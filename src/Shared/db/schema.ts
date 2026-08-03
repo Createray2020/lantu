@@ -5,10 +5,16 @@ import {
 } from 'drizzle-orm/pg-core';
 
 // 教練（對應 Clerk user id）
+// role: coach（一般教練）/ admin（管理員，可進後台）
+// status: pending（待審核）/ active（已開通）/ suspended（停權）
 export const coaches = pgTable('coaches', {
   id: text('id').primaryKey(), // Clerk userId
   email: text('email'),
   name: text('name'),
+  role: text('role').default('coach').notNull(),
+  status: text('status').default('pending').notNull(),
+  note: text('note'),           // 備註（聯絡方式／收款狀態等，後台用）
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

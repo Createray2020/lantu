@@ -1,11 +1,17 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { ensureCoach } from "@/lib/coach";
 import PlannerFrame from "./PlannerFrame";
+import PendingNotice from "./PendingNotice";
 
-// 登入後即進入完整嵐途 App（v12 HTML 原型，嵌於受保護頁面）。
-// 底層將於 P1+ 逐步改為 React + Neon；此頁確保「與現有 HTML 一模一樣」。
+// 登入後：確認教練帳號與狀態。
+// - 未登入 → 導回登入。
+// - 未開通／停權 → 顯示待開通頁（進不了 App）。
+// - 已開通 → 進入完整嵐途 App。
 export default async function Dashboard() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  return <PlannerFrame />;
+  const coach = await ensureCoach();
+  if (!coach) redirect("/sign-in");
+  if (coach.status !== "active") {
+    return <PendingNotice email={coach.email} status={coach.status} />;
+  }
+  return <PlannerFrame isAdmin={coach.role === "admin"} />;
 }

@@ -8,6 +8,13 @@
       "when": 1785760663438,
       "tag": "0000_rich_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785765965585,
+      "tag": "0001_slippery_beyonder",
+      "breakpoints": true
     }
   ]
 }
