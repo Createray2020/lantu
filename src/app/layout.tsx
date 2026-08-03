@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_TC, Noto_Serif_TC } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import VersionWatcher from "./VersionWatcher";
 import "./globals.css";
 
 const sans = Noto_Sans_TC({
@@ -29,7 +30,10 @@ export default function RootLayout({
         lang="zh-Hant"
         className={`${sans.variable} ${serif.variable} h-full antialiased`}
       >
-        <body className="min-h-full flex flex-col">{children}</body>
+        <body className="min-h-full flex flex-col">
+          <VersionWatcher />
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   );
