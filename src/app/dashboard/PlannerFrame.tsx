@@ -8,7 +8,7 @@ export default function PlannerFrame({ isAdmin = false }: { isAdmin?: boolean })
   return (
     <div className="fixed inset-0 flex flex-col bg-[#081a2b]">
       <div
-        className="absolute top-2 right-3 z-50 flex items-center gap-2"
+        className="absolute top-2.5 right-3 z-50 flex items-center gap-3"
         style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,.4))" }}
       >
         {isAdmin && (
