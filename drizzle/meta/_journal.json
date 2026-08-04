@@ -15,6 +15,13 @@
       "when": 1785765965585,
       "tag": "0001_slippery_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785863918256,
+      "tag": "0002_chief_strong_guy",
+      "breakpoints": true
     }
   ]
 }

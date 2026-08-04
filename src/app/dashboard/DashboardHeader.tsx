@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 
-// 客戶管理各頁共用頂欄：品牌 + 客戶/儀表板切換 + 後台 + Clerk 頭貼。
+// 各頁共用頂欄：品牌 + 首頁/客戶/儀表板切換 + 後台 + Clerk 頭貼。
 export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
-  const onClients = pathname === "/dashboard" || pathname.startsWith("/dashboard/clients");
+  const onHome = pathname === "/dashboard";
+  const onClients = pathname.startsWith("/dashboard/clients");
   const onOverview = pathname.startsWith("/dashboard/overview");
 
   const tab = (active: boolean) =>
@@ -25,7 +26,8 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
         <span className="font-serif tracking-[0.14em] text-[#eef2f7] text-lg">嵐途</span>
       </Link>
       <nav className="flex items-center gap-1">
-        <Link href="/dashboard" className={tab(onClients)}>客戶</Link>
+        <Link href="/dashboard" className={tab(onHome)}>首頁</Link>
+        <Link href="/dashboard/clients" className={tab(onClients)}>客戶</Link>
         <Link href="/dashboard/overview" className={tab(onOverview)}>儀表板</Link>
       </nav>
       <div className="flex-1" />

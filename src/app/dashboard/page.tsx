@@ -1,27 +1,43 @@
 import { redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
-import { listClientsForCoach } from "@/lib/clients";
+import { getHome } from "@/lib/home";
 import DashboardHeader from "./DashboardHeader";
 import PendingNotice from "./PendingNotice";
-import ClientList from "./ClientList";
+import HomeSwitcher from "./HomeSwitcher";
+import Home from "./HomeView";
 
 export const dynamic = "force-dynamic";
 
-// 登入後主畫面：客戶列表（三層架構最上層）。
+// 登入後著陸首頁：依組織職級（顧問／主管／老闆）呈現對應視角。
 // - 未登入 → 導回登入。
 // - 未開通／停權 → 待開通頁。
-// - 已開通 → 客戶列表。
-export default async function Dashboard() {
+// - 已開通 → 角色首頁（owner/manager 可用切換器預覽其他視角）。
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ as?: string; focus?: string }>;
+}) {
   const coach = await ensureCoach();
   if (!coach) redirect("/sign-in");
   if (coach.status !== "active") {
     return <PendingNotice email={coach.email} status={coach.status} />;
   }
-  const clients = await listClientsForCoach(coach.id);
+  const sp = await searchParams;
+  const data = await getHome(coach, { as: sp.as, focus: sp.focus });
+
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
       <DashboardHeader isAdmin={coach.role === "admin"} />
-      <ClientList clients={clients} />
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-6">
+        <HomeSwitcher
+          rank={data.rank}
+          views={data.views}
+          focusId={data.focusId}
+          teamOptions={data.teamOptions}
+          memberOptions={data.memberOptions}
+        />
+        <Home data={data} />
+      </div>
     </div>
   );
 }

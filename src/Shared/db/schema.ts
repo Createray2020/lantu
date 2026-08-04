@@ -2,17 +2,25 @@
 // 三層：coaches → clients → plans(年度版本) / reviews(諮詢，掛客戶層) → action_items
 import {
   pgTable, text, integer, bigint, boolean, jsonb, timestamp, uuid, date,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 // 教練（對應 Clerk user id）
 // role: coach（一般教練）/ admin（管理員，可進後台）
 // status: pending（待審核）/ active（已開通）/ suspended（停權）
+// orgRank（組織職級，決定首頁視角與可見範圍）：
+//   member（顧問，只看自己）/ manager（主管，看下線子樹）/ owner（老闆，看全組織）
+// uplineId：上線教練（自參照），組織樹的父節點；null＝頂點。
 export const coaches = pgTable('coaches', {
   id: text('id').primaryKey(), // Clerk userId
   email: text('email'),
   name: text('name'),
   role: text('role').default('coach').notNull(),
   status: text('status').default('pending').notNull(),
+  orgRank: text('org_rank').default('member').notNull(),
+  uplineId: text('upline_id').references((): AnyPgColumn => coaches.id, { onDelete: 'set null' }),
+  title: text('title'),           // 職稱顯示（資深財務顧問／處經理／執行長…）
+  joinDate: date('join_date'),
   note: text('note'),           // 備註（聯絡方式／收款狀態等，後台用）
   approvedAt: timestamp('approved_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -79,6 +87,58 @@ export const attachments = pgTable('attachments', {
   clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
   kind: text('kind'),
   filePath: text('file_path').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ────────────────────────────────────────────────────────────
+// 組織後台：業績／活動量／增員／公告（可編輯的模擬資料先進來）
+// 業績資料來源尚未拍板（手動錄入／上傳／串接），故先以本表承載、可手動編修。
+// ────────────────────────────────────────────────────────────
+
+// 成員月度指標（每位教練每月一筆）：收益、成交案、活動量、目標、留存率。
+export const memberMetrics = pgTable('member_metrics', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  period: text('period').notNull(),                 // 'YYYY-MM'
+  income: bigint('income', { mode: 'number' }).default(0).notNull(),        // 本月收益（服務收入）
+  incomeGoal: bigint('income_goal', { mode: 'number' }).default(0).notNull(),
+  deals: integer('deals').default(0).notNull(),      // 成交案件數
+  dealsGoal: integer('deals_goal').default(0).notNull(),
+  newClients: integer('new_clients').default(0).notNull(),
+  visits: integer('visits').default(0).notNull(),    // 活動量：拜訪
+  calls: integer('calls').default(0).notNull(),      // 電話
+  proposals: integer('proposals').default(0).notNull(), // 提案
+  closes: integer('closes').default(0).notNull(),    // 成交
+  activityGoal: integer('activity_goal').default(0).notNull(),
+  retentionRate: integer('retention_rate').default(0).notNull(), // 客戶留存率 %
+  ceHours: integer('ce_hours').default(0).notNull(),        // 進修時數（已完成）
+  ceHoursGoal: integer('ce_hours_goal').default(12).notNull(),
+  licenseNote: text('license_note'),                        // 證照展延提醒（如 CFP 2026/11）
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 增員 pipeline（每位增員負責人底下的準增員名單與階段）。
+// stage: prospect（準增員）/ contact（接觸）/ interview（面談）/ offer（錄取）/ onboard（到職）
+export const recruits = pgTable('recruits', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  ownerCoachId: text('owner_coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  candidateName: text('candidate_name').notNull(),
+  source: text('source'),
+  stage: text('stage').default('prospect').notNull(),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 公告（全組織共用）。category: important（重要）/ activity（活動）/ general（一般）
+export const announcements = pgTable('announcements', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  category: text('category').default('general').notNull(),
+  title: text('title').notNull(),
+  body: text('body'),
+  pinned: boolean('pinned').default(false).notNull(),
+  author: text('author'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

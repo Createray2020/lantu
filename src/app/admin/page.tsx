@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin, listCoaches } from "@/lib/coach";
-import { approveCoach, suspendCoach, resetCoach } from "./actions";
+import { approveCoach, suspendCoach, resetCoach, updateOrg } from "./actions";
+
+const RANK_LABEL: Record<string, string> = { member: "顧問", manager: "主管", owner: "老闆" };
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,7 @@ export default async function Admin() {
                 <th className="px-3 py-2 font-semibold">姓名 / Email</th>
                 <th className="px-3 py-2 font-semibold">角色</th>
                 <th className="px-3 py-2 font-semibold">狀態</th>
+                <th className="px-3 py-2 font-semibold">組織（職級 / 上線）</th>
                 <th className="px-3 py-2 font-semibold">申請日</th>
                 <th className="px-3 py-2 font-semibold">開通日</th>
                 <th className="px-3 py-2 font-semibold text-right">動作</th>
@@ -80,6 +83,18 @@ export default async function Admin() {
                       >
                         {s.label}
                       </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <form action={updateOrg.bind(null, c.id)} className="flex items-center gap-1">
+                        <select name="orgRank" defaultValue={c.orgRank} className="bg-[#0d2b45] border border-white/10 rounded px-1.5 py-1 text-xs text-[#eef2f7]">
+                          {Object.entries(RANK_LABEL).map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
+                        </select>
+                        <select name="uplineId" defaultValue={c.uplineId ?? ""} className="bg-[#0d2b45] border border-white/10 rounded px-1.5 py-1 text-xs text-[#eef2f7] max-w-[120px]">
+                          <option value="">（無上線）</option>
+                          {coaches.filter((o) => o.id !== c.id).map((o) => (<option key={o.id} value={o.id}>{o.name || o.email}</option>))}
+                        </select>
+                        <button className="rounded bg-[#12334f] border border-white/15 text-[#a9bccf] px-2 py-1 text-xs hover:bg-[#17406a]">存</button>
+                      </form>
                     </td>
                     <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.createdAt)}</td>
                     <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.approvedAt)}</td>
@@ -117,7 +132,7 @@ export default async function Admin() {
               })}
               {coaches.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-[#6f869c]">
+                  <td colSpan={7} className="px-3 py-8 text-center text-[#6f869c]">
                     尚無教練註冊。
                   </td>
                 </tr>

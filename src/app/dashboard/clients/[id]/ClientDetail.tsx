@@ -86,7 +86,7 @@ export default function ClientDetail({
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
       <div className="flex items-center gap-2 text-sm text-[#6b7d8f] mb-3">
-        <Link href="/dashboard" className="hover:text-[#a9bccf]">客戶</Link>
+        <Link href="/dashboard/clients" className="hover:text-[#a9bccf]">客戶</Link>
         <span>/</span>
         <span className="text-[#a9bccf]">{client.name}</span>
       </div>

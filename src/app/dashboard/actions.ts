@@ -18,6 +18,7 @@ export async function createClientAction(input: Clients.ClientInput): Promise<st
   const cid = await coachId();
   const id = await Clients.createClient(cid, input);
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/clients");
   revalidatePath("/dashboard/overview");
   return id;
 }
@@ -26,6 +27,7 @@ export async function updateClientAction(clientId: string, patch: Partial<Client
   const cid = await coachId();
   await Clients.updateClient(cid, clientId, patch);
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/clients");
   revalidatePath(`/dashboard/clients/${clientId}`);
 }
 
@@ -33,6 +35,7 @@ export async function archiveClientAction(clientId: string): Promise<void> {
   const cid = await coachId();
   await Clients.setClientStatus(cid, clientId, "archived");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/clients");
   revalidatePath(`/dashboard/clients/${clientId}`);
 }
 
@@ -74,6 +77,7 @@ export async function createReviewAction(clientId: string, input: Reviews.Review
   await Reviews.createReview(cid, clientId, input);
   revalidatePath(`/dashboard/clients/${clientId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/clients");
   revalidatePath("/dashboard/overview");
 }
 

@@ -1,11 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ensureCoach, isAdmin, setCoachStatus } from "@/lib/coach";
+import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg } from "@/lib/coach";
 
 async function guard() {
   const me = await ensureCoach();
   if (!(await isAdmin(me))) throw new Error("forbidden");
+}
+
+// 設定組織樹：職級（member/manager/owner）＋上線。
+export async function updateOrg(id: string, formData: FormData) {
+  await guard();
+  const orgRank = String(formData.get("orgRank") || "member");
+  const upline = String(formData.get("uplineId") || "");
+  await setCoachOrg(id, orgRank, upline && upline !== id ? upline : null);
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
 }
 
 export async function approveCoach(id: string) {

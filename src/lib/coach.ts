@@ -68,3 +68,8 @@ export async function setCoachStatus(id: string, status: "pending" | "active" | 
     .set({ status, approvedAt: status === "active" ? new Date() : null })
     .where(eq(coaches.id, id));
 }
+
+// 設定組織職級與上線（後台維護組織樹）。
+export async function setCoachOrg(id: string, orgRank: string, uplineId: string | null) {
+  await db.update(coaches).set({ orgRank, uplineId }).where(eq(coaches.id, id));
+}
