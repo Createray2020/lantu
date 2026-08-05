@@ -112,7 +112,8 @@ function uid(){return 'c'+Math.floor(performance.now()*1000%1e9)+app.cases.lengt
 
 function sampleCase(){return {
  id:uid(),
- profile:{name:'王大明(示範)',gender:'男',age:40,retireAge:65,lifeExp:85,credit:80},
+ profile:{name:'王大明(示範)',gender:'男',age:40,retireAge:65,lifeExp:85,credit:80,jobType:'一般就業者',monthlySalary:100000},
+ company:defaultCompany(),
  params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,freeSaving:1,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
  tracking:[{year:2024,age:40,net:9500000},{year:2025,age:41,net:9950000}],
  riskQuiz:{ans:{0:1,1:2,2:2,3:2,4:1,5:2,6:2,7:2,8:2,9:2,10:2,11:2}},
@@ -180,7 +181,18 @@ function sampleCase(){return {
  ]}
 };}
 function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
- c.intent={purposes:[],targets:[],mustHave:[]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};return c}
+ c.intent={purposes:[],targets:[],mustHave:[]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.jobType='一般就業者';c.profile.monthlySalary=0;c.company=defaultCompany();return c}
+
+// ===== 工作類別 / 投保級距 =====
+// 2026(115年) 勞工保險投保薪資分級表：實際月薪 → 對應月投保薪資（第1級 29,500；天花板第11級 45,800，115.01.01 生效）。
+var LABOR_INS_GRADES=[29500,30300,31800,33300,34800,36300,38200,40100,42000,43900,45800];
+function laborInsSalary(monthly){monthly=n(monthly);if(monthly<=0)return 0;for(var i=0;i<LABOR_INS_GRADES.length;i++){if(monthly<=LABOR_INS_GRADES[i])return LABOR_INS_GRADES[i]}return LABOR_INS_GRADES[LABOR_INS_GRADES.length-1];}
+function jobInsType(jobType){return jobType==='業務工作者'?'職業工會':'勞保';}
+function defaultCompany(){return {name:'',taxId:'',industry:'',role:'負責人',sharePct:100,annualRevenue:0,netProfit:0,ownerLoan:0,note:''};}
+function ensureJobFields(c){if(!c.profile)c.profile={};if(!c.profile.jobType)c.profile.jobType='一般就業者';if(c.profile.monthlySalary==null)c.profile.monthlySalary='';if(!c.company)c.company=defaultCompany();return c;}
+function primaryMember(c){return (c.members||[]).filter(function(m){return m.role==='本人'})[0]||(c.members||[])[0];}
+// 就業者/業務：以月薪帶入「本人」成員的投保類型與月投保薪資（企業主投保自行維持）。
+function applyInsFromSalary(c){if(c.profile.jobType==='企業主')return;var pm=primaryMember(c);if(!pm)return;pm.insSalary=laborInsSalary(c.profile.monthlySalary);pm.insType=jobInsType(c.profile.jobType);}
 
 function save(){try{localStorage.setItem('fps_data_v2',JSON.stringify(app.cases))}catch(e){}}
 function load(){try{var d=localStorage.getItem('fps_data_v2');if(d)app.cases=JSON.parse(d)}catch(e){}
@@ -509,6 +521,9 @@ function setRetire(k,v,type){var c=activeCase();c.retire[k]=(type==='num')?n(v):
 function setTax(k,v,type){var c=activeCase();c.taxParams=c.taxParams||{};c.taxParams[k]=(type==='num')?n(v):(type==='bool'?v:v);save();render();}
 function setPlan(k,v,type){var c=activeCase();c.plan=c.plan||{};c.plan[k]=(type==='num')?n(v):v;save();render();}
 function setCase(k,v){var c=activeCase();c[k]=v;save();render();}
+function setJobType(v){var c=activeCase();ensureJobFields(c);c.profile.jobType=v;if(v!=='企業主')applyInsFromSalary(c);save();render();}
+function setMonthlySalary(v){var c=activeCase();ensureJobFields(c);c.profile.monthlySalary=n(v);applyInsFromSalary(c);save();render();}
+function setCompany(k,v,type){var c=activeCase();ensureJobFields(c);c.company[k]=(type==='num')?n(v):v;save();if(app.role==='client')render();}
 function setTool(g,k,v){app.tools[g][k]=n(v);render();}
 function addRow(arr){var c=activeCase();var A=c.profile.age;var tpl={
  members:{name:'',role:'子女',gender:'男',age:0,worked:0,insType:'健保眷屬',insSalary:0,depRatio:0,expRatio:0,indepAge:26},
@@ -574,6 +589,23 @@ function dataPane(c){
  else body=trackingSec(c);
  return '<div class="tabbar" style="margin-bottom:14px">'+tb+'</div>'+body;
 }
+function jobSec(c){ensureJobFields(c);var p=c.profile,jt=p.jobType;
+ var sel='<div class="f"><label>工作類別</label><select onchange="setJobType(this.value)">'+
+  ['一般就業者','業務工作者','企業主'].map(function(o){return '<option '+(jt===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
+ var body='';
+ if(jt==='企業主'){var co=c.company||{};
+  function cf(k,label,type){return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(co[k]==null?'':co[k])+'" oninput="setCompany(\''+k+'\',this.value,\''+(type||'text')+'\')"></div>';}
+  body='<div class="hint" style="margin:2px 0 8px">企業主的財務常與公司連動，先留存公司基本與概略財務資料；完整公司財報（資產負債／損益）之後由專屬介面處理。</div>'+
+   '<div class="fgrid">'+cf('name','公司名稱')+cf('taxId','統一編號')+cf('industry','行業別')+
+   cf('role','擔任角色')+cf('sharePct','持股比例%','num')+cf('annualRevenue','年營收(概略)','num')+
+   cf('netProfit','年淨利(概略)','num')+cf('ownerLoan','負責人往來(股東往來/借貸)','num')+cf('note','備註')+'</div>'+
+   '<div style="margin-top:10px"><button class="add" style="opacity:.55;cursor:not-allowed" disabled title="規劃中，後續由專屬介面接手">＋ 完整公司財務（規劃中）</button></div>';
+ }else{var ins=laborInsSalary(p.monthlySalary),it=jobInsType(jt);
+  body='<div class="fgrid"><div class="f"><label>月薪(投保計算用)</label><input type="number" value="'+esc(p.monthlySalary==null?'':p.monthlySalary)+'" onchange="setMonthlySalary(this.value)"></div></div>'+
+   '<div class="hint" style="margin-top:6px">依 2026 勞保投保薪資分級表自動帶入：投保類型 <b>'+it+'</b>、月投保薪資 <b>'+fmt(ins)+'</b>（級距天花板 45,800，已回填下方「本人」成員，仍可手動微調）。'+(jt==='業務工作者'?' 業務工作者收入常浮動、多以職業工會投保。':'')+'</div>';
+ }
+ return '<div class="sec"><h4>工作類別</h4><div class="fgrid">'+sel+'</div>'+body+'</div>';
+}
 function familySec(c){var p=c.profile,pa=c.params;
  function fld(obj,g,k,label,type){if(type&&type.indexOf('sel:')===0){var opts=type.slice(4).split(',').map(function(o){return '<option '+(obj[k]===o?'selected':'')+'>'+o+'</option>'}).join('');
    return '<div class="f"><label>'+label+'</label><select onchange="setMeta(\''+g+'\',\''+k+'\',this.value)">'+opts+'</select></div>'}
@@ -581,6 +613,7 @@ function familySec(c){var p=c.profile,pa=c.params;
  return '<div class="sec"><h4>基本資料</h4><div class="fgrid">'+
   fld(p,'profile','name','客戶姓名')+fld(p,'profile','gender','性別','sel:男,女')+fld(p,'profile','age','目前年齡','num')+
   fld(p,'profile','retireAge','預計退休年齡','num')+fld(p,'profile','lifeExp','預估壽命','num')+fld(p,'profile','credit','信用評分(0-100)','num')+'</div></div>'+
+  jobSec(c)+
   '<div class="sec"><h4>規劃參數</h4><div class="fgrid">'+
   fld(pa,'params','inflation','通膨率%','num')+fld(pa,'params','salaryGrowth','薪資成長率%','num')+fld(pa,'params','invReturn','投資報酬率%','num')+
   fld(pa,'params','tuitionGrowth','學費上漲率%','num')+fld(pa,'params','freeSaving','自由儲蓄%','num')+fld(pa,'params','planSaving','計劃儲蓄%','num')+
@@ -588,7 +621,7 @@ function familySec(c){var p=c.profile,pa=c.params;
   fld(pa,'params','invReturnStd','報酬標準差%','num')+fld(pa,'params','inflationStd','通膨標準差%','num')+fld(pa,'params','salaryStd','薪資標準差%','num')+'</div></div>';
 }
 function membersSec(c){
- return tableSec('家庭成員','members',c.members,[['name','姓名','text'],['role','稱謂','sel:本人,配偶,父,母,子女,長輩,其他'],['gender','性別','sel:男,女'],['age','年齡','num'],['worked','已工作年數','num'],['insType','投保類型','sel:勞保,公保,健保眷屬,無'],['insSalary','月投保薪資','num'],['depRatio','家計負擔%','num'],['expRatio','支出比例%','num'],['indepAge','財務獨立歲','num']]);
+ return tableSec('家庭成員','members',c.members,[['name','姓名','text'],['role','稱謂','sel:本人,配偶,父,母,子女,長輩,其他'],['gender','性別','sel:男,女'],['age','年齡','num'],['worked','已工作年數','num'],['insType','投保類型','sel:勞保,職業工會,公保,健保眷屬,無'],['insSalary','月投保薪資','num'],['depRatio','家計負擔%','num'],['expRatio','支出比例%','num'],['indepAge','財務獨立歲','num']]);
 }
 function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
  var pf=[['monthLiving','期望退休月生活費(現值)','num'],['retireReturn','退休後報酬率%','num'],['retireInflation','退休後通膨%','num']]
@@ -1006,7 +1039,10 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:1;min-width:230px">'+rBars([{label:'收支平衡',val:hp['收支平衡']},{label:'預備金',val:hp['預備金']},{label:'信用',val:hp['信用']},{label:'負債平衡',val:hp['負債平衡']},{label:'風險保全',val:hp['風險保全'],color:'#c99a5b'}])+'</div>'+
    '<div style="min-width:150px;text-align:center"><div style="color:#5a6b72;font-size:12px">評鑑等級</div><div style="font-size:46px;font-weight:800;color:'+(h.grade==='A'?'#6f8f74':h.grade==='D'?'#b05a4a':'#c99a5b')+'">'+h.grade+'</div><div style="font-size:12px;color:#33474e">'+GRADE_STRAT[h.grade]+'</div></div></div>'+
   '<table style="margin-top:12px"><tr><th>成員</th><th>稱謂</th><th>年齡</th><th>家計負擔</th></tr>'+(memRows||'<tr><td colspan=4>—</td></tr>')+'</table>'+
-  '<table style="margin-top:8px"><tr><td>此次規劃目的</td><td>'+esc(((c.intent||{}).purposes||[]).join('、')||'—')+'</td></tr><tr><td>願景優先序</td><td>'+esc(((c.intent||{}).mustHave||[]).join('、')||'—')+'</td></tr><tr><td>淨資產 / 年收入 / 年支出</td><td>'+fmt(m.net)+' ／ '+fmt(m.incTotal)+' ／ '+fmt(m.expTotal)+'</td></tr></table>'+
+  '<table style="margin-top:8px">'+
+   '<tr><td>工作類別</td><td>'+esc(p.jobType||'一般就業者')+((p.jobType==='企業主'&&(c.company||{}).name)?'（'+esc(c.company.name)+'）':'')+'</td></tr>'+
+   ((p.jobType==='企業主')?'<tr><td>公司概況</td><td>'+esc((c.company||{}).industry||'—')+' ｜ 持股 '+n((c.company||{}).sharePct)+'% ｜ 年營收 '+fmt((c.company||{}).annualRevenue)+' ｜ 年淨利 '+fmt((c.company||{}).netProfit)+((c.company||{}).ownerLoan?' ｜ 負責人往來 '+fmt(c.company.ownerLoan):'')+'</td></tr>':'')+
+   '<tr><td>此次規劃目的</td><td>'+esc(((c.intent||{}).purposes||[]).join('、')||'—')+'</td></tr><tr><td>願景優先序</td><td>'+esc(((c.intent||{}).mustHave||[]).join('、')||'—')+'</td></tr><tr><td>淨資產 / 年收入 / 年支出</td><td>'+fmt(m.net)+' ／ '+fmt(m.incTotal)+' ／ '+fmt(m.expTotal)+'</td></tr></table>'+
 
   '<h2>二、收支與資產結構</h2>'+
   '<div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">收入比重</div>'+rPie(incPie)+'</div>'+
