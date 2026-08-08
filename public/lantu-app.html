@@ -271,6 +271,8 @@ function coverageGaps(c){
   };
   Object.keys(map).forEach(function(k){
    var need=map[k],ex=existingCover(c,nd.member,k);
+   // 已備來源擴充：本人的壽險一次性需求，可由家庭流動資產支應
+   if(k==='壽險'&&nd.member===(primaryMember(c)||{}).name)ex+=liquidMovable(c);
    rows.push({member:nd.member,kind:k,need:need,have:ex,gap:need-ex});
   });
  });
@@ -455,8 +457,12 @@ function actionList(c){var adv=advice(c),axes=['A','B','C','D'];
 }
 
 /* ===== 稅賦 ===== */
+// ===== 稅制常數（每年檢視更新，單點維護）=====
+// 綜所稅級距 [淨額上限, 稅率, 累進差額]；適用 2025 年度(2026 申報)。來源：財政部綜所稅稅率級距表。逐年調整時只改此處。
 var TAX_BR=[[590000,0.05,0],[1330000,0.12,41300],[2660000,0.2,147700],[4980000,0.3,413700],[1e15,0.4,911700]];
+// 遺產稅級距 [課稅淨額上限, 稅率, 累進差額]；免稅額另見下方 estateTax()。逐年調整時只改此處。
 var EST_BR=[[56210000,0.10,0],[112420000,0.15,2810500],[1e15,0.20,8431500]];
+// 綜所稅免稅額/標準扣除/薪資特別扣除見 incomeTax()（exempt/stdDed/salarySpecial）；遺產稅免稅額見 estateTax()（13,330,000）。同屬每年檢視項。
 function bracket(x,br){for(var i=0;i<br.length;i++){if(x<=br[i][0])return {rate:br[i][1],ded:br[i][2],tax:Math.max(0,x*br[i][1]-br[i][2])}}return{rate:0,ded:0,tax:0}}
 function incomeTax(c){
  var tp=c.taxParams||{};
@@ -524,14 +530,18 @@ function setCase(k,v){var c=activeCase();c[k]=v;save();render();}
 function setJobType(v){var c=activeCase();ensureJobFields(c);c.profile.jobType=v;if(v!=='企業主')applyInsFromSalary(c);save();render();}
 function setMonthlySalary(v){var c=activeCase();ensureJobFields(c);c.profile.monthlySalary=n(v);applyInsFromSalary(c);save();render();}
 function setCompany(k,v,type){var c=activeCase();ensureJobFields(c);c.company[k]=(type==='num')?n(v):v;save();if(app.role==='client')render();}
+// 月/年週期：資料一律存「年額」(引擎不變)，僅輸入層依 period 換算顯示。
+function setAmtPeriod(arr,idx,v){var c=activeCase();c[arr][idx].period=v;save();render();}
+function setAmtByPeriod(arr,idx,val){var c=activeCase();var it=c[arr][idx];var v=n(val);it.amount=(it.period==='月')?v*12:v;save();if(app.role==='client')render();}
+function shownAmt(it){return (it.period==='月')?Math.round(n(it.amount)/12):n(it.amount);}
 function setTool(g,k,v){app.tools[g][k]=n(v);render();}
 function addRow(arr){var c=activeCase();var A=c.profile.age;var tpl={
  members:{name:'',role:'子女',gender:'男',age:0,worked:0,insType:'健保眷屬',insSalary:0,depRatio:0,expRatio:0,indepAge:26},
- incomes:{owner:'',type:'工作',amount:0,growth:0,start:A,end:65},
- expenses:{name:'',cat:'生活',amount:0,infl:true,start:A,end:85,cut:0},
+ incomes:{owner:(c.members[0]||{}).name||'',type:'工作',subType:'薪資',period:'年',amount:0,growth:0,start:A,end:65},
+ expenses:{name:'',cat:'生活',period:'年',amount:0,infl:true,start:A,end:85,cut:0},
  assets:{name:'',owner:(c.members[0]||{}).name||'',mainCat:'可投資資產',type:'現金',cls:'流動',region:'台灣',currency:'台幣',fxRate:1,cost:0,value:0,ret:0,income:0,movable:true},
  liabilities:{name:'',owner:(c.members[0]||{}).name||'',mainCat:'房貸',currency:'台幣',fxRate:1,balance:0,rate:0,repay:'本息攤還',pay:0,months:0,grace:0,startAge:n(c.profile.age)},
- education:{child:'',stage:'大學',annual:0,years:4,startIn:0},
+ education:{child:(c.members.find(function(m){return m.role==='子女'})||{}).name||'',stage:'大學',schoolType:'公立',annual:0,years:4,startIn:0},
  goals:{name:'',type:'其他',present:0,start:A,end:A,freq:0,growth:'通膨',imp:3,prepared:0,loanRatio:0,appreciation:0},
  needs:{member:(c.members[0]||{}).name||'',funeral:600000,protectYears:5,estateTax:0,room:2000,selfPay:1500,nursing:1500,firstCancer:300000,cancerHosp:2000,critical:2000000,monthCare:30000,careMonths:120},
  coverages:{member:(c.members[0]||{}).name||'',kind:'壽險',comm:0,social:0},
@@ -566,12 +576,12 @@ function coachView(){var c=activeCase();
  return '<div class="shell"><div class="side">'+side+'</div><div class="main"><div class="tabbar">'+tb+'</div>'+body+'</div></div>';
 }
 function dataPane(c){
- var dt=[['family','家庭 / 參數'],['intent','意圖 / 生涯'],['risk','風險屬性'],['incomes','收入'],['expenses','支出'],['assets','資產'],['liabilities','負債'],['retire','退休'],['education','子女教育'],['goals','目標/置產'],['lifestyle','生活願望'],['needs','保障需求'],['coverages','需求/已有(簡)'],['policies','現有保單'],['credit','信用/海外'],['tax','稅賦'],['plan','調整方案'],['tracking','真實追蹤']];
+ var dt=[['family','家庭 / 參數'],['intent','意圖 / 生涯'],['risk','風險屬性'],['incomes','收入'],['expenses','支出'],['assets','資產'],['liabilities','負債'],['retire','退休'],['education','子女教育'],['goals','目標/置產'],['lifestyle','生活願望'],['needs','保障需求'],['coverages','需求/已備(簡)'],['policies','現有保單'],['credit','信用/海外'],['tax','稅賦'],['plan','調整方案'],['tracking','真實追蹤']];
  var tb=dt.map(function(t){return '<button data-dtab="'+t[0]+'" class="'+(app.dataTab===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('');
  var body;
  if(app.dataTab==='family')body=familySec(c)+membersSec(c);
- else if(app.dataTab==='incomes')body=tableSec('收入','incomes',c.incomes,[['owner','持有人','text'],['type','類別','sel:工作,理財,其他'],['amount','金額(年)','num'],['growth','成長率%','num'],['start','起始歲','num'],['end','結束歲','num']]);
- else if(app.dataTab==='expenses')body=tableSec('支出','expenses',c.expenses,[['name','項目','text'],['cat','分類','sel:生活,消費,稅賦,孝親,保險,其他'],['amount','金額(年)','num'],['infl','通膨','bool'],['start','起始歲','num'],['end','結束歲','num'],['cut','可刪減%','num']]);
+ else if(app.dataTab==='incomes')body=incomesSec(c);
+ else if(app.dataTab==='expenses')body=expensesSec(c);
  else if(app.dataTab==='assets')body=assetsSec(c);
  else if(app.dataTab==='liabilities')body=liabilitiesSec(c);
  else if(app.dataTab==='retire')body=retireSec(c);
@@ -579,7 +589,7 @@ function dataPane(c){
  else if(app.dataTab==='goals')body=tableSec('目標 / 置產 / 願望','goals',c.goals,[['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,孝親,旅遊,休閒,奢侈品,傳承,其他'],['present','金額(理想)','num'],['minPresent','金額(最低)','num'],['start','起始歲','num'],['end','結束歲','num'],['freq','頻率(年,0=一次)','num'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度1-5','num'],['prepared','已備','num']]);
  else if(app.dataTab==='lifestyle')body=lifestyleSec(c);
  else if(app.dataTab==='needs')body=tableSec('保障需求參數(反推)','needs',c.needs,[['member','被保人','memsel'],['funeral','生命禮儀費','num'],['protectYears','保障年數','num'],['estateTax','遺產稅','num'],['room','病房日額','num'],['selfPay','自付日額','num'],['nursing','看護日額','num'],['firstCancer','初次罹癌','num'],['cancerHosp','癌症住院日額','num'],['critical','重病給付','num'],['monthCare','每月照護','num'],['careMonths','照護月數','num']]);
- else if(app.dataTab==='coverages')body='<div class="sec"><h4 style="color:var(--mut)">簡易保障輸入 <span class="hint">若已於「現有保單」逐張登錄，此處通常留空；系統會自動彙總</span></h4></div>'+tableSec('已有保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外險,住院醫療,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已有商業','num'],['social','已有社會','num']]);
+ else if(app.dataTab==='coverages')body='<div class="sec"><h4 style="color:var(--mut)">簡易保障輸入 <span class="hint">若已於「現有保單」逐張登錄，此處通常留空；系統會自動彙總。員工團體保險也可登錄於此（計入已備）。</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外險,住院醫療,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','num'],['social','已備社會','num']]);
  else if(app.dataTab==='policies')body=policiesSec(c);
  else if(app.dataTab==='tax')body=taxSec(c);
  else if(app.dataTab==='plan')body=planSec(c);
@@ -623,6 +633,54 @@ function familySec(c){var p=c.profile,pa=c.params;
 function membersSec(c){
  return tableSec('家庭成員','members',c.members,[['name','姓名','text'],['role','稱謂','sel:本人,配偶,父,母,子女,長輩,其他'],['gender','性別','sel:男,女'],['age','年齡','num'],['worked','已工作年數','num'],['insType','投保類型','sel:勞保,職業工會,公保,健保眷屬,無'],['insSalary','月投保薪資','num'],['depRatio','家計負擔%','num'],['expRatio','支出比例%','num'],['indepAge','財務獨立歲','num']]);
 }
+var INC_SUB=['薪資','執行業務所得','年終獎金','三節獎金','績效/季獎金','兼職','加班費','租金收入','股利/利息','其他'];
+function incomesSec(c){
+ var incs=c.incomes||[];
+ var head='<tr><th>持有人</th><th>類別</th><th>子類別</th><th>週期</th><th>金額</th><th>年化</th><th>成長%</th><th>起</th><th>訖</th><th></th></tr>';
+ var order=[];incs.forEach(function(x){var o=x.owner||'(未指定)';if(order.indexOf(o)<0)order.push(o)});
+ var body=order.map(function(o){
+  var sub=0;
+  var rows=incs.map(function(x,idx){return [x,idx]}).filter(function(pp){return (pp[0].owner||'(未指定)')===o}).map(function(pp){
+   var x=pp[0],idx=pp[1];sub+=n(x.amount);var per=x.period||'年';
+   var tSel=['工作','理財','其他'].map(function(t){return '<option '+((x.type||'工作')===t?'selected':'')+'>'+t+'</option>'}).join('');
+   var sSel='<option value="" '+(!x.subType?'selected':'')+'></option>'+INC_SUB.map(function(s){return '<option '+((x.subType||'')===s?'selected':'')+'>'+s+'</option>'}).join('');
+   var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
+   return '<tr>'+
+    '<td><input value="'+esc(x.owner)+'" onchange="set(\'incomes:'+idx+'\',\'owner\',this.value)"></td>'+
+    '<td><select onchange="set(\'incomes:'+idx+'\',\'type\',this.value)">'+tSel+'</select></td>'+
+    '<td><select onchange="set(\'incomes:'+idx+'\',\'subType\',this.value)">'+sSel+'</select></td>'+
+    '<td><select onchange="setAmtPeriod(\'incomes\','+idx+',this.value)">'+pSel+'</select></td>'+
+    '<td><input type="number" value="'+shownAmt(x)+'" onchange="setAmtByPeriod(\'incomes\','+idx+',this.value)"></td>'+
+    '<td class="muted">'+fmt(n(x.amount))+'</td>'+
+    '<td><input type="number" value="'+esc(x.growth)+'" onchange="set(\'incomes:'+idx+'\',\'growth\',this.value,\'num\')"></td>'+
+    '<td><input type="number" value="'+esc(x.start)+'" onchange="set(\'incomes:'+idx+'\',\'start\',this.value,\'num\')"></td>'+
+    '<td><input type="number" value="'+esc(x.end)+'" onchange="set(\'incomes:'+idx+'\',\'end\',this.value,\'num\')"></td>'+
+    '<td><button class="del" onclick="delRow(\'incomes\','+idx+')">✕</button></td></tr>';
+  }).join('');
+  return '<tr><td colspan="10" style="background:#0a1a20;color:var(--amber2);font-weight:700">'+esc(o)+' <span class="muted" style="font-weight:400">· 年化小計 '+fmt(sub)+'</span></td></tr>'+rows;
+ }).join('');
+ return '<div class="sec"><h4>收入 <button class="add" onclick="addRow(\'incomes\')">＋ 新增</button></h4><table>'+head+(body||'<tr><td colspan="10" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table><div class="hint">依持有人自動分組並顯示年化小計；金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。子類別僅供分類與報告，不影響稅務大類（工作/理財/其他）。</div></div>';
+}
+function expensesSec(c){
+ var head='<tr><th>項目</th><th>分類</th><th>週期</th><th>金額</th><th>年化</th><th>通膨</th><th>起</th><th>訖</th><th>可刪減%</th><th></th></tr>';
+ var CATS=['生活','消費','稅賦','孝親','保險','其他'];
+ var rows=(c.expenses||[]).map(function(x,idx){var per=x.period||'年';
+   var cSel=CATS.map(function(ct){return '<option '+((x.cat||'生活')===ct?'selected':'')+'>'+ct+'</option>'}).join('');
+   var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
+   return '<tr>'+
+    '<td><input value="'+esc(x.name)+'" onchange="set(\'expenses:'+idx+'\',\'name\',this.value)"></td>'+
+    '<td><select onchange="set(\'expenses:'+idx+'\',\'cat\',this.value)">'+cSel+'</select></td>'+
+    '<td><select onchange="setAmtPeriod(\'expenses\','+idx+',this.value)">'+pSel+'</select></td>'+
+    '<td><input type="number" value="'+shownAmt(x)+'" onchange="setAmtByPeriod(\'expenses\','+idx+',this.value)"></td>'+
+    '<td class="muted">'+fmt(n(x.amount))+'</td>'+
+    '<td><input type="checkbox" '+(x.infl?'checked':'')+' onchange="set(\'expenses:'+idx+'\',\'infl\',this.checked,\'bool\')"></td>'+
+    '<td><input type="number" value="'+esc(x.start)+'" onchange="set(\'expenses:'+idx+'\',\'start\',this.value,\'num\')"></td>'+
+    '<td><input type="number" value="'+esc(x.end)+'" onchange="set(\'expenses:'+idx+'\',\'end\',this.value,\'num\')"></td>'+
+    '<td><input type="number" value="'+esc(x.cut)+'" onchange="set(\'expenses:'+idx+'\',\'cut\',this.value,\'num\')"></td>'+
+    '<td><button class="del" onclick="delRow(\'expenses\','+idx+')">✕</button></td></tr>';
+ }).join('');
+ return '<div class="sec"><h4>支出 <button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></h4><table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table><div class="hint">金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。</div></div>';
+}
 function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
  var pf=[['monthLiving','期望退休月生活費(現值)','num'],['retireReturn','退休後報酬率%','num'],['retireInflation','退休後通膨%','num']]
   .map(function(x){return '<div class="f"><label>'+x[1]+'</label><input type="number" value="'+esc(r[x[0]])+'" onchange="setRetire(\''+x[0]+'\',this.value,\'num\');render()"></div>'}).join('');
@@ -635,8 +693,9 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
   '<div class="b"><div class="l" style="color:var(--warn)">退休缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div></div>'+prep;
 }
 function eduSec(c){var tot=eduTotal(c);
- var tbl=tableSec('子女教育金','education',c.education,[['child','子女','text'],['stage','階段','sel:'+EDU_STAGES.join(',')],['annual','年費用(現值)','num'],['years','供給年數','num'],['startIn','幾年後開始','num']]);
+ var tbl=tableSec('子女教育金','education',c.education,[['child','子女','memsel'],['stage','階段','sel:'+EDU_STAGES.join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','num'],['years','供給年數','num'],['startIn','幾年後開始','num']]);
  return '<div class="sec"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
+  '<div class="hint" style="margin:2px 0 8px">子女欄請從家庭成員選取；學別（公立/私立/海外）供分類與報告參考，年費用請依實況填寫（大學參考：公立約 6–10 萬、私立約 10–13 萬、海外差異大）。</div>'+
   '<div class="big3"><div class="b"><div class="l">教育金總需求(終值)</div><div class="v" style="color:var(--amber2)">'+fmt(tot)+'</div></div></div></div>'+tbl;
 }
 function taxSec(c){var t=c.taxParams||{},it=incomeTax(c),es=estateTax(c);
@@ -871,7 +930,7 @@ function analysisPane(c){
    '<div class="muted" style="flex:1;min-width:220px">策略階段：<b style="color:var(--amber2)">'+GRADE_STRAT[h.grade]+'</b></div></div><table style="margin-top:14px">'+parts+'</table></div>'+
   '<div class="sec"><h4>現況財務指標（11 項）</h4><table class="rtable">'+rt+'</table></div>'+
   '<div class="sec"><h4>退休需求</h4><div class="big3"><div class="b"><div class="l">退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div><div class="b"><div class="l">已準備</div><div class="v">'+fmt(rn.prepared)+'</div></div><div class="b"><div class="l" style="color:var(--warn)">缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div></div>'+
-  '<div class="sec"><h4>保障缺口（需求已反推計算）</h4><table class="rtable"><tr><th>被保人</th><th>險種</th><th>需求</th><th>已有</th><th>缺口</th></tr>'+(gt||'<tr><td colspan=5 class=muted>請於「保障需求」分頁新增</td></tr>')+'</table></div>'+
+  '<div class="sec"><h4>保障缺口（需求已反推計算）</h4><table class="rtable"><tr><th>被保人</th><th>險種</th><th>需求</th><th>已備</th><th>缺口</th></tr>'+(gt||'<tr><td colspan=5 class=muted>請於「保障需求」分頁新增</td></tr>')+'</table></div>'+
   (pt?'<div class="sec"><h4>置產缺口</h4><table class="rtable"><tr><th>項目</th><th>需求終值</th><th>可貸款</th><th>缺口</th></tr>'+pt+'</table></div>':'')+
   '<div class="sec"><h4>財務十字表</h4>'+crossTableHTML(ct)+'</div>'+
   '<div class="sec"><h4>財務目標歷程</h4>'+timelineSVG(c)+'</div>'+
