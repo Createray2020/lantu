@@ -560,7 +560,7 @@ function addRow(arr){var c=activeCase();var A=c.profile.age;var tpl={
 }[arr];
  if(arr==='prepared'){c.retire.prepared.push(JSON.parse(JSON.stringify(tpl)))}
  else if(arr==='allocations'){c.plan.allocations=c.plan.allocations||[];c.plan.allocations.push(JSON.parse(JSON.stringify(tpl)))}
- else{c[arr].push(JSON.parse(JSON.stringify(tpl)))}
+ else{c[arr]=c[arr]||[];c[arr].push(JSON.parse(JSON.stringify(tpl)))}
  save();render()}
 function delRow(arr,i){var c=activeCase();if(arr==='prepared'){c.retire.prepared.splice(i,1)}else if(arr==='allocations'){c.plan.allocations.splice(i,1)}else{c[arr].splice(i,1)}save();render()}
 
