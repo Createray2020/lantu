@@ -107,7 +107,7 @@ html.embed .shell{grid-template-columns:1fr!important}
 <script>
 var KINDS=['壽險','意外險','住院醫療','初次罹癌','癌症住院','重病給付','每月照護'];
 var EDU_STAGES=['嬰兒','幼稚園','小學','國中','高中職','大學','研究所','博士班'];
-var app={role:'coach',activeTab:'data',dataTab:'family',activeId:null,cases:[],tools:{loan:{amt:5000000,rate:2,years:20},ret:{age:40,rAge:65,life:85,month:50000,infl:1.5,rr:4}}};
+var app={role:'coach',activeTab:'data',dataTab:'family',ownerView:'全家',activeId:null,cases:[],tools:{loan:{amt:5000000,rate:2,years:20},ret:{age:40,rAge:65,life:85,month:50000,infl:1.5,rr:4}}};
 function uid(){return 'c'+Math.floor(performance.now()*1000%1e9)+app.cases.length}
 
 function sampleCase(){return {
@@ -166,6 +166,12 @@ function sampleCase(){return {
  ],
  intent:{purposes:['想增加收入','想進行投資、活化資產','有節稅需求，想進行節稅'],targets:['退休生活規劃','子女教養規劃','購屋規劃','孝親規劃'],mustHave:['退休生活規劃','子女教養規劃']},
  legacy:{heirs:2,perHeirCash:20000000,perHeirNote:'每人一間房',feedEstate:true},
+ lifeGoals:[
+  {name:'安穩退休',priority:1,value:'不想造成子女負擔，維持現有生活品質',importance:5,linkModule:'退休',note:''},
+  {name:'子女完成大學/研究所',priority:2,value:'教育是給孩子最好的禮物',importance:4,linkModule:'教育',note:''},
+  {name:'50 歲換一間電梯宅',priority:3,value:'父母年紀大、爬樓梯不便',importance:3,linkModule:'置產',note:''}
+ ],
+ reportNote:'',
  nextReview:'2025-06-01',
  career:{plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:2},
  marriage:{plan:'否',age:'',budget:'',minBudget:'',importance:0},
@@ -181,7 +187,7 @@ function sampleCase(){return {
  ]}
 };}
 function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
- c.intent={purposes:[],targets:[],mustHave:[]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.jobType='一般就業者';c.profile.monthlySalary=0;c.company=defaultCompany();return c}
+ c.intent={purposes:[],targets:[],mustHave:[]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.jobType='一般就業者';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
 
 // ===== 工作類別 / 投保級距 =====
 // 2026(115年) 勞工保險投保薪資分級表：實際月薪 → 對應月投保薪資（第1級 29,500；天花板第11級 45,800，115.01.01 生效）。
@@ -549,7 +555,8 @@ function addRow(arr){var c=activeCase();var A=c.profile.age;var tpl={
  hobby:{sub:'體能類',start:c.profile.age,end:75,freq:1,amount:0,minAmount:0,imp:3},
  luxury:{sub:'首飾配件',start:c.profile.age,end:c.profile.age,freq:1,amount:0,minAmount:0,imp:2},
  prepared:{item:'',age:65,amount:0,method:'一次領'},
- allocations:{name:'',pct:0,ret:0,benefit:''}
+ allocations:{name:'',pct:0,ret:0,benefit:''},
+ lifeGoals:{name:'',priority:(c.lifeGoals||[]).length+1,value:'',importance:3,linkModule:'退休',note:''}
 }[arr];
  if(arr==='prepared'){c.retire.prepared.push(JSON.parse(JSON.stringify(tpl)))}
  else if(arr==='allocations'){c.plan.allocations=c.plan.allocations||[];c.plan.allocations.push(JSON.parse(JSON.stringify(tpl)))}
@@ -597,6 +604,7 @@ function dataPane(c){
  else if(app.dataTab==='risk')body=riskSec(c);
  else if(app.dataTab==='credit')body=creditSec(c);
  else body=trackingSec(c);
+ if(['incomes','expenses','assets','liabilities'].indexOf(app.dataTab)>=0)body=ownerBar(c)+body;
  return '<div class="tabbar" style="margin-bottom:14px">'+tb+'</div>'+body;
 }
 function jobSec(c){ensureJobFields(c);var p=c.profile,jt=p.jobType;
@@ -637,7 +645,9 @@ var INC_SUB=['薪資','執行業務所得','年終獎金','三節獎金','績效
 function incomesSec(c){
  var incs=c.incomes||[];
  var head='<tr><th>持有人</th><th>類別</th><th>子類別</th><th>週期</th><th>金額</th><th>年化</th><th>成長%</th><th>起</th><th>訖</th><th></th></tr>';
+ var cur=app.ownerView||'全家';
  var order=[];incs.forEach(function(x){var o=x.owner||'(未指定)';if(order.indexOf(o)<0)order.push(o)});
+ if(cur!=='全家')order=order.filter(function(o){return o===cur});
  var body=order.map(function(o){
   var sub=0;
   var rows=incs.map(function(x,idx){return [x,idx]}).filter(function(pp){return (pp[0].owner||'(未指定)')===o}).map(function(pp){
@@ -679,7 +689,8 @@ function expensesSec(c){
     '<td><input type="number" value="'+esc(x.cut)+'" onchange="set(\'expenses:'+idx+'\',\'cut\',this.value,\'num\')"></td>'+
     '<td><button class="del" onclick="delRow(\'expenses\','+idx+')">✕</button></td></tr>';
  }).join('');
- return '<div class="sec"><h4>支出 <button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></h4><table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table><div class="hint">金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。</div></div>';
+ var note=(app.ownerView&&app.ownerView!=='全家')?'<div class="hint" style="margin-bottom:6px;color:var(--amber2)">目前為「'+esc(app.ownerView)+'」視角；支出屬家庭層級、不分持有人，以下仍顯示全部。</div>':'';
+ return '<div class="sec"><h4>支出 <button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></h4>'+note+'<table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table><div class="hint">金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。</div></div>';
 }
 function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
  var pf=[['monthLiving','期望退休月生活費(現值)','num'],['retireReturn','退休後報酬率%','num'],['retireInflation','退休後通膨%','num']]
@@ -690,7 +701,38 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
   '<div class="b"><div class="l">退休月生活費(終值)</div><div class="v">'+fmt(rn.monthFV)+'</div></div>'+
   '<div class="b"><div class="l">預估退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div>'+
   '<div class="b"><div class="l">已準備退休金</div><div class="v">'+fmt(rn.prepared)+'</div></div>'+
-  '<div class="b"><div class="l" style="color:var(--warn)">退休缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div></div>'+prep;
+  '<div class="b"><div class="l" style="color:var(--warn)">退休缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div></div>'+laborPensionBox(c)+prep;
+}
+// 勞保老年年金 + 勞退新制 概算（供退休已備參考；非精算，可手動覆寫）
+function estimateLaborPension(c){
+ var pm=primaryMember(c)||{};var ins=n(pm.insSalary);
+ var age=n(c.profile.age),ra=n(c.profile.retireAge);
+ var years=Math.max(0,n(pm.worked)+Math.max(0,ra-age));
+ var r=c.retire||{};var rr=n(r.retireReturn)/100||0.04;var m=Math.max(0,n(c.profile.lifeExp)-ra);
+ if(ins<=0||years<=0)return {ins:ins,years:years,monthly:0,lump:0,fund:0,total:0};
+ var monthly=ins*years*0.0155;                 // 勞保老年年金 B式 1.55%
+ var annual=monthly*12;
+ var lump=(rr>0)?annual*(1-Math.pow(1+rr,-m))/rr:annual*m;  // 退休時之年金現值
+ var g=0.03, annualContrib=ins*0.06*12;         // 勞退：雇主月提繳6%、基金概估年化3%
+ var fund=(g>0)?annualContrib*(Math.pow(1+g,years)-1)/g:annualContrib*years;
+ return {ins:ins,years:years,monthly:monthly,lump:lump,fund:fund,total:lump+fund};
+}
+function addLaborPensionPrepared(){var c=activeCase();var e=estimateLaborPension(c);if(e.total<=0)return;
+ c.retire=c.retire||{};c.retire.prepared=(c.retire.prepared||[]).filter(function(p){return p.item!=='勞保老年年金(概算)'&&p.item!=='勞退新制(概算)'});
+ var ra=n(c.profile.retireAge);
+ c.retire.prepared.push({item:'勞保老年年金(概算)',age:ra,amount:Math.round(e.lump),method:'一次領'});
+ c.retire.prepared.push({item:'勞退新制(概算)',age:ra,amount:Math.round(e.fund),method:'一次領'});
+ save();render();
+}
+function laborPensionBox(c){var lp=estimateLaborPension(c);
+ if(lp.total<=0)return '<div class="sec"><div class="hint">填寫「本人」月投保薪資（於「工作類別」填月薪自動帶入，或家庭成員分頁手填）後，這裡會出現勞保/勞退概算與一鍵帶入。</div></div>';
+ return '<div class="sec"><h4>勞保 / 勞退 概算 <span class="hint">依本人月投保薪資 '+fmt(lp.ins)+' × 概估年資 '+lp.years+' 年；非精算，僅供參考</span></h4>'+
+  '<div class="big3"><div class="b"><div class="l">勞保老年年金(月領)</div><div class="v">'+fmt(lp.monthly)+'</div></div>'+
+  '<div class="b"><div class="l">勞保年金退休現值</div><div class="v">'+fmt(lp.lump)+'</div></div>'+
+  '<div class="b"><div class="l">勞退新制累積(概估)</div><div class="v">'+fmt(lp.fund)+'</div></div>'+
+  '<div class="b"><div class="l">合計可帶入已備</div><div class="v" style="color:var(--ok)">'+fmt(lp.total)+'</div></div></div>'+
+  '<div style="margin-top:10px"><button class="add" onclick="addLaborPensionPrepared()">＋ 一鍵帶入已準備退休金</button><a href="https://www.bli.gov.tw/" target="_blank" rel="noopener" style="color:var(--amber2);font-size:12.5px;margin-left:10px">開啟勞保局試算 ↗</a></div>'+
+  '<div class="hint" style="margin-top:6px">勞保年金採 B 式 1.55%；勞退以雇主月提繳 6%、基金概估年化 3% 累積至退休。帶入後為「一次領」現值列，可於下方手動調整或刪除。</div></div>';
 }
 function eduSec(c){var tot=eduTotal(c);
  var tbl=tableSec('子女教育金','education',c.education,[['child','子女','memsel'],['stage','階段','sel:'+EDU_STAGES.join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','num'],['years','供給年數','num'],['startIn','幾年後開始','num']]);
@@ -785,7 +827,9 @@ function ofld(obj,k,label,type){var c=activeCase(),v=(c[obj]||{})[k];
   return '<div class="f"><label>'+label+'</label><select onchange="setObj(\''+obj+'\',\''+k+'\',this.value)">'+opts+'</select></div>'}
  return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(v==null?'':v)+'" onchange="setObj(\''+obj+'\',\''+k+'\',this.value,\''+(type||'text')+'\')"></div>'}
 function intentSec(c){var it=c.intent||{};
- return '<div class="sec"><h4>此次規劃目的 <span class="hint">可複選</span></h4>'+chips('purposes',PURPOSES,it.purposes)+'</div>'+
+ var lifeTbl=tableSec('人生財務目標清單','lifeGoals',c.lifeGoals||[],[['name','目標','text'],['priority','優先序','num'],['value','價值觀 / 重要原因','text'],['importance','重要程度1-5','num'],['linkModule','對應模組','sel:退休,教育,置產,購車,傳承,婚姻,創業,其他'],['note','備註','text']]);
+ return '<div class="sec"><h4>人生財務目標清單 <span class="hint">自由填寫客戶「最在意的事」，帶價值觀與優先序；對應模組做軟連結，於報告呈現</span></h4><div class="hint" style="margin-bottom:6px">與下方勾選式目的/目標並用：這張清單捕捉「為什麼」，勾選捕捉「做什麼」。實際運算仍由各模組（退休/教育/置產…）負責。</div></div>'+lifeTbl+
+  '<div class="sec"><h4>此次規劃目的 <span class="hint">可複選</span></h4>'+chips('purposes',PURPOSES,it.purposes)+'</div>'+
   '<div class="sec"><h4>具體財務目標 <span class="hint">可複選 · 勾選後於各分頁補資料</span></h4>'+chips('targets',TARGETS,it.targets)+'</div>'+
   '<div class="sec"><h4>願景優先序 <span class="hint">哪些是人生中「一定」要實現的</span></h4>'+chips('mustHave',TARGETS,it.mustHave)+'</div>'+
   '<div class="sec"><h4>傳承規劃</h4><div class="fgrid">'+ofld('legacy','heirs','繼承人數','num')+ofld('legacy','perHeirCash','每人現金傳承','num')+ofld('legacy','perHeirNote','每人其他(如一間房)')+ofld('legacy','feedEstate','納入遺產稅考量','sel:true,false')+'</div><div class="hint" style="margin-top:6px">傳承總需求(現金)＝繼承人數 × 每人現金傳承，會列入建議與缺口總表。</div></div>'+
@@ -848,8 +892,38 @@ function creditSec(c){
   ofld('overseas','hasAssets','是否有海外資產','sel:否,是')+ofld('overseas','identity','是否有海外身份','sel:否,是')+ofld('overseas','purpose','海外置產/移民用途')+ofld('overseas','assetTypes','海外資產分類')+
   '</div><div class="hint" style="margin-top:8px">個別海外資產請於「資產」分頁以地區=美國/韓國/其他海外 登錄。</div></div>';
 }
+// ===== 持有人視角切換 + 依持有人分組的資料表（波2-B）=====
+function ownerViewMembers(c){return (c.members||[]).map(function(m){return m.name}).filter(function(x){return x});}
+function setOwnerView(v){app.ownerView=v;render();}
+function ownerBar(c){var cur=app.ownerView||'全家';
+ var btns=['全家'].concat(ownerViewMembers(c)).map(function(o){var on=(cur===o);
+  return '<button onclick="setOwnerView(\''+esc(o).replace(/'/g,'')+'\')" style="background:'+(on?'var(--amber)':'var(--card)')+';color:'+(on?'#08202a':'var(--mut)')+';border:1px solid '+(on?'var(--amber)':'var(--line)')+';border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer">'+esc(o)+'</button>'}).join('');
+ return '<div class="sec" style="padding:10px 12px"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="muted" style="font-size:12.5px">檢視視角：</span>'+btns+'</div></div>';
+}
+function cellInput(arr,idx,col,row,c){var k=col[0],ty=col[2];
+ if(ty==='bool')return '<td><input type="checkbox" '+(row[k]?'checked':'')+' onchange="set(\''+arr+':'+idx+'\',\''+k+'\',this.checked,\'bool\')"></td>';
+ if(ty==='memsel'){var o1=(c.members||[]).map(function(mm){return '<option '+(row[k]===mm.name?'selected':'')+'>'+esc(mm.name)+'</option>'}).join('');return '<td><select onchange="set(\''+arr+':'+idx+'\',\''+k+'\',this.value)">'+o1+'</select></td>'}
+ if(ty&&ty.indexOf('sel:')===0){var o2=ty.slice(4).split(',').map(function(o){return '<option '+(row[k]===o?'selected':'')+'>'+o+'</option>'}).join('');return '<td><select onchange="set(\''+arr+':'+idx+'\',\''+k+'\',this.value)">'+o2+'</select></td>'}
+ return '<td><input '+(ty==='num'?'type="number"':'')+' value="'+esc(row[k])+'" onchange="set(\''+arr+':'+idx+'\',\''+k+'\',this.value,\''+(ty==='num'?'num':'txt')+'\')"></td>';
+}
+// 依持有人(ownerKey)分組、可依 app.ownerView 過濾；valFn 回台幣值供小計。以原始索引呼叫 set/delRow。
+function groupedTable(c,title,arr,list,cols,ownerKey,valFn,hint){
+ var cur=app.ownerView||'全家';
+ var idxList=(list||[]).map(function(x,i){return [x,i]});
+ if(cur!=='全家')idxList=idxList.filter(function(p){return (p[0][ownerKey]||'')===cur});
+ var order=[];idxList.forEach(function(p){var o=p[0][ownerKey]||'(未指定)';if(order.indexOf(o)<0)order.push(o)});
+ var head='<tr>'+cols.map(function(cl){return '<th>'+cl[1]+'</th>'}).join('')+'<th></th></tr>';
+ var ncol=cols.length+1;
+ var body=order.map(function(o){var sub=0;
+  var rows=idxList.filter(function(p){return (p[0][ownerKey]||'(未指定)')===o}).map(function(p){var x=p[0],idx=p[1];sub+=n(valFn(x));
+   return '<tr>'+cols.map(function(cl){return cellInput(arr,idx,cl,x,c)}).join('')+'<td><button class="del" onclick="delRow(\''+arr+'\','+idx+')">✕</button></td></tr>';
+  }).join('');
+  return '<tr><td colspan="'+ncol+'" style="background:#0a1a20;color:var(--amber2);font-weight:700">'+esc(o)+' <span class="muted" style="font-weight:400">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
+ }).join('');
+ return '<div class="sec"><h4>'+title+' <button class="add" onclick="addRow(\''+arr+'\')">＋ 新增</button></h4><table>'+head+(body||'<tr><td colspan="'+ncol+'" class="muted" style="padding:14px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>'+(hint?'<div class="hint">'+hint+'</div>':'')+'</div>';
+}
 function assetsSec(c){
- var tbl=tableSec('資產','assets',c.assets,[['name','名稱','text'],['owner','持有人','memsel'],['mainCat','主分類','sel:自用資產,可投資資產'],['type','次分類','sel:現金,定存,股票,基金,債券,不動產,其他'],['cls','流動性','sel:流動,固定'],['region','地區','sel:台灣,美國,韓國,其他海外'],['currency','幣別','sel:台幣,美金,人民幣,日圓,港幣,其他'],['fxRate','匯率','num'],['cost','購入價(原幣)','num'],['value','現值(原幣)','num'],['ret','報酬率%','num'],['income','被動現金流(原幣/年)','num'],['movable','可變動','bool']]);
+ var tbl=groupedTable(c,'資產','assets',c.assets,[['name','名稱','text'],['owner','持有人','memsel'],['mainCat','主分類','sel:自用資產,可投資資產'],['type','次分類','sel:現金,定存,股票,基金,債券,不動產,其他'],['cls','流動性','sel:流動,固定'],['region','地區','sel:台灣,美國,韓國,其他海外'],['currency','幣別','sel:台幣,美金,人民幣,日圓,港幣,其他'],['fxRate','匯率','num'],['cost','購入價(原幣)','num'],['value','現值(原幣)','num'],['ret','報酬率%','num'],['income','被動現金流(原幣/年)','num'],['movable','可變動','bool']],'owner',aVal,'依持有人分組、小計為台幣現值；現值/購入價/被動現金流以原幣輸入，依匯率換算統計。');
  var tot=sum(c.assets,function(a){return aVal(a)}),liq=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
  var pnl=sum(c.assets,function(a){return (n(a.value)-n(a.cost))*(n(a.fxRate)||1)});
  var pas=assetPassive(c);
@@ -857,7 +931,7 @@ function assetsSec(c){
 }
 function pmt(bal,rate,months){var i=rate/12/100;if(i<=0)return months>0?bal/months:0;return bal*i*Math.pow(1+i,months)/(Math.pow(1+i,months)-1)}
 function liabilitiesSec(c){
- var tbl=tableSec('負債','liabilities',c.liabilities,[['name','項目','text'],['owner','持有人','memsel'],['mainCat','主分類','sel:房貸,車貸,信貸,其他'],['currency','幣別','sel:台幣,美金,其他'],['fxRate','匯率','num'],['balance','負債金額(原幣)','num'],['rate','年利率%','num'],['repay','攤還方式','sel:本息攤還,本金平均,只付利息,暫緩還款'],['pay','月繳款(原幣)','num'],['months','剩餘月數','num'],['grace','寬限期(月)','num'],['startAge','起始年齡','num']]);
+ var tbl=groupedTable(c,'負債','liabilities',c.liabilities,[['name','項目','text'],['owner','持有人','memsel'],['mainCat','主分類','sel:房貸,車貸,信貸,其他'],['currency','幣別','sel:台幣,美金,其他'],['fxRate','匯率','num'],['balance','負債金額(原幣)','num'],['rate','年利率%','num'],['repay','攤還方式','sel:本息攤還,本金平均,只付利息,暫緩還款'],['pay','月繳款(原幣)','num'],['months','剩餘月數','num'],['grace','寬限期(月)','num'],['startAge','起始年齡','num']],'owner',lBal,'依持有人分組、小計為台幣餘額。「起始年齡」用於未來才發生的貸款。');
  var tot=sum(c.liabilities,function(l){return lBal(l)}), int=annualDebtInterest(c),pay=annualDebtPay(c);
  var rows=(c.liabilities||[]).map(function(l){return '<tr><td class="k">'+esc(l.name)+'</td><td>'+l.repay+'</td><td>本息攤還試算月繳 '+fmt(pmt(n(l.balance),n(l.rate),n(l.months)))+'</td></tr>'}).join('');
  return '<div class="sec"><h4>負債總覽（換算台幣）</h4><div class="big3"><div class="b"><div class="l">負債總額</div><div class="v">'+fmt(tot)+'</div></div><div class="b"><div class="l">年應付本息</div><div class="v">'+fmt(pay)+'</div></div><div class="b"><div class="l">年利息</div><div class="v">'+fmt(int)+'</div></div></div>'+
@@ -913,6 +987,24 @@ function tableSec(title,arr,list,cols){var c=activeCase();
  return '<div class="sec"><h4>'+title+'<button class="add" onclick="addRow(\''+arr+'\')">＋ 新增</button></h4><table>'+head+(rows||'<tr><td colspan="12" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table></div>';
 }
 
+function financeNavHTML(){
+ var items=[['an-tables','財務三表'],['an-health','健康度'],['an-gap','保障缺口'],['an-tax','稅賦'],['an-mc','機率模擬']];
+ return '<div class="sec" style="position:sticky;top:0;z-index:5"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px"><span class="muted">快速跳轉：</span>'+
+  items.map(function(a){return '<a href="#'+a[0]+'" style="color:var(--amber2);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:3px 11px">'+a[1]+'</a>'}).join('')+'</div></div>';
+}
+function threeTablesHTML(ct){
+ function row(l,v,bold,col){return '<tr><td class="k"'+(bold?' style="font-weight:800"':'')+'>'+l+'</td><td'+(bold||col?' style="'+(bold?'font-weight:800;':'')+(col?'color:'+col:'')+'"':'')+'>'+fmt(v)+'</td></tr>'}
+ var bal=ct.incTotal-ct.expTotal;
+ var bs='<table class="rtable" style="flex:1;min-width:250px"><tr><th colspan="2">資產負債表</th></tr>'+
+  row('自用資產',ct.aSelf)+row('可投資資產',ct.aInv)+row('資產合計',ct.aTotal,true)+
+  row('消費型負債',ct.dCons)+row('投資型負債',ct.dInv)+row('負債合計',ct.dTotal,true)+
+  row('淨值',ct.net,true,'var(--amber2)')+'</table>';
+ var cf='<table class="rtable" style="flex:1;min-width:250px"><tr><th colspan="2">現金流量表（年）</th></tr>'+
+  row('工作收入',ct.incWork)+row('理財收入',ct.incFin)+row('其他收入',ct.incOther)+row('收入合計',ct.incTotal,true)+
+  row('生活支出',ct.expLive)+row('稅賦',ct.expTax)+row('保險',ct.expIns)+row('其他＋負債',ct.expOther)+row('支出合計',ct.expTotal,true)+
+  '<tr><td class="k" style="font-weight:800;color:'+(bal>=0?'var(--ok)':'var(--warn)')+'">年度結餘</td><td style="font-weight:800;color:'+(bal>=0?'var(--ok)':'var(--warn)')+'">'+fmt(bal)+'（月 '+fmt(bal/12)+'）</td></tr></table>';
+ return '<div class="sec" id="an-tables"><h4>財務三表（正式版）<span class="hint">資產負債表 · 現金流量表；快速識字版見下方「財務十字表」</span></h4><div style="display:flex;gap:16px;flex-wrap:wrap">'+bs+cf+'</div></div>';
+}
 function analysisPane(c){
  var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGaps(c),proj=m.proj,rn=retireNeed(c),props=propertyGaps(c);
  var ct=crossTable(c),it=incomeTax(c),es=estateTax(c),al=allocInfo(c),mc=monteCarlo(c);
@@ -925,21 +1017,23 @@ function analysisPane(c){
  var gt=gaps.map(function(g){return '<tr><td class="k">'+g.member+'</td><td>'+g.kind+'</td><td>'+fmt(g.need)+'</td><td>'+fmt(g.have)+'</td><td class="'+(g.gap>0?'bad':'good')+'">'+fmt(g.gap)+'</td></tr>'}).join('');
  var pt=props.map(function(p){return '<tr><td class="k">'+esc(p.name)+'</td><td>'+fmt(p.fv)+'</td><td>'+fmt(p.loan)+'</td><td class="'+(p.gap>0?'bad':'good')+'">'+fmt(p.gap)+'</td></tr>'}).join('');
  return '<div class="kpis">'+kp+'</div>'+
-  '<div class="sec"><h4>財務健康度</h4><div class="gauges">'+gau+'</div>'+
+  financeNavHTML()+
+  threeTablesHTML(ct)+
+  '<div class="sec" id="an-health"><h4>財務健康度</h4><div class="gauges">'+gau+'</div>'+
    '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:12px"><div class="gradebox"><div class="muted">評鑑等級</div><div class="g" style="color:'+gradeColor(h.grade)+'">'+h.grade+'</div></div>'+
    '<div class="muted" style="flex:1;min-width:220px">策略階段：<b style="color:var(--amber2)">'+GRADE_STRAT[h.grade]+'</b></div></div><table style="margin-top:14px">'+parts+'</table></div>'+
   '<div class="sec"><h4>現況財務指標（11 項）</h4><table class="rtable">'+rt+'</table></div>'+
   '<div class="sec"><h4>退休需求</h4><div class="big3"><div class="b"><div class="l">退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div><div class="b"><div class="l">已準備</div><div class="v">'+fmt(rn.prepared)+'</div></div><div class="b"><div class="l" style="color:var(--warn)">缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div></div>'+
-  '<div class="sec"><h4>保障缺口（需求已反推計算）</h4><table class="rtable"><tr><th>被保人</th><th>險種</th><th>需求</th><th>已備</th><th>缺口</th></tr>'+(gt||'<tr><td colspan=5 class=muted>請於「保障需求」分頁新增</td></tr>')+'</table></div>'+
+  '<div class="sec" id="an-gap"><h4>保障缺口（需求已反推計算）</h4><table class="rtable"><tr><th>被保人</th><th>險種</th><th>需求</th><th>已備</th><th>缺口</th></tr>'+(gt||'<tr><td colspan=5 class=muted>請於「保障需求」分頁新增</td></tr>')+'</table></div>'+
   (pt?'<div class="sec"><h4>置產缺口</h4><table class="rtable"><tr><th>項目</th><th>需求終值</th><th>可貸款</th><th>缺口</th></tr>'+pt+'</table></div>':'')+
   '<div class="sec"><h4>財務十字表</h4>'+crossTableHTML(ct)+'</div>'+
   '<div class="sec"><h4>財務目標歷程</h4>'+timelineSVG(c)+'</div>'+
-  '<div class="sec"><h4>稅賦分析</h4><table class="rtable"><tr><td class="k">綜合所得淨額</td><td>'+fmt(it.net)+'</td></tr><tr><td class="k">綜所稅(年)</td><td class="bad">'+fmt(it.tax)+'（稅率 '+(it.rate*100)+'%）</td></tr><tr><td class="k">課稅遺產淨額</td><td>'+fmt(es.base)+'</td></tr><tr><td class="k">預估遺產稅</td><td class="bad">'+fmt(es.tax)+'（稅率 '+(es.rate*100)+'%）</td></tr></table></div>'+
+  '<div class="sec" id="an-tax"><h4>稅賦分析</h4><table class="rtable"><tr><td class="k">綜合所得淨額</td><td>'+fmt(it.net)+'</td></tr><tr><td class="k">綜所稅(年)</td><td class="bad">'+fmt(it.tax)+'（稅率 '+(it.rate*100)+'%）</td></tr><tr><td class="k">課稅遺產淨額</td><td>'+fmt(es.base)+'</td></tr><tr><td class="k">預估遺產稅</td><td class="bad">'+fmt(es.tax)+'（稅率 '+(es.rate*100)+'%）</td></tr></table></div>'+
   '<div class="sec"><h4>建議資產配置 <span class="hint">加權報酬 '+al.wRet.toFixed(2)+'%</span></h4>'+pieSVG(al.list)+'</div>'+
   '<div class="sec"><h4>規劃前 / 後對照</h4>'+beforeAfterHTML(c)+'</div>'+
   shortTermHTML(c)+
   retireCashflowHTML(c)+
-  '<div class="chart"><h4 style="color:var(--amber2);margin-bottom:8px">蒙地卡羅機率模擬 <span class="hint" style="font-weight:400">'+mc.N+' 條路徑</span></h4>'+
+  '<div class="chart" id="an-mc"><h4 style="color:var(--amber2);margin-bottom:8px">蒙地卡羅機率模擬 <span class="hint" style="font-weight:400">'+mc.N+' 條路徑</span></h4>'+
    '<div class="big3"><div class="b"><div class="l">資產不破產機率</div><div class="v" style="color:'+(mc.pSuccess>=0.7?'var(--ok)':mc.pSuccess>=0.4?'var(--amber)':'var(--warn)')+'">'+(mc.pSuccess*100).toFixed(0)+'%</div></div>'+
    '<div class="b"><div class="l">最終可投資資產 P50</div><div class="v">'+fmt(mc.finalP50)+'</div></div>'+
    '<div class="b"><div class="l">區間 P10 ～ P90</div><div class="v" style="font-size:15px">'+fmt(mc.finalP10)+' ～ '+fmt(mc.finalP90)+'</div></div></div>'+
@@ -1020,7 +1114,9 @@ function toolsPane(c){var L=app.tools.loan,R=app.tools.ret;
   '<div class="sec"><h4>退休快速試算</h4><div class="fgrid">'+retF+'</div><div class="big3" style="margin-top:12px"><div class="b"><div class="l">退休後餘年</div><div class="v">'+m2+' 年</div></div><div class="b"><div class="l">退休月生活費(終值)</div><div class="v">'+fmt(monthFV)+'</div></div><div class="b"><div class="l">退休總需求</div><div class="v" style="color:var(--amber2)">'+fmt(total)+'</div></div></div></div>'+
   '<div class="muted">工具箱為獨立快速試算，不影響客戶案件資料。</div>';
 }
-function reportPane(c){return '<div style="margin-bottom:14px" class="muted">客戶交付報告預覽（圖表化），右上「列印報告」輸出 PDF。</div>'+reportHTML(c)}
+function reportPane(c){return '<div style="margin-bottom:10px" class="muted">客戶交付報告預覽（圖表化），右上「列印報告」輸出 PDF。</div>'+
+ '<div class="sec"><h4>顧問總結 <span class="hint">顧問可編輯；填寫後會出現在報告書結尾（客戶版）</span></h4><textarea onchange="setCase(\'reportNote\',this.value)" placeholder="例：整體財務結構穩健，建議優先補強壽險缺口與提高緊急預備金…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.reportNote||'')+'</textarea></div>'+
+ reportHTML(c)}
 /* ===== 報告用淺色圖表元件 ===== */
 var RCOL=['#0d2b45','#c99a5b','#7f97ac','#8ba888','#b07d3d','#b05a4a','#5a7186','#cbb488'];
 function rGauge(t,v){v=Math.max(0,Math.min(100,v));var col=v>=70?'#6f8f74':v>=40?'#c99a5b':'#b05a4a';
@@ -1093,6 +1189,9 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg></div>'+
   '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務健康等級 <b style="color:'+(h.grade==='D'?'#e08a68':'#e0bd8b')+'">'+h.grade+'</b><span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>'+
 
+  '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px"><b style="color:#0d2b45">目錄</b><ol style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
+   ['財務健康總覽','收支與資產結構','現況財務指標','財務目標歷程','退休與教育需求','風險保障缺口','現金流投影與機率','稅賦分析','投資風險屬性與建議配置','規劃前／後對照','規劃執行建議','執行行動清單','動態調整（PDCA）','注意事項'].map(function(t){return '<li>'+t+'</li>'}).join('')+'</ol></div>'+
+  (((c.lifeGoals||[]).length)?'<div style="margin:6px 0 4px;color:#5a6b72;font-size:13px">客戶最在意的事：'+(c.lifeGoals||[]).slice().sort(function(a,b){return n(a.priority)-n(b.priority)}).map(function(g){return esc(g.name)}).join('、')+'</div>':'')+
   '<h2>一、財務健康總覽</h2>'+
   '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+rGauge('財務安全度',h.safety)+rGauge('財務自由度',h.freedom)+rGauge('願景達成度',h.vision)+'</div>'+
   '<div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:1;min-width:230px">'+rBars([{label:'收支平衡',val:hp['收支平衡']},{label:'預備金',val:hp['預備金']},{label:'信用',val:hp['信用']},{label:'負債平衡',val:hp['負債平衡']},{label:'風險保全',val:hp['風險保全'],color:'#c99a5b'}])+'</div>'+
@@ -1103,6 +1202,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
    ((p.jobType==='企業主')?'<tr><td>公司概況</td><td>'+esc((c.company||{}).industry||'—')+' ｜ 持股 '+n((c.company||{}).sharePct)+'% ｜ 年營收 '+fmt((c.company||{}).annualRevenue)+' ｜ 年淨利 '+fmt((c.company||{}).netProfit)+((c.company||{}).ownerLoan?' ｜ 負責人往來 '+fmt(c.company.ownerLoan):'')+'</td></tr>':'')+
    '<tr><td>此次規劃目的</td><td>'+esc(((c.intent||{}).purposes||[]).join('、')||'—')+'</td></tr><tr><td>願景優先序</td><td>'+esc(((c.intent||{}).mustHave||[]).join('、')||'—')+'</td></tr><tr><td>淨資產 / 年收入 / 年支出</td><td>'+fmt(m.net)+' ／ '+fmt(m.incTotal)+' ／ '+fmt(m.expTotal)+'</td></tr></table>'+
 
+  (((c.lifeGoals||[]).length)?'<div style="margin-top:12px;color:#0d2b45;font-weight:700;font-size:13px">人生財務目標（客戶最在意的事）</div><table style="margin-top:4px"><tr><th>優先</th><th>目標</th><th>價值觀／重要原因</th><th>對應模組</th></tr>'+(c.lifeGoals||[]).slice().sort(function(a,b){return n(a.priority)-n(b.priority)}).map(function(g){return '<tr><td>'+n(g.priority)+'</td><td>'+esc(g.name)+'</td><td>'+esc(g.value)+'</td><td>'+esc(g.linkModule||'')+'</td></tr>'}).join('')+'</table>':'')+
   '<h2>二、收支與資產結構</h2>'+
   '<div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">收入比重</div>'+rPie(incPie)+'</div>'+
    '<div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">支出比重</div>'+rPie(expPie)+'</div></div>'+
@@ -1138,6 +1238,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<h2>十一、規劃執行建議</h2><ol style="color:#33474e;padding-left:20px">'+advRows+'</ol>'+
   '<h2>十二、執行行動清單</h2><table><tr><th>軸線</th><th>動作</th><th>說明</th></tr>'+actRep+'</table>'+
   '<h2>十三、動態調整（PDCA）</h2><p style="color:#33474e">計畫(Plan)→行動(Do)→確認(Check)→調整(Act)，建議每半年檢視一次。下次檢視日期：<b>'+(esc(c.nextReview)||'尚未設定')+'</b></p>'+
+  (c.reportNote?'<div style="margin:14px 0;padding:14px 16px;background:#f4f7f5;border:1px solid #cfe0d5;border-radius:10px"><b style="color:#0d2b45">顧問總結</b><div style="color:#33474e;margin-top:6px;white-space:pre-wrap">'+esc(c.reportNote)+'</div></div>':'')+
   '<h2>十四、注意事項</h2><p style="color:#5a6b72;font-size:12.5px">本報告依所提供資料與假設參數試算，僅供參考；稅額為簡化估算，實際以主管機關與會計師核定為準。財務規劃為動態調整過程，建議每半年檢視。</p></div>';
 }
 
