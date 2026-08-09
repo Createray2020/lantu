@@ -82,6 +82,37 @@ td input[type=checkbox]{width:auto}
 /* ===== embed 模式（單一年度版本編輯器，由 /dashboard 外殼載入）===== */
 html.embed .side{display:none!important}
 html.embed .shell{grid-template-columns:1fr!important}
+/* ===== 收支資債 四合一輸入台 ===== */
+.finsum{position:sticky;top:0;z-index:15;background:rgba(8,26,43,.94);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.finsg{display:flex;gap:10px;align-items:stretch;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.finsg .gt{writing-mode:vertical-rl;text-orientation:upright;font-size:11px;letter-spacing:.16em;color:var(--amber2);font-weight:800}
+.finsg .cells{display:flex;gap:14px;flex-wrap:wrap;align-items:center;flex:1}
+.finsg .l{color:var(--mut);font-size:11.5px}.finsg .v{font-size:18px;font-weight:800;line-height:1.2}.finsg .v.big{font-size:21px}
+.finsg .op{color:var(--mut2);font-size:18px;font-weight:800;align-self:center}
+.pos{color:var(--ok)}.neg{color:var(--warn)}
+.finhint{color:var(--mut);font-size:12.5px;margin:0 2px 12px}
+.finquad{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:1024px){.finquad{grid-template-columns:1fr}.finsum{grid-template-columns:1fr}}
+.finpanel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;display:flex;flex-direction:column}
+.finpanel.inc{border-top:3px solid var(--ok)}.finpanel.exp{border-top:3px solid var(--warn)}.finpanel.ast{border-top:3px solid var(--teal)}.finpanel.lia{border-top:3px solid var(--amber)}
+.finph{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.finph h4{font-size:15px;color:var(--tx);margin:0}
+.finph .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.finph .sub{margin-left:auto;text-align:right}.finph .sub .sl{color:var(--mut);font-size:11px}.finph .sub .sv{font-size:15px;font-weight:800}
+.finph .add{margin-left:10px}
+.fintag{font-size:10.5px;color:var(--mut2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-weight:400}
+.fintbl{overflow-x:auto;flex:1}
+td.calc{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.grp td{background:#0a1a20;color:var(--amber2);font-weight:700;font-size:12px}.grp .gm{color:var(--mut);font-weight:400}
+.exp-btn{background:none;border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:1px 7px;font-size:12px;line-height:1.4}
+.exp-btn.on{color:var(--amber2);border-color:var(--amber);background:rgba(201,154,91,.12)}
+.acts{white-space:nowrap;display:flex;gap:4px;align-items:center}
+.drow>td{background:#091420;padding:9px 12px 11px}
+.dform{display:flex;flex-wrap:wrap;gap:9px 15px}
+.dfield{display:flex;flex-direction:column;gap:2px}.dfield label{color:var(--mut);font-size:11px}
+.dfield input,.dfield select{width:auto;background:#0a1a20;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:5px 7px;font-size:12.5px;min-width:118px}
+.dhead{width:100%;color:var(--mut2);font-size:11px;letter-spacing:.06em;margin-bottom:2px}
+.finfoot{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;font-size:11.5px;color:var(--mut2)}
 </style>
 </head>
 <body>
@@ -527,7 +558,8 @@ function crossTable(c){var m=metrics(c);
 function listOf(c,arr){if(arr==='allocations')return c.plan.allocations;if(arr==='prepared')return c.retire.prepared;return c[arr]}
 function set(id,field,val,type){var c=activeCase();var t=id.split(':'),arr=t[0],i=t[1];
  var v=type==='num'?n(val):val;if(i==null)c[arr][field]=v;else listOf(c,arr)[i][field]=v;save();
- if(app.activeTab!=='data'||app.role==='client'||arr==='allocations')render();}
+ if(app.activeTab!=='data'||app.role==='client'||arr==='allocations')render();
+ if(typeof syncFinSummary==='function')syncFinSummary();}
 function setMeta(grp,k,v,type){var c=activeCase();c[grp][k]=(type==='num')?n(v):v;save();if(app.role==='client')render();}
 function setRetire(k,v,type){var c=activeCase();c.retire[k]=(type==='num')?n(v):v;save();}
 function setTax(k,v,type){var c=activeCase();c.taxParams=c.taxParams||{};c.taxParams[k]=(type==='num')?n(v):(type==='bool'?v:v);save();render();}
@@ -538,7 +570,7 @@ function setMonthlySalary(v){var c=activeCase();ensureJobFields(c);c.profile.mon
 function setCompany(k,v,type){var c=activeCase();ensureJobFields(c);c.company[k]=(type==='num')?n(v):v;save();if(app.role==='client')render();}
 // 月/年週期：資料一律存「年額」(引擎不變)，僅輸入層依 period 換算顯示。
 function setAmtPeriod(arr,idx,v){var c=activeCase();c[arr][idx].period=v;save();render();}
-function setAmtByPeriod(arr,idx,val){var c=activeCase();var it=c[arr][idx];var v=n(val);it.amount=(it.period==='月')?v*12:v;save();if(app.role==='client')render();}
+function setAmtByPeriod(arr,idx,val){var c=activeCase();var it=c[arr][idx];var v=n(val);it.amount=(it.period==='月')?v*12:v;save();if(app.role==='client')render();if(typeof syncFinSummary==='function')syncFinSummary();}
 function shownAmt(it){return (it.period==='月')?Math.round(n(it.amount)/12):n(it.amount);}
 function setTool(g,k,v){app.tools[g][k]=n(v);render();}
 function addRow(arr){var c=activeCase();var A=c.profile.age;var tpl={
@@ -583,10 +615,11 @@ function coachView(){var c=activeCase();
  return '<div class="shell"><div class="side">'+side+'</div><div class="main"><div class="tabbar">'+tb+'</div>'+body+'</div></div>';
 }
 function dataPane(c){
- var dt=[['family','家庭 / 參數'],['intent','意圖 / 生涯'],['risk','風險屬性'],['incomes','收入'],['expenses','支出'],['assets','資產'],['liabilities','負債'],['retire','退休'],['education','子女教育'],['goals','目標/置產'],['lifestyle','生活願望'],['needs','保障需求'],['coverages','需求/已備(簡)'],['policies','現有保單'],['credit','信用/海外'],['tax','稅賦'],['plan','調整方案'],['tracking','真實追蹤']];
+ var dt=[['family','家庭 / 參數'],['intent','意圖 / 生涯'],['risk','風險屬性'],['finance','收支資債'],['retire','退休'],['education','子女教育'],['goals','目標/置產'],['lifestyle','生活願望'],['needs','保障需求'],['coverages','需求/已備(簡)'],['policies','現有保單'],['credit','信用/海外'],['tax','稅賦'],['plan','調整方案'],['tracking','真實追蹤']];
  var tb=dt.map(function(t){return '<button data-dtab="'+t[0]+'" class="'+(app.dataTab===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('');
  var body;
  if(app.dataTab==='family')body=familySec(c)+membersSec(c);
+ else if(app.dataTab==='finance')body=financeSec(c);
  else if(app.dataTab==='incomes')body=incomesSec(c);
  else if(app.dataTab==='expenses')body=expensesSec(c);
  else if(app.dataTab==='assets')body=assetsSec(c);
@@ -938,6 +971,167 @@ function liabilitiesSec(c){
   (rows?'<table class="rtable" style="margin-top:12px"><tr><th>項目</th><th>攤還方式</th><th>試算</th></tr>'+rows+'</table>':'')+
   '<div class="hint" style="margin-top:8px">「起始年齡」用於未來才發生的貸款（如幾歲後購屋）；投影會在該年齡才計入本息。攤還試算為本息平均攤還的參考月繳。</div></div>'+tbl;
 }
+/* ===== 收支資債 四合一輸入台 ===== */
+function finMatch(o){var cur=app.ownerView||'全家';return cur==='全家'||(o||'')===cur;}
+function finMem(c,arr,i,k,val){var o=(c.members||[]).map(function(m){return '<option '+(val===m.name?'selected':'')+'>'+esc(m.name)+'</option>'}).join('');return '<select onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value)">'+o+'</select>';}
+function finSel(arr,i,k,val,list){return '<select onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value)">'+list.map(function(o){return '<option '+(val===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select>';}
+function finNum(arr,i,k,val){return '<input type="number" value="'+esc(val)+'" onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value,\'num\')">';}
+function finTxt(arr,i,k,val){return '<input value="'+esc(val)+'" onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value)">';}
+function finBool(arr,i,k,val){return '<input type="checkbox" '+(val?'checked':'')+' onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.checked,\'bool\')">';}
+function finDF(label,ctl){return '<div class="dfield"><label>'+label+'</label>'+ctl+'</div>';}
+function finCaret(arr,i,open){return '<button class="exp-btn'+(open?' on':'')+'" onclick="finToggle(\''+arr+'\','+i+')" title="進階欄">'+(open?'▾':'▸')+'</button>';}
+function finToggle(arr,i){app.finOpen=app.finOpen||{assets:{},liabilities:{}};app.finOpen[arr][i]=!app.finOpen[arr][i];render();}
+
+function finIncTable(c){
+ var incs=c.incomes||[];var idx=incs.map(function(x,i){return [x,i]}).filter(function(p){return finMatch(p[0].owner)});
+ var order=[];idx.forEach(function(p){var o=p[0].owner||'(未指定)';if(order.indexOf(o)<0)order.push(o)});
+ var head='<tr><th>持有人</th><th>類別</th><th>子類別</th><th>週期</th><th>金額</th><th>年化</th><th>成長%</th><th>起</th><th>訖</th><th></th></tr>';
+ var body=order.map(function(o){var sub=0;
+  var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=n(x.amount);var per=x.period||'年';
+   var tSel=['工作','理財','其他'].map(function(t){return '<option '+((x.type||'工作')===t?'selected':'')+'>'+t+'</option>'}).join('');
+   var sSel='<option value="" '+(!x.subType?'selected':'')+'></option>'+INC_SUB.map(function(s){return '<option '+((x.subType||'')===s?'selected':'')+'>'+s+'</option>'}).join('');
+   var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
+   return '<tr>'+
+    '<td>'+finTxt('incomes',i,'owner',x.owner)+'</td>'+
+    '<td><select onchange="set(\'incomes:'+i+'\',\'type\',this.value)">'+tSel+'</select></td>'+
+    '<td><select onchange="set(\'incomes:'+i+'\',\'subType\',this.value)">'+sSel+'</select></td>'+
+    '<td><select onchange="setAmtPeriod(\'incomes\','+i+',this.value)">'+pSel+'</select></td>'+
+    '<td><input type="number" value="'+shownAmt(x)+'" onchange="setAmtByPeriod(\'incomes\','+i+',this.value)"></td>'+
+    '<td class="calc">'+fmt(n(x.amount))+'</td>'+
+    '<td>'+finNum('incomes',i,'growth',x.growth)+'</td>'+
+    '<td>'+finNum('incomes',i,'start',x.start)+'</td>'+
+    '<td>'+finNum('incomes',i,'end',x.end)+'</td>'+
+    '<td><button class="del" onclick="delRow(\'incomes\','+i+')">✕</button></td></tr>';
+  }).join('');
+  return '<tr class="grp"><td colspan="10">'+esc(o)+' <span class="gm">· 年化小計 '+fmt(sub)+'</span></td></tr>'+rows;
+ }).join('');
+ return '<table>'+head+(body||'<tr><td colspan="10" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
+}
+
+function finExpTable(c){
+ var CATS=['生活','消費','稅賦','孝親','保險','其他'];
+ var head='<tr><th>項目</th><th>分類</th><th>週期</th><th>金額</th><th>年化</th><th>通膨</th><th>起</th><th>訖</th><th>可刪減%</th><th></th></tr>';
+ var rows=(c.expenses||[]).map(function(x,i){var per=x.period||'年';
+   var cSel=CATS.map(function(ct){return '<option '+((x.cat||'生活')===ct?'selected':'')+'>'+ct+'</option>'}).join('');
+   var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
+   return '<tr>'+
+    '<td>'+finTxt('expenses',i,'name',x.name)+'</td>'+
+    '<td><select onchange="set(\'expenses:'+i+'\',\'cat\',this.value)">'+cSel+'</select></td>'+
+    '<td><select onchange="setAmtPeriod(\'expenses\','+i+',this.value)">'+pSel+'</select></td>'+
+    '<td><input type="number" value="'+shownAmt(x)+'" onchange="setAmtByPeriod(\'expenses\','+i+',this.value)"></td>'+
+    '<td class="calc">'+fmt(n(x.amount))+'</td>'+
+    '<td style="text-align:center"><input type="checkbox" '+(x.infl?'checked':'')+' onchange="set(\'expenses:'+i+'\',\'infl\',this.checked,\'bool\')"></td>'+
+    '<td>'+finNum('expenses',i,'start',x.start)+'</td>'+
+    '<td>'+finNum('expenses',i,'end',x.end)+'</td>'+
+    '<td>'+finNum('expenses',i,'cut',x.cut)+'</td>'+
+    '<td><button class="del" onclick="delRow(\'expenses\','+i+')">✕</button></td></tr>';
+ }).join('');
+ return '<table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:12px">尚無資料，點「＋ 新增」。</td></tr>')+'</table>';
+}
+
+function finAstTable(c){
+ app.finOpen=app.finOpen||{assets:{},liabilities:{}};
+ var idx=(c.assets||[]).map(function(x,i){return [x,i]}).filter(function(p){return finMatch(p[0].owner)});
+ var order=[];idx.forEach(function(p){var o=p[0].owner||'(未指定)';if(order.indexOf(o)<0)order.push(o)});
+ var head='<tr><th>名稱</th><th>持有人</th><th>類型</th><th>幣別</th><th>現值(原幣)</th><th>台幣值</th><th></th></tr>';
+ var body=order.map(function(o){var sub=0;
+  var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=aVal(x);var open=!!app.finOpen.assets[i];
+   var main='<tr>'+
+    '<td>'+finTxt('assets',i,'name',x.name)+'</td>'+
+    '<td>'+finMem(c,'assets',i,'owner',x.owner)+'</td>'+
+    '<td>'+finSel('assets',i,'type',x.type,['現金','定存','股票','基金','債券','不動產','其他'])+'</td>'+
+    '<td>'+finSel('assets',i,'currency',x.currency,['台幣','美金','人民幣','日圓','港幣','其他'])+'</td>'+
+    '<td>'+finNum('assets',i,'value',x.value)+'</td>'+
+    '<td class="calc">'+fmt(aVal(x))+'</td>'+
+    '<td class="acts">'+finCaret('assets',i,open)+'<button class="del" onclick="delRow(\'assets\','+i+')">✕</button></td></tr>';
+   var detail=open?'<tr class="drow"><td colspan="7"><div class="dhead">進階欄</div><div class="dform">'+
+    finDF('主分類',finSel('assets',i,'mainCat',x.mainCat,['自用資產','可投資資產']))+
+    finDF('流動性',finSel('assets',i,'cls',x.cls,['流動','固定']))+
+    finDF('地區',finSel('assets',i,'region',x.region,['台灣','美國','韓國','其他海外']))+
+    finDF('匯率',finNum('assets',i,'fxRate',x.fxRate))+
+    finDF('購入價(原幣)',finNum('assets',i,'cost',x.cost))+
+    finDF('報酬率 %',finNum('assets',i,'ret',x.ret))+
+    finDF('被動現金流(原幣/年)',finNum('assets',i,'income',x.income))+
+    finDF('可變動',finBool('assets',i,'movable',x.movable))+
+    '</div></td></tr>':'';
+   return main+detail;
+  }).join('');
+  return '<tr class="grp"><td colspan="7">'+esc(o)+' <span class="gm">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
+ }).join('');
+ return '<table>'+head+(body||'<tr><td colspan="7" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
+}
+
+function finLiaTable(c){
+ app.finOpen=app.finOpen||{assets:{},liabilities:{}};
+ var idx=(c.liabilities||[]).map(function(x,i){return [x,i]}).filter(function(p){return finMatch(p[0].owner)});
+ var order=[];idx.forEach(function(p){var o=p[0].owner||'(未指定)';if(order.indexOf(o)<0)order.push(o)});
+ var head='<tr><th>項目</th><th>持有人</th><th>主分類</th><th>餘額(原幣)</th><th>台幣值</th><th></th></tr>';
+ var body=order.map(function(o){var sub=0;
+  var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=lBal(x);var open=!!app.finOpen.liabilities[i];
+   var main='<tr>'+
+    '<td>'+finTxt('liabilities',i,'name',x.name)+'</td>'+
+    '<td>'+finMem(c,'liabilities',i,'owner',x.owner)+'</td>'+
+    '<td>'+finSel('liabilities',i,'mainCat',x.mainCat,['房貸','車貸','信貸','其他'])+'</td>'+
+    '<td>'+finNum('liabilities',i,'balance',x.balance)+'</td>'+
+    '<td class="calc">'+fmt(lBal(x))+'</td>'+
+    '<td class="acts">'+finCaret('liabilities',i,open)+'<button class="del" onclick="delRow(\'liabilities\','+i+')">✕</button></td></tr>';
+   var detail=open?'<tr class="drow"><td colspan="6"><div class="dhead">進階欄</div><div class="dform">'+
+    finDF('幣別',finSel('liabilities',i,'currency',x.currency,['台幣','美金','其他']))+
+    finDF('匯率',finNum('liabilities',i,'fxRate',x.fxRate))+
+    finDF('年利率 %',finNum('liabilities',i,'rate',x.rate))+
+    finDF('攤還方式',finSel('liabilities',i,'repay',x.repay,['本息攤還','本金平均','只付利息','暫緩還款']))+
+    finDF('月繳(原幣)',finNum('liabilities',i,'pay',x.pay))+
+    finDF('剩餘月數',finNum('liabilities',i,'months',x.months))+
+    finDF('寬限期(月)',finNum('liabilities',i,'grace',x.grace))+
+    finDF('起始年齡',finNum('liabilities',i,'startAge',x.startAge))+
+    '</div></td></tr>':'';
+   return main+detail;
+  }).join('');
+  return '<tr class="grp"><td colspan="6">'+esc(o)+' <span class="gm">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
+ }).join('');
+ return '<table>'+head+(body||'<tr><td colspan="6" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
+}
+
+function finTotals(c){
+ var inc=0;(c.incomes||[]).forEach(function(x){if(finMatch(x.owner))inc+=n(x.amount)});
+ var exp=sum(c.expenses,function(e){return n(e.amount)});
+ var ast=0;(c.assets||[]).forEach(function(a){if(finMatch(a.owner))ast+=aVal(a)});
+ var lia=0;(c.liabilities||[]).forEach(function(l){if(finMatch(l.owner))lia+=lBal(l)});
+ return {inc:inc,exp:exp,ast:ast,lia:lia,bal:inc-exp,net:ast-lia};
+}
+function syncFinSummary(){var probe=document.getElementById('finSum_inc');if(!probe)return;var c=activeCase();if(!c)return;var t=finTotals(c);
+ function T(id,v){var e=document.getElementById(id);if(e)e.textContent=fmt(v);}
+ function S(id,v){var e=document.getElementById(id);if(e){e.textContent=fmt(v);e.className='v big '+(v>=0?'pos':'neg');}}
+ T('finSum_inc',t.inc);T('finSum_exp',t.exp);S('finSum_bal',t.bal);
+ T('finSum_ast',t.ast);T('finSum_lia',t.lia);S('finSum_net',t.net);
+ T('finSub_inc',t.inc);T('finSub_exp',t.exp);T('finSub_ast',t.ast);T('finSub_lia',t.lia);
+}
+
+function financeSec(c){
+ app.finOpen=app.finOpen||{assets:{},liabilities:{}};
+ var t=finTotals(c);
+ var summary='<div class="finsum">'+
+  '<div class="finsg"><div class="gt">現金流量</div><div class="cells">'+
+   '<div><div class="l">年收入</div><div class="v pos" id="finSum_inc">'+fmt(t.inc)+'</div></div><div class="op">−</div>'+
+   '<div><div class="l">年支出</div><div class="v neg" id="finSum_exp">'+fmt(t.exp)+'</div></div><div class="op">=</div>'+
+   '<div><div class="l">年結餘</div><div class="v big '+(t.bal>=0?'pos':'neg')+'" id="finSum_bal">'+fmt(t.bal)+'</div></div>'+
+  '</div></div>'+
+  '<div class="finsg"><div class="gt">資產負債</div><div class="cells">'+
+   '<div><div class="l">資產總額</div><div class="v" style="color:var(--teal)" id="finSum_ast">'+fmt(t.ast)+'</div></div><div class="op">−</div>'+
+   '<div><div class="l">負債總額</div><div class="v" style="color:var(--amber2)" id="finSum_lia">'+fmt(t.lia)+'</div></div><div class="op">=</div>'+
+   '<div><div class="l">淨值</div><div class="v big '+(t.net>=0?'pos':'neg')+'" id="finSum_net">'+fmt(t.net)+'</div></div>'+
+  '</div></div>'+
+ '</div>';
+ var expNote=(app.ownerView&&app.ownerView!=='全家')?'<div class="finfoot" style="border:0;padding-top:0;color:var(--amber2)">＊ 支出屬家庭層級、不分持有人，仍顯示全部。</div>':'';
+ var quad='<div class="finquad">'+
+  '<div class="finpanel inc"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div><button class="add" onclick="addRow(\'incomes\')">＋ 新增</button></div><div class="fintbl">'+finIncTable(c)+'</div></div>'+
+  '<div class="finpanel exp"><div class="finph"><div class="ic" style="background:rgba(224,138,104,.16);color:var(--warn)">支</div><h4>支出</h4><div class="sub"><div class="sl">年化小計</div><div class="sv neg" id="finSub_exp">'+fmt(t.exp)+'</div></div><button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></div><div class="fintbl">'+finExpTable(c)+'</div>'+expNote+'</div>'+
+  '<div class="finpanel ast"><div class="finph"><div class="ic" style="background:rgba(169,188,207,.16);color:var(--teal)">資</div><h4>資產 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">現值合計</div><div class="sv" style="color:var(--teal)" id="finSub_ast">'+fmt(t.ast)+'</div></div><button class="add" onclick="addRow(\'assets\')">＋ 新增</button></div><div class="fintbl">'+finAstTable(c)+'</div><div class="finfoot"><span>原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
+  '<div class="finpanel lia"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">債</div><h4>負債 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">餘額合計</div><div class="sv" style="color:var(--amber2)" id="finSub_lia">'+fmt(t.lia)+'</div></div><button class="add" onclick="addRow(\'liabilities\')">＋ 新增</button></div><div class="fintbl">'+finLiaTable(c)+'</div><div class="finfoot"><span>餘額原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
+ '</div>';
+ return ownerBar(c)+summary+'<div class="finhint">💡 一個介面同時填四項：左上收入、右上支出＝現金流；左下資產、右下負債＝資產負債表。任一格輸入，頂部年結餘、淨值即時更新。</div>'+quad;
+}
+
 function lifestyleSec(c){
  var travel=tableSec('旅遊規劃','travel',c.travel,[['cat','國內/外','sel:國內,國外'],['sub','類型','sel:認知旅遊,體育旅遊,消費旅遊,鄉村旅遊,宗教旅遊'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','每次預算(理想)','num'],['minAmount','每次(最低)','num'],['imp','重要度1-5','num']]);
  var hobby=tableSec('休閒興趣','hobby',c.hobby,[['sub','類型','sel:體能類,收藏類,思考類,娛樂創作類,社會服務類,栽培飼養類,其他類'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','平均花費(每次)','num'],['minAmount','最低','num'],['imp','重要度1-5','num']]);
