@@ -118,12 +118,14 @@ td.calc{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;whit
 <body>
 <div class="top">
   <div class="brand">
+    <span id="brandMark" style="display:inline-flex">
     <svg width="34" height="34" viewBox="0 0 48 48" fill="none" aria-label="嵐途 LAN TU">
       <rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="#0d2b45" stroke="#c99a5b" stroke-width="1.2"/>
       <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       <path d="M20 30 L34 30" stroke="#b7c6b0" stroke-width="2.2" stroke-linecap="round" opacity=".8"/>
       <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/>
     </svg>
+    </span>
     <span class="bt"><span class="zh">嵐途</span><span class="en">LAN TU</span></span>
     <small>全方位財務規劃</small>
   </div>
@@ -1380,7 +1382,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  var assetPie=[{name:'流動資產',pct:aLiq},{name:'固定資產',pct:aFix}];
  var hp=h.parts;
  return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>財務規劃報告書</h1></div>'+
-  '<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg></div>'+
+  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>')+'</div>'+
   '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務健康等級 <b style="color:'+(h.grade==='D'?'#e08a68':'#e0bd8b')+'">'+h.grade+'</b><span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>'+
 
   '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px"><b style="color:#0d2b45">目錄</b><ol style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
@@ -1472,6 +1474,24 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
   });
   try{parent.postMessage({type:'lantu:ready'},'*');}catch(e){}
   setTimeout(function(){if(!inited)render();},1500);
+})();
+</script>
+<script>
+/* 全組織品牌 Logo：載入時抓 /api/brand，有上傳就換掉頂欄標記；報告書封面於產生時讀 window.LANTU_BRAND。*/
+(function(){
+  window.LANTU_BRAND=window.LANTU_BRAND||null;
+  function applyMark(logoUrl){
+    var m=document.getElementById('brandMark');
+    if(m&&logoUrl){
+      m.innerHTML='<img src="'+logoUrl+'" alt="嵐途 LAN TU" style="height:34px;width:auto;max-width:180px;object-fit:contain;display:block"/>';
+    }
+  }
+  try{
+    fetch('/api/brand',{cache:'no-store'})
+      .then(function(r){return r&&r.ok?r.json():null;})
+      .then(function(b){ if(!b)return; window.LANTU_BRAND=b; applyMark(b.logoUrl); })
+      .catch(function(){});
+  }catch(e){}
 })();
 </script>
 </body>

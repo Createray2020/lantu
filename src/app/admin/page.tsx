@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin, listCoaches } from "@/lib/coach";
+import { getBrand } from "@/lib/brand";
 import { approveCoach, suspendCoach, resetCoach, updateOrg } from "./actions";
+import BrandSettings from "./BrandSettings";
 
 const RANK_LABEL: Record<string, string> = { member: "顧問", manager: "主管", owner: "老闆" };
 
@@ -27,10 +29,15 @@ export default async function Admin() {
 
   const coaches = await listCoaches();
   const pending = coaches.filter((c) => c.status === "pending").length;
+  const brand = await getBrand();
 
   return (
     <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
       <header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]">
+        {brand.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
+        )}
         <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
         <span className="text-[#a9bccf] text-xs">教練管理後台</span>
         <div className="flex-1" />
@@ -144,6 +151,8 @@ export default async function Admin() {
         <p className="mt-4 text-xs text-[#6f869c]">
           運作方式：教練用 Google／Email 註冊後為「待審核」，無法進入系統；你在此按「核准開通」（確認收款後）即可啟用。停權可隨時收回存取。
         </p>
+
+        <BrandSettings currentLogo={brand.logoUrl} />
       </section>
     </main>
   );

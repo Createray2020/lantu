@@ -143,9 +143,13 @@ export const announcements = pgTable('announcements', {
 });
 
 // 品牌 / 後台設定（每位教練一組；Logo 上傳）
+// 全組織品牌以「org 擁有者(owner)」這一列為準：全員讀 owner 的設定。
+// logoUrl：橫式 logo（透明底，供頂欄與報告書封面）。
+// iconUrl：512×512 方形 icon（供 favicon 與 PWA 安裝圖示）。
 export const orgSettings = pgTable('org_settings', {
   coachId: text('coach_id').primaryKey().references(() => coaches.id, { onDelete: 'cascade' }),
   logoUrl: text('logo_url'),
+  iconUrl: text('icon_url'),
   brandName: text('brand_name').default('嵐途 LAN TU'),
   slogan: text('slogan').default('理解自己・做出選擇・走向未來'),
   reportFooter: text('report_footer'),
