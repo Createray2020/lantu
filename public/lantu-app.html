@@ -375,6 +375,7 @@ function projection(c){
  var invest=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
  var fixedAssets=sum(c.assets,function(a){return a.cls==='固定'?aVal(a):0});
  var rows=[],turnNeg=null,totalOut=0;
+ var planBal=n(c.params.planInit)||0,planRet=n(c.params.planSaving)/100,planYr=n(c.params.planYearly)||0;
  var eduByYear={}; var g=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){var ag=s+yy;eduByYear[ag]=(eduByYear[ag]||0)+n(e.annual)*Math.pow(1+g,n(e.startIn)+yy)}});
  var rn=retireNeed(c);
@@ -399,7 +400,11 @@ function projection(c){
   if(turnNeg===null&&invest<0)turnNeg=age;
   var remDebt=sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;if(age<sa)return 0;return Math.max(0,lBal(l)-lPay(l)*12*(age-sa))});
   var netEst=invest+fixedAssets-remDebt;
-  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,bal:bal,invest:invest,net:netEst});
+  var planOut=goalOut+edu+life;
+  planBal=(planBal>0?planBal*(1+planRet):planBal)+planYr;
+  var planDraw=Math.max(0,Math.min(planBal,planOut));
+  planBal-=planDraw; if(planBal<0)planBal=0; var freeCap=Math.max(0,invest); if(planBal>freeCap)planBal=freeCap;
+  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,bal:bal,invest:invest,net:netEst,planBal:planBal,planDraw:planDraw,planOut:planOut});
  }
  return {rows:rows,turnNeg:turnNeg,totalOutflow:totalOut};
 }
@@ -686,7 +691,7 @@ function familySec(c){var p=c.profile,pa=c.params;
   jobSec(c)+
   '<div class="sec"><h4>規劃參數</h4><div class="fgrid">'+
   fld(pa,'params','inflation','通膨率%','num')+fld(pa,'params','salaryGrowth','薪資成長率%','num')+fld(pa,'params','invReturn','投資報酬率%','num')+
-  fld(pa,'params','tuitionGrowth','學費上漲率%','num')+fld(pa,'params','freeSaving','自由儲蓄%','num')+fld(pa,'params','planSaving','計劃儲蓄%','num')+
+  fld(pa,'params','tuitionGrowth','學費上漲率%','num')+fld(pa,'params','freeSaving','自由儲蓄%','num')+fld(pa,'params','planSaving','計劃儲蓄%','num')+fld(pa,'params','planInit','計劃儲蓄期初','num')+fld(pa,'params','planYearly','計劃儲蓄年投入','num')+
   fld(pa,'params','emergencyMonths','緊急預備金(月)','num')+fld(pa,'params','horizon','模擬到幾歲','num')+
   fld(pa,'params','invReturnStd','報酬標準差%','num')+fld(pa,'params','inflationStd','通膨標準差%','num')+fld(pa,'params','salaryStd','薪資標準差%','num')+'</div></div>';
 }
@@ -840,23 +845,30 @@ function crossTableHTML(x){
   cell('負債',r('消費型',x.dCons)+r('投資型',x.dInv),x.dTotal)+
   '</div><div style="text-align:center;margin-top:10px;color:var(--mut)">保險居中 ｜ 單月結餘 <b style="color:'+(x.monthBal>=0?'var(--ok)':'var(--warn)')+'">'+fmt(x.monthBal)+'</b> ｜ 淨資產 <b style="color:var(--amber2)">'+fmt(x.net)+'</b></div>';
 }
-function timelineSVG(c){
- var evs=[];var A=n(c.profile.age);
- (c.goals||[]).forEach(function(g){evs.push({age:n(g.start),label:g.name,amt:n(g.present)})});
- if(c.retire&&n(c.retire.monthLiving)>0)evs.push({age:n(c.profile.retireAge),label:'退休',amt:0});
- (c.education||[]).forEach(function(e){evs.push({age:A+n(e.startIn),label:'教育·'+e.stage,amt:n(e.annual)})});
- [].concat(c.travel||[],c.hobby||[],c.luxury||[]).forEach(function(x){evs.push({age:n(x.start),label:esc(x.cat||'')+(x.sub||'願望'),amt:0})});
- evs.sort(function(a,b){return a.age-b.age});
- if(!evs.length)return '<div class="muted">尚無目標</div>';
- var W=760,H=130,pad=40,a0=A,a1=Math.max(n(c.profile.lifeExp),evs[evs.length-1].age);
- function X(ag){return pad+(ag-a0)/((a1-a0)||1)*(W-pad*2)}
- var line='<line x1="'+pad+'" y1="70" x2="'+(W-pad)+'" y2="70" stroke="rgba(255,255,255,.2)" stroke-width="2"/>';
- var pts=evs.map(function(e,i){var x=X(e.age),up=i%2===0;return '<circle cx="'+x+'" cy="70" r="5" fill="#c99a5b"/>'+
-   '<line x1="'+x+'" y1="70" x2="'+x+'" y2="'+(up?46:94)+'" stroke="#c99a5b" stroke-width="1"/>'+
-   '<text x="'+x+'" y="'+(up?40:108)+'" fill="#e9f0f2" font-size="11" text-anchor="middle">'+esc(e.label)+'</text>'+
-   '<text x="'+x+'" y="'+(up?30:120)+'" fill="#9db2b9" font-size="10" text-anchor="middle">'+e.age+'歲</text>'}).join('');
- return '<svg width="100%" viewBox="0 0 '+W+' '+H+'">'+line+pts+'<text x="'+pad+'" y="66" fill="#a9bccf" font-size="10">'+a0+'歲</text></svg>';
+function timelineHTML(c,theme){var A=n(c.profile.age);var evs=[];
+ (c.goals||[]).forEach(function(g){evs.push({age:n(g.start),label:g.name})});
+ if(c.retire&&n(c.retire.monthLiving)>0)evs.push({age:n(c.profile.retireAge),label:'退休'});
+ (c.education||[]).forEach(function(e){evs.push({age:A+n(e.startIn),label:'教育·'+e.stage})});
+ [].concat(c.travel||[],c.hobby||[],c.luxury||[]).forEach(function(x){evs.push({age:n(x.start),label:(x.cat||'')+(x.sub||'願望')})});
+ if(!evs.length)return '<div class="muted" style="color:'+(theme==='light'?'#5a6b72':'')+'">尚無目標</div>';
+ var map={};evs.forEach(function(e){var k=e.age;(map[k]=map[k]||[]).push(e.label)});
+ var ages=Object.keys(map).map(Number).sort(function(a,b){return a-b});var G=ages.length;
+ var dark=theme!=='light';
+ var col=dark?{line:'rgba(255,255,255,.18)',node:'#c99a5b',lab:'#e9f0f2',age:'#9db2b9'}:{line:'#cdd8db',node:'#c99a5b',lab:'#22333a',age:'#5a6b72'};
+ var maxStack=Math.max.apply(null,ages.map(function(a){return map[a].length}));
+ var rowH=15,gap0=20,W=760,pad=48;
+ var half=gap0+maxStack*rowH+16,cy=half,H=half*2;
+ function X(i){return pad+(G>1?i/(G-1):0.5)*(W-pad*2)}
+ var nodes=ages.map(function(ag,i){var x=X(i),up=(i%2===0),dir=up?-1:1;var stalkEnd=cy+dir*gap0;
+   var s='<line x1="'+x.toFixed(0)+'" y1="'+cy+'" x2="'+x.toFixed(0)+'" y2="'+stalkEnd.toFixed(0)+'" stroke="'+col.node+'" stroke-width="1"/>'+
+     '<circle cx="'+x.toFixed(0)+'" cy="'+cy+'" r="4.5" fill="'+col.node+'"/>'+
+     '<text x="'+x.toFixed(0)+'" y="'+(cy+(up?15:-7)).toFixed(0)+'" fill="'+col.age+'" font-size="10" font-weight="700" text-anchor="middle">'+ag+'歲</text>';
+   map[ag].forEach(function(lb,k){var ly=up?(stalkEnd-4-k*rowH):(stalkEnd+12+k*rowH);var t=lb.length>9?lb.slice(0,9)+'…':lb;
+     s+='<text x="'+x.toFixed(0)+'" y="'+ly.toFixed(0)+'" fill="'+col.lab+'" font-size="10.5" text-anchor="middle">'+esc(t)+'</text>'});
+   return s}).join('');
+ return '<svg width="100%" viewBox="0 0 '+W+' '+H+'"><line x1="'+pad+'" y1="'+cy+'" x2="'+(W-pad)+'" y2="'+cy+'" stroke="'+col.line+'" stroke-width="2"/>'+nodes+'</svg>';
 }
+function timelineSVG(c){return timelineHTML(c,'dark');}
 function beforeAfterHTML(c){var s=scenario(c);
  function row(l,b,a,better){var imp=(better==='down')?(a<b):(a>b);return '<tr><td class="k">'+l+'</td><td>'+b+'</td><td style="color:'+(imp?'var(--ok)':'var(--mut)')+'">'+a+'</td></tr>'}
  var b=s.before,a=s.after;
@@ -1237,7 +1249,7 @@ function analysisPane(c){
    '<div class="muted" style="flex:1;min-width:220px">策略階段：<b style="color:var(--amber2)">'+GRADE_STRAT[h.grade]+'</b></div></div><table style="margin-top:14px">'+parts+'</table></div>'+
   '<div class="sec"><h4>現況財務指標（11 項）</h4><table class="rtable">'+rt+'</table></div>'+
   '<div class="sec"><h4>退休需求</h4><div class="big3"><div class="b"><div class="l">退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div><div class="b"><div class="l">已準備</div><div class="v">'+fmt(rn.prepared)+'</div></div><div class="b"><div class="l" style="color:var(--warn)">缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div></div>'+
-  '<div class="sec" id="an-gap"><h4>保障缺口（需求已反推計算）</h4><table class="rtable"><tr><th>被保人</th><th>險種</th><th>需求</th><th>已備</th><th>缺口</th></tr>'+(gt||'<tr><td colspan=5 class=muted>請於「保障需求」分頁新增</td></tr>')+'</table></div>'+
+  '<div class="sec" id="an-gap"><h4>保障缺口（需求已反推計算）</h4><table class="rtable"><tr><th>被保人</th><th>險種</th><th>需求</th><th>已備</th><th>缺口</th></tr>'+(gt||'<tr><td colspan=5 class=muted>請於「保障需求」分頁新增</td></tr>')+'</table></div>'+'<div class="sec"><h4>壽險需求圖 <span class="hint">身故情境下家庭保障可支撐幾年</span></h4>'+lifeNeedCharts(c)+'</div>'+
   (pt?'<div class="sec"><h4>置產缺口</h4><table class="rtable"><tr><th>項目</th><th>需求終值</th><th>可貸款</th><th>缺口</th></tr>'+pt+'</table></div>':'')+
   '<div class="sec"><h4>財務十字表</h4>'+crossTableHTML(ct)+'</div>'+
   '<div class="sec"><h4>財務目標歷程</h4>'+timelineSVG(c)+'</div>'+
@@ -1260,54 +1272,105 @@ function gauge(t,v){v=Math.max(0,Math.min(100,v));var col=v>=70?'var(--ok)':v>=4
   '<path d="M13 75 A62 62 0 0 1 137 75" fill="none" stroke="'+col+'" stroke-width="12" stroke-linecap="round" stroke-dasharray="'+(v/100*195)+' 400"/>'+
   '<circle cx="'+x+'" cy="'+y+'" r="5" fill="#fff"/></svg></div><div class="sc" style="color:'+col+'">'+Math.round(v)+'<small style="color:var(--mut);font-size:13px"> 分</small></div></div>';}
 function cfAxis(v){var a=Math.abs(v);var sg=v<0?'-':'';if(a>=1e8)return sg+(a/1e8).toFixed(a>=1e9?0:1)+'億';if(a>=1e4)return sg+Math.round(a/1e4)+'萬';return fmt(v);}
-function expenseSourceSVG(proj){var rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
+function expenseSourceSVG(proj,theme){var rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
+ var dark=theme!=='light',AX=dark?'#6f869c':'#5a6b72',GRID=dark?'rgba(255,255,255,.08)':'rgba(0,0,0,.08)',HINT=dark?'#a7bacb':'#5a6b72',TICK=dark?'#71858c':'#8a9aa2';
  var W=760,H=250,pL=52,pR=12,pT=14,pB=28,plotW=W-pL-pR,plotH=H-pT-pB;
  var Es=rows.map(function(r){return Math.max(0,r.income-r.bal)});
  var mx=Math.max.apply(null,Es.concat([1]));
  function X(i){return pL+(rows.length>1?i/(rows.length-1):0)*plotW}
  var bw=Math.max(2,Math.min(14,plotW/rows.length*0.62));
- var COL={work:'#5b93d6',fin:'#5cc08a',asset:'#f0c34e',gap:'#ef6f6f'};
- function comp(r,i){var E=Math.max(0,r.income-r.bal);var work=Math.min(Math.max(0,r.work),E);var fin=Math.min(Math.max(0,r.fin+r.other),Math.max(0,E-work));var R=Math.max(0,E-work-fin);var prev=i>0?rows[i-1].invest:Infinity;var aBefore=prev>0?(r.invest-r.bal):prev;var asset=Math.max(0,Math.min(aBefore,R));var gap=Math.max(0,R-asset);return {E:E,work:work,fin:fin,asset:asset,gap:gap};}
- var bars=rows.map(function(r,i){var c=comp(r,i);if(c.E<=0)return '';var x=X(i)-bw/2,yTop=pT+plotH,out='';[['work',c.work],['fin',c.fin],['asset',c.asset],['gap',c.gap]].forEach(function(sp){var val=sp[1];if(val<=0)return;var h=(val/mx)*plotH;yTop-=h;out+='<rect x="'+x.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+COL[sp[0]]+'"/>';});return out;}).join('');
- var grid='',NL=4;for(var k=0;k<=NL;k++){var v=mx*k/NL,y=pT+plotH-(v/mx)*plotH;grid+='<line x1="'+pL+'" y1="'+y.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+y.toFixed(1)+'" stroke="rgba(255,255,255,.08)"/><text x="'+(pL-6)+'" y="'+(y+3).toFixed(1)+'" fill="#6f869c" font-size="9" text-anchor="end">'+cfAxis(v)+'</text>';}
- var ticks='';for(var i2=0;i2<rows.length;i2+=5)ticks+='<text x="'+X(i2).toFixed(1)+'" y="'+(H-9)+'" fill="#71858c" font-size="9" text-anchor="middle">'+rows[i2].age+'</text>';
- var leg=[['#5b93d6','薪資/工作收入'],['#5cc08a','理財+退休收入'],['#f0c34e','可投資資產本金'],['#ef6f6f','缺口(資產變現/降低需求)']].map(function(l){return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px"><span style="width:11px;height:11px;border-radius:2px;background:'+l[0]+';display:inline-block"></span>'+l[1]+'</span>';}).join('');
+ var COL={work:'#5b93d6',fin:'#5cc08a',plan:'#e79ec4',asset:'#f0c34e',gap:'#ef6f6f'};
+ function comp(r,i){var E=Math.max(0,r.income-r.bal);var work=Math.min(Math.max(0,r.work),E);var fin=Math.min(Math.max(0,r.fin+r.other),Math.max(0,E-work));var R=Math.max(0,E-work-fin);var prev=i>0?rows[i-1].invest:Infinity;var aBefore=prev>0?(r.invest-r.bal):prev;var assetCover=Math.max(0,Math.min(aBefore,R));var gap=Math.max(0,R-assetCover);var plan=Math.max(0,Math.min(r.planDraw||0,assetCover));var asset=assetCover-plan;return {E:E,work:work,fin:fin,plan:plan,asset:asset,gap:gap};}
+ var bars=rows.map(function(r,i){var c=comp(r,i);if(c.E<=0)return '';var x=X(i)-bw/2,yTop=pT+plotH,out='';[['work',c.work],['fin',c.fin],['plan',c.plan],['asset',c.asset],['gap',c.gap]].forEach(function(sp){var val=sp[1];if(val<=0)return;var h=(val/mx)*plotH;yTop-=h;out+='<rect x="'+x.toFixed(1)+'" y="'+yTop.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+COL[sp[0]]+'"/>';});return out;}).join('');
+ var grid='',NL=4;for(var k=0;k<=NL;k++){var v=mx*k/NL,y=pT+plotH-(v/mx)*plotH;grid+='<line x1="'+pL+'" y1="'+y.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+y.toFixed(1)+'" stroke="'+GRID+'"/><text x="'+(pL-6)+'" y="'+(y+3).toFixed(1)+'" fill="'+AX+'" font-size="9" text-anchor="end">'+cfAxis(v)+'</text>';}
+ var ticks='';for(var i2=0;i2<rows.length;i2+=5)ticks+='<text x="'+X(i2).toFixed(1)+'" y="'+(H-9)+'" fill="'+TICK+'" font-size="9" text-anchor="middle">'+rows[i2].age+'</text>';
+ var leg=[['#5b93d6','薪資/工作收入'],['#5cc08a','理財+退休收入'],['#e79ec4','計劃儲蓄帳戶'],['#f0c34e','可投資資產本金'],['#ef6f6f','缺口(資產變現/降低需求)']].map(function(l){return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px"><span style="width:11px;height:11px;border-radius:2px;background:'+l[0]+';display:inline-block"></span>'+l[1]+'</span>';}).join('');
  var hasGap=rows.some(function(r,i){return comp(r,i).gap>1;});
  return '<svg width="100%" viewBox="0 0 '+W+' '+H+'">'+grid+bars+ticks+'</svg>'+
-  '<div class="muted" style="margin-top:6px;font-size:12px;line-height:1.9">'+leg+'</div>'+
-  '<div class="muted" style="margin-top:4px;font-size:12px">每根柱＝當年家庭總支出，依序由 收入→可投資資產→缺口 支應。'+(hasGap?'⚠ 出現<span style="color:#ef6f6f">紅色缺口</span>的年度代表資金已不足，需降低目標或變現資產。':'✓ 期間內各年支出皆由收入與資產支應，無缺口。')+'</div>';
+  '<div style="margin-top:6px;font-size:12px;line-height:1.9;color:'+HINT+'">'+leg+'</div>'+
+  '<div style="margin-top:4px;font-size:12px;color:'+HINT+'">每根柱＝當年家庭總支出，依序由 收入→計劃儲蓄→可投資資產→缺口 支應。'+(hasGap?'⚠ 出現<span style="color:#ef6f6f">紅色缺口</span>的年度代表資金已不足，需降低目標或變現資產。':'✓ 期間內各年支出皆由收入與資產支應，無缺口。')+'</div>';
 }
-function annualBalanceSVG(proj){var rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
+function annualBalanceSVG(proj,theme){var rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
+ var dark=theme!=='light',AX=dark?'#6f869c':'#5a6b72',GRID=dark?'rgba(255,255,255,.08)':'rgba(0,0,0,.08)',HINT=dark?'#a7bacb':'#5a6b72',TICK=dark?'#71858c':'#8a9aa2',ZERO=dark?'rgba(255,255,255,.25)':'rgba(0,0,0,.22)',DOTC=dark?'#0d2b45':'#ffffff';
  var W=760,H=250,pL=52,pR=52,pT=16,pB=28,plotW=W-pL-pR,plotH=H-pT-pB;
  function X(i){return pL+(rows.length>1?i/(rows.length-1):0)*plotW}
  var bw=Math.max(2,Math.min(14,plotW/rows.length*0.62));
  var bals=rows.map(function(r){return r.bal});
  var bMax=Math.max.apply(null,bals.concat([0])),bMin=Math.min.apply(null,bals.concat([0])),bSpan=(bMax-bMin)||1;
  function Yb(v){return pT+plotH-((v-bMin)/bSpan)*plotH}
- var invs=rows.map(function(r){return r.invest});
+ var invs=rows.map(function(r){return r.invest});var plans=rows.map(function(r){return r.planBal||0});var hasPlan=plans.some(function(v){return v>1});
  var iMax=Math.max.apply(null,invs.concat([0])),iMin=Math.min.apply(null,invs.concat([0])),iSpan=(iMax-iMin)||1;
  function Yi(v){return pT+plotH-((v-iMin)/iSpan)*plotH}
  var zeroY=Yb(0);
  var bars=rows.map(function(r,i){var y0=Math.min(Yb(r.bal),zeroY),h=Math.abs(Yb(r.bal)-zeroY);var col=r.bal>=0?'#e6bd6a':'#ef6f6f';return '<rect x="'+(X(i)-bw/2).toFixed(1)+'" y="'+y0.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(0.6,h).toFixed(1)+'" fill="'+col+'"/>';}).join('');
- var line=rows.map(function(r,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Yi(r.invest).toFixed(1);}).join(' ');
- var dots=rows.map(function(r,i){return (i%3===0)?'<circle cx="'+X(i).toFixed(1)+'" cy="'+Yi(r.invest).toFixed(1)+'" r="2.4" fill="#0d2b45" stroke="#5cc08a" stroke-width="1.4"/>':'';}).join('');
+ var line=rows.map(function(r,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Yi(r.invest-(r.planBal||0)).toFixed(1);}).join(' ');
+ var pline=hasPlan?('<path d="'+rows.map(function(r,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Yi(r.planBal||0).toFixed(1);}).join(' ')+'" fill="none" stroke="#7fb0e6" stroke-width="2" stroke-dasharray="5 3"/>'):'';
+ var dots=rows.map(function(r,i){return (i%3===0)?'<circle cx="'+X(i).toFixed(1)+'" cy="'+Yi(r.invest-(r.planBal||0)).toFixed(1)+'" r="2.4" fill="'+DOTC+'" stroke="#5cc08a" stroke-width="1.4"/>':'';}).join('');
  var grid='',gL='',gR='',NL=4;
- for(var k=0;k<=NL;k++){var y=pT+plotH*k/NL;grid+='<line x1="'+pL+'" y1="'+y.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+y.toFixed(1)+'" stroke="rgba(255,255,255,.08)"/>';var bv=bMax-bSpan*k/NL;gL+='<text x="'+(pL-6)+'" y="'+(y+3).toFixed(1)+'" fill="#6f869c" font-size="9" text-anchor="end">'+cfAxis(bv)+'</text>';var iv=iMax-iSpan*k/NL;gR+='<text x="'+(W-pR+6)+'" y="'+(y+3).toFixed(1)+'" fill="#6f869c" font-size="9" text-anchor="start">'+cfAxis(iv)+'</text>';}
- var ticks='';for(var i3=0;i3<rows.length;i3+=5)ticks+='<text x="'+X(i3).toFixed(1)+'" y="'+(H-9)+'" fill="#71858c" font-size="9" text-anchor="middle">'+rows[i3].age+'</text>';
+ for(var k=0;k<=NL;k++){var y=pT+plotH*k/NL;grid+='<line x1="'+pL+'" y1="'+y.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+y.toFixed(1)+'" stroke="'+GRID+'"/>';var bv=bMax-bSpan*k/NL;gL+='<text x="'+(pL-6)+'" y="'+(y+3).toFixed(1)+'" fill="'+AX+'" font-size="9" text-anchor="end">'+cfAxis(bv)+'</text>';var iv=iMax-iSpan*k/NL;gR+='<text x="'+(W-pR+6)+'" y="'+(y+3).toFixed(1)+'" fill="'+AX+'" font-size="9" text-anchor="start">'+cfAxis(iv)+'</text>';}
+ var ticks='';for(var i3=0;i3<rows.length;i3+=5)ticks+='<text x="'+X(i3).toFixed(1)+'" y="'+(H-9)+'" fill="'+TICK+'" font-size="9" text-anchor="middle">'+rows[i3].age+'</text>';
  var tn=proj.turnNeg,tni=tn?rows.findIndex(function(r){return r.age===tn;}):-1,tnx=tni>=0?X(tni):null;
- window.__charts=window.__charts||{};window.__charts.cf={a0:rows[0].age,rows:invs,bals:bals,W:W,pad:pL,n:rows.length};
- var leg=[['#e6bd6a','年度收支結餘(左軸)'],['#5cc08a','可投資資產累積(右軸)']].map(function(l){return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px"><span style="width:11px;height:11px;border-radius:2px;background:'+l[0]+';display:inline-block"></span>'+l[1]+'</span>';}).join('');
- return '<div id="cfReadout" style="background:#0a1a20;border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:13px;color:var(--mut)">移動滑鼠／手指到圖上任一年齡，即時顯示該年結餘與可投資資產</div>'+
-  '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="cursor:crosshair;touch-action:none" onmousemove="hoverChart(event,\'cf\')" ontouchmove="hoverChart(event,\'cf\')">'+grid+
-  '<line x1="'+pL+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+zeroY.toFixed(1)+'" stroke="rgba(255,255,255,.25)" stroke-dasharray="4 4"/>'+bars+
-  '<path d="'+line+'" fill="none" stroke="#5cc08a" stroke-width="2.2"/>'+dots+gL+gR+ticks+
-  (tnx!==null?'<line x1="'+tnx.toFixed(1)+'" y1="'+pT+'" x2="'+tnx.toFixed(1)+'" y2="'+(H-pB)+'" stroke="var(--warn)" stroke-dasharray="3 3"/><text x="'+tnx.toFixed(1)+'" y="'+(pT+9)+'" fill="#e08a68" font-size="10" text-anchor="middle">轉負 '+tn+'歲</text>':'')+
-  '<line id="cfCursor" x1="0" y1="'+pT+'" x2="0" y2="'+(H-pB)+'" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" style="display:none"/></svg>'+
-  '<div class="muted" style="margin-top:6px;font-size:12px">'+leg+'</div>'+
-  '<div class="muted" style="margin-top:4px;font-size:12px">橘/紅柱＝年度收支結餘(0 以下為入不敷出)；綠線＝可投資資產累積。'+(tn?'⚠ 可投資資產於 '+tn+' 歲轉負。':'✓ 可投資資產期間內維持為正。')+'</div>';
+ var legArr=[['#e6bd6a','年度收支結餘(左軸)'],['#5cc08a',hasPlan?'自由儲蓄累積(右軸)':'可投資資產累積(右軸)']];if(hasPlan)legArr.push(['#7fb0e6','計劃儲蓄累積(右軸)']);var leg=legArr.map(function(l){return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px"><span style="width:11px;height:11px;border-radius:2px;background:'+l[0]+';display:inline-block"></span>'+l[1]+'</span>';}).join('');
+ var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'"'+(dark?' style="cursor:crosshair;touch-action:none" onmousemove="hoverChart(event,\'cf\')" ontouchmove="hoverChart(event,\'cf\')"':'')+'>'+grid+
+  '<line x1="'+pL+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+zeroY.toFixed(1)+'" stroke="'+ZERO+'" stroke-dasharray="4 4"/>'+bars+
+  '<path d="'+line+'" fill="none" stroke="#5cc08a" stroke-width="2.2"/>'+pline+dots+gL+gR+ticks+
+  (tnx!==null?'<line x1="'+tnx.toFixed(1)+'" y1="'+pT+'" x2="'+tnx.toFixed(1)+'" y2="'+(H-pB)+'" stroke="#e08a68" stroke-dasharray="3 3"/><text x="'+tnx.toFixed(1)+'" y="'+(pT+9)+'" fill="#e08a68" font-size="10" text-anchor="middle">轉負 '+tn+'歲</text>':'')+
+  (dark?'<line id="cfCursor" x1="0" y1="'+pT+'" x2="0" y2="'+(H-pB)+'" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" style="display:none"/>':'')+'</svg>';
+ window.__charts=window.__charts||{};if(dark)window.__charts.cf={a0:rows[0].age,rows:invs,bals:bals,W:W,pad:pL,n:rows.length};
+ return (dark?'<div id="cfReadout" style="background:#0a1a20;border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:13px;color:var(--mut)">移動滑鼠／手指到圖上任一年齡，即時顯示該年結餘與可投資資產</div>':'')+svg+
+  '<div style="margin-top:6px;font-size:12px;color:'+HINT+'">'+leg+'</div>'+
+  '<div style="margin-top:4px;font-size:12px;color:'+HINT+'">橘/紅柱＝年度收支結餘(0 以下為入不敷出)；綠線＝可投資資產累積。'+(tn?'⚠ 可投資資產於 '+tn+' 歲轉負。':'✓ 可投資資產期間內維持為正。')+'</div>';
 }
-function cashflowCharts(proj){return '<div class="chart"><h4 style="color:var(--amber2);margin-bottom:8px">支出來源圖 <span class="hint" style="font-weight:400">每年支出如何被支應，紅色為資金缺口</span></h4>'+expenseSourceSVG(proj)+'</div>'+
- '<div class="chart"><h4 style="color:var(--amber2);margin-bottom:8px">年度收支結餘圖 <span class="hint" style="font-weight:400">結餘柱＋可投資資產累積</span></h4>'+annualBalanceSVG(proj)+'</div>';}
+function cashflowCharts(proj,theme){var dark=theme!=='light',hc=dark?'var(--amber2)':'#0d2b45',sub=dark?'#6f869c':'#5a6b72',wrapC=dark?' class="chart"':'',wrapS=dark?'':' style="margin:12px 0"';
+ return '<div'+wrapC+wrapS+'><h4 style="color:'+hc+';margin-bottom:8px;font-size:15px">支出來源圖 <span style="font-weight:400;font-size:12px;color:'+sub+'">每年支出如何被支應，紅色為資金缺口</span></h4>'+expenseSourceSVG(proj,theme)+'</div>'+
+  '<div'+wrapC+wrapS+'><h4 style="color:'+hc+';margin-bottom:8px;font-size:15px">年度收支結餘圖 <span style="font-weight:400;font-size:12px;color:'+sub+'">結餘柱＋可投資資產累積</span></h4>'+annualBalanceSVG(proj,theme)+'</div>';}
+function deathProjection(c,mb){var base=projection(c),a0=n(c.profile.age),infl=n(c.params.inflation)/100,ret=n(c.params.invReturn)/100;
+ var liquid0=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
+ var lump=existingCover(c,mb.name,'壽險');
+ var funeral=sum((c.needs||[]),function(nd){return nd.member===mb.name?n(nd.funeral):0});
+ var premium=sum((c.policies||[]),function(p){return p.insured===mb.name?n(p.premium):0});
+ var expRatio=n(mb.expRatio)/100;
+ var asset=liquid0,rows=[],depletedAge=null;
+ base.rows.forEach(function(br,i){var age=br.age,t=age-a0;
+  var mWork=sum(c.incomes,function(inc){return (inc.owner===mb.name&&inc.type==='工作'&&age>=n(inc.start)&&age<=n(inc.end))?n(inc.amount)*Math.pow(1+n(inc.growth)/100,t):0;});
+  var hLiving=sum(c.expenses,function(e){return (e.cat==='生活'&&age>=n(e.start)&&age<=n(e.end))?n(e.amount)*(e.infl?Math.pow(1+infl,t):1):0;});
+  var totalOut=br.income-br.bal;
+  var income=br.income-mWork+(i===0?lump:0);
+  var expense=Math.max(0,totalOut-(hLiving+n(br.goal))*expRatio-premium)+(i===0?funeral:0);
+  asset=(asset>0?asset*(1+ret):asset)+(income-expense);
+  if(depletedAge===null&&asset<0)depletedAge=age;
+  rows.push({age:age,income:income,expense:expense,asset:asset});
+ });
+ return {rows:rows,depletedAge:depletedAge,protectYears:depletedAge?depletedAge-a0:null};
+}
+function lifeNeedSVG(dp,mbName,theme){var rows=dp.rows;if(!rows.length)return '';
+ var dark=theme!=='light',AX=dark?'#6f869c':'#5a6b72',GRID=dark?'rgba(255,255,255,.08)':'rgba(0,0,0,.08)',HINT=dark?'#a7bacb':'#5a6b72',TICK=dark?'#71858c':'#8a9aa2',ZERO=dark?'rgba(255,255,255,.2)':'rgba(0,0,0,.2)';
+ var W=760,H=240,pL=54,pR=54,pT=18,pB=28,plotW=W-pL-pR,plotH=H-pT-pB;
+ function X(i){return pL+(rows.length>1?i/(rows.length-1):0)*plotW}
+ var bw=Math.max(2,Math.min(12,plotW/rows.length*0.6));
+ var as=rows.map(function(r){return r.asset});var aMax=Math.max.apply(null,as.concat([0])),aMin=Math.min.apply(null,as.concat([0])),aSpan=(aMax-aMin)||1;
+ function Ya(v){return pT+plotH-((v-aMin)/aSpan)*plotH}
+ var ie=rows.map(function(r){return Math.max(r.income,r.expense)});var vMax=Math.max.apply(null,ie.concat([1])),vSpan=vMax||1;
+ function Yv(v){return pT+plotH-(v/vSpan)*plotH}
+ var zeroA=Ya(0);
+ var bars=rows.map(function(r,i){var y0=Math.min(Ya(r.asset),zeroA),h=Math.abs(Ya(r.asset)-zeroA);return '<rect x="'+(X(i)-bw/2).toFixed(1)+'" y="'+y0.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(0.6,h).toFixed(1)+'" fill="'+(r.asset>=0?'#5cc08a':'#ef6f6f')+'"/>';}).join('');
+ var incLine=rows.map(function(r,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Yv(r.income).toFixed(1);}).join(' ');
+ var expLine=rows.map(function(r,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Yv(r.expense).toFixed(1);}).join(' ');
+ var grid='',gL='',gR='',NL=4;
+ for(var k=0;k<=NL;k++){var y=pT+plotH*k/NL;grid+='<line x1="'+pL+'" y1="'+y.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+y.toFixed(1)+'" stroke="'+GRID+'"/>';gL+='<text x="'+(pL-6)+'" y="'+(y+3).toFixed(1)+'" fill="'+AX+'" font-size="9" text-anchor="end">'+cfAxis(aMax-aSpan*k/NL)+'</text>';gR+='<text x="'+(W-pR+6)+'" y="'+(y+3).toFixed(1)+'" fill="'+AX+'" font-size="9" text-anchor="start">'+cfAxis(vMax-vSpan*k/NL)+'</text>';}
+ var ticks='';for(var i2=0;i2<rows.length;i2+=5)ticks+='<text x="'+X(i2).toFixed(1)+'" y="'+(H-9)+'" fill="'+TICK+'" font-size="9" text-anchor="middle">'+rows[i2].age+'</text>';
+ var dAge=dp.depletedAge,dx=dAge?X(rows.findIndex(function(r){return r.age===dAge;})):null;
+ var leg=[['#5cc08a','可投資資產(左軸)'],['#7fb0e6','年度總所得(右軸)'],['#ef6f6f','年度總支出(右軸)']].map(function(l){return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px"><span style="width:11px;height:11px;border-radius:2px;background:'+l[0]+';display:inline-block"></span>'+l[1]+'</span>';}).join('');
+ return '<svg width="100%" viewBox="0 0 '+W+' '+H+'">'+grid+'<line x1="'+pL+'" y1="'+zeroA.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+zeroA.toFixed(1)+'" stroke="'+ZERO+'" stroke-dasharray="4 4"/>'+bars+
+  '<path d="'+incLine+'" fill="none" stroke="#7fb0e6" stroke-width="2"/><path d="'+expLine+'" fill="none" stroke="#ef6f6f" stroke-width="2"/>'+gL+gR+ticks+
+  (dx!=null?'<line x1="'+dx.toFixed(1)+'" y1="'+pT+'" x2="'+dx.toFixed(1)+'" y2="'+(H-pB)+'" stroke="#e08a68" stroke-dasharray="3 3"/><text x="'+dx.toFixed(1)+'" y="'+(pT+9)+'" fill="#e08a68" font-size="10" text-anchor="middle">資產耗盡 '+dAge+'歲</text>':'')+'</svg>'+
+  '<div style="margin-top:6px;font-size:12px;color:'+HINT+'">'+leg+'</div>'+
+  '<div style="margin-top:4px;font-size:12px;color:'+HINT+'">模擬 '+esc(mbName)+' 身故：綠柱＝家庭可投資資產（'+(dp.protectYears!=null?'約 '+dp.protectYears+' 年後（'+dAge+'歲）資產耗盡':'期間內不耗盡')+'）；藍線＝年度總所得、紅線＝年度總支出。</div>';
+}
+function lifeNeedCharts(c,theme){var mbs=(c.members||[]).filter(function(m){return m.role==='本人'||m.role==='配偶';});if(!mbs.length)return '<div style="color:'+(theme==='light'?'#5a6b72':'#a7bacb')+';font-size:12px">尚無成員資料</div>';
+ var dark=theme!=='light',hc=dark?'var(--amber2)':'#0d2b45',wrapC=dark?' class="chart"':'',wrapS=dark?'':' style="margin:12px 0"';
+ return mbs.map(function(m){var dp=deathProjection(c,m);return '<div'+wrapC+wrapS+'><h4 style="color:'+hc+';margin-bottom:8px;font-size:14px">壽險需求圖 – '+esc(m.name)+'（'+esc(m.role)+'）</h4>'+lifeNeedSVG(dp,m.name,theme)+'</div>';}).join('');
+}
 
 function shortTermHTML(c){var ct=crossTable(c),pas=assetPassive(c);
  var inc=[['工作收入',ct.incWork],['理財收入',ct.incFin+pas],['其他收入',ct.incOther]];
@@ -1390,16 +1453,7 @@ function rCross(ct){function box(t,rows,tot,cl){return '<div style="border:1px s
   box('資產',r('自用',ct.aSelf)+r('可投資',ct.aInv),ct.aTotal,'#7f97ac')+
   box('負債',r('消費型',ct.dCons)+r('投資型',ct.dInv),ct.dTotal,'#c99a5b')+
   '</div><div style="text-align:center;margin-top:8px;color:#5a6b72;font-size:12.5px">保險居中 ｜ 淨資產 <b style="color:#0d2b45">'+fmt(ct.net)+'</b></div>';}
-function rTimeline(c){var evs=[],A=n(c.profile.age);
- (c.goals||[]).forEach(function(g){evs.push({age:n(g.start),label:g.name})});
- if(c.retire&&n(c.retire.monthLiving)>0)evs.push({age:n(c.profile.retireAge),label:'退休'});
- (c.education||[]).forEach(function(e){evs.push({age:A+n(e.startIn),label:'教育·'+e.stage})});
- [].concat(c.travel||[],c.hobby||[],c.luxury||[]).forEach(function(x){evs.push({age:n(x.start),label:(x.cat||'')+(x.sub||'願望')})});
- evs.sort(function(a,b){return a.age-b.age});if(!evs.length)return '<p style="color:#5a6b72">尚無目標</p>';
- var W=740,H=120,pad=36,a1=Math.max(n(c.profile.lifeExp),evs[evs.length-1].age);
- function X(ag){return pad+(ag-A)/((a1-A)||1)*(W-pad*2)}
- var pts=evs.map(function(e,i){var x=X(e.age),up=i%2===0;return '<circle cx="'+x.toFixed(0)+'" cy="60" r="4" fill="#c99a5b"/><line x1="'+x.toFixed(0)+'" y1="60" x2="'+x.toFixed(0)+'" y2="'+(up?42:78)+'" stroke="#c99a5b"/><text x="'+x.toFixed(0)+'" y="'+(up?36:92)+'" fill="#22333a" font-size="10.5" text-anchor="middle">'+esc(e.label)+'</text><text x="'+x.toFixed(0)+'" y="'+(up?26:104)+'" fill="#5a6b72" font-size="9.5" text-anchor="middle">'+e.age+'歲</text>'}).join('');
- return '<svg width="100%" viewBox="0 0 '+W+' '+H+'"><line x1="'+pad+'" y1="60" x2="'+(W-pad)+'" y2="60" stroke="#cdd8db" stroke-width="2"/>'+pts+'</svg>';}
+function rTimeline(c){return timelineHTML(c,'light');}
 function rLine(proj){var rows=proj.rows;if(!rows.length)return '';var W=740,H=180,pad=40;
  var vals=rows.map(function(r){return r.invest}),mx=Math.max.apply(null,vals.concat([0])),mn=Math.min.apply(null,vals.concat([0])),span=(mx-mn)||1;
  function X(i){return pad+i/(rows.length-1)*(W-pad*2)}function Y(v){return pad+(1-(v-mn)/span)*(H-pad*2)}
@@ -1465,10 +1519,10 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<div style="max-width:420px">'+rBars([{label:'退休總需求',val:100,color:'#7f97ac'},{label:'已準備退休金',val:rn.total?Math.min(100,rn.prepared/rn.total*100):0,color:'#6f8f74'}])+'</div>'+
   '<table style="margin-top:8px"><tr><td>退休總需求 / 已準備 / 缺口</td><td>'+fmt(rn.total)+' ／ '+fmt(rn.prepared)+' ／ <b style="color:#b05a4a">'+fmt(rn.gap)+'</b></td></tr><tr><td>子女教育金總需求(終值)</td><td><b>'+fmt(eduTotal(c))+'</b> 元</td></tr></table>'+
 
-  '<h2>六、風險保障缺口</h2>'+rGapBars(gaps)+
+  '<h2>六、風險保障缺口</h2>'+rGapBars(gaps)+'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">壽險需求圖（身故情境）</div>'+lifeNeedCharts(c,'light')+
 
   '<h2>七、現金流投影與機率</h2>'+
-  '<div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:4px">可投資資產本金走勢</div>'+rLine(proj)+
+  cashflowCharts(proj,'light')+
   '<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:10px 0 4px">蒙地卡羅機率區間（P10–P90，中位數橙線）</div>'+rFan(mc)+
   '<p style="color:#33474e;margin-top:6px">'+(proj.turnNeg?'可投資本金預計於 <b>'+proj.turnNeg+' 歲</b>由正轉負；':'期間內本金維持為正；')+'蒙地卡羅（'+mc.N+' 條路徑）顯示不破產機率約 <b>'+(mc.pSuccess*100).toFixed(0)+'%</b>，最終資產中位數約 '+fmt(mc.finalP50)+' 元（P10～P90：'+fmt(mc.finalP10)+'～'+fmt(mc.finalP90)+'）。</p>'+
 
