@@ -36,6 +36,15 @@ h1,h2,h3,h4{margin:0}
 .tabbar{display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px}
 .tabbar button{background:none;border:none;color:var(--mut);padding:9px 14px;font-weight:700;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabbar button.on{color:var(--amber);border-bottom-color:var(--amber)}
+/* 資料分頁：分組導覽（B 排法＋A 視覺） */
+.dgroups{border-bottom:1px solid var(--line);margin-bottom:16px;padding-bottom:5px;display:flex;flex-direction:column;gap:3px}
+.dgrow{display:flex;flex-wrap:wrap;align-items:center;gap:1px 3px}
+.dglab{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;letter-spacing:.05em;color:var(--amber);background:#0a1a20;border:1px solid var(--line);border-radius:8px;padding:4px 11px;margin:2px 8px 2px 0;white-space:nowrap}
+.dglab .dgn{font-family:var(--serif);font-size:15px;font-weight:800;line-height:1}
+.dglab.exec{color:var(--mut2)}
+.dgrow .dtab{background:none;border:none;color:var(--mut);padding:8px 12px;font-weight:700;font-size:13.5px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
+.dgrow .dtab:hover{color:var(--tx)}
+.dgrow .dtab.on{color:var(--amber);border-bottom-color:var(--amber)}
 .sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:16px}
 .sec h4{font-size:15px;margin-bottom:12px;color:var(--amber2);display:flex;align-items:center;gap:8px}
 .sec h4 .add{margin-left:auto;background:var(--card);border:1px solid var(--line);color:var(--teal);border-radius:8px;padding:4px 11px;font-size:12.5px;font-weight:700}
@@ -617,8 +626,16 @@ function coachView(){var c=activeCase();
  return '<div class="shell"><div class="side">'+side+'</div><div class="main"><div class="tabbar">'+tb+'</div>'+body+'</div></div>';
 }
 function dataPane(c){
- var dt=[['family','家庭 / 參數'],['intent','意圖 / 生涯'],['risk','風險屬性'],['finance','收支資債'],['retire','退休'],['education','子女教育'],['goals','目標/置產'],['lifestyle','生活願望'],['needs','保障需求'],['coverages','需求/已備(簡)'],['policies','現有保單'],['credit','信用/海外'],['tax','稅賦'],['plan','調整方案'],['tracking','真實追蹤']];
- var tb=dt.map(function(t){return '<button data-dtab="'+t[0]+'" class="'+(app.dataTab===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('');
+ var dgroups=[
+  {no:'①',name:'基礎參數 · 諮詢資料',subs:[['family','家庭 / 參數'],['intent','意圖 / 生涯'],['risk','風險屬性']]},
+  {no:'②',name:'現在的狀況',subs:[['finance','收支資債'],['policies','現有保單'],['coverages','需求/已備(簡)'],['credit','信用/海外'],['tax','稅賦']]},
+  {no:'③',name:'未來的需求',subs:[['retire','退休'],['education','子女教育'],['goals','目標/置產'],['lifestyle','生活願望'],['needs','保障需求']]},
+  {no:'',name:'方案 · 追蹤',exec:true,subs:[['plan','調整方案'],['tracking','真實追蹤']]}
+ ];
+ var tb=dgroups.map(function(g){
+  var btns=g.subs.map(function(t){return '<button data-dtab="'+t[0]+'" class="dtab'+(app.dataTab===t[0]?' on':'')+'">'+t[1]+'</button>'}).join('');
+  return '<div class="dgrow"><span class="dglab'+(g.exec?' exec':'')+'">'+(g.no?'<span class="dgn">'+g.no+'</span>':'')+g.name+'</span>'+btns+'</div>';
+ }).join('');
  var body;
  if(app.dataTab==='family')body=familySec(c)+membersSec(c);
  else if(app.dataTab==='finance')body=financeSec(c);
@@ -640,7 +657,7 @@ function dataPane(c){
  else if(app.dataTab==='credit')body=creditSec(c);
  else body=trackingSec(c);
  if(['incomes','expenses','assets','liabilities'].indexOf(app.dataTab)>=0)body=ownerBar(c)+body;
- return '<div class="tabbar" style="margin-bottom:14px">'+tb+'</div>'+body;
+ return '<div class="dgroups">'+tb+'</div>'+body;
 }
 function jobSec(c){ensureJobFields(c);var p=c.profile,jt=p.jobType;
  var sel='<div class="f"><label>工作類別</label><select onchange="setJobType(this.value)">'+
