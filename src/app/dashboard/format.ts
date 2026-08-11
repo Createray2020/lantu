@@ -40,6 +40,5 @@ export const REVIEW_TYPE_LABEL: Record<string, string> = {
   adhoc: "臨時",
 };
 
-export const LIFE_STAGES = ["單身", "新婚", "育兒", "退休前", "退休"] as const;
-export const CLIENT_SOURCES = ["轉介", "講座", "廣告", "自來"] as const;
+export const CLIENT_SOURCES = ["原生人脈", "活動認識", "網路開發", "廣告開發", "人脈轉介", "客戶轉介", "公司分配", "其他"] as const;
 export const REVIEW_TYPES = ["intro", "review", "quarter", "half", "annual", "adhoc"] as const;

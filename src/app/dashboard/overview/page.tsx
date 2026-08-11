@@ -97,9 +97,8 @@ export default async function OverviewPage() {
 
         <section>
           <h2 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">客戶分佈</h2>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             <Dist title="狀態" data={d.byStatus} labelMap={STATUS_LABEL} />
-            <Dist title="生命階段" data={d.byLifeStage} />
             <Dist title="健康等級" data={d.byGrade} gradeColored />
           </div>
         </section>

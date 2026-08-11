@@ -23,12 +23,11 @@ import {
   PLAN_STATUS_LABEL,
   REVIEW_TYPE_LABEL,
   REVIEW_TYPES,
-  LIFE_STAGES,
   CLIENT_SOURCES,
 } from "../../format";
 
 type Contact = { phone?: string; email?: string; line?: string };
-type ClientLite = { id: string; name: string; contact: Contact; source: string | null; tags: string[]; lifeStage: string | null; status: string; birthDate: string | null };
+type ClientLite = { id: string; name: string; contact: Contact; source: string | null; tags: string[]; status: string; birthDate: string | null };
 type PlanLite = { id: string; year: number; label: string | null; status: string; healthGrade: string | null; netWorth: number | null; basedOnDate: string | null; updatedAt: string | null };
 type ReviewLite = { id: string; date: string; type: string; planId: string | null; attendees: string | null; summary: string | null; nextAppt: string | null };
 type ItemLite = { id: string; title: string; owner: string | null; dueDate: string | null; done: boolean; reviewId: string | null };
@@ -150,8 +149,8 @@ export default function ClientDetail({
 function ClientHeader({ client, onSave, onArchive, pending }: { client: ClientLite; onSave: (patch: Partial<ClientLite> & { tags?: string[]; contact?: Contact }) => void; onArchive: () => void; pending: boolean }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(client.name);
-  const [source, setSource] = useState(client.source ?? "");
-  const [lifeStage, setLifeStage] = useState(client.lifeStage ?? "");
+  const [source, setSource] = useState((client.source ?? "").startsWith("其他") ? "其他" : (client.source ?? ""));
+  const [sourceNote, setSourceNote] = useState((client.source ?? "").startsWith("其他：") ? (client.source as string).slice(3) : "");
   const [tags, setTags] = useState((client.tags ?? []).join(", "));
   const [phone, setPhone] = useState(client.contact?.phone ?? "");
   const [email, setEmail] = useState(client.contact?.email ?? "");
@@ -164,8 +163,7 @@ function ClientHeader({ client, onSave, onArchive, pending }: { client: ClientLi
         <div className="grid sm:grid-cols-2 gap-3">
           <div><label className="text-xs text-[#a9bccf]">姓名</label><input className={field} value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div><label className="text-xs text-[#a9bccf]">生日</label><input type="date" className={field} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></div>
-          <div><label className="text-xs text-[#a9bccf]">來源</label><select className={field} value={source} onChange={(e) => setSource(e.target.value)}><option value="">—</option>{CLIENT_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
-          <div><label className="text-xs text-[#a9bccf]">生命階段</label><select className={field} value={lifeStage} onChange={(e) => setLifeStage(e.target.value)}><option value="">—</option>{LIFE_STAGES.map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
+          <div><label className="text-xs text-[#a9bccf]">來源</label><select className={field} value={source} onChange={(e) => setSource(e.target.value)}><option value="">—</option>{CLIENT_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}</select>{source === "其他" && <input className={field + " mt-2"} value={sourceNote} onChange={(e) => setSourceNote(e.target.value)} placeholder="請說明其他來源（選填）" />}</div>
           <div className="sm:col-span-2"><label className="text-xs text-[#a9bccf]">標籤（逗號分隔）</label><input className={field} value={tags} onChange={(e) => setTags(e.target.value)} /></div>
           <div><label className="text-xs text-[#a9bccf]">電話</label><input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
           <div><label className="text-xs text-[#a9bccf]">Email</label><input className={field} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
@@ -179,8 +177,7 @@ function ClientHeader({ client, onSave, onArchive, pending }: { client: ClientLi
             onClick={() => {
               onSave({
                 name: name.trim() || client.name,
-                source: source || null,
-                lifeStage: lifeStage || null,
+                source: source === "其他" ? (sourceNote.trim() ? `其他：${sourceNote.trim()}` : "其他") : source || null,
                 tags: tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean),
                 contact: { phone, email, line },
                 birthDate: birthDate || null,
@@ -203,8 +200,7 @@ function ClientHeader({ client, onSave, onArchive, pending }: { client: ClientLi
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#0d2b45] text-[#a9bccf] border border-white/10">{STATUS_LABEL[client.status] ?? client.status}</span>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {client.lifeStage && <span className="text-[11px] text-[#a9bccf]">{client.lifeStage}</span>}
-          {client.source && <span className="text-[11px] text-[#6b7d8f]">· 來源 {client.source}</span>}
+          {client.source && <span className="text-[11px] text-[#6b7d8f]">來源 {client.source}</span>}
           {(client.tags ?? []).map((t) => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] border border-white/10">{t}</span>)}
         </div>
         <div className="text-[12px] text-[#6b7d8f] mt-2 flex flex-wrap gap-x-4">

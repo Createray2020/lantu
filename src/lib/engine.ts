@@ -11,7 +11,7 @@ function uid(){return 'c'+Date.now().toString(36)+(__uidSeq++).toString(36)+Math
 
 function sampleCase(){return {
  id:uid(),
- profile:{name:'王大明(示範)',gender:'男',age:40,retireAge:65,lifeExp:85,credit:80},
+ profile:{name:'王大明(示範)',gender:'男',age:40,retireAge:65,lifeExp:85,credit:700},
  params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,freeSaving:1,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
  tracking:[{year:2024,age:40,net:9500000},{year:2025,age:41,net:9950000}],
  riskQuiz:{ans:{0:1,1:2,2:2,3:2,4:1,5:2,6:2,7:2,8:2,9:2,10:2,11:2}},

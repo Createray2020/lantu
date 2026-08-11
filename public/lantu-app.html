@@ -154,7 +154,7 @@ function uid(){return 'c'+Math.floor(performance.now()*1000%1e9)+app.cases.lengt
 
 function sampleCase(){return {
  id:uid(),
- profile:{name:'王大明(示範)',gender:'男',age:40,retireAge:65,lifeExp:85,credit:80,jobType:'一般就業者',monthlySalary:100000},
+ profile:{name:'王大明(示範)',gender:'男',age:40,retireAge:65,lifeExp:85,credit:700,jobType:'一般就業者',monthlySalary:100000},
  company:defaultCompany(),
  params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,freeSaving:1,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
  tracking:[{year:2024,age:40,net:9500000},{year:2025,age:41,net:9950000}],
@@ -476,7 +476,7 @@ function fanSVG(mc){var W=760,H=230,pad=40,years=mc.years;
 function health(c){
  var m=metrics(c),savingRate=m.save/(m.incTotal||1);
  var reserve=Math.min(1,(m.liquid/(m.monthExp||1))/n(c.params.emergencyMonths||6));
- var cs=n((c.credit&&c.credit.score))||n(c.profile.credit);var credit=cs?cs/100:0;
+ var cs=n((c.credit&&c.credit.score))||n(c.profile.credit);var credit=cs>=200?Math.min(1,Math.max(0,(cs-200)/600)):0;
  var dr=m.debtTotal/(m.assetTotal||1);var debtBal=dr<0.2?1:Math.max(0,1-(dr-0.2)/0.6);
  var need=totalGap(c),needBase=sum(coverageGaps(c),function(g){return g.need})||1;
  var riskCover=Math.max(0,1-need/needBase);
@@ -671,7 +671,8 @@ function jobSec(c){ensureJobFields(c);var p=c.profile,jt=p.jobType;
  if(jt==='企業主'){var co=c.company||{};
   function cf(k,label,type){return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(co[k]==null?'':co[k])+'" oninput="setCompany(\''+k+'\',this.value,\''+(type||'text')+'\')"></div>';}
   body='<div class="hint" style="margin:2px 0 8px">企業主的財務常與公司連動，先留存公司基本與概略財務資料；完整公司財報（資產負債／損益）之後由專屬介面處理。</div>'+
-   '<div class="fgrid">'+cf('name','公司名稱')+cf('taxId','統一編號')+cf('industry','行業別')+
+   '<div class="fgrid">'+cf('name','公司名稱')+cf('taxId','統一編號')+
+   '<div class="f"><label>行業別</label><input list="industryList" value="'+esc(co.industry==null?'':co.industry)+'" oninput="setCompany(\'industry\',this.value,\'text\')"><datalist id="industryList"><option value="批發/零售"></option><option value="餐飲/住宿"></option><option value="製造"></option><option value="營建/工程"></option><option value="資訊/科技"></option><option value="金融/保險"></option><option value="醫療/生技"></option><option value="教育/文創"></option><option value="農林漁牧"></option><option value="專業服務(法律/會計/顧問)"></option></datalist></div>'+
    cf('role','擔任角色')+cf('sharePct','持股比例%','num')+cf('annualRevenue','年營收(概略)','num')+
    cf('netProfit','年淨利(概略)','num')+cf('ownerLoan','負責人往來(股東往來/借貸)','num')+cf('note','備註')+'</div>'+
    '<div style="margin-top:10px"><button class="add" style="opacity:.55;cursor:not-allowed" disabled title="規劃中，後續由專屬介面接手">＋ 完整公司財務（規劃中）</button></div>';
@@ -687,7 +688,7 @@ function familySec(c){var p=c.profile,pa=c.params;
   return '<div class="f"><label>'+label+'</label><input value="'+esc(obj[k])+'" oninput="setMeta(\''+g+'\',\''+k+'\',this.value,\''+(type||'text')+'\')"></div>'}
  return '<div class="sec"><h4>基本資料</h4><div class="fgrid">'+
   fld(p,'profile','name','客戶姓名')+fld(p,'profile','gender','性別','sel:男,女')+fld(p,'profile','age','目前年齡','num')+
-  fld(p,'profile','retireAge','預計退休年齡','num')+fld(p,'profile','lifeExp','預估壽命','num')+fld(p,'profile','credit','信用評分(0-100)','num')+'</div></div>'+
+  fld(p,'profile','retireAge','預計退休年齡','num')+fld(p,'profile','lifeExp','預估壽命','num')+fld(p,'profile','credit','聯徵信用評分(200-800)','num')+'</div></div>'+
   jobSec(c)+
   '<div class="sec"><h4>規劃參數</h4><div class="fgrid">'+
   fld(pa,'params','inflation','通膨率%','num')+fld(pa,'params','salaryGrowth','薪資成長率%','num')+fld(pa,'params','invReturn','投資報酬率%','num')+
@@ -696,7 +697,7 @@ function familySec(c){var p=c.profile,pa=c.params;
   fld(pa,'params','invReturnStd','報酬標準差%','num')+fld(pa,'params','inflationStd','通膨標準差%','num')+fld(pa,'params','salaryStd','薪資標準差%','num')+'</div></div>';
 }
 function membersSec(c){
- return tableSec('家庭成員','members',c.members,[['name','姓名','text'],['role','稱謂','sel:本人,配偶,父,母,子女,長輩,其他'],['gender','性別','sel:男,女'],['age','年齡','num'],['worked','已工作年數','num'],['insType','投保類型','sel:勞保,職業工會,公保,健保眷屬,無'],['insSalary','月投保薪資','num'],['depRatio','家計負擔%','num'],['expRatio','支出比例%','num'],['indepAge','財務獨立歲','num']]);
+ return tableSec('家庭成員','members',c.members,[['name','姓名','text'],['role','稱謂','sel:本人,配偶,父,母,子女,長輩,其他'],['gender','性別','sel:男,女'],['age','年齡','num'],['worked','已工作年數','num'],['insType','投保類型','sel:勞保,職業工會,農保,公保,軍保,國民年金,勞工職業災害保險,就業保險,健保眷屬,無'],['insSalary','月投保薪資','num'],['depRatio','家計負擔%','num'],['expRatio','支出比例%','num'],['indepAge','財務獨立歲','num']]);
 }
 var INC_SUB=['薪資','執行業務所得','年終獎金','三節獎金','績效/季獎金','兼職','加班費','租金收入','股利/利息','其他'];
 function incomesSec(c){
@@ -951,7 +952,7 @@ function creditSec(c){
  return '<div class="sec"><h4>信用現況</h4><div class="fgrid">'+
   ofld('credit','cards','信用卡家數','num')+ofld('credit','payFull','每期全額繳清','sel:是,否')+ofld('credit','firstCardOver1yr','第一張卡>1年','sel:是,否')+
   ofld('credit','installment','信用卡分期','sel:無,有')+ofld('credit','badRecord5yr','5年內不良紀錄','sel:否,是')+ofld('credit','recentApply','近三月辦卡/貸款','sel:無,有辦卡,有貸款')+
-  ofld('credit','score','信用評分(0-100)','num')+'</div><div class="hint" style="margin-top:8px">信用評分同步影響財務健康度的「信用」加權；亦可於「家庭/參數」直接調整。</div></div>'+
+  ofld('credit','score','聯徵信用評分(200-800)','num')+'</div><div class="hint" style="margin-top:8px">請填聯徵中心信用報告的真實分數（範圍 200–800；資料不足另有代碼）。此分數同步影響財務健康度的「信用」加權（(分數−200)/600 正規化）；亦可於「家庭/參數」直接調整。</div></div>'+
   '<div class="sec"><h4>海外資產 / 身份</h4><div class="fgrid">'+
   ofld('overseas','hasAssets','是否有海外資產','sel:否,是')+ofld('overseas','identity','是否有海外身份','sel:否,是')+ofld('overseas','purpose','海外置產/移民用途')+ofld('overseas','assetTypes','海外資產分類')+
   '</div><div class="hint" style="margin-top:8px">個別海外資產請於「資產」分頁以地區=美國/韓國/其他海外 登錄。</div></div>';

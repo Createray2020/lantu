@@ -26,7 +26,6 @@ export type CoachDashboard = {
   overdue: OverdueItem[];
   openItems: OpenActionItem[];
   byStatus: Record<string, number>;
-  byLifeStage: Record<string, number>;
   byGrade: Record<string, number>;
 };
 
@@ -92,10 +91,8 @@ export async function getCoachDashboard(coachId: string): Promise<CoachDashboard
 
   // 分佈
   const byStatus: Record<string, number> = {};
-  const byLifeStage: Record<string, number> = {};
   for (const c of clientRows) {
     inc(byStatus, c.status);
-    inc(byLifeStage, c.lifeStage || "未分類");
   }
   // 等級分佈：取每位客戶最新版本的等級。
   const latestPlanByClient = new Map<string, (typeof planRows)[number]>();
@@ -123,7 +120,6 @@ export async function getCoachDashboard(coachId: string): Promise<CoachDashboard
     overdue,
     openItems,
     byStatus,
-    byLifeStage,
     byGrade,
   };
 }

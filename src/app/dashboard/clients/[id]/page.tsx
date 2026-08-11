@@ -24,7 +24,6 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     contact: detail.client.contact ?? {},
     source: detail.client.source,
     tags: detail.client.tags ?? [],
-    lifeStage: detail.client.lifeStage,
     status: detail.client.status,
     birthDate: detail.client.birthDate,
   };

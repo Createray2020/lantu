@@ -10,7 +10,6 @@ import {
   gradeColor,
   STATUS_LABEL,
   PLAN_STATUS_LABEL,
-  LIFE_STAGES,
   CLIENT_SOURCES,
 } from "./format";
 
@@ -20,7 +19,6 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
-  const [stage, setStage] = useState("all");
   const [tag, setTag] = useState("all");
   const [sort, setSort] = useState<SortKey>("updated");
   const [showNew, setShowNew] = useState(false);
@@ -34,7 +32,6 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
   const rows = useMemo(() => {
     let r = clients.filter((c) => {
       if (status !== "all" && c.status !== status) return false;
-      if (stage !== "all" && (c.lifeStage || "") !== stage) return false;
       if (tag !== "all" && !(c.tags ?? []).includes(tag)) return false;
       if (q.trim()) {
         const hay = (c.name + " " + (c.tags ?? []).join(" ") + " " + (c.source ?? "")).toLowerCase();
@@ -54,7 +51,7 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
       return 0; // updated：後端已按 updatedAt desc
     });
     return r;
-  }, [clients, q, status, stage, tag, sort]);
+  }, [clients, q, status, tag, sort]);
 
   const sel = "bg-[#0d2b45] border border-white/15 rounded-md text-sm px-2.5 py-1.5 text-[#eef2f7]";
 
@@ -84,12 +81,6 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
           <option value="active">進行中</option>
           <option value="pending">待處理</option>
           <option value="archived">已封存</option>
-        </select>
-        <select value={stage} onChange={(e) => setStage(e.target.value)} className={sel}>
-          <option value="all">全部生命階段</option>
-          {LIFE_STAGES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
         </select>
         {allTags.length > 0 && (
           <select value={tag} onChange={(e) => setTag(e.target.value)} className={sel}>
@@ -134,7 +125,6 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
                   {(c.tags ?? []).map((t) => (
                     <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] border border-white/10">{t}</span>
                   ))}
-                  {c.lifeStage && <span className="text-[10px] text-[#6b7d8f]">{c.lifeStage}</span>}
                 </div>
               </div>
               <div className="text-sm text-[#a9bccf]">
@@ -170,7 +160,7 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
   function NewClientDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
     const [name, setName] = useState("");
     const [source, setSource] = useState("");
-    const [lifeStage, setLifeStage] = useState("");
+    const [sourceNote, setSourceNote] = useState("");
     const [tags, setTags] = useState("");
     const [phone, setPhone] = useState("");
     const [birthDate, setBirthDate] = useState("");
@@ -185,12 +175,17 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
         return;
       }
       setErr("");
+      const finalSource =
+        source === "其他"
+          ? sourceNote.trim()
+            ? `其他：${sourceNote.trim()}`
+            : "其他"
+          : source || null;
       start(async () => {
         try {
           const id = await createClientAction({
             name: name.trim(),
-            source: source || null,
-            lifeStage: lifeStage || null,
+            source: finalSource,
             tags: tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean),
             contact: phone ? { phone } : {},
             birthDate: birthDate || null,
@@ -211,25 +206,23 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
               <label className="text-xs text-[#a9bccf]">姓名 *</label>
               <input className={field} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-[#a9bccf]">來源</label>
-                <select className={field} value={source} onChange={(e) => setSource(e.target.value)}>
-                  <option value="">—</option>
-                  {CLIENT_SOURCES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-[#a9bccf]">生命階段</label>
-                <select className={field} value={lifeStage} onChange={(e) => setLifeStage(e.target.value)}>
-                  <option value="">—</option>
-                  {LIFE_STAGES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="text-xs text-[#a9bccf]">來源</label>
+              <select className={field} value={source} onChange={(e) => setSource(e.target.value)}>
+                <option value="">—</option>
+                {CLIENT_SOURCES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              {source === "其他" && (
+                <input
+                  className={field + " mt-2"}
+                  value={sourceNote}
+                  onChange={(e) => setSourceNote(e.target.value)}
+                  placeholder="請說明其他來源（選填）"
+                  autoFocus
+                />
+              )}
             </div>
             <div>
               <label className="text-xs text-[#a9bccf]">標籤（逗號分隔）</label>
