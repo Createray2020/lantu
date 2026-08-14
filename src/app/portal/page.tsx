@@ -3,22 +3,30 @@ import { redirect } from "next/navigation";
 import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
 import { getClientOwnPlan } from "@/lib/clientPlan";
-import { FACES } from "@/lib/passport";
+import { wan, ntfmt } from "@/lib/passport";
 
 export const dynamic = "force-dynamic";
 
-const nt = (n: number) => Math.round(n || 0).toLocaleString("en-US");
-
 // 客戶端首頁。
 // - 尚未做人生護照：導引開始。
-// - 已有基礎方案：顯示每月應存摘要；「真的進入規劃」要等掛上教練（雙向連結，之後開放）。
+// - 已有基礎方案：顯示能力分析摘要；「真的進入規劃」要等掛上教練（雙向連結，之後開放）。
 export default async function Portal() {
   // 任何登入者（含教練）都看客戶介面；未登入才導去客戶登入。
   const client = await ensureClientUser();
   if (!client) redirect("/client/sign-in");
   const name = client.name || "貴賓";
   const own = await getClientOwnPlan(client.id);
-  const monthly = own?.monthly ?? null;
+  const r = own?.result ?? null;
+
+  const rows = r
+    ? [
+        { icon: "🏠", label: "購房", head: `可購房價 ${wan(r.house.price).toLocaleString("en-US")} 萬`, monthly: r.house.monthly },
+        { icon: "🚗", label: "購車", head: `可購車價 ${wan(r.car.price).toLocaleString("en-US")} 萬`, monthly: r.car.monthly },
+        { icon: "🌴", label: "退休", head: `退休月領 ${ntfmt(r.retire.totalMonthly)} 元`, monthly: r.retire.monthly },
+        { icon: "👨‍👩‍👧", label: "扶養", head: `可扶養約 ${r.support.kids.toFixed(2)} 位`, monthly: r.support.monthly },
+        { icon: "✈️", label: "旅遊", head: `旅遊基金 ${ntfmt(r.travel.fund)} 元`, monthly: r.travel.monthly },
+      ]
+    : [];
 
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] flex flex-col">
@@ -33,37 +41,38 @@ export default async function Portal() {
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </div>
         <SignOutButton redirectUrl="/">
-          <button className="text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-3 py-1.5">
-            登出
-          </button>
+          <button className="text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-3 py-1.5">登出</button>
         </SignOutButton>
       </header>
 
       <main className="flex-1 px-6 py-12">
-        {monthly ? (
+        {r ? (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-8">
               <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-2">MY LIFE PASSPORT</div>
               <h1 className="font-serif text-3xl mb-2">{name}，你的人生護照</h1>
-              <p className="text-[#a7bacb] text-sm">為了實現你的目標，建議每月存下：</p>
-              <div className="font-serif text-4xl text-[#e0bd8b] mt-3">NT$ {nt(monthly.total)}</div>
+              <p className="text-[#a7bacb] text-sm">依你目前的存錢規劃，每月應存合計</p>
+              <div className="font-serif text-4xl text-[#e0bd8b] mt-2">{r.totalMonthlyWan.toFixed(1)} 萬</div>
             </div>
 
             <div className="rounded-2xl bg-[#12334f] border border-white/8 divide-y divide-white/8 mb-6">
-              {FACES.map((f) => (
-                <div key={f.key} className="flex items-center justify-between px-5 py-3.5">
+              {rows.map((row) => (
+                <div key={row.label} className="flex items-center justify-between px-5 py-3.5">
                   <span className="flex items-center gap-3 text-[#cdd9e5]">
-                    <span>{f.icon}</span>
-                    <span>{f.label}</span>
+                    <span>{row.icon}</span>
+                    <span>{row.label}</span>
                   </span>
-                  <span className="font-semibold text-[#e0bd8b]">NT$ {nt(monthly[f.key])}</span>
+                  <span className="text-right">
+                    <span className="font-semibold text-[#e0bd8b]">{row.head}</span>
+                    <span className="block text-[11px] text-[#6f869c]">月存 {row.monthly} 萬</span>
+                  </span>
                 </div>
               ))}
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
               <Link href="/portal/passport" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
-                重新編輯人生護照
+                重新調整人生護照
               </Link>
             </div>
 
@@ -84,7 +93,7 @@ export default async function Portal() {
             <h1 className="font-serif text-3xl mb-4">{name}，歡迎回來</h1>
             <p className="text-[#a7bacb] leading-relaxed mb-8">
               你的專屬財務規劃，從「人生護照」開始——用購房、購車、退休、扶養、旅遊
-              五個面向，把你最在意的人生目標換算成「每個月該存多少」，完成後就成為你的第一份規劃基礎。
+              五個面向，設定你每月能存多少，即時算出你能達成什麼，完成後就成為你的第一份規劃基礎。
             </p>
             <Link href="/portal/passport" className="inline-block font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-8 py-3 rounded-lg">
               開始我的人生護照

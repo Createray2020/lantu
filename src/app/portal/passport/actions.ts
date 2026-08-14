@@ -8,6 +8,6 @@ import type { PassportInputs } from "@/lib/passport";
 export async function savePassportAction(inputs: PassportInputs) {
   const user = await ensureClientUser();
   if (!user) return { ok: false as const, error: "未登入或非客戶帳號" };
-  const monthly = await savePassport(user, inputs);
-  return { ok: true as const, monthly };
+  const result = await savePassport(user, inputs);
+  return { ok: true as const, result };
 }
