@@ -52,6 +52,12 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
         <Link href="/dashboard/overview" className={tab(onOverview)}>儀表板</Link>
       </nav>
       <div className="flex-1" />
+      <Link
+        href="/home"
+        className="text-[#a9bccf] hover:text-[#eef2f7] text-xs font-bold px-2.5 py-1.5 rounded-md border border-white/15"
+      >
+        官網首頁
+      </Link>
       {isAdmin && (
         <Link
           href="/admin"

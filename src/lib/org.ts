@@ -1,5 +1,5 @@
 // 組織樹與可見範圍（岔路 #2 的權限骨架）。
-// orgRank：member（顧問，只看自己）/ manager（主管，看下線子樹）/ owner（老闆，看全組織）。
+// orgRank：member（教練，只看自己）/ manager（主管，看下線子樹）/ owner（老闆，看全組織）。
 // uplineId：組織樹父節點（自參照）。可見範圍一律以「active 教練」為母體。
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/Shared/db";

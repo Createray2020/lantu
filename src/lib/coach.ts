@@ -22,7 +22,7 @@ export async function ensureCoach(): Promise<Coach | null> {
   const user = await currentUser();
   if (!user) return null;
 
-  // 互斥：已是客戶帳號 → 不建立教練（避免客戶誤入教練流程被當成待開通顧問）。
+  // 互斥：已是客戶帳號 → 不建立教練（避免客戶誤入教練流程被當成待開通教練）。
   const asClient = await db
     .select({ id: clientUsers.id })
     .from(clientUsers)

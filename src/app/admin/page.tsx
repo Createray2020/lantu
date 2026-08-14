@@ -6,7 +6,7 @@ import { getBrand } from "@/lib/brand";
 import { approveCoach, suspendCoach, resetCoach, updateOrg } from "./actions";
 import BrandSettings from "./BrandSettings";
 
-const RANK_LABEL: Record<string, string> = { member: "顧問", manager: "主管", owner: "老闆" };
+const RANK_LABEL: Record<string, string> = { member: "教練", manager: "主管", owner: "老闆" };
 
 export const dynamic = "force-dynamic";
 

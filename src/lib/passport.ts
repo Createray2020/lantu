@@ -1,6 +1,6 @@
 // 人生護照：純計算與型別（可同時被 client 精靈與 server action 使用，勿 import db/engine）。
 // 五面向：購房 / 購車 / 退休 / 扶養 / 旅遊 → 各自「每月應存」＋合計。
-// 這是客戶自助的友善估算；正式規劃仍以顧問端引擎為準。
+// 這是客戶自助的友善估算；正式規劃仍以教練端引擎為準。
 
 export const PASSPORT_CONST = {
   preRetReturn: 5, // 退休前投資報酬 %（存錢期）

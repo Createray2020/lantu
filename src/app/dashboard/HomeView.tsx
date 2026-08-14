@@ -165,7 +165,7 @@ function ManagerView({ d }: { d: ManagerHome }) {
   return (
     <>
       <Hero k={`團隊概況 · ${d.teamName}`} h1={`本月團隊達成 ${k.achievePct}%`}
-        sub={<>{d.memberCount} 位顧問 · <b className="text-[#e0bd8b]">{k.pending} 件</b> 待你審核</>}
+        sub={<>{d.memberCount} 位教練 · <b className="text-[#e0bd8b]">{k.pending} 件</b> 待你審核</>}
         right={<div className="min-w-[150px]"><div className="text-[11.5px] text-[#a7bacb]">團隊月目標進度<Demo /></div><div className="text-[15px] font-extrabold text-[#e0bd8b]">{k.achievePct}%</div><div className="mt-1.5"><Bar pct={k.achievePct} /></div></div>} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
@@ -270,7 +270,7 @@ function OwnerView({ d }: { d: OwnerHome }) {
         </div>
       </div>
 
-      <Section title="🏅 全組織顧問排行榜 Top 5" more="排行榜">
+      <Section title="🏅 全組織教練排行榜 Top 5" more="排行榜">
         {d.top5.length === 0 ? <Empty>尚無排行資料</Empty> : <Leaderboard rows={d.top5} />}
       </Section>
     </>
@@ -294,7 +294,7 @@ export default function Home({ data }: { data: HomeView }) {
   );
 }
 
-// 顧問 Hero 需要日期，補一層把 today 帶進 sub。
+// 教練 Hero 需要日期，補一層把 today 帶進 sub。
 function MemberViewWithDate({ d, today }: { d: MemberHome; today: string }) {
   const k = d.kpis;
   return (
@@ -307,7 +307,7 @@ function MemberViewWithDate({ d, today }: { d: MemberHome; today: string }) {
   );
 }
 
-// 抽出顧問主體（去掉 Hero，避免重複）。
+// 抽出教練主體（去掉 Hero，避免重複）。
 function MemberBody({ d }: { d: MemberHome }) {
   const k = d.kpis;
   return (

@@ -73,11 +73,11 @@ export default async function Portal() {
             <div className="rounded-xl border border-[#c99a5b]/30 bg-[#0d2b45]/50 p-5 text-center">
               <div className="inline-flex items-center gap-2 text-sm text-[#e0bd8b] mb-2">
                 <span className="w-2 h-2 rounded-full bg-[#c99a5b] animate-pulse" />
-                下一步：連結你的專屬顧問
+                下一步：連結你的專屬教練
               </div>
               <p className="text-[#a7bacb] text-sm leading-relaxed">
-                你的規劃基礎已建立。掛上信任的財務顧問、經你授權後，
-                就能一起把這份基礎深化成完整的財務規劃。（顧問連結即將開放）
+                你的規劃基礎已建立。掛上信任的財務教練、經你授權後，
+                就能一起把這份基礎深化成完整的財務規劃。（教練連結即將開放）
               </p>
             </div>
           </div>

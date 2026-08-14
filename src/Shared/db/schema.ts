@@ -9,7 +9,7 @@ import {
 // role: coach（一般教練）/ admin（管理員，可進後台）
 // status: pending（待審核）/ active（已開通）/ suspended（停權）
 // orgRank（組織職級，決定首頁視角與可見範圍）：
-//   member（顧問，只看自己）/ manager（主管，看下線子樹）/ owner（老闆，看全組織）
+//   member（教練，只看自己）/ manager（主管，看下線子樹）/ owner（老闆，看全組織）
 // uplineId：上線教練（自參照），組織樹的父節點；null＝頂點。
 export const coaches = pgTable('coaches', {
   id: text('id').primaryKey(), // Clerk userId
@@ -19,7 +19,7 @@ export const coaches = pgTable('coaches', {
   status: text('status').default('pending').notNull(),
   orgRank: text('org_rank').default('member').notNull(),
   uplineId: text('upline_id').references((): AnyPgColumn => coaches.id, { onDelete: 'set null' }),
-  title: text('title'),           // 職稱顯示（資深財務顧問／處經理／執行長…）
+  title: text('title'),           // 職稱顯示（資深財務教練／處經理／執行長…）
   joinDate: date('join_date'),
   note: text('note'),           // 備註（聯絡方式／收款狀態等，後台用）
   approvedAt: timestamp('approved_at', { withTimezone: true }),
@@ -28,7 +28,7 @@ export const coaches = pgTable('coaches', {
 
 // 客戶登入帳號（雙邊平台：客戶自己上官網註冊、以客戶身分登入）
 // 對應 Clerk user id；與 coaches 互斥（同一 Clerk 使用者不會同時是教練與客戶）。
-// 注意：這是「客戶端登入者」，與下方 clients（顧問管理的 CRM 客戶）是不同物，
+// 注意：這是「客戶端登入者」，與下方 clients（教練管理的 CRM 客戶）是不同物，
 //       兩者的合併（客戶擁有自己的 clients 記錄）屬租戶反轉波，之後才做。
 // status: active（自助入口，註冊即開通）/ suspended（停權）
 export const clientUsers = pgTable('client_users', {
@@ -42,7 +42,7 @@ export const clientUsers = pgTable('client_users', {
 // 客戶（永久身份）
 export const clients = pgTable('clients', {
   id: uuid('id').defaultRandom().primaryKey(),
-  // 顧問建立的客戶：coachId 有值。自助客戶（人生護照）：coachId 為 null、clientUserId 指向登入帳號，
+  // 教練建立的客戶：coachId 有值。自助客戶（人生護照）：coachId 為 null、clientUserId 指向登入帳號，
   // 待客戶授權／掛上教練後，coachId 才會被設上（＝「真的進入規劃」）。
   coachId: text('coach_id').references(() => coaches.id, { onDelete: 'cascade' }),
   clientUserId: text('client_user_id').references(() => clientUsers.id, { onDelete: 'cascade' }),

@@ -9,7 +9,7 @@ import Home from "./HomeView";
 
 export const dynamic = "force-dynamic";
 
-// 登入後著陸首頁：依組織職級（顧問／主管／老闆）呈現對應視角。
+// 登入後著陸首頁：依組織職級（教練／主管／老闆）呈現對應視角。
 // - 未登入 → 導回登入。
 // - 未開通／停權 → 待開通頁。
 // - 已開通 → 角色首頁（owner/manager 可用切換器預覽其他視角）。

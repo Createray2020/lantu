@@ -10,7 +10,7 @@ export type ClientUser = typeof clientUsers.$inferSelect;
 
 // 確保目前登入的 Clerk 使用者在 client_users 表有一筆資料，並回傳該筆。
 // - 若該 Clerk 使用者已是教練（coaches 有列）→ 回 null（他是教練，不是客戶）。
-// - 否則首次登入即建立為 status=active（客戶自助入口，免顧問審核）。
+// - 否則首次登入即建立為 status=active（客戶自助入口，免教練審核）。
 export async function ensureClientUser(): Promise<ClientUser | null> {
   const user = await currentUser();
   if (!user) return null;

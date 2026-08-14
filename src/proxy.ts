@@ -4,12 +4,13 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 // 公開路由：首頁與登入/註冊；其餘一律需登入。
 const isPublicRoute = createRouteMatcher([
   '/',
+  '/home', // 官網 landing 常駐公開路由（登入後也能回來看，不跳轉）
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/client/sign-in(.*)', // 客戶端登入入口
   '/client/sign-up(.*)', // 客戶端申請帳號入口
   // 客戶端頁面：middleware 不強制導向（會導到教練 /sign-in）；改由頁面內 ensureClientUser
-  // 自行守門並導向 /client/sign-in，避免客戶被丟到顧問登入。
+  // 自行守門並導向 /client/sign-in，避免客戶被丟到教練登入。
   '/portal(.*)',
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀

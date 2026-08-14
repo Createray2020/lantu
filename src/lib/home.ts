@@ -1,4 +1,4 @@
-// 首頁彙總層：依角色（顧問／主管／老闆）把各卡片要的數字算出來。
+// 首頁彙總層：依角色（教練／主管／老闆）把各卡片要的數字算出來。
 // 有真實資料源的（客戶／待辦／約訪、組織樹、成員名冊）直接接；
 // 業績／活動量／增員／公告等由 member_metrics / recruits / announcements 承載（可編輯的模擬資料）。
 import { inArray, eq, desc } from "drizzle-orm";
@@ -53,7 +53,7 @@ async function listAnnouncements(): Promise<Announcement[]> {
   return rows.slice(0, 5);
 }
 
-// ---------- 顧問（member）----------
+// ---------- 教練（member）----------
 export type MemberHome = {
   coach: { name: string; title: string | null };
   kpis: { income: number; incomeGoal: number; deals: number; dealsGoal: number; newClients: number; openItems: number; todayAppts: number };
@@ -90,7 +90,7 @@ export async function getMemberHome(coach: CoachRow, period: string): Promise<Me
   }
 
   return {
-    coach: { name: coach.name ?? "顧問", title: coach.title },
+    coach: { name: coach.name ?? "教練", title: coach.title },
     kpis: {
       income, incomeGoal: m?.incomeGoal ?? 0,
       deals: m?.deals ?? 0, dealsGoal: m?.dealsGoal ?? 0,
@@ -250,7 +250,7 @@ export async function getOwnerHome(owner: CoachRow, all: CoachRow[], period: str
     { label: "活動量", pct: mActivity, color: "#8fc0a3" },
     { label: "增員動能", pct: recruitMomentum, color: "#e08a68" },
     { label: "客戶留存", pct: retention, color: "#8fc0a3" },
-    { label: "顧問留存", pct: advisorRetention, color: "#a9bccf" },
+    { label: "教練留存", pct: advisorRetention, color: "#a9bccf" },
   ];
   const healthScore = Math.round(health.reduce((a, h) => a + h.pct, 0) / health.length);
 
@@ -344,7 +344,7 @@ export async function getHome(me: CoachRow, opts: { as?: string; focus?: string 
     if (!mgr) return { ...base, rank: "member", member: await getMemberHome(me, period) };
     return { ...base, focusId: mgr.id, manager: await getManagerHome(mgr, all, period) };
   }
-  // member：優先 focus；否則 viewer 本人（若為顧問）；再否則挑本月業績最高的成員（保證有資料可看）。
+  // member：優先 focus；否則 viewer 本人（若為教練）；再否則挑本月業績最高的成員（保證有資料可看）。
   let target = opts.focus ? all.find((c) => c.id === opts.focus) : undefined;
   if (!target && myRank === "member") target = me;
   if (!target) target = membersByIncome[0] ?? me;

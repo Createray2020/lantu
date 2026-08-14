@@ -1629,7 +1629,7 @@ function coverageCheckupHTML(c,ck,pc){
  ck.due.forEach(function(d){todo.push('續保 '+esc(d.name)+'（'+esc(d.when)+'）並檢視保額');});
  if(ck.dups.length)todo.push('檢視重複投保：'+ck.dups.join('、'));
  if(!todo.length)todo.push('目前保障結構完整，維持定期健檢即可。');
- return '<div class="sec"><h4>保單健檢報告 <span class="hint">五面向診斷 → 顧問行動清單</span></h4><div class="diag">'+cards.join('')+'</div><h4 style="margin-top:16px">顧問行動清單</h4><ul class="todo">'+todo.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>';
+ return '<div class="sec"><h4>保單健檢報告 <span class="hint">五面向診斷 → 教練行動清單</span></h4><div class="diag">'+cards.join('')+'</div><h4 style="margin-top:16px">教練行動清單</h4><ul class="todo">'+todo.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>';
 }
 function coverageHubSec(c){
  c.policies=c.policies||[];c.needs=c.needs||[];c.coverages=c.coverages||[];
@@ -2030,7 +2030,7 @@ function bizToolHTML(){var T=app.tools.biz,net=n(T.monthRev)-n(T.monthCost);
  return '<div class="sec"><h4>公司開辦 · 營運資金試算 <span class="hint">適用企業主客戶</span></h4><div class="fgrid">'+toolF('biz',[['setup','開辦資金'],['cash','現有可用資金'],['monthRev','每月營業額'],['monthCost','每月成本']])+'</div>'+
   toolBig([['每月淨流'+(net>=0?'入':'出'),fmt(Math.abs(net)),net>=0?'var(--ok)':'var(--warn)'],['現金可撐',runway,net>=0?'var(--ok)':'var(--warn)'],['開辦＋半年週轉',fmt(n(T.setup)+Math.max(0,-net)*6),'var(--amber2)']])+'</div>';}
 function reportPane(c){return '<div style="margin-bottom:10px" class="muted">客戶交付報告預覽（圖表化），右上「列印報告」輸出 PDF。</div>'+
- '<div class="sec"><h4>顧問總結 <span class="hint">顧問可編輯；填寫後會出現在報告書結尾（客戶版）</span></h4><textarea onchange="setCase(\'reportNote\',this.value)" placeholder="例：整體財務結構穩健，建議優先補強壽險缺口與提高緊急預備金…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.reportNote||'')+'</textarea></div>'+
+ '<div class="sec"><h4>教練總結 <span class="hint">教練可編輯；填寫後會出現在報告書結尾（客戶版）</span></h4><textarea onchange="setCase(\'reportNote\',this.value)" placeholder="例：整體財務結構穩健，建議優先補強壽險缺口與提高緊急預備金…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.reportNote||'')+'</textarea></div>'+
  reportHTML(c)}
 /* ===== 報告用淺色圖表元件 ===== */
 var RCOL=['#0d2b45','#c99a5b','#7f97ac','#8ba888','#b07d3d','#b05a4a','#5a7186','#cbb488'];
@@ -2145,7 +2145,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<h2>十一、規劃執行建議</h2><ol style="color:#33474e;padding-left:20px">'+advRows+'</ol>'+
   '<h2>十二、執行行動清單</h2><table><tr><th>軸線</th><th>動作</th><th>說明</th></tr>'+actRep+'</table>'+
   '<h2>十三、動態調整（PDCA）</h2><p style="color:#33474e">計畫(Plan)→行動(Do)→確認(Check)→調整(Act)，建議每半年檢視一次。下次檢視日期：<b>'+(esc(c.nextReview)||'尚未設定')+'</b></p>'+
-  (c.reportNote?'<div style="margin:14px 0;padding:14px 16px;background:#f4f7f5;border:1px solid #cfe0d5;border-radius:10px"><b style="color:#0d2b45">顧問總結</b><div style="color:#33474e;margin-top:6px;white-space:pre-wrap">'+esc(c.reportNote)+'</div></div>':'')+
+  (c.reportNote?'<div style="margin:14px 0;padding:14px 16px;background:#f4f7f5;border:1px solid #cfe0d5;border-radius:10px"><b style="color:#0d2b45">教練總結</b><div style="color:#33474e;margin-top:6px;white-space:pre-wrap">'+esc(c.reportNote)+'</div></div>':'')+
   '<h2>十四、注意事項</h2><p style="color:#5a6b72;font-size:12.5px">本報告依所提供資料與假設參數試算，僅供參考；稅額為簡化估算，實際以主管機關與會計師核定為準。財務規劃為動態調整過程，建議每半年檢視。</p></div>';
 }
 
