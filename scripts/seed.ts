@@ -143,7 +143,7 @@ async function main() {
   const mockCoachIds = TEAMS.flatMap((t) => [t.mgr.id, ...t.members.map((m) => m.id)]);
   const allClients = await db.select().from(clients);
   const staleIds = allClients
-    .filter((c) => mockCoachIds.includes(c.coachId) || (c.tags ?? []).includes(DEMO_TAG))
+    .filter((c) => (c.coachId != null && mockCoachIds.includes(c.coachId)) || (c.tags ?? []).includes(DEMO_TAG))
     .map((c) => c.id);
   if (staleIds.length) {
     await db.delete(actionItems).where(inArray(actionItems.clientId, staleIds));

@@ -42,7 +42,10 @@ export const clientUsers = pgTable('client_users', {
 // 客戶（永久身份）
 export const clients = pgTable('clients', {
   id: uuid('id').defaultRandom().primaryKey(),
-  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  // 顧問建立的客戶：coachId 有值。自助客戶（人生護照）：coachId 為 null、clientUserId 指向登入帳號，
+  // 待客戶授權／掛上教練後，coachId 才會被設上（＝「真的進入規劃」）。
+  coachId: text('coach_id').references(() => coaches.id, { onDelete: 'cascade' }),
+  clientUserId: text('client_user_id').references(() => clientUsers.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   contact: jsonb('contact').$type<{ phone?: string; email?: string; line?: string }>().default({}),
   source: text('source'),          // 轉介/講座/廣告/自來

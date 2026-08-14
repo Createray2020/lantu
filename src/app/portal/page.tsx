@@ -3,20 +3,25 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
+import { getClientOwnPlan } from "@/lib/clientPlan";
+import { FACES } from "@/lib/passport";
 
 export const dynamic = "force-dynamic";
 
-// 客戶端登入後的落點。
-// 本輪為最小 placeholder：確認「門」通了（客戶可註冊→登入→有地方落地）。
-// 人生護照的實際畫面與規劃結構連動＝下一個 pass。
+const nt = (n: number) => Math.round(n || 0).toLocaleString("en-US");
+
+// 客戶端首頁。
+// - 尚未做人生護照：導引開始。
+// - 已有基礎方案：顯示每月應存摘要；「真的進入規劃」要等掛上教練（雙向連結，之後開放）。
 export default async function Portal() {
   const client = await ensureClientUser();
   if (!client) {
-    // 非客戶：教練帳號 → 導去教練端；未登入 → 導去客戶登入。
     const { userId } = await auth();
     redirect(userId ? "/dashboard" : "/client/sign-in");
   }
   const name = client.name || "貴賓";
+  const own = await getClientOwnPlan(client.id);
+  const monthly = own?.monthly ?? null;
 
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] flex flex-col">
@@ -37,25 +42,58 @@ export default async function Portal() {
         </SignOutButton>
       </header>
 
-      <main className="flex-1 grid place-items-center px-6 py-16">
-        <div className="max-w-lg text-center">
-          <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-3">MY FINANCIAL PLAN</div>
-          <h1 className="font-serif text-3xl mb-4">{name}，歡迎回來</h1>
-          <p className="text-[#a7bacb] leading-relaxed mb-8">
-            你的專屬財務規劃即將展開。第一步是「人生護照」——
-            用購房、購車、退休、扶養、旅遊五個面向，把你最在意的人生目標
-            換算成「每個月該存多少」，完成後就成為你的第一份規劃基礎。
-          </p>
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-5 py-2.5 text-sm text-[#e0bd8b]">
-            <span className="w-2 h-2 rounded-full bg-[#c99a5b] animate-pulse" />
-            人生護照 · 即將開放
+      <main className="flex-1 px-6 py-12">
+        {monthly ? (
+          <div className="max-w-2xl mx-auto">
+            <div className="text-center mb-8">
+              <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-2">MY LIFE PASSPORT</div>
+              <h1 className="font-serif text-3xl mb-2">{name}，你的人生護照</h1>
+              <p className="text-[#a7bacb] text-sm">為了實現你的目標，建議每月存下：</p>
+              <div className="font-serif text-4xl text-[#e0bd8b] mt-3">NT$ {nt(monthly.total)}</div>
+            </div>
+
+            <div className="rounded-2xl bg-[#12334f] border border-white/8 divide-y divide-white/8 mb-6">
+              {FACES.map((f) => (
+                <div key={f.key} className="flex items-center justify-between px-5 py-3.5">
+                  <span className="flex items-center gap-3 text-[#cdd9e5]">
+                    <span>{f.icon}</span>
+                    <span>{f.label}</span>
+                  </span>
+                  <span className="font-semibold text-[#e0bd8b]">NT$ {nt(monthly[f.key])}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+              <Link href="/portal/passport" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
+                重新編輯人生護照
+              </Link>
+            </div>
+
+            <div className="rounded-xl border border-[#c99a5b]/30 bg-[#0d2b45]/50 p-5 text-center">
+              <div className="inline-flex items-center gap-2 text-sm text-[#e0bd8b] mb-2">
+                <span className="w-2 h-2 rounded-full bg-[#c99a5b] animate-pulse" />
+                下一步：連結你的專屬顧問
+              </div>
+              <p className="text-[#a7bacb] text-sm leading-relaxed">
+                你的規劃基礎已建立。掛上信任的財務顧問、經你授權後，
+                就能一起把這份基礎深化成完整的財務規劃。（顧問連結即將開放）
+              </p>
+            </div>
           </div>
-          <div className="mt-10">
-            <Link href="/" className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">
-              回首頁
+        ) : (
+          <div className="max-w-lg mx-auto text-center pt-6">
+            <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-3">MY FINANCIAL PLAN</div>
+            <h1 className="font-serif text-3xl mb-4">{name}，歡迎回來</h1>
+            <p className="text-[#a7bacb] leading-relaxed mb-8">
+              你的專屬財務規劃，從「人生護照」開始——用購房、購車、退休、扶養、旅遊
+              五個面向，把你最在意的人生目標換算成「每個月該存多少」，完成後就成為你的第一份規劃基礎。
+            </p>
+            <Link href="/portal/passport" className="inline-block font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-8 py-3 rounded-lg">
+              開始我的人生護照
             </Link>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );
