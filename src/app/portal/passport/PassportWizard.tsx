@@ -160,6 +160,7 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
           <Slider label="月存入起始年" value={p.house.startYear} min={BASE_YEAR - 20} max={BASE_YEAR + 10} onChange={(v) => set("house", "startYear", v)} fmt={yr} minLabel={`${BASE_YEAR - 20}`} maxLabel={`${BASE_YEAR + 10}`} />
           <Slider label="年報酬" value={p.house.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("house", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
           <Slider label="貸款成數" value={p.house.loanRatio} min={1} max={9} onChange={(v) => set("house", "loanRatio", v)} fmt={(v) => `${v} 成`} minLabel="1 成" maxLabel="9 成" />
+          <Slider label="貸款年期" value={p.house.loanYears} min={5} max={40} onChange={(v) => set("house", "loanYears", v)} fmt={(v) => `${v} 年`} minLabel="5 年" maxLabel="40 年" />
         </Face>
 
         {/* 購車 */}
@@ -170,6 +171,7 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
           <Slider label="月存入起始年" value={p.car.startYear} min={BASE_YEAR - 20} max={BASE_YEAR + 10} onChange={(v) => set("car", "startYear", v)} fmt={yr} minLabel={`${BASE_YEAR - 20}`} maxLabel={`${BASE_YEAR + 10}`} />
           <Slider label="年報酬" value={p.car.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("car", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
           <Slider label="貸款成數" value={p.car.loanRatio} min={1} max={9} onChange={(v) => set("car", "loanRatio", v)} fmt={(v) => `${v} 成`} minLabel="1 成" maxLabel="9 成" />
+          <Slider label="貸款年期" value={p.car.loanYears} min={1} max={10} onChange={(v) => set("car", "loanYears", v)} fmt={(v) => `${v} 年`} minLabel="1 年" maxLabel="10 年" />
         </Face>
 
         {/* 退休 */}
@@ -210,6 +212,7 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
           <Slider label="月存入" value={p.support.monthly} min={0} max={10} step={0.1} onChange={(v) => set("support", "monthly", v)} fmt={(v) => `${v} 萬`} minLabel="0 萬" maxLabel="10 萬" />
           <Slider label="月存入起始年" value={p.support.startYear} min={BASE_YEAR - 20} max={BASE_YEAR + 10} onChange={(v) => set("support", "startYear", v)} fmt={yr} minLabel={`${BASE_YEAR - 20}`} maxLabel={`${BASE_YEAR + 10}`} />
           <Slider label="年報酬" value={p.support.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("support", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
+          <Slider label="扶養到幾歲" value={p.support.raiseToAge} min={18} max={30} onChange={(v) => set("support", "raiseToAge", v)} fmt={(v) => `${v} 歲`} minLabel="18 歲" maxLabel="30 歲" />
         </Face>
 
         {/* 旅遊 */}
