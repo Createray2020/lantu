@@ -122,6 +122,35 @@ td.calc{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;whit
 .dfield input,.dfield select{width:auto;background:#0a1a20;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:5px 7px;font-size:12.5px;min-width:118px}
 .dhead{width:100%;color:var(--mut2);font-size:11px;letter-spacing:.06em;margin-bottom:2px}
 .finfoot{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;font-size:11.5px;color:var(--mut2)}
+/* 家庭成員：全員卡片化 */
+.ppband{font-size:15px;font-weight:800;color:var(--amber2);margin:2px 0 12px;display:flex;align-items:center;gap:8px}
+.ppband .hint{color:var(--mut2);font-size:12px;font-weight:400}
+.pcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;overflow:hidden}
+.pcard.self{border-left:3px solid var(--amber)}
+.pcard.spouse{border-left:3px solid var(--teal)}
+.pcard.other{border-left:3px solid var(--mut2)}
+.pcard .phd{display:flex;align-items:center;gap:11px;padding:11px 15px;background:linear-gradient(90deg,#0d2b45,#102f4c);border-bottom:1px solid var(--line)}
+.pcard .av{width:33px;height:33px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+.pcard.self .av{background:rgba(201,154,91,.2);color:var(--amber2);border:1px solid var(--amber)}
+.pcard.spouse .av{background:rgba(169,188,207,.16);color:var(--teal);border:1px solid var(--teal)}
+.pcard.other .av{background:rgba(111,134,156,.18);color:var(--mut);border:1px solid var(--mut2)}
+.pcard .pident{min-width:0}
+.pcard .who{font-weight:800;font-size:15px;line-height:1.2}
+.pcard .rolewrap{margin-top:2px}
+.pcard .role{font-size:11.5px;color:var(--mut2);font-weight:700;letter-spacing:.06em}
+.pcard .rolesel{background:#0a1a20;border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:2px 7px;font-size:11.5px;font-weight:700}
+.pcard .jobtag{margin-left:auto;font-size:12px;font-weight:700;color:var(--amber2);background:#0a1a20;border:1px solid var(--line);border-radius:999px;padding:3px 12px;white-space:nowrap}
+.pcard .jobtag.dep{color:var(--ok);border-color:rgba(143,192,163,.5)}
+.pcard .jobtag.mut{color:var(--mut2)}
+.pcard .pcdel{background:none;border:none;color:var(--warn);font-size:15px;padding:0 2px 0 8px;cursor:pointer;flex-shrink:0}
+.pcard .pbody{padding:14px 16px}
+.pcard .subhd{font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--mut);margin:15px 0 9px;display:flex;align-items:center;gap:8px}
+.pcard .subhd::before{content:"";width:3px;height:13px;background:var(--amber);border-radius:2px;display:inline-block}
+.pcard .subhd:first-child{margin-top:0}
+.pcard .bizbox{margin-top:12px;border:1px dashed var(--line);border-radius:10px;padding:13px;background:#0a1c2e}
+.pcard .bizbox .bh{font-size:12px;font-weight:800;color:var(--teal);margin-bottom:9px}
+.pcard .note{font-size:12px;color:var(--mut2);margin-top:9px;background:#0a1a20;border-left:3px solid var(--teal);border-radius:0 7px 7px 0;padding:7px 11px}
+.pcard .note b{color:var(--amber2)}
 </style>
 </head>
 <body>
@@ -241,6 +270,9 @@ function ensureJobFields(c){if(!c.profile)c.profile={};if(!c.profile.jobType)c.p
 function primaryMember(c){return (c.members||[]).filter(function(m){return m.role==='本人'})[0]||(c.members||[])[0];}
 // 就業者/業務：以月薪帶入「本人」成員的投保類型與月投保薪資（企業主投保自行維持）。
 function applyInsFromSalary(c){if(c.profile.jobType==='企業主')return;var pm=primaryMember(c);if(!pm)return;pm.insSalary=laborInsSalary(c.profile.monthlySalary);pm.insType=jobInsType(c.profile.jobType);}
+// 配偶／其他賺薪成員：工作類別與月薪存在成員物件上（本人維持存 c.profile/c.company）
+function ensureMemberJob(m){if(!m)return m;if(m.jobType==null)m.jobType='一般就業者';if(m.monthlySalary==null)m.monthlySalary='';if(!m.company)m.company=defaultCompany();return m;}
+function applyInsFromSalaryMember(m){if(!m||m.jobType==='企業主')return;m.insSalary=laborInsSalary(m.monthlySalary);m.insType=jobInsType(m.jobType);}
 
 function save(){try{localStorage.setItem('fps_data_v2',JSON.stringify(app.cases))}catch(e){}}
 function load(){try{var d=localStorage.getItem('fps_data_v2');if(d)app.cases=JSON.parse(d)}catch(e){}
@@ -737,6 +769,10 @@ function setCase(k,v){var c=activeCase();c[k]=v;save();render();}
 function setJobType(v){var c=activeCase();ensureJobFields(c);c.profile.jobType=v;if(v!=='企業主')applyInsFromSalary(c);save();render();}
 function setMonthlySalary(v){var c=activeCase();ensureJobFields(c);c.profile.monthlySalary=n(v);applyInsFromSalary(c);save();render();}
 function setCompany(k,v,type){var c=activeCase();ensureJobFields(c);c.company[k]=(type==='num')?n(v):v;save();if(app.role==='client')render();}
+function setMemberJobType(i,v){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m.jobType=v;if(v!=='企業主')applyInsFromSalaryMember(m);save();render();}
+function setMemberSalary(i,v){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m.monthlySalary=n(v);applyInsFromSalaryMember(m);save();render();}
+function setMemberCompany(i,k,v,type){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m.company[k]=(type==='num')?n(v):v;save();if(app.role==='client')render();}
+function setMemberRole(i,v){var c=activeCase();var m=c.members[i];if(!m)return;m.role=v;if(v==='本人'||v==='配偶')ensureMemberJob(m);save();render();}
 // 月/年週期：資料一律存「年額」(引擎不變)，僅輸入層依 period 換算顯示。
 function setAmtPeriod(arr,idx,v){var c=activeCase();c[arr][idx].period=v;save();render();}
 function setAmtByPeriod(arr,idx,val){var c=activeCase();var it=c[arr][idx];var v=n(val);it.amount=(it.period==='月')?v*12:v;save();if(app.role==='client')render();if(typeof syncFinSummary==='function')syncFinSummary();}
@@ -795,7 +831,7 @@ function dataPane(c){
   return '<div class="dgrow"><span class="dglab'+(g.exec?' exec':'')+'">'+(g.no?'<span class="dgn">'+g.no+'</span>':'')+g.name+'</span>'+btns+'</div>';
  }).join('');
  var body;
- if(app.dataTab==='family')body=familySec(c)+membersSec(c);
+ if(app.dataTab==='family')body=peopleSec(c);
  else if(app.dataTab==='finance')body=financeSec(c);
  else if(app.dataTab==='incomes')body=incomesSec(c);
  else if(app.dataTab==='expenses')body=expensesSec(c);
@@ -817,40 +853,94 @@ function dataPane(c){
  if(['incomes','expenses','assets','liabilities'].indexOf(app.dataTab)>=0)body=ownerBar(c)+body;
  return '<div class="dgroups">'+tb+'</div>'+body;
 }
-function jobSec(c){ensureJobFields(c);var p=c.profile,jt=p.jobType;
- var sel='<div class="f"><label>工作類別</label><select onchange="setJobType(this.value)">'+
-  ['一般就業者','業務工作者','企業主'].map(function(o){return '<option '+(jt===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
- var body='';
- if(jt==='企業主'){var co=c.company||{};
-  function cf(k,label,type){return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(co[k]==null?'':co[k])+'" oninput="setCompany(\''+k+'\',this.value,\''+(type||'text')+'\')"></div>';}
-  body='<div class="hint" style="margin:2px 0 8px">企業主的財務常與公司連動，先留存公司基本與概略財務資料；完整公司財報（資產負債／損益）之後由專屬介面處理。</div>'+
-   '<div class="fgrid">'+cf('name','公司名稱')+cf('taxId','統一編號')+
-   '<div class="f"><label>行業別</label><input list="industryList" value="'+esc(co.industry==null?'':co.industry)+'" oninput="setCompany(\'industry\',this.value,\'text\')"><datalist id="industryList"><option value="批發/零售"></option><option value="餐飲/住宿"></option><option value="製造"></option><option value="營建/工程"></option><option value="資訊/科技"></option><option value="金融/保險"></option><option value="醫療/生技"></option><option value="教育/文創"></option><option value="農林漁牧"></option><option value="專業服務(法律/會計/顧問)"></option></datalist></div>'+
-   cf('role','擔任角色')+cf('sharePct','持股比例%','num')+cf('annualRevenue','年營收(概略)','num')+
-   cf('netProfit','年淨利(概略)','num')+cf('ownerLoan','負責人往來(股東往來/借貸)','num')+cf('note','備註')+'</div>'+
-   '<div style="margin-top:10px"><button class="add" style="opacity:.55;cursor:not-allowed" disabled title="規劃中，後續由專屬介面接手">＋ 完整公司財務（規劃中）</button></div>';
- }else{var ins=laborInsSalary(p.monthlySalary),it=jobInsType(jt);
-  body='<div class="fgrid"><div class="f"><label>月薪(投保計算用)</label><input type="number" value="'+esc(p.monthlySalary==null?'':p.monthlySalary)+'" onchange="setMonthlySalary(this.value)"></div></div>'+
-   '<div class="hint" style="margin-top:6px">依 2026 勞保投保薪資分級表自動帶入：投保類型 <b>'+it+'</b>、月投保薪資 <b>'+fmt(ins)+'</b>（級距天花板 45,800，已回填下方「本人」成員，仍可手動微調）。'+(jt==='業務工作者'?' 業務工作者收入常浮動、多以職業工會投保。':'')+'</div>';
+// ===== 家庭成員：全員卡片化（本人／配偶＝完整工作卡；其餘＝身分＋投保＋分攤＋財務獨立歲）=====
+var MEMBER_INS_TYPES=['勞保','職業工會','農保','公保','軍保','國民年金','勞工職業災害保險','就業保險','健保眷屬','退休','無'];
+function fFld(bindAttr,label,val,type,opts){
+ if(opts){var os=opts.map(function(o){return '<option '+(val===o?'selected':'')+'>'+esc(o)+'</option>'}).join('');
+  return '<div class="f"><label>'+label+'</label><select '+bindAttr+'>'+os+'</select></div>';}
+ return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(val==null?'':val)+'" '+bindAttr+'></div>';
+}
+function companyGridHTML(co,onAttr){
+ function cf(k,label,type){return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(co[k]==null?'':co[k])+'" '+onAttr(k,type||'text')+'></div>';}
+ return '<div class="bizbox"><div class="bh">🏢 公司基本 · 概略財務 <span class="hint" style="font-weight:400">完整公司財報之後由專屬介面處理</span></div>'+
+  '<div class="fgrid">'+cf('name','公司名稱')+cf('taxId','統一編號')+
+  '<div class="f"><label>行業別</label><input list="industryList" value="'+esc(co.industry==null?'':co.industry)+'" '+onAttr('industry','text')+'><datalist id="industryList"><option value="批發/零售"></option><option value="餐飲/住宿"></option><option value="製造"></option><option value="營建/工程"></option><option value="資訊/科技"></option><option value="金融/保險"></option><option value="醫療/生技"></option><option value="教育/文創"></option><option value="農林漁牧"></option><option value="專業服務(法律/會計/顧問)"></option></datalist></div>'+
+  cf('role','擔任角色')+cf('sharePct','持股比例%','num')+cf('annualRevenue','年營收(概略)','num')+
+  cf('netProfit','年淨利(概略)','num')+cf('ownerLoan','負責人往來(股東往來/借貸)','num')+cf('note','備註')+'</div></div>';
+}
+function personCard(c,m,idx,isPrimary){
+ var p=c.profile;
+ var role=isPrimary?'本人':(m.role||'其他');
+ var isEarner=(role==='本人'||role==='配偶');
+ if(isPrimary)ensureJobFields(c);else if(isEarner)ensureMemberJob(m);
+ var jt=isEarner?(isPrimary?p.jobType:m.jobType):'';
+ var dispName=isPrimary?(p.name||m.name||'本人'):(m.name||'（未命名）');
+ var av=esc(dispName.slice(0,1));
+ var cls=isPrimary?'self':(role==='配偶'?'spouse':'other');
+ var jobtag=isEarner?'<span class="jobtag">'+esc(jt||'一般就業者')+'</span>'
+   :((role==='子女'&&m.indepAge!==''&&m.indepAge!=null)?'<span class="jobtag dep">獨立歲 '+esc(m.indepAge)+'</span>':'<span class="jobtag mut">'+esc(role)+'</span>');
+ var roleSel=isPrimary?'<span class="role">本人</span>'
+   :'<select class="rolesel" onchange="setMemberRole('+idx+',this.value)">'+['配偶','父','母','子女','長輩','其他'].map(function(o){return '<option '+(role===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select>';
+ var delBtn=isPrimary?'':'<button class="pcdel" title="刪除成員" onclick="delRow(\'members\','+idx+')">✕</button>';
+ var hd='<div class="phd"><span class="av">'+av+'</span><div class="pident"><div class="who">'+esc(dispName)+'</div><div class="rolewrap">'+roleSel+'</div></div>'+jobtag+delBtn+'</div>';
+ // 身分
+ var mb=function(k,ty){return 'onchange="set(\'members:'+idx+'\',\''+k+'\',this.value'+(ty==='num'?',\'num\'':'')+')"';};
+ var idFields;
+ if(isPrimary){
+  idFields=fFld('oninput="setMeta(\'profile\',\'name\',this.value)"','姓名',p.name)+
+   fFld('onchange="setMeta(\'profile\',\'gender\',this.value)"','性別',p.gender,null,['男','女'])+
+   fFld('oninput="setMeta(\'profile\',\'age\',this.value,\'num\')"','目前年齡',p.age,'num')+
+   fFld('oninput="setMeta(\'profile\',\'retireAge\',this.value,\'num\')"','預計退休年齡',p.retireAge,'num')+
+   fFld('oninput="setMeta(\'profile\',\'lifeExp\',this.value,\'num\')"','預估壽命',p.lifeExp,'num')+
+   fFld('oninput="setMeta(\'profile\',\'credit\',this.value,\'num\')"','聯徵信用評分(200-800)',p.credit,'num');
+ }else{
+  idFields=fFld(mb('name'),'姓名',m.name)+fFld(mb('gender'),'性別',m.gender,null,['男','女'])+fFld(mb('age','num'),'年齡',m.age,'num');
  }
- return '<div class="sec"><h4>工作類別</h4><div class="fgrid">'+sel+'</div>'+body+'</div>';
+ var idBlock='<div class="subhd">身分資料</div><div class="fgrid">'+idFields+'</div>';
+ // 工作與投保
+ var workBlock='';
+ if(isEarner){
+  var jobSelAttr,salAttr,coHTML,sal;
+  if(isPrimary){
+   jobSelAttr='onchange="setJobType(this.value)"';salAttr='onchange="setMonthlySalary(this.value)"';sal=p.monthlySalary;
+   coHTML=(jt==='企業主')?companyGridHTML(c.company||{},function(k,ty){return 'oninput="setCompany(\''+k+'\',this.value,\''+ty+'\')"';}):'';
+  }else{
+   jobSelAttr='onchange="setMemberJobType('+idx+',this.value)"';salAttr='onchange="setMemberSalary('+idx+',this.value)"';sal=m.monthlySalary;
+   coHTML=(jt==='企業主')?companyGridHTML(m.company||{},function(k,ty){return 'oninput="setMemberCompany('+idx+',\''+k+'\',this.value,\''+ty+'\')"';}):'';
+  }
+  var jobSel='<div class="f"><label>工作類別</label><select '+jobSelAttr+'>'+['一般就業者','業務工作者','企業主'].map(function(o){return '<option '+(jt===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
+  var salField=(jt==='企業主')?'':'<div class="f"><label>月薪(投保計算用)</label><input type="number" value="'+esc(sal==null?'':sal)+'" '+salAttr+'></div>';
+  var insField=fFld(mb('insSalary','num'),'月投保薪資',m.insSalary,'num')+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES);
+  var hint=(jt==='企業主')?'<div class="hint" style="margin-top:6px">企業主投保多自行維持，月投保薪資請於上方手填。</div>'
+    :'<div class="hint" style="margin-top:6px">依 2026 勞保投保薪資分級表自動帶入（級距天花板 45,800，可手動微調）。'+(jt==='業務工作者'?' 業務工作者收入常浮動、多以職業工會投保。':'')+'</div>';
+  workBlock='<div class="subhd">工作與投保</div><div class="fgrid">'+jobSel+salField+insField+'</div>'+hint+coHTML;
+ }else{
+  workBlock='<div class="subhd">投保</div><div class="fgrid">'+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES)+fFld(mb('insSalary','num'),'月投保薪資',m.insSalary,'num')+'</div>';
+ }
+ // 家庭分攤 · 財務獨立歲
+ var ratioFields=fFld(mb('depRatio','num'),'家計負擔%',m.depRatio,'num')+fFld(mb('expRatio','num'),'支出比例%',m.expRatio,'num');
+ if(!isEarner)ratioFields+=fFld(mb('indepAge','num'),'財務獨立歲',m.indepAge,'num');
+ var ratioHint=(!isEarner&&m.indepAge!==''&&m.indepAge!=null)?'<div class="note">🔗 到 <b>'+esc(m.indepAge)+'</b> 歲後，其「支出比例」份額會自動從壽險保障需求（責任遞減）中移除。</div>':'';
+ var ratioBlock='<div class="subhd">家庭分攤'+(!isEarner?' · 財務獨立':'')+'</div><div class="fgrid">'+ratioFields+'</div>'+ratioHint;
+ return '<div class="pcard '+cls+'">'+hd+'<div class="pbody">'+idBlock+workBlock+ratioBlock+'</div></div>';
 }
-function familySec(c){var p=c.profile,pa=c.params;
- function fld(obj,g,k,label,type){if(type&&type.indexOf('sel:')===0){var opts=type.slice(4).split(',').map(function(o){return '<option '+(obj[k]===o?'selected':'')+'>'+o+'</option>'}).join('');
-   return '<div class="f"><label>'+label+'</label><select onchange="setMeta(\''+g+'\',\''+k+'\',this.value)">'+opts+'</select></div>'}
-  return '<div class="f"><label>'+label+'</label><input value="'+esc(obj[k])+'" oninput="setMeta(\''+g+'\',\''+k+'\',this.value,\''+(type||'text')+'\')"></div>'}
- return '<div class="sec"><h4>基本資料</h4><div class="fgrid">'+
-  fld(p,'profile','name','客戶姓名')+fld(p,'profile','gender','性別','sel:男,女')+fld(p,'profile','age','目前年齡','num')+
-  fld(p,'profile','retireAge','預計退休年齡','num')+fld(p,'profile','lifeExp','預估壽命','num')+fld(p,'profile','credit','聯徵信用評分(200-800)','num')+'</div></div>'+
-  jobSec(c)+
-  '<div class="sec"><h4>規劃參數</h4><div class="fgrid">'+
-  fld(pa,'params','inflation','通膨率%','num')+fld(pa,'params','salaryGrowth','薪資成長率%','num')+fld(pa,'params','invReturn','投資報酬率%','num')+
-  fld(pa,'params','tuitionGrowth','學費上漲率%','num')+fld(pa,'params','freeSaving','自由儲蓄%','num')+fld(pa,'params','planSaving','計劃儲蓄%','num')+fld(pa,'params','planInit','計劃儲蓄期初','num')+fld(pa,'params','planYearly','計劃儲蓄年投入','num')+
-  fld(pa,'params','emergencyMonths','緊急預備金(月)','num')+fld(pa,'params','horizon','模擬到幾歲','num')+
-  fld(pa,'params','invReturnStd','報酬標準差%','num')+fld(pa,'params','inflationStd','通膨標準差%','num')+fld(pa,'params','salaryStd','薪資標準差%','num')+'</div></div>';
+function peopleSec(c){
+ ensureJobFields(c);
+ var members=c.members||[];
+ var pi=members.findIndex(function(m){return m.role==='本人';});if(pi<0)pi=0;
+ var primary=members[pi]||{name:c.profile.name,role:'本人',depRatio:100,expRatio:100};
+ var cards=personCard(c,primary,pi,true);
+ members.forEach(function(m,i){if(i===pi)return;cards+=personCard(c,m,i,false);});
+ var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'members\')">＋ 新增家庭成員</button></div>';
+ return '<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+paramsSec(c);
 }
-function membersSec(c){
- return tableSec('家庭成員','members',c.members,[['name','姓名','text'],['role','稱謂','sel:本人,配偶,父,母,子女,長輩,其他'],['gender','性別','sel:男,女'],['age','年齡','num'],['worked','已工作年數','num'],['insType','投保類型','sel:勞保,職業工會,農保,公保,軍保,國民年金,勞工職業災害保險,就業保險,健保眷屬,無'],['insSalary','月投保薪資','num'],['depRatio','家計負擔%','num'],['expRatio','支出比例%','num'],['indepAge','財務獨立歲','num']]);
+function paramsSec(c){var pa=c.params;
+ function fld(k,label,type){return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(pa[k]==null?'':pa[k])+'" oninput="setMeta(\'params\',\''+k+'\',this.value,\''+(type||'text')+'\')"></div>';}
+ return '<div class="sec"><h4>規劃參數</h4><div class="fgrid">'+
+  fld('inflation','通膨率%','num')+fld('salaryGrowth','薪資成長率%','num')+fld('invReturn','投資報酬率%','num')+
+  fld('tuitionGrowth','學費上漲率%','num')+fld('freeSaving','自由儲蓄%','num')+fld('planSaving','計劃儲蓄%','num')+fld('planInit','計劃儲蓄期初','num')+fld('planYearly','計劃儲蓄年投入','num')+
+  fld('emergencyMonths','緊急預備金(月)','num')+fld('horizon','模擬到幾歲','num')+
+  fld('invReturnStd','報酬標準差%','num')+fld('inflationStd','通膨標準差%','num')+fld('salaryStd','薪資標準差%','num')+'</div></div>';
 }
 var INC_SUB=['薪資','執行業務所得','年終獎金','三節獎金','績效/季獎金','兼職','加班費','租金收入','股利/利息','其他'];
 function incomesSec(c){
@@ -1574,13 +1664,17 @@ function deathProjection(c,mb){var base=projection(c),a0=n(c.profile.age),infl=n
  var funeral=sum((c.needs||[]),function(nd){return nd.member===mb.name?n(nd.funeral):0});
  var premium=sum((c.policies||[]),function(p){return p.insured===mb.name?n(p.premium):0});
  var expRatio=n(mb.expRatio)/100;
+ // 財務獨立歲：其他被撫養成員到達獨立歲後，其支出比例份額自家庭生活費移除（責任遞減）
+ var deps=(c.members||[]).filter(function(x){return x.name!==mb.name&&x.indepAge!==''&&x.indepAge!=null&&n(x.expRatio)>0;});
  var asset=liquid0,rows=[],depletedAge=null;
  base.rows.forEach(function(br,i){var age=br.age,t=age-a0;
   var mWork=sum(c.incomes,function(inc){return (inc.owner===mb.name&&inc.type==='工作'&&age>=n(inc.start)&&age<=n(inc.end))?n(inc.amount)*Math.pow(1+n(inc.growth)/100,t):0;});
   var hLiving=sum(c.expenses,function(e){return (e.cat==='生活'&&age>=n(e.start)&&age<=n(e.end))?n(e.amount)*(e.infl?Math.pow(1+infl,t):1):0;});
+  var indepFrac=0;deps.forEach(function(d){if(n(d.age)+t>=n(d.indepAge))indepFrac+=n(d.expRatio)/100;});
+  var removeFrac=Math.min(1,expRatio+indepFrac);
   var totalOut=br.income-br.bal;
   var income=br.income-mWork+(i===0?lump:0);
-  var expense=Math.max(0,totalOut-(hLiving+n(br.goal))*expRatio-premium)+(i===0?funeral:0);
+  var expense=Math.max(0,totalOut-(hLiving+n(br.goal))*removeFrac-premium)+(i===0?funeral:0);
   asset=(asset>0?asset*(1+ret):asset)+(income-expense);
   if(depletedAge===null&&asset<0)depletedAge=age;
   rows.push({age:age,income:income,expense:expense,asset:asset});
