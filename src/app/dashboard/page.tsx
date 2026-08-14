@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { ensureCoach } from "@/lib/coach";
 import { getHome } from "@/lib/home";
 import DashboardHeader from "./DashboardHeader";
@@ -18,7 +19,11 @@ export default async function Dashboard({
   searchParams: Promise<{ as?: string; focus?: string }>;
 }) {
   const coach = await ensureCoach();
-  if (!coach) redirect("/sign-in");
+  if (!coach) {
+    // 非教練：客戶帳號 → 導去客戶端；未登入 → 導去登入。
+    const { userId } = await auth();
+    redirect(userId ? "/portal" : "/sign-in");
+  }
   if (coach.status !== "active") {
     return <PendingNotice email={coach.email} status={coach.status} />;
   }

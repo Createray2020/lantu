@@ -26,6 +26,19 @@ export const coaches = pgTable('coaches', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// 客戶登入帳號（雙邊平台：客戶自己上官網註冊、以客戶身分登入）
+// 對應 Clerk user id；與 coaches 互斥（同一 Clerk 使用者不會同時是教練與客戶）。
+// 注意：這是「客戶端登入者」，與下方 clients（顧問管理的 CRM 客戶）是不同物，
+//       兩者的合併（客戶擁有自己的 clients 記錄）屬租戶反轉波，之後才做。
+// status: active（自助入口，註冊即開通）/ suspended（停權）
+export const clientUsers = pgTable('client_users', {
+  id: text('id').primaryKey(), // Clerk userId
+  email: text('email'),
+  name: text('name'),
+  status: text('status').default('active').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // 客戶（永久身份）
 export const clients = pgTable('clients', {
   id: uuid('id').defaultRandom().primaryKey(),
