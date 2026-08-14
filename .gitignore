@@ -44,3 +44,8 @@ next-env.d.ts
 _to_delete/
 *.tar.gz
 lantu_src_v1.tgz
+
+# Cowork 暫存打包檔（改法：一律忽略）
+*.tgz
+_stage*
+_incoming*
