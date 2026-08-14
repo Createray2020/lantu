@@ -1,27 +1,19 @@
 // 客戶帳號與身分（伺服器端）。
 // Clerk 負責「你是誰」；這裡負責「你是客戶端使用者」（client_users 表）。
-// 與 coaches 互斥：已是教練者不建立客戶帳號（反向互斥見 ensureCoach）。
+// 註：教練與客戶不互斥——同一個帳號可同時是教練也是客戶（自己的財務規劃）。
+//     介面看你進到哪個區域（/portal＝客戶、/dashboard＝教練），不由身分綁死。
 import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clientUsers, coaches } from "@/Shared/db/schema";
+import { clientUsers } from "@/Shared/db/schema";
 
 export type ClientUser = typeof clientUsers.$inferSelect;
 
 // 確保目前登入的 Clerk 使用者在 client_users 表有一筆資料，並回傳該筆。
-// - 若該 Clerk 使用者已是教練（coaches 有列）→ 回 null（他是教練，不是客戶）。
-// - 否則首次登入即建立為 status=active（客戶自助入口，免教練審核）。
+// 任何登入者（含教練）都可有客戶身分；首次進來即建立為 status=active（自助、免審核）。
 export async function ensureClientUser(): Promise<ClientUser | null> {
   const user = await currentUser();
   if (!user) return null;
-
-  // 互斥：已是教練 → 不是客戶。
-  const asCoach = await db
-    .select({ id: coaches.id })
-    .from(coaches)
-    .where(eq(coaches.id, user.id))
-    .limit(1);
-  if (asCoach[0]) return null;
 
   const email = user.emailAddresses?.[0]?.emailAddress?.toLowerCase() ?? null;
   const name =

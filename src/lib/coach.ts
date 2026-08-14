@@ -3,7 +3,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { coaches, clientUsers } from "@/Shared/db/schema";
+import { coaches } from "@/Shared/db/schema";
 
 export type Coach = typeof coaches.$inferSelect;
 
@@ -22,14 +22,7 @@ export async function ensureCoach(): Promise<Coach | null> {
   const user = await currentUser();
   if (!user) return null;
 
-  // 互斥：已是客戶帳號 → 不建立教練（避免客戶誤入教練流程被當成待開通教練）。
-  const asClient = await db
-    .select({ id: clientUsers.id })
-    .from(clientUsers)
-    .where(eq(clientUsers.id, user.id))
-    .limit(1);
-  if (asClient[0]) return null;
-
+  // 教練與客戶不互斥：教練就算用過客戶端（/portal）有了 client_users 列，仍可正常進 /dashboard。
   const email = user.emailAddresses?.[0]?.emailAddress?.toLowerCase() ?? null;
   const name =
     [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || null;

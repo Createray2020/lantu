@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
 import { getClientOwnPlan } from "@/lib/clientPlan";
@@ -14,11 +13,9 @@ const nt = (n: number) => Math.round(n || 0).toLocaleString("en-US");
 // - 尚未做人生護照：導引開始。
 // - 已有基礎方案：顯示每月應存摘要；「真的進入規劃」要等掛上教練（雙向連結，之後開放）。
 export default async function Portal() {
+  // 任何登入者（含教練）都看客戶介面；未登入才導去客戶登入。
   const client = await ensureClientUser();
-  if (!client) {
-    const { userId } = await auth();
-    redirect(userId ? "/dashboard" : "/client/sign-in");
-  }
+  if (!client) redirect("/client/sign-in");
   const name = client.name || "貴賓";
   const own = await getClientOwnPlan(client.id);
   const monthly = own?.monthly ?? null;

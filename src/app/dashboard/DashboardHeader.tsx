@@ -53,6 +53,12 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
       </nav>
       <div className="flex-1" />
       <Link
+        href="/portal"
+        className="text-[#a9bccf] hover:text-[#eef2f7] text-xs font-bold px-2.5 py-1.5 rounded-md border border-white/15"
+      >
+        我的規劃
+      </Link>
+      <Link
         href="/home"
         className="text-[#a9bccf] hover:text-[#eef2f7] text-xs font-bold px-2.5 py-1.5 rounded-md border border-white/15"
       >
