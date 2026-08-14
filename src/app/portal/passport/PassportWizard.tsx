@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -122,22 +122,38 @@ function Face({
 /* ---------- 主元件 ---------- */
 export default function PassportWizard({ initial }: { initial: PassportInputs | null }) {
   const [p, setP] = useState<PassportInputs>(initial ?? emptyPassport());
-  const [saved, setSaved] = useState(false);
-  const [pending, start] = useTransition();
+  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [errMsg, setErrMsg] = useState<string | null>(null);
   const router = useRouter();
   const m = useMemo(() => computePassport(p), [p]);
 
   function set<K extends keyof PassportInputs>(face: K, key: keyof PassportInputs[K], v: number) {
     setP((prev) => ({ ...prev, [face]: { ...prev[face], [key]: v } }));
-    setSaved(false);
+    if (status !== "saving") { setStatus("idle"); setErrMsg(null); }
   }
   const yr = (v: number) => `${v} 年`;
 
-  function onSave() {
-    start(async () => {
-      const res = await savePassportAction(p);
-      if (res.ok) { setSaved(true); router.push("/portal"); router.refresh(); }
-    });
+  async function onSave() {
+    if (status === "saving") return;
+    setStatus("saving"); setErrMsg(null);
+    try {
+      // 25 秒逾時保護：就算後端沒回應也不會永遠乾等。
+      const res = (await Promise.race([
+        savePassportAction(p),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("連線逾時，請檢查網路後再試")), 25000)),
+      ])) as Awaited<ReturnType<typeof savePassportAction>>;
+      if (res.ok) {
+        setStatus("success");
+        router.push("/portal");
+        router.refresh();
+      } else {
+        setStatus("error");
+        setErrMsg(res.error || "儲存失敗，請重試");
+      }
+    } catch (e) {
+      setStatus("error");
+      setErrMsg(e instanceof Error ? e.message : "儲存失敗，請重試");
+    }
   }
 
   return (
@@ -238,14 +254,34 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
 
       {/* 底部合計＋存檔 */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#0b2036]/95 backdrop-blur border-t border-white/10">
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[11px] tracking-[0.2em] text-[#6f869c]">合計 每月應存</div>
-            <div className="font-serif text-2xl text-[#e0bd8b]">{m.totalMonthlyWan.toFixed(1)} 萬</div>
+        {/* 儲存中的進度指示條（不確定式） */}
+        {status === "saving" && (
+          <div className="absolute -top-0.5 left-0 right-0 h-1 overflow-hidden bg-white/5">
+            <style>{`@keyframes pwslide{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}`}</style>
+            <div className="h-full w-1/4 bg-[#c99a5b]" style={{ animation: "pwslide 1.1s ease-in-out infinite" }} />
           </div>
-          <button onClick={onSave} disabled={pending}
-            className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] disabled:opacity-60 px-7 py-3 rounded-lg">
-            {pending ? "儲存中…" : saved ? "已儲存 ✓" : "存檔，建立我的規劃"}
+        )}
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            {status === "error" ? (
+              <div className="text-[#ff9b9b] text-sm">⚠ {errMsg}</div>
+            ) : status === "saving" ? (
+              <div className="text-[#e0bd8b] text-sm">儲存中，請稍候…</div>
+            ) : status === "success" ? (
+              <div className="text-[#7bd88f] text-sm">已儲存，正在開啟你的規劃…</div>
+            ) : (
+              <>
+                <div className="text-[11px] tracking-[0.2em] text-[#6f869c]">合計 每月應存</div>
+                <div className="font-serif text-2xl text-[#e0bd8b]">{m.totalMonthlyWan.toFixed(1)} 萬</div>
+              </>
+            )}
+          </div>
+          <button onClick={onSave} disabled={status === "saving"}
+            className="shrink-0 font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] disabled:opacity-60 px-7 py-3 rounded-lg inline-flex items-center gap-2">
+            {status === "saving" && (
+              <span className="w-4 h-4 border-2 border-[#08202a]/40 border-t-[#08202a] rounded-full animate-spin" />
+            )}
+            {status === "saving" ? "儲存中…" : status === "success" ? "已儲存 ✓" : status === "error" ? "重試存檔" : "存檔，建立我的規劃"}
           </button>
         </div>
       </div>
