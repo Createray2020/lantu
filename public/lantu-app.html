@@ -151,6 +151,46 @@ td.calc{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;whit
 .pcard .bizbox .bh{font-size:12px;font-weight:800;color:var(--teal);margin-bottom:9px}
 .pcard .note{font-size:12px;color:var(--mut2);margin-top:9px;background:#0a1a20;border-left:3px solid var(--teal);border-radius:0 7px 7px 0;padding:7px 11px}
 .pcard .note b{color:var(--amber2)}
+/* 加厚保單卡 */
+.pcard.life{border-left:3px solid var(--amber)}
+.pcard.prop{border-left:3px solid var(--teal)}
+.pcard .polco{font-size:11.5px;color:var(--mut2);font-weight:700}
+.polbadge{font-size:10.5px;font-weight:700;border-radius:5px;padding:2px 8px;border:1px solid var(--line);white-space:nowrap}
+.polbadge.main{color:var(--amber2);border-color:rgba(201,154,91,.5)}
+.polbadge.rider{color:var(--teal)}
+.polbadge.eff{color:var(--ok);border-color:rgba(143,192,163,.5)}
+.polbadge.off{color:var(--mut2)}
+.polbadge.due{color:var(--warn);border-color:rgba(224,138,104,.55)}
+.pcard .phd .polbadge{margin-left:0}
+.pcard .phd .av+.pident{margin-right:auto}
+.claimin{width:100%;background:#0a1a20;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:7px 9px;font-size:12.5px}
+/* 保障中心 */
+.matrix{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px}
+.matrix th,.matrix td{text-align:center;padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.matrix td.mem{text-align:left;font-weight:700;white-space:nowrap}
+.cell{display:inline-block;width:22px;height:22px;border-radius:6px;line-height:22px;font-size:12px;font-weight:800;text-align:center}
+.cell.g{background:rgba(143,192,163,.22);color:var(--ok);border:1px solid rgba(143,192,163,.5)}
+.cell.y{background:rgba(224,138,104,.16);color:var(--amber2);border:1px solid rgba(201,154,91,.5)}
+.cell.r{background:rgba(224,138,104,.2);color:var(--warn);border:1px solid rgba(224,138,104,.55)}
+.cell.n{background:#0a1a20;color:var(--mut2);border:1px solid var(--line)}
+.cvlegend{display:flex;gap:15px;flex-wrap:wrap;color:var(--mut2);font-size:12px;margin-top:10px}
+.cvlegend span{display:inline-flex;align-items:center;gap:6px}
+.cvlegend .cell{width:14px;height:14px;line-height:14px}
+.chk td:first-child{font-weight:700;white-space:nowrap}
+.pill{display:inline-block;font-size:11px;font-weight:800;border-radius:5px;padding:1px 9px}
+.pill.have{background:rgba(143,192,163,.18);color:var(--ok)}
+.pill.miss{background:rgba(224,138,104,.18);color:var(--warn)}
+.pill.thin{background:rgba(201,154,91,.16);color:var(--amber2)}
+.diag{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.dcard{border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:11px;padding:12px 14px;background:var(--card)}
+.dcard.bad{border-left-color:var(--warn)}.dcard.good{border-left-color:var(--ok)}
+.dcard h5{margin:0 0 5px;font-size:13.5px;color:var(--amber2)}
+.dcard.bad h5{color:var(--warn)}.dcard.good h5{color:var(--ok)}
+.dcard p{margin:0;font-size:12.5px;color:var(--mut)}
+.todo{list-style:none;padding:0;margin:8px 0 0}
+.todo li{padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;display:flex;gap:9px}
+.todo li::before{content:"▸";color:var(--amber)}
+.todo li:last-child{border-bottom:none}
 </style>
 </head>
 <body>
@@ -788,6 +828,7 @@ function addRow(arr){var c=activeCase();var A=c.profile.age;var tpl={
  goals:{name:'',type:'其他',present:0,start:A,end:A,freq:0,growth:'通膨',imp:3,prepared:0,loanRatio:0,appreciation:0},
  needs:{member:(c.members[0]||{}).name||'',funeral:600000,protectYears:5,estateTax:0,room:2000,selfPay:1500,nursing:1500,firstCancer:300000,cancerHosp:2000,critical:2000000,monthCare:30000,careMonths:120},
  coverages:{member:(c.members[0]||{}).name||'',kind:'壽險',comm:0,social:0},
+ policies:{insured:(c.members[0]||{}).name||'',name:'',insurer:'',bigCat:'人身',subtype:'終身壽險',policyKind:'主約',owner:(c.members[0]||{}).name||'',beneficiary:'',policyNo:'',premium:0,currency:'TWD',payYears:'',paidYears:'',termEnd:'',status:'有效',cashValue:0,claimNote:CLAIM_TPL['終身壽險']||'',life:0,accident:0,medical:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,pAmount:0},
  travel:{cat:'國內',sub:'認知旅遊',start:c.profile.age,end:80,freq:1,amount:0,minAmount:0,imp:3},
  hobby:{sub:'體能類',start:c.profile.age,end:75,freq:1,amount:0,minAmount:0,imp:3},
  luxury:{sub:'首飾配件',start:c.profile.age,end:c.profile.age,freq:1,amount:0,minAmount:0,imp:2},
@@ -822,8 +863,8 @@ function coachView(){var c=activeCase();
 function dataPane(c){
  var dgroups=[
   {no:'①',name:'基礎參數 · 諮詢資料',subs:[['family','家庭 / 參數'],['intent','意圖 / 生涯'],['risk','風險屬性']]},
-  {no:'②',name:'現在的狀況',subs:[['finance','收支資債'],['policies','現有保單'],['coverages','需求/已備(簡)'],['credit','信用/海外'],['tax','稅賦']]},
-  {no:'③',name:'未來的需求',subs:[['retire','退休'],['education','子女教育'],['goals','目標/置產'],['lifestyle','生活願望'],['needs','保障需求']]},
+  {no:'②',name:'現在的狀況',subs:[['finance','收支資債'],['coverage','保障中心'],['credit','信用/海外'],['tax','稅賦']]},
+  {no:'③',name:'未來的需求',subs:[['retire','退休'],['education','子女教育'],['goals','目標/置產'],['lifestyle','生活願望']]},
   {no:'',name:'方案 · 追蹤',exec:true,subs:[['plan','調整方案'],['tracking','真實追蹤']]}
  ];
  var tb=dgroups.map(function(g){
@@ -831,7 +872,9 @@ function dataPane(c){
   return '<div class="dgrow"><span class="dglab'+(g.exec?' exec':'')+'">'+(g.no?'<span class="dgn">'+g.no+'</span>':'')+g.name+'</span>'+btns+'</div>';
  }).join('');
  var body;
- if(app.dataTab==='family')body=peopleSec(c);
+ if(['policies','coverages','needs'].indexOf(app.dataTab)>=0)app.dataTab='coverage';
+ if(app.dataTab==='coverage')body=coverageHubSec(c);
+ else if(app.dataTab==='family')body=peopleSec(c);
  else if(app.dataTab==='finance')body=financeSec(c);
  else if(app.dataTab==='incomes')body=incomesSec(c);
  else if(app.dataTab==='expenses')body=expensesSec(c);
@@ -1441,15 +1484,177 @@ function lifestyleSec(c){
  var now=lifestyleAnnualNow(c);
  return '<div class="sec"><h4>生活願望總覽 <span class="hint">旅遊/休閒/奢侈品皆為週期性支出，會計入現金流投影</span></h4><div class="big3"><div class="b"><div class="l">現值年支出(合計)</div><div class="v" style="color:var(--amber2)">'+fmt(now)+'</div></div><div class="b"><div class="l">項目數</div><div class="v">'+((c.travel||[]).length+(c.hobby||[]).length+(c.luxury||[]).length)+'</div></div></div><div class="hint" style="margin-top:8px">年支出＝每次預算 × 頻率(次/年)，隨通膨調整。</div></div>'+travel+hobby+luxury;
 }
+// ===== 加厚保單模型 =====
+var POLICY_SUB={
+ '人身':['終身壽險','定期壽險','增額/儲蓄壽險','投資型壽險','住院醫療(日額)','實支實付','手術','重大傷病','防癌(一次金)','防癌(住院日額)','重大疾病','特定傷病','意外身故/失能','意外醫療','長期照顧','失能扶助','失能所得','年金','其他'],
+ '產物':['汽車強制','汽車第三人責任','汽車車體','汽車竊盜','機車強制','機車第三人','住宅火險','地震險','居家綜合','個人責任','公共意外','雇主責任','旅平險','海外突發疾病','寵物險','商業火險','其他']
+};
+var POLICY_STATUS=['有效','繳費中','已繳清','停效','失效'];
+// 險種細分 → 對應到既有人身彙總欄位(POLICY_MAP 之保額欄)；不在此表者(產物/儲蓄/年金)不進人身缺口彙總
+var SUB_TO_FIELD={'終身壽險':'life','定期壽險':'life','增額/儲蓄壽險':'life','投資型壽險':'life','住院醫療(日額)':'medical','實支實付':'medical','手術':'medical','重大傷病':'critical','防癌(一次金)':'firstCancer','防癌(住院日額)':'cancerHosp','重大疾病':'critical','特定傷病':'critical','意外身故/失能':'accident','意外醫療':'accident','長期照顧':'monthCare','失能扶助':'monthCare','失能所得':'monthCare'};
+var CLAIM_TPL={'終身壽險':'身故／完全失能給付保額；具現金價值，可作最後費用與遺產稅預留。','定期壽險':'保障期間內身故／完全失能給付；純保障、無現金價值。','增額/儲蓄壽險':'身故給付＋逐年增額之現金價值，兼具保障與儲蓄。','投資型壽險':'身故給付連結投資帳戶價值，保額與投資績效連動。','住院醫療(日額)':'因疾病或傷害住院，按住院日數給付定額日額。','實支實付':'住院/手術醫療費用，於限額內憑收據實支實付。','手術':'施行約定手術，依手術倍率給付。','重大傷病':'取得健保重大傷病證明即給付一次金。','防癌(一次金)':'初次罹患癌症給付一次金。','防癌(住院日額)':'因癌症住院/療程按日或按項給付。','重大疾病':'罹患約定重大疾病（癌症、急性心肌梗塞、腦中風等）給付一次金。','特定傷病':'罹患約定特定傷病給付一次金。','意外身故/失能':'因意外事故身故或失能，按失能等級給付。','意外醫療':'因意外就醫之醫療費用，實支或日額給付。','長期照顧':'符合長期照顧狀態（生理/認知）按月給付照護金。','失能扶助':'因疾病或意外達約定失能等級，按月/一次給付扶助金。','失能所得':'因失能無法工作，按月補償工作損失。','年金':'約定年金給付期起，定期給付至身故或期滿。','汽車強制':'汽車事故對第三人之體傷/死亡，法定基本理賠。','汽車第三人責任':'超過強制險部分，賠付第三人體傷與財損。','汽車車體':'本車碰撞/事故車損，依甲乙丙式承保範圍賠付。','汽車竊盜':'車輛遭竊損失，扣除折舊與自負額賠付。','機車強制':'機車事故對第三人之體傷/死亡，法定基本理賠。','機車第三人':'超過強制險部分，賠付第三人體傷與財損。','住宅火險':'房屋建築因火災等事故毀損，依重置成本賠付（房貸多附帶）。','地震險':'地震致住宅全損之基本保額給付；可加保超額地震。','居家綜合':'居家財物、第三人責任等綜合保障。','個人責任':'日常生活致第三人體傷/財損之賠償責任。','公共意外':'營業場所致第三人傷亡/財損之賠償責任。','雇主責任':'受僱員工職災致雇主應負之賠償責任。','旅平險':'旅遊期間意外身故/失能與醫療給付。','海外突發疾病':'海外旅遊期間突發疾病之醫療費用。','寵物險':'寵物醫療與第三人責任。','商業火險':'營業場所建築與生財器具因火災等損失。','其他':''};
+var HUMAN_AMT=[['life','壽險保額'],['accident','意外險保額'],['medical','住院醫療日額'],['firstCancer','初次罹癌一次金'],['cancerHosp','癌症住院日額'],['critical','重病/重疾給付'],['monthCare','每月照護金']];
+function ensurePolicy(p){if(p.bigCat==null)p.bigCat='人身';if(p.subtype==null)p.subtype=(p.bigCat==='產物'?'汽車第三人責任':'終身壽險');if(p.status==null)p.status='有效';if(p.currency==null)p.currency='TWD';if(p.policyKind==null)p.policyKind='主約';['insurer','owner','beneficiary','policyNo','payYears','paidYears','termEnd','claimNote'].forEach(function(k){if(p[k]==null)p[k]='';});if(p.pAmount==null)p.pAmount=0;return p;}
+function setPolicyCat(i,v){var c=activeCase();var p=c.policies[i];if(!p)return;p.bigCat=v;var subs=POLICY_SUB[v]||[];if(subs.indexOf(p.subtype)<0)p.subtype=subs[0]||'';if(!p.claimNote)p.claimNote=CLAIM_TPL[p.subtype]||'';save();render();}
+function setPolicySub(i,v){var c=activeCase();var p=c.policies[i];if(!p)return;var wasTpl=(!p.claimNote||p.claimNote===(CLAIM_TPL[p.subtype]||''));p.subtype=v;if(wasTpl)p.claimNote=CLAIM_TPL[v]||'';save();render();}
+function policyCard(c,p,i){
+ ensurePolicy(p);
+ var isProp=p.bigCat==='產物';
+ var sb=function(k,ty){return 'onchange="set(\'policies:'+i+'\',\''+k+'\',this.value'+(ty==='num'?',\'num\'':'')+')"';};
+ var memOpts=(c.members||[]).map(function(m){return m.name;});
+ var dueBadge='';
+ if(isProp&&p.termEnd)dueBadge='<span class="polbadge due">到期 '+esc(p.termEnd)+'</span>';
+ var stCls=(p.status==='失效'||p.status==='停效')?'off':'eff';
+ var hd='<div class="phd"><span class="av">'+esc((p.insurer||p.name||'保').slice(0,1))+'</span><div class="pident"><div class="who">'+esc(p.name||'（未命名保單）')+'</div><div class="rolewrap"><span class="polco">'+esc(p.insurer||'—')+'</span></div></div>'+
+  '<span class="polbadge '+(p.policyKind==='附約'?'rider':'main')+'">'+esc(p.policyKind||'主約')+'</span><span class="polbadge '+stCls+'">'+esc(p.status||'有效')+'</span>'+dueBadge+
+  '<button class="pcdel" title="刪除保單" onclick="delRow(\'policies\','+i+')">✕</button></div>';
+ // 分類與狀態
+ var catSel='<div class="f"><label>大類</label><select onchange="setPolicyCat('+i+',this.value)">'+['人身','產物'].map(function(o){return '<option '+(p.bigCat===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
+ var subSel='<div class="f"><label>險種細分</label><select onchange="setPolicySub('+i+',this.value)">'+(POLICY_SUB[p.bigCat]||[]).map(function(o){return '<option '+(p.subtype===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
+ var block1='<div class="subhd">保單基本</div><div class="fgrid">'+
+   fFld(sb('insurer'),'保險公司',p.insurer)+fFld(sb('name'),'保單名稱',p.name)+catSel+subSel+
+   fFld(sb('policyKind'),'主約/附約',p.policyKind,null,['主約','附約'])+fFld(sb('status'),'保單狀態',p.status,null,POLICY_STATUS)+
+   fFld(sb('policyNo'),'保單號碼',p.policyNo)+'</div>';
+ // 關係人
+ var block2='<div class="subhd">關係人</div><div class="fgrid">'+
+   fFld(sb('owner'),'要保人',p.owner,null,[''].concat(memOpts))+fFld(sb('insured'),'被保人',p.insured,null,memOpts)+fFld(sb('beneficiary'),'受益人',p.beneficiary)+'</div>';
+ // 保費與期間
+ var block3='<div class="subhd">保費與期間</div><div class="fgrid">'+
+   fFld(sb('premium','num'),'年繳保費',p.premium,'num')+fFld(sb('currency'),'幣別',p.currency,null,['TWD','USD','其他'])+
+   fFld(sb('payYears','num'),'繳費年期',p.payYears,'num')+fFld(sb('paidYears','num'),'已繳年數',p.paidYears,'num')+
+   fFld(sb('termEnd'),(isProp?'到期日 (YYYY/MM)':'保障期間/到期'),p.termEnd)+fFld(sb('cashValue','num'),'保單現金價值',p.cashValue,'num')+'</div>';
+ // 保障明細
+ var block4;
+ if(isProp){block4='<div class="subhd">保障保額</div><div class="fgrid">'+fFld(sb('pAmount','num'),'保額/主要限額',p.pAmount,'num')+'</div>';}
+ else{block4='<div class="subhd">保障明細 <span class="hint" style="font-weight:400">此保單各項給付（進人身缺口彙總）</span></div><div class="fgrid">'+HUMAN_AMT.map(function(a){return fFld(sb(a[0],'num'),a[1],p[a[0]],'num');}).join('')+'</div>';}
+ var claim='<div class="subhd">理賠條件</div><input class="claimin" value="'+esc(p.claimNote||'')+'" oninput="set(\'policies:'+i+'\',\'claimNote\',this.value)">';
+ return '<div class="pcard '+(isProp?'prop':'life')+'">'+hd+'<div class="pbody">'+block1+block2+block3+block4+claim+'</div></div>';
+}
 function policiesSec(c){
- var tbl=tableSec('現有保單(逐張登錄)','policies',c.policies,[['insured','被保人','memsel'],['name','保單名稱','text'],['premium','年繳保費','num'],['life','壽險','num'],['accident','意外險','num'],['medical','住院醫療日額','num'],['firstCancer','初次罹癌','num'],['cancerHosp','癌症住院日額','num'],['critical','重病給付','num'],['monthCare','每月照護','num'],['cashValue','保單現金價值','num']]);
- // 保障統計 by member
- var mems=[...new Set((c.policies||[]).map(function(p){return p.insured}))];
+ c.policies=c.policies||[];
+ var cards=c.policies.map(function(p,i){return policyCard(c,p,i);}).join('')||'<div class="sec"><div class="muted" style="padding:6px">尚無保單，點下方「＋ 新增保單」逐張登錄。</div></div>';
+ var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'policies\')">＋ 新增保單</button></div>';
+ // 保障統計 by member（人身彙總，沿用既有引擎欄位）
+ var mems=[...new Set((c.policies||[]).map(function(p){return p.insured}).filter(Boolean))];
  var stat=mems.map(function(mm){var cells=KINDS.map(function(k){var f=POLICY_MAP[k];return '<td>'+fmt(sum(c.policies,function(p){return p.insured===mm?n(p[f]):0}))+'</td>'}).join('');
   return '<tr><td class="k">'+esc(mm)+'</td>'+cells+'</tr>'}).join('');
  var totPrem=sum(c.policies,function(p){return n(p.premium)});
- var statTbl=mems.length?'<div class="sec"><h4>保障統計 <span class="hint">年繳保費合計 '+fmt(totPrem)+'</span></h4><table class="rtable"><tr><th>被保人</th>'+KINDS.map(function(k){return '<th>'+k+'</th>'}).join('')+'</tr>'+stat+'</table></div>':'';
- return tbl+statTbl;
+ var propPrem=sum(c.policies,function(p){return p.bigCat==='產物'?n(p.premium):0});
+ var statTbl=mems.length?'<div class="sec"><h4>人身保障統計 <span class="hint">年繳保費合計 '+fmt(totPrem)+'（其中產險 '+fmt(propPrem)+'）</span></h4><table class="rtable"><tr><th>被保人</th>'+KINDS.map(function(k){return '<th>'+k+'</th>'}).join('')+'</tr>'+stat+'</table></div>':'';
+ return '<div class="ppband">現有保單 <span class="hint">逐張加厚登錄：人身／產物 · 主附約 · 關係人 · 期間狀態 · 理賠條件</span></div>'+cards+addBtn+statTbl;
+}
+// ===== 保障中心：地圖 + 產險涵蓋 + 健檢報告 =====
+function isEarnerRole(r){return r==='本人'||r==='配偶';}
+function polSum(c,member,fields){return sum(c.policies||[],function(p){return p.insured===member?fields.reduce(function(s,f){return s+n(p[f]);},0):0;});}
+function memberHasSub(c,member,subs){return (c.policies||[]).some(function(p){return p.insured===member&&subs.indexOf(p.subtype)>=0;});}
+function hhHasSub(c,subs){return (c.policies||[]).some(function(p){return subs.indexOf(p.subtype)>=0;});}
+function covSignals(c){
+ var hasCar=hhHasSub(c,['汽車強制','汽車第三人責任','汽車車體','汽車竊盜','機車強制','機車第三人'])||(c.assets||[]).some(function(a){return /車/.test((a.type||'')+(a.name||''));});
+ var hasHouse=(c.liabilities||[]).some(function(l){return l.mainCat==='房貸';})||(c.assets||[]).some(function(a){return /房|宅|不動產|自住/.test((a.type||'')+(a.name||''));})||hhHasSub(c,['住宅火險','地震險']);
+ var isOwner=(c.profile&&c.profile.jobType==='企業主')||(c.members||[]).some(function(m){return m.jobType==='企業主';});
+ var goesAbroad=((c.travel||[]).some(function(t){return t.cat==='國外';}))||(c.overseas&&(c.overseas.hasAssets==='是'||c.overseas.identity==='是'));
+ return {hasCar:hasCar,hasHouse:hasHouse,isOwner:isOwner,goesAbroad:goesAbroad};
+}
+function propertyChecklist(c){
+ var s=covSignals(c),rows=[];
+ function due(subs){var p=(c.policies||[]).filter(function(x){return subs.indexOf(x.subtype)>=0&&x.termEnd;})[0];return p?p.termEnd:'';}
+ if(s.hasCar){var third=hhHasSub(c,['汽車第三人責任','機車第三人']);rows.push({scene:'有汽/機車',should:'強制險＋第三人責任＋車體',key:'car',status:third?'have':'miss',adeq:third?'檢視第三人責任是否增額至超額責任':'僅強制險，建議加保第三人/車體',due:due(['汽車第三人責任','汽車車體','汽車強制','機車強制','機車第三人'])});}
+ else rows.push({scene:'有汽/機車',should:'強制險＋第三人責任＋車體',key:'car',status:'thin',adeq:'如有車輛，建議完整投保',due:''});
+ if(s.hasHouse){var fire=hhHasSub(c,['住宅火險']),quake=hhHasSub(c,['地震險']);rows.push({scene:'有自住房',should:'住宅火險＋地震(基本/超額)',key:'house',status:fire?'have':'miss',adeq:quake?'地震已保，可評估超額地震':'建議加保地震(基本+超額)',due:due(['住宅火險','地震險'])});}
+ else rows.push({scene:'有自住房',should:'住宅火險＋地震',key:'house',status:'thin',adeq:'如有自住房，建議投保',due:''});
+ var trip=hhHasSub(c,['旅平險','海外突發疾病']);rows.push({scene:'旅遊/出國',should:'旅平險＋海外突發疾病',key:'travel',status:trip?'have':(s.goesAbroad?'miss':'thin'),adeq:s.goesAbroad?'常出國，建議每趟或年約投保':'出國前投保',due:''});
+ if(s.isOwner){var biz=hhHasSub(c,['商業火險','公共意外','雇主責任']);rows.push({scene:'企業主',should:'商業火險＋公共意外/雇主責任',key:'biz',status:biz?'have':'miss',adeq:'營業場所財損與員工職災責任',due:due(['商業火險','公共意外','雇主責任'])});}
+ var liab=hhHasSub(c,['個人責任','居家綜合']);rows.push({scene:'家庭日常',should:'個人責任/居家綜合',key:'personal',status:liab?'have':'thin',adeq:'日常致第三人賠償責任',due:''});
+ return rows;
+}
+function coverageMatrix(c){
+ var members=c.members||[];
+ var rd=coverageReadiness(c);
+ function rdRatio(member,kind){var o=rd.filter(function(x){return x.member===member&&x.kind===kind;})[0];return o?o.ratio:null;}
+ var pc=propertyChecklist(c);
+ function pcStatus(key){var r=pc.filter(function(x){return x.key===key;})[0];if(!r)return 'n';return r.status==='have'?'g':r.status==='miss'?'r':'y';}
+ var sig=covSignals(c);
+ var HCOLS=[
+  {lb:'壽險',kind:'壽險',fields:['life'],app:function(m){return isEarnerRole(m.role);}},
+  {lb:'醫療',kind:'住院醫療',fields:['medical'],app:function(){return true;}},
+  {lb:'意外',kind:'意外險',fields:['accident'],app:function(){return true;}},
+  {lb:'癌症',kind:null,fields:['firstCancer','cancerHosp'],app:function(){return true;}},
+  {lb:'重疾',kind:'重病給付',fields:['critical'],app:function(){return true;}},
+  {lb:'長照/失能',kind:'每月照護',fields:['monthCare'],app:function(m){return m.role!=='子女';}},
+  {lb:'年金',kind:null,fields:[],sub:['年金'],app:function(m){return isEarnerRole(m.role);}}
+ ];
+ var PCOLS=[['汽/機車','car'],['住宅','house'],['責任',sig.isOwner?'biz':'personal'],['旅平','travel']];
+ var rows=members.map(function(m,idx){
+  var isPrimary=(m.role==='本人')||(idx===0&&!members.some(function(x){return x.role==='本人';}));
+  var cells=HCOLS.map(function(col){
+   if(!col.app(m))return {s:'n'};
+   var have=col.fields.length?polSum(c,m.name,col.fields):(memberHasSub(c,m.name,col.sub||[])?1:0);
+   if(have<=0)return {s:'r'};
+   var ratio=col.kind?rdRatio(m.name,col.kind):null;
+   if(ratio!=null&&ratio<0.6)return {s:'y'};
+   return {s:'g'};
+  });
+  var pcells=PCOLS.map(function(pcx){return isPrimary?{s:pcStatus(pcx[1])}:{s:'n'};});
+  return {name:m.name,role:isPrimary?'本人':(m.role||''),cells:cells.concat(pcells)};
+ });
+ return {cols:HCOLS.map(function(x){return x.lb;}).concat(PCOLS.map(function(x){return x[0];})),rows:rows};
+}
+function coverageCheckup(c){
+ var totPrem=sum(c.policies||[],function(p){return n(p.premium);});
+ var ct=crossTable(c);var income=n(ct.incTotal);
+ var premRatio=income>0?totPrem/income:0;
+ var lifeTotal=sum(c.policies||[],function(p){return n(p.life);});
+ var rd=coverageReadiness(c);
+ var humanGaps=rd.filter(function(o){return o.need>0&&o.ratio<1;}).map(function(o){return {member:o.member,kind:o.kind,ratio:o.ratio};}).sort(function(a,b){return a.ratio-b.ratio;});
+ var pc=propertyChecklist(c);var propMiss=pc.filter(function(r){return r.status==='miss';});
+ var dupMap={},dups=[];(c.policies||[]).forEach(function(p){if(!p.insured||!p.subtype)return;var k=p.insured+'|'+p.subtype;dupMap[k]=(dupMap[k]||0)+1;});
+ Object.keys(dupMap).forEach(function(k){if(dupMap[k]>1){var a=k.split('|');dups.push(a[0]+' 的 '+a[1]+'（'+dupMap[k]+' 張）');}});
+ var now=new Date();var nowM=now.getFullYear()*12+now.getMonth();
+ var due=[];(c.policies||[]).forEach(function(p){if(p.bigCat==='產物'&&p.termEnd){var mch=(''+p.termEnd).match(/(\d{4})\D+(\d{1,2})/);if(mch){var months=(+mch[1]*12+(+mch[2]-1))-nowM;if(months<=4&&months>=-2)due.push({name:p.name||p.subtype,when:p.termEnd,months:months});}}});
+ return {totPrem:totPrem,income:income,premRatio:premRatio,lifeTotal:lifeTotal,lifeVsIncome:income>0?lifeTotal/income:0,humanGaps:humanGaps,propMiss:propMiss,dups:dups,due:due};
+}
+function coverageCheckupHTML(c,ck,pc){
+ function card(cls,title,body){return '<div class="dcard '+cls+'"><h5>'+title+'</h5><p>'+body+'</p></div>';}
+ var cards=[];
+ cards.push(card(ck.premRatio<=0.1?'good':'bad','保費健檢','年保費 '+fmt(ck.totPrem)+(ck.income>0?'＝年收 '+(Math.round(ck.premRatio*1000)/10)+'%':'')+'，'+(ck.premRatio<=0.1?'落在雙十原則內':'超過年收 10%，偏高')+'。壽險總保額 '+fmt(ck.lifeTotal)+'≈年收 '+(Math.round(ck.lifeVsIncome*10)/10)+' 倍。'));
+ var gapTxt=ck.humanGaps.length?ck.humanGaps.slice(0,3).map(function(g){return esc(g.member)+' '+g.kind+'（'+Math.round(g.ratio*100)+'%）';}).join('、'):'人身各項準備度達標';
+ cards.push(card(ck.humanGaps.length?'bad':'good','人身缺口',gapTxt+'。'));
+ var pmTxt=ck.propMiss.length?ck.propMiss.map(function(r){return r.should;}).join('；'):'產險涵蓋齊全';
+ cards.push(card(ck.propMiss.length?'bad':'good','產險缺項',pmTxt+'。'));
+ cards.push(card('','重複/浪費',ck.dups.length?ck.dups.join('；')+'，可評估整併。':'未偵測到明顯重複投保。'));
+ cards.push(card(ck.due.length?'bad':'','到期/續約',ck.due.length?ck.due.map(function(d){return esc(d.name)+'（'+esc(d.when)+'）';}).join('、')+' 即將到期。':'近期無到期保單。'));
+ var todo=[];
+ ck.humanGaps.slice(0,3).forEach(function(g){todo.push('補強 '+esc(g.member)+' 的'+g.kind+'（目前 '+Math.round(g.ratio*100)+'%）');});
+ ck.propMiss.forEach(function(r){todo.push('投保 '+esc(r.should)+'（'+esc(r.scene)+'）');});
+ ck.due.forEach(function(d){todo.push('續保 '+esc(d.name)+'（'+esc(d.when)+'）並檢視保額');});
+ if(ck.dups.length)todo.push('檢視重複投保：'+ck.dups.join('、'));
+ if(!todo.length)todo.push('目前保障結構完整，維持定期健檢即可。');
+ return '<div class="sec"><h4>保單健檢報告 <span class="hint">五面向診斷 → 顧問行動清單</span></h4><div class="diag">'+cards.join('')+'</div><h4 style="margin-top:16px">顧問行動清單</h4><ul class="todo">'+todo.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>';
+}
+function coverageHubSec(c){
+ c.policies=c.policies||[];c.needs=c.needs||[];c.coverages=c.coverages||[];
+ var mtx=coverageMatrix(c),ck=coverageCheckup(c),pc=propertyChecklist(c);
+ var applic=0,green=0;mtx.rows.forEach(function(r){r.cells.forEach(function(cl){if(cl.s!=='n'){applic++;if(cl.s==='g')green++;}});});
+ var covPct=applic?Math.round(green/applic*100):0,dueN=ck.due.length;
+ var premPct=ck.income>0?Math.round(ck.premRatio*1000)/10:0;
+ var kpi=function(cls,lb,vv,sm){return '<div class="kpi '+cls+'"><div class="lb">'+lb+'</div><div class="vv">'+vv+'</div><small>'+sm+'</small></div>';};
+ var kpis='<div class="kpis">'+
+  kpi(ck.premRatio<=0.1?'ok':'warn','年繳保費',fmt(ck.totPrem),'占年收 '+(ck.income>0?premPct+'%':'—')+'（雙十≤10%）')+
+  kpi(ck.premRatio<=0.1?'ok':'warn','保費雙十',ck.premRatio<=0.1?'✓ 通過':'⚠ 偏高','壽險 '+(Math.round(ck.lifeVsIncome*10)/10)+' 倍年收')+
+  kpi(covPct>=80?'ok':'warn','保障覆蓋率',covPct+'%','綠格 '+green+'/'+applic)+
+  kpi(dueN?'warn':'','即將到期',dueN+' 張',dueN?ck.due.map(function(d){return esc(d.name);}).join('、'):'近期無')+'</div>';
+ var head='<tr><th>成員</th>'+mtx.cols.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr>';
+ var cellHTML=function(s){var m={g:['g','✓'],y:['y','△'],r:['r','✕'],n:['n','—']}[s];return '<span class="cell '+m[0]+'">'+m[1]+'</span>';};
+ var mrows=mtx.rows.map(function(r){return '<tr><td class="mem">'+esc(r.name||'—')+(r.role?' · '+esc(r.role):'')+'</td>'+r.cells.map(function(cl){return '<td>'+cellHTML(cl.s)+'</td>';}).join('')+'</tr>';}).join('')||'<tr><td class="muted" style="padding:12px">尚無成員</td></tr>';
+ var legend='<div class="cvlegend"><span><i class="cell g"></i>足額</span><span><i class="cell y"></i>不足</span><span><i class="cell r"></i>未保</span><span><i class="cell n"></i>不適用</span></div>';
+ var mapSec='<div class="sec"><h4>全家保障地圖 <span class="hint">成員 × 險種｜綠=足額 黃=不足 紅=未保 —=不適用</span></h4><div style="overflow-x:auto"><table class="matrix">'+head+mrows+'</table></div>'+legend+'</div>';
+ var pcRows=pc.map(function(r){var pl={have:['have','已保'],miss:['miss','未保'],thin:['thin','建議評估']}[r.status];return '<tr><td>'+esc(r.scene)+'</td><td>'+esc(r.should)+'</td><td><span class="pill '+pl[0]+'">'+pl[1]+'</span></td><td class="muted">'+esc(r.adeq||'—')+'</td><td>'+(r.due?'<span style="color:var(--warn)">'+esc(r.due)+'</span>':'—')+'</td></tr>';}).join('');
+ var propSec='<div class="sec"><h4>產險涵蓋清單 <span class="hint">依家庭情境 · 有沒有 · 適足 · 到期</span></h4><table class="chk"><tr><th>情境</th><th>應有產險</th><th>狀態</th><th>適足/建議</th><th>到期</th></tr>'+pcRows+'</table></div>';
+ var needsTbl=tableSec('保障需求參數（反推計算用）','needs',c.needs,[['member','被保人','memsel'],['funeral','生命禮儀費','num'],['protectYears','保障年數','num'],['estateTax','遺產稅','num'],['room','病房日額','num'],['selfPay','自付日額','num'],['nursing','看護日額','num'],['firstCancer','初次罹癌','num'],['cancerHosp','癌症住院日額','num'],['critical','重病給付','num'],['monthCare','每月照護','num'],['careMonths','照護月數','num']]);
+ var covTbl='<div class="sec" style="margin-bottom:8px"><h4 style="color:var(--mut)">已備保障（手動補充）<span class="hint">已逐張登錄者此處通常留空；員工團險可記於此</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外險,住院醫療,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','num'],['social','已備社會','num']]);
+ return '<div class="ppband">保障中心 <span class="hint">全家保障地圖 · 逐張保單 · 產險涵蓋 · 健檢報告</span></div>'+
+  kpis+mapSec+propSec+coverageCheckupHTML(c,ck,pc)+policiesSec(c)+
+  '<div class="ppband" style="margin-top:6px">保障需求 · 已備補充 <span class="hint">壽險/醫療缺口反推的輸入</span></div>'+needsTbl+covTbl;
 }
 function trackingSec(c){
  var tbl=tableSec('真實資產追蹤 (Beta) — 逐年實際淨資產','tracking',c.tracking,[['year','西元年','num'],['age','年齡','num'],['net','實際淨資產','num']]);
