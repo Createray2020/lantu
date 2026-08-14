@@ -387,6 +387,54 @@ function respGapCharts(c,theme){var nds=c.needs||[];if(!nds.length)return theme=
  var hc=theme==='light'?'#0d2b45':'var(--amber2)';
  return nds.map(function(nd){var rp=responsibilityProjection(c,nd);return '<div style="margin:10px 0"><div style="color:'+hc+';font-weight:700;font-size:13px;margin-bottom:4px">責任遞減缺口圖 – '+esc(nd.member)+'（保障年數 '+(n(nd.protectYears)||20)+' 年）</div>'+respGapSVG(rp,theme)+'</div>';}).join('');}
 
+// ===== 通用可展開明細元件 =====
+function detailBox(title,inner){return '<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--amber2);font-weight:700;font-size:13px">'+title+'（點開）</summary><div style="margin-top:8px">'+inner+'</div></details>';}
+function kvTbl(rows){return '<table class="rtable">'+rows.map(function(r){return '<tr><td class="k">'+r[0]+'</td><td'+(r[2]?' style="color:'+r[2]+';font-weight:800"':'')+'>'+(typeof r[1]==='number'?fmt(r[1]):r[1])+'</td></tr>'}).join('')+'</table>';}
+// 退休需求計算明細
+function retireDetailHTML(c){var r=c.retire||{},rn=retireNeed(c),age=n(c.profile.age),ra=n(c.profile.retireAge),le=n(c.profile.lifeExp);
+ var infl=n(c.params.inflation)/100,g=n(r.retireInflation)/100,rr=n(r.retireReturn)/100,years=Math.max(0,ra-age),m=Math.max(0,le-ra);
+ var monthFV=n(r.monthLiving)*Math.pow(1+infl,years);
+ var rows=[['退休月生活費(現值)',n(r.monthLiving)],['距退休年數',years+' 年'],['退休時月生活費(終值)',Math.round(monthFV)],['退休時年支出(終值)',Math.round(monthFV*12)],['退休後餘命',m+' 年'],['退休後報酬率 / 通膨',(rr*100).toFixed(1)+'% / '+(g*100).toFixed(1)+'%'],['退休總需求(成長型年金現值)',Math.round(rn.total),'var(--amber2)']];
+ var prepRows=(r.prepared||[]).map(function(p){return [(p.item||'已備')+(p.age?'（'+p.age+'歲'+(p.method?'·'+p.method:'')+'）':''),n(p.amount)]});
+ var prep=prepRows.length?kvTbl(prepRows.concat([['已備合計',Math.round(rn.prepared),'var(--ok)']])):'<div class="hint">尚未登錄已備退休金（可用勞保/勞退一鍵帶入）。</div>';
+ return detailBox('退休需求計算明細','<div class="hint" style="margin-bottom:4px">需求＝退休後每年支出(終值)折現至退休時點的成長型年金現值。</div>'+kvTbl(rows)+'<div class="hint" style="margin:8px 0 4px">已準備明細</div>'+prep);}
+// 壽險/保障需求反推明細
+function lifeNeedDetailHTML(c){var nds=c.needs||[];if(!nds.length)return '';var pm=(primaryMember(c)||{}).name;
+ var famLiving=familyAnnualLiving(c),liab=sum(c.liabilities,function(l){return lBal(l)}),edu=eduTotal(c);
+ var blocks=nds.map(function(nd){var depR=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100;
+   var living=depR*famLiving*n(nd.protectYears),existing=existingCover(c,nd.member,'壽險'),liq=nd.member===pm?liquidMovable(c):0;
+   var gross=living+liab+edu+n(nd.funeral)+n(nd.estateTax);
+   var rows=[['家庭年生活費 '+fmt(famLiving)+' × 扶養比 '+(depR*100)+'% × 保障 '+n(nd.protectYears)+' 年',Math.round(living)],['負債餘額',Math.round(liab)],['教育金總需求',Math.round(edu)],['生命禮儀費',n(nd.funeral)],['遺產稅預留',n(nd.estateTax)],['＝ 壽險毛需求',Math.round(gross),'var(--amber2)'],['− 已備壽險',Math.round(existing)],['− 可動用流動資產',Math.round(liq)],['＝ 壽險淨缺口',Math.round(Math.max(0,gross-existing-liq)),'var(--warn)']];
+   return '<div style="margin-bottom:8px"><div class="hint">'+esc(nd.member)+'</div>'+kvTbl(rows)+'</div>';}).join('');
+ return detailBox('保障需求反推明細',blocks);}
+// 勞保/勞退計算明細
+function laborDetailHTML(c){var lp=estimateLaborPension(c);if(lp.total<=0)return '';var r=c.retire||{},m=Math.max(0,n(c.profile.lifeExp)-n(c.profile.retireAge)),rr=n(r.retireReturn)/100||0.04;
+ var rows=[['本人月投保薪資',lp.ins],['概估年資',lp.years+' 年'],['勞保老年年金月領 ＝ 投保薪資 × 年資 × 1.55%',Math.round(lp.monthly)],['年領',Math.round(lp.monthly*12)],['退休後餘命',m+' 年'],['勞保年金退休現值（折現 '+(rr*100).toFixed(1)+'%）',Math.round(lp.lump),'var(--ok)'],['勞退：雇主月提繳 6% × 12',Math.round(lp.ins*0.06*12)],['勞退新制累積（年化 3% 滾存至退休）',Math.round(lp.fund),'var(--ok)'],['合計可帶入已備',Math.round(lp.total),'var(--amber2)']];
+ return detailBox('勞保 / 勞退 計算明細',kvTbl(rows));}
+// 教育金計算明細
+function eduDetailHTML(c){var edu=c.education||[];if(!edu.length)return '';var g=n(c.params.tuitionGrowth)/100;
+ var rows=edu.map(function(e){var fv=n(e.annual)*n(e.years)*Math.pow(1+g,n(e.startIn));return [esc(e.child||'子女')+' · '+esc(e.stage||'')+'（'+esc(e.schoolType||'')+'）年費 '+fmt(n(e.annual))+' × '+n(e.years)+' 年 ×(1+'+(g*100)+'%)^'+n(e.startIn),Math.round(fv)];});
+ rows.push(['教育金總需求(終值)',Math.round(eduTotal(c)),'var(--amber2)']);
+ return detailBox('教育金計算明細（各子女終值）',kvTbl(rows));}
+// 財務健康度評分明細
+function healthDetailHTML(c){var h=health(c),rw=h.raw||{};
+ var s=[['收支平衡 balScore ×25',Math.round((rw.balScore||0)*25)],['緊急預備金 ×15',Math.round((rw.reserve||0)*15)],['信用 ×15',Math.round((rw.credit||0)*15)],['負債平衡 ×15',Math.round((rw.debtBal||0)*15)],['風險保全 ×30',Math.round((rw.riskCover||0)*30)],['＝ 財務安全度',h.safety+' 分','var(--amber2)']];
+ var fv=[['財務自由度 ＝ 理財收入 ÷ 總支出 ×100',h.freedom+' 分'],['願景達成度 ＝ 淨資產 ÷ 願景總需求 ×100',h.vision+' 分'],['評鑑等級',h.grade]];
+ return detailBox('財務健康度評分明細','<div class="hint" style="margin-bottom:4px">財務安全度＝五項加權（滿分 100）：</div>'+kvTbl(s)+'<div style="margin-top:8px"></div>'+kvTbl(fv));}
+// 稅賦計算明細
+function taxDetailHTML(c){var it=incomeTax(c),es=estateTax(c),pt=propertyTax(c);
+ var itRows=[['薪資收入(年)',it.salary],['免稅額（'+it.people+'人 × 97,000）',it.exempt],['標準扣除額',it.stdDed],['薪資所得特別扣除',it.salarySpecial],['綜合所得淨額',it.net],['適用稅率 / 累進差額',(it.rate*100)+'% / '+fmt(it.ded)],['應納稅額',it.tax,'var(--warn)']];
+ var esRows=[['淨資產 − 免稅額 1,333 萬 ＝ 課稅遺產淨額',es.base],['適用稅率',(es.rate*100)+'%'],['預估遺產稅',es.tax,'var(--warn)']];
+ var ptRows=[['房屋稅（課稅現值 × 1.2%）',pt.house],['地價稅（地價 × 0.2%）',pt.land],['牌照 + 燃料稅',pt.car],['小計',pt.total,'var(--warn)']];
+ return detailBox('稅賦計算明細','<div class="hint" style="margin-bottom:4px">綜合所得稅</div>'+kvTbl(itRows)+'<div class="hint" style="margin:8px 0 4px">遺產稅</div>'+kvTbl(esRows)+'<div class="hint" style="margin:8px 0 4px">房產與車輛稅（年）</div>'+kvTbl(ptRows));}
+// 比率計算原料
+function metricsDetailHTML(c){var m=metrics(c);
+ var rows=[['家庭總收入',Math.round(m.incTotal)],['理財收入',Math.round(m.incFinancial)],['家庭總支出(含負債本息)',Math.round(m.expTotal)],['生活費用',Math.round(m.living)],['稅賦支出',Math.round(m.tax)],['保險支出',Math.round(m.ins)],['年度負債本息',Math.round(annualDebtPay(c))],['年結餘',Math.round(m.save)],['現金',Math.round(m.cash)],['流動資產',Math.round(m.liquid)],['總資產',Math.round(m.assetTotal)],['總負債',Math.round(m.debtTotal)],['資產淨值',Math.round(m.net)]];
+ return detailBox('比率計算原料（總量數字）','<div class="hint" style="margin-bottom:4px">上表各比率的分子 / 分母，皆由下列總量計算：</div>'+kvTbl(rows));}
+// 貸款逐期攤還
+function amortTbl(amt,rate,months){var i=rate/12/100,bal=amt,mp=pmt(amt,rate,months),out=[];for(var k=1;k<=months;k++){var interest=bal*i,principal=mp-interest;bal=Math.max(0,bal-principal);out.push([k,principal,interest,bal]);}
+ var step=months>36?12:(months>12?3:1);var body=out.filter(function(r,idx){return idx===0||idx===out.length-1||(idx+1)%step===0}).map(function(r){return '<tr><td>'+r[0]+'</td><td>'+fmt(r[1])+'</td><td>'+fmt(r[2])+'</td><td>'+fmt(r[3])+'</td></tr>'}).join('');
+ return '<table class="rtable"><tr><th>期次</th><th>本金</th><th>利息</th><th>餘額</th></tr>'+body+'</table>'+(step>1?'<div class="hint">每 '+step+' 期顯示一列。</div>':'');}
 // 置產缺口
 function propertyGaps(c){
  return (c.goals||[]).filter(function(g){return g.type==='購屋'||g.type==='置產'}).map(function(g){
@@ -590,6 +638,7 @@ function health(c){
  var vision=Math.round(Math.min(1,m.net/(m.visionNeed||1))*100);
  var grade=(safety<60||balScore<1)?'D':(freedom<20?'C':(vision<60?'B':'A'));
  return {safety:safety,freedom:freedom,vision:vision,grade:grade,
+  raw:{balScore:balScore,reserve:reserve,credit:credit,debtBal:debtBal,riskCover:riskCover},
   parts:{收支平衡:Math.round(balScore*100),預備金:Math.round(reserve*100),信用:Math.round(credit*100),負債平衡:Math.round(debtBal*100),風險保全:Math.round(riskCover*100)}};
 }
 var GRADE_STRAT={A:'討論願景增加',B:'稅務規劃、資產配置、抗風險及資產安全性',C:'投資收入、財務自由度和信用狀況',D:'增加收入、減少支出、負債處理與基本風險保全'};
@@ -863,7 +912,7 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
   '<div class="b"><div class="l">退休月生活費(終值)</div><div class="v">'+fmt(rn.monthFV)+'</div></div>'+
   '<div class="b"><div class="l">預估退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div>'+
   '<div class="b"><div class="l">已準備退休金</div><div class="v">'+fmt(rn.prepared)+'</div></div>'+
-  '<div class="b"><div class="l" style="color:var(--warn)">退休缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div></div>'+laborPensionBox(c)+prep;
+  '<div class="b"><div class="l" style="color:var(--warn)">退休缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div>'+retireDetailHTML(c)+'</div>'+laborPensionBox(c)+laborDetailHTML(c)+prep;
 }
 // 勞保老年年金 + 勞退新制 概算（供退休已備參考；非精算，可手動覆寫）
 function estimateLaborPension(c){
@@ -900,7 +949,7 @@ function eduSec(c){var tot=eduTotal(c);
  var tbl=tableSec('子女教育金','education',c.education,[['child','子女','memsel'],['stage','階段','sel:'+EDU_STAGES.join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','num'],['years','供給年數','num'],['startIn','幾年後開始','num']]);
  return '<div class="sec"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
   '<div class="hint" style="margin:2px 0 8px">子女欄請從家庭成員選取；學別（公立/私立/海外）供分類與報告參考，年費用請依實況填寫（大學參考：公立約 6–10 萬、私立約 10–13 萬、海外差異大）。</div>'+
-  '<div class="big3"><div class="b"><div class="l">教育金總需求(終值)</div><div class="v" style="color:var(--amber2)">'+fmt(tot)+'</div></div></div></div>'+tbl;
+  '<div class="big3"><div class="b"><div class="l">教育金總需求(終值)</div><div class="v" style="color:var(--amber2)">'+fmt(tot)+'</div></div></div>'+eduDetailHTML(c)+'</div>'+tbl;
 }
 function taxSec(c){var t=c.taxParams||{},it=incomeTax(c),es=estateTax(c);
  var f='<div class="f"><label>婚姻</label><select onchange="setTax(\'married\',this.value===\'true\',\'bool\')"><option value="false" '+(!t.married?'selected':'')+'>單身</option><option value="true" '+(t.married?'selected':'')+'>有偶</option></select></div>'+
@@ -1380,16 +1429,16 @@ function analysisPane(c){
   threeTablesHTML(ct)+
   '<div class="sec" id="an-health"><h4>財務健康度</h4><div class="gauges">'+gau+'</div>'+
    '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:12px"><div class="gradebox"><div class="muted">評鑑等級</div><div class="g" style="color:'+gradeColor(h.grade)+'">'+h.grade+'</div></div>'+
-   '<div class="muted" style="flex:1;min-width:220px">策略階段：<b style="color:var(--amber2)">'+GRADE_STRAT[h.grade]+'</b></div></div><table style="margin-top:14px">'+parts+'</table></div>'+
+   '<div class="muted" style="flex:1;min-width:220px">策略階段：<b style="color:var(--amber2)">'+GRADE_STRAT[h.grade]+'</b></div></div><table style="margin-top:14px">'+parts+'</table>'+healthDetailHTML(c)+'</div>'+
   '<div class="sec"><h4>現況財務指標 · 收支流量 <span class="hint">協會標準 '+rtCount('收支流量')+' 項 · 燈號＝綠達標/黃待留意/紅需改善</span></h4>'+ratioTbl('收支流量')+'</div>'+
-  '<div class="sec"><h4>現況財務指標 · 資產負債 <span class="hint">協會標準 '+rtCount('資產負債')+' 項</span></h4>'+ratioTbl('資產負債')+'</div>'+
-  '<div class="sec"><h4>退休需求</h4><div class="big3"><div class="b"><div class="l">退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div><div class="b"><div class="l">已準備</div><div class="v">'+fmt(rn.prepared)+'</div></div><div class="b"><div class="l" style="color:var(--warn)">缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div></div>'+
-  '<div class="sec" id="an-gap"><h4>保障準備度 <span class="hint">各險種「已備 ÷ 毛需求」；100% 即足額</span></h4>'+coverageReadinessHTML(c)+'</div>'+
+  '<div class="sec"><h4>現況財務指標 · 資產負債 <span class="hint">協會標準 '+rtCount('資產負債')+' 項</span></h4>'+ratioTbl('資產負債')+metricsDetailHTML(c)+'</div>'+
+  '<div class="sec"><h4>退休需求</h4><div class="big3"><div class="b"><div class="l">退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div><div class="b"><div class="l">已準備</div><div class="v">'+fmt(rn.prepared)+'</div></div><div class="b"><div class="l" style="color:var(--warn)">缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div>'+retireDetailHTML(c)+'</div>'+
+  '<div class="sec" id="an-gap"><h4>保障準備度 <span class="hint">各險種「已備 ÷ 毛需求」；100% 即足額</span></h4>'+coverageReadinessHTML(c)+lifeNeedDetailHTML(c)+'</div>'+
   '<div class="sec"><h4>保障缺口（需求已反推計算）</h4><table class="rtable"><tr><th>被保人</th><th>險種</th><th>需求</th><th>已備</th><th>缺口</th></tr>'+(gt||'<tr><td colspan=5 class=muted>請於「保障需求」分頁新增</td></tr>')+'</table></div>'+'<div class="sec"><h4>責任遞減缺口圖 <span class="hint">身故責任逐年遞減，對照已備保障</span></h4>'+respGapCharts(c)+'</div>'+'<div class="sec"><h4>壽險需求圖 <span class="hint">身故情境下家庭保障可支撐幾年</span></h4>'+lifeNeedCharts(c)+'</div>'+
   (pt?'<div class="sec"><h4>置產缺口</h4><table class="rtable"><tr><th>項目</th><th>需求終值</th><th>可貸款</th><th>缺口</th></tr>'+pt+'</table></div>':'')+
   '<div class="sec"><h4>財務十字表</h4>'+crossTableHTML(ct)+'</div>'+
   '<div class="sec"><h4>財務目標歷程</h4>'+timelineSVG(c)+'</div>'+
-  '<div class="sec" id="an-tax"><h4>稅賦分析</h4><table class="rtable"><tr><td class="k">綜合所得淨額</td><td>'+fmt(it.net)+'</td></tr><tr><td class="k">綜所稅(年)</td><td class="bad">'+fmt(it.tax)+'（稅率 '+(it.rate*100)+'%）</td></tr><tr><td class="k">課稅遺產淨額</td><td>'+fmt(es.base)+'</td></tr><tr><td class="k">預估遺產稅</td><td class="bad">'+fmt(es.tax)+'（稅率 '+(es.rate*100)+'%）</td></tr></table></div>'+
+  '<div class="sec" id="an-tax"><h4>稅賦分析</h4><table class="rtable"><tr><td class="k">綜合所得淨額</td><td>'+fmt(it.net)+'</td></tr><tr><td class="k">綜所稅(年)</td><td class="bad">'+fmt(it.tax)+'（稅率 '+(it.rate*100)+'%）</td></tr><tr><td class="k">課稅遺產淨額</td><td>'+fmt(es.base)+'</td></tr><tr><td class="k">預估遺產稅</td><td class="bad">'+fmt(es.tax)+'（稅率 '+(es.rate*100)+'%）</td></tr></table>'+taxDetailHTML(c)+'</div>'+
   '<div class="sec"><h4>建議資產配置 <span class="hint">加權報酬 '+al.wRet.toFixed(2)+'%</span></h4>'+pieSVG(al.list)+'</div>'+
   '<div class="sec"><h4>規劃前 / 後對照</h4>'+beforeAfterHTML(c)+'</div>'+
   shortTermHTML(c)+
@@ -1616,8 +1665,8 @@ function toolsPane(c){var L=app.tools.loan,R=app.tools.ret;
  var monthFV=n(R.month)*Math.pow(1+infl,years),annualFV=monthFV*12;
  var total=Math.abs(rr-infl)<1e-6?annualFV*m2/(1+rr):annualFV*(1-Math.pow((1+infl)/(1+rr),m2))/(rr-infl);
  var retF=[['age','目前年齡'],['rAge','退休年齡'],['life','預估壽命'],['month','退休月生活費(現值)'],['infl','通膨%'],['rr','退休後報酬%']].map(function(x){return '<div class="f"><label>'+x[1]+'</label><input type="number" value="'+esc(R[x[0]])+'" oninput="setTool(\'ret\',\''+x[0]+'\',this.value)"></div>'}).join('');
- return '<div class="sec"><h4>貸款試算（本息平均攤還）</h4><div class="fgrid">'+loanF+'</div><div class="big3" style="margin-top:12px"><div class="b"><div class="l">每月應繳</div><div class="v">'+fmt(mp)+'</div></div><div class="b"><div class="l">總還款</div><div class="v">'+fmt(totalPay)+'</div></div><div class="b"><div class="l">總利息</div><div class="v" style="color:var(--warn)">'+fmt(totalInt)+'</div></div></div></div>'+
-  '<div class="sec"><h4>退休快速試算</h4><div class="fgrid">'+retF+'</div><div class="big3" style="margin-top:12px"><div class="b"><div class="l">退休後餘年</div><div class="v">'+m2+' 年</div></div><div class="b"><div class="l">退休月生活費(終值)</div><div class="v">'+fmt(monthFV)+'</div></div><div class="b"><div class="l">退休總需求</div><div class="v" style="color:var(--amber2)">'+fmt(total)+'</div></div></div></div>'+
+ return '<div class="sec"><h4>貸款試算（本息平均攤還）</h4><div class="fgrid">'+loanF+'</div><div class="big3" style="margin-top:12px"><div class="b"><div class="l">每月應繳</div><div class="v">'+fmt(mp)+'</div></div><div class="b"><div class="l">總還款</div><div class="v">'+fmt(totalPay)+'</div></div><div class="b"><div class="l">總利息</div><div class="v" style="color:var(--warn)">'+fmt(totalInt)+'</div></div></div>'+detailBox('逐期攤還明細',amortTbl(n(L.amt),n(L.rate),months))+'</div>'+
+  '<div class="sec"><h4>退休快速試算</h4><div class="fgrid">'+retF+'</div><div class="big3" style="margin-top:12px"><div class="b"><div class="l">退休後餘年</div><div class="v">'+m2+' 年</div></div><div class="b"><div class="l">退休月生活費(終值)</div><div class="v">'+fmt(monthFV)+'</div></div><div class="b"><div class="l">退休總需求</div><div class="v" style="color:var(--amber2)">'+fmt(total)+'</div></div></div>'+detailBox('年金計算明細',kvTbl([['退休月生活費(現值)',n(R.month)],['距退休 '+years+' 年 → 月生活費(終值)',Math.round(monthFV)],['退休時年支出(終值)',Math.round(annualFV)],['退休後餘命',m2+' 年'],['報酬率 / 通膨',(rr*100).toFixed(1)+'% / '+(infl*100).toFixed(1)+'%'],['退休總需求(成長型年金現值)',Math.round(total),'var(--amber2)']]))+'</div>'+
   compToolHTML()+irrToolHTML()+houseToolHTML()+carToolHTML()+bizToolHTML()+
   '<div class="muted">工具箱為獨立快速試算，不影響客戶案件資料。</div>';
 }
@@ -1628,8 +1677,10 @@ function compToolHTML(){var T=app.tools.comp,i=n(T.rate)/12/100,ms=n(T.years)*12
  var fvStart=n(T.start)*Math.pow(1+i,ms),factor=i>0?(Math.pow(1+i,ms)-1)/i:ms;
  var reqM=factor>0?Math.max(0,(n(T.target)-fvStart)/factor):0;
  var invested=reqM*ms+n(T.start),gain=n(T.target)-invested;
+ var crows='';for(var y=1;y<=n(T.years);y++){var mm=12*y,fvv=n(T.start)*Math.pow(1+i,mm)+reqM*(i>0?(Math.pow(1+i,mm)-1)/i:mm),inv=n(T.start)+reqM*mm;crows+='<tr><td>'+y+'</td><td>'+fmt(inv)+'</td><td>'+fmt(fvv)+'</td><td>'+fmt(fvv-inv)+'</td></tr>';}
+ var compDetail='<table class="rtable"><tr><th>年</th><th>累積投入</th><th>年末現值</th><th>累積報酬</th></tr>'+crows+'</table>';
  return '<div class="sec"><h4>複利滾存達標試算 <span class="hint">達成目標金額所需的每月投入</span></h4><div class="fgrid">'+toolF('comp',[['target','目標金額'],['years','年數'],['rate','預期年報酬%'],['start','起始資金']])+'</div>'+
-  toolBig([['每月需投入',fmt(reqM),'var(--amber2)'],['累積投入本金',fmt(invested)],['複利總報酬',fmt(gain),'var(--ok)']])+'</div>';}
+  toolBig([['每月需投入',fmt(reqM),'var(--amber2)'],['累積投入本金',fmt(invested)],['複利總報酬',fmt(gain),'var(--ok)']])+detailBox('逐年累積明細',compDetail)+'</div>';}
 // 年化利率(IRR)：定期定額回推實際年化報酬
 function irrToolHTML(){var T=app.tools.irr,ms=Math.max(1,n(T.months));
  function fv(i){return n(T.start)*Math.pow(1+i,ms)+n(T.monthly)*(i!==0?(Math.pow(1+i,ms)-1)/i*(1+i):ms);}
@@ -1637,23 +1688,43 @@ function irrToolHTML(){var T=app.tools.irr,ms=Math.max(1,n(T.months));
  for(var k=0;k<80;k++){mid=(lo+hi)/2;if(fv(mid)>target){hi=mid}else{lo=mid}}
  var annual=(Math.pow(1+mid,12)-1)*100,invested=n(T.monthly)*ms+n(T.start);
  return '<div class="sec"><h4>投資年化報酬回推 <span class="hint">由已投入期數與現值估算實際年化利率</span></h4><div class="fgrid">'+toolF('irr',[['monthly','每月定期定額'],['months','已投入期數(月)'],['fv','目前市場現值'],['start','起始金額']])+'</div>'+
-  toolBig([['實際年化報酬',annual.toFixed(2)+'%',annual>=0?'var(--ok)':'var(--warn)'],['累積投入',fmt(invested)],['損益',fmt(target-invested),target-invested>=0?'var(--ok)':'var(--warn)']])+'</div>';}
+  toolBig([['實際年化報酬',annual.toFixed(2)+'%',annual>=0?'var(--ok)':'var(--warn)'],['累積投入',fmt(invested)],['損益',fmt(target-invested),target-invested>=0?'var(--ok)':'var(--warn)']])+detailBox('計算基礎',kvTbl([['每月定期定額',n(T.monthly)],['已投入期數',ms+' 期（月）'],['起始金額',n(T.start)],['累積投入本金',Math.round(invested)],['目前市場現值',target],['求得月報酬率',(mid*100).toFixed(4)+'%'],['年化報酬（有效）',annual.toFixed(2)+'%','var(--amber2)'],['年化報酬（名目 ×12）',(mid*12*100).toFixed(2)+'%']]))+'</div>';}
 // 以房換房試算
 function houseToolHTML(){var T=app.tools.house,newLoan=Math.max(0,n(T.newPrice)-n(T.down)),ms=n(T.years)*12;
  var mp=pmt(newLoan,n(T.rate),ms),diff=n(T.newPrice)-n(T.oldPrice),needCash=n(T.down)+n(T.deco);
  return '<div class="sec"><h4>以房換房試算 <span class="hint">換屋的貸款、月付與所需現金</span></h4><div class="fgrid">'+toolF('house',[['oldPrice','原房價'],['newPrice','新房價'],['down','自備款'],['rate','房貸年利率%'],['years','貸款年期'],['deco','裝潢費']])+'</div>'+
   toolBig([['新房貸款',fmt(newLoan)],['每月本息',fmt(mp),'var(--amber2)'],['需準備現金',fmt(needCash),'var(--warn)']])+
-  '<div class="muted" style="margin-top:6px">購房差價（新－原）：'+fmt(diff)+' 元</div></div>';}
+  '<div class="muted" style="margin-top:6px">購房差價（新－原）：'+fmt(diff)+' 元</div>'+detailBox('計算明細 / 新貸款攤還',kvTbl([['新房貸款 ＝ 新房價 − 自備款',Math.round(newLoan)],['貸款年期',n(T.years)+' 年（'+ms+' 期）'],['每月本息',Math.round(mp)],['貸款期間總利息',Math.round(mp*ms-newLoan),'var(--warn)'],['需準備現金 ＝ 自備款 + 裝潢費',Math.round(needCash)],['購房差價（新－原）',Math.round(diff)]])+detailBox('新貸款逐期攤還',amortTbl(newLoan,n(T.rate),ms)))+'</div>';}
 // 車價折損 + 養車成本（平均法折舊；牌照稅/燃料稅依排氣量）
-function carLicenseTax(cc){var t=[[500,1620],[600,2160],[1200,4320],[1800,7120],[2400,11230],[3000,15210],[4200,28220],[5400,46170],[6600,69690],[7800,117000],[1e9,151200]];for(var i=0;i<t.length;i++)if(cc<=t[i][0])return t[i][1];return 151200;}
-function carFuelTax(cc){var t=[[500,2160],[600,2880],[1200,4320],[1800,4800],[2400,6180],[3000,7200],[3600,8640],[4200,9810],[4800,11220],[5400,12180],[6000,13080],[1e9,14910]];for(var i=0;i<t.length;i++)if(cc<=t[i][0])return t[i][1];return 14910;}
-function carToolHTML(){var T=app.tools.car,life=Math.max(1,n(T.life));
+// 級距表：[排氣量上限, 自用, 營業]（牌照稅）／[排氣量上限, 汽油自用, 柴油自用]（燃料稅）。來源＝監理服務牌照稅/汽車燃料使用費表。
+var CAR_LICENSE=[[500,1620,900],[600,2160,1260],[1200,4320,2160],[1800,7120,3060],[2400,11230,6480],[3000,15210,9900],[4200,28220,16380],[5400,46170,24300],[6600,69690,33660],[7800,117000,44460],[1/0,151200,56700]];
+var CAR_FUEL=[[500,2160,1296],[600,2880,1728],[1200,4320,2592],[1800,4800,2880],[2400,6180,3708],[3000,7200,4320],[3600,8640,5184],[4200,9810,5886],[4800,11220,6732],[5400,12180,7380],[6000,13080,7848],[6600,13950,8370],[7200,14910,8946],[1/0,15720,9432]];
+function carLicenseTax(cc,biz){for(var i=0;i<CAR_LICENSE.length;i++)if(cc<=CAR_LICENSE[i][0])return CAR_LICENSE[i][biz?2:1];return CAR_LICENSE[CAR_LICENSE.length-1][biz?2:1];}
+function carFuelTax(cc,diesel){for(var i=0;i<CAR_FUEL.length;i++)if(cc<=CAR_FUEL[i][0])return CAR_FUEL[i][diesel?2:1];return CAR_FUEL[CAR_FUEL.length-1][diesel?2:1];}
+function carBracketTbl(tbl,cc,heads){var rows=tbl.map(function(r,i){var lo=i===0?0:tbl[i-1][0];
+  var lbl=i===0?('≤'+tbl[i][0]):(r[0]===1/0?((lo+1)+' 以上'):((lo+1)+'–'+r[0]));var active=cc>lo&&cc<=r[0];
+  var em=active?' style="color:var(--amber2);font-weight:800"':'';
+  return '<tr'+(active?' style="background:rgba(224,189,139,.12)"':'')+'><td'+em+'>'+lbl+'</td>'+heads.map(function(h,ci){return '<td'+em+'>'+fmt(r[ci+1])+'</td>'}).join('')+'</tr>';}).join('');
+ return '<table class="rtable"><tr><th>排氣量 c.c</th>'+heads.map(function(h){return '<th>'+h+'</th>'}).join('')+'</tr>'+rows+'</table>';}
+function carToolHTML(){var T=app.tools.car,life=Math.max(1,n(T.life)),cc=n(T.cc);
  var salvage=n(T.price)/(life+1),annualDep=(n(T.price)-salvage)/life,accDep=annualDep*Math.min(n(T.used),life);
  var nowVal=Math.max(salvage,n(T.price)-accDep),finalSale=nowVal*(1-n(T.sellLoss)/100);
- var tax=carLicenseTax(n(T.cc))+carFuelTax(n(T.cc)),yearCost=tax+n(T.oil)+n(T.park)+n(T.other);
+ var lic=carLicenseTax(cc),fuel=carFuelTax(cc),tax=lic+fuel,yearCost=tax+n(T.oil)+n(T.park)+n(T.other);
+ // 養車成本逐項明細
+ var costRows=[['牌照稅',lic,cc+'c.c 自用'],['燃料稅',fuel,cc+'c.c 自用汽油'],['年油錢',n(T.oil),'自填'],['年停車位',n(T.park),'自填'],['年保養/保險/雜支',n(T.other),'保養＋車體險＋雜支']]
+   .map(function(x){return '<tr><td class="k">'+x[0]+'</td><td>'+fmt(x[1])+'</td><td class="muted" style="font-size:12px">'+x[2]+'</td></tr>'}).join('')
+   +'<tr><td class="k">每年養車成本合計</td><td style="color:var(--warn);font-weight:800">'+fmt(yearCost)+'</td><td></td></tr>';
+ // 折舊明細（平均法）
+ var depRows=[['原車價',n(T.price)],['殘價（原價÷(耐用年數+1)）',salvage],['每年折舊費用',annualDep],['已使用 '+n(T.used)+' 年累積折舊',accDep],['目前現值',nowVal],['出售折損 '+n(T.sellLoss)+'%',nowVal*n(T.sellLoss)/100],['預估售價',finalSale]]
+   .map(function(x){return '<tr><td class="k">'+x[0]+'</td><td>'+fmt(x[1])+'</td></tr>'}).join('');
+ var detail='<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--amber2);font-weight:700;font-size:13px">明細 / 稅率級距對照（點開）</summary>'+
+   '<div style="margin-top:10px"><div class="hint" style="margin-bottom:4px">養車成本逐項明細</div><table class="rtable"><tr><th>項目</th><th>金額</th><th>說明</th></tr>'+costRows+'</table></div>'+
+   '<div style="margin-top:12px"><div class="hint" style="margin-bottom:4px">車價折損明細（司法院平均法）</div><table class="rtable"><tr><th>項目</th><th>金額</th></tr>'+depRows+'</table></div>'+
+   '<div style="margin-top:12px"><div class="hint" style="margin-bottom:4px">牌照稅級距表（每年；反白＝目前排氣量）</div>'+carBracketTbl(CAR_LICENSE,cc,['自用小客車','營業用'])+'</div>'+
+   '<div style="margin-top:12px"><div class="hint" style="margin-bottom:4px">汽車燃料使用費級距表（自用/每年）</div>'+carBracketTbl(CAR_FUEL,cc,['汽油','柴油'])+'</div></details>';
  return '<div class="sec"><h4>車價折損 · 養車成本 <span class="hint">平均法折舊；稅額依排氣量自動帶入</span></h4><div class="fgrid">'+toolF('car',[['price','原車價'],['life','耐用年數'],['used','使用年數'],['cc','排氣量c.c'],['sellLoss','出售折損%'],['oil','年油錢'],['park','年停車位'],['other','年保養/保險/雜支']])+'</div>'+
   toolBig([['目前現值',fmt(nowVal)],['預估售價',fmt(finalSale),'var(--amber2)'],['每年養車成本',fmt(yearCost),'var(--warn)']])+
-  '<div class="muted" style="margin-top:6px">牌照稅 '+fmt(carLicenseTax(n(T.cc)))+' ＋ 燃料稅 '+fmt(carFuelTax(n(T.cc)))+'（'+n(T.cc)+'c.c 自用汽油）</div></div>';}
+  '<div class="muted" style="margin-top:6px">牌照稅 '+fmt(lic)+' ＋ 燃料稅 '+fmt(fuel)+'（'+cc+'c.c 自用汽油）</div>'+detail+'</div>';}
 // 公司開辦 / 營運資金
 function bizToolHTML(){var T=app.tools.biz,net=n(T.monthRev)-n(T.monthCost);
  var runway=net>=0?'—（獲利）':Math.floor(n(T.cash)/Math.max(1,-net))+' 個月';
