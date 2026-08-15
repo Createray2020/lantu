@@ -302,10 +302,37 @@ function health(c){
  var vision=Math.round(Math.min(1,m.net/(m.visionNeed||1))*100);
  var grade=(safety<60||balScore<1)?'D':(freedom<20?'C':(vision<60?'B':'A'));
  return {safety:safety,freedom:freedom,vision:vision,grade:grade,
+  raw:{balScore:balScore,reserve:reserve,credit:credit,debtBal:debtBal,riskCover:riskCover},
   parts:{收支平衡:Math.round(balScore*100),預備金:Math.round(reserve*100),信用:Math.round(credit*100),負債平衡:Math.round(debtBal*100),風險保全:Math.round(riskCover*100)}};
 }
 
-var GRADE_STRAT={A:'討論願景增加',B:'稅務規劃、資產配置、抗風險及資產安全性',C:'投資收入、財務自由度和信用狀況',D:'增加收入、減少支出、負債處理與基本風險保全'};
+// ===== 財務階段（旅程命名）：內部值仍為 A/B/C/D，此處只做顯示層對照 =====
+// 與 public/lantu-app.html 的 STAGE 必須保持一致。
+var STAGE={
+ D:{name:'整裝期',task:'讓收支轉正、備妥緊急預備金與基本保障',c:'#8fa6b8',cl:'#5f7385'},
+ C:{name:'啟程期',task:'把儲蓄變成會生錢的資產，建立理財收入',c:'#7fa8a0',cl:'#4e7a72'},
+ B:{name:'前行期',task:'資產配置、抗風險，朝願景累積',c:'#c9a86b',cl:'#a3814a'},
+ A:{name:'遠行期',task:'願景擴張、傳承與稅務配置',c:'#e0c88b',cl:'#8a6f3c'}
+};
+var STAGE_ORDER=['D','C','B','A'];
+function stageName(g){return (STAGE[g]||{}).name||'未評估'}
+function stageTask(g){return (STAGE[g]||{}).task||''}
+function stageColor(g,light){var st=STAGE[g];return st?(light?st.cl:st.c):(light?'#6b7d8f':'var(--mut)')}
+// 為什麼在這個階段：指出當前最關鍵的那一項
+function stageReason(h){
+ if(!h)return '';
+ var rw=h.raw||{};
+ if(rw.balScore<1)return '目前收支為負，第一步是讓現金流轉正';
+ if(h.safety<60){
+  var it=[['風險保全',rw.riskCover],['緊急預備金',rw.reserve],['負債結構',rw.debtBal],['信用狀況',rw.credit]];
+  it.sort(function(a,b){return (a[1]||0)-(b[1]||0)});
+  return it[0][0]+'是目前最需要補強的一項';
+ }
+ if(h.freedom<20)return '理財收入目前覆蓋 '+h.freedom+'% 的支出，下一步是讓資產開始工作';
+ if(h.vision<60)return '淨資產已達願景需求的 '+h.vision+'%，持續累積中';
+ return '基礎與現金流都到位，可以把重心放在願景與傳承';
+}
+var GRADE_STRAT={A:STAGE.A.task,B:STAGE.B.task,C:STAGE.C.task,D:STAGE.D.task};
 
 function advice(c){
  var m=metrics(c),h=health(c),proj=m.proj,list=[],rn=retireNeed(c);
@@ -389,6 +416,7 @@ function crossTable(c){var m=metrics(c);
   aSelf:aSelf,aInv:aInv,aTotal:m.assetTotal,dCons:dCons,dInv:dInv,dTotal:m.debtTotal,net:m.net,monthBal:(m.incTotal-m.expTotal)/12};
 }
 
+// @deprecated 已改用 stageColor（財務階段）；保留僅為既有 export 契約相容，勿用於新程式。
 function gradeColor(g){return {A:'var(--ok)',B:'var(--teal)',C:'var(--amber)',D:'var(--warn)'}[g]}
 
 var PURPOSES=['想增加收入','想買車、買房，進行置產','想進行儲蓄，替未來準備','想進行投資、活化資產','想優化個人的信用評分','想進行風險的保障評估','有節稅需求，想進行節稅','人生模擬，了解一生金流'];
@@ -464,6 +492,12 @@ export {
   monteCarlo,
   health,
   GRADE_STRAT,
+  STAGE,
+  STAGE_ORDER,
+  stageName,
+  stageTask,
+  stageColor,
+  stageReason,
   advice,
   actionList,
   TAX_BR,

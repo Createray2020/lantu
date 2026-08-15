@@ -44,6 +44,27 @@ describe("嵐途財務引擎（移植 v12）", () => {
     expect(E.riskProfile(partial)).toBeNull();
   });
 
+  it("財務階段：四階段皆有名稱與課題，且不使用等級語彙", () => {
+    for (const g of ["D", "C", "B", "A"]) {
+      expect(E.stageName(g)).toMatch(/期$/);
+      expect(E.stageTask(g).length).toBeGreaterThan(5);
+      expect(E.stageColor(g)).toMatch(/^#/);
+    }
+    expect(E.STAGE_ORDER).toEqual(["D", "C", "B", "A"]); // 整裝 → 遠行
+    expect(E.stageName(null)).toBe("未評估");
+    expect(E.stageName("X")).toBe("未評估");
+  });
+
+  it("階段成因：說明為什麼在這個階段，且不炸", () => {
+    const h = E.health(c);
+    expect(typeof E.stageReason(h)).toBe("string");
+    expect(E.stageReason(h).length).toBeGreaterThan(0);
+    expect(E.stageReason(null)).toBe("");
+    // 收支為負時，成因優先指向現金流
+    const neg = { safety: 30, freedom: 0, vision: 0, raw: { balScore: 0.5, reserve: 1, credit: 1, debtBal: 1, riskCover: 1 } };
+    expect(E.stageReason(neg)).toContain("現金流");
+  });
+
   it("空白個案不炸（newCase）", () => {
     const nc = E.newCase();
     expect(nc.id).toBeTruthy();

@@ -31,7 +31,7 @@ h1,h2,h3,h4{margin:0}
 .clientcard{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:9px;cursor:pointer;transition:.15s;position:relative}
 .clientcard:hover{background:var(--card2)}.clientcard.on{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
 .clientcard .nm{font-weight:700}.clientcard .mt{color:var(--mut);font-size:12px}
-.clientcard .gr{position:absolute;top:10px;right:11px;font-weight:800;font-size:16px}
+.clientcard .gr{position:absolute;top:9px;right:10px;font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid currentColor;opacity:.92}
 .main{padding:20px 24px;overflow:auto}
 .tabbar{display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px}
 .tabbar button{background:none;border:none;color:var(--mut);padding:9px 14px;font-weight:700;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -65,7 +65,7 @@ td input[type=checkbox]{width:auto}
 .gau{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;text-align:center}
 .gau .t{color:var(--mut);font-size:13px}.arc{width:150px;height:82px;margin:8px auto 2px}.gau .sc{font-size:26px;font-weight:800}
 .gradebox{display:inline-flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 20px}
-.gradebox .g{font-size:44px;font-weight:800;line-height:1}
+.gradebox .g{font-size:26px;font-weight:800;line-height:1.25;letter-spacing:.04em}
 .rtable td.k{color:var(--tx);font-weight:700}.rtable code{color:var(--teal);font-family:ui-monospace,monospace;font-size:12px}
 .bad{color:var(--warn);font-weight:800}.good{color:var(--ok);font-weight:800}
 .bar{height:8px;background:#0a1a20;border-radius:5px;overflow:hidden;margin-top:5px}.bar>i{display:block;height:100%;background:var(--teal)}
@@ -491,7 +491,7 @@ function eduDetailHTML(c){var edu=c.education||[];if(!edu.length)return '';var g
 // 財務健康度評分明細
 function healthDetailHTML(c){var h=health(c),rw=h.raw||{};
  var s=[['收支平衡 balScore ×25',Math.round((rw.balScore||0)*25)],['緊急預備金 ×15',Math.round((rw.reserve||0)*15)],['信用 ×15',Math.round((rw.credit||0)*15)],['負債平衡 ×15',Math.round((rw.debtBal||0)*15)],['風險保全 ×30',Math.round((rw.riskCover||0)*30)],['＝ 財務安全度',h.safety+' 分','var(--amber2)']];
- var fv=[['財務自由度 ＝ 理財收入 ÷ 總支出 ×100',h.freedom+' 分'],['願景達成度 ＝ 淨資產 ÷ 願景總需求 ×100',h.vision+' 分'],['評鑑等級',h.grade]];
+ var fv=[['財務自由度 ＝ 理財收入 ÷ 總支出 ×100',h.freedom+' 分'],['願景達成度 ＝ 淨資產 ÷ 願景總需求 ×100',h.vision+' 分'],['財務階段',stageName(h.grade)]];
  return detailBox('財務健康度評分明細','<div class="hint" style="margin-bottom:4px">財務安全度＝五項加權（滿分 100）：</div>'+kvTbl(s)+'<div style="margin-top:8px"></div>'+kvTbl(fv));}
 // 稅賦計算明細
 function taxDetailHTML(c){var it=incomeTax(c),es=estateTax(c),pt=propertyTax(c);
@@ -713,7 +713,32 @@ function health(c){
   raw:{balScore:balScore,reserve:reserve,credit:credit,debtBal:debtBal,riskCover:riskCover},
   parts:{收支平衡:Math.round(balScore*100),預備金:Math.round(reserve*100),信用:Math.round(credit*100),負債平衡:Math.round(debtBal*100),風險保全:Math.round(riskCover*100)}};
 }
-var GRADE_STRAT={A:'討論願景增加',B:'稅務規劃、資產配置、抗風險及資產安全性',C:'投資收入、財務自由度和信用狀況',D:'增加收入、減少支出、負債處理與基本風險保全'};
+// ===== 財務階段（旅程命名）：內部值仍為 A/B/C/D，此處只做顯示層對照 =====
+var STAGE={
+ D:{name:'整裝期',task:'讓收支轉正、備妥緊急預備金與基本保障',c:'#8fa6b8',cl:'#5f7385'},
+ C:{name:'啟程期',task:'把儲蓄變成會生錢的資產，建立理財收入',c:'#7fa8a0',cl:'#4e7a72'},
+ B:{name:'前行期',task:'資產配置、抗風險，朝願景累積',c:'#c9a86b',cl:'#a3814a'},
+ A:{name:'遠行期',task:'願景擴張、傳承與稅務配置',c:'#e0c88b',cl:'#8a6f3c'}
+};
+var STAGE_ORDER=['D','C','B','A'];
+function stageName(g){return (STAGE[g]||{}).name||'未評估'}
+function stageTask(g){return (STAGE[g]||{}).task||''}
+function stageColor(g,light){var st=STAGE[g];return st?(light?st.cl:st.c):(light?'#6b7d8f':'var(--mut)')}
+// 為什麼在這個階段：指出當前最關鍵的那一項，避免「同一階段不同成因」造成誤解
+function stageReason(h){
+ if(!h)return '';
+ var rw=h.raw||{};
+ if(rw.balScore<1)return '目前收支為負，第一步是讓現金流轉正';
+ if(h.safety<60){
+  var it=[['風險保全',rw.riskCover],['緊急預備金',rw.reserve],['負債結構',rw.debtBal],['信用狀況',rw.credit]];
+  it.sort(function(a,b){return (a[1]||0)-(b[1]||0)});
+  return it[0][0]+'是目前最需要補強的一項';
+ }
+ if(h.freedom<20)return '理財收入目前覆蓋 '+h.freedom+'% 的支出，下一步是讓資產開始工作';
+ if(h.vision<60)return '淨資產已達願景需求的 '+h.vision+'%，持續累積中';
+ return '基礎與現金流都到位，可以把重心放在願景與傳承';
+}
+var GRADE_STRAT={A:STAGE.A.task,B:STAGE.B.task,C:STAGE.C.task,D:STAGE.D.task};
 function advice(c){
  var m=metrics(c),h=health(c),proj=m.proj,list=[],rn=retireNeed(c);
  if(proj.turnNeg)list.push(['退休期限／資產本金警訊','可投資資產本金預計在 '+proj.turnNeg+' 歲由正轉負，需提高資產使用率或延後收入中斷。']);
@@ -847,11 +872,10 @@ function render(){document.querySelectorAll('#roleSw button').forEach(function(b
  document.getElementById('app').innerHTML=app.role==='coach'?coachView():clientView();bindTabs()}
 function bindTabs(){document.querySelectorAll('[data-tab]').forEach(function(b){b.onclick=function(){app.activeTab=b.dataset.tab;render()}});
  document.querySelectorAll('[data-dtab]').forEach(function(b){b.onclick=function(){app.dataTab=b.dataset.dtab;render()}})}
-function gradeColor(g){return {A:'var(--ok)',B:'var(--teal)',C:'var(--amber)',D:'var(--warn)'}[g]}
 
 function coachView(){var c=activeCase();
  var list=app.cases.map(function(x){var h=health(x);return '<div class="clientcard '+(x.id===app.activeId?'on':'')+'" onclick="app.activeId=\''+x.id+'\';render()">'+
-  '<div class="gr" style="color:'+gradeColor(h.grade)+'">'+h.grade+'</div><div class="nm">'+esc(x.profile.name)+'</div>'+
+  '<div class="gr" style="color:'+stageColor(h.grade)+'">'+stageName(h.grade)+'</div><div class="nm">'+esc(x.profile.name)+'</div>'+
   '<div class="mt">'+n(x.profile.age)+' 歲 · 淨值 '+fmt(metrics(x).net)+'</div></div>';}).join('');
  var side='<h3>客戶管理</h3>'+list+'<button class="tbtn amber" style="width:100%;margin-top:6px" onclick="var n=newCase();app.cases.push(n);app.activeId=n.id;save();render()">＋ 新增客戶</button>';
  var tabs=[['data','資料'],['analysis','分析'],['advice','建議'],['report','報告'],['tools','工具']];
@@ -1723,8 +1747,8 @@ function analysisPane(c){
   financeNavHTML()+
   threeTablesHTML(ct)+
   '<div class="sec" id="an-health"><h4>財務健康度</h4><div class="gauges">'+gau+'</div>'+
-   '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:12px"><div class="gradebox"><div class="muted">評鑑等級</div><div class="g" style="color:'+gradeColor(h.grade)+'">'+h.grade+'</div></div>'+
-   '<div class="muted" style="flex:1;min-width:220px">策略階段：<b style="color:var(--amber2)">'+GRADE_STRAT[h.grade]+'</b></div></div><table style="margin-top:14px">'+parts+'</table>'+healthDetailHTML(c)+'</div>'+
+   '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:12px"><div class="gradebox"><div class="muted">財務階段</div><div class="g" style="color:'+stageColor(h.grade)+'">'+stageName(h.grade)+'</div></div>'+
+   '<div class="muted" style="flex:1;min-width:220px">當前課題：<b style="color:var(--amber2)">'+stageTask(h.grade)+'</b><div style="font-size:12px;margin-top:4px">'+stageReason(h)+'</div></div></div><table style="margin-top:14px">'+parts+'</table>'+healthDetailHTML(c)+'</div>'+
   '<div class="sec"><h4>現況財務指標 · 收支流量 <span class="hint">協會標準 '+rtCount('收支流量')+' 項 · 燈號＝綠達標/黃待留意/紅需改善</span></h4>'+ratioTbl('收支流量')+'</div>'+
   '<div class="sec"><h4>現況財務指標 · 資產負債 <span class="hint">協會標準 '+rtCount('資產負債')+' 項</span></h4>'+ratioTbl('資產負債')+metricsDetailHTML(c)+'</div>'+
   '<div class="sec"><h4>退休需求</h4><div class="big3"><div class="b"><div class="l">退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div><div class="b"><div class="l">已準備</div><div class="v">'+fmt(rn.prepared)+'</div></div><div class="b"><div class="l" style="color:var(--warn)">缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div>'+retireDetailHTML(c)+'</div>'+
@@ -1945,7 +1969,7 @@ function retireCashflowHTML(c){var proj=projection(c),ra=n(c.profile.retireAge),
 function advicePane(c){var list=advice(c),h=health(c),m=metrics(c),rn=retireNeed(c),acts=actionList(c);
  var cards=list.map(function(a,i){return '<div class="advcard"><h4>'+(i+1)+'. '+a[0]+'</h4><p>'+a[1]+'</p></div>'}).join('');
  var actRows=acts.map(function(a){return '<tr><td class="k" style="text-align:center;color:var(--amber2)">'+a.axis+'</td><td class="k">'+esc(a.title)+'</td><td>'+esc(a.detail)+'</td></tr>'}).join('');
- return '<div class="sec"><h4>規劃建議（等級 '+h.grade+' · '+GRADE_STRAT[h.grade]+'）</h4>'+cards+'</div>'+
+ return '<div class="sec"><h4>規劃建議（'+stageName(h.grade)+' · '+stageTask(h.grade)+'）</h4>'+cards+'</div>'+
   '<div class="sec"><h4>執行行動清單（依軸線 A/B/C/D）</h4><table class="rtable"><tr><th>軸線</th><th>動作</th><th>說明</th></tr>'+actRows+'</table></div>'+
   '<div class="sec"><h4>動態調整（PDCA）</h4><div class="muted">計畫(Plan) → 行動(Do) → 確認(Check) → 調整(Act)，每年至少檢視一次。<br>下次檢視日期：<b style="color:var(--amber2)">'+(esc(c.nextReview)||'尚未設定')+'</b></div></div>'+
   '<div class="sec"><h4>缺口總表</h4><table class="rtable">'+
@@ -2094,7 +2118,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  var hp=h.parts;
  return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>財務規劃報告書</h1></div>'+
   (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>')+'</div>'+
-  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務健康等級 <b style="color:'+(h.grade==='D'?'#e08a68':'#e0bd8b')+'">'+h.grade+'</b><span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>'+
+  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務階段 <b style="color:#e0bd8b">'+stageName(h.grade)+'</b><span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>'+
 
   '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px"><b style="color:#0d2b45">目錄</b><ol style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
    ['財務健康總覽','收支與資產結構','現況財務指標','財務目標歷程','退休與教育需求','風險保障缺口','現金流投影與機率','稅賦分析','投資風險屬性與建議配置','規劃前／後對照','規劃執行建議','執行行動清單','動態調整（PDCA）','注意事項'].map(function(t){return '<li>'+t+'</li>'}).join('')+'</ol></div>'+
@@ -2102,7 +2126,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<h2>一、財務健康總覽</h2>'+
   '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+rGauge('財務安全度',h.safety)+rGauge('財務自由度',h.freedom)+rGauge('願景達成度',h.vision)+'</div>'+
   '<div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:1;min-width:230px">'+rBars([{label:'收支平衡',val:hp['收支平衡']},{label:'預備金',val:hp['預備金']},{label:'信用',val:hp['信用']},{label:'負債平衡',val:hp['負債平衡']},{label:'風險保全',val:hp['風險保全'],color:'#c99a5b'}])+'</div>'+
-   '<div style="min-width:150px;text-align:center"><div style="color:#5a6b72;font-size:12px">評鑑等級</div><div style="font-size:46px;font-weight:800;color:'+(h.grade==='A'?'#6f8f74':h.grade==='D'?'#b05a4a':'#c99a5b')+'">'+h.grade+'</div><div style="font-size:12px;color:#33474e">'+GRADE_STRAT[h.grade]+'</div></div></div>'+
+   '<div style="min-width:172px;text-align:center"><div style="color:#5a6b72;font-size:12px">財務階段</div><div style="font-size:30px;font-weight:800;letter-spacing:.04em;margin:4px 0 2px;color:'+stageColor(h.grade,1)+'">'+stageName(h.grade)+'</div><div style="font-size:12px;color:#33474e;line-height:1.6">'+stageTask(h.grade)+'</div><div style="font-size:11px;color:#5a6b72;margin-top:4px">'+stageReason(h)+'</div></div></div>'+
   '<table style="margin-top:12px"><tr><th>成員</th><th>稱謂</th><th>年齡</th><th>家計負擔</th></tr>'+(memRows||'<tr><td colspan=4>—</td></tr>')+'</table>'+
   '<table style="margin-top:8px">'+
    '<tr><td>工作類別</td><td>'+esc(p.jobType||'一般就業者')+((p.jobType==='企業主'&&(c.company||{}).name)?'（'+esc(c.company.name)+'）':'')+'</td></tr>'+
@@ -2155,12 +2179,12 @@ function clientView(){var c=activeCase();if(!c)return '<div style="padding:60px;
  var tb=[['analysis','我的財務儀表'],['report','我的規劃報告']].map(function(t){return '<button data-tab="'+t[0]+'" class="'+(view===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('');
  var body;
  if(view==='report')body=reportHTML(c);
- else{var kp=[['淨資產',fmt(m.net)],['財務健康等級',h.grade],['退休缺口',fmt(rn.gap)],['資產轉負',proj.turnNeg?proj.turnNeg+' 歲':'無']]
+ else{var kp=[['淨資產',fmt(m.net)],['財務階段',stageName(h.grade)],['退休缺口',fmt(rn.gap)],['資產轉負',proj.turnNeg?proj.turnNeg+' 歲':'無']]
    .map(function(k){return '<div class="kpi"><div class="lb">'+k[0]+'</div><div class="vv">'+k[1]+'</div></div>'}).join('');
   var gau=[['財務安全度',h.safety],['財務自由度',h.freedom],['願景達成度',h.vision]].map(function(g){return gauge(g[0],g[1])}).join('');
   var rtC=function(s){return s==='good'?'var(--ok)':s==='warn'?'var(--amber2)':s==='bad'?'var(--warn)':'var(--mut)'};
   var rt=Object.keys(r).map(function(k){var x=r[k];return '<tr><td class="k">'+k+'</td><td style="color:'+rtC(x.status)+';font-weight:800">'+x.v+'</td><td class="muted" style="font-size:12px">'+x.ideal+'</td></tr>'}).join('');
-  body='<div class="hero2"><div class="k">MY FINANCIAL DASHBOARD</div><h1>'+esc(c.profile.name)+'，您好</h1><div class="muted">您目前的財務健康等級 <b style="color:'+gradeColor(h.grade)+'">'+h.grade+'</b>。</div></div>'+
+  body='<div class="hero2"><div class="k">MY FINANCIAL DASHBOARD</div><h1>'+esc(c.profile.name)+'，您好</h1><div class="muted">您目前在 <b style="color:'+stageColor(h.grade)+'">'+stageName(h.grade)+'</b>——'+stageTask(h.grade)+'。<div style="font-size:12px;margin-top:5px;opacity:.85">'+stageReason(h)+'</div></div></div>'+
    '<div class="kpis">'+kp+'</div><div class="sec"><h4>財務健康度</h4><div class="gauges">'+gau+'</div></div>'+
    '<div class="sec"><h4>我的財務指標</h4><table class="rtable">'+rt+'</table></div>'+
    cashflowCharts(proj);}

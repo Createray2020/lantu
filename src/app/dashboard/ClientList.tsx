@@ -7,13 +7,14 @@ import type { ClientListItem } from "@/lib/clients";
 import { createClientAction } from "./actions";
 import {
   fmtMoney,
-  gradeColor,
+  stageColor,
+  stageName,
   STATUS_LABEL,
   PLAN_STATUS_LABEL,
   CLIENT_SOURCES,
 } from "./format";
 
-type SortKey = "updated" | "next" | "net" | "grade";
+type SortKey = "updated" | "next" | "net" | "stage";
 
 export default function ClientList({ clients }: { clients: ClientListItem[] }) {
   const router = useRouter();
@@ -39,10 +40,11 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
       }
       return true;
     });
-    const gr2n = (g: string | null | undefined) => ({ A: 4, B: 3, C: 2, D: 1 } as Record<string, number>)[g ?? ""] ?? 0;
+    // 階段序：整裝 → 啟程 → 前行 → 遠行；未評估排最後。非優劣排序，是「誰先需要陪伴」。
+    const stageRank = (g: string | null | undefined) => ({ D: 1, C: 2, B: 3, A: 4 } as Record<string, number>)[g ?? ""] ?? 9;
     r = [...r].sort((a, b) => {
       if (sort === "net") return (b.latestPlan?.netWorth ?? -1) - (a.latestPlan?.netWorth ?? -1);
-      if (sort === "grade") return gr2n(b.latestPlan?.healthGrade) - gr2n(a.latestPlan?.healthGrade);
+      if (sort === "stage") return stageRank(a.latestPlan?.healthGrade) - stageRank(b.latestPlan?.healthGrade);
       if (sort === "next") {
         const av = a.nextAppt ?? "9999";
         const bv = b.nextAppt ?? "9999";
@@ -94,7 +96,7 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
           <option value="updated">最近更新</option>
           <option value="next">下次預約</option>
           <option value="net">淨值高→低</option>
-          <option value="grade">等級高→低</option>
+          <option value="stage">階段（整裝期優先）</option>
         </select>
       </div>
 
@@ -105,10 +107,10 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
         </div>
       ) : (
         <div className="grid gap-2">
-          <div className="hidden md:grid grid-cols-[1.6fr_1fr_0.8fr_1fr_1fr_0.8fr] gap-3 px-3 text-[11px] uppercase tracking-wider text-[#6b7d8f]">
+          <div className="hidden md:grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-3 text-[11px] uppercase tracking-wider text-[#6b7d8f]">
             <div>客戶</div>
             <div>最新版本</div>
-            <div>等級</div>
+            <div>財務階段</div>
             <div>淨值</div>
             <div>上次／下次諮詢</div>
             <div>狀態</div>
@@ -117,7 +119,7 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
             <Link
               key={c.id}
               href={`/dashboard/clients/${c.id}`}
-              className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_0.8fr_1fr_1fr_0.8fr] gap-3 items-center bg-[#0c2135] hover:bg-[#123049] border border-white/10 rounded-lg px-3 py-3 transition"
+              className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 items-center bg-[#0c2135] hover:bg-[#123049] border border-white/10 rounded-lg px-3 py-3 transition"
             >
               <div className="col-span-2 md:col-span-1">
                 <div className="font-bold">{c.name}</div>
@@ -138,8 +140,8 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
                   <span className="text-[#6b7d8f]">—</span>
                 )}
               </div>
-              <div className="font-extrabold" style={{ color: gradeColor(c.latestPlan?.healthGrade) }}>
-                {c.latestPlan?.healthGrade ?? "—"}
+              <div className="text-[12px] font-bold" style={{ color: stageColor(c.latestPlan?.healthGrade) }}>
+                {c.latestPlan ? stageName(c.latestPlan.healthGrade) : "—"}
               </div>
               <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(c.latestPlan?.netWorth ?? null)}</div>
               <div className="text-[12px] text-[#a9bccf]">

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import { getCoachDashboard } from "@/lib/dashboard";
 import DashboardHeader from "../DashboardHeader";
-import { STATUS_LABEL, REVIEW_TYPE_LABEL, gradeColor } from "../format";
+import { STATUS_LABEL, REVIEW_TYPE_LABEL, STAGE_LABEL, STAGE_ORDER, stageColor } from "../format";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +99,8 @@ export default async function OverviewPage() {
           <h2 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">客戶分佈</h2>
           <div className="grid md:grid-cols-2 gap-4">
             <Dist title="狀態" data={d.byStatus} labelMap={STATUS_LABEL} />
-            <Dist title="健康等級" data={d.byGrade} gradeColored />
+            <Dist title="客群階段分佈" data={d.byGrade} labelMap={STAGE_LABEL} stageColored
+              note="反映客群結構，非服務品質指標" />
           </div>
         </section>
       </div>
@@ -107,8 +108,11 @@ export default async function OverviewPage() {
   );
 }
 
-function Dist({ title, data, labelMap, gradeColored }: { title: string; data: Record<string, number>; labelMap?: Record<string, string>; gradeColored?: boolean }) {
-  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+function Dist({ title, data, labelMap, stageColored, note }: { title: string; data: Record<string, number>; labelMap?: Record<string, string>; stageColored?: boolean; note?: string }) {
+  // 階段分佈固定照旅程順序（整裝 → 遠行），不依人數排序，避免讀成排行榜。
+  const order = stageColored ? [...STAGE_ORDER as readonly string[], "未評"] : null;
+  const entries = Object.entries(data).sort((a, b) =>
+    order ? order.indexOf(a[0]) - order.indexOf(b[0]) : b[1] - a[1]);
   const max = Math.max(1, ...entries.map(([, v]) => v));
   return (
     <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3">
@@ -117,15 +121,16 @@ function Dist({ title, data, labelMap, gradeColored }: { title: string; data: Re
         <div className="grid gap-1.5">
           {entries.map(([k, v]) => (
             <div key={k} className="flex items-center gap-2 text-sm">
-              <span className="w-16 text-[12px] truncate" style={gradeColored ? { color: gradeColor(k), fontWeight: 700 } : undefined}>{labelMap?.[k] ?? k}</span>
+              <span className="w-16 text-[12px] truncate" style={stageColored ? { color: stageColor(k), fontWeight: 700 } : undefined}>{labelMap?.[k] ?? k}</span>
               <div className="flex-1 h-2 rounded bg-[#0a1a2b] overflow-hidden">
-                <div className="h-full rounded" style={{ width: `${(v / max) * 100}%`, background: gradeColored ? gradeColor(k) : "#c99a5b" }} />
+                <div className="h-full rounded" style={{ width: `${(v / max) * 100}%`, background: stageColored ? stageColor(k) : "#c99a5b" }} />
               </div>
               <span className="w-6 text-right text-[12px] text-[#a9bccf]">{v}</span>
             </div>
           ))}
         </div>
       )}
+      {note && <div className="text-[11px] text-[#6b7d8f] mt-2">{note}</div>}
     </div>
   );
 }

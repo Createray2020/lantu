@@ -18,7 +18,9 @@ import {
 } from "../../actions";
 import {
   fmtMoney,
-  gradeColor,
+  stageColor,
+  stageName,
+  stageTask,
   STATUS_LABEL,
   PLAN_STATUS_LABEL,
   REVIEW_TYPE_LABEL,
@@ -226,9 +228,9 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
   return (
     <div className="grid gap-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card label="最新等級">
+        <Card label="財務階段">
           <div className="flex items-end gap-2">
-            <span className="text-4xl font-extrabold leading-none" style={{ color: gradeColor(latest?.healthGrade) }}>{latest?.healthGrade ?? "—"}</span>
+            <span className="text-2xl font-extrabold leading-none tracking-wide" style={{ color: stageColor(latest?.healthGrade) }} title={stageTask(latest?.healthGrade)}>{latest ? stageName(latest.healthGrade) : "—"}</span>
             {latestCmp && (
               <span className="text-[11px] text-[#6b7d8f] leading-tight">安 {latestCmp.safety ?? "—"}<br />由 {latestCmp.freedom ?? "—"} · 願 {latestCmp.vision ?? "—"}</span>
             )}
@@ -286,7 +288,7 @@ function Plans({ plans, compare, pending, onOpen, onClone, onNew, onStatus, onDe
   onStatus: (id: string, status: string) => void; onDelete: (id: string) => void;
 }) {
   const rows: { key: string; label: string; fmt: (c: Compare) => string; color?: (c: Compare) => string }[] = [
-    { key: "grade", label: "等級", fmt: (c) => c.grade ?? "—", color: (c) => gradeColor(c.grade) },
+    { key: "grade", label: "財務階段", fmt: (c) => (c.grade ? stageName(c.grade) : "—"), color: (c) => stageColor(c.grade) },
     { key: "net", label: "淨值", fmt: (c) => fmtMoney(c.net) },
     { key: "assetTotal", label: "總資產", fmt: (c) => fmtMoney(c.assetTotal) },
     { key: "debtTotal", label: "總負債", fmt: (c) => fmtMoney(c.debtTotal) },
@@ -314,7 +316,7 @@ function Plans({ plans, compare, pending, onOpen, onClone, onNew, onStatus, onDe
               <div className="text-lg font-bold">{p.year}</div>
               {idx === 0 && <div className="text-[10px] text-[#7bbf6a]">最新</div>}
             </div>
-            <div className="font-extrabold text-xl w-8 text-center" style={{ color: gradeColor(p.healthGrade) }}>{p.healthGrade ?? "—"}</div>
+            <div className="text-[12px] font-bold w-16 text-center" style={{ color: stageColor(p.healthGrade) }}>{stageName(p.healthGrade)}</div>
             <div className="text-sm tabular-nums w-28">{fmtMoney(p.netWorth)}</div>
             <div className="text-[11px] text-[#6b7d8f] flex-1 min-w-[120px]">{p.label} · 依據 {p.basedOnDate ?? "—"} · 更新 {p.updatedAt ?? "—"}</div>
             <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} className="bg-[#0a1a2b] border border-white/15 rounded-md text-xs px-2 py-1.5 text-[#a9bccf]">
