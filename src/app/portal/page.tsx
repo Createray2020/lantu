@@ -71,7 +71,10 @@ export default async function Portal() {
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
-              <Link href="/portal/setup" className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg text-sm">
+              <Link href="/portal/plan" className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg text-sm">
+                查看我的完整財務藍圖
+              </Link>
+              <Link href="/portal/setup" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
                 補資料 · 看缺口 · 選教練
               </Link>
               <Link href="/portal/passport" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">

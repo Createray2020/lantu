@@ -144,3 +144,14 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
   c.setup = { basics, cross, savedAt: new Date().toISOString() };
   await db.update(plans).set({ data: c, updatedAt: new Date() }).where(eq(plans.id, plan.id));
 }
+
+// 取客戶自己 plan 的完整 case（餵給 lantu-app.html 客戶端唯讀檢視）。
+export async function getClientPlanCase(clientUserId: string): Promise<{ planId: string; data: unknown } | null> {
+  const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
+  const client = cRows[0];
+  if (!client) return null;
+  const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
+  const plan = pRows[0];
+  if (!plan) return null;
+  return { planId: plan.id, data: plan.data };
+}

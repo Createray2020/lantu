@@ -2172,16 +2172,19 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
 (function(){
   var EMBED=/[?&]embed=1/.test(location.search);
   if(!EMBED){load();render();return;}
+  // role=client → 客戶端唯讀檢視（財務儀表／規劃報告）；否則教練端編輯。
+  var CLIENT=/[?&]role=client/.test(location.search);
   document.documentElement.classList.add('embed');
+  if(CLIENT){var _rs=document.getElementById('roleSw');if(_rs)_rs.style.display='none';}
   document.querySelectorAll('.top .tbtn').forEach(function(b){if(/匯出|匯入/.test(b.textContent||''))b.style.display='none';});
-  // embed：save() 不寫 localStorage，改把整份 case 回傳父層（父層存回 DB）
-  save=function(){try{if(app.cases&&app.cases[0])parent.postMessage({type:'lantu:save',data:app.cases[0]},'*');}catch(e){}};
+  // embed：save() 不寫 localStorage，改把整份 case 回傳父層（父層存回 DB）；客戶唯讀不回存。
+  save=function(){try{if(!CLIENT&&app.cases&&app.cases[0])parent.postMessage({type:'lantu:save',data:app.cases[0]},'*');}catch(e){}};
   var inited=false;
   window.addEventListener('message',function(e){
     if(e.source!==parent)return;
     var m=e.data;if(!m||m.type!=='lantu:init')return;
     var c=m.data||{};if(!c.id)c.id=uid();
-    app.cases=[c];app.activeId=c.id;app.role='coach';app.activeTab='data';
+    app.cases=[c];app.activeId=c.id;app.role=CLIENT?'client':'coach';app.activeTab=CLIENT?'analysis':'data';
     inited=true;render();
   });
   try{parent.postMessage({type:'lantu:ready'},'*');}catch(e){}
