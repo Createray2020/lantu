@@ -187,3 +187,21 @@ export const FACES: { key: keyof PassportInputs; label: string; icon: string }[]
 // 顯示輔助
 export const wan = (nt: number) => Math.round(nt / 10000); // 元→萬（整數）
 export const ntfmt = (nt: number) => Math.round(nt || 0).toLocaleString("en-US");
+
+// ---------- 現況十字表 → 缺口 / 願景達成率 ----------
+export type CrossInputs = { income: number; expense: number; assets: number; liabilities: number }; // 月收入/月支出/總資產/總負債（元）
+export type GapResult = {
+  monthlyNeed: number; // 每月應存（人生護照）
+  monthlyCapacity: number; // 每月可存＝月收入−月支出
+  monthlyGap: number; // 每月缺口
+  achieveRate: number; // 願景達成率 0~1
+  netWorth: number; // 淨資產＝資產−負債
+};
+export function computeGap(monthlyNeedWan: number, cross: CrossInputs): GapResult {
+  const monthlyNeed = monthlyNeedWan * 10000;
+  const monthlyCapacity = Math.max(0, num(cross.income) - num(cross.expense));
+  const monthlyGap = Math.max(0, monthlyNeed - monthlyCapacity);
+  const achieveRate = monthlyNeed > 0 ? Math.min(1, monthlyCapacity / monthlyNeed) : 1;
+  const netWorth = num(cross.assets) - num(cross.liabilities);
+  return { monthlyNeed, monthlyCapacity, monthlyGap, achieveRate, netWorth };
+}

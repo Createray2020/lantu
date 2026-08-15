@@ -71,6 +71,9 @@ export default async function Portal() {
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+              <Link href="/portal/setup" className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg text-sm">
+                補資料 · 看缺口 · 選教練
+              </Link>
               <Link href="/portal/passport" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
                 重新調整人生護照
               </Link>
@@ -78,12 +81,12 @@ export default async function Portal() {
 
             <div className="rounded-xl border border-[#c99a5b]/30 bg-[#0d2b45]/50 p-5 text-center">
               <div className="inline-flex items-center gap-2 text-sm text-[#e0bd8b] mb-2">
-                <span className="w-2 h-2 rounded-full bg-[#c99a5b] animate-pulse" />
-                下一步：連結你的專屬教練
+                <span className="w-2 h-2 rounded-full bg-[#c99a5b]" />
+                下一步：補完現況、選一位教練
               </div>
               <p className="text-[#a7bacb] text-sm leading-relaxed">
-                你的規劃基礎已建立。掛上信任的財務教練、經你授權後，
-                就能一起把這份基礎深化成完整的財務規劃。（教練連結即將開放）
+                填上基本資料與財務現況，看你的缺口與願景達成率；
+                再選一位教練送出連結邀請，對方接受後就能一起把規劃做深。
               </p>
             </div>
           </div>

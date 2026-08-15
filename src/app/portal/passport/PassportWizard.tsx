@@ -144,7 +144,7 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
       ])) as Awaited<ReturnType<typeof savePassportAction>>;
       if (res.ok) {
         setStatus("success");
-        router.push("/portal");
+        router.push("/portal/setup");
         router.refresh();
       } else {
         setStatus("error");

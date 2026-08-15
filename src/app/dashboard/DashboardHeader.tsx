@@ -11,9 +11,11 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
   const onHome = pathname === "/dashboard";
   const onClients = pathname.startsWith("/dashboard/clients");
   const onOverview = pathname.startsWith("/dashboard/overview");
+  const onRequests = pathname.startsWith("/dashboard/requests");
 
   // 全組織品牌 Logo：有上傳就換掉預設標記（保留「嵐途」文字）。
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [pending, setPending] = useState(0);
   useEffect(() => {
     let alive = true;
     fetch("/api/brand", { cache: "no-store" })
@@ -22,10 +24,16 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
         if (alive && b?.logoUrl) setLogoUrl(b.logoUrl as string);
       })
       .catch(() => {});
+    fetch("/api/pending-links", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && typeof d?.count === "number") setPending(d.count);
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
-  }, []);
+  }, [pathname]);
 
   const tab = (active: boolean) =>
     `px-3 py-1.5 rounded-md text-sm font-bold transition ${
@@ -50,6 +58,14 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
         <Link href="/dashboard" className={tab(onHome)}>首頁</Link>
         <Link href="/dashboard/clients" className={tab(onClients)}>客戶</Link>
         <Link href="/dashboard/overview" className={tab(onOverview)}>儀表板</Link>
+        <Link href="/dashboard/requests" className={`${tab(onRequests)} relative`}>
+          客戶連結
+          {pending > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#e5484d] text-white text-[10px] font-bold grid place-items-center">
+              {pending}
+            </span>
+          )}
+        </Link>
       </nav>
       <div className="flex-1" />
       <Link

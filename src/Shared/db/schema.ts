@@ -57,6 +57,19 @@ export const clients = pgTable('clients', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// 客戶↔教練 連結申請（雙向確認）：客戶端「選擇教練」送出 → 教練端「接受」才把 clients.coachId 設上。
+// status: pending（待教練接受）/ accepted（已掛上）/ rejected（教練婉拒）
+export const coachLinkRequests = pgTable('coach_link_requests', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientUserId: text('client_user_id').notNull().references(() => clientUsers.id, { onDelete: 'cascade' }),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  status: text('status').default('pending').notNull(),
+  note: text('note'), // 客戶留言（選填）
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  respondedAt: timestamp('responded_at', { withTimezone: true }),
+});
+
 // 年度版本（每年重製一份完整規劃；整份案件存 data jsonb）
 export const plans = pgTable('plans', {
   id: uuid('id').defaultRandom().primaryKey(),

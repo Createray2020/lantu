@@ -4,7 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
 import { newCase } from "@/lib/engine";
-import { computePassport, type PassportInputs, type PassportResult } from "@/lib/passport";
+import { computePassport, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
 import type { ClientUser } from "@/lib/clientUser";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -94,4 +94,53 @@ export async function savePassport(user: ClientUser, inputs: PassportInputs): Pr
     await db.insert(plans).values({ clientId, year: new Date().getFullYear(), label: "人生護照", status: "draft", data });
   }
   return data.passport.result as PassportResult;
+}
+
+// ---------- 基本資料 ＋ 財務現況十字表（後續補完，寫進同一份 plan） ----------
+export type ClientBasics = {
+  name: string; birth: string; gender: string; phone: string; email: string; marital: string; dependents: number;
+};
+
+export async function getClientSetup(clientUserId: string): Promise<{ basics: ClientBasics | null; cross: CrossInputs | null }> {
+  const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
+  const client = cRows[0];
+  if (!client) return { basics: null, cross: null };
+  const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
+  const data = pRows[0]?.data as any;
+  return { basics: data?.setup?.basics ?? null, cross: data?.setup?.cross ?? null };
+}
+
+// 存基本資料＋十字表：更新 clients 本體與 plan.data（收支資債彙總進 case，供引擎與教練接手用）。
+export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cross: CrossInputs): Promise<void> {
+  const cRows = await db.select().from(clients).where(eq(clients.clientUserId, user.id)).limit(1);
+  const client = cRows[0];
+  if (!client) throw new Error("請先完成人生護照");
+
+  await db.update(clients).set({
+    name: basics.name || client.name,
+    birthDate: basics.birth || null,
+    contact: { phone: basics.phone || undefined, email: basics.email || undefined },
+    updatedAt: new Date(),
+  }).where(eq(clients.id, client.id));
+
+  const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
+  const plan = pRows[0];
+  if (!plan) throw new Error("找不到規劃");
+  const c: any = plan.data || {};
+  c.profile = c.profile || {};
+  c.profile.name = basics.name || c.profile.name;
+  c.profile.gender = basics.gender || c.profile.gender;
+  if (basics.birth) { const by = parseInt(basics.birth.slice(0, 4), 10); if (by) c.profile.age = new Date().getFullYear() - by; }
+  c.profile.marital = basics.marital || c.profile.marital;
+  c.profile.dependents = num(basics.dependents);
+
+  const inc = num(cross.income), exp = num(cross.expense), ast = num(cross.assets), lia = num(cross.liabilities);
+  const age = num(c.profile.age) || 30, retireAge = num(c.profile.retireAge) || 65, lifeExp = num(c.profile.lifeExp) || 85;
+  const who = basics.name || "本人";
+  c.incomes = inc > 0 ? [{ owner: who, type: "工作", amount: inc * 12, growth: 2, start: age, end: retireAge }] : [];
+  c.expenses = exp > 0 ? [{ name: "生活支出", cat: "生活", amount: exp * 12, infl: true, start: age, end: lifeExp, cut: 0 }] : [];
+  c.assets = ast > 0 ? [{ name: "總資產", owner: who, mainCat: "可投資資產", type: "現金", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: ast, value: ast, ret: 1, income: 0, movable: true }] : [];
+  c.liabilities = lia > 0 ? [{ name: "總負債", owner: who, mainCat: "其他", currency: "台幣", fxRate: 1, balance: lia, rate: 2, repay: "本息攤還", pay: 0, months: 240, grace: 0, startAge: age }] : [];
+  c.setup = { basics, cross, savedAt: new Date().toISOString() };
+  await db.update(plans).set({ data: c, updatedAt: new Date() }).where(eq(plans.id, plan.id));
 }

@@ -43,6 +43,13 @@
       "when": 1786731302858,
       "tag": "0005_dazzling_captain_midlands",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786742716936,
+      "tag": "0006_spooky_puppet_master",
+      "breakpoints": true
     }
   ]
 }
