@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   computePassport, emptyPassport, BASE_YEAR, ntfmt, wan,
@@ -124,7 +123,6 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
   const [p, setP] = useState<PassportInputs>(initial ?? emptyPassport());
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errMsg, setErrMsg] = useState<string | null>(null);
-  const router = useRouter();
   const m = useMemo(() => computePassport(p), [p]);
 
   function set<K extends keyof PassportInputs>(face: K, key: keyof PassportInputs[K], v: number) {
@@ -144,8 +142,8 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
       ])) as Awaited<ReturnType<typeof savePassportAction>>;
       if (res.ok) {
         setStatus("success");
-        router.push("/portal/setup");
-        router.refresh();
+        // 硬導頁到下一步（比 router.push+refresh 穩，避免導頁被當前頁重刷蓋掉）。
+        window.location.href = "/portal/setup";
       } else {
         setStatus("error");
         setErrMsg(res.error || "儲存失敗，請重試");
