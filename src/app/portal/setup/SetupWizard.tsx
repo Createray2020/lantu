@@ -5,7 +5,7 @@ import Link from "next/link";
 import { computeGap, ntfmt, wan, type CrossInputs } from "@/lib/passport";
 import type { ClientBasics } from "@/lib/clientPlan";
 import type { ActiveCoach, LinkStatus } from "@/lib/coachLink";
-import { saveSetupAction, requestCoachAction } from "./actions";
+import { saveSetupAction, requestCoachAction, revokeCoachAction } from "./actions";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -65,6 +65,16 @@ export default function SetupWizard({
         setReqStatus("idle");
       } else { setReqStatus("error"); setReqErr(res.error || "送出失敗"); }
     } catch (e) { setReqStatus("error"); setReqErr(e instanceof Error ? e.message : "送出失敗"); }
+  }
+
+  async function onRevoke() {
+    if (!confirm("確定要解除與教練的連結嗎？")) return;
+    setReqStatus("sending"); setReqErr(null);
+    try {
+      const res = await revokeCoachAction();
+      if (res.ok) { setLocalLink({ state: "none" }); setSelCoach(""); setReqStatus("idle"); }
+      else { setReqStatus("error"); setReqErr(res.error || "解除失敗"); }
+    } catch (e) { setReqStatus("error"); setReqErr(e instanceof Error ? e.message : "解除失敗"); }
   }
 
   const numVal = (n: number) => (n === 0 ? "" : n);
@@ -149,7 +159,14 @@ export default function SetupWizard({
       <section className="rounded-2xl bg-[#12334f] border border-white/8 p-5 sm:p-6 mb-16">
         <h2 className="font-serif text-lg mb-1">🤝 選擇你的教練</h2>
         {localLink.state === "linked" ? (
-          <p className="text-[#7bd88f] text-sm mt-3">✓ 你已連結教練{localLink.coachName ? `：${localLink.coachName}` : ""}。你們現在可以一起規劃了。</p>
+          <div className="mt-3">
+            <p className="text-[#7bd88f] text-sm">✓ 你已連結教練{localLink.coachName ? `：${localLink.coachName}` : ""}。你們現在可以一起規劃了。</p>
+            <button onClick={onRevoke} disabled={reqStatus === "sending"}
+              className="mt-3 text-[#ff9b9b] hover:text-[#ffb4a2] text-sm border border-[#ff9b9b]/30 rounded-lg px-4 py-2 disabled:opacity-50">
+              解除與教練的連結
+            </button>
+            {reqStatus === "error" && <span className="ml-3 text-[#ff9b9b] text-sm">⚠ {reqErr}</span>}
+          </div>
         ) : localLink.state === "pending" ? (
           <div className="mt-3 rounded-lg border border-[#c99a5b]/30 bg-[#0d2b45]/50 p-4">
             <div className="text-[#e0bd8b] text-sm">⏳ 已送出連結申請{localLink.coachName ? `給 ${localLink.coachName}` : ""}，等待教練接受。</div>

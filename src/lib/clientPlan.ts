@@ -5,6 +5,7 @@ import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
 import { newCase } from "@/lib/engine";
 import { computePassport, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
+import { logRevision } from "@/lib/revisions";
 import type { ClientUser } from "@/lib/clientUser";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -88,11 +89,15 @@ export async function savePassport(user: ClientUser, inputs: PassportInputs): Pr
 
   const data = buildCase(inputs, name);
   const existingPlan = await db.select({ id: plans.id }).from(plans).where(eq(plans.clientId, clientId)).limit(1);
+  let planId: string;
   if (existingPlan[0]) {
-    await db.update(plans).set({ data, updatedAt: new Date() }).where(eq(plans.id, existingPlan[0].id));
+    planId = existingPlan[0].id;
+    await db.update(plans).set({ data, updatedAt: new Date() }).where(eq(plans.id, planId));
   } else {
-    await db.insert(plans).values({ clientId, year: new Date().getFullYear(), label: "人生護照", status: "draft", data });
+    const ins = await db.insert(plans).values({ clientId, year: new Date().getFullYear(), label: "人生護照", status: "draft", data }).returning({ id: plans.id });
+    planId = ins[0].id;
   }
+  await logRevision(planId, "client", user.id, user.name, data);
   return data.passport.result as PassportResult;
 }
 
@@ -143,6 +148,7 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
   c.liabilities = lia > 0 ? [{ name: "總負債", owner: who, mainCat: "其他", currency: "台幣", fxRate: 1, balance: lia, rate: 2, repay: "本息攤還", pay: 0, months: 240, grace: 0, startAge: age }] : [];
   c.setup = { basics, cross, savedAt: new Date().toISOString() };
   await db.update(plans).set({ data: c, updatedAt: new Date() }).where(eq(plans.id, plan.id));
+  await logRevision(plan.id, "client", user.id, user.name, c);
 }
 
 // 取客戶自己 plan 的完整 case（餵給 lantu-app.html 客戶端唯讀檢視）。

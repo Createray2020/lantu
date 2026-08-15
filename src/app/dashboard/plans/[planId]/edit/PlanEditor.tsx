@@ -83,6 +83,7 @@ export default function PlanEditor({
         </Link>
         <span className="text-sm font-bold">{year} 年度版本{label ? ` · ${label}` : ""}</span>
         <div className="flex-1" />
+        <Link href={`/dashboard/plans/${planId}/history`} className="text-xs text-[#a9bccf] hover:text-[#eef2f7] mr-3">版本紀錄</Link>
         <span className={"text-xs " + (state === "error" ? "text-[#d9773f]" : state === "saved" ? "text-[#7bbf6a]" : "text-[#6b7d8f]")}>
           {statusText[state]}
         </span>

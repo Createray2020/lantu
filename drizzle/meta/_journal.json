@@ -50,6 +50,13 @@
       "when": 1786742716936,
       "tag": "0006_spooky_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786814007289,
+      "tag": "0007_useful_trish_tilby",
+      "breakpoints": true
     }
   ]
 }

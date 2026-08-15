@@ -184,3 +184,25 @@ export const orgSettings = pgTable('org_settings', {
   reportFooter: text('report_footer'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// 編輯版本快照：plan 每次存檔存一版，標記編輯者（教練/客戶）。共用一份、版本歷史取代鎖定。
+export const planRevisions = pgTable('plan_revisions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  planId: uuid('plan_id').notNull().references(() => plans.id, { onDelete: 'cascade' }),
+  editorType: text('editor_type').notNull(), // coach / client
+  editorId: text('editor_id'),
+  editorName: text('editor_name'),
+  data: jsonb('data').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 教練反向邀請：教練產生邀請碼/連結，客戶開啟即掛到該教練（教練主動＝視同已同意）。
+export const coachInvites = pgTable('coach_invites', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  code: text('code').notNull().unique(),
+  note: text('note'),
+  usedByClientUserId: text('used_by_client_user_id').references(() => clientUsers.id, { onDelete: 'set null' }),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});

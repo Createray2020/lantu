@@ -4,6 +4,7 @@ import { ensureCoach } from "@/lib/coach";
 import { listPendingRequestsForCoach } from "@/lib/coachLink";
 import DashboardHeader from "../DashboardHeader";
 import RequestList from "./RequestList";
+import InviteBox from "./InviteBox";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,9 @@ export default async function RequestsPage() {
         <h1 className="font-serif text-2xl mb-1">客戶連結申請</h1>
         <p className="text-[#a7bacb] text-sm mb-5">客戶從人生護照送出的連結邀請；接受後對方就掛到你名下、可一起規劃。</p>
         <RequestList requests={requests.map((r) => ({ id: r.id, clientId: r.clientId, clientName: r.clientName, note: r.note }))} />
+        <div className="mt-8 pt-6 border-t border-white/10">
+          <InviteBox />
+        </div>
       </div>
     </div>
   );

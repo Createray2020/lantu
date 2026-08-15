@@ -6,6 +6,7 @@ import { ensureCoach } from "@/lib/coach";
 import * as Clients from "@/lib/clients";
 import * as Plans from "@/lib/plans";
 import * as Reviews from "@/lib/reviews";
+import { logRevision } from "@/lib/revisions";
 
 async function coachId(): Promise<string> {
   const me = await ensureCoach();
@@ -41,8 +42,10 @@ export async function archiveClientAction(clientId: string): Promise<void> {
 
 // ── 年度版本 ─────────────────────────────────────────
 export async function savePlanDataAction(planId: string, data: unknown): Promise<{ netWorth: number | null; healthGrade: string | null }> {
-  const cid = await coachId();
-  const snap = await Plans.updatePlanData(cid, planId, data);
+  const me = await ensureCoach();
+  if (!me || me.status !== "active") throw new Error("forbidden");
+  const snap = await Plans.updatePlanData(me.id, planId, data);
+  await logRevision(planId, "coach", me.id, me.name, data); // 存版本快照＋標作者
   return snap;
 }
 

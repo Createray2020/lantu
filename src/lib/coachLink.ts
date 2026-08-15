@@ -2,7 +2,7 @@
 // 客戶端「選擇教練」→ 建 pending 申請；教練端「接受」→ 設 clients.coachId、申請 accepted。
 import { and, eq, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clients, coaches, coachLinkRequests } from "@/Shared/db/schema";
+import { clients, coaches, coachLinkRequests, coachInvites } from "@/Shared/db/schema";
 import type { ClientUser } from "@/lib/clientUser";
 
 export type ActiveCoach = { id: string; name: string | null; title: string | null; orgRank: string };
@@ -93,4 +93,53 @@ export async function respondToLinkRequest(requestId: string, coachId: string, a
     await db.update(coachLinkRequests).set({ status: "rejected", respondedAt: new Date() }).where(eq(coachLinkRequests.id, requestId));
   }
   return { ok: true };
+}
+
+// 客戶解除與教練的連結（撤銷授權）：coachId 清空、已接受的申請標 revoked。
+export async function revokeClientLink(user: ClientUser): Promise<{ ok: boolean; error?: string }> {
+  const cRows = await db.select().from(clients).where(eq(clients.clientUserId, user.id)).limit(1);
+  const client = cRows[0];
+  if (!client || !client.coachId) return { ok: false, error: "目前沒有連結教練" };
+  await db.update(clients).set({ coachId: null, updatedAt: new Date() }).where(eq(clients.id, client.id));
+  await db.update(coachLinkRequests)
+    .set({ status: "revoked", respondedAt: new Date() })
+    .where(and(eq(coachLinkRequests.clientId, client.id), eq(coachLinkRequests.status, "accepted")));
+  return { ok: true };
+}
+
+// ── 教練反向邀請連結 ──────────────────────────────
+function genCode(): string {
+  return (Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6)).toLowerCase();
+}
+
+export async function createInvite(coachId: string, note?: string): Promise<{ code: string }> {
+  const code = genCode();
+  await db.insert(coachInvites).values({ coachId, code, note: note || null });
+  return { code };
+}
+
+export async function getInviteByCode(code: string): Promise<{ coachId: string; coachName: string | null; used: boolean } | null> {
+  const rows = await db.select({ coachId: coachInvites.coachId, usedAt: coachInvites.usedAt }).from(coachInvites).where(eq(coachInvites.code, code)).limit(1);
+  if (!rows[0]) return null;
+  const co = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, rows[0].coachId)).limit(1);
+  return { coachId: rows[0].coachId, coachName: co[0]?.name ?? null, used: !!rows[0].usedAt };
+}
+
+// 客戶開啟邀請 → 直接掛到該教練（教練主動＝視同同意）。
+export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok: boolean; error?: string; coachName?: string | null }> {
+  const inv = await getInviteByCode(code);
+  if (!inv) return { ok: false, error: "邀請連結無效或已失效" };
+  const cRows = await db.select().from(clients).where(eq(clients.clientUserId, user.id)).limit(1);
+  const client = cRows[0];
+  if (!client) return { ok: false, error: "請先完成人生護照，再用邀請連結掛教練" };
+  if (client.coachId) {
+    if (client.coachId === inv.coachId) return { ok: true, coachName: inv.coachName }; // 已連結同一位＝視同成功（可重複開）
+    return { ok: false, error: "你已連結其他教練，請先解除再用此連結" };
+  }
+  await db.update(clients).set({ coachId: inv.coachId, updatedAt: new Date() }).where(eq(clients.id, client.id));
+  await db.update(coachLinkRequests)
+    .set({ status: "rejected", respondedAt: new Date() })
+    .where(and(eq(coachLinkRequests.clientId, client.id), eq(coachLinkRequests.status, "pending")));
+  await db.update(coachInvites).set({ usedByClientUserId: user.id, usedAt: new Date() }).where(eq(coachInvites.code, code));
+  return { ok: true, coachName: inv.coachName };
 }
