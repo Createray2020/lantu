@@ -1472,8 +1472,9 @@ function docChecklistHTML(c){var d=c.docCheck||{};
    '<td><input value="'+esc(d[name+'_note']==null?'':d[name+'_note'])+'" onchange="setObj(\'docCheck\',\''+name+'_note\',this.value)"></td></tr>';}).join('');
  return '<table class="rtable"><tr><th>項目</th><th>數量</th><th>說明 / 備註</th></tr>'+rows+'</table>';}
 function intentSec(c){var it=c.intent||{};
- var lifeTbl=tableSec('人生財務目標清單','lifeGoals',c.lifeGoals||[],[['name','目標','text'],['priority','優先序','num'],['value','價值觀 / 重要原因','text'],['importance','重要程度1-5','num'],['linkModule','對應模組','sel:退休,教育,置產,購車,傳承,婚姻,創業,其他'],['note','備註','text']]);
- return '<div class="sec"><h4>人生財務目標清單 <span class="hint">自由填寫客戶「最在意的事」，帶價值觀與優先序；對應模組做軟連結，於報告呈現</span></h4><div class="hint" style="margin-bottom:6px">與下方勾選式目的/目標並用：這張清單捕捉「為什麼」，勾選捕捉「做什麼」。實際運算仍由各模組（退休/教育/置產…）負責。</div></div>'+lifeTbl+
+ var lifeTbl=tableSec('人生財務目標清單','lifeGoals',c.lifeGoals||[],[['name','目標','text'],['priority','優先序','num'],['value','價值觀 / 重要原因','text'],['importance','重要程度1-5','num'],['linkModule','對應模組','sel:退休,教育,置產,購車,傳承,婚姻,創業,其他'],['note','備註','text']],
+  '自由填寫客戶「最在意的事」與背後的價值觀；對應模組做軟連結，於報告呈現。這張清單捕捉「為什麼」，下方的人生目標捕捉「做什麼」，實際運算仍由各模組（退休/教育/置產…）負責。');
+ return lifeTbl+
   '<div class="sec"><h4>關注議題 <span class="owner">客戶填寫 · 教練可代填</span> <span class="hint">客戶於人生護照選的「這次想解決什麼」，不含有時間軸的人生目標；勾「人生模擬」＝目標全選</span></h4>'+chips('purposes',PURPOSES,it.purposes,'togglePurpose')+'</div>'+
   goalsSec(c)+
   (targetOn(c,'傳承規劃')
@@ -1954,7 +1955,7 @@ function trackingChartSVG(c){var proj=projection(c),rows=proj.rows;if(!rows.leng
   '<line id="tkCursor" x1="0" y1="'+pad+'" x2="0" y2="'+(H-pad)+'" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" style="display:none"/></svg>'+
   '<div class="muted" style="margin-top:6px">青線＝模擬淨資產走勢；黑點/線＝實際淨資產。差距越大代表實際與規劃偏離越多。</div>';
 }
-function tableSec(title,arr,list,cols){var c=activeCase();
+function tableSec(title,arr,list,cols,hint){var c=activeCase();
  var head='<tr>'+cols.map(function(cl){return '<th>'+cl[1]+'</th>'}).join('')+'<th></th></tr>';
  var rows=(list||[]).map(function(row,i){var tds=cols.map(function(cl){var k=cl[0],ty=cl[2],id=arr+':'+i;
    if(ty==='bool')return '<td><input type="checkbox" '+(row[k]?'checked':'')+' onchange="set(\''+id+'\',\''+k+'\',this.checked,\'bool\')"></td>';
@@ -1962,7 +1963,7 @@ function tableSec(title,arr,list,cols){var c=activeCase();
    if(ty&&ty.indexOf('sel:')===0){var opts=ty.slice(4).split(',').map(function(o){return '<option '+(row[k]===o?'selected':'')+'>'+o+'</option>'}).join('');return '<td><select onchange="set(\''+id+'\',\''+k+'\',this.value)">'+opts+'</select></td>'}
    return '<td><input '+(ty==='num'?'type="number"':'')+' value="'+esc(row[k])+'" onchange="set(\''+id+'\',\''+k+'\',this.value,\''+(ty==='num'?'num':'txt')+'\')"></td>';
   }).join('');return '<tr>'+tds+'<td><button class="del" onclick="delRow(\''+arr+'\','+i+')">✕</button></td></tr>';}).join('');
- return '<div class="sec"><h4>'+title+'<button class="add" onclick="addRow(\''+arr+'\')">＋ 新增</button></h4><table>'+head+(rows||'<tr><td colspan="12" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table></div>';
+ return '<div class="sec"><h4>'+title+'<button class="add" onclick="addRow(\''+arr+'\')">＋ 新增</button></h4>'+(hint?'<div class="hint" style="margin:-4px 0 9px">'+hint+'</div>':'')+'<table>'+head+(rows||'<tr><td colspan="12" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table></div>';
 }
 
 function financeNavHTML(){
@@ -2371,7 +2372,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
 
   '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px"><b style="color:#0d2b45">目錄</b><ol style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
    ['財務健康總覽','收支與資產結構','現況財務指標','財務目標歷程','退休與教育需求','風險保障缺口','現金流投影與機率','稅賦分析','投資風險屬性與建議配置','規劃前／後對照','規劃執行建議','執行行動清單','動態調整（PDCA）','注意事項'].map(function(t){return '<li>'+t+'</li>'}).join('')+'</ol></div>'+
-  (((c.lifeGoals||[]).length)?'<div style="margin:6px 0 4px;color:#5a6b72;font-size:13px">客戶最在意的事：'+(c.lifeGoals||[]).slice().sort(function(a,b){return n(a.priority)-n(b.priority)}).map(function(g){return esc(g.name)}).join('、')+'</div>':'')+
+
   '<h2>一、財務健康總覽</h2>'+
   '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+rGauge('財務安全度',h.safety)+rGauge('財務自由度',h.freedom)+rGauge('願景達成度',h.vision)+'</div>'+
   '<div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:1;min-width:230px">'+rBars([{label:'收支平衡',val:hp['收支平衡']},{label:'預備金',val:hp['預備金']},{label:'信用',val:hp['信用']},{label:'負債平衡',val:hp['負債平衡']},{label:'風險保全',val:hp['風險保全'],color:'#c99a5b'}])+'</div>'+
@@ -2382,7 +2383,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
    ((p.jobType==='企業主')?'<tr><td>公司概況</td><td>'+esc((c.company||{}).industry||'—')+' ｜ 持股 '+n((c.company||{}).sharePct)+'% ｜ 年營收 '+fmt((c.company||{}).annualRevenue)+' ｜ 年淨利 '+fmt((c.company||{}).netProfit)+((c.company||{}).ownerLoan?' ｜ 負責人往來 '+fmt(c.company.ownerLoan):'')+'</td></tr>':'')+
    '<tr><td>關注議題</td><td>'+esc(((c.intent||{}).purposes||[]).join('、')||'—')+'</td></tr><tr><td>必須達成 · 優先序</td><td>'+(orderedMustText(c)||'—')+'</td></tr><tr><td>淨資產 / 年收入 / 年支出</td><td>'+fmt(m.net)+' ／ '+fmt(m.incTotal)+' ／ '+fmt(m.expTotal)+'</td></tr></table>'+
 
-  (((c.lifeGoals||[]).length)?'<div style="margin-top:12px;color:#0d2b45;font-weight:700;font-size:13px">人生財務目標（客戶最在意的事）</div><table style="margin-top:4px"><tr><th>優先</th><th>目標</th><th>價值觀／重要原因</th><th>對應模組</th></tr>'+(c.lifeGoals||[]).slice().sort(function(a,b){return n(a.priority)-n(b.priority)}).map(function(g){return '<tr><td>'+n(g.priority)+'</td><td>'+esc(g.name)+'</td><td>'+esc(g.value)+'</td><td>'+esc(g.linkModule||'')+'</td></tr>'}).join('')+'</table>':'')+
+  (((c.lifeGoals||[]).length)?'<div style="margin-top:12px;color:#0d2b45;font-weight:700;font-size:13px">這些目標對你的意義</div><table style="margin-top:4px"><tr><th>目標</th><th>價值觀／重要原因</th><th>對應模組</th></tr>'+(c.lifeGoals||[]).map(function(g){return '<tr><td>'+esc(g.name)+'</td><td>'+esc(g.value)+'</td><td>'+esc(g.linkModule||'')+'</td></tr>'}).join('')+'</table>':'')+
   '<h2>二、收支與資產結構</h2>'+
   '<div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">收入比重</div>'+rPie(incPie)+'</div>'+
    '<div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">支出比重</div>'+rPie(expPie)+'</div></div>'+
