@@ -4,13 +4,14 @@ import { ensureClientUser } from "@/lib/clientUser";
 import { saveClientSetup, type ClientBasics } from "@/lib/clientPlan";
 import { requestCoachLink, revokeClientLink } from "@/lib/coachLink";
 import type { CrossInputs } from "@/lib/passport";
+import { normalizeIntent, type Intent } from "@/lib/intent";
 
-// 存基本資料＋財務現況十字表。
-export async function saveSetupAction(basics: ClientBasics, cross: CrossInputs) {
+// 存基本資料＋財務現況十字表＋規劃意圖（關注議題／人生目標與優先序）。
+export async function saveSetupAction(basics: ClientBasics, cross: CrossInputs, intent?: Intent) {
   try {
     const user = await ensureClientUser();
     if (!user) return { ok: false as const, error: "未登入，請重新登入" };
-    await saveClientSetup(user, basics, cross);
+    await saveClientSetup(user, basics, cross, intent ? normalizeIntent({ ...intent }) : undefined);
     return { ok: true as const };
   } catch (e) {
     console.error("[saveSetupAction]", e);

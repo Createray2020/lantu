@@ -5,6 +5,7 @@ import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
 import { newCase } from "@/lib/engine";
 import { computePassport, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
+import { normalizeIntent, DEFAULT_TARGET, type Intent } from "@/lib/intent";
 import { logRevision } from "@/lib/revisions";
 import type { ClientUser } from "@/lib/clientUser";
 
@@ -42,6 +43,14 @@ function buildCase(p: PassportInputs, name: string): any {
   c.travel = [];
   if (r.travel.fund > 0)
     c.travel.push({ cat: "綜合", sub: "旅遊", start: age, end: age + 20, freq: 1, amount: Math.round(r.travel.fund), minAmount: Math.round(r.travel.fund), imp: 3 });
+
+  // 人生護照的五面向就是客戶的人生目標——直接帶成「必須達成」，教練端意圖分頁即刻讀得到。
+  const passportTargets: string[] = [DEFAULT_TARGET];
+  if (r.house.price > 0) passportTargets.push("購屋規劃");
+  if (r.car.price > 0) passportTargets.push("購車規劃");
+  if (r.travel.fund > 0) passportTargets.push("旅遊規劃");
+  if (r.support.perChildCost > 0 && num(p.support.monthly) > 0) passportTargets.push("子女教養規劃");
+  c.intent = normalizeIntent({ purposes: [], targets: passportTargets, mustHave: passportTargets });
 
   c.education = [];
   if (r.support.perChildCost > 0 && num(p.support.monthly) > 0)
@@ -106,17 +115,17 @@ export type ClientBasics = {
   name: string; birth: string; gender: string; phone: string; email: string; marital: string; dependents: number;
 };
 
-export async function getClientSetup(clientUserId: string): Promise<{ basics: ClientBasics | null; cross: CrossInputs | null }> {
+export async function getClientSetup(clientUserId: string): Promise<{ basics: ClientBasics | null; cross: CrossInputs | null; intent: Intent | null }> {
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];
-  if (!client) return { basics: null, cross: null };
+  if (!client) return { basics: null, cross: null, intent: null };
   const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
   const data = pRows[0]?.data as any;
-  return { basics: data?.setup?.basics ?? null, cross: data?.setup?.cross ?? null };
+  return { basics: data?.setup?.basics ?? null, cross: data?.setup?.cross ?? null, intent: data?.intent ?? null };
 }
 
 // 存基本資料＋十字表：更新 clients 本體與 plan.data（收支資債彙總進 case，供引擎與教練接手用）。
-export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cross: CrossInputs): Promise<void> {
+export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cross: CrossInputs, intent?: Intent): Promise<void> {
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, user.id)).limit(1);
   const client = cRows[0];
   if (!client) throw new Error("請先完成人生護照");
@@ -146,6 +155,8 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
   c.expenses = exp > 0 ? [{ name: "生活支出", cat: "生活", amount: exp * 12, infl: true, start: age, end: lifeExp, cut: 0 }] : [];
   c.assets = ast > 0 ? [{ name: "總資產", owner: who, mainCat: "可投資資產", type: "現金", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: ast, value: ast, ret: 1, income: 0, movable: true }] : [];
   c.liabilities = lia > 0 ? [{ name: "總負債", owner: who, mainCat: "其他", currency: "台幣", fxRate: 1, balance: lia, rate: 2, repay: "本息攤還", pay: 0, months: 240, grace: 0, startAge: age }] : [];
+  // 規劃意圖：客戶選的關注議題與人生目標優先序，寫進教練端讀的同一個欄位。
+  if (intent) c.intent = normalizeIntent({ ...intent });
   c.setup = { basics, cross, savedAt: new Date().toISOString() };
   await db.update(plans).set({ data: c, updatedAt: new Date() }).where(eq(plans.id, plan.id));
   await logRevision(plan.id, "client", user.id, user.name, c);

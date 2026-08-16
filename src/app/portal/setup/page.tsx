@@ -23,6 +23,7 @@ export default async function SetupPage() {
         defaultName={user.name ?? ""}
         basics={setup.basics}
         cross={setup.cross}
+        intent={setup.intent}
         coaches={coaches}
         link={link}
       />

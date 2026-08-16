@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
-import { getClientOwnPlan } from "@/lib/clientPlan";
+import { getClientOwnPlan, getClientSetup } from "@/lib/clientPlan";
+import { normalizeIntent } from "@/lib/intent";
 import { wan, ntfmt } from "@/lib/passport";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,8 @@ export default async function Portal() {
   const name = client.name || "貴賓";
   const own = await getClientOwnPlan(client.id);
   const r = own?.result ?? null;
+  const setup = await getClientSetup(client.id);
+  const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
 
   const rows = r
     ? [
@@ -81,6 +84,21 @@ export default async function Portal() {
                 重新調整人生護照
               </Link>
             </div>
+
+            {mustHave.length > 0 && (
+              <div className="rounded-xl border border-white/8 bg-[#12334f] p-5 mb-6">
+                <div className="text-[#e0bd8b] text-sm font-bold mb-1">你的必達目標 · 優先序</div>
+                <p className="text-[11px] text-[#6f869c] mb-3">錢不夠時，我們會從順位在後的開始調整。可到「補資料」頁重新排。</p>
+                <div className="flex flex-wrap gap-2">
+                  {mustHave.map((t, i) => (
+                    <span key={t} className="inline-flex items-center gap-2 rounded-lg bg-[#0a2137] border border-white/10 px-3 py-1.5">
+                      <span className="font-serif text-[13px] font-extrabold text-[#e0bd8b]">{i + 1}</span>
+                      <span className="text-[13px] text-[#cdd9e5]">{t}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="rounded-xl border border-[#c99a5b]/30 bg-[#0d2b45]/50 p-5 text-center">
               <div className="inline-flex items-center gap-2 text-sm text-[#e0bd8b] mb-2">

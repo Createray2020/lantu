@@ -5,6 +5,8 @@ import Link from "next/link";
 import { computeGap, ntfmt, wan, type CrossInputs } from "@/lib/passport";
 import type { ClientBasics } from "@/lib/clientPlan";
 import type { ActiveCoach, LinkStatus } from "@/lib/coachLink";
+import { normalizeIntent, defaultIntent, type Intent } from "@/lib/intent";
+import IntentPicker from "./IntentPicker";
 import { saveSetupAction, requestCoachAction, revokeCoachAction } from "./actions";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -22,14 +24,15 @@ const emptyBasics: ClientBasics = { name: "", birth: "", gender: "", phone: "", 
 const emptyCross: CrossInputs = { income: 0, expense: 0, assets: 0, liabilities: 0 };
 
 export default function SetupWizard({
-  monthlyNeedWan, defaultName, basics, cross, coaches, link,
+  monthlyNeedWan, defaultName, basics, cross, intent, coaches, link,
 }: {
   monthlyNeedWan: number; defaultName: string;
-  basics: ClientBasics | null; cross: CrossInputs | null;
+  basics: ClientBasics | null; cross: CrossInputs | null; intent: Intent | null;
   coaches: ActiveCoach[]; link: LinkStatus;
 }) {
   const [b, setB] = useState<ClientBasics>(basics ?? { ...emptyBasics, name: defaultName });
   const [c, setC] = useState<CrossInputs>(cross ?? emptyCross);
+  const [it, setIt] = useState<Intent>(intent ? normalizeIntent({ ...intent }) : defaultIntent());
   const [showGap, setShowGap] = useState<boolean>(!!cross);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -48,7 +51,7 @@ export default function SetupWizard({
   async function onSubmitCurrent() {
     setSaveStatus("saving"); setSaveErr(null);
     try {
-      const res = await saveSetupAction(b, c);
+      const res = await saveSetupAction(b, c, it);
       if (res.ok) { setShowGap(true); setSaveStatus("idle"); }
       else { setSaveStatus("error"); setSaveErr(res.error || "儲存失敗"); }
     } catch (e) { setSaveStatus("error"); setSaveErr(e instanceof Error ? e.message : "儲存失敗"); }
@@ -108,6 +111,8 @@ export default function SetupWizard({
           <Field label="扶養人數"><input type="number" inputMode="numeric" className={inputCls} value={numVal(b.dependents)} placeholder="0" onChange={(e) => setBasic("dependents", parseInt(e.target.value, 10) || 0)} /></Field>
         </div>
       </section>
+
+      <IntentPicker value={it} onChange={setIt} />
 
       {/* 財務現況十字表 */}
       <section className="rounded-2xl bg-[#12334f] border border-white/8 p-5 sm:p-6 mb-4">
