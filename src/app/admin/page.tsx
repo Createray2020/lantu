@@ -3,10 +3,9 @@ import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin, listCoaches } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
-import { approveCoach, suspendCoach, resetCoach, updateOrg } from "./actions";
 import BrandSettings from "./BrandSettings";
-
-const RANK_LABEL: Record<string, string> = { member: "教練", manager: "主管", owner: "老闆" };
+import OrgCell from "./OrgCell";
+import StatusActions from "./StatusActions";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +29,7 @@ export default async function Admin() {
   const coaches = await listCoaches();
   const pending = coaches.filter((c) => c.status === "pending").length;
   const brand = await getBrand();
+  const peers = coaches.map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
 
   return (
     <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
@@ -92,16 +92,12 @@ export default async function Admin() {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <form action={updateOrg.bind(null, c.id)} className="flex items-center gap-1">
-                        <select name="orgRank" defaultValue={c.orgRank} className="bg-[#0d2b45] border border-white/10 rounded px-1.5 py-1 text-xs text-[#eef2f7]">
-                          {Object.entries(RANK_LABEL).map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
-                        </select>
-                        <select name="uplineId" defaultValue={c.uplineId ?? ""} className="bg-[#0d2b45] border border-white/10 rounded px-1.5 py-1 text-xs text-[#eef2f7] max-w-[120px]">
-                          <option value="">（無上線）</option>
-                          {coaches.filter((o) => o.id !== c.id).map((o) => (<option key={o.id} value={o.id}>{o.name || o.email}</option>))}
-                        </select>
-                        <button className="rounded bg-[#12334f] border border-white/15 text-[#a9bccf] px-2 py-1 text-xs hover:bg-[#17406a]">存</button>
-                      </form>
+                      <OrgCell
+                        id={c.id}
+                        orgRank={c.orgRank}
+                        uplineId={c.uplineId}
+                        peers={peers}
+                      />
                     </td>
                     <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.createdAt)}</td>
                     <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.approvedAt)}</td>
@@ -109,29 +105,7 @@ export default async function Admin() {
                       {admin ? (
                         <span className="text-[#6f869c] text-xs block text-right">—</span>
                       ) : (
-                        <div className="flex gap-2 justify-end">
-                          {c.status !== "active" && (
-                            <form action={approveCoach.bind(null, c.id)}>
-                              <button className="rounded-md bg-[#6f8f74] text-[#08202a] font-bold px-3 py-1.5 text-xs">
-                                核准開通
-                              </button>
-                            </form>
-                          )}
-                          {c.status === "active" && (
-                            <form action={suspendCoach.bind(null, c.id)}>
-                              <button className="rounded-md bg-[#b05a4a] text-white font-bold px-3 py-1.5 text-xs">
-                                停權
-                              </button>
-                            </form>
-                          )}
-                          {c.status === "suspended" && (
-                            <form action={resetCoach.bind(null, c.id)}>
-                              <button className="rounded-md border border-white/20 text-[#a9bccf] px-3 py-1.5 text-xs">
-                                重設待審
-                              </button>
-                            </form>
-                          )}
-                        </div>
+                        <StatusActions id={c.id} status={c.status} />
                       )}
                     </td>
                   </tr>

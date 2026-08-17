@@ -4,6 +4,20 @@ import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg } from "@/lib/coach";
 import { saveBrand } from "@/lib/brand";
 
+// 後台動作的統一回傳型別：讓 client 端能顯示「已儲存 / 失敗原因」，
+// 而不是丟出例外後在畫面上靜默失敗。
+export type ActionResult = { ok: true } | { ok: false; error: string };
+
+const MSG: Record<string, string> = {
+  forbidden: "沒有後台權限",
+  "invalid-rank": "職級不正確",
+};
+
+function fail(e: unknown): ActionResult {
+  const raw = e instanceof Error ? e.message : String(e);
+  return { ok: false, error: MSG[raw] ?? raw };
+}
+
 async function guard() {
   const me = await ensureCoach();
   if (!(await isAdmin(me))) throw new Error("forbidden");
@@ -19,32 +33,51 @@ function validPng(v: FormDataEntryValue | null): string | null {
   return s;
 }
 
+const RANKS = ["member", "manager", "owner"] as const;
+
 // 設定組織樹：職級（member/manager/owner）＋上線。
-export async function updateOrg(id: string, formData: FormData) {
-  await guard();
-  const orgRank = String(formData.get("orgRank") || "member");
-  const upline = String(formData.get("uplineId") || "");
-  await setCoachOrg(id, orgRank, upline && upline !== id ? upline : null);
-  revalidatePath("/admin");
-  revalidatePath("/dashboard");
+export async function updateOrg(
+  id: string,
+  input: { orgRank: string; uplineId: string },
+): Promise<ActionResult> {
+  try {
+    await guard();
+    const orgRank = input.orgRank;
+    if (!RANKS.includes(orgRank as (typeof RANKS)[number])) throw new Error("invalid-rank");
+    const upline = String(input.uplineId || "");
+    await setCoachOrg(id, orgRank, upline && upline !== id ? upline : null);
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+async function setStatus(
+  id: string,
+  status: "pending" | "active" | "suspended",
+): Promise<ActionResult> {
+  try {
+    await guard();
+    await setCoachStatus(id, status);
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function approveCoach(id: string) {
-  await guard();
-  await setCoachStatus(id, "active");
-  revalidatePath("/admin");
+  return setStatus(id, "active");
 }
 
 export async function suspendCoach(id: string) {
-  await guard();
-  await setCoachStatus(id, "suspended");
-  revalidatePath("/admin");
+  return setStatus(id, "suspended");
 }
 
 export async function resetCoach(id: string) {
-  await guard();
-  await setCoachStatus(id, "pending");
-  revalidatePath("/admin");
+  return setStatus(id, "pending");
 }
 
 // 上傳／替換全組織品牌 Logo（logoUrl＝橫式、iconUrl＝方形），寫到 owner 那一列。
