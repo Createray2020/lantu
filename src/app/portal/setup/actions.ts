@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { ensureClientUser } from "@/lib/clientUser";
 import { saveClientSetup, type ClientBasics } from "@/lib/clientPlan";
 import { requestCoachLink, revokeClientLink } from "@/lib/coachLink";
@@ -12,6 +13,9 @@ export async function saveSetupAction(basics: ClientBasics, cross: CrossInputs, 
     const user = await ensureClientUser();
     if (!user) return { ok: false as const, error: "未登入，請重新登入" };
     await saveClientSetup(user, basics, cross, intent ? normalizeIntent({ ...intent }) : undefined);
+    revalidatePath("/portal");
+    revalidatePath("/portal/setup");
+    revalidatePath("/portal/plan");
     return { ok: true as const };
   } catch (e) {
     console.error("[saveSetupAction]", e);
@@ -25,6 +29,8 @@ export async function requestCoachAction(coachId: string, note?: string) {
     const user = await ensureClientUser();
     if (!user) return { ok: false as const, error: "未登入，請重新登入" };
     const r = await requestCoachLink(user, coachId, note);
+    revalidatePath("/portal");
+    revalidatePath("/portal/setup");
     return r.ok ? { ok: true as const } : { ok: false as const, error: r.error };
   } catch (e) {
     console.error("[requestCoachAction]", e);
@@ -38,6 +44,8 @@ export async function revokeCoachAction() {
     const user = await ensureClientUser();
     if (!user) return { ok: false as const, error: "未登入，請重新登入" };
     const r = await revokeClientLink(user);
+    revalidatePath("/portal");
+    revalidatePath("/portal/setup");
     return r.ok ? { ok: true as const } : { ok: false as const, error: r.error };
   } catch (e) {
     console.error("[revokeCoachAction]", e);

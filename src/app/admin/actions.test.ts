@@ -20,7 +20,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   asMock(ensureCoach).mockResolvedValue({ id: "admin1", role: "admin" });
   asMock(isAdmin).mockResolvedValue(true);
-  asMock(setCoachOrg).mockResolvedValue(undefined);
+  // setCoachOrg 現在會回 { ok } —— 上線鏈的環狀檢查失敗時要讓 updateOrg 轉成畫面看得到的錯誤。
+  asMock(setCoachOrg).mockResolvedValue({ ok: true });
   asMock(setCoachStatus).mockResolvedValue(undefined);
 });
 
@@ -39,6 +40,12 @@ describe("updateOrg", () => {
   it("上線選到自己時視為無上線（避免自我循環）", async () => {
     await updateOrg("c1", { orgRank: "member", uplineId: "c1" });
     expect(setCoachOrg).toHaveBeenCalledWith("c1", "member", null);
+  });
+
+  it("會形成組織環時不寫 DB，把資料層的錯誤原樣回報", async () => {
+    asMock(setCoachOrg).mockResolvedValue({ ok: false, error: "會形成組織環（該教練已在你的下線）" });
+    const res = await updateOrg("c1", { orgRank: "manager", uplineId: "downline1" });
+    expect(res).toEqual({ ok: false, error: "會形成組織環（該教練已在你的下線）" });
   });
 
   it("非法職級不寫 DB，回傳錯誤讓畫面顯示", async () => {

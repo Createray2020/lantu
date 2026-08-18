@@ -11,6 +11,9 @@ export type ActionResult = { ok: true } | { ok: false; error: string };
 const MSG: Record<string, string> = {
   forbidden: "沒有後台權限",
   "invalid-rank": "職級不正確",
+  "invalid-logo-format": "只接受 PNG 圖片",
+  "logo-too-large": "圖片太大（上限約 3MB）",
+  "missing-logo": "橫式 logo 與方形 icon 都要上傳",
 };
 
 function fail(e: unknown): ActionResult {
@@ -18,6 +21,8 @@ function fail(e: unknown): ActionResult {
   return { ok: false, error: MSG[raw] ?? raw };
 }
 
+// isAdmin() 同時檢查 role==='admin' 與 status==='active'，
+// 所以被停權的管理員在這裡就會被擋下（舊版只看 role，停權後 /admin 照樣能用）。
 async function guard() {
   const me = await ensureCoach();
   if (!(await isAdmin(me))) throw new Error("forbidden");
@@ -45,7 +50,8 @@ export async function updateOrg(
     const orgRank = input.orgRank;
     if (!RANKS.includes(orgRank as (typeof RANKS)[number])) throw new Error("invalid-rank");
     const upline = String(input.uplineId || "");
-    await setCoachOrg(id, orgRank, upline && upline !== id ? upline : null);
+    const r = await setCoachOrg(id, orgRank, upline && upline !== id ? upline : null);
+    if (!r.ok) return { ok: false, error: r.error };
     revalidatePath("/admin");
     revalidatePath("/dashboard");
     return { ok: true };
@@ -88,6 +94,7 @@ export async function saveBrandLogo(formData: FormData) {
   if (!logoUrl || !iconUrl) throw new Error("missing-logo");
   await saveBrand(me.id, { logoUrl, iconUrl });
   revalidatePath("/admin");
+  revalidatePath("/dashboard");
 }
 
 // 移除品牌 Logo，還原成嵐途預設標記。
@@ -95,4 +102,5 @@ export async function removeBrandLogo() {
   const me = await guard();
   await saveBrand(me.id, { logoUrl: null, iconUrl: null });
   revalidatePath("/admin");
+  revalidatePath("/dashboard");
 }

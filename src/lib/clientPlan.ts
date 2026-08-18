@@ -1,11 +1,14 @@
 // 自助客戶（人生護照）的資料層：把五面向存成「客戶自己的 clients 列＋一份 plan（基礎方案）」。
 // coachId=null（還沒掛教練）；掛上教練、被授權後才「真的進入規劃」。
-import { eq, desc } from "drizzle-orm";
+import { and, eq, asc, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
 import { newCase } from "@/lib/engine";
 import { computePassport, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
 import { normalizeIntent, DEFAULT_TARGET, type Intent } from "@/lib/intent";
+// 客戶端寫 plan.data 時也必須重算快照。舊版只 set({data})，教練列表上的階段/淨值會一直停在
+// 客戶「上次由教練存檔」時的舊值（實測正式庫有一筆淨值差 500 萬）。
+import { planSnapshot } from "@/lib/snapshot";
 import { logRevision } from "@/lib/revisions";
 import type { ClientUser } from "@/lib/clientUser";
 
@@ -17,7 +20,9 @@ const num = (v: unknown): number => {
 
 // 由五面向（能力分析）組出一份 v12 case：profile／goals／education／travel／retire 給合理值，
 // 並把 passport 原料＋算出的結果一起 stash 進 data，供 /portal 顯示與重編。
-function buildCase(p: PassportInputs, name: string): any {
+// export 供測試：這裡的量綱（一次性 vs 年度、現值 vs 已複利）錯了不會有任何型別或執行期錯誤，
+// 只會讓所有自助客戶的規劃數字整批偏掉，所以一定要有測試守著。
+export function buildCase(p: PassportInputs, name: string): any {
   const r: PassportResult = computePassport(p);
   const c: any = newCase();
   const age = num(p.retire.curAge) || num(c.profile.age) || 35;
@@ -41,8 +46,13 @@ function buildCase(p: PassportInputs, name: string): any {
     c.goals.push({ name: "購車", type: "購車", present: Math.round(r.car.price), minPresent: Math.round(r.car.price), start: num(p.car.buyYear) - num(p.car.startYear) + age, end: num(p.car.buyYear) - num(p.car.startYear) + age, freq: 0, growth: "固定", appreciation: 0, loanRatio: 0, imp: 3, prepared: 0 });
 
   c.travel = [];
-  if (r.travel.fund > 0)
-    c.travel.push({ cat: "綜合", sub: "旅遊", start: age, end: age + 20, freq: 1, amount: Math.round(r.travel.fund), minAmount: Math.round(r.travel.fund), imp: 3 });
+  if (r.travel.fund > 0) {
+    // travel.fund 是「存到旅遊那一年會累積到的一筆基金」＝一次性支出。
+    // 舊版寫成 start=age, end=age+20, freq=1，被 lifestyleFactor 當成「每年花、連花 21 年」，
+    // 生涯累計金額直接放大 21 倍。改成只在目標年度發生一次。
+    const travelAge = age + Math.max(0, num(p.travel.travelYear) - num(p.travel.startYear));
+    c.travel.push({ cat: "綜合", sub: "旅遊", start: travelAge, end: travelAge, freq: 1, amount: Math.round(r.travel.fund), minAmount: Math.round(r.travel.fund), imp: 3 });
+  }
 
   // 人生護照的五面向就是客戶的人生目標——直接帶成「必須達成」，教練端意圖分頁即刻讀得到。
   const passportTargets: string[] = [DEFAULT_TARGET];
@@ -53,12 +63,45 @@ function buildCase(p: PassportInputs, name: string): any {
   c.intent = normalizeIntent({ purposes: [], targets: passportTargets, mustHave: passportTargets });
 
   c.education = [];
-  if (r.support.perChildCost > 0 && num(p.support.monthly) > 0)
-    c.education.push({ child: "子女", stage: "教育", schoolType: "", annual: Math.round(r.support.perChildCost / Math.max(1, num(p.support.raiseToAge))), years: num(p.support.raiseToAge), startIn: Math.max(0, num(p.support.birthYear) - num(p.support.startYear)) });
+  if (r.support.perChildCost > 0 && num(p.support.monthly) > 0) {
+    // education[].annual 是「今日現值的年費用」——引擎（eduTotal / projection）會自己再套學費上漲率。
+    // 舊版填的是 perChildCost/年數，而 perChildCost 已經是逐年複利加總過的結果，
+    // 等於把學費成長算了兩次，投影裡的教育支出被放大約 1.66 倍。
+    c.education.push({
+      child: "子女", stage: "教育", schoolType: "",
+      annual: Math.round(num(p.support.annualCost)),
+      years: num(p.support.raiseToAge),
+      startIn: Math.max(0, num(p.support.birthYear) - num(p.support.startYear)),
+    });
+  }
 
   c.passport = { inputs: p, result: r, savedAt: new Date().toISOString() };
   return c;
 }
+
+// 客戶「自己那一份」plan：優先取標記為人生護照的那份，否則取最早建立的那份。
+// ⚠️ 舊版是 `limit(1)` 無 orderBy（或取最新），客戶掛上教練後有兩份 plan 時，
+//    Postgres 回哪一列不確定 / 或直接命中教練剛建的年度版 →
+//    客戶在 /portal 存一次檔就把教練做了數小時的規劃整份覆寫成護照骨架（不可逆）。
+//    客戶端的讀寫一律鎖定這一份；教練建立的年度版本對客戶端不可寫。
+async function ownPlanRow(clientId: string): Promise<{ id: string; data: unknown } | null> {
+  const tagged = await db
+    .select({ id: plans.id, data: plans.data })
+    .from(plans)
+    .where(and(eq(plans.clientId, clientId), eq(plans.label, PASSPORT_LABEL)))
+    .orderBy(asc(plans.createdAt))
+    .limit(1);
+  if (tagged[0]) return tagged[0];
+  const oldest = await db
+    .select({ id: plans.id, data: plans.data })
+    .from(plans)
+    .where(eq(plans.clientId, clientId))
+    .orderBy(asc(plans.createdAt))
+    .limit(1);
+  return oldest[0] ?? null;
+}
+
+const PASSPORT_LABEL = "人生護照";
 
 export type ClientOwnPlan = {
   clientId: string;
@@ -72,8 +115,7 @@ export async function getClientOwnPlan(clientUserId: string): Promise<ClientOwnP
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];
   if (!client) return null;
-  const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
-  const plan = pRows[0];
+  const plan = await ownPlanRow(client.id);
   if (!plan) return { clientId: client.id, planId: "", passport: null, result: null };
   const data = plan.data as any;
   return {
@@ -97,13 +139,19 @@ export async function savePassport(user: ClientUser, inputs: PassportInputs): Pr
   }
 
   const data = buildCase(inputs, name);
-  const existingPlan = await db.select({ id: plans.id }).from(plans).where(eq(plans.clientId, clientId)).limit(1);
+  const existingPlan = await ownPlanRow(clientId);
   let planId: string;
-  if (existingPlan[0]) {
-    planId = existingPlan[0].id;
-    await db.update(plans).set({ data, updatedAt: new Date() }).where(eq(plans.id, planId));
+  const snap = planSnapshot(data);
+  if (existingPlan) {
+    planId = existingPlan.id;
+    await db.update(plans)
+      .set({ data, label: PASSPORT_LABEL, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })
+      .where(eq(plans.id, planId));
   } else {
-    const ins = await db.insert(plans).values({ clientId, year: new Date().getFullYear(), label: "人生護照", status: "draft", data }).returning({ id: plans.id });
+    const ins = await db.insert(plans)
+      .values({ clientId, year: new Date().getFullYear(), label: PASSPORT_LABEL, status: "draft", data,
+                healthGrade: snap.healthGrade, netWorth: snap.netWorth })
+      .returning({ id: plans.id });
     planId = ins[0].id;
   }
   await logRevision(planId, "client", user.id, user.name, data);
@@ -119,8 +167,8 @@ export async function getClientSetup(clientUserId: string): Promise<{ basics: Cl
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];
   if (!client) return { basics: null, cross: null, intent: null };
-  const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
-  const data = pRows[0]?.data as any;
+  const own = await ownPlanRow(client.id);
+  const data = own?.data as any;
   return { basics: data?.setup?.basics ?? null, cross: data?.setup?.cross ?? null, intent: data?.intent ?? null };
 }
 
@@ -137,8 +185,7 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
     updatedAt: new Date(),
   }).where(eq(clients.id, client.id));
 
-  const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
-  const plan = pRows[0];
+  const plan = await ownPlanRow(client.id);
   if (!plan) throw new Error("找不到規劃");
   const c: any = plan.data || {};
   c.profile = c.profile || {};
@@ -158,11 +205,16 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
   // 規劃意圖：客戶選的關注議題與人生目標優先序，寫進教練端讀的同一個欄位。
   if (intent) c.intent = normalizeIntent({ ...intent });
   c.setup = { basics, cross, savedAt: new Date().toISOString() };
-  await db.update(plans).set({ data: c, updatedAt: new Date() }).where(eq(plans.id, plan.id));
+  const snap = planSnapshot(c);
+  await db.update(plans)
+    .set({ data: c, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })
+    .where(eq(plans.id, plan.id));
   await logRevision(plan.id, "client", user.id, user.name, c);
 }
 
-// 取客戶自己 plan 的完整 case（餵給 lantu-app.html 客戶端唯讀檢視）。
+// 取要餵給 lantu-app.html 客戶端唯讀檢視的 case。
+// TODO(待拍板)：這裡刻意仍取「最新一份」——掛了教練之後，客戶在「我的財務藍圖」看到的是教練做的年度版。
+// 客戶可寫範圍（只能改護照那份 vs 可編年度版的部分 section）定案後再一起調整，見盤點報告待拍板 #5。
 export async function getClientPlanCase(clientUserId: string): Promise<{ planId: string; data: unknown } | null> {
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];

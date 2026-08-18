@@ -1,12 +1,12 @@
 // 首頁彙總層：依角色（教練／主管／老闆）把各卡片要的數字算出來。
 // 有真實資料源的（客戶／待辦／約訪、組織樹、成員名冊）直接接；
 // 業績／活動量／增員／公告等由 member_metrics / recruits / announcements 承載（可編輯的模擬資料）。
-import { inArray, eq, desc } from "drizzle-orm";
+import { and, inArray, eq, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { memberMetrics, recruits, announcements, coaches, clients, reviews } from "@/Shared/db/schema";
 import { getCoachDashboard } from "./dashboard";
 import {
-  listActiveCoaches, teamsUnder, downlineIds, rankOf,
+  listActiveCoaches, teamsUnder, downlineIds, visibleCoachIds, rankOf,
   type CoachRow, type OrgRank,
 } from "./org";
 
@@ -38,12 +38,14 @@ function todayISO(d = new Date()): string { return d.toISOString().slice(0, 10);
 export type Metric = typeof memberMetrics.$inferSelect;
 export type Announcement = typeof announcements.$inferSelect;
 
+// period 條件要下推到 SQL。舊版把該教練「所有期間」的列全撈回 Node 再 filter，
+// 100 位教練 × 36 個月＝3600 列拉回來丟掉 97%，而老闆首頁一次 render 會呼叫 2~4 次。
 async function metricsFor(period: string, coachIds: string[]): Promise<Map<string, Metric>> {
   if (!coachIds.length) return new Map();
   const rows = await db.select().from(memberMetrics)
-    .where(inArray(memberMetrics.coachId, coachIds));
+    .where(and(inArray(memberMetrics.coachId, coachIds), eq(memberMetrics.period, period)));
   const map = new Map<string, Metric>();
-  for (const r of rows) if (r.period === period) map.set(r.coachId, r);
+  for (const r of rows) map.set(r.coachId, r);
   return map;
 }
 
@@ -127,9 +129,8 @@ export type ManagerHome = {
 const STAGE_LABEL: Record<string, string> = { prospect: "準增員名單", contact: "接觸中", interview: "面談", offer: "錄取", onboard: "到職" };
 const STAGE_ORDER = ["prospect", "contact", "interview", "offer", "onboard"];
 
-async function recruitFunnel(ownerIds: string[]): Promise<{ label: string; value: number }[]> {
-  if (!ownerIds.length) return STAGE_ORDER.map((s) => ({ label: STAGE_LABEL[s], value: 0 }));
-  const rows = await db.select().from(recruits).where(inArray(recruits.ownerCoachId, ownerIds));
+// 純函式版：吃已經撈回來的 recruits 列，避免同一批資料查兩次。
+function recruitFunnelFrom(rows: { stage: string }[]): { label: string; value: number }[] {
   const count: Record<string, number> = {};
   for (const r of rows) count[r.stage] = (count[r.stage] ?? 0) + 1;
   // 漏斗以「該階段(含)之後」的累計呈現遞減。
@@ -174,8 +175,9 @@ export async function getManagerHome(manager: CoachRow, all: CoachRow[], period:
   }
   board.sort((a, b) => b.income - a.income);
 
+  // 同一批 recruits 只查一次，funnel 由已取得的列算（舊版用同一組 teamIds 連查兩次）。
   const recRows = await db.select().from(recruits).where(inArray(recruits.ownerCoachId, teamIds));
-  const funnel = await recruitFunnel(teamIds);
+  const funnel = recruitFunnelFrom(recRows);
   const recruitsActive = recRows.filter((r) => r.stage !== "onboard").length;
 
   // 待審核：下線中 status=pending 的教練 + 增員在「錄取」階段（待簽核）。
@@ -321,32 +323,45 @@ export async function getHome(me: CoachRow, opts: { as?: string; focus?: string 
   const teamLeaders = teamsUnder(rankOf(me) === "owner" ? me.id : (me.uplineId ?? me.id), all);
   const teamOptions = (myRank === "owner" ? teamsUnder(me.id, all) : []).map((t) => ({ id: t.manager.id, name: t.manager.title || t.manager.name || "" }));
 
+  // 可見範圍：owner＝全組織、manager＝自己子樹（含自己）、member＝只有自己。
+  // ⚠️ 這是 ?focus= 的唯一防線。舊版完全沒有比對可見範圍，任一 member 教練把 focus 換成
+  //    別人的 Clerk userId，就能看到對方的客戶總數、客戶姓名、約訪、逾期名單與階段分佈；
+  //    而 memberOptions 又把全體 active 教練的 id 序列化進 RSC payload（即使 UI 不渲染，
+  //    網頁原始碼裡也撈得到），等於把可用的 id 清單一起附上。兩者都要收斂。
+  const visible = new Set(visibleCoachIds(me, all));
+
   // 成員清單依「本月是否有業績」排序：有資料的排前面（預設預覽會落在有資料者）。
-  const members = all.filter((c) => rankOf(c) === "member");
+  const members = all.filter((c) => rankOf(c) === "member" && visible.has(c.id));
   const memberMetric = await metricsFor(period, members.map((c) => c.id));
   const incomeOf = (id: string) => memberMetric.get(id)?.income ?? 0;
   const membersByIncome = [...members].sort((a, b) => incomeOf(b.id) - incomeOf(a.id));
   const memberOptions = membersByIncome.map((c) => ({ id: c.id, name: c.name || "" }));
 
+  // focus 一律先過可見範圍；不在範圍內就當作沒帶（退回自己），不要靜默給出別人的資料。
+  const focus = opts.focus && visible.has(opts.focus) ? opts.focus : undefined;
+
   const base = {
     rank: view, views, teamOptions, memberOptions,
     period, periodLabel: periodLabel(period), today: todayLabel(),
-    focusId: opts.focus || me.id,
+    focusId: focus || me.id,
   };
 
   if (view === "owner") {
+    // 只有 owner 進得來（allowedViews 把關），這裡的 owner 一定是自己。
     const owner = rankOf(me) === "owner" ? me : all.find((c) => rankOf(c) === "owner") ?? me;
     return { ...base, owner: await getOwnerHome(owner, all, period) };
   }
   if (view === "manager") {
-    let mgr = all.find((c) => c.id === opts.focus && rankOf(c) === "manager");
+    // 主管視角同樣受限：只能看自己子樹內的主管，不能預覽平行團隊。
+    let mgr = all.find((c) => c.id === focus && rankOf(c) === "manager");
     if (!mgr) mgr = myRank === "manager" ? me : (teamsUnder(me.id, all)[0]?.manager ?? teamLeaders[0]?.manager);
-    if (!mgr) return { ...base, rank: "member", member: await getMemberHome(me, period) };
+    if (!mgr || !visible.has(mgr.id)) return { ...base, rank: "member", member: await getMemberHome(me, period) };
     return { ...base, focusId: mgr.id, manager: await getManagerHome(mgr, all, period) };
   }
   // member：優先 focus；否則 viewer 本人（若為教練）；再否則挑本月業績最高的成員（保證有資料可看）。
-  let target = opts.focus ? all.find((c) => c.id === opts.focus) : undefined;
+  let target = focus ? all.find((c) => c.id === focus) : undefined;
   if (!target && myRank === "member") target = me;
   if (!target) target = membersByIncome[0] ?? me;
+  if (!visible.has(target.id)) target = me;
   return { ...base, focusId: target.id, member: await getMemberHome(target, period) };
 }

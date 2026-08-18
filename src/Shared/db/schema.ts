@@ -1,9 +1,15 @@
 // 嵐途資料表（Drizzle / Neon Postgres）
 // 三層：coaches → clients → plans(年度版本) / reviews(諮詢，掛客戶層) → action_items
+import { sql } from 'drizzle-orm';
 import {
   pgTable, text, integer, bigint, boolean, jsonb, timestamp, uuid, date,
+  index, uniqueIndex,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+
+// ⚠️ 索引一律宣告在這裡再跑 db:generate。
+//    直接用 psql 手建的索引不在 schema 快照裡，之後任何人跑 `npm run db:push`
+//    都會把它們默默 DROP 掉（Postgres 也不會自動幫 FK 建索引）。
 
 // 教練（對應 Clerk user id）
 // role: coach（一般教練）/ admin（管理員，可進後台）
@@ -24,7 +30,12 @@ export const coaches = pgTable('coaches', {
   note: text('note'),           // 備註（聯絡方式／收款狀態等，後台用）
   approvedAt: timestamp('approved_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // 自參照 FK：刪除教練時的 ON DELETE SET NULL 需要它，否則每次刪除都要全表掃。
+  index('coaches_upline_id_idx').on(t.uplineId),
+  // listActiveCoaches / getOrgOwnerId 的熱路徑。
+  index('coaches_status_idx').on(t.status),
+]);
 
 // 客戶登入帳號（雙邊平台：客戶自己上官網註冊、以客戶身分登入）
 // 對應 Clerk user id；與 coaches 互斥（同一 Clerk 使用者不會同時是教練與客戶）。
@@ -55,7 +66,13 @@ export const clients = pgTable('clients', {
   birthDate: date('birth_date'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // 教練端每一頁的第一個查詢（列表另有 ORDER BY updated_at DESC）。
+  index('clients_coach_id_updated_at_idx').on(t.coachId, t.updatedAt.desc()),
+  // 客戶端 /portal 每個頁面/動作都用它反查，且程式全篇假設 1:1（七處 limit(1)）。
+  // Postgres 的 UNIQUE 允許多個 NULL，所以教練建立的客戶（clientUserId=null）不受影響。
+  uniqueIndex('clients_client_user_id_uidx').on(t.clientUserId),
+]);
 
 // 客戶↔教練 連結申請（雙向確認）：客戶端「選擇教練」送出 → 教練端「接受」才把 clients.coachId 設上。
 // status: pending（待教練接受）/ accepted（已掛上）/ rejected（教練婉拒）
@@ -68,7 +85,15 @@ export const coachLinkRequests = pgTable('coach_link_requests', {
   note: text('note'), // 客戶留言（選填）
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   respondedAt: timestamp('responded_at', { withTimezone: true }),
-});
+}, (t) => [
+  // 教練端紅點（/api/pending-links）在每次導頁時打一次。
+  index('clr_coach_pending_idx').on(t.coachId).where(sql`status = 'pending'`),
+  index('clr_client_id_idx').on(t.clientId),
+  index('clr_client_user_id_idx').on(t.clientUserId),
+  // 「同一位客戶同時只能有一筆 pending」原本靠程式維護（先 update 再 insert，無交易），
+  // 雙擊送出就會產生兩筆，教練端紅點永遠歸不了零。交由資料庫保證。
+  uniqueIndex('clr_one_pending_per_client').on(t.clientId).where(sql`status = 'pending'`),
+]);
 
 // 年度版本（每年重製一份完整規劃；整份案件存 data jsonb）
 export const plans = pgTable('plans', {
@@ -83,7 +108,13 @@ export const plans = pgTable('plans', {
   data: jsonb('data').notNull(),   // 整份案件（v12 case 結構）
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // 複合鍵同時服務 WHERE client_id 與 ORDER BY year DESC, created_at DESC。
+  index('plans_client_id_year_idx').on(t.clientId, t.year.desc(), t.createdAt.desc()),
+  // 「每年重製一份」是領域模型的前提（clonePlan 用 max(year)+1）。
+  // 沒有這條約束時，新建客戶後再按一次「新增版本」就會出現兩筆同年版本（單機操作必然發生）。
+  uniqueIndex('plans_client_id_year_uidx').on(t.clientId, t.year),
+]);
 
 // 諮詢／檢視紀錄（掛客戶層的連續時間軸，可標記對應版本）
 export const reviews = pgTable('reviews', {
@@ -96,7 +127,11 @@ export const reviews = pgTable('reviews', {
   summary: text('summary'),
   nextAppt: date('next_appt'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index('reviews_client_id_idx').on(t.clientId),
+  // deletePlan 觸發 ON DELETE SET NULL，沒有索引會全表掃 reviews。
+  index('reviews_plan_id_idx').on(t.planId),
+]);
 
 // 動作項目（追蹤）
 export const actionItems = pgTable('action_items', {
@@ -108,7 +143,10 @@ export const actionItems = pgTable('action_items', {
   dueDate: date('due_date'),
   done: boolean('done').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index('action_items_client_id_idx').on(t.clientId),
+  index('action_items_review_id_idx').on(t.reviewId),
+]);
 
 // 文件附件（保單/報稅/身分等）
 export const attachments = pgTable('attachments', {
@@ -117,7 +155,9 @@ export const attachments = pgTable('attachments', {
   kind: text('kind'),
   filePath: text('file_path').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index('attachments_client_id_idx').on(t.clientId),
+]);
 
 // ────────────────────────────────────────────────────────────
 // 組織後台：業績／活動量／增員／公告（可編輯的模擬資料先進來）
@@ -145,7 +185,12 @@ export const memberMetrics = pgTable('member_metrics', {
   licenseNote: text('license_note'),                        // 證照展延提醒（如 CFP 2026/11）
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // 「每位教練每月一筆」是這張表的前提（home.ts 的 map.set 直接假設一筆）。
+  // 少了這條約束，同一 (coach, period) 有兩筆時老闆頁的 trend 是 `+=` 累加 → 同一筆業績算兩次、
+  // 達成率直接翻倍，而且畫面上看不出是 bug。
+  uniqueIndex('member_metrics_coach_period_uidx').on(t.coachId, t.period),
+]);
 
 // 增員 pipeline（每位增員負責人底下的準增員名單與階段）。
 // stage: prospect（準增員）/ contact（接觸）/ interview（面談）/ offer（錄取）/ onboard（到職）
@@ -158,7 +203,9 @@ export const recruits = pgTable('recruits', {
   note: text('note'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index('recruits_owner_coach_id_idx').on(t.ownerCoachId),
+]);
 
 // 公告（全組織共用）。category: important（重要）/ activity（活動）/ general（一般）
 export const announcements = pgTable('announcements', {
@@ -194,7 +241,10 @@ export const planRevisions = pgTable('plan_revisions', {
   editorName: text('editor_name'),
   data: jsonb('data').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  // 全庫成長最快的表；版本紀錄頁與 plan 刪除的 cascade 都靠它。
+  index('plan_revisions_plan_id_created_at_idx').on(t.planId, t.createdAt.desc()),
+]);
 
 // 教練反向邀請：教練產生邀請碼/連結，客戶開啟即掛到該教練（教練主動＝視同已同意）。
 export const coachInvites = pgTable('coach_invites', {
@@ -205,4 +255,6 @@ export const coachInvites = pgTable('coach_invites', {
   usedByClientUserId: text('used_by_client_user_id').references(() => clientUsers.id, { onDelete: 'set null' }),
   usedAt: timestamp('used_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index('coach_invites_coach_id_idx').on(t.coachId),
+]);

@@ -9,13 +9,35 @@ const E: any = EngineExports;
 describe("嵐途財務引擎（移植 v12）", () => {
   const c = E.sampleCase();
 
-  it("示範個案：核心指標可計算", () => {
+  it("示範個案：核心指標可計算，且分數落在合法值域", () => {
     const m = E.metrics(c);
     const h = E.health(c);
-    const r = E.ratios(c);
     expect(m.net).toBeGreaterThan(0);
+    expect(m.net).toBe(m.assetTotal - m.debtTotal);
     expect(["A", "B", "C", "D"]).toContain(h.grade);
-    expect(Object.keys(r).length).toBe(11);
+    // ⚠️ 舊版只驗 grade 落在四個字母裡，safety=183 / parts.信用=700 完全逃過。
+    //    這三條就是抓 credit 值域漂移的那組斷言（見 engine.drift.test.ts）。
+    expect(h.safety).toBeGreaterThanOrEqual(0);
+    expect(h.safety).toBeLessThanOrEqual(100);
+    for (const v of Object.values(h.parts) as number[]) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(100);
+    }
+    for (const v of Object.values(h.raw) as number[]) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("財務比率體檢：協會 25 項、每項都有理想值與燈號", () => {
+    const r = E.ratios(c);
+    // 驗的是「每一項算得對不對」，不是「共有幾項」——
+    // 舊版 expect(...).toBe(11) 只鎖住數量，等於在保護 engine 與 iframe 之間的漂移。
+    expect(r["負債比率"].v).toBe(E.pct(E.metrics(c).debtTotal / E.metrics(c).assetTotal));
+    expect(r["財務自由度"].v).toBe(E.pct(E.metrics(c).incFinancial / E.metrics(c).expTotal));
+    expect(r["支出收入比"].status).toMatch(/good|warn|bad/);
+    expect(r["撫養壓力比"].status).toBe("na"); // 無門檻項固定 na
+    expect(Object.keys(r)).toContain("願景達成率");
   });
 
   it("退休 / 教育 / 稅務引擎回傳數值", () => {
@@ -65,11 +87,37 @@ describe("嵐途財務引擎（移植 v12）", () => {
     expect(E.stageReason(neg)).toContain("現金流");
   });
 
-  it("空白個案不炸（newCase）", () => {
+  it("空白個案不炸（newCase），且不帶示範資料的信用評分", () => {
     const nc = E.newCase();
     expect(nc.id).toBeTruthy();
     expect(() => E.metrics(nc)).not.toThrow();
     expect(() => E.health(nc)).not.toThrow();
     expect(() => E.projection(nc)).not.toThrow();
+    // sampleCase 的 profile.credit=700 必須被清掉，否則新客戶白送約 12.5 分安全度
+    expect(E.creditScoreOf(nc)).toBe(0);
+    expect(E.health(nc).raw.credit).toBe(0);
+    // 與 lantu-app.html 的 newCase() 對齊的欄位
+    expect(Array.isArray(nc.lifeGoals)).toBe(true);
+    expect(nc.reportNote).toBe("");
+    expect(nc.company).toBeTruthy();
+  });
+
+  it("蒙地卡羅：horizon 未填時退回 85，不會謊報「不破產機率 100%」", () => {
+    const bad = E.sampleCase();
+    bad.params.horizon = "";
+    const mc = E.monteCarlo(bad, 200);
+    expect(mc.years).toBeGreaterThan(2);
+    expect(mc.bands.length).toBe(mc.years);
+    // P10 ≤ P50 ≤ P90，且不是全 0 的空圖
+    expect(mc.finalP10).toBeLessThanOrEqual(mc.finalP50);
+    expect(mc.finalP50).toBeLessThanOrEqual(mc.finalP90);
+  });
+
+  it("退休參數不合理時明確標示 valid=false，而不是靜默回「沒有缺口」", () => {
+    const bad = E.sampleCase();
+    bad.profile.retireAge = 95; // > lifeExp 85
+    const rn = E.retireNeed(bad);
+    expect(rn.valid).toBe(false);
+    expect(E.retireNeed(c).valid).toBe(true);
   });
 });

@@ -13,9 +13,13 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   if (!coach) redirect("/sign-in");
   if (coach.status !== "active") redirect("/dashboard");
 
-  const detail = await getClientDetail(coach.id, id);
+  // getClientDetail 已改成不撈 plans.data（只有 comparePlans 需要整份 jsonb），
+  // 兩支可以並行，不必序列等待。
+  const [detail, compare] = await Promise.all([
+    getClientDetail(coach.id, id),
+    comparePlans(coach.id, id).catch(() => []),
+  ]);
   if (!detail) notFound();
-  const compare = await comparePlans(coach.id, id);
 
   // 只傳前端需要的欄位（不把整份 plan.data jsonb 送到瀏覽器）。
   const client = {

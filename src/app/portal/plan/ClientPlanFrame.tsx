@@ -10,8 +10,10 @@ export default function ClientPlanFrame({ data }: { data: unknown }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
+    // targetOrigin 一律指定本站 origin（教練端 PlanEditor 已是如此）。
+    // 用 "*" 廣播的是含姓名/統編/保單號/資產負債的完整財務資料，而且下面還有 350ms×8 次重試。
     function post() {
-      iframeRef.current?.contentWindow?.postMessage({ type: "lantu:init", data }, "*");
+      iframeRef.current?.contentWindow?.postMessage({ type: "lantu:init", data }, window.location.origin);
     }
     function onMsg(e: MessageEvent) {
       if (e.source !== iframeRef.current?.contentWindow) return;
@@ -46,7 +48,7 @@ export default function ClientPlanFrame({ data }: { data: unknown }) {
         src="/lantu-app.html?embed=1&role=client"
         title="我的財務藍圖"
         className="flex-1 w-full border-0"
-        onLoad={() => iframeRef.current?.contentWindow?.postMessage({ type: "lantu:init", data }, "*")}
+        onLoad={() => iframeRef.current?.contentWindow?.postMessage({ type: "lantu:init", data }, window.location.origin)}
       />
     </div>
   );

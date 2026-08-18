@@ -48,8 +48,15 @@ export async function listClientsForCoach(coachId: string): Promise<ClientListIt
   const rows = await db.select().from(clients).where(eq(clients.coachId, coachId)).orderBy(desc(clients.updatedAt));
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const planRows = await db.select().from(plans).where(inArray(plans.clientId, ids));
-  const reviewRows = await db.select().from(reviews).where(inArray(reviews.clientId, ids));
+  // ⚠️ 明列欄位，不要 select() 整列 —— plans.data 是整份 case（約 20KB/份）。
+  // 200 位客戶 × 2 份 plan ＝ 8MB 以 JSON 文字傳回 Node，再被 filter 丟掉 99.9%。
+  const planRows = await db.select({
+    id: plans.id, clientId: plans.clientId, year: plans.year, label: plans.label,
+    status: plans.status, healthGrade: plans.healthGrade, netWorth: plans.netWorth, createdAt: plans.createdAt,
+  }).from(plans).where(inArray(plans.clientId, ids));
+  const reviewRows = await db.select({
+    clientId: reviews.clientId, date: reviews.date, nextAppt: reviews.nextAppt,
+  }).from(reviews).where(inArray(reviews.clientId, ids));
   const today = todayISO();
 
   return rows.map((c) => {
@@ -116,9 +123,12 @@ export async function getClient(coachId: string, clientId: string): Promise<Clie
   return row ?? null;
 }
 
+// plans 不含 data jsonb（詳情頁只顯示中繼資料；要算指標請用 comparePlans）。
+export type PlanMeta = Omit<Plan, "data">;
+
 export type ClientDetail = {
   client: Client;
-  plans: Plan[];
+  plans: PlanMeta[];
   reviews: Review[];
   actionItems: ActionItem[];
 };
@@ -126,8 +136,14 @@ export type ClientDetail = {
 export async function getClientDetail(coachId: string, clientId: string): Promise<ClientDetail | null> {
   const client = await getClient(coachId, clientId);
   if (!client) return null;
+  // 同上：客戶詳情頁只顯示各版本的中繼資料，不需要整份 data
+  //（版本比較的 planMetrics 由 comparePlans 另外撈，避免同一批 jsonb 被完整拉兩次）。
   const [planRows, reviewRows, itemRows] = await Promise.all([
-    db.select().from(plans).where(eq(plans.clientId, clientId)).orderBy(desc(plans.year), desc(plans.createdAt)),
+    db.select({
+      id: plans.id, clientId: plans.clientId, year: plans.year, label: plans.label, status: plans.status,
+      basedOnDate: plans.basedOnDate, healthGrade: plans.healthGrade, netWorth: plans.netWorth,
+      createdAt: plans.createdAt, updatedAt: plans.updatedAt,
+    }).from(plans).where(eq(plans.clientId, clientId)).orderBy(desc(plans.year), desc(plans.createdAt)),
     db.select().from(reviews).where(eq(reviews.clientId, clientId)).orderBy(desc(reviews.date)),
     db.select().from(actionItems).where(eq(actionItems.clientId, clientId)).orderBy(asc(actionItems.done), asc(actionItems.dueDate)),
   ]);

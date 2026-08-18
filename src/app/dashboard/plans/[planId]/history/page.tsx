@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
+import { getPlan } from "@/lib/plans";
 import { listRevisions } from "@/lib/revisions";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,10 @@ export default async function HistoryPage({ params }: { params: Promise<{ planId
   const coach = await ensureCoach();
   if (!coach || coach.status !== "active") redirect("/dashboard");
   const { planId } = await params;
+  // 必須驗這份 plan 屬於自己。舊版只檢查「是 active 教練」，
+  // 拿到別人的 planId 就能看到 editorName（客戶端存檔寫的是客戶真實姓名）與完整編輯時間軸。
+  const plan = await getPlan(coach.id, planId);
+  if (!plan) notFound();
   const revs = await listRevisions(planId);
 
   return (

@@ -52,6 +52,9 @@ export async function savePlanDataAction(planId: string, data: unknown): Promise
 export async function clonePlanAction(planId: string): Promise<string> {
   const cid = await coachId();
   const id = await Plans.clonePlan(cid, planId);
+  // 唯一沒補 revalidatePath 的教練端寫入 action：呼叫端會 router.push 到新編輯器所以看不出來，
+  // 但使用者按上一頁回客戶頁時會看不到剛複製出的版本。
+  revalidatePath("/dashboard/clients");
   return id;
 }
 

@@ -6,7 +6,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { inArray, eq } from "drizzle-orm";
+import { and, inArray, eq } from "drizzle-orm";
 import * as schema from "../src/Shared/db/schema";
 import { sampleCase } from "../src/lib/engine";
 import { planSnapshot } from "../src/lib/snapshot";
@@ -17,7 +17,31 @@ const {
 } = schema;
 
 const db = drizzle(neon(process.env.DATABASE_URL!), { schema });
+// 可刪除標記：不能用 tags（教練在 UI 可以自由輸入「示範資料」給真實客戶，下次 seed 就把人家的資料連 plans/reviews 一起硬刪）。
+// 改用使用者介面碰不到的 clients.source 值。
 const DEMO_TAG = "示範資料";
+const SEED_SOURCE = "__seed__";
+const SEED_AUTHOR = "__seed__";
+
+// ─────────────────────────────────────────────────────────────
+// 破壞性腳本防呆：這支會刪除/覆寫資料，而 .env.local 指向的就是**正式** Neon。
+// 必須明確帶 ALLOW_DESTRUCTIVE_SEED=1 才會執行，並印出目標資料庫讓人肉眼確認。
+//   ALLOW_DESTRUCTIVE_SEED=1 npx tsx scripts/xxx.ts
+// ─────────────────────────────────────────────────────────────
+function assertSeedAllowed(scriptName: string): void {
+  const url = process.env.DATABASE_URL || "";
+  const host = (/@([^/?]+)/.exec(url)?.[1]) || "(未知)";
+  if (!process.env.ALLOW_DESTRUCTIVE_SEED) {
+    console.error(
+      `\n拒絕執行 ${scriptName}：這是破壞性腳本（會刪除既有資料）。\n` +
+      `目標資料庫：${host}\n` +
+      `確定要跑的話請帶環境變數：ALLOW_DESTRUCTIVE_SEED=1 npx tsx scripts/${scriptName}\n`,
+    );
+    process.exit(1);
+  }
+  console.log(`⚠️  ${scriptName} 將寫入資料庫：${host}`);
+}
+
 
 // ---------- 期間工具 ----------
 function period(offset: number): string {
@@ -28,6 +52,8 @@ function period(offset: number): string {
 }
 const CUR = period(0);
 const PERIODS = Array.from({ length: 8 }, (_, i) => period(7 - i)); // 舊→新
+// 本腳本會重種的期間；清除 metrics 時只限縮在這幾個月，不動其他歷史月份。
+const SEED_PERIODS = PERIODS;
 function isoAddDays(days: number): string {
   const d = new Date(); d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
@@ -68,7 +94,7 @@ async function createDemoClient(coachId: string, persona: Persona, opts: { statu
   const snap = planSnapshot(data);
   const [c] = await db.insert(clients).values({
     coachId, name: `${persona.name}（示範）`, status: opts.status ?? "active",
-    lifeStage: opts.lifeStage ?? "育兒", source: "轉介",
+    lifeStage: opts.lifeStage ?? "育兒", source: SEED_SOURCE,
     contact: { phone: "09xx-xxx-xxx" }, tags: [DEMO_TAG],
     birthDate: `${new Date().getFullYear() - persona.age}-06-15`,
   }).returning();
@@ -131,6 +157,7 @@ function pushMetricsRows(rows: any[], coachId: string, baseIncome: number, reten
 }
 
 async function main() {
+  assertSeedAllowed("seed.ts");
   // 1) owner = Ray 的 admin 帳號。
   const admins = await db.select().from(coaches).where(eq(coaches.role, "admin"));
   const owner = admins[0];
@@ -143,7 +170,7 @@ async function main() {
   const mockCoachIds = TEAMS.flatMap((t) => [t.mgr.id, ...t.members.map((m) => m.id)]);
   const allClients = await db.select().from(clients);
   const staleIds = allClients
-    .filter((c) => (c.coachId != null && mockCoachIds.includes(c.coachId)) || (c.tags ?? []).includes(DEMO_TAG))
+    .filter((c) => (c.coachId != null && mockCoachIds.includes(c.coachId)) || c.source === SEED_SOURCE)
     .map((c) => c.id);
   if (staleIds.length) {
     await db.delete(actionItems).where(inArray(actionItems.clientId, staleIds));
@@ -178,21 +205,27 @@ async function main() {
     for (const m of t.members) await upsertCoach(m.id, m.name, m.title, "member", t.mgr.id);
   }
 
-  // 4b) 真實同仁：只補「組織位置的空缺」（輪流掛進三個團隊當成員），不動帳號本身（不改 name/email/role/status）。
+  // 4b) 真實同仁：只補「還沒有上線」的人，且不覆寫既有職級/職稱。
+  //     組織位置是這套系統的權限維度（決定誰看得到誰的客戶與業績），
+  //     舊版每跑一次 seed 就把管理員在 /admin 排好的組織樹整個打散重排。
   const mgrIds = TEAMS.map((t) => t.mgr.id);
-  for (let i = 0; i < realColleagues.length; i++) {
-    const col = realColleagues[i];
+  const needUpline = realColleagues.filter((c) => !c.uplineId);
+  for (let i = 0; i < needUpline.length; i++) {
+    const col = needUpline[i];
     await db.update(coaches).set({
-      orgRank: "member",
       uplineId: mgrIds[i % mgrIds.length],
-      title: col.title || "財務顧問",
+      ...(col.title ? {} : { title: "財務顧問" }),
     }).where(eq(coaches.id, col.id));
   }
-  if (realColleagues.length) console.log(`真實同仁已補進團隊（輪流掛在業務一/二/三部；可在 /admin 調整）`);
+  if (needUpline.length) console.log(`真實同仁補上線 ${needUpline.length} 位（原本已有上線者一律不動）`);
 
   // 5) 月度指標：mock 教練 + 真實同仁（真實同仁不改 org 位置，只補指標）。
+  // 只清「本次要重種的期間」，不要把真實同仁全部歷史月份洗掉
+  //（這張表在 schema 註解裡就寫明是可手動編修的）。
   const seededMetricIds = [...mockCoachIds, owner.id, ...realColleagues.map((c) => c.id)];
-  await db.delete(memberMetrics).where(inArray(memberMetrics.coachId, seededMetricIds));
+  await db.delete(memberMetrics).where(
+    and(inArray(memberMetrics.coachId, seededMetricIds), inArray(memberMetrics.period, SEED_PERIODS)),
+  );
   const rows: any[] = [];
   for (const t of TEAMS) {
     pushMetricsRows(rows, t.mgr.id, 60000, 94);
@@ -218,13 +251,13 @@ async function main() {
   await db.insert(recruits).values(rec);
   console.log(`recruits: ${rec.length} 筆`);
 
-  // 7) 公告（整批重種）。
-  await db.delete(announcements);
+  // 7) 公告（只重種本腳本自己種的那幾筆；舊版是無 where 的 delete，會清空整張公告表）。
+  await db.delete(announcements).where(eq(announcements.author, SEED_AUTHOR));
   await db.insert(announcements).values([
-    { category: "activity", title: "8月增員說明會開放報名", body: "8/20 晚間 19:00，線上與台北辦公室同步。", pinned: true, author: "總部" },
-    { category: "important", title: "新版退休試算引擎已上線（v12）", body: "蒙地卡羅模擬與缺口分析已更新。", pinned: false, author: "系統" },
-    { category: "general", title: "第三季頂尖顧問競賽起跑", body: "即日起至 9/30，收益與活動量雙榜。", pinned: false, author: "業務部" },
-    { category: "general", title: "理財規劃證照(CFP)換證提醒", body: "本年度到期者請於 11 月前完成展延。", pinned: false, author: "合規" },
+    { category: "activity", title: "8月增員說明會開放報名", body: "8/20 晚間 19:00，線上與台北辦公室同步。", pinned: true, author: SEED_AUTHOR },
+    { category: "important", title: "新版退休試算引擎已上線（v12）", body: "蒙地卡羅模擬與缺口分析已更新。", pinned: false, author: SEED_AUTHOR },
+    { category: "general", title: "第三季頂尖顧問競賽起跑", body: "即日起至 9/30，收益與活動量雙榜。", pinned: false, author: SEED_AUTHOR },
+    { category: "general", title: "理財規劃證照(CFP)換證提醒", body: "本年度到期者請於 11 月前完成展延。", pinned: false, author: SEED_AUTHOR },
   ]);
   console.log("announcements: 4 筆");
 

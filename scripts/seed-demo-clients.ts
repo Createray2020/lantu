@@ -4,7 +4,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import * as schema from "../src/Shared/db/schema";
 import { sampleCase } from "../src/lib/engine";
 import { planSnapshot } from "../src/lib/snapshot";
@@ -462,7 +462,24 @@ export const SEEDS: Seed[] = [
   },
 ];
 
+
+// 破壞性腳本防呆（同 seed.ts）：.env.local 指向的是正式 Neon，必須明確帶旗標才跑。
+function assertSeedAllowed(scriptName: string): void {
+  const url = process.env.DATABASE_URL || "";
+  const host = (/@([^/?]+)/.exec(url)?.[1]) || "(未知)";
+  if (!process.env.ALLOW_DESTRUCTIVE_SEED) {
+    console.error(
+      `\n拒絕執行 ${scriptName}：這是破壞性腳本（會刪除既有資料）。\n` +
+      `目標資料庫：${host}\n` +
+      `確定要跑的話請帶：ALLOW_DESTRUCTIVE_SEED=1 npx tsx scripts/${scriptName}\n`,
+    );
+    process.exit(1);
+  }
+  console.log(`⚠️  ${scriptName} 將寫入資料庫：${host}`);
+}
+
 async function main() {
+  assertSeedAllowed("seed-demo-clients.ts");
   const admins = await db.select().from(coaches).where(eq(coaches.role, "admin"));
   const owner = admins.find((a) => a.email === "createray2020@gmail.com") ?? admins[0];
   if (!owner) throw new Error("找不到 admin 帳號");

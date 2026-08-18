@@ -49,7 +49,24 @@ const COLLEAGUES: { email: string; scale: number; names: string[] }[] = [
   { email: "wcgeso0221@gmail.com",       scale: 0.95, names: ["邵柏丞", "尤思穎", "溫俊德", "莊惠美", "康福生"] }, // 家慶 汪
 ];
 
+
+// 破壞性腳本防呆（同 seed.ts）：.env.local 指向的是正式 Neon，必須明確帶旗標才跑。
+function assertSeedAllowed(scriptName: string): void {
+  const url = process.env.DATABASE_URL || "";
+  const host = (/@([^/?]+)/.exec(url)?.[1]) || "(未知)";
+  if (!process.env.ALLOW_DESTRUCTIVE_SEED) {
+    console.error(
+      `\n拒絕執行 ${scriptName}：這是破壞性腳本（會刪除既有資料）。\n` +
+      `目標資料庫：${host}\n` +
+      `確定要跑的話請帶：ALLOW_DESTRUCTIVE_SEED=1 npx tsx scripts/${scriptName}\n`,
+    );
+    process.exit(1);
+  }
+  console.log(`⚠️  ${scriptName} 將寫入資料庫：${host}`);
+}
+
 async function main() {
+  assertSeedAllowed("seed-colleagues.ts");
   const allCoaches = await db.select().from(coaches);
   const byEmail = new Map(allCoaches.map((c) => [c.email, c]));
 
@@ -103,4 +120,9 @@ async function main() {
   console.log("\n✅ 四位同仁各 5 位示範客戶寫入完成。");
 }
 
-main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
+// 入口守衛：舊版 main() 在模組頂層無條件執行，任何人為了複用常數而 import 這個檔，
+// 整支寫入腳本就會在 import 的當下對正式庫執行。
+const __direct = !!(process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("seed-colleagues.ts"));
+if (__direct) {
+  main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
+}

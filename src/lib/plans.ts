@@ -10,6 +10,7 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// 完整列（含 data jsonb）：只有真的要用 data 的路徑才呼叫（getPlan / clonePlan）。
 async function ownedPlan(coachId: string, planId: string): Promise<Plan | null> {
   const [row] = await db
     .select({ plan: plans })
@@ -18,6 +19,20 @@ async function ownedPlan(coachId: string, planId: string): Promise<Plan | null> 
     .where(and(eq(plans.id, planId), eq(clients.coachId, coachId)))
     .limit(1);
   return row?.plan ?? null;
+}
+
+// 輕量版：只做「這份 plan 是不是我的」驗證，不撈 data。
+// PlanEditor 是 700ms debounce 自動存檔，一小時編輯約 100 次；
+// 每次都因為權限檢查回讀 20KB 的 jsonb 是純浪費。
+type PlanLite = { id: string; clientId: string; year: number; label: string | null; status: string };
+async function ownedPlanLite(coachId: string, planId: string): Promise<PlanLite | null> {
+  const [row] = await db
+    .select({ id: plans.id, clientId: plans.clientId, year: plans.year, label: plans.label, status: plans.status })
+    .from(plans)
+    .innerJoin(clients, eq(plans.clientId, clients.id))
+    .where(and(eq(plans.id, planId), eq(clients.coachId, coachId)))
+    .limit(1);
+  return row ?? null;
 }
 
 async function ownedClientId(coachId: string, clientId: string): Promise<boolean> {
@@ -35,7 +50,7 @@ export async function getPlan(coachId: string, planId: string): Promise<Plan | n
 
 // 存回 iframe 編輯的整份案件，同時用引擎重算快照。
 export async function updatePlanData(coachId: string, planId: string, data: unknown): Promise<{ netWorth: number | null; healthGrade: string | null }> {
-  const plan = await ownedPlan(coachId, planId);
+  const plan = await ownedPlanLite(coachId, planId);
   if (!plan) throw new Error("forbidden");
   const snap = planSnapshot(data);
   await db
@@ -53,7 +68,7 @@ export type PlanMetaPatch = {
 };
 
 export async function updatePlanMeta(coachId: string, planId: string, patch: PlanMetaPatch): Promise<void> {
-  const plan = await ownedPlan(coachId, planId);
+  const plan = await ownedPlanLite(coachId, planId);
   if (!plan) throw new Error("forbidden");
   await db
     .update(plans)
@@ -114,7 +129,7 @@ export async function createPlan(coachId: string, clientId: string, name: string
 }
 
 export async function deletePlan(coachId: string, planId: string): Promise<void> {
-  const plan = await ownedPlan(coachId, planId);
+  const plan = await ownedPlanLite(coachId, planId);
   if (!plan) throw new Error("forbidden");
   await db.delete(plans).where(eq(plans.id, planId));
 }

@@ -40,12 +40,14 @@ export async function getCoachDashboard(coachId: string): Promise<CoachDashboard
 
   let reviewRows: (typeof reviews.$inferSelect)[] = [];
   let itemRows: (typeof actionItems.$inferSelect)[] = [];
-  let planRows: (typeof plans.$inferSelect)[] = [];
+  // 儀表板只用得到 healthGrade 做階段分佈；明列欄位，不要把整份 plans.data jsonb 撈回來。
+  let planRows: { clientId: string; year: number; createdAt: Date; healthGrade: string | null }[] = [];
   if (ids.length) {
     [reviewRows, itemRows, planRows] = await Promise.all([
       db.select().from(reviews).where(inArray(reviews.clientId, ids)),
       db.select().from(actionItems).where(inArray(actionItems.clientId, ids)),
-      db.select().from(plans).where(inArray(plans.clientId, ids)),
+      db.select({ clientId: plans.clientId, year: plans.year, createdAt: plans.createdAt, healthGrade: plans.healthGrade })
+        .from(plans).where(inArray(plans.clientId, ids)),
     ]);
   }
 

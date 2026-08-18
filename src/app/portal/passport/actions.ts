@@ -1,5 +1,9 @@
 "use server";
 
+// 教練端的 action 都有 revalidatePath，客戶端這幾支原本完全沒有——
+// 目前只是靠 Next 的 staleTimes.dynamic 預設 0 才沒出事（PassportWizard 的「硬導頁比 router.push 穩」
+// 註解就是這個缺失的症狀補丁）。補齊，別留這種隱性依賴。
+import { revalidatePath } from "next/cache";
 import { ensureClientUser } from "@/lib/clientUser";
 import { savePassport } from "@/lib/clientPlan";
 import type { PassportInputs } from "@/lib/passport";
@@ -11,6 +15,10 @@ export async function savePassportAction(inputs: PassportInputs) {
     const user = await ensureClientUser();
     if (!user) return { ok: false as const, error: "未登入，請重新登入後再試" };
     const result = await savePassport(user, inputs);
+    revalidatePath("/portal");
+    revalidatePath("/portal/passport");
+    revalidatePath("/portal/setup");
+    revalidatePath("/portal/plan");
     return { ok: true as const, result };
   } catch (e) {
     console.error("[savePassportAction] 存檔失敗", e);

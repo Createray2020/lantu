@@ -1,7 +1,20 @@
 /* eslint-disable */
 // @ts-nocheck
 // 嵐途財務引擎 — 由 v12 單檔原型移植的純函式（無 DOM/狀態）。
-import { defaultIntent } from "@/lib/intent";
+//
+// ⚠️ 雙實作：本檔與 public/lantu-app.html 是同一套邏輯的兩份實作。
+//    engine.ts 算的是「寫進 DB 的快照」(planSnapshot/planMetrics)，
+//    lantu-app.html 算的是「使用者在 iframe 看到的數字」。兩邊漂移＝列表與畫面對不上。
+//    src/lib/engine.test.ts 有一組「雙實作對拍」測試會正則比對關鍵公式，改任何計算務必兩邊一起改。
+import { defaultIntent, PURPOSES, TARGETS } from "@/lib/intent";
+import {
+  TAX_BR, EXEMPT_PER_PERSON, STD_DED_MARRIED, STD_DED_SINGLE, SALARY_SPECIAL,
+  EST_BR, ESTATE_EXEMPT, ESTATE_SPOUSE_DED, ESTATE_LINEAL_DED, ESTATE_FUNERAL_DED,
+  LABOR_INS_GRADES, LABOR_PENSION_RATE, LABOR_INS_ANNUITY_RATE,
+  laborInsSalary, laborPensionSalary,
+  PROF_EXPENSE, profStdRate, profExpenseRate,
+  HOUSE_TAX_RATE, LAND_TAX_RATE,
+} from "@/lib/taiwan";
 
 var KINDS=['壽險','意外險','住院醫療','初次罹癌','癌症住院','重病給付','每月照護'];
 
@@ -80,18 +93,33 @@ function sampleCase(){return {
  ]}
 };}
 
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
- c.intent=defaultIntent();c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};return c}
+function defaultCompany(){return {name:'',taxId:'',industry:'',role:'負責人',sharePct:100,annualRevenue:0,netProfit:0,ownerLoan:0,note:''};}
+
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0,estateDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+ // profile.credit 是信用評分的舊欄位（與 credit.score 雙寫）。sampleCase 帶 700 分，
+ // 這裡若不一併清掉，新客戶會憑空拿到示範資料的評分並白送約 12.5 分財務安全度。
+ c.profile.credit='';
+ c.intent=defaultIntent();c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};
+ // 與 lantu-app.html 的 newCase() 對齊：少了這幾個欄位，新客戶進 iframe 後價值輪與報告備註會是 undefined。
+ c.profile.jobType='一般就業者';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';
+ return c}
+
+// 「本人」成員；找不到就退回第一位。壽險缺口的流動資產抵充、勞保勞退概算都以他為準。
+function primaryMember(c){return ((c&&c.members)||[]).filter(function(m){return m.role==='本人'})[0]||((c&&c.members)||[])[0];}
+
+// 信用評分有兩個輸入口（家庭/參數的 profile.credit、信用/海外的 credit.score），已雙寫同步。
+function creditScoreOf(c){return n(((c||{}).credit||{}).score)||n(((c||{}).profile||{}).credit);}
 
 function n(v){v=Number(v);return isNaN(v)?0:v}
 
 function sum(a,f){return (a||[]).reduce(function(s,x){return s+f(x)},0)}
 
-function fmt(v){v=Math.round(n(v));return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
+// Infinity 不擋的話會原字串印到畫面上（例：月數為 0 的貸款試算 → 「月繳 Infinity」）。
+function fmt(v){v=n(v);if(!isFinite(v))return '—';v=Math.round(v);return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
 
-function pct(x){return (x*100).toFixed(2)+'%'}
+function pct(x){x=Number(x);if(!isFinite(x))return '—';return (x*100).toFixed(2)+'%'}
 
 function annualDebtInterest(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;return (a0>=sa)?lBal(l)*n(l.rate)/100:0})}
 
@@ -106,6 +134,20 @@ function aInc(a){return n(a.income)*(n(a.fxRate)||1)}
 function lBal(l){return n(l.balance)*(n(l.fxRate)||1)}
 
 function lPay(l){return n(l.pay)*(n(l.fxRate)||1)}
+
+// 貸款剩餘本金（本息攤還）。舊版用「餘額 − 月繳×12×年數」線性遞減，把每期利息也當本金攤掉，
+// 2% 的 1000 萬房貸第 10 年會少算約 170 萬負債，生涯藍圖的淨資產因此系統性樂觀。
+function lRemain(l,age,a0){
+ var sa=n(l.startAge)||a0; if(age<sa)return 0;
+ var P=lBal(l); if(P<=0)return 0;
+ var k=Math.max(0,Math.round((age-sa)*12));
+ var total=n(l.months); if(total>0)k=Math.min(k,total);
+ var i=n(l.rate)/12/100, pay=lPay(l);
+ if(pay<=0)return P;
+ if(i<=0)return Math.max(0,P-pay*k);
+ var f=Math.pow(1+i,k);
+ return Math.max(0,Math.min(P,P*f-pay*(f-1)/i));
+}
 
 function assetPassive(c){return sum(c.assets,function(a){return (a.income!=null&&a.income!=='')?aInc(a):((a.type==='股票'||a.type==='基金'||a.type==='債券')?aVal(a)*n(a.ret)/100:0)})}
 
@@ -128,13 +170,16 @@ function retireNeed(c){
  if(Math.abs(rr-g)<1e-6){total=annualFV*m/(1+rr);}
  else{total=annualFV*(1-Math.pow((1+g)/(1+rr),m))/(rr-g);}
  var prepared=sum(r.prepared,function(p){return n(p.amount)});
- return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,gap:Math.max(0,total-prepared)};
+ // valid=false 代表「退休年齡 ≥ 預期壽命」，余年 0 → total/gap 都是 0。
+ // 呼叫端要據此顯示「參數有誤」而不是「沒有退休缺口」。
+ return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,gap:Math.max(0,total-prepared),valid:m>0};
 }
 
 function lifeNeed(c,nd){
  var famLiving=familyAnnualLiving(c);
+ // 負債一律走 lBal()（有乘匯率）。直接用 n(l.balance) 會讓外幣房貸在「缺口」與「準備度」兩頁差一個匯率。
  var need=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
-   + sum(c.liabilities,function(l){return n(l.balance)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax);
+   + sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax);
  var existing=existingCover(c,nd.member,'壽險');
  var liquid=liquidMovable(c);
  return Math.max(0,need - existing - liquid);
@@ -165,6 +210,8 @@ function coverageGaps(c){
   };
   Object.keys(map).forEach(function(k){
    var need=map[k],ex=existingCover(c,nd.member,k);
+   // 已備來源擴充：本人的壽險一次性需求，可由家庭流動資產支應（與 lantu-app.html:453 一致）。
+   if(k==='壽險'&&nd.member===(primaryMember(c)||{}).name)ex+=liquidMovable(c);
    rows.push({member:nd.member,kind:k,need:need,have:ex,gap:need-ex});
   });
  });
@@ -201,18 +248,64 @@ function metrics(c){
   assetTotal:assetTotal,debtTotal:debtTotal,net:net,save:save_,interest:interest,monthExp:monthExp,visionNeed:proj.totalOutflow,proj:proj};
 }
 
+// 協會標準財務比率體檢：收支流量 13 項 + 資產負債 12 項，各帶 ideal（理想值）與 status 紅黃綠燈。
+// 與 public/lantu-app.html:663 的 ratios() 逐項一致（項目名稱與判燈門檻由對拍測試守著）。
 function ratios(c){var m=metrics(c),r={};
- r['年儲蓄率']={v:pct(m.save/(m.incTotal||1)),f:'年儲蓄 ÷ 總收入',ok:m.save/(m.incTotal||1)>=0.1};
- r['消費比率']={v:pct(m.living/(m.incTotal||1)),f:'生活費用 ÷ 總收入',ok:true};
- r['財務負擔率']={v:pct((m.tax+m.ins+m.interest)/(m.incTotal||1)),f:'(稅+保險+利息) ÷ 總收入',ok:(m.tax+m.ins+m.interest)/(m.incTotal||1)<=0.4};
- r['現金佔流動比']={v:pct(m.cash/(m.liquid||1)),f:'現金 ÷ 流動資產',ok:m.cash/(m.liquid||1)>=0.2};
- r['負債比率']={v:pct(m.debtTotal/(m.assetTotal||1)),f:'負債 ÷ 資產總額',ok:m.debtTotal/(m.assetTotal||1)<0.5};
- r['緊急預備金']={v:(m.monthExp?(m.liquid/m.monthExp).toFixed(1):'0')+' 個月',f:'流動資產 ÷ 每月支出',ok:m.liquid/(m.monthExp||1)>=n(c.params.emergencyMonths||6)};
- r['財務自由度']={v:pct(m.incFinancial/(m.expTotal||1)),f:'理財收入 ÷ 總支出',ok:m.incFinancial/(m.expTotal||1)>=1};
- r['理財成就率']={v:pct(m.net/((m.net-m.save)||1)),f:'淨值 ÷ (去年淨值)',ok:m.save>0};
- r['淨值成長率']={v:pct(m.save/(m.net||1)),f:'年儲蓄 ÷ 淨值',ok:m.save>0};
- r['願景達成率']={v:pct(m.net/(m.visionNeed||1)),f:'現有淨資產 ÷ 願景總需求',ok:m.net/(m.visionNeed||1)>=1};
- r['願景成就率']={v:pct((m.net/(m.visionNeed||1))/0.5),f:'願景達成率 ÷ 歷程比率',ok:false};
+ var inc=m.incTotal||1, at=m.assetTotal||1;
+ // 收支流量子聚合
+ var incWork=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
+ var livingCore=sum(c.expenses,function(e){return e.cat==='生活'?n(e.amount):0});
+ var discretionary=sum(c.expenses,function(e){return (e.cat==='消費'||e.cat==='其他')?n(e.amount):0});
+ var rent=sum(c.expenses,function(e){return (e.cat==='生活'&&/租/.test(e.name||''))?n(e.amount):0});
+ var insAll=sum(c.expenses,function(e){return e.cat==='保險'?n(e.amount):0});
+ var social=sum(c.expenses,function(e){return (e.cat==='保險'&&/(勞保|健保|勞健保|社會|國保|國民年金)/.test(e.name||''))?n(e.amount):0});
+ var premium=Math.max(0,insAll-social);
+ var loanPay=annualDebtPay(c);
+ var eduNow=sum(c.education,function(e){var s=n(e.startIn);return (s<=0&&0<s+n(e.years))?n(e.annual):0});
+ var support=sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0})+eduNow;
+ var saveActive=n(c.params.planYearly)||Math.max(0,m.save);
+ // 資產負債子聚合
+ var selfUse=sum(c.assets,function(a){return a.mainCat==='自用資產'?aVal(a):0});
+ var coreAsset=sum(c.assets,function(a){return a.mainCat==='可投資資產'?aVal(a):0});
+ var riskAsset=sum(c.assets,function(a){return (a.type==='股票'||a.type==='基金'||a.type==='債券'||(a.type==='不動產'&&a.mainCat==='可投資資產'))?aVal(a):0});
+ var conserv=sum(c.assets,function(a){return (a.type==='現金'||a.type==='定存'||/儲蓄|保單/.test(a.name||''))?aVal(a):0});
+ var emReq=m.monthExp*6;
+ var flow=m.save; // 年度(結餘+儲蓄+投資)：本模型合併為年結餘
+ var tr=(c.tracking||[]).slice().sort(function(x,y){return n(x.year)-n(y.year)});
+ // 判燈：band=越低越好、bandLow=越高越好、bandRange=落在區間最佳
+ function band(v,hi){return v<hi?'good':v<hi*1.3?'warn':'bad'}
+ function bandLow(v,lo){return v>=lo?'good':v>=lo*0.5?'warn':'bad'}
+ function bandRange(v,lo,hi){if(v>=lo&&v<=hi)return 'good';if(v>=lo*0.5&&v<=hi*1.35)return 'warn';return 'bad'}
+ function add(g,name,val,ideal,f,status){r[name]={v:val,ideal:ideal,f:f,status:status,ok:status==='good',group:g}}
+ var g1='收支流量',g2='資產負債';
+ add(g1,'所得穩定度',pct(incWork/inc),'>50%','工作收入 ÷ 總收入',bandLow(incWork/inc*100,50));
+ add(g1,'支出收入比',pct(m.expTotal/inc),'<70%','年度支出 ÷ 總收入',band(m.expTotal/inc*100,70));
+ add(g1,'生活費用比',pct(livingCore/inc),'<55%','生活費支出 ÷ 總收入',band(livingCore/inc*100,55));
+ add(g1,'貸款壓力比',pct(loanPay/inc),'<30%','貸款本息 ÷ 總收入',band(loanPay/inc*100,30));
+ add(g1,'租金壓力比',pct(rent/inc),'<20%','租金支出 ÷ 總收入',band(rent/inc*100,20));
+ add(g1,'保費支出比',pct(premium/inc),'10%~15%','(保費−社會保險) ÷ 總收入',bandRange(premium/inc*100,10,15));
+ add(g1,'低彈性支出比',pct((loanPay+rent+insAll)/inc),'<40%','(貸款+租金+保費) ÷ 總收入',band((loanPay+rent+insAll)/inc*100,40));
+ add(g1,'撫養壓力比',pct(support/inc),'—（越高責任越大）','扶養(孝親+教育) ÷ 總收入','na');
+ add(g1,'消費隨興比',pct(discretionary/inc),'<10%','消費/雜費 ÷ 總收入',band(discretionary/inc*100,10));
+ add(g1,'名目儲蓄率',pct(m.save/inc),'20%~30%','年結餘 ÷ 總收入',bandLow(m.save/inc*100,20));
+ add(g1,'有效儲蓄率',pct(saveActive/inc),'20%~30%','儲蓄理財投入 ÷ 總收入',bandLow(saveActive/inc*100,20));
+ add(g1,'理財收入比',pct(m.incFinancial/inc),'—','理財收入 ÷ 總收入','na');
+ add(g1,'財務自由度',pct(m.incFinancial/(m.expTotal||1)),'≥100% 即財務自由','理財收入 ÷ 總支出',m.incFinancial>=m.expTotal?'good':m.incFinancial>=m.expTotal*0.3?'warn':'na');
+ add(g2,'資產變現性',pct(m.liquid/at),'>30%','流動資產 ÷ 總資產',bandLow(m.liquid/at*100,30));
+ add(g2,'生活準備金適足',fmt(emReq)+' 元','6 個月支出','(年支出/12)×6','na');
+ add(g2,'超額現金比率',emReq?pct(m.cash/emReq):'—','50%~100%','現金 ÷ 生活準備金',emReq?bandRange(m.cash/emReq*100,50,100):'na');
+ add(g2,'自用資產比',pct(selfUse/at),'<50%','自用資產 ÷ 總資產',band(selfUse/at*100,50));
+ add(g2,'核心資產比',pct(coreAsset/at),'愈高愈好','可投資資產 ÷ 總資產',bandLow(coreAsset/at*100,40));
+ add(g2,'風險資產比',pct(riskAsset/at),'>20%','(股票+基金+債券+投資性不動產) ÷ 總資產',m.net<0?'na':bandLow(riskAsset/at*100,20));
+ add(g2,'保守資產比',pct(conserv/at),'<20%','(現金+定存+儲蓄型保單) ÷ 總資產',band(conserv/at*100,20));
+ add(g2,'負債比率',pct(m.debtTotal/at),'<50%','總負債 ÷ 總資產',band(m.debtTotal/at*100,50));
+ var repayIdx=m.debtTotal>0?Math.max(0,1-flow/m.debtTotal):null;
+ add(g2,'償債壓力指數',repayIdx==null?'—（無負債）':pct(repayIdx),'<50%','1 −（年結餘 ÷ 總負債）',repayIdx==null?'na':band(repayIdx*100,50));
+ var growth=m.net!==0?flow/Math.abs(m.net):0;
+ add(g2,'資產成長動力比',pct(growth),'>10%','年結餘 ÷ 資產淨值',bandLow(growth*100,10));
+ if(tr.length>=2){var pv=n(tr[tr.length-2].net),cv=n(tr[tr.length-1].net);var gr=pv?(cv-pv)/Math.abs(pv):0;add(g2,'資產淨值增長率',pct(gr),'愈高愈好','(今年淨值−去年淨值) ÷ 去年淨值',bandLow(gr*100,0.01));}
+ else add(g2,'資產淨值增長率','—（需兩年度資料）','愈高愈好','需連續兩年淨值','na');
+ add(g2,'願景達成率',pct(m.net/(m.visionNeed||1)),'≥100%','現有淨資產 ÷ 願景總需求',bandLow(m.net/(m.visionNeed||1)*100,100));
  return r;
 }
 
@@ -243,7 +336,7 @@ function projection(c){
   invest=(invest>0?invest*(1+ret):invest)+bal;
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
   if(turnNeg===null&&invest<0)turnNeg=age;
-  var remDebt=sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;if(age<sa)return 0;return Math.max(0,lBal(l)-lPay(l)*12*(age-sa))});
+  var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)});
   var netEst=invest+fixedAssets-remDebt;
   rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,bal:bal,invest:invest,net:netEst});
  }
@@ -256,8 +349,10 @@ function hashStr(s){s=s||'x';var h=2166136261;for(var i=0;i<s.length;i++){h^=s.c
 
 function gauss(rng,m,sd){var u=0,v=0;while(u===0)u=rng();while(v===0)v=rng();return m+sd*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
 
-function monteCarlo(c,N){N=N||1000;var rng=mulberry32(hashStr(c.id)+N);
- var a0=n(c.profile.age),aEnd=n(c.params.horizon),years=aEnd-a0+1;
+function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(hashStr(c.id)+N);
+ // horizon 沒填時要退回 85（與 projection 一致）。少了 ||85 會讓 years 變負數 →
+ // 迴圈不執行 → neg=0 → pSuccess 顯示「不破產機率 100%」而圖是空的。
+ var a0=n(c.profile.age)||40,aEnd=n(c.params.horizon)||85,years=Math.max(0,aEnd-a0+1);
  var bR=n(c.params.invReturn),sR=n(c.params.invReturnStd),bI=n(c.params.inflation),sI=n(c.params.inflationStd),bG=n(c.params.salaryGrowth),sG=n(c.params.salaryStd);
  var liquid0=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
  var passive=assetPassive(c);
@@ -285,7 +380,9 @@ function monteCarlo(c,N){N=N||1000;var rng=mulberry32(hashStr(c.id)+N);
   }
   matrix.push(traj);finals.push(invest);if(broke)neg++;
  }
- function pctile(arr,p){var a=arr.slice().sort(function(x,y){return x-y});return a[Math.min(a.length-1,Math.floor(p*a.length))]}
+ // p 分位：索引要用 (len-1) 內插，用 floor(p*len) 在小樣本會把 P90 取成最大值。
+ function pctile(arr,p){var a=arr.slice().sort(function(x,y){return x-y});if(!a.length)return 0;
+  return a[Math.min(a.length-1,Math.max(0,Math.round(p*(a.length-1))))]}
  var bands=[];for(var y=0;y<years;y++){var col=matrix.map(function(m){return m[y]});bands.push([pctile(col,0.1),pctile(col,0.5),pctile(col,0.9)])}
  return {N:N,years:years,a0:a0,pSuccess:(N-neg)/N,finalP10:pctile(finals,0.1),finalP50:pctile(finals,0.5),finalP90:pctile(finals,0.9),bands:bands};
 }
@@ -293,12 +390,15 @@ function monteCarlo(c,N){N=N||1000;var rng=mulberry32(hashStr(c.id)+N);
 function health(c){
  var m=metrics(c),savingRate=m.save/(m.incTotal||1);
  var reserve=Math.min(1,(m.liquid/(m.monthExp||1))/n(c.params.emergencyMonths||6));
- var cs=n((c.credit&&c.credit.score))||n(c.profile.credit);var credit=cs?cs/100:0;
+ // 聯徵評分區間是 200–800。credit 的設計值域是 0~1（safety 用 credit*15 加權，滿分 100）；
+ // 用 cs/100 會讓 700 分算成 7.0、safety 直接飆到 183。與 lantu-app.html:827 一致。
+ var cs=creditScoreOf(c);var credit=cs>=200?Math.min(1,Math.max(0,(cs-200)/600)):0;
  var dr=m.debtTotal/(m.assetTotal||1);var debtBal=dr<0.2?1:Math.max(0,1-(dr-0.2)/0.6);
  var need=totalGap(c),needBase=sum(coverageGaps(c),function(g){return g.need})||1;
  var riskCover=Math.max(0,1-need/needBase);
  var balScore=savingRate>=0?1:Math.max(0,1+savingRate);
- var safety=Math.round((balScore*25+reserve*15+credit*15+debtBal*15+riskCover*30));
+ // 五項加權滿分 100；clamp 是防呆，任何一項若因資料異常超出 0~1 都不該讓總分破表。
+ var safety=Math.max(0,Math.min(100,Math.round((balScore*25+reserve*15+credit*15+debtBal*15+riskCover*30))));
  var freedom=Math.round(Math.min(1,m.incFinancial/(m.expTotal||1))*100);
  var vision=Math.round(Math.min(1,m.net/(m.visionNeed||1))*100);
  var grade=(safety<60||balScore<1)?'D':(freedom<20?'C':(vision<60?'B':'A'));
@@ -355,33 +455,85 @@ function actionList(c){var adv=advice(c),axes=['A','B','C','D'];
  return adv.map(function(a,i){return {axis:axes[i%4],title:a[0],detail:a[1]}});
 }
 
-var TAX_BR=[[590000,0.05,0],[1330000,0.12,41300],[2660000,0.2,147700],[4980000,0.3,413700],[1e15,0.4,911700]];
+// TAX_BR / EST_BR / 各項扣除額已移到 src/lib/taiwan.ts（帶年度標註＋跨年護欄測試），此處僅 re-export。
 
-var EST_BR=[[56210000,0.10,0],[112420000,0.15,2810500],[1e15,0.20,8431500]];
-
-function bracket(x,br){for(var i=0;i<br.length;i++){if(x<=br[i][0])return {rate:br[i][1],ded:br[i][2],tax:Math.max(0,x*br[i][1]-br[i][2])}}return{rate:0,ded:0,tax:0}}
+// 累進級距。三個邊界情形要擋掉：
+//  - NaN / Infinity → 回 0 稅（原本 NaN 會靜默落到 rate 0）
+//  - 負數（負所得）→ rate 也要是 0，原本會回 5%
+//  - 超過最高級距上界 → 套最高級距，原本直接掉出迴圈回「0 稅」
+function bracket(x,br){
+ x=Number(x);
+ if(!isFinite(x)||x<=0)return {rate:0,ded:0,tax:0};
+ for(var i=0;i<br.length;i++){if(x<=br[i][0])return {rate:br[i][1],ded:br[i][2],tax:Math.max(0,x*br[i][1]-br[i][2])}}
+ var last=br[br.length-1];
+ return {rate:last[1],ded:last[2],tax:Math.max(0,x*last[1]-last[2])};
+}
 
 function incomeTax(c){
  var tp=c.taxParams||{};
- var salary=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
+ var work=(c.incomes||[]).filter(function(i){return i.type==='工作'});
+ // 子類別＝執行業務所得者走費用率扣除，其餘工作收入走薪資所得特別扣除（與 lantu-app.html:910 一致）。
+ var profGross=sum(work,function(i){return i.subType==='執行業務所得'?n(i.amount):0});
+ var salary=sum(work,function(i){return i.subType==='執行業務所得'?0:n(i.amount)});
+ var pRate=profExpenseRate(tp);
+ var profExpense=Math.round(profGross*pRate/100);
+ var profNet=Math.max(0,profGross-profExpense);
  var people=1+(tp.married?1:0)+n(tp.dependents);
- var salaryEarners=(c.members||[]).filter(function(m){return n(m.insSalary)>0}).length||1;
- var exempt=97000*people;
- var stdDed=tp.married?262000:131000;
- var salarySpecial=Math.min(salary,218000*salaryEarners);
- var net=Math.max(0,salary-exempt-stdDed-salarySpecial-n(tp.otherDeduction));
+ // 薪資特別扣除的人數依申報身分（本人＋有偶）認定，與免稅額/標準扣除同一個來源。
+ // 舊版改用「成員中 insSalary>0 的人數」，會在「家庭加了有薪配偶但稅賦沒切有偶」時多扣一份、稅額少算約 5 萬。
+ var salaryEarners=Math.max(1,Math.min(1+(tp.married?1:0),(c.members||[]).filter(function(m){return n(m.insSalary)>0}).length||1));
+ var exempt=EXEMPT_PER_PERSON*people;
+ var stdDed=tp.married?STD_DED_MARRIED:STD_DED_SINGLE;
+ var salarySpecial=Math.min(salary,SALARY_SPECIAL*salaryEarners);
+ var gross=salary+profNet;
+ var net=Math.max(0,gross-exempt-stdDed-salarySpecial-n(tp.otherDeduction));
  var b=bracket(net,TAX_BR);
- return {salary:salary,exempt:exempt,stdDed:stdDed,salarySpecial:salarySpecial,net:net,rate:b.rate,ded:b.ded,tax:b.tax,people:people};
+ return {salary:salary,profGross:profGross,profRate:pRate,profExpense:profExpense,profNet:profNet,
+  profOccupation:tp.profOccupation||'',gross:gross,
+  exempt:exempt,stdDed:stdDed,salarySpecial:salarySpecial,salaryEarners:salaryEarners,
+  net:net,rate:b.rate,ded:b.ded,tax:b.tax,people:people};
 }
 
+// 遺產稅：免稅額之外還有配偶／直系血親卑親屬／喪葬費三項法定扣除額，舊版全部沒算，稅額被系統性高估。
+// 另：舊版誤用綜所稅的 taxParams.otherDeduction，改為獨立的 estateDeduction。
 function estateTax(c,netOverride){
+ var tp=(c||{}).taxParams||{};
+ var lg=(c||{}).legacy||{};
  var net=(netOverride!=null)?netOverride:metrics(c).net;
- var exempt=13330000, base=Math.max(0,net-exempt-n((c.taxParams||{}).otherDeduction));
+ var heirs=Math.max(0,n(lg.heirs));
+ var ded={
+  exempt:ESTATE_EXEMPT,
+  spouse:tp.married?ESTATE_SPOUSE_DED:0,
+  lineal:heirs*ESTATE_LINEAL_DED,
+  funeral:ESTATE_FUNERAL_DED,
+  other:n(tp.estateDeduction)
+ };
+ var totalDed=ded.exempt+ded.spouse+ded.lineal+ded.funeral+ded.other;
+ var base=Math.max(0,net-totalDed);
  var b=bracket(base,EST_BR);
- return {base:base,rate:b.rate,tax:b.tax};
+ return {base:base,rate:b.rate,tax:b.tax,net:net,heirs:heirs,deductions:ded,totalDeduction:totalDed};
 }
 
-function propertyTax(c){var tp=c.taxParams||{};var house=n(tp.houseAssessed)*0.012,land=n(tp.landAssessed)*0.002,car=n(tp.carTax);return {house:house,land:land,car:car,total:house+land+car}}
+function propertyTax(c){var tp=c.taxParams||{};var house=n(tp.houseAssessed)*HOUSE_TAX_RATE,land=n(tp.landAssessed)*LAND_TAX_RATE,car=n(tp.carTax);return {house:house,land:land,car:car,total:house+land+car}}
+
+// 勞保老年年金（B式）＋勞退新制概算。
+// ⚠️ 勞退走的是「月提繳工資分級表」(上限 150,000)，不是勞保投保薪資分級表(上限 45,800)。
+//    兩張表混用會讓月薪 10 萬的客戶勞退提繳低估過半。
+function estimateLaborPension(c){
+ var pm=primaryMember(c)||{};
+ var ins=n(pm.insSalary);
+ var pensionBase=laborPensionSalary(n(pm.monthlySalary)||n((c.profile||{}).monthlySalary)||ins);
+ var age=n(c.profile.age),ra=n(c.profile.retireAge);
+ var years=Math.max(0,n(pm.worked)+Math.max(0,ra-age));
+ var r=c.retire||{};var rr=n(r.retireReturn)/100||0.04;var m=Math.max(0,n(c.profile.lifeExp)-ra);
+ if(ins<=0||years<=0)return {ins:ins,pensionBase:pensionBase,years:years,monthly:0,lump:0,fund:0,total:0};
+ var monthly=ins*years*LABOR_INS_ANNUITY_RATE;
+ var annual=monthly*12;
+ var lump=(rr>0)?annual*(1-Math.pow(1+rr,-m))/rr:annual*m;   // 退休時之年金現值
+ var g=0.03, annualContrib=pensionBase*LABOR_PENSION_RATE*12; // 勞退：雇主月提繳 6%、基金概估年化 3%
+ var fund=(g>0)?annualContrib*(Math.pow(1+g,years)-1)/g:annualContrib*years;
+ return {ins:ins,pensionBase:pensionBase,years:years,monthly:monthly,lump:lump,fund:fund,total:lump+fund};
+}
 
 function legacyNeed(c){var lg=c.legacy||{};return n(lg.heirs)*n(lg.perHeirCash)}
 
@@ -420,10 +572,11 @@ function crossTable(c){var m=metrics(c);
 // @deprecated 已改用 stageColor（財務階段）；保留僅為既有 export 契約相容，勿用於新程式。
 function gradeColor(g){return {A:'var(--ok)',B:'var(--teal)',C:'var(--amber)',D:'var(--warn)'}[g]}
 
-var PURPOSES=['想增加收入','想買車、買房，進行置產','想進行儲蓄，替未來準備','想進行投資、活化資產','想優化個人的信用評分','想進行風險的保障評估','有節稅需求，想進行節稅','人生模擬，了解一生金流'];
+// PURPOSES / TARGETS 的唯一真相在 src/lib/intent.ts（本檔僅 re-export，見檔頂 import）。
+// 舊版在這裡另存一份，已經漂到含有已廢止的「置產」「人生模擬」且缺「婚姻規劃」。
 
-var TARGETS=['人生模擬','職涯規劃','購車規劃','購屋規劃','子女教養規劃','孝親規劃','旅遊規劃','休閒興趣規劃','奢侈品購買規劃','退休生活規劃','傳承規劃'];
-
+// 作答值：單選＝選項索引；複選（multi）＝索引陣列。計分一律取所選項中的最高分，
+// 因此複選題不會膨脹總分，12 題滿分仍為 60，四個分級門檻不變。
 var RISK_Q=[
  {q:'您目前的年齡層是？',o:[['70歲以上',1],['60–69歲',2],['50–59歲',3],['40–49歲',4],['39歲以下',5]]},
  {q:'這筆可投資資金占您整體資產的比例？',o:[['80%以上（幾乎是全部）',1],['約60–80%',2],['約40–60%',3],['約20–40%',4],['20%以下（僅一小部分）',5]]},
@@ -431,8 +584,8 @@ var RISK_Q=[
  {q:'您預計這筆資金可以不動用多久？',o:[['1年以內',1],['1–3年',2],['3–5年',3],['5–10年',4],['10年以上',5]]},
  {q:'您目前的收入來源穩定度？',o:[['已無主動收入（退休/待業）',1],['不穩定、起伏大',2],['尚可，普通穩定',3],['穩定的薪資收入',4],['穩定且有多重來源',5]]},
  {q:'未來3–5年您的收入預期？',o:[['可能明顯減少',1],['可能略減',2],['大致持平',3],['可能成長',4],['可望大幅成長',5]]},
- {q:'您對投資理財商品的了解與經驗？',o:[['完全沒有',1],['僅定存/儲蓄險',2],['買過基金/ETF',3],['熟悉股票/債券操作',4],['熟悉衍生性/槓桿商品',5]]},
- {q:'您實際投資過風險最高的商品是？',o:[['定存、儲蓄險',1],['債券、貨幣型基金',2],['平衡型基金、績優股',3],['個股、股票型基金',4],['期權、外匯、加密貨幣等',5]]},
+ {q:'您對投資理財商品的了解與經驗？（可複選）',multi:true,hint:'請勾選所有接觸過的類型；計分以最高者為準。',o:[['完全沒有',1],['僅定存/儲蓄險',2],['買過基金/ETF',3],['熟悉股票/債券操作',4],['熟悉衍生性/槓桿商品',5]]},
+ {q:'您實際投資過（或目前持有）的商品有哪些？（可複選）',multi:true,hint:'請勾選所有持有過的商品；計分以風險最高者為準。',o:[['定存、儲蓄險',1],['債券、貨幣型基金',2],['平衡型基金、績優股',3],['個股、股票型基金',4],['期權、外匯、加密貨幣等',5]]},
  {q:'若投資一年內下跌20%，您會？',o:[['立刻全部贖回、不再投資',1],['贖回大部分',2],['觀望、暫不動作',3],['續抱等待回升',4],['視為機會、加碼買進',5]]},
  {q:'您能接受這筆資金最大的本金虧損幅度？',o:[['不能接受任何虧損',1],['5%以內',2],['約10–15%',3],['約20–30%',4],['30%以上也可承受',5]]},
  {q:'下列報酬/風險組合，您偏好哪一種？',o:[['報酬2%，幾乎不虧',1],['報酬4%，最差-5%',2],['報酬6%，最差-15%',3],['報酬9%，最差-25%',4],['報酬12%，最差-40%',5]]},
@@ -446,11 +599,17 @@ var RISK_TIERS=[
  {min:48,max:60,name:'進取型',en:'Growth',rr:8,std:18,desc:'追求長期最大化報酬，可承受大幅波動與較高風險。',color:'#b07d3d',alloc:'高成長股票、產業/區域型與另類資產為主（80%以上），現金部位極低。'}
 ];
 
-function riskScore(c){var a=(c.riskQuiz&&c.riskQuiz.ans)||{},s=0,answered=0;for(var i=0;i<RISK_Q.length;i++){if(a[i]!=null){s+=RISK_Q[i].o[a[i]][1];answered++;}}return {score:s,answered:answered,total:RISK_Q.length};}
+// 複選題的作答值是陣列。舊版直接 RISK_Q[i].o[a[i]][1]，遇到陣列或越界索引會丟 TypeError。
+function riskAnsList(a,qi){var v=a?a[qi]:null;if(v==null)return [];return Array.isArray(v)?v.slice():[v];}
+function riskQScore(qi,list){var Q=RISK_Q[qi],mx=0;if(!Q)return 0;(list||[]).forEach(function(oi){if(Q.o[oi]&&Q.o[oi][1]>mx)mx=Q.o[oi][1];});return mx;}
+function riskScore(c){var a=((c||{}).riskQuiz&&c.riskQuiz.ans)||{},s=0,answered=0,un=[];
+ for(var i=0;i<RISK_Q.length;i++){var L=riskAnsList(a,i);if(L.length){s+=riskQScore(i,L);answered++;}else un.push(i);}
+ return {score:s,answered:answered,total:RISK_Q.length,unanswered:un};}
 
 function riskProfile(c){var r=riskScore(c);if(r.answered<RISK_Q.length)return null;var t=RISK_TIERS[0];for(var i=0;i<RISK_TIERS.length;i++){if(r.score>=RISK_TIERS[i].min)t=RISK_TIERS[i];}return {tier:t,score:r.score,answered:r.answered,total:r.total};}
 
-function pmt(bal,rate,months){var i=rate/12/100;if(i<=0)return months>0?bal/months:0;return bal*i*Math.pow(1+i,months)/(Math.pow(1+i,months)-1)}
+// months<=0 時分母 (1+i)^0−1 = 0 → Infinity，會原字串印到畫面（「月繳 Infinity」）。
+function pmt(bal,rate,months){months=n(months);if(!(months>0))return 0;var i=n(rate)/12/100;if(i<=0)return n(bal)/months;return n(bal)*i*Math.pow(1+i,months)/(Math.pow(1+i,months)-1)}
 
 export {
   KINDS,
@@ -458,6 +617,9 @@ export {
   uid,
   sampleCase,
   newCase,
+  defaultCompany,
+  primaryMember,
+  creditScoreOf,
   n,
   sum,
   fmt,
@@ -470,6 +632,7 @@ export {
   aInc,
   lBal,
   lPay,
+  lRemain,
   assetPassive,
   liquidMovable,
   lifestyleFactor,
@@ -507,6 +670,13 @@ export {
   incomeTax,
   estateTax,
   propertyTax,
+  estimateLaborPension,
+  LABOR_INS_GRADES,
+  laborInsSalary,
+  laborPensionSalary,
+  PROF_EXPENSE,
+  profStdRate,
+  profExpenseRate,
   legacyNeed,
   allocInfo,
   scenario,
@@ -516,6 +686,8 @@ export {
   TARGETS,
   RISK_Q,
   RISK_TIERS,
+  riskAnsList,
+  riskQScore,
   riskScore,
   riskProfile,
   pmt

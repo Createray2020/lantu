@@ -102,8 +102,10 @@ export default async function Admin() {
                     <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.createdAt)}</td>
                     <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.approvedAt)}</td>
                     <td className="px-3 py-2">
-                      {admin ? (
-                        <span className="text-[#6f869c] text-xs block text-right">—</span>
+                      {c.id === me.id ? (
+                        // 只擋「對自己動手」，避免把自己鎖在門外。
+                        // 舊版是所有 admin 都不給操作 → 一旦某人成為 admin 就再也停不了權。
+                        <span className="text-[#6f869c] text-xs block text-right">本人</span>
                       ) : (
                         <StatusActions id={c.id} status={c.status} />
                       )}

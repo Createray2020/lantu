@@ -33,7 +33,8 @@ type ClientLite = { id: string; name: string; contact: Contact; source: string |
 type PlanLite = { id: string; year: number; label: string | null; status: string; healthGrade: string | null; netWorth: number | null; basedOnDate: string | null; updatedAt: string | null };
 type ReviewLite = { id: string; date: string; type: string; planId: string | null; attendees: string | null; summary: string | null; nextAppt: string | null };
 type ItemLite = { id: string; title: string; owner: string | null; dueDate: string | null; done: boolean; reviewId: string | null };
-type Compare = { id: string; year: number; label: string | null; status: string; net: number; assetTotal: number; debtTotal: number; incTotal: number; expTotal: number; save: number; gap: number; grade: string | null; safety: number | null; freedom: number | null; vision: number | null };
+// 數字欄位可能是 null＝「這一版的 data 算不出來」，畫面顯示「—」而不是假的 0。
+type Compare = { id: string; year: number; label: string | null; status: string; net: number | null; assetTotal: number | null; debtTotal: number | null; incTotal: number | null; expTotal: number | null; save: number | null; gap: number | null; grade: string | null; safety: number | null; freedom: number | null; vision: number | null };
 
 const field = "w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7]";
 const btn = "px-3 py-1.5 text-sm font-bold rounded-md";

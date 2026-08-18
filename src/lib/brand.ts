@@ -1,9 +1,17 @@
 // 全組織品牌設定（伺服器端）。
 // 全組織「一組品牌」：以 org 擁有者(owner)的 org_settings 為準，全員共用。
 // 只有 admin 能寫入（見 app/admin/actions.ts）。
+// Next 16：revalidateTag 需要第二個 profile 參數；從 Server Action 內要用 updateTag
+// （read-your-own-writes：上傳完立刻讀得到新 logo）。saveBrand 只由 admin 的 server action 呼叫。
+import { unstable_cache, updateTag } from "next/cache";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches, orgSettings } from "@/Shared/db/schema";
+
+// 品牌是「幾個月才改一次」的資料，但被 /api/brand（每次導頁）與 /api/brand/icon（每個分頁的 favicon、
+// 每次 PWA 啟動、匿名可打）狂打，每次 2 趟 DB＋重傳最大 3.5MB 的 base64。
+// 用 tag 快取：讀取幾乎零成本，saveBrand/removeBrand 時 revalidateTag 讓它立刻生效。
+export const BRAND_TAG = "brand";
 
 export const BRAND_DEFAULTS = {
   brandName: "嵐途 LAN TU",
@@ -29,7 +37,9 @@ export async function getOrgOwnerId(): Promise<string | null> {
 }
 
 // 讀取全組織品牌（沒設定就回預設，logo/icon 為 null）。
-export async function getBrand(): Promise<Brand> {
+export const getBrand = unstable_cache(_getBrand, ["lantu-brand"], { tags: [BRAND_TAG] });
+
+async function _getBrand(): Promise<Brand> {
   const ownerId = await getOrgOwnerId();
   if (!ownerId) {
     return { logoUrl: null, iconUrl: null, ...BRAND_DEFAULTS };
@@ -71,7 +81,9 @@ export async function saveBrand(
         updatedAt: new Date(),
       },
     });
+  updateTag(BRAND_TAG);
 }
+
 
 // dataURL 解析成 bytes（給 icon 路由用）。非法/非 dataURL 回 null。
 export function parseDataUrl(

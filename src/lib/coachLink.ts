@@ -1,6 +1,7 @@
 // 客戶↔教練 連結（雙向確認）資料層。
 // 客戶端「選擇教練」→ 建 pending 申請；教練端「接受」→ 設 clients.coachId、申請 accepted。
-import { and, eq, desc } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
+import { and, eq, desc, count } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, coaches, coachLinkRequests, coachInvites } from "@/Shared/db/schema";
 import type { ClientUser } from "@/lib/clientUser";
@@ -75,9 +76,14 @@ export async function listPendingRequestsForCoach(coachId: string): Promise<Pend
   return rows;
 }
 
+// 只要數量就用 count(*)，不要把整批列（還 join clients）撈回 Node 再 .length。
+// 這支被 DashboardHeader 的紅點在「每次導頁」時打一次。
 export async function countPendingForCoach(coachId: string): Promise<number> {
-  const rows = await listPendingRequestsForCoach(coachId);
-  return rows.length;
+  const rows = await db
+    .select({ n: count() })
+    .from(coachLinkRequests)
+    .where(and(eq(coachLinkRequests.coachId, coachId), eq(coachLinkRequests.status, "pending")));
+  return Number(rows[0]?.n ?? 0);
 }
 
 // 教練回應：接受→掛上(設 clients.coachId)；婉拒→rejected。只能回應掛給自己的申請。
@@ -108,8 +114,10 @@ export async function revokeClientLink(user: ClientUser): Promise<{ ok: boolean;
 }
 
 // ── 教練反向邀請連結 ──────────────────────────────
+// Math.random 不是 CSPRNG（同一個 V8 isolate 連續產生的碼可由前幾組還原內部狀態），
+// 邀請碼等同「把客戶掛到某位教練」的授權憑證，一律用 CSPRNG。
 function genCode(): string {
-  return (Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6)).toLowerCase();
+  return randomBytes(12).toString("base64url").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 14);
 }
 
 export async function createInvite(coachId: string, note?: string): Promise<{ code: string }> {
@@ -126,9 +134,18 @@ export async function getInviteByCode(code: string): Promise<{ coachId: string; 
 }
 
 // 客戶開啟邀請 → 直接掛到該教練（教練主動＝視同同意）。
+// TODO(待拍板)：邀請碼目前是「一碼多人可用」——getInviteByCode 已算出 used 旗標但這裡沒有採用。
+// 單次用 vs 多次用是產品決策（見盤點報告待拍板 #4），定案前先不改這個語意。
+// 但「教練必須仍是 active」是安全底線，先補上：停權教練的舊連結不該還能繼續收客戶。
 export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok: boolean; error?: string; coachName?: string | null }> {
   const inv = await getInviteByCode(code);
   if (!inv) return { ok: false, error: "邀請連結無效或已失效" };
+  const coachRows = await db
+    .select({ status: coaches.status })
+    .from(coaches)
+    .where(eq(coaches.id, inv.coachId))
+    .limit(1);
+  if (coachRows[0]?.status !== "active") return { ok: false, error: "這位教練目前無法接受新客戶" };
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, user.id)).limit(1);
   const client = cRows[0];
   if (!client) return { ok: false, error: "請先完成人生護照，再用邀請連結掛教練" };
