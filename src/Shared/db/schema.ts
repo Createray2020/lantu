@@ -30,11 +30,28 @@ export const coaches = pgTable('coaches', {
   note: text('note'),           // 備註（聯絡方式／收款狀態等，後台用）
   approvedAt: timestamp('approved_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+
+  // ── 業務制度欄位（見 docs/業務制度_V4.md）──
+  // orgRank（member/manager/owner）是「系統可見範圍」，rankCode 是「制度職級」（C1…首席），
+  // 兩者刻意分開：制度升到 S2 不代表就該看得到別人的客戶。
+  rankCode: text('rank_code'),
+  entryType: text('entry_type'),              // training（培訓認證）/ recruit（同業招募）/ rejoin（回任）
+  hireDate: date('hire_date'),                // 到職日：真除倒數與首年豁免的起點
+  sponsorId: text('sponsor_id').references((): AnyPgColumn => coaches.id, { onDelete: 'set null' }),
+  tenureRankCode: text('tenure_rank_code'),   // 真除中的核定職級（null＝非真除狀態）
+  tenureUntil: date('tenure_until'),
+  initialCases: integer('initial_cases').default(0).notNull(),   // 同業招募帶入的既往實績
+  initialFees: bigint('initial_fees', { mode: 'number' }).default(0).notNull(),
+  // 資格覆寫：null＝依維持資格自動判定；true/false＝管理員手動覆寫。
+  recruitAllowed: boolean('recruit_allowed'),
+  leadAllowed: boolean('lead_allowed'),
 }, (t) => [
   // 自參照 FK：刪除教練時的 ON DELETE SET NULL 需要它，否則每次刪除都要全表掃。
   index('coaches_upline_id_idx').on(t.uplineId),
   // listActiveCoaches / getOrgOwnerId 的熱路徑。
   index('coaches_status_idx').on(t.status),
+  // 推薦人也是自參照 FK（代管移轉與同業招募業績歸屬都要沿它查）。
+  index('coaches_sponsor_id_idx').on(t.sponsorId),
 ]);
 
 // 客戶登入帳號（雙邊平台：客戶自己上官網註冊、以客戶身分登入）
@@ -327,4 +344,157 @@ export const compThresholds = pgTable('comp_thresholds', {
   index('comp_thresholds_version_id_idx').on(t.versionId),
   // 每個版本、每種軌別、每個目標職級只有一列 —— 少了它，重複列會讓晉升判定看到兩套門檻。
   uniqueIndex('comp_thresholds_version_kind_to_uidx').on(t.versionId, t.kind, t.toCode),
+]);
+
+// ── 業務制度 波2：案件與分潤 ─────────────────────────────────────────────────
+
+// 案件。versionId 是「簽約當下的制度版本」——分潤永遠用這一版算，
+// 之後改制度不會回頭改舊案（辦法第三十一條）。
+// clientId 允許為 null（客戶還沒進 CRM 也能先登錄案件），此時以 clientName 認人。
+// caseYear：個案歸屬年度。同一自然人同年度的多筆服務合併為一個「個案」（第二十條），
+//           合併是在統計時以 (客戶, 年度) 去重，不在這裡合併列——每筆收費仍各自分潤。
+// status: open（未結案）/ closed（問卷回收）/ paid（分潤已發放）/ refunded（退費）/ void（作廢）
+export const compCases = pgTable('comp_cases', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  versionId: uuid('version_id').notNull().references(() => compVersions.id),
+  clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+  clientName: text('client_name').notNull(),
+  serviceType: text('service_type').default('full').notNull(),  // full / spot
+  fee: bigint('fee', { mode: 'number' }).default(0).notNull(),
+  isCompanyLead: boolean('is_company_lead').default(false).notNull(),
+  promoterId: text('promoter_id').references(() => coaches.id, { onDelete: 'set null' }),
+  executorId: text('executor_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  signedAt: date('signed_at'),
+  paidAt: date('paid_at'),          // 公司實際收訖日（未收訖不發分潤）
+  surveyAt: date('survey_at'),      // 回饋問卷回收日（結案要件）
+  caseYear: integer('case_year').notNull(),
+  refundAmount: bigint('refund_amount', { mode: 'number' }).default(0).notNull(),
+  status: text('status').default('open').notNull(),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 個人指標（累計案數／顧問費）與顧問頁的熱路徑。
+  index('comp_cases_executor_year_idx').on(t.executorId, t.caseYear),
+  index('comp_cases_promoter_id_idx').on(t.promoterId),
+  index('comp_cases_version_id_idx').on(t.versionId),
+  index('comp_cases_client_id_idx').on(t.clientId),
+  index('comp_cases_status_idx').on(t.status),
+]);
+
+// 分潤明細。一筆案件一次計算會產生多列（每位受分潤人一列＋公司列）。
+// 重算一律「先把舊列標 void 再寫新列」，不做原地 update —— 保留稽核軌跡。
+// payeeKey：payeeId ?? kind。Postgres 的 unique 對 NULL 視為互異，
+//           公司列的 payeeId 是 null 會讓唯一鍵形同虛設，所以另存一個永不為 null 的鍵。
+export const compPayouts = pgTable('comp_payouts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  caseId: uuid('case_id').notNull().references(() => compCases.id, { onDelete: 'cascade' }),
+  payeeId: text('payee_id').references(() => coaches.id, { onDelete: 'set null' }),
+  payeeKey: text('payee_key').notNull(),
+  payeeName: text('payee_name').notNull(),
+  kind: text('kind').notNull(),        // advisor / company_ops / company_lead / company_remainder
+  role: text('role'),
+  rankCode: text('rank_code'),
+  promoPct: doublePrecision('promo_pct').default(0).notNull(),
+  execPct: doublePrecision('exec_pct').default(0).notNull(),
+  bonusPct: doublePrecision('bonus_pct').default(0).notNull(),
+  totalPct: doublePrecision('total_pct').default(0).notNull(),
+  amount: bigint('amount', { mode: 'number' }).default(0).notNull(),
+  batchId: uuid('batch_id').references(() => compBatches.id, { onDelete: 'set null' }),
+  status: text('status').default('pending').notNull(), // pending / batched / paid / void
+  trace: jsonb('trace').default([]).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('comp_payouts_case_id_idx').on(t.caseId),
+  index('comp_payouts_payee_id_idx').on(t.payeeId),
+  index('comp_payouts_batch_id_idx').on(t.batchId),
+  // 同一案件、同一受款人、同一種類，有效列只能有一筆。
+  // 少了它，重算時漏標 void 就會把同一筆分潤發兩次，而且畫面上看不出來。
+  uniqueIndex('comp_payouts_case_payee_active_uidx')
+    .on(t.caseId, t.payeeKey).where(sql`status <> 'void'`),
+]);
+
+// 月結發放批次（辦法第二十二條：次月 N 日發放）。
+export const compBatches = pgTable('comp_batches', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  period: text('period').notNull(),                  // 'YYYY-MM'
+  payoutDate: date('payout_date'),
+  status: text('status').default('draft').notNull(), // draft / approved / paid
+  totalAmount: bigint('total_amount', { mode: 'number' }).default(0).notNull(),
+  approvedBy: text('approved_by').references(() => coaches.id, { onDelete: 'set null' }),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 一個月一批：少了它，重複按「產生批次」會把同一筆分潤分進兩批。
+  uniqueIndex('comp_batches_period_uidx').on(t.period),
+]);
+
+// ── 業務制度 波3：訓練時數、職級異動 ────────────────────────────────────────
+
+// 研討會場次（第十六條第二項）。hours 為每位出席者的基本認列時數。
+export const compTrainingSessions = pgTable('comp_training_sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  heldOn: date('held_on').notNull(),
+  topic: text('topic').notNull(),
+  mode: text('mode').default('onsite').notNull(),   // onsite / online / hybrid
+  hours: doublePrecision('hours'),                  // null＝沿用制度設定的「每場認列」
+  speakerId: text('speaker_id').references(() => coaches.id, { onDelete: 'set null' }),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('comp_training_sessions_held_on_idx').on(t.heldOn),
+]);
+
+// 訓練時數紀錄。kind: internal（出席內部場次）/ speaker（擔任講師）/ external（外部課程）。
+// 外部課程要經核准才計入，且受年度上限限制（上限在計算時套用，不在這裡截斷——
+// 截斷會讓「申請了多少」與「認列了多少」變成同一個數字，事後查不出原始申請）。
+export const compTrainingRecords = pgTable('comp_training_records', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  sessionId: uuid('session_id').references(() => compTrainingSessions.id, { onDelete: 'cascade' }),
+  year: integer('year').notNull(),
+  kind: text('kind').notNull(),
+  hours: doublePrecision('hours').default(0).notNull(),
+  title: text('title'),
+  evidence: text('evidence'),
+  status: text('status').default('approved').notNull(), // pending / approved / rejected
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('comp_training_records_coach_year_idx').on(t.coachId, t.year),
+  index('comp_training_records_session_id_idx').on(t.sessionId),
+  // 同一場次同一人只能有一筆出席紀錄（重複點名會讓時數翻倍）。
+  uniqueIndex('comp_training_records_session_coach_uidx').on(t.sessionId, t.coachId, t.kind),
+]);
+
+// 職級異動時間軸（晉升／真除轉正／人工調整／退費扣回）。
+// reason: auto_a / auto_b / tenure / manual / refund
+export const compRankEvents = pgTable('comp_rank_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  fromCode: text('from_code'),
+  toCode: text('to_code'),
+  reason: text('reason').notNull(),
+  effectiveAt: date('effective_at'),
+  operatorId: text('operator_id').references(() => coaches.id, { onDelete: 'set null' }),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('comp_rank_events_coach_id_idx').on(t.coachId),
+]);
+
+// 年度維持資格快照（第十六～十九條）。每人每年一列，由排程或手動重算寫入。
+export const compMaintenance = pgTable('comp_maintenance', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  year: integer('year').notNull(),
+  execCases: integer('exec_cases').default(0).notNull(),
+  trainHours: doublePrecision('train_hours').default(0).notNull(),
+  execPass: boolean('exec_pass').default(false).notNull(),
+  trainPass: boolean('train_pass').default(false).notNull(),
+  exempt: boolean('exempt').default(false).notNull(),
+  exemptReason: text('exempt_reason'),
+  evaluatedAt: timestamp('evaluated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 每人每年一列 —— 少了它，重算會疊出多列，畫面取到哪一列全看排序運氣。
+  uniqueIndex('comp_maintenance_coach_year_uidx').on(t.coachId, t.year),
 ]);

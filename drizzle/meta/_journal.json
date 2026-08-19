@@ -71,6 +71,13 @@
       "when": 1787128545848,
       "tag": "0009_remarkable_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787161812697,
+      "tag": "0010_brown_warpath",
+      "breakpoints": true
     }
   ]
 }

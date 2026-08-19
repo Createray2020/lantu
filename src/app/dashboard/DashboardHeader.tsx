@@ -12,6 +12,7 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
   const onClients = pathname.startsWith("/dashboard/clients");
   const onOverview = pathname.startsWith("/dashboard/overview");
   const onRequests = pathname.startsWith("/dashboard/requests");
+  const onBusiness = pathname.startsWith("/dashboard/my-business");
 
   // 全組織品牌 Logo：有上傳就換掉預設標記（保留「嵐途」文字）。
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -66,6 +67,7 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
             </span>
           )}
         </Link>
+        <Link href="/dashboard/my-business" className={tab(onBusiness)}>我的業務</Link>
       </nav>
       <div className="flex-1" />
       <Link
