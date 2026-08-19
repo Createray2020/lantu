@@ -3,7 +3,7 @@
 import { sql } from 'drizzle-orm';
 import {
   pgTable, text, integer, bigint, boolean, jsonb, timestamp, uuid, date,
-  index, uniqueIndex,
+  doublePrecision, index, uniqueIndex,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
@@ -257,4 +257,74 @@ export const coachInvites = pgTable('coach_invites', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('coach_invites_coach_id_idx').on(t.coachId),
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 業務制度（財務顧問業務制度辦法）
+//
+// 設計原則（見 docs/業務制度_V4.md）：
+// 1. 所有「數字」欄位一律 nullable ——「留空」＝該門檻不檢查／該規則不計算，不是 0。
+//    後台預設全空白，可一鍵載入 V4 辦法數值。
+// 2. 版本化：每個制度版本一列 comp_versions，底下掛自己的職級表與門檻表。
+//    案件永遠指向「簽約當下的版本」，改制度不回頭改舊分潤（辦法第三十一條）。
+// 3. 職級不是寫死的 enum 而是一張可編輯的表 —— 制度日後可增設階級或改名。
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 制度版本。status: draft（草稿，可試算不影響正式）/ active（生效中）/ archived（已封存）。
+// settings：所有單值參數與開關的 jsonb（型別見 src/lib/comp/types.ts 的 CompSettings）。
+//           key 不存在 ＝ 未設定；引擎遇到未設定的門檻是「跳過」而非擋人。
+export const compVersions = pgTable('comp_versions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  version: text('version').notNull(),                 // 'V4.0'
+  effectiveFrom: date('effective_from'),
+  status: text('status').default('draft').notNull(),
+  changeNote: text('change_note'),
+  settings: jsonb('settings').default({}).notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // getActiveVersion() 的熱路徑（每次載入制度頁／試算／算分潤都會查）。
+  index('comp_versions_status_idx').on(t.status),
+]);
+
+// 職級與分潤率（辦法第四、五條）。seq 決定高低順序，晉升表與差％引擎都靠它。
+// promoPct／execPct 為百分比數值（可小數），null＝未設定。
+export const compRanks = pgTable('comp_ranks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  versionId: uuid('version_id').notNull().references(() => compVersions.id, { onDelete: 'cascade' }),
+  seq: integer('seq').notNull(),
+  groupName: text('group_name'),                      // 認證顧問／資深顧問／首席顧問
+  tierLabel: text('tier_label'),                      // 一階／二階／三階
+  code: text('code').notNull(),                       // C1 / S2 / CHIEF…
+  promoPct: doublePrecision('promo_pct'),
+  execPct: doublePrecision('exec_pct'),
+}, (t) => [
+  index('comp_ranks_version_id_idx').on(t.versionId),
+  // 同一版本內職級代號唯一 —— 引擎全部以 code 查表，重複會靜默算錯人。
+  uniqueIndex('comp_ranks_version_code_uidx').on(t.versionId, t.code),
+]);
+
+// 門檻通用表：晉升 A 軌／B 軌（第十一、十二條）與真除（第十五條）共用一張。
+// kind: promotion_a / promotion_b / tenure
+//   promotion_a：fromCode → toCode，需 cases + fees
+//   promotion_b：再加 teamCases 與育成條件（mentorCount 位 mentorRankCode 以上）
+//   tenure     ：fromCode 為 null，toCode ＝ 核定職級
+export const compThresholds = pgTable('comp_thresholds', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  versionId: uuid('version_id').notNull().references(() => compVersions.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  seq: integer('seq').default(0).notNull(),
+  fromCode: text('from_code'),
+  toCode: text('to_code').notNull(),
+  cases: integer('cases'),
+  fees: bigint('fees', { mode: 'number' }),
+  teamCases: integer('team_cases'),
+  mentorCount: integer('mentor_count'),
+  mentorRankCode: text('mentor_rank_code'),
+  extraNote: text('extra_note'),
+  enabled: boolean('enabled').default(true).notNull(),
+}, (t) => [
+  index('comp_thresholds_version_id_idx').on(t.versionId),
+  // 每個版本、每種軌別、每個目標職級只有一列 —— 少了它，重複列會讓晉升判定看到兩套門檻。
+  uniqueIndex('comp_thresholds_version_kind_to_uidx').on(t.versionId, t.kind, t.toCode),
 ]);

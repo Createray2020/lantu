@@ -48,6 +48,21 @@ export default async function Admin() {
       </header>
 
       <section className="p-6 max-w-4xl">
+        <div className="mb-5 flex flex-wrap gap-2">
+          <Link
+            href="/admin/system"
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
+          >
+            業務制度設定 →
+          </Link>
+          <Link
+            href="/admin/system/simulator"
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
+          >
+            分潤試算器 →
+          </Link>
+        </div>
+
         <div className="flex items-center gap-4 mb-5">
           <h1 className="text-xl font-bold">教練帳號</h1>
           <span className="text-sm text-[#a9bccf]">

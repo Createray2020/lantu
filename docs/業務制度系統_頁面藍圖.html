@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>嵐途 · 業務制度系統 頁面藍圖</title>
+<style>
+:root{
+  --ink:#12212e; --ink2:#3d5567; --line:#dde5ec; --line2:#eef3f7;
+  --bg:#f5f8fa; --card:#fff; --brand:#0f6f8c; --brand-soft:#e6f2f6;
+  --amber:#b26a00; --amber-soft:#fdf3e2; --green:#1c7a52; --green-soft:#e6f4ee;
+  --violet:#6b4ea8; --violet-soft:#f0ebfa; --grey-soft:#eef1f4;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"PingFang TC","Noto Sans TC","Helvetica Neue",sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.65;font-size:14px}
+header.top{background:linear-gradient(135deg,#0f3145,#0f6f8c);color:#fff;padding:26px 28px}
+header.top h1{margin:0;font-size:21px;letter-spacing:.5px}
+header.top p{margin:6px 0 0;opacity:.85;font-size:13px}
+.wrap{display:flex;gap:0;align-items:flex-start;max-width:1400px;margin:0 auto}
+nav.side{width:250px;flex:0 0 250px;padding:18px 12px 60px;position:sticky;top:0;max-height:100vh;overflow:auto}
+nav.side .grp{font-size:11px;letter-spacing:1px;color:#8ba0b0;margin:16px 8px 6px}
+nav.side a{display:block;padding:7px 10px;border-radius:7px;color:var(--ink2);text-decoration:none;font-size:13px}
+nav.side a:hover{background:#e9eff4}
+nav.side a.on{background:var(--brand);color:#fff;font-weight:600}
+main{flex:1;padding:18px 24px 80px;min-width:0}
+section.page{display:none}
+section.page.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:16px}
+h2{font-size:19px;margin:0 0 4px}
+h3{font-size:15px;margin:22px 0 8px;padding-left:9px;border-left:3px solid var(--brand)}
+h4{font-size:13px;margin:16px 0 6px;color:var(--ink2)}
+.path{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#10222e;color:#9fe0f0;
+  padding:3px 9px;border-radius:5px;margin:2px 6px 2px 0}
+.meta{color:var(--ink2);font-size:13px;margin:6px 0 0}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;margin:0 4px 3px 0;white-space:nowrap}
+.t-fill{background:var(--amber-soft);color:var(--amber)}
+.t-calc{background:var(--grey-soft);color:var(--ink2)}
+.t-sw{background:var(--violet-soft);color:var(--violet)}
+.t-list{background:var(--green-soft);color:var(--green)}
+.t-new{background:#fde8e8;color:#a33}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink2)}
+table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:13px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:middle}
+th{background:#f2f6f9;font-weight:600;font-size:12px;color:var(--ink2)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.inp{display:inline-block;min-width:64px;padding:3px 8px;border:1px dashed #b9c8d4;border-radius:5px;
+  background:#fbfdfe;color:#a7b7c4;font-size:12px}
+.inp.w{min-width:130px}
+.inp.s{min-width:44px}
+.ro{color:var(--ink2);font-variant-numeric:tabular-nums}
+.btn{display:inline-block;padding:5px 12px;border-radius:7px;font-size:12px;border:1px solid var(--brand);
+  color:var(--brand);background:#fff;margin:6px 6px 0 0}
+.btn.solid{background:var(--brand);color:#fff}
+.btn.ghost{border-color:var(--line);color:var(--ink2)}
+.note{background:var(--brand-soft);border-left:3px solid var(--brand);padding:10px 12px;border-radius:0 8px 8px 0;
+  font-size:12.5px;color:#124d61;margin:10px 0}
+.warn{background:#fdf3e2;border-left:3px solid var(--amber);padding:10px 12px;border-radius:0 8px 8px 0;
+  font-size:12.5px;color:#7a4a00;margin:10px 0}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.tabs span{font-size:12px;padding:5px 11px;border-radius:7px;background:#eef3f7;color:var(--ink2)}
+.tabs span.on{background:var(--brand);color:#fff}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fcfdfe}
+.tile b{display:block;font-size:12px;color:var(--ink2);font-weight:600}
+.tile .v{font-size:20px;font-variant-numeric:tabular-nums;color:var(--brand);margin-top:2px}
+.bar{height:7px;border-radius:5px;background:#e6edf2;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--brand)}
+.tree{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:2;color:var(--ink2);white-space:pre}
+.tree b{color:#a33;font-weight:600}
+ul.li{margin:6px 0 0 0;padding-left:18px}
+ul.li li{margin:3px 0}
+.state{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.state div{font-size:12px;padding:6px 10px;border-radius:8px;background:#f3f7fa;border:1px solid var(--line);color:var(--ink2)}
+.state div b{color:var(--ink)}
+code{background:#eef3f7;padding:1px 5px;border-radius:4px;font-size:12px}
+@media(max-width:900px){.wrap{flex-direction:column}nav.side{width:100%;flex:none;position:static;max-height:none;display:flex;flex-wrap:wrap}nav.side .grp{width:100%}.grid2,.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>嵐途 · 財務顧問業務制度系統　頁面藍圖</h1>
+  <p>依《財務顧問業務制度辦法 V4.0》規劃　｜　全套範圍：制度參數 ＋ 分潤試算 ＋ 案件分潤 ＋ 晉升追蹤　｜　所有數字欄位預設留空，可一鍵載入 V4 建議值</p>
+</header>
+
+<div class="wrap">
+<nav class="side">
+  <div class="grp">總覽</div>
+  <a href="#" data-p="ia" class="on">0・系統定位與導覽</a>
+  <div class="grp">制度設定（後台）</div>
+  <a href="#" data-p="s1">1・分潤架構</a>
+  <a href="#" data-p="s2">2・職級與分潤率</a>
+  <a href="#" data-p="s3">3・差％與平階代管規則</a>
+  <a href="#" data-p="s4">4・晉升門檻 A／B 軌</a>
+  <a href="#" data-p="s5">5・同業招募與真除</a>
+  <a href="#" data-p="s6">6・維持資格</a>
+  <a href="#" data-p="s7">7・個案認定與結案</a>
+  <a href="#" data-p="s8">8・發放・退費・合作規範</a>
+  <a href="#" data-p="s9">9・制度版本管理</a>
+  <div class="grp">運作頁</div>
+  <a href="#" data-p="sim">10・分潤試算器</a>
+  <a href="#" data-p="case">11・案件與分潤明細</a>
+  <a href="#" data-p="adv">12・顧問職級與晉升追蹤</a>
+  <a href="#" data-p="trn">13・訓練時數與研討會</a>
+  <a href="#" data-p="me">14・我的業務（顧問端）</a>
+  <div class="grp">技術</div>
+  <a href="#" data-p="db">15・資料表與引擎</a>
+  <a href="#" data-p="plan">16・實作波次</a>
+</nav>
+
+<main>
+
+<!-- ============ 0 IA ============ -->
+<section class="page on" id="ia">
+  <div class="card">
+    <h2>0・系統定位與導覽</h2>
+    <p class="meta">業務制度系統掛在既有嵐途上，不動理財規劃引擎。新增節點以 <b style="color:#a33">紅字</b> 標示。</p>
+
+    <h3>資訊架構（新增位置）</h3>
+    <div class="tree">嵐途 lantu-finance.vercel.app
+├─ /dashboard　教練（顧問）端
+│   ├─ 首頁（三角色視角：member／manager／owner）
+│   ├─ 客戶管理 → 年度版本 → 諮詢檢視
+│   ├─ 規劃系統（lantu-app.html iframe）
+│   └─ <b>我的業務　← 新增（頁 14）</b>
+│       <b>├─ 我的職級與晉升進度</b>
+│       <b>├─ 我的分潤明細（月結）</b>
+│       <b>├─ 我的維持資格（執案／訓練）</b>
+│       <b>└─ 我的直轄團隊業績</b>
+├─ /admin　組織後台（owner／admin）
+│   ├─ 顧問管理（審核・職級・組織樹）
+│   ├─ 品牌設定（Logo／PWA）
+│   ├─ 公告
+│   ├─ <b>業務制度　← 新增（頁 1–9，九個分頁）</b>
+│   ├─ <b>分潤試算器　← 新增（頁 10）</b>
+│   ├─ <b>案件與分潤　← 新增（頁 11）</b>
+│   ├─ <b>顧問職級與晉升　← 新增（頁 12）</b>
+│   └─ <b>訓練時數　← 新增（頁 13）</b>
+└─ /portal　客戶端（不受影響）</div>
+
+    <h3>權限</h3>
+    <table>
+      <tr><th>角色</th><th>制度設定 1–9</th><th>試算器 10</th><th>案件分潤 11</th><th>職級追蹤 12</th><th>訓練 13</th><th>我的業務 14</th></tr>
+      <tr><td>owner（首席／公司）</td><td>編輯</td><td>✓</td><td>編輯・發放</td><td>全組織</td><td>編輯</td><td>本人</td></tr>
+      <tr><td>admin</td><td>編輯</td><td>✓</td><td>編輯</td><td>全組織</td><td>編輯</td><td>本人</td></tr>
+      <tr><td>manager（有直轄團隊）</td><td>唯讀</td><td>✓</td><td>僅本人相關</td><td>本人子樹</td><td>唯讀</td><td>本人＋團隊</td></tr>
+      <tr><td>member（一般顧問）</td><td>唯讀</td><td>✓</td><td>僅本人分潤</td><td>僅本人</td><td>唯讀</td><td>本人</td></tr>
+    </table>
+
+    <h3>欄位狀態圖例（後面每頁都用這套標記）</h3>
+    <div class="legend">
+      <span><span class="tag t-fill">可填・預設空白</span>你們自己輸入的數字，留空＝該規則不啟用</span>
+      <span><span class="tag t-calc">系統計算</span>唯讀，由引擎推導</span>
+      <span><span class="tag t-sw">開關</span>規則要不要啟用</span>
+      <span><span class="tag t-list">清單可增刪</span>可自行新增／刪除列</span>
+    </div>
+
+    <div class="note"><b>「留空」的語意（全系統一致）</b><br>
+    數字欄留空 ＝ <b>該門檻不檢查／該規則不計算</b>，不是 0。例如「訓練時數」留空 → 維持資格只看執案門檻；「B 軌團隊門檻」留空 → 該階不開放 B 軌晉升。畫面上留空欄一律顯示灰色虛線框，右上角有「未設定」提示，晉升／分潤引擎遇到未設定的門檻會<b>跳過而非擋人</b>。</div>
+
+    <div class="warn"><b>一鍵載入 V4</b>：每個分頁右上角有「載入 V4 辦法數值」按鈕，只填入目前空白的欄位，已填的不覆蓋；另有「全部清空」與「還原上次儲存」。</div>
+  </div>
+</section>
+
+<!-- ============ 1 分潤架構 ============ -->
+<section class="page" id="s1">
+  <div class="card">
+    <h2>1・分潤架構</h2>
+    <span class="path">/admin/system?tab=split</span>
+    <p class="meta">對應辦法第二條、第三條。決定每筆顧問費 100% 怎麼切三塊。</p>
+    <div class="tabs"><span class="on">分潤架構</span><span>職級與分潤率</span><span>差％規則</span><span>晉升門檻</span><span>同業招募與真除</span><span>維持資格</span><span>個案與結案</span><span>發放與退費</span><span>版本管理</span></div>
+
+    <h3>收入分配</h3>
+    <table>
+      <tr><th style="width:26%">區塊</th><th style="width:20%">比例</th><th>說明／狀態</th></tr>
+      <tr><td>推廣端</td><td class="num"><span class="inp s">　</span> %</td><td><span class="tag t-fill">可填</span>V4＝30</td></tr>
+      <tr><td>執案端</td><td class="num"><span class="inp s">　</span> %</td><td><span class="tag t-fill">可填</span>V4＝60</td></tr>
+      <tr><td>公司營運</td><td class="num"><span class="ro">＝ 100 − 推廣 − 執案</span></td><td><span class="tag t-calc">系統計算</span>合計不等於 100 時整頁鎖存檔並紅字提示</td></tr>
+      <tr><td>├ 營業稅</td><td class="num"><span class="inp s">　</span> %</td><td><span class="tag t-fill">可填</span>V4＝5（僅供帳務拆解顯示）</td></tr>
+      <tr><td>└ 行政成本</td><td class="num"><span class="inp s">　</span> %</td><td><span class="tag t-fill">可填</span>V4＝5</td></tr>
+    </table>
+
+    <h3>適用範圍</h3>
+    <table>
+      <tr><th style="width:60%">收入類型</th><th>套用本制度</th></tr>
+      <tr><td>完整財務規劃服務</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>單點諮詢服務</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>培訓費／會員費／講座／課程／工作坊</td><td><span class="tag t-sw">開關</span>（V4＝關，另訂辦法）</td></tr>
+      <tr><td><span class="inp w">＋ 新增收入類型</span></td><td><span class="tag t-list">清單可增刪</span></td></tr>
+    </table>
+
+    <h3>服務定價（維持資格門檻會引用）</h3>
+    <table>
+      <tr><th style="width:40%">項目</th><th>金額</th><th>狀態</th></tr>
+      <tr><td>單點諮詢服務定價</td><td class="num"><span class="inp">　</span> 元</td><td><span class="tag t-fill">可填</span>被第 6 頁「維持門檻・最低顧問費」引用</td></tr>
+      <tr><td>完整財務規劃定價</td><td class="num"><span class="inp">　</span> 元</td><td><span class="tag t-fill">可填</span>案件登錄時的預設金額</td></tr>
+    </table>
+    <span class="btn solid">儲存</span><span class="btn">載入 V4 辦法數值</span><span class="btn ghost">全部清空</span>
+  </div>
+</section>
+
+<!-- ============ 2 職級 ============ -->
+<section class="page" id="s2">
+  <div class="card">
+    <h2>2・職級與分潤率</h2>
+    <span class="path">/admin/system?tab=ranks</span>
+    <p class="meta">對應第四條、第五條。整套制度的骨架——差％引擎、晉升表、真除表全部引用這張表的職級代號。</p>
+    <div class="tabs"><span>分潤架構</span><span class="on">職級與分潤率</span><span>差％規則</span><span>晉升門檻</span><span>同業招募與真除</span><span>維持資格</span><span>個案與結案</span><span>發放與退費</span><span>版本管理</span></div>
+
+    <h3>職級表 <span class="tag t-list">整列可增刪・可拖曳排序</span></h3>
+    <table>
+      <tr><th style="width:6%">序</th><th style="width:16%">職級群組</th><th style="width:10%">階</th><th style="width:10%">代號</th><th style="width:14%">推廣端 %</th><th style="width:14%">執案端 %</th><th style="width:12%">合計</th><th>操作</th></tr>
+      <tr><td>1</td><td><span class="inp w">　</span></td><td><span class="inp s">　</span></td><td><span class="inp s">　</span></td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="ro">—</span></td><td><span class="btn ghost">刪</span></td></tr>
+      <tr><td>2</td><td colspan="7" style="color:#a7b7c4">（V4 共 7 列：C1 15/30・C2 18/33・C3 21/36・S1 24/43・S2 26/50・S3 28/57・首席 30/60）</td></tr>
+      <tr><td colspan="8"><span class="btn">＋ 新增職級</span><span class="btn">載入 V4 七職級</span></td></tr>
+    </table>
+    <div class="note"><b>為什麼職級要能增刪</b>：制度日後可能增設「資深顧問四階」或改名。職級不是寫死的 enum，而是一張可編輯的表；已發生的案件永遠指向<b>當時版本</b>的職級（見頁 9 版本管理），改職級表不會回頭改舊分潤。</div>
+
+    <h4>合計欄的檢核（系統計算）</h4>
+    <ul class="li">
+      <li>合計 ＝ 推廣端% ＋ 執案端%，超過「推廣端上限＋執案端上限」時紅字警示。</li>
+      <li>最高階職級（首席）的推廣端／執案端應等於頁 1 的兩個上限，否則提示「頂層有未分配差額，將歸公司」。</li>
+      <li>職級序必須嚴格遞增（下一階兩個 % 都 ≥ 上一階），否則差％引擎會出現負值——存檔時擋。</li>
+    </ul>
+    <span class="btn solid">儲存</span><span class="btn">載入 V4 辦法數值</span>
+  </div>
+</section>
+
+<!-- ============ 3 差％規則 ============ -->
+<section class="page" id="s3">
+  <div class="card">
+    <h2>3・差％與平階、代管規則</h2>
+    <span class="path">/admin/system?tab=rules</span>
+    <p class="meta">對應第六條、第七條、第八條、第九條。這一頁是分潤引擎的行為開關。</p>
+    <div class="tabs"><span>分潤架構</span><span>職級與分潤率</span><span class="on">差％規則</span><span>晉升門檻</span><span>同業招募與真除</span><span>維持資格</span><span>個案與結案</span><span>發放與退費</span><span>版本管理</span></div>
+
+    <h3>差％計算（第六條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>推廣端與執案端獨立計算</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>輔導鏈逐層向上取「自身% − 下層已計%」</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>倒掛（下層職級 ≥ 上層）該層不計差％，由更上層續算</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>輔導鏈不完整時，未分配差額歸公司</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>公司派案：推廣端全數歸公司</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>差％向上追溯層數上限（留空＝追到頂）</td><td class="num"><span class="inp s">　</span> 層 <span class="tag t-fill">可填</span></td></tr>
+    </table>
+
+    <h3>平階輔導獎金（第七條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>平階時，直屬主管自「上一層實際取得差％者」分得</td><td class="num"><span class="inp s">　</span> % <span class="tag t-fill">可填</span>V4＝50</td></tr>
+      <tr><td>僅取一層、不向上遞延</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>同一案件不因多層平階重複發放</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>上層無差％可分者不發放</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>公司營運 % 不因平階另行提撥</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <h3>團隊輔導業績認列（第八條、第十三條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>平階／倒掛案件之業績計入直屬主管</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>沿執案者輔導鏈逐層向上，鏈上各層皆計入</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>每案僅歸屬一條輔導鏈（推廣／執案分屬不同鏈時歸執案鏈）</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>同業招募顧問業績計入推薦人</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <h3>代管（第九條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>推薦人未達此職級時，其招募之平階／高階顧問由上層代管</td><td><span class="inp s">　</span> <span class="tag t-fill">可填</span>V4＝S1</td></tr>
+      <tr><td>代管期間差％與平階獎金依代管者計算</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>推薦人達標後輔導關係自動移轉回推薦人</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>移轉前業績不回溯計入推薦人</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <div class="note"><b>頁面下緣常駐「即時驗算條」</b>：任何開關一改，下方立刻用辦法附錄的四個範例（倒掛／推廣執案分離／鏈不完整／代管）重跑一次，顯示每例是否仍加總 100%。改壞了當場看得到。</div>
+    <span class="btn solid">儲存</span><span class="btn">載入 V4 辦法數值</span>
+  </div>
+</section>
+
+<!-- ============ 4 晉升 ============ -->
+<section class="page" id="s4">
+  <div class="card">
+    <h2>4・晉升門檻（A 軌／B 軌）</h2>
+    <span class="path">/admin/system?tab=promotion</span>
+    <p class="meta">對應第十至十三條。門檻表的每一列都對應「頁 2 職級表」的相鄰兩階，職級改了這裡自動長出對應列。</p>
+    <div class="tabs"><span>分潤架構</span><span>職級與分潤率</span><span>差％規則</span><span class="on">晉升門檻</span><span>同業招募與真除</span><span>維持資格</span><span>個案與結案</span><span>發放與退費</span><span>版本管理</span></div>
+
+    <h3>晉升原則</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>雙指標制（個案數＋顧問費）須同時達標</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>累計採終身制不歸零</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>顧問費以公司實收發票紀錄為準</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>個案須回饋問卷回收結案才計入</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>達標後自動晉升生效時點</td><td>次月 <span class="inp s">　</span> 日 <span class="tag t-fill">可填</span>V4＝1</td></tr>
+      <tr><td>晉升需人工複核（關＝全自動）</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <h3>A 軌：個人路徑（第十一條）</h3>
+    <table>
+      <tr><th style="width:26%">晉升</th><th style="width:24%">累計個案數</th><th style="width:24%">累計顧問費</th><th>狀態</th></tr>
+      <tr><td>C1 → C2</td><td class="num"><span class="inp s">　</span> 案</td><td class="num"><span class="inp">　</span> 元</td><td><span class="tag t-fill">可填</span>V4＝1／3 萬</td></tr>
+      <tr><td>C2 → C3</td><td class="num"><span class="inp s">　</span> 案</td><td class="num"><span class="inp">　</span> 元</td><td>V4＝3／9 萬</td></tr>
+      <tr><td>C3 → S1</td><td class="num"><span class="inp s">　</span> 案</td><td class="num"><span class="inp">　</span> 元</td><td>V4＝5／15 萬</td></tr>
+      <tr><td>S1 → S2</td><td class="num"><span class="inp s">　</span> 案</td><td class="num"><span class="inp">　</span> 元</td><td>V4＝15／45 萬</td></tr>
+      <tr><td>S2 → S3</td><td class="num"><span class="inp s">　</span> 案</td><td class="num"><span class="inp">　</span> 元</td><td>V4＝25／75 萬</td></tr>
+      <tr><td>S3 → 首席</td><td class="num"><span class="inp s">　</span> 案</td><td class="num"><span class="inp">　</span> 元</td><td>V4＝35／105 萬</td></tr>
+    </table>
+
+    <h3>B 軌：個人＋團隊路徑（第十二條）</h3>
+    <table>
+      <tr><th style="width:18%">晉升</th><th style="width:14%">個人案數</th><th style="width:16%">個人顧問費</th><th style="width:16%">團隊輔導業績</th><th style="width:22%">育成條件</th><th>啟用</th></tr>
+      <tr><td>S1 → S2</td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="inp">　</span></td><td class="num"><span class="inp s">　</span> 案</td><td><span class="inp s">　</span> 位 <span class="inp s">　</span> 階以上</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>S2 → S3</td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="inp">　</span></td><td class="num"><span class="inp s">　</span> 案</td><td><span class="inp s">　</span> 位 <span class="inp s">　</span> 階以上</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>S3 → 首席</td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="inp">　</span></td><td class="num"><span class="inp s">　</span> 案</td><td><span class="inp s">　</span> 位 <span class="inp s">　</span> 階以上</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td colspan="6" style="color:#a7b7c4">V4：10/30萬/20案・18/54萬/40案・25/75萬/70案＋育成 2 位 S1↑；C1–S1 不開放 B 軌</td></tr>
+    </table>
+
+    <h3>B 軌配套（第十三條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>B 軌開放的最低起始職級</td><td><span class="inp s">　</span> <span class="tag t-fill">可填</span>V4＝S1</td></tr>
+      <tr><td>認證顧問階段前 N 案須親自執案</td><td class="num"><span class="inp s">　</span> 案 <span class="tag t-fill">可填</span>V4＝5</td></tr>
+      <tr><td>非輔導鏈成員之協助／轉介不計入團隊業績</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+    <span class="btn solid">儲存</span><span class="btn">載入 V4 辦法數值</span>
+  </div>
+</section>
+
+<!-- ============ 5 真除 ============ -->
+<section class="page" id="s5">
+  <div class="card">
+    <h2>5・同業招募與真除制度</h2>
+    <span class="path">/admin/system?tab=tenure</span>
+    <p class="meta">對應第十四條、第十五條、第二十四條。</p>
+    <div class="tabs"><span>分潤架構</span><span>職級與分潤率</span><span>差％規則</span><span>晉升門檻</span><span class="on">同業招募與真除</span><span>維持資格</span><span>個案與結案</span><span>發放與退費</span><span>版本管理</span></div>
+
+    <h3>職級核定（第十四條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>依過往實績對照 A 軌門檻表核定</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>核定得高於推薦人職級（允許倒掛）</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>必附佐證資料類型</td><td><span class="tag t-list">清單</span>服務合約／收費紀錄／客戶見證／<span class="inp">＋</span></td></tr>
+      <tr><td>初任職級（一般培訓進入）</td><td><span class="inp s">　</span> <span class="tag t-fill">可填</span>V4＝C1</td></tr>
+    </table>
+
+    <h3>真除制度（第十五條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>適用真除的最低核定職級（以下不需真除）</td><td><span class="inp s">　</span> <span class="tag t-fill">可填</span>V4＝S1</td></tr>
+      <tr><td>真除期間（自到職日起）</td><td class="num"><span class="inp s">　</span> 個月 <span class="tag t-fill">可填</span>V4＝12</td></tr>
+      <tr><td>真除期間分潤按核定職級全額計算、不折減</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>真除期間業績計入本人終身累計</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>未達標時「認階轉正」（往下對照最高達成階）</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>認階次數上限</td><td class="num"><span class="inp s">　</span> 次 <span class="tag t-fill">可填</span>V4＝1</td></tr>
+      <tr><td>全未達標時之保底職級</td><td><span class="inp s">　</span> <span class="tag t-fill">可填</span>V4＝C3</td></tr>
+      <tr><td>真除狀態對外顯示</td><td><span class="tag t-sw">開關</span>V4＝關（僅內部註記）</td></tr>
+    </table>
+
+    <h3>真除門檻表 <span class="tag t-list">依職級表自動生成列</span></h3>
+    <table>
+      <tr><th style="width:20%">核定職級</th><th style="width:20%">期間個案數</th><th style="width:24%">期間顧問費</th><th>附加條件</th></tr>
+      <tr><td>S1</td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="inp">　</span></td><td><span class="inp w">　</span></td></tr>
+      <tr><td>S2</td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="inp">　</span></td><td><span class="inp w">　</span></td></tr>
+      <tr><td>S3</td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="inp">　</span></td><td><span class="inp w">　</span></td></tr>
+      <tr><td>首席</td><td class="num"><span class="inp s">　</span></td><td class="num"><span class="inp">　</span></td><td><span class="inp w">　</span>V4＝育成 1 位直轄顧問完成首案</td></tr>
+    </table>
+    <div class="note">「附加條件」不是自由文字而是<b>結構化條件</b>下拉：育成 N 位 X 階以上／帶領 N 位完成首案／團隊業績 N 案／無附加條件。這樣引擎才能自動判定，不用人工看字。</div>
+
+    <h3>回任（第二十六條第三項）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>離職顧問回任比照同業招募程序（含真除）</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>離職顧問已累計個人業績不予保留</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+    <span class="btn solid">儲存</span><span class="btn">載入 V4 辦法數值</span>
+  </div>
+</section>
+
+<!-- ============ 6 維持資格 ============ -->
+<section class="page" id="s6">
+  <div class="card">
+    <h2>6・維持資格</h2>
+    <span class="path">/admin/system?tab=maintain</span>
+    <p class="meta">對應第十六至十九條。年度制（1/1–12/31）。</p>
+    <div class="tabs"><span>分潤架構</span><span>職級與分潤率</span><span>差％規則</span><span>晉升門檻</span><span>同業招募與真除</span><span class="on">維持資格</span><span>個案與結案</span><span>發放與退費</span><span>版本管理</span></div>
+
+    <h3>執案門檻（第十六條一）</h3>
+    <table>
+      <tr><th style="width:56%">項目</th><th>設定</th></tr>
+      <tr><td>年度最低完成收費個案數</td><td class="num"><span class="inp s">　</span> 案 <span class="tag t-fill">可填</span>V4＝1</td></tr>
+      <tr><td>該個案顧問費不低於</td><td><span class="inp">　</span> 元 ／ <span class="tag t-sw">開關</span>「引用單點諮詢定價（頁 1）」</td></tr>
+      <tr><td>年度區間</td><td><span class="inp s">　</span>/<span class="inp s">　</span> 起算 <span class="tag t-fill">可填</span>V4＝1/1</td></tr>
+    </table>
+
+    <h3>訓練門檻（第十六條二）</h3>
+    <table>
+      <tr><th style="width:56%">項目</th><th>設定</th></tr>
+      <tr><td>年度最低訓練時數</td><td class="num"><span class="inp s">　</span> 小時 <span class="tag t-fill">可填</span>V4＝8</td></tr>
+      <tr><td>內部研討會每場認列</td><td class="num"><span class="inp s">　</span> 小時 <span class="tag t-fill">可填</span>V4＝2</td></tr>
+      <tr><td>擔任講師之倍率</td><td class="num"><span class="inp s">　</span> 倍 <span class="tag t-fill">可填</span>V4＝2（＝4 小時）</td></tr>
+      <tr><td>外部課程年度認列上限</td><td class="num"><span class="inp s">　</span> 小時 <span class="tag t-fill">可填</span>V4＝3</td></tr>
+      <tr><td>外部課程須事前認可</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>內部研討會優先認列</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>線上同步參與視同出席</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <h3>未達門檻之處理（第十七、十八條）</h3>
+    <table>
+      <tr><th style="width:56%">處理項目</th><th>設定</th></tr>
+      <tr><td>暫停「招募直轄顧問」資格</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>暫停「公司派案」受派資格</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>職級不因此降級</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>既有直轄團隊差％照常領取</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>暫停生效時點</td><td>次年度 <span class="inp s">　</span>/<span class="inp s">　</span> <span class="tag t-fill">可填</span></td></tr>
+      <tr><td>補足後恢復時點</td><td>次月 <span class="inp s">　</span> 日 <span class="tag t-fill">可填</span></td></tr>
+      <tr><td>恢復需人工審核</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <h3>豁免（第十九條）</h3>
+    <table>
+      <tr><th style="width:56%">豁免事由 <span class="tag t-list">可增刪</span></th><th>需核准</th></tr>
+      <tr><td>育嬰</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>重大傷病</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>兵役</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td><span class="inp w">＋ 新增事由</span></td><td>—</td></tr>
+      <tr><td>到職未滿一完整年度之首年度豁免</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+    <span class="btn solid">儲存</span><span class="btn">載入 V4 辦法數值</span>
+  </div>
+</section>
+
+<!-- ============ 7 個案認定 ============ -->
+<section class="page" id="s7">
+  <div class="card">
+    <h2>7・個案認定與結案流程</h2>
+    <span class="path">/admin/system?tab=case-rules</span>
+    <p class="meta">對應第二十條、第二十一條。定義「一個案子」怎麼算，以及結案要件。</p>
+    <div class="tabs"><span>分潤架構</span><span>職級與分潤率</span><span>差％規則</span><span>晉升門檻</span><span>同業招募與真除</span><span>維持資格</span><span class="on">個案與結案</span><span>發放與退費</span><span>版本管理</span></div>
+
+    <h3>個案計數（第二十條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>同一自然人同一年度內所有服務合併為一個案</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>該年度內顧問費累積計入</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>跨年度續約各年各計一案</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>個案數不依金額加權</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>推廣者認定基準</td><td>下拉：最終促成簽約者／首次接觸者 <span class="tag t-fill">可填</span></td></tr>
+      <tr><td>爭議以公司簽約及收費紀錄裁決</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <h3>回饋問卷結案制（第二十一條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>問卷回收為結案要件（未回收不計晉升指標）</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>問卷題目 <span class="tag t-list">可增刪・可排序</span></td><td><span class="inp w">　</span></td></tr>
+      <tr><td colspan="2" style="color:#a7b7c4">V4 三題：諮詢前的困擾與期待／過程中印象最深的環節／諮詢後的具體改變或決定</td></tr>
+      <tr><td>末端行銷授權勾選欄</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>授權後可作為見證素材</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <div class="note"><b>與既有系統的接點</b>：問卷可直接掛在客戶端 <code>/portal</code>——客戶登入後看到「回饋問卷」卡片，填完即自動結案並觸發晉升重算。顧問端也可代填並註記「代填」。這是把制度跑起來的關鍵一環（沒問卷＝沒結案＝不算業績）。</div>
+
+    <h3>公司派案（第二十五條）</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>派案指派依據 <span class="tag t-list">可複選排序</span></td><td>職級／專長領域／維持資格狀態</td></tr>
+      <tr><td>暫停受派者不予指派</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>專長領域清單 <span class="tag t-list">可增刪</span></td><td><span class="inp w">＋ 新增</span></td></tr>
+    </table>
+    <span class="btn solid">儲存</span><span class="btn">載入 V4 辦法數值</span>
+  </div>
+</section>
+
+<!-- ============ 8 發放 ============ -->
+<section class="page" id="s8">
+  <div class="card">
+    <h2>8・發放、退費與合作規範</h2>
+    <span class="path">/admin/system?tab=payout-rules</span>
+    <p class="meta">對應第二十二、二十三、二十六、二十七、二十八條。</p>
+    <div class="tabs"><span>分潤架構</span><span>職級與分潤率</span><span>差％規則</span><span>晉升門檻</span><span>同業招募與真除</span><span>維持資格</span><span>個案與結案</span><span class="on">發放與退費</span><span>版本管理</span></div>
+
+    <h3>分潤發放（第二十二條）</h3>
+    <table>
+      <tr><th style="width:60%">項目</th><th>設定</th></tr>
+      <tr><td>發放日</td><td>次月 <span class="inp s">　</span> 日 <span class="tag t-fill">可填</span>V4＝5</td></tr>
+      <tr><td>發放前提：公司實際收訖</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>退費／解約觀察期</td><td class="num"><span class="inp s">　</span> 天 <span class="tag t-fill">可填</span></td></tr>
+      <tr><td>得由公司核定提前發放</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>分期收款按各期實收計算</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <h3>退費與解約（第二十三條）</h3>
+    <table>
+      <tr><th style="width:60%">項目</th><th>設定</th></tr>
+      <tr><td>未發放分潤不予發放</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>部分退費按實收比例重算</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>退費案件自累計指標扣除</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>扣除後若低於現職級門檻</td><td>下拉：不降級／降級 <span class="tag t-fill">可填</span>（辦法未明定，需你們決定）</td></tr>
+    </table>
+
+    <h3>離職與退出（第二十六條）</h3>
+    <table>
+      <tr><th style="width:60%">項目</th><th>設定</th></tr>
+      <tr><td>直轄團隊自動歸屬直屬主管</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>既有客戶與在途案件歸屬</td><td>下拉：直屬主管／主管指派承接</td></tr>
+      <tr><td>離職者已累計個人業績不予保留</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <h3>重大違規（第二十七條）<span class="tag t-list">清單可增刪</span></h3>
+    <table>
+      <tr><th style="width:60%">事由</th><th>處理</th></tr>
+      <tr><td>挪用或侵占客戶款項</td><td>終止合作／暫停未結分潤 <span class="tag t-sw">開關</span></td></tr>
+      <tr><td>偽造業績、佐證資料或回饋問卷</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>重大客戶投訴查證屬實</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>洩漏客戶個人資料</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>其他重大違反誠信原則</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td><span class="inp w">＋ 新增事由</span></td><td>—</td></tr>
+    </table>
+
+    <h3>合作關係定位（第二十八條）</h3>
+    <table>
+      <tr><th style="width:60%">項目</th><th>設定</th></tr>
+      <tr><td>關係定位文字（顯示於顧問端與合約）</td><td><span class="inp w">　</span><span class="tag t-fill">可填</span></td></tr>
+      <tr><td>合作契約範本上傳</td><td><span class="btn ghost">上傳 PDF</span></td></tr>
+    </table>
+    <span class="btn solid">儲存</span><span class="btn">載入 V4 辦法數值</span>
+  </div>
+</section>
+
+<!-- ============ 9 版本 ============ -->
+<section class="page" id="s9">
+  <div class="card">
+    <h2>9・制度版本管理</h2>
+    <span class="path">/admin/system?tab=versions</span>
+    <p class="meta">對應第三十一條「制度修訂不溯及已結案件」。這是整套系統最重要的防呆——沒有版本，改一次分潤率就會把過去所有分潤算錯。</p>
+    <div class="tabs"><span>分潤架構</span><span>職級與分潤率</span><span>差％規則</span><span>晉升門檻</span><span>同業招募與真除</span><span>維持資格</span><span>個案與結案</span><span>發放與退費</span><span class="on">版本管理</span></div>
+
+    <h3>版本清單</h3>
+    <table>
+      <tr><th style="width:12%">版本</th><th style="width:14%">生效日</th><th style="width:12%">狀態</th><th style="width:34%">修訂重點</th><th>操作</th></tr>
+      <tr><td>V4.0</td><td>2026-07-01</td><td><span class="tag t-list">生效中</span></td><td>真除定名與認階轉正、維持門檻加訓練時數…</td><td><span class="btn ghost">檢視</span><span class="btn ghost">複製為新版</span></td></tr>
+      <tr><td>V3.0</td><td>—</td><td><span class="tag t-calc">已封存</span></td><td>名詞統一、新增發放與合作規範專章</td><td><span class="btn ghost">檢視</span></td></tr>
+      <tr><td><span class="inp s">V　</span></td><td><span class="inp w">　</span></td><td>草稿</td><td><span class="inp w">　</span></td><td><span class="btn">建立草稿版</span></td></tr>
+    </table>
+
+    <h3>版本規則</h3>
+    <table>
+      <tr><th style="width:64%">規則</th><th>設定</th></tr>
+      <tr><td>制度修訂不溯及已結案件之分潤</td><td><span class="tag t-sw">開關</span>（V4＝開）</td></tr>
+      <tr><td>已發放案件永久凍結在當時版本</td><td><span class="tag t-sw">開關</span></td></tr>
+      <tr><td>草稿版可先試算不影響正式</td><td><span class="tag t-sw">開關</span></td></tr>
+    </table>
+
+    <div class="warn"><b>版本的實作意義</b>：每筆案件的分潤明細會存下 <code>comp_version_id</code> 與<b>當下計算用的完整參數快照</b>。之後你改職級分潤率、改門檻，舊案永遠重算不動；新案自動套新版。版本切換前系統會跑「差異對照」：列出這次改了哪些數字、影響哪些未發放案件。</div>
+    <span class="btn solid">發布為生效版</span><span class="btn">與 V4.0 比對差異</span>
+  </div>
+</section>
+
+<!-- ============ 10 試算器 ============ -->
+<section class="page" id="sim">
+  <div class="card">
+    <h2>10・分潤試算器</h2>
+    <span class="path">/admin/system/simulator</span>
+    <p class="meta">全體顧問都能用。輸入一個情境，即時算出每一層拿多少、驗算是否 100%。招募說明與制度教育都靠這頁。</p>
+
+    <h3>輸入區</h3>
+    <div class="grid2">
+      <div class="tile"><b>顧問費金額</b><div><span class="inp">　</span> 元 <span class="tag t-fill">可填</span></div>
+        <b style="margin-top:10px">案件來源</b><div>○ 顧問開發　○ 公司派案 <span class="tag t-fill">可填</span></div>
+        <b style="margin-top:10px">推廣者</b><div><span class="inp w">選顧問或輸入職級</span></div>
+        <b style="margin-top:10px">執案者</b><div><span class="inp w">選顧問或輸入職級</span>　□ 自推自執</div>
+      </div>
+      <div class="tile"><b>輔導鏈（由下而上，可拖曳）</b>
+        <div style="margin-top:6px">
+          <div class="inp w">第 1 層　職級 ▾</div><div class="inp w" style="margin-top:5px">第 2 層　職級 ▾</div>
+          <div class="inp w" style="margin-top:5px">第 3 層　職級 ▾</div>
+          <div><span class="btn ghost">＋ 加一層</span><span class="btn ghost">鏈不完整（頂層非首席）</span></div>
+        </div>
+        <b style="margin-top:10px">套用制度版本</b><div><span class="inp w">V4.0（生效中）▾</span></div>
+      </div>
+    </div>
+
+    <h3>輸出：逐層分潤明細 <span class="tag t-calc">全部系統計算</span></h3>
+    <table>
+      <tr><th style="width:26%">角色</th><th style="width:18%">推廣端</th><th style="width:18%">執案端</th><th style="width:14%">合計 %</th><th style="width:16%">金額</th><th>依據條文</th></tr>
+      <tr><td class="ro">執案／推廣者（C1）</td><td class="num ro">15%</td><td class="num ro">30%</td><td class="num ro">45%</td><td class="num ro">27,000</td><td class="ro">§5</td></tr>
+      <tr><td class="ro">直屬主管（S2）</td><td class="num ro">11%</td><td class="num ro">20%</td><td class="num ro">31%</td><td class="num ro">18,600</td><td class="ro">§6-2</td></tr>
+      <tr><td class="ro">首席顧問</td><td class="num ro">4%</td><td class="num ro">10%</td><td class="num ro">14%</td><td class="num ro">8,400</td><td class="ro">§6-2</td></tr>
+      <tr><td class="ro">公司營運</td><td class="num ro">—</td><td class="num ro">—</td><td class="num ro">10%</td><td class="num ro">6,000</td><td class="ro">§3</td></tr>
+      <tr style="background:#e6f4ee"><td><b>驗算</b></td><td colspan="2"></td><td class="num"><b>100%</b> ✓</td><td class="num"><b>60,000</b></td><td>—</td></tr>
+    </table>
+    <p class="meta">上表為示意（範例一）。實際數字由制度參數即時推導；若加總 ≠ 100% 會整列轉紅並指出是哪一層規則造成。</p>
+
+    <h3>快速情境按鈕</h3>
+    <div>
+      <span class="btn">範例一 自推自執</span><span class="btn">範例二 公司派案</span><span class="btn">範例三 平階</span>
+      <span class="btn">附錄A 倒掛</span><span class="btn">附錄B 推廣執案分離</span><span class="btn">附錄C 鏈不完整</span><span class="btn">附錄D 代管</span>
+    </div>
+    <div class="note">這七個情境同時是<b>引擎的單元測試案例</b>——制度參數只要載入 V4，七個範例的每一格數字都必須跟辦法完全一致，測試才過。改任何規則開關，測試會立刻告訴你哪個範例破了。</div>
+
+    <h3>額外輸出</h3>
+    <ul class="li">
+      <li><b>平階／倒掛提示</b>：偵測到平階時，顯示「觸發平階輔導獎金 §7，由 X 讓出 50%」的說明句。</li>
+      <li><b>團隊業績歸屬</b>：標示這案會計入哪幾位的團隊輔導業績（§13 逐層）。</li>
+      <li><b>一鍵匯出</b>：把試算結果輸出成 PNG／PDF，可放進招募簡報。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 11 案件 ============ -->
+<section class="page" id="case">
+  <div class="card">
+    <h2>11・案件與分潤明細</h2>
+    <span class="path">/admin/cases</span>
+    <p class="meta">制度真正跑起來的地方：登錄案件 → 引擎算分潤 → 月結發放 → 回寫晉升指標。</p>
+
+    <h3>案件列表</h3>
+    <div class="tabs"><span class="on">全部</span><span>待收款</span><span>待問卷</span><span>待發放</span><span>已發放</span><span>退費／解約</span></div>
+    <table>
+      <tr><th>案號</th><th>客戶</th><th>顧問費</th><th>推廣者</th><th>執案者</th><th>來源</th><th>問卷</th><th>收款</th><th>分潤狀態</th><th></th></tr>
+      <tr><td class="ro">2026-0031</td><td class="ro">王○明</td><td class="num ro">60,000</td><td class="ro">陳○（C1）</td><td class="ro">陳○（C1）</td><td class="ro">自開發</td><td class="ro">✓ 已回收</td><td class="ro">✓ 實收</td><td class="ro">待發放 8/5</td><td><span class="btn ghost">明細</span></td></tr>
+      <tr><td class="ro">2026-0032</td><td class="ro">李○華</td><td class="num ro">30,000</td><td class="ro">公司派案</td><td class="ro">林○（S1）</td><td class="ro">派案</td><td class="ro">未回收</td><td class="ro">✓ 實收</td><td class="ro">卡結案</td><td><span class="btn ghost">明細</span></td></tr>
+      <tr><td colspan="10"><span class="btn solid">＋ 登錄案件</span><span class="btn">批次匯入 CSV</span><span class="btn">產生本月發放批次</span></td></tr>
+    </table>
+
+    <h3>案件登錄表單</h3>
+    <div class="grid2">
+      <div class="tile"><b>案件基本</b>
+        <div style="margin-top:6px">客戶 <span class="inp w">從既有客戶挑選 ▾</span>　<span class="tag t-fill">可填</span></div>
+        <div>服務類型 <span class="inp w">完整規劃／單點 ▾</span></div>
+        <div>顧問費 <span class="inp">　</span> 元　□ 分期（<span class="inp s">　</span> 期）</div>
+        <div>簽約日 <span class="inp w">　</span>　收款日 <span class="inp w">　</span></div>
+        <div>發票號碼 <span class="inp w">　</span></div>
+      </div>
+      <div class="tile"><b>角色與鏈</b>
+        <div style="margin-top:6px">推廣者 <span class="inp w">　▾</span>　□ 公司派案</div>
+        <div>執案者 <span class="inp w">　▾</span>　□ 自推自執</div>
+        <div class="ro" style="margin-top:8px">輔導鏈 <span class="tag t-calc">系統自動由組織樹推出</span></div>
+        <div class="ro" style="font-family:monospace;font-size:12px">陳○(C1) → 林○(S2) → 浩軍(首席)</div>
+        <div class="ro">套用制度版本 <span class="tag t-calc">依簽約日自動判定 V4.0</span></div>
+      </div>
+    </div>
+
+    <h3>案件明細頁：分潤展開 <span class="tag t-calc">系統計算・可展開查明細</span></h3>
+    <table>
+      <tr><th>受分潤人</th><th>身分</th><th>推廣端</th><th>執案端</th><th>平階獎金</th><th>合計</th><th>金額</th><th>狀態</th></tr>
+      <tr><td class="ro">陳○</td><td class="ro">推廣＋執案 C1</td><td class="num ro">15%</td><td class="num ro">30%</td><td class="num ro">—</td><td class="num ro">45%</td><td class="num ro">27,000</td><td class="ro">待發放</td></tr>
+      <tr><td class="ro">林○</td><td class="ro">直屬主管 S2</td><td class="num ro">11%</td><td class="num ro">20%</td><td class="num ro">—</td><td class="num ro">31%</td><td class="num ro">18,600</td><td class="ro">待發放</td></tr>
+      <tr><td class="ro">浩軍</td><td class="ro">首席</td><td class="num ro">4%</td><td class="num ro">10%</td><td class="num ro">—</td><td class="num ro">14%</td><td class="num ro">8,400</td><td class="ro">待發放</td></tr>
+      <tr><td class="ro">公司</td><td class="ro">營運保留</td><td class="num ro">—</td><td class="num ro">—</td><td class="num ro">—</td><td class="num ro">10%</td><td class="num ro">6,000</td><td class="ro">—</td></tr>
+    </table>
+    <p class="meta">每一列可展開看「這個 % 怎麼來的」：引用哪一條、扣掉下層哪個 %、套用哪個版本——沿用嵐途既有的 detailBox／明細可展開通則。</p>
+
+    <h3>月結發放批次</h3>
+    <div class="state">
+      <div><b>批次</b> 2026-08（發放日 8/5）</div><div><b>案件</b> 12 件</div><div><b>總分潤</b> 486,000</div>
+      <div><b>狀態</b> 待覆核 → 已覆核 → 已發放</div><div><b>凍結</b> 發放後參數變更不影響</div>
+    </div>
+    <div>
+      <span class="btn solid">產生批次</span><span class="btn">匯出發放清冊 XLSX</span><span class="btn ghost">標記已發放</span>
+    </div>
+
+    <h3>退費／解約處理</h3>
+    <ul class="li">
+      <li>輸入退費金額 → 系統按實收比例重算全鏈分潤，列出「原本→現在」逐人差額。</li>
+      <li>未發放者直接扣，已發放者產生「應追回」清單。</li>
+      <li>同步自累計個案數與顧問費扣除，並重新評估相關人的職級（若設定為會降級）。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 12 顧問 ============ -->
+<section class="page" id="adv">
+  <div class="card">
+    <h2>12・顧問職級與晉升追蹤</h2>
+    <span class="path">/admin/advisors</span>
+    <p class="meta">既有 /admin 顧問管理的加強版：多出職級、真除、累計指標、晉升進度、維持資格與資格狀態。</p>
+
+    <h3>顧問總表</h3>
+    <div class="tabs"><span class="on">全部</span><span>真除中</span><span>可晉升</span><span>維持資格未達</span><span>已暫停資格</span></div>
+    <table>
+      <tr><th>顧問</th><th>職級</th><th>直屬主管</th><th>到職</th><th>真除</th><th>終身案數</th><th>終身顧問費</th><th>團隊業績</th><th>A軌</th><th>B軌</th><th>維持</th><th>資格</th></tr>
+      <tr><td class="ro">陳○</td><td class="ro">C1</td><td class="ro">林○</td><td class="ro">2026-03</td><td class="ro">—</td><td class="num ro">1</td><td class="num ro">60,000</td><td class="num ro">0</td><td class="ro">✓ 達標</td><td class="ro">n/a</td><td class="ro">首年豁免</td><td class="ro">正常</td></tr>
+      <tr><td class="ro">林○</td><td class="ro">S2</td><td class="ro">浩軍</td><td class="ro">2024-01</td><td class="ro">—</td><td class="num ro">19</td><td class="num ro">570,000</td><td class="num ro">26</td><td class="ro">76%</td><td class="ro">✓ 達標</td><td class="ro">執案✓ 訓練 6/8</td><td class="ro">正常</td></tr>
+      <tr><td class="ro">吳○（同業）</td><td class="ro">S3・真除中</td><td class="ro">林○</td><td class="ro">2026-02</td><td class="ro">剩 6 月</td><td class="num ro">2</td><td class="num ro">80,000</td><td class="num ro">0</td><td class="ro">—</td><td class="ro">—</td><td class="ro">執案✓ 訓練 2/8</td><td class="ro">正常</td></tr>
+    </table>
+
+    <h3>顧問個人頁</h3>
+    <div class="grid3">
+      <div class="tile"><b>現職級</b><div class="v">S2</div><div class="ro" style="font-size:12px">2025-11-01 由 S1 晉升（A 軌）</div></div>
+      <div class="tile"><b>A 軌進度 → S3</b><div class="v">19 / 25 案</div><div class="bar"><i style="width:76%"></i></div>
+        <div class="ro" style="font-size:12px">顧問費 57 / 75 萬</div><div class="bar"><i style="width:76%"></i></div></div>
+      <div class="tile"><b>B 軌進度 → S3</b><div class="v">26 / 40 案</div><div class="bar"><i style="width:65%"></i></div>
+        <div class="ro" style="font-size:12px">個人 19/18 案 ✓・57/54 萬 ✓</div></div>
+    </div>
+    <h4>可編輯欄位（管理員）</h4>
+    <table>
+      <tr><th style="width:34%">欄位</th><th>狀態</th></tr>
+      <tr><td>職級</td><td><span class="inp w">　▾</span><span class="tag t-fill">可填</span>手動調整需填異動原因，寫入異動紀錄</td></tr>
+      <tr><td>直屬主管（輔導關係）</td><td><span class="inp w">　▾</span><span class="tag t-fill">可填</span>沿用既有組織樹 uplineId</td></tr>
+      <tr><td>推薦人（可不同於直屬主管）</td><td><span class="inp w">　▾</span><span class="tag t-fill">可填</span>代管情境用</td></tr>
+      <tr><td>到職日</td><td><span class="inp w">　</span><span class="tag t-fill">可填</span>真除倒數與首年豁免的起點</td></tr>
+      <tr><td>進入方式</td><td>培訓認證／同業招募／回任 <span class="tag t-fill">可填</span></td></tr>
+      <tr><td>核定職級與佐證</td><td><span class="inp w">　</span>＋附件上傳 <span class="tag t-fill">可填</span></td></tr>
+      <tr><td>期初累計（同業帶入之既往業績）</td><td>案數 <span class="inp s">　</span>／顧問費 <span class="inp">　</span> <span class="tag t-fill">可填</span></td></tr>
+      <tr><td>維持資格豁免</td><td>年度 <span class="inp s">　</span>／事由 <span class="inp w">　</span> <span class="tag t-fill">可填</span></td></tr>
+      <tr><td>累計案數／顧問費／團隊業績</td><td><span class="tag t-calc">系統計算</span>唯讀，來自案件表；可展開看組成明細</td></tr>
+      <tr><td>招募資格／受派資格</td><td><span class="tag t-calc">系統計算</span>由維持資格推導，可手動覆寫並記錄原因</td></tr>
+    </table>
+
+    <h4>異動紀錄（每位顧問一條時間軸）</h4>
+    <ul class="li">
+      <li>2026-07-01　由 S1 晉升 S2（A 軌自動・案數 15／45 萬達標）</li>
+      <li>2026-02-01　同業招募到職，核定 S3，真除期至 2027-01-31</li>
+      <li>2026-01-01　維持資格未達（訓練 4/8）→ 暫停招募與受派</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 13 訓練 ============ -->
+<section class="page" id="trn">
+  <div class="card">
+    <h2>13・訓練時數與研討會</h2>
+    <span class="path">/admin/training</span>
+    <p class="meta">對應第十六條第二項。維持資格的訓練門檻要有資料來源，否則那個 8 小時只是紙上規定。</p>
+
+    <h3>研討會場次</h3>
+    <table>
+      <tr><th>日期</th><th>主題</th><th>形式</th><th>認列時數</th><th>講師</th><th>出席</th><th></th></tr>
+      <tr><td class="ro">2026-08-12</td><td class="ro">高資產客戶稅務實務</td><td class="ro">實體＋線上</td><td class="num ro">2</td><td class="ro">林○（4h）</td><td class="ro">18 人</td><td><span class="btn ghost">點名</span></td></tr>
+      <tr><td colspan="7"><span class="btn solid">＋ 新增場次</span><span class="btn">匯入出席名單</span></td></tr>
+    </table>
+    <p class="meta">新增場次欄位：日期 <span class="tag t-fill">可填</span>・主題 <span class="tag t-fill">可填</span>・形式（實體／線上／混合）・認列時數（預設帶入頁 6 的「每場認列」）・講師（自動套倍率）。</p>
+
+    <h3>外部課程認列申請</h3>
+    <table>
+      <tr><th>申請人</th><th>課程</th><th>時數</th><th>證明</th><th>狀態</th><th></th></tr>
+      <tr><td class="ro">吳○</td><td class="ro">CFP 持續教育・退休規劃</td><td class="num ro">3</td><td class="ro">結業證書.pdf</td><td class="ro">待審</td><td><span class="btn ghost">核准</span><span class="btn ghost">退回</span></td></tr>
+    </table>
+    <p class="meta">核准時系統自動檢查該顧問當年度外部認列是否已達上限（頁 6 設定），超過部分不計並提示。</p>
+
+    <h3>年度訓練時數總表</h3>
+    <table>
+      <tr><th>顧問</th><th>內部研討會</th><th>講師加倍</th><th>外部（上限內）</th><th>合計</th><th>門檻</th><th>狀態</th></tr>
+      <tr><td class="ro">林○</td><td class="num ro">4</td><td class="num ro">2</td><td class="num ro">0</td><td class="num ro">6</td><td class="num ro">8</td><td class="ro">未達・差 2h</td></tr>
+      <tr><td class="ro">陳○</td><td class="num ro">8</td><td class="num ro">0</td><td class="num ro">0</td><td class="num ro">8</td><td class="num ro">8</td><td class="ro">✓ 達標</td></tr>
+    </table>
+    <div class="note">每月自動寄／站內通知「你的維持資格進度」給未達標者，年底前兩個月加密提醒——避免 1/1 突然被暫停資格的爭議。</div>
+  </div>
+</section>
+
+<!-- ============ 14 我的業務 ============ -->
+<section class="page" id="me">
+  <div class="card">
+    <h2>14・我的業務（顧問端）</h2>
+    <span class="path">/dashboard　新增「我的業務」分頁</span>
+    <p class="meta">顧問自己看的那一面。制度要有效，關鍵是每位顧問隨時知道「我在哪、還差多少、這個月領多少」。</p>
+
+    <h3>頂部四塊</h3>
+    <div class="grid3">
+      <div class="tile"><b>我的職級</b><div class="v">S2 資深顧問二階</div><div class="ro" style="font-size:12px">推廣端 26%・執案端 50%</div></div>
+      <div class="tile"><b>本月待發分潤</b><div class="v">48,600</div><div class="ro" style="font-size:12px">8/5 發放・3 件</div></div>
+      <div class="tile"><b>維持資格</b><div class="v">訓練 6/8h</div><div class="ro" style="font-size:12px">執案 ✓・年底前需補 2 小時</div></div>
+    </div>
+
+    <h3>晉升進度（雙軌並列，取先達標者）</h3>
+    <table>
+      <tr><th style="width:16%">路徑</th><th>條件</th><th style="width:34%">進度</th><th style="width:12%">狀態</th></tr>
+      <tr><td class="ro">A 軌</td><td class="ro">25 案／75 萬</td><td class="ro">19 案・57 萬<div class="bar"><i style="width:76%"></i></div></td><td class="ro">差 6 案</td></tr>
+      <tr><td class="ro">B 軌</td><td class="ro">個人 18 案／54 萬＋團隊 40 案</td><td class="ro">個人 ✓✓・團隊 26 案<div class="bar"><i style="width:65%"></i></div></td><td class="ro">差 14 案</td></tr>
+    </table>
+    <p class="meta">下方一句白話：「你目前 B 軌較接近，團隊再完成 14 案即可晉升 S3。」——把制度翻成行動語言。</p>
+
+    <h3>我的分潤明細</h3>
+    <table>
+      <tr><th>月份</th><th>案號</th><th>客戶</th><th>我的身分</th><th>%</th><th>金額</th><th>狀態</th></tr>
+      <tr><td class="ro">2026-08</td><td class="ro">2026-0031</td><td class="ro">王○明</td><td class="ro">直屬主管差％</td><td class="num ro">31%</td><td class="num ro">18,600</td><td class="ro">待發放</td></tr>
+      <tr><td class="ro">2026-07</td><td class="ro">2026-0027</td><td class="ro">張○</td><td class="ro">執案</td><td class="num ro">76%</td><td class="num ro">45,600</td><td class="ro">已發放</td></tr>
+    </table>
+    <p class="meta">每列可展開「這筆怎麼算的」——同一套明細元件，顧問看得到自己那層的推導，看不到別人的金額（權限：只顯示本人列）。</p>
+
+    <h3>我的直轄團隊</h3>
+    <table>
+      <tr><th>成員</th><th>職級</th><th>本年案數</th><th>計入我的團隊業績</th><th>維持資格</th></tr>
+      <tr><td class="ro">陳○</td><td class="ro">C1</td><td class="num ro">1</td><td class="ro">✓</td><td class="ro">首年豁免</td></tr>
+      <tr><td class="ro">吳○</td><td class="ro">S3・真除中</td><td class="num ro">2</td><td class="ro">✓（倒掛・§8）</td><td class="ro">訓練 2/8</td></tr>
+    </table>
+
+    <h3>制度說明（唯讀）</h3>
+    <p class="meta">同一份制度參數渲染成給顧問看的「制度說明書」頁：職級表、晉升門檻、維持資格、發放規則，永遠跟後台設定同步，不會有「制度文件跟系統不一樣」的落差。含試算器連結。</p>
+  </div>
+</section>
+
+<!-- ============ 15 DB ============ -->
+<section class="page" id="db">
+  <div class="card">
+    <h2>15・資料表與引擎</h2>
+    <p class="meta">Drizzle / Neon。制度參數與運作資料分離；引擎純函式、可單測。</p>
+
+    <h3>制度參數（版本化）</h3>
+    <table>
+      <tr><th style="width:24%">資料表</th><th>用途與關鍵欄位</th></tr>
+      <tr><td><code>comp_versions</code></td><td>制度版本：version、effectiveFrom、status(draft/active/archived)、changeNote、publishedAt</td></tr>
+      <tr><td><code>comp_ranks</code></td><td>職級：versionId、seq、groupName、tierLabel、code、promoPct、execPct（<b>全部 nullable</b>）</td></tr>
+      <tr><td><code>comp_thresholds</code></td><td>門檻通用表：versionId、kind(promotion_a / promotion_b / tenure)、fromRank、toRank、cases、fees、teamCases、extraCondition(jsonb)</td></tr>
+      <tr><td><code>comp_settings</code></td><td>其餘所有單值參數與開關，一個 jsonb：splitPromo、splitExec、peerBonusPct、payoutDay、maintainHours…（key 缺席＝未設定）</td></tr>
+    </table>
+
+    <h3>顧問與運作</h3>
+    <table>
+      <tr><th style="width:24%">資料表</th><th>用途與關鍵欄位</th></tr>
+      <tr><td><code>coaches</code>（既有・擴充）</td><td>新增 rankCode、entryType、hireDate、sponsorId、tenureUntil、tenureRank、initialCases、initialFees</td></tr>
+      <tr><td><code>comp_cases</code></td><td>案件：clientId、serviceType、fee、promoterId、executorId、isCompanyLead、signedAt、paidAt、surveyAt、versionId、status</td></tr>
+      <tr><td><code>comp_payouts</code></td><td>分潤明細：caseId、payeeId(nullable＝公司)、role、promoPct、execPct、bonusPct、amount、batchId、status、calcTrace(jsonb)</td></tr>
+      <tr><td><code>comp_batches</code></td><td>發放批次：period、payoutDate、status、總額、覆核人</td></tr>
+      <tr><td><code>comp_training_sessions</code> / <code>comp_training_records</code></td><td>場次與出席／講師／外部課程認列</td></tr>
+      <tr><td><code>comp_rank_events</code></td><td>職級異動時間軸：coachId、from、to、reason(auto_a/auto_b/tenure/manual)、effectiveAt、operatorId</td></tr>
+    </table>
+
+    <h3>引擎（純函式，src/lib/comp/）</h3>
+    <ul class="li">
+      <li><code>splitCase(caseInput, chain, params)</code> → payout[]：差％、平階獎金、倒掛、鏈不完整、派案，全部在這裡。回傳含 <code>calcTrace</code>（每層怎麼算的）。</li>
+      <li><code>evalPromotion(advisorStats, params)</code> → { canPromote, track, nextGap }。</li>
+      <li><code>evalTenure(advisor, stats, params)</code> → { pass, settledRank }（含認階轉正）。</li>
+      <li><code>evalMaintenance(advisor, yearStats, params)</code> → { execPass, trainPass, suspended[] }。</li>
+      <li>測試：辦法七個範例逐格比對 ＋ 「任一情境加總必為 100%」的 property test。</li>
+    </ul>
+
+    <div class="warn"><b>踩雷預防（依系統盤點的教訓）</b>：① 所有新表的 FK 一律在 schema.ts 宣告索引，不手建。② <code>comp_payouts</code> 對 (caseId, payeeId, role) 加 unique，避免重算時重複寫入。③ 重算一律「先作廢舊 payout 再寫新的」，不做原地 update。④ seed 腳本不得無 where 刪除任何 comp_ 表。</div>
+  </div>
+</section>
+
+<!-- ============ 16 波次 ============ -->
+<section class="page" id="plan">
+  <div class="card">
+    <h2>16・實作波次</h2>
+    <p class="meta">每一波都能單獨上線、單獨驗收。</p>
+
+    <h3>波 1：制度參數台 ＋ 引擎 ＋ 試算器</h3>
+    <ul class="li">
+      <li>schema：comp_versions / comp_ranks / comp_thresholds / comp_settings ＋ migration。</li>
+      <li>頁 1–9 九個分頁（全部欄位可留空、一鍵載入 V4）、頁 9 版本管理、頁 10 試算器。</li>
+      <li><code>splitCase</code> 引擎 ＋ 辦法七個範例的單元測試全綠。</li>
+      <li><b>驗收</b>：載入 V4 後，七個範例在試算器上的每格數字與辦法完全相同。</li>
+    </ul>
+
+    <h3>波 2：顧問職級與案件分潤</h3>
+    <ul class="li">
+      <li>coaches 擴充職級欄位、頁 12 顧問總表與個人頁、異動時間軸。</li>
+      <li>comp_cases / comp_payouts / comp_batches、頁 11 案件登錄與分潤明細、月結批次、退費重算。</li>
+      <li><b>驗收</b>：登錄一筆真實案件，分潤明細與手算一致；退費後金額正確回滾。</li>
+    </ul>
+
+    <h3>波 3：晉升／真除／維持資格自動化 ＋ 顧問端</h3>
+    <ul class="li">
+      <li>evalPromotion / evalTenure / evalMaintenance ＋ 每月排程重算與通知。</li>
+      <li>頁 13 訓練時數、頁 14 顧問端「我的業務」、制度說明書唯讀頁。</li>
+      <li>問卷結案接客戶端 /portal。</li>
+      <li><b>驗收</b>：造一位假顧問跑滿一年，職級、真除認階、資格暫停與恢復全部自動且正確。</li>
+    </ul>
+
+    <div class="note"><b>先確認再動手</b>：這份藍圖你看過、頁面位置與欄位狀態沒問題後，我才開始波 1 的實作（schema ＋ 制度設定頁 ＋ 引擎 ＋ 測試），測試綠再 commit push。</div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+const links=[...document.querySelectorAll('nav.side a')];
+const pages=[...document.querySelectorAll('section.page')];
+links.forEach(a=>a.addEventListener('click',e=>{
+  e.preventDefault();
+  links.forEach(x=>x.classList.remove('on'));a.classList.add('on');
+  const id=a.dataset.p;
+  pages.forEach(p=>p.classList.toggle('on',p.id===id));
+  window.scrollTo({top:0,behavior:'smooth'});
+}));
+</script>
+</body>
+</html>
