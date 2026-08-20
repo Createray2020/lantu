@@ -121,6 +121,10 @@ export const plans = pgTable('plans', {
   id: uuid('id').defaultRandom().primaryKey(),
   clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
   year: integer('year').notNull(),
+  // 雙軌：coach＝教練做的年度版；client＝客戶自己的人生護照。
+  // 這是「結構鍵」，label 只是給人看的自由文字——舊版拿 label='人生護照' 當判斷，
+  // 教練改個 label 就會讓客戶端找不到自己那份、fallback 到教練的版本上去寫。
+  track: text('track').default('coach').notNull(), // coach / client
   label: text('label'),            // 例 2025版
   status: text('status').default('draft').notNull(), // draft/delivered/active/archived
   basedOnDate: date('based_on_date'),
@@ -134,7 +138,11 @@ export const plans = pgTable('plans', {
   index('plans_client_id_year_idx').on(t.clientId, t.year.desc(), t.createdAt.desc()),
   // 「每年重製一份」是領域模型的前提（clonePlan 用 max(year)+1）。
   // 沒有這條約束時，新建客戶後再按一次「新增版本」就會出現兩筆同年版本（單機操作必然發生）。
-  uniqueIndex('plans_client_id_year_uidx').on(t.clientId, t.year),
+  //
+  // 加上 track：教練年度版與客戶人生護照是兩條並行的軌，同一年必須能各存一份。
+  // 舊的 (client_id, year) 唯一鍵讓「客戶先玩護照(2026) → 掛上教練 → 教練要建 2026 年度版」
+  // 直接撞鍵失敗（線上已有 4 位客戶卡在這個狀態）。
+  uniqueIndex('plans_client_id_year_track_uidx').on(t.clientId, t.year, t.track),
 ]);
 
 // 諮詢／檢視紀錄（掛客戶層的連續時間軸，可標記對應版本）

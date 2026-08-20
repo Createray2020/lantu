@@ -140,7 +140,7 @@ export async function getClientDetail(coachId: string, clientId: string): Promis
   //（版本比較的 planMetrics 由 comparePlans 另外撈，避免同一批 jsonb 被完整拉兩次）。
   const [planRows, reviewRows, itemRows] = await Promise.all([
     db.select({
-      id: plans.id, clientId: plans.clientId, year: plans.year, label: plans.label, status: plans.status,
+      id: plans.id, clientId: plans.clientId, year: plans.year, track: plans.track, label: plans.label, status: plans.status,
       basedOnDate: plans.basedOnDate, healthGrade: plans.healthGrade, netWorth: plans.netWorth,
       createdAt: plans.createdAt, updatedAt: plans.updatedAt,
     }).from(plans).where(eq(plans.clientId, clientId)).orderBy(desc(plans.year), desc(plans.createdAt)),

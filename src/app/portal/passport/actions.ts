@@ -10,11 +10,16 @@ import type { PassportInputs } from "@/lib/passport";
 
 // 存人生護照 → 生成客戶自己的基礎方案（plan）。
 // 一律回傳明確成敗（不丟例外），避免未捕捉錯誤讓 Vercel 回 503、前端乾等。
-export async function savePassportAction(inputs: PassportInputs) {
+// overwrite：已有護照份時，第一次呼叫會回 needsConfirm，使用者確認後才帶 true 再送一次。
+export async function savePassportAction(inputs: PassportInputs, opts?: { overwrite?: boolean }) {
   try {
     const user = await ensureClientUser();
-    if (!user) return { ok: false as const, error: "未登入，請重新登入後再試" };
-    const result = await savePassport(user, inputs);
+    if (!user) return { ok: false as const, error: "未登入，請重新登入後再試", needsAuth: true as const };
+    const outcome = await savePassport(user, inputs, opts);
+    if (outcome.status === "needs-confirm") {
+      return { ok: false as const, needsConfirm: true as const, existingUpdatedAt: outcome.existingUpdatedAt };
+    }
+    const result = outcome.result;
     revalidatePath("/portal");
     revalidatePath("/portal/passport");
     revalidatePath("/portal/setup");

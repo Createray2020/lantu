@@ -13,6 +13,10 @@ const isPublicRoute = createRouteMatcher([
   // 自行守門並導向 /client/sign-in，避免客戶被丟到教練登入。
   '/portal(.*)',
   '/coaches(.*)', // 官網公開教練頁：訪客要看得到，才有對外招客的意義
+  // 官網公開試算：未登入就能玩完整人生護照。全程純前端計算、不寫任何後端資料
+  // （所以不構成個資蒐集），按存檔才導去註冊。見 lib/passportDraft.ts。
+  '/passport(.*)',
+  '/join', // 招募頁：對外公開，訪客要看得到
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀
   // 收支資債細類字典與教育費用參數：iframe app 一載入就抓，客戶端未登入頁面也會用到。

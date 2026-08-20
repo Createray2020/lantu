@@ -84,24 +84,22 @@ export function buildCase(p: PassportInputs, name: string): any {
 //    Postgres 回哪一列不確定 / 或直接命中教練剛建的年度版 →
 //    客戶在 /portal 存一次檔就把教練做了數小時的規劃整份覆寫成護照骨架（不可逆）。
 //    客戶端的讀寫一律鎖定這一份；教練建立的年度版本對客戶端不可寫。
-async function ownPlanRow(clientId: string): Promise<{ id: string; data: unknown } | null> {
-  const tagged = await db
-    .select({ id: plans.id, data: plans.data })
+async function ownPlanRow(clientId: string): Promise<{ id: string; data: unknown; updatedAt: Date } | null> {
+  // 只認 track='client'。舊版先比對 label='人生護照'、找不到再退回「最舊一筆」——
+  // 那個 fallback 正是覆寫教練規劃的來源：只要教練改過 label，客戶端的存檔就會落到教練那份上。
+  // track 是結構鍵、不會被 UI 文案動到，所以這裡不再需要任何 fallback；
+  // 找不到就是還沒有護照份，交給 savePassport 建新的。
+  const rows = await db
+    .select({ id: plans.id, data: plans.data, updatedAt: plans.updatedAt })
     .from(plans)
-    .where(and(eq(plans.clientId, clientId), eq(plans.label, PASSPORT_LABEL)))
+    .where(and(eq(plans.clientId, clientId), eq(plans.track, CLIENT_TRACK)))
     .orderBy(asc(plans.createdAt))
     .limit(1);
-  if (tagged[0]) return tagged[0];
-  const oldest = await db
-    .select({ id: plans.id, data: plans.data })
-    .from(plans)
-    .where(eq(plans.clientId, clientId))
-    .orderBy(asc(plans.createdAt))
-    .limit(1);
-  return oldest[0] ?? null;
+  return rows[0] ?? null;
 }
 
 const PASSPORT_LABEL = "人生護照";
+const CLIENT_TRACK = "client";
 
 export type ClientOwnPlan = {
   clientId: string;
@@ -126,8 +124,19 @@ export async function getClientOwnPlan(clientUserId: string): Promise<ClientOwnP
   };
 }
 
-// 存人生護照：建/更新客戶自己的 clients 列與 plan（基礎方案）。回傳算出的結果。
-export async function savePassport(user: ClientUser, inputs: PassportInputs): Promise<PassportResult> {
+// 存檔結果：已有護照份而呼叫端沒帶 overwrite 時，先回 needs-confirm 讓使用者決定，不直接蓋。
+// 覆蓋是不可逆的（plan.data 整份換掉），而公開試算註冊回來會「自動存檔」——
+// 沒有這道確認，一個已經有規劃的人在官網隨手試算一次就會把自己的規劃洗掉。
+export type SavePassportOutcome =
+  | { status: "saved"; result: PassportResult }
+  | { status: "needs-confirm"; existingUpdatedAt: string };
+
+// 存人生護照：建/更新客戶自己的 clients 列與 plan（基礎方案）。
+export async function savePassport(
+  user: ClientUser,
+  inputs: PassportInputs,
+  opts?: { overwrite?: boolean },
+): Promise<SavePassportOutcome> {
   const name = user.name || "我的規劃";
   let clientId: string;
   const existing = await db.select().from(clients).where(eq(clients.clientUserId, user.id)).limit(1);
@@ -138,24 +147,28 @@ export async function savePassport(user: ClientUser, inputs: PassportInputs): Pr
     clientId = ins[0].id;
   }
 
-  const data = buildCase(inputs, name);
   const existingPlan = await ownPlanRow(clientId);
+  if (existingPlan && !opts?.overwrite) {
+    return { status: "needs-confirm", existingUpdatedAt: existingPlan.updatedAt.toISOString() };
+  }
+
+  const data = buildCase(inputs, name);
   let planId: string;
   const snap = planSnapshot(data);
   if (existingPlan) {
     planId = existingPlan.id;
     await db.update(plans)
-      .set({ data, label: PASSPORT_LABEL, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })
+      .set({ data, label: PASSPORT_LABEL, track: CLIENT_TRACK, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })
       .where(eq(plans.id, planId));
   } else {
     const ins = await db.insert(plans)
-      .values({ clientId, year: new Date().getFullYear(), label: PASSPORT_LABEL, status: "draft", data,
+      .values({ clientId, year: new Date().getFullYear(), track: CLIENT_TRACK, label: PASSPORT_LABEL, status: "draft", data,
                 healthGrade: snap.healthGrade, netWorth: snap.netWorth })
       .returning({ id: plans.id });
     planId = ins[0].id;
   }
   await logRevision(planId, "client", user.id, user.name, data);
-  return data.passport.result as PassportResult;
+  return { status: "saved", result: data.passport.result as PassportResult };
 }
 
 // ---------- 基本資料 ＋ 財務現況十字表（後續補完，寫進同一份 plan） ----------
@@ -213,8 +226,9 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
 }
 
 // 取要餵給 lantu-app.html 客戶端唯讀檢視的 case。
-// TODO(待拍板)：這裡刻意仍取「最新一份」——掛了教練之後，客戶在「我的財務藍圖」看到的是教練做的年度版。
-// 客戶可寫範圍（只能改護照那份 vs 可編年度版的部分 section）定案後再一起調整，見盤點報告待拍板 #5。
+// 刻意仍取「最新一份」（跨兩軌）——掛了教練之後，客戶在「我的財務藍圖」看到的就是教練做的年度版，
+// 這是對的：客戶要看的是最新的規劃，不是自己當初的護照骨架。
+// 「客戶能改哪些 section」是另一件事（見 客戶可編頁面清單），與這裡取哪一份無關。
 export async function getClientPlanCase(clientUserId: string): Promise<{ planId: string; data: unknown } | null> {
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];

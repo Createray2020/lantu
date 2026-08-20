@@ -1,12 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   computePassport, emptyPassport, BASE_YEAR, ntfmt, wan,
   type PassportInputs, type LoanResult,
 } from "@/lib/passport";
-import { savePassportAction } from "./actions";
+import { readDraft, saveDraft, clearDraft, ASSUMED_WORK_START_AGE } from "@/lib/passportDraft";
+import { savePassportAction } from "@/app/portal/passport/actions";
+
+// hydration-safe 的「我在瀏覽器了嗎」。用 useSyncExternalStore 而不是 useEffect+setState：
+// 專案的 eslint 有 react-hooks/set-state-in-effect，而且 effect 版本會先閃一次 SSR 的內容。
+const noopSubscribe = () => () => {};
+const useIsClient = () => useSyncExternalStore(noopSubscribe, () => true, () => false);
 
 /* ---------- 小元件 ---------- */
 function Slider({
@@ -153,34 +159,81 @@ function Face({
 }
 
 /* ---------- 主元件 ---------- */
-export default function PassportWizard({ initial }: { initial: PassportInputs | null }) {
-  const [p, setP] = useState<PassportInputs>(initial ?? emptyPassport());
-  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+// mode="public"：官網 /passport，未登入可玩。按存檔＝把草稿存進 sessionStorage 再導去註冊。
+// mode="private"：/portal/passport，登入後的正式頁。restore=true 時才吃草稿（註冊回來那一趟）。
+export default function PassportWizard({
+  initial, mode = "private", restore = false, signedIn = false,
+}: {
+  initial: PassportInputs | null;
+  mode?: "public" | "private";
+  restore?: boolean;
+  signedIn?: boolean;
+}) {
+  const isClient = useIsClient();
+  const [edited, setEdited] = useState<PassportInputs | null>(null);
+  const [draftChecked, setDraftChecked] = useState(false);
+  const [fromDraft, setFromDraft] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error" | "confirm">("idle");
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [existingAt, setExistingAt] = useState<string | null>(null);
+  const [showAssume, setShowAssume] = useState(false);
+
+  // render 期間校正 state（React 允許、且不會像 effect 那樣先閃一幀舊值）。
+  // 只有公開頁、或註冊回來帶 restore 的那一趟才吃草稿——否則 sessionStorage 裡的殘留
+  // 會在客戶下次正常進來編輯時，把他既有的護照悄悄換成官網隨手試算的那組數字。
+  if (isClient && !draftChecked) {
+    setDraftChecked(true);
+    if (mode === "public" || restore) {
+      const d = readDraft();
+      if (d) { setEdited(d); setFromDraft(true); }
+    }
+  }
+
+  const p = edited ?? initial ?? emptyPassport();
   const m = useMemo(() => computePassport(p), [p]);
 
   function set<K extends keyof PassportInputs>(face: K, key: keyof PassportInputs[K], v: number) {
-    setP((prev) => ({ ...prev, [face]: { ...prev[face], [key]: v } }));
+    setEdited((prev) => {
+      const base = prev ?? initial ?? emptyPassport();
+      return { ...base, [face]: { ...base[face], [key]: v } };
+    });
     if (status !== "saving") { setStatus("idle"); setErrMsg(null); }
   }
   const yr = (v: number) => `${v} 年`;
 
-  async function onSave() {
+  // 公開頁：不寫任何後端資料。草稿留在瀏覽器，導去註冊（已登入就直接進正式頁），回來再存。
+  function goSignUp() {
+    saveDraft(p);
+    const back = encodeURIComponent("/portal/passport?restore=1");
+    window.location.href = signedIn ? "/portal/passport?restore=1" : `/client/sign-up?redirect_url=${back}`;
+  }
+
+  async function onSave(overwrite = false) {
     if (status === "saving") return;
+    if (mode === "public") { goSignUp(); return; }
     setStatus("saving"); setErrMsg(null);
     try {
       // 25 秒逾時保護：就算後端沒回應也不會永遠乾等。
       const res = (await Promise.race([
-        savePassportAction(p),
+        savePassportAction(p, overwrite ? { overwrite: true } : undefined),
         new Promise((_, rej) => setTimeout(() => rej(new Error("連線逾時，請檢查網路後再試")), 25000)),
       ])) as Awaited<ReturnType<typeof savePassportAction>>;
       if (res.ok) {
         setStatus("success");
+        clearDraft();
         // 硬導頁到下一步（比 router.push+refresh 穩，避免導頁被當前頁重刷蓋掉）。
         window.location.href = "/portal/setup";
+      } else if ("needsConfirm" in res && res.needsConfirm) {
+        // 已經有一份規劃了。覆蓋是不可逆的，停下來問。
+        setStatus("confirm");
+        setExistingAt(res.existingUpdatedAt);
+      } else if ("needsAuth" in res && res.needsAuth) {
+        // session 掉了（例如放著太久）。草稿還在，登入後 restore 把資料接回來。
+        saveDraft(p);
+        window.location.href = `/client/sign-in?redirect_url=${encodeURIComponent("/portal/passport?restore=1")}`;
       } else {
         setStatus("error");
-        setErrMsg(res.error || "儲存失敗，請重試");
+        setErrMsg(("error" in res && res.error) || "儲存失敗，請重試");
       }
     } catch (e) {
       setStatus("error");
@@ -193,11 +246,34 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
       {/* 標頭＋每月應存彙總 */}
       <div className="rounded-2xl bg-gradient-to-br from-[#0d2b45] to-[#12334f] border border-[#c99a5b]/30 p-6 mb-6 text-center">
         <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-1">MY LIFE PASSPORT · {BASE_YEAR} 年度</div>
-        <h1 className="font-serif text-2xl mb-2">我的人生護照</h1>
+        <h1 className="font-serif text-2xl mb-2">{mode === "public" ? "人生護照 · 免費試算" : "我的人生護照"}</h1>
         <div className="text-[#a7bacb] text-sm mb-1">每月應存合計</div>
         <div className="font-serif text-4xl text-[#e0bd8b]">{m.totalMonthlyWan.toFixed(1)} 萬</div>
-        <p className="text-[11px] text-[#6f869c] mt-2">拉動下方條件，即時看你每月存這些錢能達成什麼。試算採年報酬與通膨等假設，僅供參考。</p>
+        <p className="text-[11px] text-[#6f869c] mt-2">拉動下方條件，即時看你每月存這些錢能達成什麼。</p>
+        <button
+          type="button"
+          onClick={() => setShowAssume((v) => !v)}
+          className="mt-3 text-[11px] text-[#a7bacb] hover:text-white underline underline-offset-4"
+        >
+          {showAssume ? "收合" : "本試算採用的假設"}
+        </button>
+        {showAssume && (
+          <div className="mt-3 text-left rounded-xl bg-[#081a2b]/70 border border-white/10 p-4 text-[11.5px] leading-relaxed text-[#a7bacb]">
+            <ul className="space-y-1 list-disc pl-4">
+              <li>各面向的年報酬、貸款利率、學費上漲率皆為<b className="text-[#cdd9e5]">情境假設</b>，由你自行設定，非預期或保證之報酬。</li>
+              <li>退休：預估壽命 {p.retire.lifeExp} 歲、勞退提繳率 {p.retire.contribRate}%、勞保年金採平均月投保薪資 × 年資 × 1.55% 概算，現值以通膨 1.5% 折現。</li>
+              <li>年資若由退休年齡推算，假設 {ASSUMED_WORK_START_AGE} 歲開始工作。</li>
+              <li>本試算為一般性財務規劃之數學推算，<b className="text-[#cdd9e5]">僅供參考，不構成任何投資建議或收益保證</b>；實際結果受市場、稅制、個人狀況影響而不同。</li>
+            </ul>
+          </div>
+        )}
       </div>
+
+      {fromDraft && status !== "success" && (
+        <div className="rounded-xl border border-[#c99a5b]/40 bg-[#c99a5b]/10 px-5 py-3 mb-4 text-sm text-[#e0bd8b]">
+          已帶回你剛才在官網填的試算內容，確認後按下方存檔即可建立你的規劃。
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* 購房 */}
@@ -281,7 +357,13 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
       </div>
 
       <div className="mt-5 text-center">
-        <Link href="/portal" className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">回客戶首頁</Link>
+        {mode === "public" ? (
+          <Link href="/coaches" className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">
+            先看看有哪些教練 →
+          </Link>
+        ) : (
+          <Link href="/portal" className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">回客戶首頁</Link>
+        )}
       </div>
 
       {/* 底部合計＋存檔 */}
@@ -295,7 +377,15 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
         )}
         <div className="max-w-5xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            {status === "error" ? (
+            {status === "confirm" ? (
+              <div className="text-sm">
+                <div className="text-[#e0bd8b] font-semibold">你已經有一份規劃了</div>
+                <div className="text-[#a7bacb] text-[12px]">
+                  最後更新：{existingAt ? new Date(existingAt).toLocaleString("zh-TW", { hour12: false }) : "—"}
+                  ．覆蓋後舊內容仍留在版本紀錄裡，可以回復。
+                </div>
+              </div>
+            ) : status === "error" ? (
               <div className="text-[#ff9b9b] text-sm">⚠ {errMsg}</div>
             ) : status === "saving" ? (
               <div className="text-[#e0bd8b] text-sm">儲存中，請稍候…</div>
@@ -308,13 +398,28 @@ export default function PassportWizard({ initial }: { initial: PassportInputs | 
               </>
             )}
           </div>
-          <button onClick={onSave} disabled={status === "saving"}
-            className="shrink-0 font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] disabled:opacity-60 px-7 py-3 rounded-lg inline-flex items-center gap-2">
-            {status === "saving" && (
-              <span className="w-4 h-4 border-2 border-[#08202a]/40 border-t-[#08202a] rounded-full animate-spin" />
-            )}
-            {status === "saving" ? "儲存中…" : status === "success" ? "已儲存 ✓" : status === "error" ? "重試存檔" : "存檔，建立我的規劃"}
-          </button>
+          {status === "confirm" ? (
+            <div className="shrink-0 flex items-center gap-2">
+              <button onClick={() => { setStatus("idle"); setExistingAt(null); }}
+                className="text-sm text-[#a7bacb] hover:text-white px-4 py-3 rounded-lg border border-white/15">
+                取消
+              </button>
+              <button onClick={() => onSave(true)}
+                className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-3 rounded-lg">
+                覆蓋舊的規劃
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => onSave()} disabled={status === "saving"}
+              className="shrink-0 font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] disabled:opacity-60 px-7 py-3 rounded-lg inline-flex items-center gap-2">
+              {status === "saving" && (
+                <span className="w-4 h-4 border-2 border-[#08202a]/40 border-t-[#08202a] rounded-full animate-spin" />
+              )}
+              {mode === "public"
+                ? (signedIn ? "存下我的規劃" : "免費註冊，存下我的規劃")
+                : status === "saving" ? "儲存中…" : status === "success" ? "已儲存 ✓" : status === "error" ? "重試存檔" : "存檔，建立我的規劃"}
+            </button>
+          )}
         </div>
       </div>
     </div>

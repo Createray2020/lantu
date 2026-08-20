@@ -86,7 +86,12 @@ export async function updatePlanMeta(coachId: string, planId: string, patch: Pla
 export async function clonePlan(coachId: string, planId: string): Promise<string> {
   const src = await ownedPlan(coachId, planId);
   if (!src) throw new Error("forbidden");
-  const yearsRows = await db.select({ year: plans.year }).from(plans).where(eq(plans.clientId, src.clientId));
+  // 只算教練那一軌：客戶的人生護照份也掛在同一個 clientId 底下，
+  // 把它算進 max(year) 會讓「重製」憑空跳過一個年度。
+  const yearsRows = await db
+    .select({ year: plans.year })
+    .from(plans)
+    .where(and(eq(plans.clientId, src.clientId), eq(plans.track, "coach")));
   const maxYear = yearsRows.reduce((m, r) => Math.max(m, r.year), src.year);
   const newYear = maxYear + 1;
   const snap = planSnapshot(src.data);

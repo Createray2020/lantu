@@ -97,6 +97,9 @@ export default async function Portal() {
               <Link href="/portal/passport" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
                 重新調整人生護照
               </Link>
+              <Link href="/portal/history" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
+                版本紀錄
+              </Link>
             </div>
 
             {mustHave.length > 0 && (
