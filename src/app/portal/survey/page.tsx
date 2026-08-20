@@ -38,7 +38,7 @@ export default async function SurveyPage() {
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] flex flex-col">
       <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-white/10">
-        <Link href="/portal" className="flex items-center gap-3">
+        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
           <span className="grid place-items-center w-9 h-9 rounded-xl border border-[#c99a5b]">
             <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
               <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />

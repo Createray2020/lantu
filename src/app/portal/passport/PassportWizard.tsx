@@ -15,15 +15,49 @@ function Slider({
   label: string; value: number; min: number; max: number; step?: number;
   onChange: (v: number) => void; minLabel?: string; maxLabel?: string; fmt?: (v: number) => string;
 }) {
+  // 單位後綴由既有 fmt 推導（"3 萬"→萬、"7%"→%、"2030 年"→年），呼叫端不必改。
+  const unit = fmt ? fmt(value).replace(/^[\s-]*[\d,]*\.?\d*/, "").trim() : "";
+  // 打字中的原始字串：讓 "3." / "" 這類中間態不被即時 clamp 吃掉。
+  const [draft, setDraft] = useState<string | null>(null);
+  const decimals = String(step).includes(".") ? String(step).split(".")[1].length : 0;
+
+  const clamp = (v: number) => {
+    const snapped = Math.round((v - min) / step) * step + min;
+    return Math.min(max, Math.max(min, parseFloat(snapped.toFixed(decimals + 2))));
+  };
+
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-1">
+      <div className="flex items-center justify-between gap-3 mb-1.5">
         <span className="text-[12px] text-[#a7bacb]">{label}</span>
-        <span className="text-[15px] font-bold text-[#eef2f7]">{fmt ? fmt(value) : value}</span>
+        <span className="flex items-baseline gap-1 shrink-0">
+          <input
+            type="number"
+            inputMode="decimal"
+            min={min}
+            max={max}
+            step={step}
+            value={draft ?? String(value)}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setDraft(raw);
+              const v = parseFloat(raw);
+              if (Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)));
+            }}
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={() => {
+              const v = parseFloat(draft ?? "");
+              onChange(Number.isFinite(v) ? clamp(v) : value);
+              setDraft(null);
+            }}
+            className="w-[96px] rounded-md border border-white/15 bg-[#0f2740] px-2 py-1 text-right text-[15px] font-bold text-[#e0bd8b] focus:border-[#c99a5b] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          {unit && <span className="w-4 text-[11px] text-[#a7bacb]">{unit}</span>}
+        </span>
       </div>
       <input
         type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        onChange={(e) => { setDraft(null); onChange(parseFloat(e.target.value)); }}
         className="w-full accent-[#2f8f8f] h-1.5"
       />
       <div className="flex justify-between text-[10px] text-[#6f869c] mt-0.5">

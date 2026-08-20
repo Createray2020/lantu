@@ -16,6 +16,7 @@ import {
   updateClientAction,
   archiveClientAction,
 } from "../../actions";
+import { StageGuideModal } from "../../StageGuide";
 import {
   fmtMoney,
   stageColor,
@@ -226,8 +227,10 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
   latest: PlanLite | null; latestCmp: Compare | null; planCount: number; nextAppt: string | null;
   reviews: ReviewLite[]; openItems: ItemLite[]; planYear: Map<string, number>; onToggle: (id: string, done: boolean) => void;
 }) {
+  const [showStageGuide, setShowStageGuide] = useState(false);
   return (
     <div className="grid gap-5">
+      {showStageGuide && <StageGuideModal current={latest?.healthGrade ?? null} onClose={() => setShowStageGuide(false)} />}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card label="財務階段">
           <div className="flex items-end gap-2">
@@ -236,6 +239,13 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
               <span className="text-[11px] text-[#6b7d8f] leading-tight">安 {latestCmp.safety ?? "—"}<br />由 {latestCmp.freedom ?? "—"} · 願 {latestCmp.vision ?? "—"}</span>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => setShowStageGuide(true)}
+            className="mt-1.5 text-[11px] text-[#a9bccf] underline decoration-dotted underline-offset-4 hover:text-[#e0bd8b]"
+          >
+            這個階段是怎麼判定的 ⓘ
+          </button>
         </Card>
         <Card label="淨值"><span className="text-2xl font-bold tabular-nums">{fmtMoney(latest?.netWorth ?? null)}</span></Card>
         <Card label="年度版本"><span className="text-2xl font-bold">{planCount}<span className="text-sm text-[#6b7d8f]"> 版</span></span></Card>

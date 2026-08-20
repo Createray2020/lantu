@@ -156,4 +156,36 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(E.TARGETS).not.toContain("人生模擬");
     expect(E.TARGETS).toContain("婚姻規劃");
   });
+
+  it("財務階段：判定條件／定義文案三份對照表一致（engine.ts ↔ lantu-app.html ↔ format.ts）", async () => {
+    const fmt = await import("@/app/dashboard/format");
+    for (const k of ["D", "C", "B", "A"] as const) {
+      const st = E.STAGE[k];
+      expect(st.gate, `STAGE.${k}.gate 未定義`).toBeTruthy();
+      expect(st.desc, `STAGE.${k}.desc 未定義`).toBeTruthy();
+      // html 端
+      expect(HTML).toContain(st.gate);
+      expect(HTML).toContain(st.desc);
+      // format.ts（React 端顯示層）
+      expect(fmt.STAGE_GATE[k]).toBe(st.gate);
+      expect(fmt.STAGE_DESC[k]).toBe(st.desc);
+      expect(fmt.STAGE_LABEL[k]).toBe(st.name);
+      expect(fmt.STAGE_TASK[k]).toBe(st.task);
+    }
+    // 三項指標的算法說明
+    expect(E.STAGE_METRICS).toHaveLength(3);
+    E.STAGE_METRICS.forEach((m: [string, string], i: number) => {
+      expect(HTML).toContain(m[1]);
+      expect(fmt.STAGE_METRICS[i][0]).toBe(m[0]);
+      expect(fmt.STAGE_METRICS[i][1]).toBe(m[1]);
+    });
+  });
+
+  it("財務階段：判定條件文字要對得上 health() 實際的門檻值", () => {
+    // 這裡守的是「說明別跟程式漂移」：grade 判定式改了，下面的字串就得跟著改。
+    expect(HTML).toContain("var grade=(safety<60||balScore<1)?'D':(freedom<20?'C':(vision<60?'B':'A'))");
+    expect(E.STAGE.D.gate).toContain("60");
+    expect(E.STAGE.C.gate).toContain("20%");
+    expect(E.STAGE.B.gate).toContain("60%");
+  });
 });

@@ -410,11 +410,27 @@ function health(c){
 // ===== 財務階段（旅程命名）：內部值仍為 A/B/C/D，此處只做顯示層對照 =====
 // 與 public/lantu-app.html 的 STAGE 必須保持一致。
 var STAGE={
- D:{name:'整裝期',task:'讓收支轉正、備妥緊急預備金與基本保障',c:'#8fa6b8',cl:'#5f7385'},
- C:{name:'啟程期',task:'把儲蓄變成會生錢的資產，建立理財收入',c:'#7fa8a0',cl:'#4e7a72'},
- B:{name:'前行期',task:'資產配置、抗風險，朝願景累積',c:'#c9a86b',cl:'#a3814a'},
- A:{name:'遠行期',task:'願景擴張、傳承與稅務配置',c:'#e0c88b',cl:'#8a6f3c'}
+ D:{name:'整裝期',task:'讓收支轉正、備妥緊急預備金與基本保障',c:'#8fa6b8',cl:'#5f7385',
+    gate:'財務安全度 < 60 分，或年結餘為負',
+    desc:'旅程的起點。先把地基補好——讓收支有結餘、備妥緊急預備金與基本保障，才有餘力談累積。'},
+ C:{name:'啟程期',task:'把儲蓄變成會生錢的資產，建立理財收入',c:'#7fa8a0',cl:'#4e7a72',
+    gate:'安全度 ≥ 60 分且收支為正，但財務自由度 < 20%',
+    desc:'地基已穩、正式上路。收入幾乎仍全靠工作，重點是把儲蓄轉成會生息的資產，讓理財收入長出來。'},
+ B:{name:'前行期',task:'資產配置、抗風險，朝願景累積',c:'#c9a86b',cl:'#a3814a',
+    gate:'財務自由度 ≥ 20%，但願景達成度 < 60%',
+    desc:'資產已開始替你工作。重點轉為配置與抗風險，穩定朝退休、教育、置產等願景累積。'},
+ A:{name:'遠行期',task:'願景擴張、傳承與稅務配置',c:'#e0c88b',cl:'#8a6f3c',
+    gate:'安全度 ≥ 60、自由度 ≥ 20%、願景達成度 ≥ 60% 全數達標',
+    desc:'三項指標都到位。可以把重心放在願景擴張、資產傳承與稅務效率。'}
 };
+// 三個判定指標的計算標準（與 health() 完全對應）
+var STAGE_METRICS=[
+ ['財務安全度','收支平衡×25 ＋ 緊急預備金×15 ＋ 信用×15 ＋ 負債平衡×15 ＋ 風險保全×30，滿分 100 分'],
+ ['財務自由度','理財收入 ÷ 家庭總支出 × 100%（理財收入能覆蓋多少比例的支出）'],
+ ['願景達成度','資產淨值 ÷ 願景總需求 × 100%（退休、教育、置產等目標的累積進度）']
+];
+function stageGate(g){return (STAGE[g]||{}).gate||''}
+function stageDesc(g){return (STAGE[g]||{}).desc||''}
 var STAGE_ORDER=['D','C','B','A'];
 function stageName(g){return (STAGE[g]||{}).name||'未評估'}
 function stageTask(g){return (STAGE[g]||{}).task||''}
@@ -657,7 +673,10 @@ export {
   health,
   GRADE_STRAT,
   STAGE,
+  STAGE_METRICS,
   STAGE_ORDER,
+  stageGate,
+  stageDesc,
   stageName,
   stageTask,
   stageColor,

@@ -28,11 +28,13 @@ export default async function SystemPage({
   return (
     <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
       <header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]">
-        {brand.logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
-        )}
-        <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
+        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
+          {brand.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
+          )}
+          <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
+        </Link>
         <span className="text-[#a9bccf] text-xs">業務制度</span>
         <div className="flex-1" />
         <Link href="/admin" className="text-[#a9bccf] text-sm hover:text-white">← 回後台</Link>

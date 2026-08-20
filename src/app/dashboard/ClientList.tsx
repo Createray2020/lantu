@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ClientListItem } from "@/lib/clients";
 import { createClientAction } from "./actions";
+import { StageGuideModal } from "./StageGuide";
 import {
   fmtMoney,
   stageColor,
@@ -23,6 +24,8 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
   const [tag, setTag] = useState("all");
   const [sort, setSort] = useState<SortKey>("updated");
   const [showNew, setShowNew] = useState(false);
+  // 財務階段說明浮層：false = 關閉；字串/null = 開啟並高亮該客戶所在階段
+  const [guideFor, setGuideFor] = useState<string | null | false>(false);
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
@@ -110,7 +113,16 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
           <div className="hidden md:grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-3 text-[11px] uppercase tracking-wider text-[#6b7d8f]">
             <div>客戶</div>
             <div>最新版本</div>
-            <div>財務階段</div>
+            <div>
+              <button
+                type="button"
+                onClick={() => setGuideFor(null)}
+                className="uppercase tracking-wider hover:text-[#e0bd8b]"
+                title="看四個階段的定義與判定標準"
+              >
+                財務階段 <span className="text-[#c99a5b]">ⓘ</span>
+              </button>
+            </div>
             <div>淨值</div>
             <div>上次／下次諮詢</div>
             <div>狀態</div>
@@ -140,8 +152,28 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
                   <span className="text-[#6b7d8f]">—</span>
                 )}
               </div>
-              <div className="text-[12px] font-bold" style={{ color: stageColor(c.latestPlan?.healthGrade) }}>
-                {c.latestPlan ? stageName(c.latestPlan.healthGrade) : "—"}
+              <div className="text-[12px] font-bold">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title="點開看這個階段的定義與判定標準"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setGuideFor(c.latestPlan?.healthGrade ?? null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setGuideFor(c.latestPlan?.healthGrade ?? null);
+                    }
+                  }}
+                  className="cursor-pointer underline decoration-dotted underline-offset-4 hover:opacity-80"
+                  style={{ color: stageColor(c.latestPlan?.healthGrade) }}
+                >
+                  {c.latestPlan ? stageName(c.latestPlan.healthGrade) : "—"}
+                </span>
               </div>
               <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(c.latestPlan?.netWorth ?? null)}</div>
               <div className="text-[12px] text-[#a9bccf]">
@@ -153,6 +185,8 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
           ))}
         </div>
       )}
+
+      {guideFor !== false && <StageGuideModal current={guideFor} onClose={() => setGuideFor(false)} />}
 
       {showNew && <NewClientDialog onClose={() => setShowNew(false)} onCreated={(id) => router.push(`/dashboard/clients/${id}`)} />}
     </div>
