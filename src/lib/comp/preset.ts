@@ -6,7 +6,7 @@
 //
 // 出處逐條對應 docs/業務制度_V4.md。
 
-import type { CompParams, CompSettings, RankRow, ThresholdRow } from "./types";
+import type { CompParams, CompSettings, ModuleRow, RankRow, ThresholdRow } from "./types";
 
 export const V4_RANKS: RankRow[] = [
   { code: "C1", seq: 1, groupName: "認證顧問", tierLabel: "一階", promoPct: 15, execPct: 30 },
@@ -40,6 +40,25 @@ export const V4_THRESHOLDS: ThresholdRow[] = [
   {
     kind: "tenure", seq: 4, toCode: "CHIEF", cases: 6, fees: 180_000,
     mentorCount: 1, extraNote: "育成或帶領至少 1 位直轄顧問完成首案",
+  },
+];
+
+/**
+ * 辦法本文只規範顧問費（§2），所以預設只有兩個模塊，且都不填比例
+ * —— 留空＝沿用全域的 30／60／10，改一處就全改。
+ * 定價也留空：完整財務規劃看實際收入，單點諮詢的價由公司自己填。
+ * 培訓費、講座那類另訂辦法的收入，由公司自己新增模塊（多半會選 flat）。
+ */
+export const V4_MODULES: ModuleRow[] = [
+  {
+    code: "FULL", seq: 1, name: "完整財務規劃服務", splitMode: "chain",
+    price: null, countPromotion: true, countMaintenance: true, enabled: true,
+    note: "顧問費依實際收入認列（§2-1）",
+  },
+  {
+    code: "SPOT", seq: 2, name: "單點諮詢服務", splitMode: "chain",
+    price: null, countPromotion: true, countMaintenance: true, enabled: true,
+    note: "定價由公司自訂；維持資格的最低顧問費會引用它（§16-1）",
   },
 ];
 
@@ -169,6 +188,7 @@ export const V4_PRESET: CompParams = {
   settings: V4_SETTINGS,
   ranks: V4_RANKS,
   thresholds: V4_THRESHOLDS,
+  modules: V4_MODULES,
 };
 
 /**
@@ -189,5 +209,6 @@ export function mergePreset(current: CompParams): CompParams {
     thresholds: current.thresholds.length
       ? current.thresholds
       : V4_THRESHOLDS.map((t) => ({ ...t })),
+    modules: current.modules?.length ? current.modules : V4_MODULES.map((m) => ({ ...m })),
   };
 }

@@ -7,11 +7,13 @@
 // - 團隊輔導業績（§13-1）：沿執案者的有效輔導鏈逐層向上，鏈上每一層各自計入。
 
 import { resolveChain, type AdvisorRow } from "./chain";
-import type { CompParams, CompSettings } from "./types";
+import type { CompParams, CompSettings, ModuleRow } from "./types";
 
 export type CaseRow = {
   id: string;
   executorId: string;
+  /** 服務模塊代號；空＝沒指定模塊，一律計入 */
+  moduleCode?: string | null;
   promoterId?: string | null;
   clientId?: string | null;
   clientName: string;
@@ -23,11 +25,32 @@ export type CaseRow = {
   status?: string | null;
 };
 
-/** 這筆案件能不能計入晉升指標。 */
-export function isCounted(c: CaseRow, s: CompSettings): boolean {
+function moduleOf(c: CaseRow, modules?: ModuleRow[]): ModuleRow | undefined {
+  if (!c.moduleCode || !modules?.length) return undefined;
+  return modules.find((m) => m.code === c.moduleCode);
+}
+
+/**
+ * 這筆案件能不能計入晉升指標。
+ * 除了結案要件，還要看服務模塊的「計入晉升指標」開關——
+ * 辦法 §2 說培訓費、講座等不適用本制度，那類模塊把開關關掉就不會抬高晉升進度。
+ */
+export function isCounted(c: CaseRow, s: CompSettings, modules?: ModuleRow[]): boolean {
   if (c.status === "refunded" || c.status === "void") return false;
   if (s.promoRequireSurvey !== false && !c.surveyAt) return false;
   if (s.promoInvoiceBased !== false && !c.paidAt) return false;
+  const m = moduleOf(c, modules);
+  if (m && m.countPromotion === false) return false;
+  return true;
+}
+
+/** 這筆案件算不算維持資格的執案門檻（模塊可單獨關閉）。 */
+export function isCountedForMaintenance(c: CaseRow, s: CompSettings, modules?: ModuleRow[]): boolean {
+  if (c.status === "refunded" || c.status === "void") return false;
+  if (s.promoRequireSurvey !== false && !c.surveyAt) return false;
+  if (s.promoInvoiceBased !== false && !c.paidAt) return false;
+  const m = moduleOf(c, modules);
+  if (m && m.countMaintenance === false) return false;
   return true;
 }
 
@@ -54,14 +77,15 @@ export function personalStats(
   cases: CaseRow[],
   coachId: string,
   params: CompParams,
-  opts?: { year?: number; from?: string; to?: string },
+  opts?: { year?: number; from?: string; to?: string; forMaintenance?: boolean },
 ): PersonalStats {
   const s = params.settings;
+  const counted = opts?.forMaintenance ? isCountedForMaintenance : isCounted;
   const keys = new Set<string>();
   let fees = 0;
   for (const c of cases) {
     if (c.executorId !== coachId) continue;
-    if (!isCounted(c, s)) continue;
+    if (!counted(c, s, params.modules)) continue;
     if (opts?.year !== undefined && c.caseYear !== opts.year) continue;
     if (opts?.from && (c.paidAt ?? "") < opts.from) continue;
     if (opts?.to && (c.paidAt ?? "") > opts.to) continue;
@@ -94,7 +118,7 @@ export function teamStats(
 
   const keys = new Set<string>();
   for (const c of cases) {
-    if (!isCounted(c, s)) continue;
+    if (!isCounted(c, s, params.modules)) continue;
     if (c.executorId === coachId) continue; // 團隊業績不含自己執的案
     if (!chainOf(c.executorId).includes(coachId)) continue;
     keys.add(caseKey(c, s));

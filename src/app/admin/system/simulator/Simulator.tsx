@@ -4,7 +4,7 @@
 // 所以「試算出來的數字」與「日後真的發下去的數字」不可能不一致。
 
 import { Fragment, useMemo, useState } from "react";
-import { splitCase, type ChainNode } from "@/lib/comp/engine";
+import { ranksForModule, splitForModule, type ChainNode } from "@/lib/comp/engine";
 import { SCENARIOS, isApplicable } from "@/lib/comp/scenarios";
 import type { CompParams } from "@/lib/comp/types";
 
@@ -14,7 +14,10 @@ const BTN = "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf
 type Row = { rankCode: string };
 
 export default function Simulator({ params }: { params: CompParams }) {
-  const codes = params.ranks.map((r) => r.code);
+  const modules = (params.modules ?? []).filter((m) => m.enabled !== false);
+  const [moduleCode, setModuleCode] = useState(modules[0]?.code ?? "");
+  const activeModule = modules.find((m) => m.code === moduleCode) ?? null;
+  const codes = ranksForModule(params, moduleCode).map((r) => r.code);
   const [fee, setFee] = useState(60_000);
   const [companyLead, setCompanyLead] = useState(false);
   const [selfBoth, setSelfBoth] = useState(true);
@@ -43,7 +46,7 @@ export default function Simulator({ params }: { params: CompParams }) {
     };
   }, [fee, companyLead, selfBoth, execCode, promoCode, chain]);
 
-  const res = useMemo(() => splitCase(input, params), [input, params]);
+  const res = useMemo(() => splitForModule(input, params, moduleCode), [input, params, moduleCode]);
   const noRanks = codes.length === 0;
 
   function applyScenario(id: string) {
@@ -70,6 +73,30 @@ export default function Simulator({ params }: { params: CompParams }) {
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
           <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2">案件條件</h3>
+          {modules.length > 0 && (
+            <label className="flex items-start gap-2 text-sm">
+              <span className="w-24 text-[#a9bccf] pt-1">服務模塊</span>
+              <span className="flex-1">
+                <select value={moduleCode}
+                  onChange={(e) => {
+                    const m = modules.find((x) => x.code === e.target.value);
+                    setModuleCode(e.target.value);
+                    if (m?.price != null) setFee(m.price);
+                  }}
+                  className={`${INPUT} w-full`}>
+                  {modules.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
+                </select>
+                {activeModule && (
+                  <span className="block text-[11px] text-[#6f869c] mt-0.5">
+                    {activeModule.splitMode === "flat" ? "固定比例分潤（不沿輔導鏈）" : "差％逐層"}
+                    {" · "}
+                    {activeModule.price == null ? "看實收" : `定價 ${activeModule.price.toLocaleString()}`}
+                    {ranksForModule(params, moduleCode).some((r) => (r.moduleCode ?? "")) && " · 使用本模塊自訂職級表"}
+                  </span>
+                )}
+              </span>
+            </label>
+          )}
           <label className="flex items-center gap-2 text-sm">
             <span className="w-24 text-[#a9bccf]">顧問費</span>
             <input type="number" value={fee} onChange={(e) => setFee(Number(e.target.value) || 0)}
@@ -107,6 +134,11 @@ export default function Simulator({ params }: { params: CompParams }) {
           <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-2">
             輔導鏈（由下而上，不含本人）
           </h3>
+          {activeModule?.splitMode === "flat" && (
+            <p className="text-xs text-[#e0bd8b] mb-2">
+              這個模塊採固定比例分潤，不沿輔導鏈計算，下面設定不影響結果。
+            </p>
+          )}
           <div className="space-y-2">
             {chain.map((c, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">

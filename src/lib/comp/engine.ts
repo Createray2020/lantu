@@ -11,7 +11,7 @@
 // 「未設定」的處理：分潤率或區塊比例留空時，該層以 0 計並在 warnings 說明，
 // 而不是丟例外——後台本來就允許把制度留白，畫面要能顯示「這裡還沒設定」。
 
-import type { CompParams, CompSettings, RankRow } from "./types";
+import type { CompParams, CompSettings, ModuleRow, RankRow } from "./types";
 import { flag } from "./types";
 
 export type ChainNode = {
@@ -121,11 +121,19 @@ function computeSide(
   if (max === null) warnings.push(`${sideName}比例未設定，以 0 計`);
   const sideMax = max ?? 0;
 
-  const holderPct = pctOf(ranks.get(holder.rankCode), side);
-  if (holderPct === null) {
+  // 這一邊的預算就是 sideMax，任何人都不能超支。
+  // 模塊可以把區塊比例調得比職級表還低（例如講座模塊推廣端只有 10%，但 C1 的分潤率是 15%），
+  // 沒有這個上限鉗制的話總和會超過 100%——制度設定得出來的東西，引擎就得算得出來。
+  const clamp = (v: number) => Math.min(v, sideMax);
+
+  const holderRaw = pctOf(ranks.get(holder.rankCode), side);
+  if (holderRaw === null) {
     warnings.push(`職級 ${holder.rankCode} 的${sideName}分潤率未設定，以 0 計`);
+  } else if (holderRaw > sideMax + EPS) {
+    warnings.push(`職級 ${holder.rankCode} 的${sideName}分潤率 ${holderRaw}% 高於${sideName}上限 ${sideMax}%，以上限計`);
   }
-  let covered = holderPct ?? 0;
+  const holderPct = clamp(holderRaw ?? 0);
+  let covered = holderPct;
 
   const entries: SideEntry[] = [
     {
@@ -148,7 +156,7 @@ function computeSide(
       if (p === null) {
         warnings.push(`職級 ${u.rankCode} 的${sideName}分潤率未設定，該層以 0 計`);
       }
-      const up = p ?? 0;
+      const up = clamp(p ?? 0);
       if (up > covered + EPS) {
         const diff = up - covered;
         entries.push({
@@ -349,4 +357,136 @@ export function teamCreditIds(input: SplitInput, params: CompParams): string[] {
   return s.teamCreditEachLevel === false
     ? chain.slice(0, 1).map((n) => n.id)
     : chain.map((n) => n.id);
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 服務模塊
+//
+// 每種服務內容可以有自己的分潤結構。核心算術（上面的 splitCase）完全不變，
+// 這裡只做兩件事：把模塊參數解析成「有效參數」再丟進去，以及提供 flat 這條旁路。
+//
+// 「留空＝沿用預設」在模塊層再延伸一次：
+//   模塊沒填比例 → 用全域 settings；模塊沒有自訂職級表 → 用預設那組（moduleCode 為空）。
+// 所以只想調「單點諮詢的執案端拉到 70%」時填那一格就好，其他照舊。
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function findModule(params: CompParams, moduleCode?: string | null): ModuleRow | null {
+  if (!moduleCode) return null;
+  return (params.modules ?? []).find((m) => m.code === moduleCode && m.enabled !== false) ?? null;
+}
+
+/** 取某個模塊該用的職級表：有自訂就用自訂，否則用預設表。 */
+export function ranksForModule(params: CompParams, moduleCode?: string | null): RankRow[] {
+  const own = moduleCode
+    ? params.ranks.filter((r) => (r.moduleCode ?? "") === moduleCode)
+    : [];
+  if (own.length) return own;
+  return params.ranks.filter((r) => !(r.moduleCode ?? ""));
+}
+
+/** 把模塊設定疊到制度參數上，產出這一案真正要用的參數。 */
+export function resolveModuleParams(params: CompParams, moduleCode?: string | null): CompParams {
+  const m = findModule(params, moduleCode);
+  const ranks = ranksForModule(params, moduleCode);
+  if (!m) return { ...params, ranks };
+  const settings: CompSettings = { ...params.settings };
+  if (num(m.splitPromoPct) !== null) settings.splitPromoPct = m.splitPromoPct!;
+  if (num(m.splitExecPct) !== null) settings.splitExecPct = m.splitExecPct!;
+  return { ...params, settings, ranks };
+}
+
+/**
+ * flat 模式：不走差％。執行者與推廣者各拿固定 %，其餘全歸公司。
+ * 自推自執時兩者相加（同一人只會出現一列）。
+ * 講座、課程這類「沒有輔導鏈概念」的服務走這條。
+ */
+function splitFlat(input: SplitInput, params: CompParams, m: ModuleRow): SplitResult {
+  const fee = num(input.fee) ?? 0;
+  const warnings: string[] = [];
+  const execPct = num(m.flatExecPct);
+  const promoPct = num(m.flatPromoPct);
+  if (execPct === null) warnings.push(`模塊「${m.name}」的執行者比例未設定，以 0 計`);
+
+  type Agg = { node: ChainNode; promo: number; exec: number; roles: string[]; trace: string[] };
+  const agg = new Map<string, Agg>();
+  const put = (node: ChainNode, side: Side, pct: number, role: string, trace: string) => {
+    if (pct <= 0) return;
+    let a = agg.get(node.id);
+    if (!a) { a = { node, promo: 0, exec: 0, roles: [], trace: [] }; agg.set(node.id, a); }
+    if (side === "promo") a.promo += pct; else a.exec += pct;
+    if (!a.roles.includes(role)) a.roles.push(role);
+    a.trace.push(trace);
+  };
+
+  // 固定比例也有 100% 的總預算：兩格加起來超過就照順序吃到滿為止，不會生出負數的公司列。
+  const execTake = Math.min(Math.max(0, execPct ?? 0), 100);
+  const promoTake = Math.min(Math.max(0, promoPct ?? 0), 100 - execTake);
+  if ((execPct ?? 0) + (promoPct ?? 0) > 100 + EPS) {
+    warnings.push(`模塊「${m.name}」的固定比例合計超過 100%，已依上限截斷`);
+  }
+
+  put(input.executor, "exec", execTake, "執案者",
+    `固定分潤 ${execTake}%（模塊「${m.name}」不走差％）`);
+
+  const companyLead = !!input.isCompanyLead && flag(params.settings, "ruleCompanyLeadTakesPromo");
+  let companyPromo = 0;
+  if (promoTake > 0) {
+    if (companyLead || !input.promoter) {
+      companyPromo = promoTake;
+    } else {
+      put(input.promoter, "promo", promoTake, "推廣者",
+        `固定推廣分潤 ${promoTake}%（模塊「${m.name}」不走差％）`);
+    }
+  }
+
+  const lines: PayoutLine[] = [];
+  for (const a of agg.values()) {
+    const total = a.promo + a.exec;
+    lines.push({
+      payeeId: a.node.id, name: label(a.node), rankCode: a.node.rankCode,
+      kind: "advisor", role: a.roles.join("＋"),
+      promoPct: round(a.promo), execPct: round(a.exec), bonusPct: 0,
+      totalPct: round(total), amount: 0, trace: a.trace,
+    });
+  }
+  const distributed = lines.reduce((x, l) => x + l.totalPct, 0);
+  const rest = round(Math.max(0, 100 - distributed));
+  if (rest > EPS) {
+    lines.push({
+      payeeId: null, name: "公司", rankCode: null,
+      kind: companyPromo > 0 ? "company_lead" : "company_ops",
+      role: companyPromo > 0 ? "公司（含派案推廣端）" : "公司保留",
+      promoPct: round(companyPromo), execPct: 0, bonusPct: 0,
+      totalPct: rest, amount: 0,
+      trace: [`模塊「${m.name}」採固定分潤，未分配的 ${rest}% 歸公司`],
+    });
+  }
+
+  let acc = 0;
+  lines.forEach((l) => { l.amount = Math.round((fee * l.totalPct) / 100); acc += l.amount; });
+  const residual = Math.round((fee * lines.reduce((a, l) => a + l.totalPct, 0)) / 100) - acc;
+  if (residual !== 0) {
+    const last = [...lines].reverse().find((l) => l.payeeId === null) ?? lines[lines.length - 1];
+    if (last) last.amount += residual;
+  }
+
+  const totalPct = round(lines.reduce((a, l) => a + l.totalPct, 0));
+  return {
+    lines, totalPct,
+    totalAmount: lines.reduce((a, l) => a + l.amount, 0),
+    balanced: Math.abs(totalPct - 100) < 1e-4,
+    warnings: [...new Set(warnings)],
+  };
+}
+
+/** 依服務模塊計算分潤。沒指定模塊（或模塊不存在）時＝走全域預設的差％。 */
+export function splitForModule(
+  input: SplitInput,
+  params: CompParams,
+  moduleCode?: string | null,
+): SplitResult {
+  const m = findModule(params, moduleCode);
+  if (m?.splitMode === "flat") return splitFlat(input, params, m);
+  return splitCase(input, resolveModuleParams(params, moduleCode));
 }

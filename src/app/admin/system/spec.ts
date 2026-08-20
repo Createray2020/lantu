@@ -25,20 +25,23 @@ export type TabSpec = {
   label: string;
   law: string;
   intro?: string;
-  /** 需要動態表格的分頁（職級／門檻／版本），由 SystemEditor 另外渲染 */
-  custom?: "ranks" | "promotion" | "tenure" | "versions";
+  /** 需要動態表格的分頁（模塊／職級／門檻／版本），由 SystemEditor 另外渲染 */
+  custom?: "modules" | "ranks" | "promotion" | "tenure" | "versions";
   sections: Section[];
 };
 
 export const TABS: TabSpec[] = [
   {
     id: "split",
-    label: "分潤架構",
+    label: "服務模塊與分潤架構",
     law: "第二、三條",
-    intro: "每筆顧問費 100% 怎麼切三塊。三者相加必須等於 100%，否則存檔會被擋下。",
+    custom: "modules",
+    intro:
+      "每種服務內容各自帶自己的分潤結構。模塊的欄位留空＝沿用下方的全域預設，" +
+      "所以只想調「單點諮詢的執案端拉到 70%」時填那一格就好，其他照舊。",
     sections: [
       {
-        title: "收入分配",
+        title: "全域預設分配（模塊沒填時就用這組）",
         fields: [
           { key: "splitPromoPct", label: "推廣端", type: "pct", hint: "V4＝30" },
           { key: "splitExecPct", label: "執案端", type: "pct", hint: "V4＝60" },
@@ -47,20 +50,10 @@ export const TABS: TabSpec[] = [
         ],
       },
       {
-        title: "適用範圍",
-        note: "培訓費、會員費、講座等另依相關辦法辦理，預設不套用本制度。",
-        fields: [
-          { key: "scopeFull", label: "完整財務規劃服務", type: "bool" },
-          { key: "scopeSpot", label: "單點諮詢服務", type: "bool" },
-          { key: "scopeTraining", label: "培訓／會員／講座／課程", type: "bool", hint: "V4＝不套用" },
-        ],
-      },
-      {
-        title: "服務定價",
-        note: "單點諮詢定價會被「維持資格」的最低顧問費門檻引用。",
+        title: "維持資格引用的定價",
+        note: "「維持資格」的最低顧問費若設為引用單點諮詢定價，取的是這一格；模塊自己的定價只影響案件登錄的預設值。",
         fields: [
           { key: "priceSpot", label: "單點諮詢服務定價", type: "money" },
-          { key: "priceFull", label: "完整財務規劃定價", type: "money" },
         ],
       },
     ],
@@ -71,7 +64,8 @@ export const TABS: TabSpec[] = [
     law: "第四、五條",
     custom: "ranks",
     intro:
-      "整套制度的骨架：差％引擎、晉升表、真除表都以這裡的職級代號查表。職級可增刪、可排序，序號小＝低階。",
+      "整套制度的骨架：差％引擎、晉升表、真除表都以這裡的職級代號查表。職級可增刪、可排序，序號小＝低階。" +
+      "上方可切換要編哪一組——預設表是所有模塊的 fallback，模塊自訂表只在該模塊生效。",
     sections: [],
   },
   {

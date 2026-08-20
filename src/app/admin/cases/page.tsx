@@ -4,8 +4,8 @@ import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
 import { listBatches, listCases, listAdvisors, listPayouts } from "@/lib/comp/caseRepo";
-import { listVersions } from "@/lib/comp/repo";
-import CasesBoard, { type CaseView, type PayoutView } from "./CasesBoard";
+import { ensureActiveVersion, listVersions, loadParams } from "@/lib/comp/repo";
+import CasesBoard, { type CaseView, type ModuleOption, type PayoutView } from "./CasesBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +21,9 @@ export default async function CasesPage() {
   if (!me) redirect("/sign-in");
   if (!(await isAdmin(me))) redirect("/dashboard");
 
-  const [cases, advisors, batches, versions] = await Promise.all([
-    listCases(), listAdvisors(), listBatches(), listVersions(),
+  const version = await ensureActiveVersion();
+  const [cases, advisors, batches, versions, params] = await Promise.all([
+    listCases(), listAdvisors(), listBatches(), listVersions(), loadParams(version.id),
   ]);
   const payoutsByCase = await Promise.all(cases.map((c) => listPayouts(c.id)));
   const versionLabel = new Map(versions.map((v) => [v.id, v.version]));
@@ -37,6 +38,8 @@ export default async function CasesPage() {
     const sum = payouts.reduce((a, p) => a + p.totalPct, 0);
     return {
       id: c.id, clientName: c.clientName, serviceType: c.serviceType, fee: c.fee,
+      moduleCode: c.moduleCode,
+      moduleName: (params.modules ?? []).find((m) => m.code === c.moduleCode)?.name ?? "",
       refundAmount: c.refundAmount, isCompanyLead: c.isCompanyLead,
       promoterId: c.promoterId, executorId: c.executorId,
       signedAt: c.signedAt, paidAt: c.paidAt, surveyAt: c.surveyAt,
@@ -52,8 +55,17 @@ export default async function CasesPage() {
     .filter((a) => a.status === "active")
     .map((a) => ({ id: a.id, label: a.name || a.email || a.id, rankCode: a.rankCode }));
 
+  const moduleOptions: ModuleOption[] = (params.modules ?? [])
+    .filter((m) => m.enabled !== false)
+    .map((m) => ({
+      code: m.code, name: m.name, price: m.price ?? null,
+      splitMode: m.splitMode ?? "chain",
+      countPromotion: m.countPromotion !== false,
+      countMaintenance: m.countMaintenance !== false,
+    }));
+
   const brand = await getBrand();
-  const { period, payoutDate } = nextMonthPayout(undefined);
+  const { period, payoutDate } = nextMonthPayout(params.settings.payoutDay);
 
   return (
     <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
@@ -81,8 +93,12 @@ export default async function CasesPage() {
           <div className="rounded-lg border border-[#e0bd8b]/40 bg-[#e0bd8b]/10 px-4 py-3 text-sm text-[#e0bd8b]">
             還沒有已開通的顧問，無法登錄案件。
           </div>
+        ) : moduleOptions.length === 0 ? (
+          <div className="rounded-lg border border-[#e0bd8b]/40 bg-[#e0bd8b]/10 px-4 py-3 text-sm text-[#e0bd8b]">
+            還沒有服務模塊。請先到「業務制度 › 服務模塊與分潤架構」新增，或按「載入 V4 辦法數值」。
+          </div>
         ) : (
-          <CasesBoard cases={views} peers={peers} batches={batches}
+          <CasesBoard cases={views} peers={peers} modules={moduleOptions} batches={batches}
             defaultPeriod={period} defaultPayoutDate={payoutDate} />
         )}
       </section>

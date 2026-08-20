@@ -10,7 +10,7 @@ import {
   compTrainingRecords, compTrainingSessions,
 } from "@/Shared/db/schema";
 import { resolveChain, type AdvisorRow } from "./chain";
-import { splitCase, type PayoutLine } from "./engine";
+import { splitForModule, type PayoutLine } from "./engine";
 import { loadParams, ensureActiveVersion } from "./repo";
 import type { CompParams } from "./types";
 import type { CaseRow } from "./stats";
@@ -33,7 +33,7 @@ export function toAdvisorRows(rows: CoachRow[]): AdvisorRow[] {
 
 export function toCaseRows(rows: CaseRecord[]): CaseRow[] {
   return rows.map((c) => ({
-    id: c.id, executorId: c.executorId, promoterId: c.promoterId,
+    id: c.id, executorId: c.executorId, promoterId: c.promoterId, moduleCode: c.moduleCode,
     clientId: c.clientId, clientName: c.clientName, fee: c.fee,
     refundAmount: c.refundAmount, caseYear: c.caseYear,
     paidAt: c.paidAt, surveyAt: c.surveyAt, status: c.status,
@@ -69,7 +69,8 @@ export async function listPayoutsFor(payeeId: string): Promise<PayoutRecord[]> {
  * 推廣端與執案端各自解析自己的輔導鏈（附錄 B：兩人分屬不同鏈時各走各的）。
  */
 export function computePayouts(
-  c: Pick<CaseRecord, "fee" | "isCompanyLead" | "promoterId" | "executorId" | "refundAmount">,
+  c: Pick<CaseRecord, "fee" | "isCompanyLead" | "promoterId" | "executorId" | "refundAmount">
+    & { moduleCode?: string | null },
   advisors: AdvisorRow[],
   params: CompParams,
 ): { lines: PayoutLine[]; balanced: boolean; warnings: string[]; skipped: string[] } {
@@ -80,7 +81,7 @@ export function computePayouts(
   // 分潤基準＝實收金額（部分退費按實收比例重算，§23-2）。
   const net = Math.max(0, (c.fee ?? 0) - (c.refundAmount ?? 0));
 
-  const res = splitCase(
+  const res = splitForModule(
     {
       fee: net,
       isCompanyLead: c.isCompanyLead,
@@ -90,6 +91,7 @@ export function computePayouts(
       executorChain: execR.chain,
     },
     params,
+    c.moduleCode,
   );
   const skipped = [...(execR.skipped ?? []), ...(promoR?.skipped ?? [])]
     .map((x) => `${x.name}（${x.rankCode}）：${x.reason}`);
@@ -129,6 +131,7 @@ export type CaseInput = {
   clientId?: string | null;
   clientName: string;
   serviceType?: string;
+  moduleCode?: string | null;
   fee: number;
   isCompanyLead?: boolean;
   promoterId?: string | null;
@@ -152,6 +155,7 @@ export async function createCase(input: CaseInput): Promise<CaseRecord> {
     clientId: input.clientId || null,
     clientName: input.clientName,
     serviceType: input.serviceType || "full",
+    moduleCode: input.moduleCode || "",
     fee: input.fee,
     isCompanyLead: !!input.isCompanyLead,
     promoterId: input.isCompanyLead ? null : (input.promoterId || null),
@@ -175,6 +179,7 @@ export async function updateCase(id: string, patch: Partial<CaseInput> & { statu
     clientId: patch.clientId !== undefined ? (patch.clientId || null) : cur.clientId,
     clientName: patch.clientName ?? cur.clientName,
     serviceType: patch.serviceType ?? cur.serviceType,
+    moduleCode: patch.moduleCode !== undefined ? (patch.moduleCode || "") : cur.moduleCode,
     fee: patch.fee ?? cur.fee,
     isCompanyLead: patch.isCompanyLead ?? cur.isCompanyLead,
     promoterId: patch.promoterId !== undefined ? (patch.promoterId || null) : cur.promoterId,

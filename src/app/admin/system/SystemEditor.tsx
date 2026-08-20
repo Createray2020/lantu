@@ -9,16 +9,18 @@
 //    uncontrolled input 的實際值不會被 React 同步過去（會彈回舊值，看起來像存不進去）。
 //    這個坑在 /admin 職級選單踩過一次，這裡從頭就用受控 state ＋ 明確存檔回饋。
 
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TABS, type Field, type TabSpec } from "./spec";
 import {
   clearAllAction, createVersionAction, loadV4Action, publishVersionAction,
-  saveRanksAction, saveSettingsAction, saveThresholdsAction, saveVersionMetaAction,
+  saveModulesAction, saveRanksAction, saveSettingsAction, saveThresholdsAction, saveVersionMetaAction,
 } from "./actions";
-import type { CompParams, CompSettings, RankRow, ThresholdKind, ThresholdRow } from "@/lib/comp/types";
-import { splitCase } from "@/lib/comp/engine";
+import type {
+  CompParams, CompSettings, ModuleRow, RankRow, ThresholdKind, ThresholdRow,
+} from "@/lib/comp/types";
+import { splitForModule } from "@/lib/comp/engine";
 import { SCENARIOS, isApplicable } from "@/lib/comp/scenarios";
 
 type VersionLite = {
@@ -51,13 +53,16 @@ export default function SystemEditor({
   const [settings, setSettings] = useState<CompSettings>(initial.settings ?? {});
   const [ranks, setRanks] = useState<RankRow[]>(initial.ranks ?? []);
   const [ths, setThs] = useState<ThresholdRow[]>(initial.thresholds ?? []);
+  const [mods, setMods] = useState<ModuleRow[]>(initial.modules ?? []);
+  // 職級分頁正在編哪一組表：""＝預設表，其餘＝模塊代號。
+  const [rankModule, setRankModule] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
 
   const spec = TABS.find((t) => t.id === tab)!;
   const params: CompParams = useMemo(
-    () => ({ versionId, settings, ranks, thresholds: ths }),
-    [versionId, settings, ranks, ths],
+    () => ({ versionId, settings, ranks, thresholds: ths, modules: mods }),
+    [versionId, settings, ranks, ths, mods],
   );
   const current = versions.find((v) => v.id === versionId);
   const editable = current?.status !== "archived";
@@ -80,7 +85,9 @@ export default function SystemEditor({
     });
   }
 
-  const rankCodes = ranks.map((r) => r.code).filter(Boolean);
+  // 門檻表與各種職級下拉一律以「預設表」為準：模塊自訂表只換分潤率，不該長出新職級。
+  const rankCodes = [...new Set(ranks.filter((r) => !(r.moduleCode ?? "")).map((r) => r.code))].filter(Boolean);
+  const rankRowsOfModule = ranks.filter((r) => (r.moduleCode ?? "") === rankModule);
 
   return (
     <div className="space-y-4">
@@ -154,8 +161,56 @@ export default function SystemEditor({
           {spec.intro && <p className="text-sm text-[#a9bccf] mt-2 leading-relaxed">{spec.intro}</p>}
         </div>
 
+        {spec.custom === "modules" && (
+          <ModulesTable rows={mods} setRows={setMods} disabled={!editable || pending} />
+        )}
         {spec.custom === "ranks" && (
-          <RanksTable rows={ranks} setRows={setRanks} disabled={!editable || pending} />
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[#a9bccf]">正在編輯</span>
+              <select value={rankModule} onChange={(e) => setRankModule(e.target.value)}
+                className={FILLED}>
+                <option value="">預設表（所有模塊的 fallback）</option>
+                {mods.map((m) => (
+                  <option key={m.code} value={m.code}>
+                    {m.name}（{m.code}）自訂表
+                  </option>
+                ))}
+              </select>
+              {rankModule && rankRowsOfModule.length === 0 && (
+                <span className="text-xs text-[#e0bd8b]">
+                  這個模塊還沒有自訂表 —— 目前沿用預設表。按下方「複製預設表」再改。
+                </span>
+              )}
+              {rankModule && (
+                <button type="button" disabled={!editable || pending} className={BTN}
+                  onClick={() => setRanks((rs) => [
+                    ...rs.filter((r) => (r.moduleCode ?? "") !== rankModule),
+                    ...rs.filter((r) => !(r.moduleCode ?? "")).map((r) => ({ ...r, moduleCode: rankModule })),
+                  ])}>
+                  複製預設表到這個模塊
+                </button>
+              )}
+              {rankModule && rankRowsOfModule.length > 0 && (
+                <button type="button" disabled={!editable || pending} className={BTN}
+                  onClick={() => {
+                    if (confirm("刪掉這個模塊的自訂表？之後這個模塊會沿用預設表。"))
+                      setRanks((rs) => rs.filter((r) => (r.moduleCode ?? "") !== rankModule));
+                  }}>
+                  刪除自訂表（改回沿用預設）
+                </button>
+              )}
+            </div>
+            <RanksTable
+              rows={rankRowsOfModule}
+              setRows={(f) => setRanks((rs) => [
+                ...rs.filter((r) => (r.moduleCode ?? "") !== rankModule),
+                ...f(rs.filter((r) => (r.moduleCode ?? "") === rankModule))
+                  .map((r) => ({ ...r, moduleCode: rankModule })),
+              ])}
+              disabled={!editable || pending}
+            />
+          </>
         )}
         {spec.custom === "promotion" && (
           <>
@@ -216,8 +271,14 @@ export default function SystemEditor({
             type="button"
             disabled={pending || !editable}
             onClick={() => {
-              if (spec.custom === "ranks") {
-                run(() => saveRanksAction(versionId, ranks), "職級表已儲存");
+              if (spec.custom === "modules") {
+                run(async () => {
+                  const m = await saveModulesAction(versionId, mods);
+                  if (!m.ok) return m;
+                  return saveSettingsAction(versionId, settings);
+                }, "服務模塊已儲存");
+              } else if (spec.custom === "ranks") {
+                run(() => saveRanksAction(versionId, rankRowsOfModule, rankModule), "職級表已儲存");
               } else if (spec.custom === "promotion") {
                 run(async () => {
                   const a = await saveThresholdsAction(versionId, "promotion_a", ths.filter((t) => t.kind === "promotion_a"));
@@ -245,7 +306,7 @@ export default function SystemEditor({
           )}
         </div>
 
-        {(spec.custom === "ranks" || spec.id === "rules" || spec.id === "split") && (
+        {(spec.custom === "ranks" || spec.custom === "modules" || spec.id === "rules") && (
           <LiveCheck params={params} />
         )}
       </div>
@@ -366,6 +427,166 @@ function FieldRow({
         )}
       </span>
     </label>
+  );
+}
+
+/* ────────────────────────── 服務模塊 ────────────────────────── */
+
+function ModulesTable({
+  rows, setRows, disabled,
+}: {
+  rows: ModuleRow[];
+  setRows: (f: (r: ModuleRow[]) => ModuleRow[]) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  function upd(i: number, patch: Partial<ModuleRow>) {
+    setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...patch } : r)));
+  }
+  const numCls = (v: number | null | undefined) => `${v == null ? EMPTY : FILLED} w-20`;
+  const cell = "px-2 py-1.5 border-t border-white/8";
+
+  return (
+    <div>
+      <div className="overflow-x-auto rounded-lg border border-white/10">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+              <th className="px-2 py-2">代號</th>
+              <th className="px-2 py-2">服務名稱</th>
+              <th className="px-2 py-2">分潤模式</th>
+              <th className="px-2 py-2">定價</th>
+              <th className="px-2 py-2">計入晉升</th>
+              <th className="px-2 py-2">計入維持</th>
+              <th className="px-2 py-2">啟用</th>
+              <th className="px-2 py-2 text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((m, i) => (
+              <Fragment key={i}>
+                <tr>
+                  <td className={cell}>
+                    <input value={m.code ?? ""} disabled={disabled} placeholder="必填"
+                      onChange={(e) => upd(i, { code: e.target.value.trim().toUpperCase() })}
+                      className={`${m.code ? FILLED : EMPTY} w-24 font-mono`} />
+                  </td>
+                  <td className={cell}>
+                    <input value={m.name ?? ""} disabled={disabled} placeholder="必填"
+                      onChange={(e) => upd(i, { name: e.target.value })}
+                      className={`${m.name ? FILLED : EMPTY} w-48`} />
+                  </td>
+                  <td className={cell}>
+                    <select value={m.splitMode ?? "chain"} disabled={disabled}
+                      onChange={(e) => upd(i, { splitMode: e.target.value as "chain" | "flat" })}
+                      className={`${FILLED} w-32`}>
+                      <option value="chain">差％逐層</option>
+                      <option value="flat">固定比例</option>
+                    </select>
+                  </td>
+                  <td className={cell}>
+                    <input type="number" value={fmtInt(m.price)} disabled={disabled} placeholder="看實收"
+                      onChange={(e) => upd(i, { price: e.target.value === "" ? null : Number(e.target.value) })}
+                      className={`${m.price == null ? EMPTY : FILLED} w-28`} />
+                  </td>
+                  <td className={cell}>
+                    <input type="checkbox" checked={m.countPromotion !== false} disabled={disabled}
+                      onChange={(e) => upd(i, { countPromotion: e.target.checked })}
+                      className="h-4 w-4 accent-[#2b7cb5]" />
+                  </td>
+                  <td className={cell}>
+                    <input type="checkbox" checked={m.countMaintenance !== false} disabled={disabled}
+                      onChange={(e) => upd(i, { countMaintenance: e.target.checked })}
+                      className="h-4 w-4 accent-[#2b7cb5]" />
+                  </td>
+                  <td className={cell}>
+                    <input type="checkbox" checked={m.enabled !== false} disabled={disabled}
+                      onChange={(e) => upd(i, { enabled: e.target.checked })}
+                      className="h-4 w-4 accent-[#2b7cb5]" />
+                  </td>
+                  <td className={`${cell} text-right whitespace-nowrap`}>
+                    <button type="button" className="text-xs text-[#a9bccf] underline mr-2"
+                      onClick={() => setOpen(open === m.code ? null : m.code)}>
+                      {open === m.code ? "收合" : "比例"}
+                    </button>
+                    <button type="button" disabled={disabled}
+                      onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))}
+                      className="text-[#e08b7a] text-xs disabled:opacity-30">刪</button>
+                  </td>
+                </tr>
+                {open === m.code && (
+                  <tr className="bg-[#0a2138]">
+                    <td colSpan={8} className="px-4 py-3">
+                      {(m.splitMode ?? "chain") === "chain" ? (
+                        <div className="flex flex-wrap items-end gap-3">
+                          <label className="text-xs text-[#a9bccf]">推廣端 %
+                            <input type="number" step="any" value={fmtInt(m.splitPromoPct)} disabled={disabled}
+                              placeholder="沿用全域"
+                              onChange={(e) => upd(i, { splitPromoPct: e.target.value === "" ? null : Number(e.target.value) })}
+                              className={`${numCls(m.splitPromoPct)} block mt-0.5`} />
+                          </label>
+                          <label className="text-xs text-[#a9bccf]">執案端 %
+                            <input type="number" step="any" value={fmtInt(m.splitExecPct)} disabled={disabled}
+                              placeholder="沿用全域"
+                              onChange={(e) => upd(i, { splitExecPct: e.target.value === "" ? null : Number(e.target.value) })}
+                              className={`${numCls(m.splitExecPct)} block mt-0.5`} />
+                          </label>
+                          <p className="text-xs text-[#7f9ab2] flex-1 min-w-[240px]">
+                            兩格都留空＝完全沿用全域預設。公司營運＝100 − 推廣 − 執案。
+                            要讓這個模塊用不同的職級分潤率，到「職級與分潤率」分頁切到本模塊建自訂表。
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-end gap-3">
+                          <label className="text-xs text-[#a9bccf]">執行者固定 %
+                            <input type="number" step="any" value={fmtInt(m.flatExecPct)} disabled={disabled}
+                              placeholder="未設定"
+                              onChange={(e) => upd(i, { flatExecPct: e.target.value === "" ? null : Number(e.target.value) })}
+                              className={`${numCls(m.flatExecPct)} block mt-0.5`} />
+                          </label>
+                          <label className="text-xs text-[#a9bccf]">推廣者固定 %
+                            <input type="number" step="any" value={fmtInt(m.flatPromoPct)} disabled={disabled}
+                              placeholder="未設定"
+                              onChange={(e) => upd(i, { flatPromoPct: e.target.value === "" ? null : Number(e.target.value) })}
+                              className={`${numCls(m.flatPromoPct)} block mt-0.5`} />
+                          </label>
+                          <p className="text-xs text-[#7f9ab2] flex-1 min-w-[240px]">
+                            固定比例模式不沿輔導鏈、不發平階獎金；自推自執時兩個 % 相加。
+                            未分配的部分全歸公司。適合講座、課程這類沒有輔導鏈概念的收入。
+                          </p>
+                        </div>
+                      )}
+                      <label className="mt-3 block text-xs text-[#a9bccf]">備註
+                        <input value={m.note ?? ""} disabled={disabled}
+                          onChange={(e) => upd(i, { note: e.target.value || null })}
+                          className={`${m.note ? FILLED : EMPTY} w-full mt-0.5`} />
+                      </label>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-[#6f869c]">
+                尚未設定服務模塊。按上方「載入 V4 辦法數值」可帶入「完整財務規劃服務」與「單點諮詢服務」兩個模塊。
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" disabled={disabled} className={BTN}
+          onClick={() => setRows((rs) => [...rs, {
+            code: "", seq: rs.length + 1, name: "", splitMode: "chain",
+            price: null, countPromotion: true, countMaintenance: true, enabled: true,
+          }])}>
+          ＋ 新增模塊
+        </button>
+        <span className="text-xs text-[#6f869c]">
+          定價留空＝每案自行輸入實收（如完整財務規劃）；有填就在案件登錄時帶入當預設，仍可改。
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -707,13 +928,15 @@ function VersionsPanel({
 /* ────────────────────────── 即時驗算 ────────────────────────── */
 
 function LiveCheck({ params }: { params: CompParams }) {
+  // 驗算條可切模塊：改了某個模塊的比例，這裡就用那個模塊重跑辦法範例。
+  const [mc, setMc] = useState("");
   const results = useMemo(
     () =>
       SCENARIOS.map((s) => {
         if (!isApplicable(s, params)) return { s, res: null };
-        return { s, res: splitCase(s.build(), params) };
+        return { s, res: splitForModule(s.build(), params, mc) };
       }),
-    [params],
+    [params, mc],
   );
   const runnable = results.filter((r) => r.res);
   const bad = runnable.filter((r) => !r.res!.balanced);
@@ -722,6 +945,13 @@ function LiveCheck({ params }: { params: CompParams }) {
     <div className="mt-6 rounded-lg border border-white/10 bg-[#0a2138] p-4">
       <div className="flex items-center gap-2 mb-2">
         <h3 className="text-sm font-bold">即時驗算</h3>
+        <select value={mc} onChange={(e) => setMc(e.target.value)}
+          className={`${FILLED} text-xs`}>
+          <option value="">全域預設</option>
+          {(params.modules ?? []).map((m) => (
+            <option key={m.code} value={m.code}>{m.name}</option>
+          ))}
+        </select>
         <span className="text-xs text-[#7f9ab2]">
           用辦法的七個範例即時重跑目前設定（尚未存檔的改動也算在內）
         </span>

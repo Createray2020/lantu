@@ -78,6 +78,13 @@
       "when": 1787161812697,
       "tag": "0010_brown_warpath",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787212487333,
+      "tag": "0011_superb_red_hulk",
+      "breakpoints": true
     }
   ]
 }

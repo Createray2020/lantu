@@ -70,7 +70,8 @@ export function buildOverview(
     today,
   );
 
-  const yearStats = personalStats(cases, advisor.id, params, { year });
+  // 維持資格的執案門檻走 forMaintenance —— 模塊可以「分潤算、維持資格不算」。
+  const yearStats = personalStats(cases, advisor.id, params, { year, forMaintenance: true });
   // training 由呼叫端過濾成「這位顧問的紀錄」再傳進來。
   const hours = trainingHours(training, params, year);
   const maintenance = evalMaintenance(

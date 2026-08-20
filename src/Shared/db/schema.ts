@@ -313,12 +313,42 @@ export const compRanks = pgTable('comp_ranks', {
   groupName: text('group_name'),                      // 認證顧問／資深顧問／首席顧問
   tierLabel: text('tier_label'),                      // 一階／二階／三階
   code: text('code').notNull(),                       // C1 / S2 / CHIEF…
+  // 這組職級表屬於哪個服務模塊；''＝預設表（所有模塊的 fallback）。
+  // 用空字串而不是 NULL：Postgres 的 UNIQUE 對 NULL 視為互異，
+  // 預設表就會被允許出現重複的 code，引擎查表時取到哪一筆全看排序運氣。
+  moduleCode: text('module_code').default('').notNull(),
   promoPct: doublePrecision('promo_pct'),
   execPct: doublePrecision('exec_pct'),
 }, (t) => [
   index('comp_ranks_version_id_idx').on(t.versionId),
-  // 同一版本內職級代號唯一 —— 引擎全部以 code 查表，重複會靜默算錯人。
-  uniqueIndex('comp_ranks_version_code_uidx').on(t.versionId, t.code),
+  // 同一版本、同一模塊內職級代號唯一 —— 引擎全部以 code 查表，重複會靜默算錯人。
+  uniqueIndex('comp_ranks_version_module_code_uidx').on(t.versionId, t.moduleCode, t.code),
+]);
+
+// 服務模塊（每種服務內容各自的分潤結構）。
+// 比例欄留空＝沿用全域 settings；沒有自訂職級表就用預設那組（module_code=''）。
+// splitMode: chain（差％逐層）/ flat（執行者與推廣者各拿固定 %，其餘歸公司）
+export const compModules = pgTable('comp_modules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  versionId: uuid('version_id').notNull().references(() => compVersions.id, { onDelete: 'cascade' }),
+  seq: integer('seq').default(0).notNull(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  splitMode: text('split_mode').default('chain').notNull(),
+  splitPromoPct: doublePrecision('split_promo_pct'),
+  splitExecPct: doublePrecision('split_exec_pct'),
+  flatExecPct: doublePrecision('flat_exec_pct'),
+  flatPromoPct: doublePrecision('flat_promo_pct'),
+  price: bigint('price', { mode: 'number' }),          // 留空＝每案自行輸入實收
+  countPromotion: boolean('count_promotion').default(true).notNull(),
+  countMaintenance: boolean('count_maintenance').default(true).notNull(),
+  enabled: boolean('enabled').default(true).notNull(),
+  note: text('note'),
+}, (t) => [
+  index('comp_modules_version_id_idx').on(t.versionId),
+  // 模塊代號是案件與職級表的外部參照鍵（comp_cases.module_code / comp_ranks.module_code），
+  // 重複會讓同一個代號指到兩套分潤結構。
+  uniqueIndex('comp_modules_version_code_uidx').on(t.versionId, t.code),
 ]);
 
 // 門檻通用表：晉升 A 軌／B 軌（第十一、十二條）與真除（第十五條）共用一張。
@@ -359,7 +389,9 @@ export const compCases = pgTable('comp_cases', {
   versionId: uuid('version_id').notNull().references(() => compVersions.id),
   clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
   clientName: text('client_name').notNull(),
-  serviceType: text('service_type').default('full').notNull(),  // full / spot
+  serviceType: text('service_type').default('full').notNull(),  // 舊欄位，保留不動（full / spot）
+  // 服務模塊代號（comp_modules.code）。空字串＝沒指定模塊，走全域預設分潤結構。
+  moduleCode: text('module_code').default('').notNull(),
   fee: bigint('fee', { mode: 'number' }).default(0).notNull(),
   isCompanyLead: boolean('is_company_lead').default(false).notNull(),
   promoterId: text('promoter_id').references(() => coaches.id, { onDelete: 'set null' }),

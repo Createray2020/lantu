@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import {
-  createVersion, loadParams, publishVersion, saveRanks, saveSettings,
+  createVersion, loadParams, publishVersion, saveModules, saveRanks, saveSettings,
   saveThresholds, saveVersionMeta,
 } from "@/lib/comp/repo";
 import { mergePreset } from "@/lib/comp/preset";
-import type { CompSettings, RankRow, ThresholdKind, ThresholdRow } from "@/lib/comp/types";
+import type { CompSettings, ModuleRow, RankRow, ThresholdKind, ThresholdRow } from "@/lib/comp/types";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -20,6 +20,9 @@ const MSG: Record<string, string> = {
   "split-not-100": "推廣端＋執案端不得超過 100%",
   "dup-rank-code": "職級代號重複",
   "empty-rank-code": "職級代號不可空白",
+  "dup-module-code": "服務模塊代號重複",
+  "empty-module-code": "服務模塊代號不可空白",
+  "empty-module-name": "服務模塊名稱不可空白",
 };
 
 function fail(e: unknown): { ok: false; error: string } {
@@ -56,7 +59,11 @@ export async function saveSettingsAction(
   }
 }
 
-export async function saveRanksAction(versionId: string, rows: RankRow[]): Promise<ActionResult> {
+export async function saveRanksAction(
+  versionId: string,
+  rows: RankRow[],
+  moduleCode = "",
+): Promise<ActionResult> {
   try {
     await guard();
     const codes = rows.map((r) => (r.code || "").trim());
@@ -65,6 +72,29 @@ export async function saveRanksAction(versionId: string, rows: RankRow[]): Promi
     await saveRanks(
       versionId,
       rows.map((r, i) => ({ ...r, code: codes[i], seq: i + 1 })),
+      moduleCode,
+    );
+    touch();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 服務模塊：代號是案件與職級表的參照鍵，空白或重複一律擋在寫入之前。 */
+export async function saveModulesAction(
+  versionId: string,
+  rows: ModuleRow[],
+): Promise<ActionResult> {
+  try {
+    await guard();
+    const codes = rows.map((m) => (m.code || "").trim().toUpperCase());
+    if (codes.some((c) => !c)) throw new Error("empty-module-code");
+    if (new Set(codes).size !== codes.length) throw new Error("dup-module-code");
+    if (rows.some((m) => !(m.name || "").trim())) throw new Error("empty-module-name");
+    await saveModules(
+      versionId,
+      rows.map((m, i) => ({ ...m, code: codes[i], name: m.name.trim(), seq: i + 1 })),
     );
     touch();
     return { ok: true };
@@ -94,7 +124,11 @@ export async function loadV4Action(versionId: string): Promise<ActionResult> {
     await guard();
     const merged = mergePreset(await loadParams(versionId));
     await saveSettings(versionId, merged.settings);
-    if (merged.ranks.length) await saveRanks(versionId, merged.ranks);
+    if (merged.modules?.length) await saveModules(versionId, merged.modules);
+    // 逐組寫回（預設表＋各模塊自訂表）。
+    for (const mc of [...new Set(merged.ranks.map((r) => r.moduleCode ?? ""))]) {
+      await saveRanks(versionId, merged.ranks.filter((r) => (r.moduleCode ?? "") === mc), mc);
+    }
     for (const kind of ["promotion_a", "promotion_b", "tenure"] as ThresholdKind[]) {
       const rows = merged.thresholds.filter((t) => t.kind === kind);
       if (rows.length) await saveThresholds(versionId, kind, rows);
@@ -111,6 +145,7 @@ export async function clearAllAction(versionId: string): Promise<ActionResult> {
   try {
     await guard();
     await saveSettings(versionId, {});
+    await saveModules(versionId, []);
     await saveRanks(versionId, []);
     for (const kind of ["promotion_a", "promotion_b", "tenure"] as ThresholdKind[]) {
       await saveThresholds(versionId, kind, []);

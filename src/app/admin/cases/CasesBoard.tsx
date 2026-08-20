@@ -23,6 +23,7 @@ export type PayoutView = {
 export type CaseView = {
   id: string; clientName: string; serviceType: string; fee: number; refundAmount: number;
   isCompanyLead: boolean; promoterId: string | null; executorId: string | null;
+  moduleCode: string; moduleName: string;
   signedAt: string | null; paidAt: string | null; surveyAt: string | null;
   caseYear: number; status: string; note: string | null;
   versionLabel: string;
@@ -30,6 +31,10 @@ export type CaseView = {
   balanced: boolean;
 };
 export type Peer = { id: string; label: string; rankCode: string | null };
+export type ModuleOption = {
+  code: string; name: string; price: number | null; splitMode: string;
+  countPromotion: boolean; countMaintenance: boolean;
+};
 export type BatchView = { id: string; period: string; payoutDate: string | null; status: string; totalAmount: number };
 
 const STATUS: Record<string, { label: string; color: string }> = {
@@ -41,10 +46,11 @@ const STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function CasesBoard({
-  cases, peers, batches, defaultPeriod, defaultPayoutDate,
+  cases, peers, modules, batches, defaultPeriod, defaultPayoutDate,
 }: {
   cases: CaseView[];
   peers: Peer[];
+  modules: ModuleOption[];
   batches: BatchView[];
   defaultPeriod: string;
   defaultPayoutDate: string;
@@ -56,7 +62,7 @@ export default function CasesBoard({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
   const [form, setForm] = useState({
-    clientName: "", serviceType: "full", fee: "", isCompanyLead: false,
+    clientName: "", moduleCode: modules[0]?.code ?? "", fee: "", isCompanyLead: false,
     promoterId: "", executorId: peers[0]?.id ?? "", selfBoth: true,
     signedAt: "", paidAt: "", surveyAt: "", note: "",
   });
@@ -91,13 +97,34 @@ export default function CasesBoard({
               <input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })}
                 placeholder="客戶姓名" className={`${form.clientName ? INPUT : EMPTY} flex-1`} />
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              <span className="w-20 text-[#a9bccf]">服務類型</span>
-              <select value={form.serviceType} onChange={(e) => setForm({ ...form, serviceType: e.target.value })}
-                className={`${INPUT} w-40`}>
-                <option value="full">完整財務規劃</option>
-                <option value="spot">單點諮詢</option>
-              </select>
+            <label className="flex items-start gap-2 text-sm">
+              <span className="w-20 text-[#a9bccf] pt-1">服務模塊</span>
+              <span className="flex-1">
+                <select value={form.moduleCode}
+                  onChange={(e) => {
+                    const m = modules.find((x) => x.code === e.target.value);
+                    // 模塊有定價就帶入當預設；留空的模塊（如完整財務規劃）不覆蓋已輸入的金額。
+                    setForm((f) => ({
+                      ...f,
+                      moduleCode: e.target.value,
+                      fee: m?.price != null ? String(m.price) : f.fee,
+                    }));
+                  }}
+                  className={`${INPUT} w-full`}>
+                  {modules.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
+                </select>
+                {(() => {
+                  const m = modules.find((x) => x.code === form.moduleCode);
+                  if (!m) return null;
+                  const tags = [
+                    m.splitMode === "flat" ? "固定比例分潤" : "差％逐層",
+                    m.price == null ? "看實收" : `定價 ${m.price.toLocaleString()}`,
+                    m.countPromotion ? "計入晉升" : "不計晉升",
+                    m.countMaintenance ? "計入維持資格" : "不計維持資格",
+                  ];
+                  return <span className="block text-[11px] text-[#6f869c] mt-0.5">{tags.join(" · ")}</span>;
+                })()}
+              </span>
             </label>
             <label className="flex items-center gap-2 text-sm">
               <span className="w-20 text-[#a9bccf]">顧問費</span>
@@ -160,7 +187,7 @@ export default function CasesBoard({
           onClick={() => run(
             () => createCaseAction({
               clientName: form.clientName,
-              serviceType: form.serviceType,
+              moduleCode: form.moduleCode,
               fee: Number(form.fee) || 0,
               isCompanyLead: form.isCompanyLead,
               promoterId: form.isCompanyLead ? null : (form.selfBoth ? form.executorId : form.promoterId || null),
@@ -220,7 +247,7 @@ export default function CasesBoard({
                     <td className="px-3 py-2">
                       <div className="font-semibold">{c.clientName}</div>
                       <div className="text-[11px] text-[#6f869c]">
-                        {c.serviceType === "spot" ? "單點諮詢" : "完整規劃"} · {c.caseYear} 年度
+                        {c.moduleName || "未指定模塊"} · {c.caseYear} 年度
                         {c.isCompanyLead && " · 公司派案"}
                       </div>
                     </td>

@@ -3,8 +3,8 @@
 
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { compRanks, compThresholds, compVersions } from "@/Shared/db/schema";
-import type { CompParams, CompSettings, RankRow, ThresholdKind, ThresholdRow } from "./types";
+import { compModules, compRanks, compThresholds, compVersions } from "@/Shared/db/schema";
+import type { CompParams, CompSettings, ModuleRow, RankRow, ThresholdKind, ThresholdRow } from "./types";
 
 export type VersionRow = typeof compVersions.$inferSelect;
 
@@ -42,19 +42,28 @@ export async function ensureActiveVersion(): Promise<VersionRow> {
 }
 
 export async function loadParams(versionId: string): Promise<CompParams> {
-  const [v, ranks, ths] = await Promise.all([
+  const [v, ranks, ths, mods] = await Promise.all([
     getVersion(versionId),
     db.select().from(compRanks).where(eq(compRanks.versionId, versionId)).orderBy(asc(compRanks.seq)),
     db.select().from(compThresholds).where(eq(compThresholds.versionId, versionId))
       .orderBy(asc(compThresholds.kind), asc(compThresholds.seq)),
+    db.select().from(compModules).where(eq(compModules.versionId, versionId)).orderBy(asc(compModules.seq)),
   ]);
   return {
     versionId,
     version: v?.version,
     settings: (v?.settings ?? {}) as CompSettings,
     ranks: ranks.map((r) => ({
-      code: r.code, seq: r.seq, groupName: r.groupName, tierLabel: r.tierLabel,
-      promoPct: r.promoPct, execPct: r.execPct,
+      code: r.code, seq: r.seq, moduleCode: r.moduleCode, groupName: r.groupName,
+      tierLabel: r.tierLabel, promoPct: r.promoPct, execPct: r.execPct,
+    })),
+    modules: mods.map((m) => ({
+      code: m.code, seq: m.seq, name: m.name,
+      splitMode: (m.splitMode === "flat" ? "flat" : "chain") as "chain" | "flat",
+      splitPromoPct: m.splitPromoPct, splitExecPct: m.splitExecPct,
+      flatExecPct: m.flatExecPct, flatPromoPct: m.flatPromoPct,
+      price: m.price, countPromotion: m.countPromotion, countMaintenance: m.countMaintenance,
+      enabled: m.enabled, note: m.note,
     })),
     thresholds: ths.map((t) => ({
       kind: t.kind as ThresholdKind, seq: t.seq, fromCode: t.fromCode, toCode: t.toCode,
@@ -87,16 +96,41 @@ export async function saveVersionMeta(
   await db.update(compVersions).set(meta).where(eq(compVersions.id, versionId));
 }
 
-/** 整批覆寫職級表（先刪後寫）。職級是引擎的查表基準，半套更新會出現孤兒 code。 */
-export async function saveRanks(versionId: string, rows: RankRow[]) {
+/**
+ * 整批覆寫某一組職級表（先刪後寫）。職級是引擎的查表基準，半套更新會出現孤兒 code。
+ * moduleCode 為空字串＝預設表；帶模塊代號＝該模塊的自訂表。
+ * 只刪同一個 moduleCode 的列，別的模塊互不影響。
+ */
+export async function saveRanks(versionId: string, rows: RankRow[], moduleCode = "") {
   await assertEditable(versionId);
-  await db.delete(compRanks).where(eq(compRanks.versionId, versionId));
+  await db.delete(compRanks)
+    .where(and(eq(compRanks.versionId, versionId), eq(compRanks.moduleCode, moduleCode)));
   if (!rows.length) return;
   await db.insert(compRanks).values(
     rows.map((r, i) => ({
-      versionId, seq: r.seq ?? i + 1, code: r.code,
+      versionId, seq: r.seq ?? i + 1, code: r.code, moduleCode,
       groupName: r.groupName ?? null, tierLabel: r.tierLabel ?? null,
       promoPct: r.promoPct ?? null, execPct: r.execPct ?? null,
+    })),
+  );
+}
+
+/** 整批覆寫服務模塊。模塊代號被案件與職級表參照，改代號等於換一個模塊。 */
+export async function saveModules(versionId: string, rows: ModuleRow[]) {
+  await assertEditable(versionId);
+  await db.delete(compModules).where(eq(compModules.versionId, versionId));
+  if (!rows.length) return;
+  await db.insert(compModules).values(
+    rows.map((m, i) => ({
+      versionId, seq: m.seq ?? i + 1, code: m.code, name: m.name,
+      splitMode: m.splitMode ?? "chain",
+      splitPromoPct: m.splitPromoPct ?? null, splitExecPct: m.splitExecPct ?? null,
+      flatExecPct: m.flatExecPct ?? null, flatPromoPct: m.flatPromoPct ?? null,
+      price: m.price ?? null,
+      countPromotion: m.countPromotion !== false,
+      countMaintenance: m.countMaintenance !== false,
+      enabled: m.enabled !== false,
+      note: m.note ?? null,
     })),
   );
 }
@@ -125,9 +159,10 @@ export async function createVersion(input: {
   let settings: CompSettings = {};
   let ranks: RankRow[] = [];
   let ths: ThresholdRow[] = [];
+  let mods: ModuleRow[] = [];
   if (input.copyFromId) {
     const src = await loadParams(input.copyFromId);
-    settings = src.settings; ranks = src.ranks; ths = src.thresholds;
+    settings = src.settings; ranks = src.ranks; ths = src.thresholds; mods = src.modules ?? [];
   }
   const created = await db.insert(compVersions).values({
     version: input.version,
@@ -137,7 +172,11 @@ export async function createVersion(input: {
     settings,
   }).returning();
   const v = created[0];
-  if (ranks.length) await saveRanks(v.id, ranks);
+  if (mods.length) await saveModules(v.id, mods);
+  // 職級表可能有多組（預設表＋各模塊自訂表），逐組複製。
+  for (const mc of [...new Set(ranks.map((r) => r.moduleCode ?? ""))]) {
+    await saveRanks(v.id, ranks.filter((r) => (r.moduleCode ?? "") === mc), mc);
+  }
   for (const kind of ["promotion_a", "promotion_b", "tenure"] as ThresholdKind[]) {
     const rows = ths.filter((t) => t.kind === kind);
     if (rows.length) await saveThresholds(v.id, kind, rows);
