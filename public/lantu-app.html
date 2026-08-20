@@ -178,9 +178,8 @@ td.calc{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;whit
 .edunow{background:rgba(143,192,163,.07)}
 .edunowtag{font-size:.66rem;padding:0 5px;border-radius:5px;background:rgba(143,192,163,.18);color:#8fc0a3}
 .catsel{max-width:12rem}
-.catnote{margin-top:3px;display:flex;align-items:center;gap:4px}
-.catnote input{font-size:.78rem;padding:2px 5px}
-.catnote .todo{flex:none;font-size:.68rem;padding:1px 5px;border-radius:6px;background:rgba(201,154,91,.16);color:#c99a5b;white-space:nowrap}
+.finname{display:flex;align-items:center;gap:4px}
+.finname .todo{flex:none;font-size:.68rem;padding:1px 5px;border-radius:6px;background:rgba(201,154,91,.16);color:#c99a5b;white-space:nowrap}
 .exp-btn{background:none;border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:1px 7px;font-size:12px;line-height:1.4}
 .exp-btn.on{color:var(--amber2);border-color:var(--amber);background:rgba(201,154,91,.12)}
 .acts{white-space:nowrap;display:flex;gap:4px;align-items:center}
@@ -349,20 +348,23 @@ function setCat(arr,i,kind,label){
   if(kind==='asset'){row.risk=!!meta.risk;if(meta.liq)row.cls=meta.liq;}
   if(kind==='liability')row.consumerDebt=!!meta.consumer;
  }
- if(!meta||!meta.note)row.otherNote='';
  save();render();
-}
-// 「其他」這類需要補明細的細類，選了就在同一格長出說明欄（選填，不擋存檔）。
-function catNote(arr,i,kind,row){
- var f=CAT_FIELDS[kind],meta=catFind(kind,row[f.sub]);
- if(!meta||!meta.note)return '';
- var v=row.otherNote||'';
- return '<div class="catnote">'+(v?'':'<span class="todo">待補明細</span>')+
-  '<input value="'+esc(v)+'" placeholder="請說明項目別（選填）" oninput="setLive(\''+arr+':'+i+'\',\'otherNote\',this.value)" onchange="set(\''+arr+':'+i+'\',\'otherNote\',this.value)"></div>';
 }
 function catCell(arr,i,kind,row){
  var f=CAT_FIELDS[kind];
- return catSelect(kind,row[f.sub],'onchange="setCat(\''+arr+'\','+i+',\''+kind+'\',this.value)"')+catNote(arr,i,kind,row);
+ return catSelect(kind,row[f.sub],'onchange="setCat(\''+arr+'\','+i+',\''+kind+'\',this.value)"');
+}
+// 選了「其他」這種需要補明細的細類、而「項目」欄還空著時，在項目欄旁標一下。
+// 只是提示，不擋存檔（Ray 拍板選填）。
+// 明細一律寫在「項目」欄——四張表都有那一欄，不要再開第二個名字欄位讓人猶豫該填哪個。
+function catTodo(kind,row){
+ var f=CAT_FIELDS[kind],meta=catFind(kind,row[f.sub]);
+ if(!meta||!meta.note)return '';
+ return (row.name||'').trim()?'':'<span class="todo" title="選了「其他」，請在項目欄寫清楚是什麼">待補明細</span>';
+}
+// 項目欄（自由文字）＋待補明細提示。四張表共用。
+function finName(arr,i,kind,row){
+ return '<div class="finname">'+finTxt(arr,i,'name',row.name)+catTodo(kind,row)+'</div>';
 }
 // ────────────────────────────────────────────────────────────────────────
 var app={role:'coach',activeTab:'data',dataTab:'family',ownerView:'全家',activeId:null,cases:[],tools:{loan:{amt:5000000,rate:2,years:20},ret:{age:40,rAge:65,life:85,month:50000,infl:1.5,rr:4},comp:{target:15000000,years:20,rate:6,start:0},irr:{monthly:10000,months:73,fv:911097,start:0},car:{price:2500000,life:15,used:8,cc:2500,sellLoss:15,oil:36000,park:48000,other:45000},house:{oldPrice:12000000,newPrice:18000000,down:5400000,rate:1.7,years:30,deco:1700000},biz:{cash:500000,monthRev:300000,monthCost:250000,setup:1500000}}};
@@ -526,6 +528,15 @@ function migrateCase(c){
  if(!c.riskQuiz||typeof c.riskQuiz!=='object')c.riskQuiz={ans:{}};
  if(!c.riskQuiz.ans||typeof c.riskQuiz.ans!=='object')c.riskQuiz.ans={};
  CASE_ARRAYS.forEach(function(k){if(!Array.isArray(c[k]))c[k]=[]});
+ // 2026/08/20 短暫存在過的 otherNote（「其他」的明細欄）已收斂成統一的「項目」欄。
+ // 那段期間存過的資料把 otherNote 搬進 name，別讓顧問填的字不見。
+ ['incomes','expenses','assets','liabilities'].forEach(function(k){
+  c[k].forEach(function(x){
+   if(!x||typeof x!=='object')return;
+   if(x.name==null)x.name='';
+   if(x.otherNote){if(!String(x.name).trim())x.name=x.otherNote;delete x.otherNote;}
+  });
+ });
  if(!c.members.length)c.members=JSON.parse(JSON.stringify(d.members));
  if(c.reportNote==null)c.reportNote='';
  ensureJobFields(c);
@@ -1332,7 +1343,7 @@ function addRow(arr){var c=activeCase();if(!c)return;
  var kid=(c.members||[]).filter(function(m){return m.role==='子女'})[0]||{};
  var TPL={
  members:function(){return {name:'',role:'子女',gender:'男',age:0,worked:0,insStart:'',pensionStart:'',pensionYears:0,pensionBalance:0,insType:'健保眷屬',insSalary:0,depRatio:0,expRatio:0,indepAge:26}},
- incomes:function(){return {owner:m0.name||'',type:'工作',subType:'薪資',period:'年',amount:0,growth:0,start:A,end:65}},
+ incomes:function(){return {name:'',owner:m0.name||'',type:'工作',subType:'薪資',period:'年',amount:0,growth:0,start:A,end:65}},
  expenses:function(){return {name:'',cat:'生活',period:'年',amount:0,infl:true,start:A,end:85,cut:0}},
  assets:function(){return {name:'',owner:m0.name||'',mainCat:'可投資資產',type:'現金',cls:'流動',region:'台灣',currency:'台幣',fxRate:1,cost:0,value:0,ret:0,income:0,movable:true}},
  liabilities:function(){return {name:'',owner:m0.name||'',mainCat:'房貸',currency:'台幣',fxRate:1,balance:0,rate:0,repay:'本息攤還',pay:0,months:0,grace:0,startAge:A}},
@@ -2653,12 +2664,13 @@ function finToggle(arr,i){app.finOpen=app.finOpen||{assets:{},liabilities:{}};ap
 function finIncTable(c){
  var incs=c.incomes||[];var idx=incs.map(function(x,i){return [x,i]}).filter(function(p){return finMatch(p[0].owner)});
  var order=[];idx.forEach(function(p){var o=p[0].owner||'(未指定)';if(order.indexOf(o)<0)order.push(o)});
- var head='<tr><th>持有人</th><th>類別</th><th>子類別</th><th>週期</th><th>金額</th><th>年化</th><th>成長%</th><th>起</th><th>訖</th><th></th></tr>';
+ var head='<tr><th>項目</th><th>持有人</th><th>類別</th><th>子類別</th><th>週期</th><th>金額</th><th>年化</th><th>成長%</th><th>起</th><th>訖</th><th></th></tr>';
  var body=order.map(function(o){var sub=0;
   var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=n(x.amount);var per=x.period||'年';
    var tSel=['工作','理財','其他'].map(function(t){return '<option '+((x.type||'工作')===t?'selected':'')+'>'+t+'</option>'}).join('');
    var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
    return '<tr>'+
+    '<td>'+finName('incomes',i,'income',x)+'</td>'+
     '<td>'+finTxt('incomes',i,'owner',x.owner)+'</td>'+
     '<td><select onchange="set(\'incomes:'+i+'\',\'type\',this.value)">'+tSel+'</select></td>'+
     '<td>'+catCell('incomes',i,'income',x)+'</td>'+
@@ -2670,9 +2682,9 @@ function finIncTable(c){
     '<td>'+finNum('incomes',i,'end',x.end)+'</td>'+
     '<td><button class="del" onclick="delRow(\'incomes\','+i+')">✕</button></td></tr>';
   }).join('');
-  return '<tr class="grp"><td colspan="10" data-fingrp="incomes|'+esc(o)+'">'+esc(o)+' <span class="gm">· 年化小計 '+fmt(sub)+'</span></td></tr>'+rows;
+  return '<tr class="grp"><td colspan="11" data-fingrp="incomes|'+esc(o)+'">'+esc(o)+' <span class="gm">· 年化小計 '+fmt(sub)+'</span></td></tr>'+rows;
  }).join('');
- return '<table>'+head+(body||'<tr><td colspan="10" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
+ return '<table>'+head+(body||'<tr><td colspan="11" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
 }
 
 function finExpTable(c){
@@ -2682,7 +2694,7 @@ function finExpTable(c){
    var cSel=CATS.map(function(ct){return '<option '+((x.cat||'生活')===ct?'selected':'')+'>'+ct+'</option>'}).join('');
    var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
    return '<tr>'+
-    '<td>'+finTxt('expenses',i,'name',x.name)+'</td>'+
+    '<td>'+finName('expenses',i,'expense',x)+'</td>'+
     '<td><select onchange="set(\'expenses:'+i+'\',\'cat\',this.value)">'+cSel+'</select></td>'+
     '<td>'+catCell('expenses',i,'expense',x)+'</td>'+
     '<td><select onchange="setAmtPeriod(\'expenses\','+i+',this.value)">'+pSel+'</select></td>'+
@@ -2705,7 +2717,7 @@ function finAstTable(c){
  var body=order.map(function(o){var sub=0;
   var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=aVal(x);var open=!!app.finOpen.assets[i];
    var main='<tr>'+
-    '<td>'+finTxt('assets',i,'name',x.name)+'</td>'+
+    '<td>'+finName('assets',i,'asset',x)+'</td>'+
     '<td>'+finMem(c,'assets',i,'owner',x.owner)+'</td>'+
     '<td>'+catCell('assets',i,'asset',x)+'</td>'+
     '<td>'+finSel('assets',i,'currency',x.currency,['台幣','美金','人民幣','日圓','港幣','其他'])+'</td>'+
@@ -2738,7 +2750,7 @@ function finLiaTable(c){
  var body=order.map(function(o){var sub=0;
   var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=lBal(x);var open=!!app.finOpen.liabilities[i];
    var main='<tr>'+
-    '<td>'+finTxt('liabilities',i,'name',x.name)+'</td>'+
+    '<td>'+finName('liabilities',i,'liability',x)+'</td>'+
     '<td>'+finMem(c,'liabilities',i,'owner',x.owner)+'</td>'+
     '<td>'+finSel('liabilities',i,'mainCat',x.mainCat,['房貸','車貸','信貸','其他'])+'</td>'+
     '<td>'+catCell('liabilities',i,'liability',x)+'</td>'+
@@ -3039,6 +3051,34 @@ function financeNavHTML(){
  return '<div class="sec" style="position:sticky;top:0;z-index:5"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px"><span class="muted">快速跳轉：</span>'+
   items.map(function(a){return '<a href="#'+a[0]+'" style="color:var(--amber2);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:3px 11px">'+a[1]+'</a>'}).join('')+'</div></div>';
 }
+// 收入逐筆明細。
+// 三表的「工作/理財/其他」只看得到三個總數，看不出「錢從哪幾個地方來」——
+// 兩份薪資、三筆補助擠在同一個數字裡，客戶問「這 120 萬是什麼」就答不出來。
+// 依大類分組、每筆列出 項目／持有人／子類別／年化金額／期間。
+function incomeRows(c){
+ var order=['工作','理財','其他'],out=[];
+ order.forEach(function(t){
+  var list=(c.incomes||[]).filter(function(i){return (i.type||'工作')===t});
+  if(!list.length)return;
+  out.push({group:t,total:sum(list,function(i){return n(i.amount)})});
+  list.forEach(function(i){out.push({group:t,item:i});});
+ });
+ return out;
+}
+function incomeDetailHTML(c){
+ var incs=c.incomes||[];
+ if(!incs.length)return '';
+ var rows=incomeRows(c).map(function(r){
+  if(!r.item)return ['<b style="color:var(--amber2)">'+esc(r.group)+'收入</b>','<b>'+fmt(r.total)+'</b>'];
+  var x=r.item;
+  var nm=(x.name||'').trim()||'<span class="muted">（未命名）</span>';
+  var tag=[x.owner,x.subType].filter(Boolean).join(' · ');
+  var span=(n(x.start)||n(x.end))?('　'+n(x.start)+'–'+n(x.end)+' 歲'):'';
+  return ['　'+esc(nm)+(tag?' <span class="muted">'+esc(tag)+'</span>':'')+'<span class="muted">'+span+'</span>',Math.round(n(x.amount))];
+ });
+ rows.push(['收入合計',Math.round(sum(incs,function(i){return n(i.amount)})),'var(--amber2)']);
+ return detailBox('收入逐筆明細（年化）',kvTbl(rows));
+}
 function threeTablesHTML(ct){
  function row(l,v,bold,col){return '<tr><td class="k"'+(bold?' style="font-weight:800"':'')+'>'+l+'</td><td'+(bold||col?' style="'+(bold?'font-weight:800;':'')+(col?'color:'+col:'')+'"':'')+'>'+fmt(v)+'</td></tr>'}
  var bal=ct.incTotal-ct.expTotal;
@@ -3050,7 +3090,7 @@ function threeTablesHTML(ct){
   row('工作收入',ct.incWork)+row('理財收入',ct.incFin)+row('其他收入',ct.incOther)+row('收入合計',ct.incTotal,true)+
   row('生活支出',ct.expLive)+row('稅賦',ct.expTax)+row('保險',ct.expIns)+row('其他＋負債',ct.expOther)+row('支出合計',ct.expTotal,true)+
   '<tr><td class="k" style="font-weight:800;color:'+(bal>=0?'var(--ok)':'var(--warn)')+'">年度結餘</td><td style="font-weight:800;color:'+(bal>=0?'var(--ok)':'var(--warn)')+'">'+fmt(bal)+'（月 '+fmt(bal/12)+'）</td></tr></table>';
- return '<div class="sec" id="an-tables"><h4>財務三表（正式版）<span class="hint">資產負債表 · 現金流量表；快速識字版見下方「財務十字表」</span></h4><div style="display:flex;gap:16px;flex-wrap:wrap">'+bs+cf+'</div></div>';
+ return '<div class="sec" id="an-tables"><h4>財務三表（正式版）<span class="hint">資產負債表 · 現金流量表；快速識字版見下方「財務十字表」</span></h4><div style="display:flex;gap:16px;flex-wrap:wrap">'+bs+cf+'</div>'+incomeDetailHTML(activeCase()||{})+'</div>';
 }
 function analysisPane(c){
  var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGaps(c),proj=m.proj,rn=retireNeed(c),props=propertyGaps(c);
@@ -3391,6 +3431,22 @@ function rPie(list){list=(list||[]).filter(function(x){return n(x.pct)>0});if(!l
   return '<path d="M'+cx+' '+cy+' L'+x0.toFixed(1)+' '+y0.toFixed(1)+' A'+rr+' '+rr+' 0 '+large+' 1 '+x1.toFixed(1)+' '+y1.toFixed(1)+' Z" fill="'+RCOL[i%8]+'"/>'}).join('');
  var leg=list.map(function(x,i){return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#33474e;margin-bottom:3px"><span style="width:10px;height:10px;border-radius:2px;background:'+RCOL[i%8]+'"></span>'+esc(x.name)+' <b>'+(n(x.pct)/tot*100).toFixed(0)+'%</b></div>'}).join('');
  return '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center"><svg width="160" height="160" viewBox="0 0 160 160">'+segs+'</svg><div style="flex:1;min-width:150px">'+leg+'</div></div>';}
+// 報告書用的收入逐筆明細（淺色列印版）。與分析頁的 incomeDetailHTML 同一份資料，換皮而已。
+function rIncomeDetail(c){
+ var incs=c.incomes||[];
+ if(!incs.length)return '';
+ var body=incomeRows(c).map(function(r){
+  if(!r.item){
+   return '<tr style="background:#f2f6f7"><td colspan="3" style="font-weight:700;color:#0d2b45">'+esc(r.group)+'收入</td><td style="font-weight:700;text-align:right">'+fmt(r.total)+'</td></tr>';
+  }
+  var x=r.item;
+  var span=(n(x.start)||n(x.end))?(n(x.start)+'–'+n(x.end)+' 歲'):'';
+  return '<tr><td>'+esc((x.name||'').trim()||'（未命名）')+'</td><td>'+esc(x.owner||'')+'</td><td>'+esc(x.subType||'')+(span?' <span style="color:#8a9aa2">'+span+'</span>':'')+'</td><td style="text-align:right">'+fmt(Math.round(n(x.amount)))+'</td></tr>';
+ }).join('');
+ return '<div style="margin-top:14px;color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">收入逐筆明細（年化）</div>'+
+  '<table style="width:100%"><tr><th>項目</th><th>持有人</th><th>子類別</th><th style="text-align:right">年化金額</th></tr>'+body+
+  '<tr><td colspan="3" style="font-weight:800">收入合計</td><td style="font-weight:800;text-align:right">'+fmt(Math.round(sum(incs,function(i){return n(i.amount)})))+'</td></tr></table>';
+}
 function rCross(ct){function box(t,rows,tot,cl){return '<div style="border:1px solid #dfe7e9;border-radius:8px;padding:10px;background:#f7fafb"><div style="color:'+cl+';font-weight:700;font-size:13px;margin-bottom:4px">'+t+'</div>'+rows+'<div style="border-top:1px solid #dfe7e9;margin-top:5px;padding-top:4px;font-weight:700;font-size:13px">合計 '+fmt(tot)+'</div></div>'}
  function r(l,v){return '<div style="display:flex;justify-content:space-between;font-size:12px;color:#5a6b72"><span>'+l+'</span><span style="color:#22333a">'+fmt(v)+'</span></div>'}
  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
@@ -3457,6 +3513,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">收入比重</div>'+rPie(incPie)+'</div>'+
    '<div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">支出比重</div>'+rPie(expPie)+'</div></div>'+
   '<div style="margin-top:14px;color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">資產結構</div>'+rPie(assetPie)+
+  rIncomeDetail(c)+
   '<div style="margin-top:14px;color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">財務十字表</div>'+rCross(ct)+
 
   '<h2>三、現況財務指標</h2><div style="color:#5a6b72;font-size:12px;margin-bottom:6px">協會標準財務比率體檢；綠＝達標、橙＝待留意、紅＝需改善。</div><div style="color:#0d2b45;font-weight:700;font-size:13px;margin:8px 0 4px">收支流量</div>'+ratioTblR('收支流量')+'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:10px 0 4px">資產負債</div>'+ratioTblR('資產負債')+

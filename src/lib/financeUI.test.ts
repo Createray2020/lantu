@@ -108,22 +108,89 @@ describe("舊資料相容：沒有旗標的資料沿用改版前的判定，數�
   });
 });
 
-describe("「其他」的明細欄：選填、不擋存檔，但沒填會標「待補明細」", () => {
-  it("選了「其他」就長出明細欄與提示；填了提示就消失", () => {
+describe("四張表都有「項目」欄；選了「其他」而項目留空會標「待補明細」", () => {
+  it("收入也有項目欄了（改版前只有 持有人／類別／子類別，兩筆薪資分不出來）", () => {
+    const c = w.activeCase();
+    c.incomes[0].name = "主業薪資-台積電";
+    c.incomes[1].name = "兼職-家教";
+    w.render();
+    const h = pane();
+    expect(h).toContain("<th>項目</th><th>持有人</th>");
+    expect(h).toContain("主業薪資-台積電");
+    expect(h).toContain("兼職-家教");
+  });
+
+  it("選了「其他」而項目留空 → 提示；填了項目就消失（提示不擋存檔）", () => {
+    const c = w.activeCase();
+    c.expenses[0].name = "";
     w.setCat("expenses", 0, "expense", "其他");
     expect(pane()).toContain("待補明細");
-    w.set("expenses:0", "otherNote", "公司團購尾款");
+    w.set("expenses:0", "name", "公司團購尾款");
     w.render();
-    expect(w.activeCase().expenses[0].otherNote).toBe("公司團購尾款");
+    expect(w.activeCase().expenses[0].name).toBe("公司團購尾款");
     expect(pane()).not.toContain("待補明細");
   });
 
-  it("改選非「其他」的細類，殘留的明細會被清掉（不會掛在不相干的類別上）", () => {
-    w.setCat("expenses", 0, "expense", "其他");
-    w.set("expenses:0", "otherNote", "殘留值");
-    w.setCat("expenses", 0, "expense", "餐食");
-    expect(w.activeCase().expenses[0].otherNote).toBe("");
-    expect(w.activeCase().expenses[0].cat).toBe("生活");
+  it("明細只有「項目」一個欄位——不會再有第二個 otherNote 讓人猶豫填哪個", () => {
+    expect(w.activeCase().expenses[0].otherNote).toBeUndefined();
+    // HTML 裡也不該再出現舊的明細輸入框
+    expect(pane()).not.toContain("請說明項目別");
+  });
+
+  it("改版初期存過 otherNote 的資料，載入時搬進項目欄且不覆蓋既有名稱", () => {
+    const c = w.migrateCase({
+      incomes: [{ owner: "a", type: "其他", subType: "其他", amount: 1, otherNote: "舊的明細字" }],
+      expenses: [{ name: "已有名字", cat: "其他", subCat: "其他", otherNote: "不該覆蓋" }],
+    });
+    expect(c.incomes[0].name).toBe("舊的明細字");
+    expect(c.incomes[0].otherNote).toBeUndefined();
+    expect(c.expenses[0].name).toBe("已有名字");
+    expect(c.expenses[0].otherNote).toBeUndefined();
+  });
+});
+
+describe("收入逐筆明細：分析頁與報告書都看得到錢從哪來", () => {
+  it("依大類分組列出每一筆的項目／持有人／子類別／年化金額", () => {
+    const c = w.activeCase();
+    c.incomes = [
+      { name: "主業薪資", owner: "王大明", type: "工作", subType: "薪資", amount: 1200000, start: 40, end: 65 },
+      { name: "家教", owner: "王太太", type: "工作", subType: "兼職", amount: 180000, start: 40, end: 60 },
+      { name: "民生東路租金", owner: "王大明", type: "理財", subType: "租金收入", amount: 360000, start: 40, end: 85 },
+      { name: "育兒津貼", owner: "王太太", type: "其他", subType: "政府補助/津貼", amount: 60000, start: 40, end: 46 },
+    ];
+    w.app.activeTab = "analysis";
+    w.render();
+    const h = pane();
+    expect(h).toContain("收入逐筆明細");
+    for (const nm of ["主業薪資", "家教", "民生東路租金", "育兒津貼"]) expect(h, nm).toContain(nm);
+    // 兩筆同屬「工作」的收入不再被壓成一個數字
+    expect(h).toContain("工作收入");
+    expect(h).toContain("理財收入");
+  });
+
+  it("報告書也列得出來（客戶拿到的那份才是重點）", () => {
+    w.app.activeTab = "report";
+    w.render();
+    const h = pane();
+    expect(h).toContain("收入逐筆明細");
+    expect(h).toContain("育兒津貼");
+    expect(h).toContain("收入合計");
+  });
+
+  it("沒填項目名稱的舊資料仍列得出來，只是標「（未命名）」而不是空白列", () => {
+    const c = w.activeCase();
+    c.incomes = [{ owner: "王大明", type: "工作", subType: "薪資", amount: 1200000, start: 40, end: 65 }];
+    w.app.activeTab = "analysis";
+    w.render();
+    expect(pane()).toContain("（未命名）");
+  });
+
+  it("完全沒有收入時不硬擠一張空表", () => {
+    const c = w.activeCase();
+    c.incomes = [];
+    w.app.activeTab = "analysis";
+    w.render();
+    expect(pane()).not.toContain("收入逐筆明細");
   });
 });
 
