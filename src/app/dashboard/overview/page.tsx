@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
   const coach = await ensureCoach();
-  if (!coach) redirect("/sign-in");
+  if (!coach) redirect("/dashboard"); // 非教練/未登入 → 由 /dashboard 統一分流
   if (coach.status !== "active") redirect("/dashboard");
   const d = await getCoachDashboard(coach.id);
 

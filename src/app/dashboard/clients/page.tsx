@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // 客戶列表（三層架構最上層）。原本在 /dashboard，首頁改為角色儀表後移到此。
 export default async function ClientsPage() {
   const coach = await ensureCoach();
-  if (!coach) redirect("/sign-in");
+  if (!coach) redirect("/dashboard"); // 非教練/未登入 → 由 /dashboard 統一分流
   if (coach.status !== "active") redirect("/dashboard");
   const clients = await listClientsForCoach(coach.id);
   return (

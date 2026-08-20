@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const coach = await ensureCoach();
-  if (!coach) redirect("/sign-in");
+  if (!coach) redirect("/dashboard"); // 非教練/未登入 → 由 /dashboard 統一分流
   if (coach.status !== "active") redirect("/dashboard");
 
   // getClientDetail 已改成不撈 plans.data（只有 comparePlans 需要整份 jsonb），

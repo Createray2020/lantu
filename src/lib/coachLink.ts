@@ -134,9 +134,9 @@ export async function getInviteByCode(code: string): Promise<{ coachId: string; 
 }
 
 // 客戶開啟邀請 → 直接掛到該教練（教練主動＝視同同意）。
-// TODO(待拍板)：邀請碼目前是「一碼多人可用」——getInviteByCode 已算出 used 旗標但這裡沒有採用。
-// 單次用 vs 多次用是產品決策（見盤點報告待拍板 #4），定案前先不改這個語意。
-// 但「教練必須仍是 active」是安全底線，先補上：停權教練的舊連結不該還能繼續收客戶。
+// 已拍板(2026/08/20)：邀請碼是「一碼多人可用」——一條連結可以群發，教練不必每位客戶產一次。
+// usedAt/usedByClientUserId 只當「最近一次被誰用掉」的紀錄，不作為失效判定。
+// 「教練必須仍是 active」是安全底線：停權教練的舊連結不該還能繼續收客戶。
 export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok: boolean; error?: string; coachName?: string | null }> {
   const inv = await getInviteByCode(code);
   if (!inv) return { ok: false, error: "邀請連結無效或已失效" };
@@ -147,8 +147,18 @@ export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok
     .limit(1);
   if (coachRows[0]?.status !== "active") return { ok: false, error: "這位教練目前無法接受新客戶" };
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, user.id)).limit(1);
-  const client = cRows[0];
-  if (!client) return { ok: false, error: "請先完成人生護照，再用邀請連結掛教練" };
+  let client = cRows[0];
+  // 還沒填人生護照也要能綁：邀請連結＝一鍵入場。舊版在這裡擋掉（「請先完成人生護照」），
+  // 新客戶會卡在中間，回頭多半找不到那條連結，教練就永遠收不到人。
+  // 先用 Clerk 姓名開一筆空的 clients 列，綁上教練，再引導去填人生護照（savePassport 會沿用這一列）。
+  if (!client) {
+    const ins = await db
+      .insert(clients)
+      .values({ coachId: null, clientUserId: user.id, name: user.name || "我的規劃", source: "教練邀請", status: "active" })
+      .returning();
+    client = ins[0];
+    if (!client) return { ok: false, error: "建立客戶資料失敗，請稍後再試" };
+  }
   if (client.coachId) {
     if (client.coachId === inv.coachId) return { ok: true, coachName: inv.coachName }; // 已連結同一位＝視同成功（可重複開）
     return { ok: false, error: "你已連結其他教練，請先解除再用此連結" };

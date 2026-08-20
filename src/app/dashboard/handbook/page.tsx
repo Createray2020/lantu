@@ -26,7 +26,7 @@ function show(v: unknown, type: string): string {
 
 export default async function HandbookPage() {
   const me = await ensureCoach();
-  if (!me) redirect("/sign-in");
+  if (!me) redirect("/dashboard"); // 非教練/未登入 → 由 /dashboard 統一分流
   if (me.status !== "active") redirect("/dashboard");
 
   const version = await ensureActiveVersion();
