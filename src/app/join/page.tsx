@@ -28,9 +28,9 @@ export default function JoinPage() {
                 <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" />
               </svg>
             </span>
-            <span className="flex flex-col leading-tight">
-              <span className="font-serif tracking-[0.16em] text-[15px]">嵐途 LAN TU</span>
-              <span className="text-[9px] tracking-[0.3em] text-[#c99a5b]">JOIN US</span>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[15px] whitespace-nowrap">嵐途 LAN TU</span>
+              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-[#c99a5b]">JOIN US</span>
             </span>
           </Link>
           <a href={LINE_URL} target="_blank" rel="noopener noreferrer"
@@ -167,7 +167,10 @@ export default function JoinPage() {
       <footer className="border-t border-white/10">
         <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-[#6f869c]">
           <span className="font-serif tracking-[0.14em]">嵐途 LAN TU</span>
-          <Link href="/home" className="hover:text-[#a7bacb]">← 回官網首頁</Link>
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="hover:text-[#a7bacb]">已經是嵐途教練？登入</Link>
+            <Link href="/home" className="hover:text-[#a7bacb]">← 回官網首頁</Link>
+          </div>
         </div>
       </footer>
     </div>

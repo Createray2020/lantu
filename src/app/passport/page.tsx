@@ -27,16 +27,16 @@ export default async function PublicPassportPage() {
                 <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" />
               </svg>
             </span>
-            <span className="flex flex-col leading-tight">
-              <span className="font-serif tracking-[0.16em] text-[15px]">嵐途 LAN TU</span>
-              <span className="text-[9px] tracking-[0.3em] text-[#c99a5b]">FINANCIAL PLANNING</span>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[15px] whitespace-nowrap">嵐途 LAN TU</span>
+              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-[#c99a5b]">FINANCIAL PLANNING</span>
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link href="/coaches" className="text-sm text-[#a7bacb] hover:text-white px-3 py-2 rounded-lg">認識教練</Link>
+            <Link href="/coaches" className="hidden sm:inline text-sm text-[#a7bacb] hover:text-white px-3 py-2 rounded-lg">認識教練</Link>
             <Link
-              href={userId ? "/portal" : "/client/sign-in"}
-              className="text-sm text-[#a7bacb] hover:text-white px-3 py-2 rounded-lg border border-white/15"
+              href={userId ? "/portal" : "/login"}
+              className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-white/15 whitespace-nowrap"
             >
               {userId ? "我的規劃" : "登入"}
             </Link>

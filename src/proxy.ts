@@ -17,6 +17,7 @@ const isPublicRoute = createRouteMatcher([
   // （所以不構成個資蒐集），按存檔才導去註冊。見 lib/passportDraft.ts。
   '/passport(.*)',
   '/join', // 招募頁：對外公開，訪客要看得到
+  '/login', // 登入身分選擇頁（官網只有一顆登入，教練/客戶在這裡分流）
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀
   // 收支資債細類字典與教育費用參數：iframe app 一載入就抓，客戶端未登入頁面也會用到。

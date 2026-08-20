@@ -29,14 +29,14 @@ export default async function LandingView() {
                 <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" />
               </svg>
             </span>
-            <span className="flex flex-col leading-tight">
-              <span className="font-serif tracking-[0.16em] text-[15px]">嵐途 LAN TU</span>
-              <span className="text-[9px] tracking-[0.3em] text-[#c99a5b]">FINANCIAL PLANNING</span>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[15px] whitespace-nowrap">嵐途 LAN TU</span>
+              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-[#c99a5b]">FINANCIAL PLANNING</span>
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link href="/coaches" className="hidden sm:inline text-sm text-[#a7bacb] hover:text-white px-3 py-2 rounded-lg whitespace-nowrap">認識教練</Link>
-            <Link href="/client/sign-in" className="hidden sm:inline text-sm text-[#a7bacb] hover:text-white px-3 py-2 rounded-lg border border-white/15 whitespace-nowrap">登入</Link>
+            <Link href="/login" className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-white/15 whitespace-nowrap">登入</Link>
             <Link href="/passport" className="text-[13px] sm:text-sm font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-3.5 sm:px-4 py-2 rounded-lg whitespace-nowrap">免費試算</Link>
           </div>
         </div>
