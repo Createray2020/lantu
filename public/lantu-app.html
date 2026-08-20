@@ -2015,7 +2015,7 @@ var DOC_LIST=['人壽險保單','產險保單(車險/住宅火險)','薪資單',
 function valuesWheelSVG(c,theme){var gs=(c.lifeGoals||[]).filter(function(g){return g.name});
  if(!gs.length)return theme==='light'?'<p style="color:#5a6b72">尚未填寫人生財務目標，無法產生價值環。</p>':'<div style="color:#a7bacb;font-size:12px">在「人生財務目標清單」填入目標名稱後，這裡會即時生成價值環。</div>';
  var dark=theme!=='light';
- var VW=520,VH=340,cx=260,cy=170,R=112;
+ var VW=520,VH=340,cx=260,cy=170,R=112,HUB=34;
  var txt=dark?'#eef2f7':'#0d2b45',sub=dark?'#a7bacb':'#5a6b72',ring=dark?'rgba(255,255,255,.13)':'rgba(0,0,0,.1)',ring2=dark?'rgba(255,255,255,.07)':'rgba(0,0,0,.05)';
  var PAL=['#c99a5b','#7f97ac','#8ba888','#b07d3d','#5a7186','#cbb488','#9c7bb0','#6f9f8a'];
  var trunc=function(t,k){t=String(t);return t.length>k?t.slice(0,k)+'…':t;};
@@ -2036,17 +2036,20 @@ function valuesWheelSVG(c,theme){var gs=(c.lifeGoals||[]).filter(function(g){ret
  var spokes=pts.map(function(q){
   var cos=Math.cos(q.ang),sin=Math.sin(q.ang);
   var lx=cx+(R+14)*cos,ly=cy+(R+14)*sin;
+  var sx=cx+HUB*cos,sy=cy+HUB*sin;
   var anchor=cos>0.25?'start':cos<-0.25?'end':'middle';
   var dy=sin<-0.7?-9:sin>0.7?13:4;
-  return '<line x1="'+cx+'" y1="'+cy+'" x2="'+q.x.toFixed(1)+'" y2="'+q.y.toFixed(1)+'" stroke="'+q.col+'" stroke-width="1.6" opacity=".75"/>'+
+  return '<line x1="'+sx.toFixed(1)+'" y1="'+sy.toFixed(1)+'" x2="'+q.x.toFixed(1)+'" y2="'+q.y.toFixed(1)+'" stroke="'+q.col+'" stroke-width="1.6" opacity=".75"/>'+
    '<circle cx="'+q.x.toFixed(1)+'" cy="'+q.y.toFixed(1)+'" r="'+(3.5+q.imp*0.9).toFixed(1)+'" fill="'+q.col+'"/>'+
    '<text x="'+lx.toFixed(1)+'" y="'+(ly+dy).toFixed(1)+'" fill="'+txt+'" font-size="11.5" font-weight="700" text-anchor="'+anchor+'">'+esc(trunc(q.g.name,8))+'</text>'+
    '<text x="'+lx.toFixed(1)+'" y="'+(ly+dy+13).toFixed(1)+'" fill="'+sub+'" font-size="10" text-anchor="'+anchor+'">重要度 '+q.imp+'</text>';
  }).join('');
- var hub='<circle cx="'+cx+'" cy="'+cy+'" r="34" fill="'+(dark?'#0d2b45':'#eef3f6')+'" stroke="'+ring+'"/>'+
+ // 核心圓：實心、最後才畫，蓋在輻線與面積之上（線條不可以壓過「人生價值」）
+ var hub='<circle cx="'+cx+'" cy="'+cy+'" r="'+(HUB+5)+'" fill="'+(dark?'#0a2137':'#e3ebf0')+'" opacity=".9"/>'+
+  '<circle cx="'+cx+'" cy="'+cy+'" r="'+HUB+'" fill="'+(dark?'#12334f':'#f7fafb')+'" stroke="'+(dark?'rgba(201,154,91,.55)':'rgba(163,129,74,.45)')+'" stroke-width="1.2"/>'+
   '<text x="'+cx+'" y="'+(cy-3)+'" fill="'+txt+'" font-size="13" font-weight="800" text-anchor="middle">人生</text>'+
   '<text x="'+cx+'" y="'+(cy+14)+'" fill="'+txt+'" font-size="13" font-weight="800" text-anchor="middle">價值</text>';
- var svg='<svg viewBox="0 0 '+VW+' '+VH+'" width="100%" style="max-width:'+VW+'px;height:auto;display:block;margin:0 auto" preserveAspectRatio="xMidYMid meet">'+rings+poly+hub+spokes+'</svg>';
+ var svg='<svg viewBox="0 0 '+VW+' '+VH+'" width="100%" style="max-width:'+VW+'px;height:auto;display:block;margin:0 auto" preserveAspectRatio="xMidYMid meet">'+rings+poly+spokes+hub+'</svg>';
  // 圖例：移到圖下方，一列兩欄，價值觀文字完整顯示不再被擠掉
  var legend='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:6px 16px;margin-top:10px">'+
   gs.map(function(g,i){
