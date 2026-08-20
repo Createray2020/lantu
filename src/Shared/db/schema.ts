@@ -530,3 +530,23 @@ export const compMaintenance = pgTable('comp_maintenance', {
   // 每人每年一列 —— 少了它，重算會疊出多列，畫面取到哪一列全看排序運氣。
   uniqueIndex('comp_maintenance_coach_year_uidx').on(t.coachId, t.year),
 ]);
+
+
+// 回饋問卷（辦法第二十一條）。案件以問卷回收為結案要件，未回收不計晉升指標。
+// 一個案件一份問卷（uniqueIndex），答案存 jsonb：題目本身在制度設定裡（surveyQuestions），
+// 改題目不用改資料表，但已提交的問卷保留當時的題目文字，否則日後看不懂答案在回答什麼。
+// submittedBy: client（客戶自填）/ coach（顧問代填，需註記）
+export const compSurveys = pgTable('comp_surveys', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  caseId: uuid('case_id').notNull().references(() => compCases.id, { onDelete: 'cascade' }),
+  questions: jsonb('questions').default([]).notNull(),   // string[]：提交當下的題目
+  answers: jsonb('answers').default([]).notNull(),       // string[]：與 questions 同序
+  marketingOptIn: boolean('marketing_opt_in').default(false).notNull(),
+  submittedBy: text('submitted_by').default('client').notNull(),
+  submitterId: text('submitter_id'),                     // Clerk userId（客戶或代填的顧問）
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 一案一份 —— 重複提交是更新而不是長出第二份，否則「哪一份才算結案」沒有答案。
+  uniqueIndex('comp_surveys_case_id_uidx').on(t.caseId),
+]);

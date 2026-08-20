@@ -14,6 +14,9 @@ const isPublicRoute = createRouteMatcher([
   '/portal(.*)',
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀
+  // Vercel Cron：帶的是 Bearer CRON_SECRET 不是 Clerk session，
+  // 走 auth.protect() 會被 401。路由自己驗 CRON_SECRET，沒設就一律拒絕。
+  '/api/cron(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

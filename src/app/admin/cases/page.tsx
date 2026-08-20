@@ -5,6 +5,7 @@ import { ensureCoach, isAdmin } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
 import { listBatches, listCases, listAdvisors, listPayouts } from "@/lib/comp/caseRepo";
 import { ensureActiveVersion, listVersions, loadParams } from "@/lib/comp/repo";
+import { listSurveys, questionsOf } from "@/lib/comp/survey";
 import CasesBoard, { type CaseView, type ModuleOption, type PayoutView } from "./CasesBoard";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,8 @@ export default async function CasesPage() {
     listCases(), listAdvisors(), listBatches(), listVersions(), loadParams(version.id),
   ]);
   const payoutsByCase = await Promise.all(cases.map((c) => listPayouts(c.id)));
+  const surveys = await listSurveys(cases.map((c) => c.id));
+  const surveyByCase = new Map(surveys.map((s) => [s.caseId, s]));
   const versionLabel = new Map(versions.map((v) => [v.id, v.version]));
 
   const views: CaseView[] = cases.map((c, i) => {
@@ -45,6 +48,10 @@ export default async function CasesPage() {
       signedAt: c.signedAt, paidAt: c.paidAt, surveyAt: c.surveyAt,
       caseYear: c.caseYear, status: c.status, note: c.note,
       versionLabel: versionLabel.get(c.versionId) ?? "—",
+      surveyAnswers: Array.isArray(surveyByCase.get(c.id)?.answers)
+        ? (surveyByCase.get(c.id)!.answers as string[])
+        : null,
+      surveyBy: surveyByCase.get(c.id)?.submittedBy ?? null,
       payouts,
       // 沒有分潤列時不判定為「未達 100%」——那是還沒算，不是算錯。
       balanced: payouts.length === 0 || Math.abs(sum - 100) < 1e-4,
@@ -99,6 +106,8 @@ export default async function CasesPage() {
           </div>
         ) : (
           <CasesBoard cases={views} peers={peers} modules={moduleOptions} batches={batches}
+            questions={questionsOf(params.settings)}
+            marketingEnabled={params.settings.surveyMarketingOptIn !== false}
             defaultPeriod={period} defaultPayoutDate={payoutDate} />
         )}
       </section>

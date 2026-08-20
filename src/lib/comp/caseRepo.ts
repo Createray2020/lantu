@@ -48,6 +48,16 @@ export async function listCases(filter?: { status?: string; executorId?: string 
   return where.length ? q.where(and(...where)) : q;
 }
 
+/** 某個制度版本底下，還沒發放分潤的案件數（發布新版前的影響評估）。 */
+export async function countUnpaidCases(versionId: string): Promise<number> {
+  const rows = await db.select({ id: compCases.id }).from(compCases)
+    .where(and(
+      eq(compCases.versionId, versionId),
+      inArray(compCases.status, ["open", "closed"]),
+    ));
+  return rows.length;
+}
+
 export async function getCase(id: string): Promise<CaseRecord | null> {
   const r = await db.select().from(compCases).where(eq(compCases.id, id)).limit(1);
   return r[0] ?? null;

@@ -32,6 +32,8 @@ export type MyView = {
   };
   canRecruit: boolean;
   canReceiveLeads: boolean;
+  /** 距離年度結束剩幾天（用來決定提醒的語氣強度） */
+  daysLeftInYear: number;
   payouts: { id: string; period: string; clientName: string; role: string; totalPct: number; amount: number; status: string; trace: string[] }[];
   team: { id: string; name: string; rankCode: string | null; yearCases: number }[];
   events: { id: string; fromCode: string | null; toCode: string | null; reason: string; effectiveAt: string | null; note: string | null }[];
@@ -74,6 +76,8 @@ export default function MyBusiness({ v }: { v: MyView }) {
         <h1 className="text-xl font-bold">我的業務</h1>
         <span className="text-xs text-[#6f869c]">制度版本 {v.versionLabel}</span>
       </div>
+
+      <MaintenanceNotice v={v} />
 
       {/* 頂部三塊 */}
       <div className="grid gap-3 md:grid-cols-3">
@@ -266,6 +270,41 @@ export default function MyBusiness({ v }: { v: MyView }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * 維持資格提醒。年底前兩個月才轉為醒目樣式——
+ * 一整年都在喊「未達標」會被當成背景噪音，等到 1/1 被停資格才吵就太晚了。
+ */
+function MaintenanceNotice({ v }: { v: MyView }) {
+  const m = v.maintenance;
+  if (m.exempt || m.pass) return null;
+
+  const urgent = v.daysLeftInYear <= 62;
+  const gaps: string[] = [];
+  if (!m.execPass && m.needCases !== null) {
+    gaps.push(`還需完成 ${Math.max(0, m.needCases - m.execCases)} 個收費個案`);
+  }
+  if (!m.trainPass && m.needHours !== null) {
+    gaps.push(`還需補 ${Math.max(0, m.needHours - m.trainHours)} 小時訓練`);
+  }
+  if (!gaps.length) return null;
+
+  return (
+    <div className={`rounded-xl px-4 py-3 border ${
+      urgent
+        ? "border-[#e08b7a]/50 bg-[#e08b7a]/10"
+        : "border-[#c99a5b]/40 bg-[#c99a5b]/10"
+    }`}>
+      <div className={`text-sm font-bold ${urgent ? "text-[#e08b7a]" : "text-[#e0bd8b]"}`}>
+        {urgent ? `年度剩 ${v.daysLeftInYear} 天，維持資格尚未達成` : "本年度維持資格尚未達成"}
+      </div>
+      <div className="text-xs text-[#a9bccf] mt-1">
+        {gaps.join("、")}。
+        未達成者自次年度起暫停招募與受派資格；<b>職級不會降級，既有團隊分潤照領</b>。
+      </div>
     </div>
   );
 }

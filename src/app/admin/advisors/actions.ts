@@ -5,12 +5,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import {
-  listAdvisors, listCases, listTrainingRecords, saveMaintenance, setAdvisorRank,
-  toAdvisorRows, toCaseRows,
-} from "@/lib/comp/caseRepo";
-import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
-import { buildOverview } from "@/lib/comp/view";
+import { setAdvisorRank } from "@/lib/comp/caseRepo";
+import { recomputeAll, summarize } from "@/lib/comp/recompute";
 
 export type ActionResult = { ok: true; note?: string } | { ok: false; error: string };
 
@@ -88,79 +84,16 @@ export async function setRankAction(
 }
 
 /**
- * 依制度重算全體顧問的晉升／真除／維持資格，並套用達標者的職級。
- * 這支是「排程要做的事」的手動入口——先讓人按得到、看得到結果，再談自動排程。
+ * 依制度重算全體顧問的晉升／真除／維持資格。
+ * 實作在 lib/comp/recompute.ts —— 與排程走同一支，
+ * 分成兩份的話遲早會出現「手動跑跟排程跑結果不一樣」這種最難查的問題。
  */
 export async function recomputeAllAction(year: number): Promise<ActionResult> {
   try {
     const me = await guard();
-    const version = await ensureActiveVersion();
-    const params = await loadParams(version.id);
-    const [coachRows, caseRows, trainRows] = await Promise.all([
-      listAdvisors(), listCases(), listTrainingRecords(year),
-    ]);
-    const advisors = toAdvisorRows(coachRows);
-    const cases = toCaseRows(caseRows);
-    const today = new Date().toISOString().slice(0, 10);
-
-    const maintRows = [];
-    let promoted = 0;
-    let settled = 0;
-
-    for (const c of coachRows) {
-      if (c.status !== "active") continue;
-      const ov = buildOverview(
-        {
-          id: c.id, name: c.name, rankCode: c.rankCode, uplineId: c.uplineId, sponsorId: c.sponsorId,
-          hireDate: c.hireDate, entryType: c.entryType,
-          tenureRankCode: c.tenureRankCode, tenureUntil: c.tenureUntil,
-          initialCases: c.initialCases, initialFees: c.initialFees,
-          recruitAllowed: c.recruitAllowed, leadAllowed: c.leadAllowed,
-        },
-        {
-          cases, advisors, params, year, today,
-          training: trainRows.filter((t) => t.coachId === c.id),
-        },
-      );
-
-      maintRows.push({
-        coachId: c.id, year,
-        execCases: ov.maintenance.execCases,
-        trainHours: ov.maintenance.trainHours,
-        execPass: ov.maintenance.execPass,
-        trainPass: ov.maintenance.trainPass,
-        exempt: ov.maintenance.exempt,
-        exemptReason: ov.maintenance.exemptReason ?? null,
-      });
-
-      // 真除期滿 → 轉正（含認階）。真除優先於一般晉升。
-      if (ov.tenure.applicable && ov.tenure.expired) {
-        await setAdvisorRank(
-          c.id, ov.tenure.settledCode, "tenure", me.id,
-          ov.tenure.note ?? `真除期滿轉正為 ${ov.tenure.settledCode}`,
-        );
-        await db.update(coaches).set({ tenureRankCode: null, tenureUntil: null })
-          .where(eq(coaches.id, c.id));
-        settled++;
-        continue;
-      }
-
-      if (ov.promotion.canPromote && ov.promotion.nextCode && params.settings.promoManualReview !== true) {
-        await setAdvisorRank(
-          c.id, ov.promotion.nextCode,
-          ov.promotion.track === "B" ? "auto_b" : "auto_a", me.id,
-          `${ov.promotion.track} 軌達標自動晉升`,
-        );
-        promoted++;
-      }
-    }
-
-    await saveMaintenance(maintRows);
+    const r = await recomputeAll(me.id, year);
     touch();
-    return {
-      ok: true,
-      note: `已重算 ${maintRows.length} 位；晉升 ${promoted} 位、真除轉正 ${settled} 位`,
-    };
+    return { ok: true, note: summarize(r) };
   } catch (e) {
     return fail(e);
   }

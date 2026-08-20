@@ -14,9 +14,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TABS, type Field, type TabSpec } from "./spec";
 import {
-  clearAllAction, createVersionAction, loadV4Action, publishVersionAction,
+  clearAllAction, createVersionAction, diffVersionAction, loadV4Action, publishVersionAction,
   saveModulesAction, saveRanksAction, saveSettingsAction, saveThresholdsAction, saveVersionMetaAction,
 } from "./actions";
+import type { Change } from "@/lib/comp/diff";
 import type {
   CompParams, CompSettings, ModuleRow, RankRow, ThresholdKind, ThresholdRow,
 } from "@/lib/comp/types";
@@ -240,7 +241,7 @@ export default function SystemEditor({
         )}
         {spec.custom === "versions" && (
           <VersionsPanel
-            versions={versions} versionId={versionId} pending={pending} run={run}
+            versions={versions} versionId={versionId} pending={pending} run={run} start={start}
           />
         )}
 
@@ -832,18 +833,22 @@ function ThresholdTable({
 /* ────────────────────────── 版本管理 ────────────────────────── */
 
 function VersionsPanel({
-  versions, versionId, pending, run,
+  versions, versionId, pending, run, start,
 }: {
   versions: VersionLite[];
   versionId: string;
   pending: boolean;
   run: (fn: () => Promise<{ ok: boolean; error?: string }>, okText: string) => void;
+  start: (fn: () => void) => void;
 }) {
   const cur = versions.find((v) => v.id === versionId);
+  const active = versions.find((v) => v.status === "active");
   const [name, setName] = useState(cur?.version ?? "");
   const [eff, setEff] = useState(cur?.effectiveFrom ?? "");
   const [note, setNote] = useState(cur?.changeNote ?? "");
   const [newName, setNewName] = useState("");
+  const [diff, setDiff] = useState<{ changes: Change[]; unpaidCases: number } | null>(null);
+  const [diffFor, setDiffFor] = useState<string | null>(null);
 
   const cell = "px-2 py-1.5 border-t border-white/8";
   return (
@@ -869,6 +874,19 @@ function VersionsPanel({
                 </td>
                 <td className={`${cell} text-[#a9bccf] max-w-[280px] truncate`}>{v.changeNote || "—"}</td>
                 <td className={`${cell} text-right whitespace-nowrap`}>
+                  {v.status !== "active" && active && (
+                    <button type="button" disabled={pending} className={`${BTN} mr-1`}
+                      onClick={() => {
+                        setDiff(null);
+                        setDiffFor(v.id);
+                        start(async () => {
+                          const r = await diffVersionAction(v.id, active.id);
+                          if (r.ok && r.data) setDiff(r.data);
+                        });
+                      }}>
+                      與生效版比對
+                    </button>
+                  )}
                   {v.status === "draft" && (
                     <button type="button" disabled={pending} className={BTN}
                       onClick={() => {
@@ -884,6 +902,58 @@ function VersionsPanel({
           </tbody>
         </table>
       </div>
+
+      {diffFor && (
+        <section className="rounded-lg border border-white/10 bg-[#0a2138] p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-bold">
+              「{versions.find((v) => v.id === diffFor)?.version}」與生效版「{active?.version}」的差異
+            </h3>
+            <div className="flex-1" />
+            <button type="button" className="text-xs text-[#a9bccf] underline"
+              onClick={() => { setDiffFor(null); setDiff(null); }}>
+              收合
+            </button>
+          </div>
+          {!diff ? (
+            <p className="text-xs text-[#6f869c]">比對中…</p>
+          ) : diff.changes.length === 0 ? (
+            <p className="text-xs text-[#7fb894]">兩版完全相同，沒有任何差異。</p>
+          ) : (
+            <>
+              <p className="text-xs text-[#e0bd8b] mb-2">
+                共 {diff.changes.length} 項差異。發布後，生效版底下
+                <b> {diff.unpaidCases} </b>
+                筆尚未發放的案件會依新制度重算；已發放的不受影響（§31）。
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-white/10">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-[#12334f] text-[#a9bccf] text-left">
+                      <th className="px-2 py-1.5">分類</th>
+                      <th className="px-2 py-1.5">項目</th>
+                      <th className="px-2 py-1.5">生效版</th>
+                      <th className="px-2 py-1.5">草稿版</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diff.changes.map((c, i) => (
+                      <tr key={i} className="border-t border-white/8">
+                        <td className="px-2 py-1.5 text-[#6f869c]">{c.group}</td>
+                        <td className="px-2 py-1.5">{c.label}</td>
+                        <td className="px-2 py-1.5 text-[#a9bccf]">{c.before}</td>
+                        <td className={`px-2 py-1.5 font-semibold ${
+                          c.kind === "removed" ? "text-[#e08b7a]" : "text-[#7fb894]"
+                        }`}>{c.after}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       <section>
         <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-2">目前版本資訊</h3>

@@ -8,7 +8,7 @@ import { and, eq, like, inArray } from "drizzle-orm";
 import { db } from "../src/Shared/db";
 import {
   coaches, compBatches, compCases, compModules, compPayouts, compRankEvents,
-  compTrainingRecords, compTrainingSessions,
+  compSurveys, compTrainingRecords, compTrainingSessions,
 } from "../src/Shared/db/schema";
 import {
   ensureActiveVersion, loadParams, saveModules, saveRanks, saveSettings, saveThresholds,
@@ -19,6 +19,7 @@ import {
   refundCase, setAdvisorRank,
 } from "../src/lib/comp/caseRepo";
 import { personalStats } from "../src/lib/comp/stats";
+import { submitSurvey } from "../src/lib/comp/survey";
 import type { ThresholdKind } from "../src/lib/comp/types";
 
 const IDS = { chief: "smoke_chief", s2: "smoke_s2", c1: "smoke_c1" };
@@ -35,6 +36,7 @@ async function cleanup() {
     await db.delete(compPayouts).where(inArray(compPayouts.caseId, cs.map((c) => c.id)));
     await db.delete(compCases).where(inArray(compCases.id, cs.map((c) => c.id)));
   }
+  if (cs.length) await db.delete(compSurveys).where(inArray(compSurveys.caseId, cs.map((c) => c.id)));
   await db.delete(compTrainingRecords).where(inArray(compTrainingRecords.coachId, ids));
   await db.delete(compTrainingSessions).where(like(compTrainingSessions.topic, "smoke%"));
   await db.delete(compRankEvents).where(inArray(compRankEvents.coachId, ids));
@@ -182,6 +184,34 @@ async function main() {
   check("重複點名只留一筆", c1rec.length === 1, recs.length);
   check("一般出席 2 小時", c1rec[0]?.hours === 2, c1rec[0]?.hours);
   check("講師加倍 4 小時", s2rec.some((r) => r.kind === "speaker" && r.hours === 4), s2rec);
+
+  // 7b) 問卷：提交即結案，重複提交是更新不是長出第二份
+  {
+    const cS = await createCase({
+      clientName: "smoke問卷", fee: 30_000, executorId: IDS.c1, promoterId: IDS.c1,
+      moduleCode: "SMOKELOW", paidAt: "2026-06-05",
+    });
+    const before = await db.select().from(compCases).where(eq(compCases.id, cS.id));
+    check("未填問卷時案件為 open", before[0].status === "open" && !before[0].surveyAt, before[0].status);
+
+    await submitSurvey({
+      caseId: cS.id, questions: ["Q1", "Q2", "Q3"], answers: ["a", "", "c"],
+      marketingOptIn: true, submittedBy: "client", submitterId: IDS.c1,
+    });
+    const after = await db.select().from(compCases).where(eq(compCases.id, cS.id));
+    check("提交問卷後自動結案並寫入回收日", after[0].status === "closed" && !!after[0].surveyAt, after[0].status);
+
+    const firstDate = after[0].surveyAt;
+    await submitSurvey({
+      caseId: cS.id, questions: ["Q1", "Q2", "Q3"], answers: ["a2", "b2", "c2"],
+      marketingOptIn: false, submittedBy: "coach", submitterId: IDS.chief,
+    });
+    const surveys = await db.select().from(compSurveys).where(eq(compSurveys.caseId, cS.id));
+    const after2 = await db.select().from(compCases).where(eq(compCases.id, cS.id));
+    check("重複提交只有一份問卷（更新而非新增）", surveys.length === 1, surveys.length);
+    check("補答不會把結案日往後推（年度歸屬才不會跳）", after2[0].surveyAt === firstDate, [firstDate, after2[0].surveyAt]);
+    check("最後一次提交的答案與填寫者被記下", (surveys[0].answers as string[])[1] === "b2" && surveys[0].submittedBy === "coach");
+  }
 
   // 8) 職級異動留紀錄
   await setAdvisorRank(IDS.c1, "C2", "manual", IDS.chief, "smoke 測試");

@@ -81,6 +81,9 @@ export default async function MyBusinessPage() {
     },
     canRecruit: ov.canRecruit,
     canReceiveLeads: ov.canReceiveLeads,
+    daysLeftInYear: Math.max(0, Math.ceil(
+      (Date.UTC(year, 11, 31) - Date.parse(today)) / 86_400_000,
+    )),
     payouts: payouts.slice(0, 50).map((p) => {
       const c = caseById.get(p.caseId);
       return {
@@ -122,6 +125,7 @@ export default async function MyBusinessPage() {
         <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
         <span className="text-[#a9bccf] text-xs">我的業務</span>
         <div className="flex-1" />
+        <Link href="/dashboard/handbook" className="text-[#a9bccf] text-sm hover:text-white">制度說明</Link>
         <Link href="/admin/system/simulator" className="text-[#a9bccf] text-sm hover:text-white">分潤試算器</Link>
         <Link href="/dashboard" className="text-[#a9bccf] text-sm hover:text-white">← 回系統</Link>
         <UserButton />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
+import { listClientCases } from "@/lib/comp/survey";
 import { getClientOwnPlan, getClientSetup } from "@/lib/clientPlan";
 import { normalizeIntent } from "@/lib/intent";
 import { wan, ntfmt } from "@/lib/passport";
@@ -19,6 +20,8 @@ export default async function Portal() {
   const own = await getClientOwnPlan(client.id);
   const r = own?.result ?? null;
   const setup = await getClientSetup(client.id);
+  // 待填回饋問卷：制度上問卷回收才算結案，所以這是客戶端的主動提示而不是被動等通知。
+  const pendingSurveys = (await listClientCases(client.id)).filter((c) => !c.surveyAt).length;
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
 
   const rows = r
@@ -49,6 +52,17 @@ export default async function Portal() {
       </header>
 
       <main className="flex-1 px-6 py-12">
+        {pendingSurveys > 0 && (
+          <div className="max-w-2xl mx-auto mb-6 rounded-xl border border-[#c99a5b]/40 bg-[#c99a5b]/10 px-5 py-4 flex flex-wrap items-center gap-3">
+            <span className="text-sm text-[#e0bd8b] flex-1">
+              有 <b>{pendingSurveys}</b> 份服務回饋等你填寫，大約兩分鐘。
+            </span>
+            <Link href="/portal/survey"
+              className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-4 py-2 rounded-lg text-sm">
+              前往填寫
+            </Link>
+          </div>
+        )}
         {r ? (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-8">

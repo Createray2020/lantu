@@ -7,6 +7,8 @@ import {
   saveThresholds, saveVersionMeta,
 } from "@/lib/comp/repo";
 import { mergePreset } from "@/lib/comp/preset";
+import { diffParams, type Change } from "@/lib/comp/diff";
+import { countUnpaidCases } from "@/lib/comp/caseRepo";
 import type { CompSettings, ModuleRow, RankRow, ThresholdKind, ThresholdRow } from "@/lib/comp/types";
 
 export type ActionResult<T = undefined> =
@@ -179,6 +181,27 @@ export async function createVersionAction(input: {
     const v = await createVersion(input);
     touch();
     return { ok: true, data: v.id };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * 與目前生效版比對。
+ * 除了數字差異，也回報「有多少筆未發放的案件會受影響」——
+ * 已發放的不會動（§31 不溯及既往），但未發放的重算後金額就會變，發布前得先知道。
+ */
+export async function diffVersionAction(
+  draftId: string,
+  activeId: string,
+): Promise<ActionResult<{ changes: Change[]; unpaidCases: number }>> {
+  try {
+    await guard();
+    const [a, b] = await Promise.all([loadParams(activeId), loadParams(draftId)]);
+    return {
+      ok: true,
+      data: { changes: diffParams(a, b), unpaidCases: await countUnpaidCases(activeId) },
+    };
   } catch (e) {
     return fail(e);
   }

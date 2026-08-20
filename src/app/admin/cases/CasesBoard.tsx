@@ -6,8 +6,9 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  createBatchAction, createCaseAction, markBatchPaidAction, recalcCaseAction, refundCaseAction,
-  updateCaseAction,
+  confirmImportAction, createBatchAction, createCaseAction, markBatchPaidAction,
+  previewImportAction, recalcCaseAction, refundCaseAction, submitSurveyByCoachAction,
+  updateCaseAction, type ImportPreview,
 } from "./actions";
 
 const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1 text-sm text-[#eef2f7] outline-none";
@@ -27,6 +28,9 @@ export type CaseView = {
   signedAt: string | null; paidAt: string | null; surveyAt: string | null;
   caseYear: number; status: string; note: string | null;
   versionLabel: string;
+  /** 已回收的問卷答案（與制度題目同序）；null＝尚未回收 */
+  surveyAnswers: string[] | null;
+  surveyBy: string | null;
   payouts: PayoutView[];
   balanced: boolean;
 };
@@ -46,12 +50,14 @@ const STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export default function CasesBoard({
-  cases, peers, modules, batches, defaultPeriod, defaultPayoutDate,
+  cases, peers, modules, batches, questions, marketingEnabled, defaultPeriod, defaultPayoutDate,
 }: {
   cases: CaseView[];
   peers: Peer[];
   modules: ModuleOption[];
   batches: BatchView[];
+  questions: string[];
+  marketingEnabled: boolean;
   defaultPeriod: string;
   defaultPayoutDate: string;
 }) {
@@ -59,6 +65,8 @@ export default function CasesBoard({
   const [tab, setTab] = useState<"all" | "open" | "closed" | "paid" | "refunded">("all");
   const [open, setOpen] = useState<string | null>(null);
   const [trace, setTrace] = useState<string | null>(null);
+  const [surveyOf, setSurveyOf] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
   const [form, setForm] = useState({
@@ -220,7 +228,18 @@ export default function CasesBoard({
             {msg.ok ? `${msg.text} ✓` : `失敗：${msg.text}`}
           </span>
         )}
+        <a href="/api/comp/export?kind=cases" className={`${BTN} inline-block`}>匯出案件</a>
+        <button type="button" className={BTN} onClick={() => setImportOpen((o) => !o)}>
+          {importOpen ? "收合匯入" : "批次匯入"}
+        </button>
       </div>
+
+      {importOpen && (
+        <ImportPanel
+          pending={pending}
+          onDone={(text) => { setMsg({ ok: true, text }); setImportOpen(false); router.refresh(); }}
+        />
+      )}
 
       {/* 案件列表 */}
       <div className="overflow-x-auto rounded-xl border border-white/10">
@@ -259,7 +278,11 @@ export default function CasesBoard({
                     </td>
                     <td className="px-3 py-2 text-[#a9bccf]">{c.isCompanyLead ? "公司" : nameOf(c.promoterId)}</td>
                     <td className="px-3 py-2 text-[#a9bccf]">{nameOf(c.executorId)}</td>
-                    <td className="px-3 py-2 text-[#a9bccf]">{c.surveyAt ?? <span className="text-[#c99a5b]">未回收</span>}</td>
+                    <td className="px-3 py-2 text-[#a9bccf]">
+                      {c.surveyAt
+                        ? <>{c.surveyAt}{c.surveyBy === "coach" && <span className="block text-[11px] text-[#6f869c]">顧問代填</span>}</>
+                        : <span className="text-[#c99a5b]">未回收</span>}
+                    </td>
                     <td className="px-3 py-2 text-[#a9bccf]">{c.paidAt ?? <span className="text-[#c99a5b]">未實收</span>}</td>
                     <td className="px-3 py-2">
                       <span className="inline-block px-2 py-0.5 rounded-md text-xs font-bold"
@@ -344,15 +367,10 @@ export default function CasesBoard({
                             onClick={() => run(() => recalcCaseAction(c.id), "已重算分潤")}>
                             重算分潤
                           </button>
-                          {!c.surveyAt && (
-                            <button type="button" disabled={pending} className={BTN}
-                              onClick={() => run(
-                                () => updateCaseAction(c.id, { surveyAt: new Date().toISOString().slice(0, 10) }),
-                                "已標記問卷回收（結案）",
-                              )}>
-                              標記問卷回收
-                            </button>
-                          )}
+                          <button type="button" disabled={pending} className={BTN}
+                            onClick={() => setSurveyOf(surveyOf === c.id ? null : c.id)}>
+                            {c.surveyAt ? "檢視問卷" : "代填問卷"}
+                          </button>
                           {!c.paidAt && (
                             <button type="button" disabled={pending} className={BTN}
                               onClick={() => run(
@@ -365,6 +383,19 @@ export default function CasesBoard({
                           <RefundBox caseId={c.id} fee={c.fee} disabled={pending}
                             onRefund={(amt) => run(() => refundCaseAction(c.id, amt), "已依實收重算分潤")} />
                         </div>
+
+                        {surveyOf === c.id && (
+                          <CoachSurvey
+                            c={c} questions={questions} marketingEnabled={marketingEnabled}
+                            disabled={pending}
+                            onSubmit={(answers, optIn) => run(
+                              () => submitSurveyByCoachAction({
+                                caseId: c.id, questions, answers, marketingOptIn: optIn,
+                              }),
+                              "問卷已存（案件結案）",
+                            )}
+                          />
+                        )}
                       </td>
                     </tr>
                   )}
@@ -415,7 +446,11 @@ export default function CasesBoard({
                       {b.status === "paid" ? "已發放" : "待發放"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <a href={`/api/comp/export?kind=batch&batchId=${b.id}`}
+                      className={`${BTN} mr-1 inline-block`}>
+                      匯出清冊
+                    </a>
                     {b.status !== "paid" && (
                       <button type="button" disabled={pending} className={BTN}
                         onClick={() => {
@@ -435,6 +470,153 @@ export default function CasesBoard({
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ImportPanel({
+  pending, onDone,
+}: {
+  pending: boolean;
+  onDone: (note: string) => void;
+}) {
+  const [csv, setCsv] = useState("");
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [busy, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+
+  const okCount = preview?.rows.filter((r) => r.ok).length ?? 0;
+  const badCount = (preview?.rows.length ?? 0) - okCount;
+  const disabled = pending || busy;
+
+  async function readFile(f: File) {
+    setErr(null);
+    setPreview(null);
+    const text = await f.text();
+    setCsv(text);
+    start(async () => {
+      const r = await previewImportAction(text);
+      if (r.ok) setPreview(r.data);
+      else setErr(r.error);
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4">
+      <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-1">批次匯入案件</h3>
+      <p className="text-xs text-[#7f9ab2] mb-3">
+        顧問以 Email 對應（姓名會重複、內部 id 不適合手填）。上傳後會先預覽，確認才寫入；
+        有問題的列會標出來且不會被匯入。日期可用 YYYY-MM-DD 或民國年。
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <a href="/api/comp/export?kind=template" className={BTN}>下載範本</a>
+        <input type="file" accept=".csv,text/csv" disabled={disabled}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) readFile(f); }}
+          className="text-xs text-[#a9bccf] file:mr-2 file:rounded-lg file:border file:border-white/15 file:bg-transparent file:px-3 file:py-1.5 file:text-[#a9bccf]" />
+        {busy && <span className="text-xs text-[#a9bccf]">解析中…</span>}
+      </div>
+
+      {err && <p className="mt-2 text-sm text-[#e08b7a]">{err}</p>}
+
+      {preview?.missingHeaders.length ? (
+        <p className="mt-3 text-sm text-[#e08b7a]">
+          缺少欄位：{preview.missingHeaders.join("、")}。請用範本的表頭。
+        </p>
+      ) : null}
+
+      {preview && preview.rows.length > 0 && (
+        <>
+          <p className="mt-3 text-xs text-[#a9bccf]">
+            共 {preview.rows.length} 列：可匯入 <b className="text-[#7fb894]">{okCount}</b> 筆
+            {badCount > 0 && <>，<b className="text-[#e08b7a]">{badCount}</b> 筆有問題（不會匯入）</>}
+          </p>
+          <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-white/10">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-[#12334f] text-[#a9bccf] text-left">
+                <tr>
+                  <th className="px-2 py-1.5">列</th><th className="px-2 py-1.5">客戶</th>
+                  <th className="px-2 py-1.5">服務模塊</th><th className="px-2 py-1.5">顧問費</th>
+                  <th className="px-2 py-1.5">推廣者</th><th className="px-2 py-1.5">執案者</th>
+                  <th className="px-2 py-1.5">簽約日</th><th className="px-2 py-1.5">狀態</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.rows.map((r) => (
+                  <tr key={r.line} className={`border-t border-white/8 ${r.ok ? "" : "bg-[#e08b7a]/10"}`}>
+                    <td className="px-2 py-1.5 text-[#6f869c]">{r.line}</td>
+                    <td className="px-2 py-1.5">{r.display.clientName}</td>
+                    <td className="px-2 py-1.5">{r.display.moduleName}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">{r.display.fee}</td>
+                    <td className="px-2 py-1.5">{r.display.promoter}</td>
+                    <td className="px-2 py-1.5">{r.display.executor}</td>
+                    <td className="px-2 py-1.5">{r.display.signedAt}</td>
+                    <td className="px-2 py-1.5">
+                      {r.ok
+                        ? <span className="text-[#7fb894]">可匯入</span>
+                        : <span className="text-[#e08b7a]">{r.errors.join("；")}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" disabled={disabled || okCount === 0} className={`${BTN_SOLID} mt-3`}
+            onClick={() => start(async () => {
+              const r = await confirmImportAction(csv);
+              if (r.ok) onDone(r.note);
+              else setErr(r.error);
+            })}>
+            {busy ? "匯入中…" : `確認匯入 ${okCount} 筆`}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CoachSurvey({
+  c, questions, marketingEnabled, disabled, onSubmit,
+}: {
+  c: CaseView;
+  questions: string[];
+  marketingEnabled: boolean;
+  disabled: boolean;
+  onSubmit: (answers: string[], optIn: boolean) => void;
+}) {
+  const [answers, setAnswers] = useState<string[]>(
+    questions.map((_, i) => c.surveyAnswers?.[i] ?? ""),
+  );
+  const [optIn, setOptIn] = useState(false);
+  const filled = answers.some((a) => a.trim());
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/10 bg-[#0d2b45] p-3">
+      <div className="text-sm font-bold mb-1">回饋問卷{c.surveyAt ? `（已於 ${c.surveyAt} 回收）` : "・代填"}</div>
+      <p className="text-xs text-[#7f9ab2] mb-3">
+        優先請客戶自己在客戶端填寫；這裡是客戶不方便自填、或案件沒掛 CRM 客戶時的備援，
+        送出後會標記為「顧問代填」。
+      </p>
+      <div className="space-y-2">
+        {questions.map((q, i) => (
+          <label key={i} className="block">
+            <span className="block text-xs text-[#cfdcea] mb-0.5">{i + 1}. {q}</span>
+            <textarea rows={2} value={answers[i] ?? ""} disabled={disabled}
+              onChange={(e) => setAnswers((a) => a.map((x, k) => (k === i ? e.target.value : x)))}
+              className={`${answers[i] ? INPUT : EMPTY} w-full leading-relaxed`} />
+          </label>
+        ))}
+      </div>
+      {marketingEnabled && (
+        <label className="flex items-center gap-2 mt-2 text-xs text-[#a9bccf]">
+          <input type="checkbox" checked={optIn} disabled={disabled}
+            onChange={(e) => setOptIn(e.target.checked)} className="h-4 w-4 accent-[#2b7cb5]" />
+          客戶已同意作為見證素材
+        </label>
+      )}
+      <button type="button" disabled={disabled || !filled} className={`${BTN_SOLID} mt-3`}
+        onClick={() => onSubmit(answers, optIn)}>
+        存檔並結案
+      </button>
     </div>
   );
 }
