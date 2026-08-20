@@ -9,6 +9,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { saveMyProfileAction } from "./actions";
+import PhotoCropper, { type CropSource } from "./PhotoCropper";
 
 const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1.5 text-sm text-[#eef2f7] outline-none focus:border-[#c99a5b]";
 const EMPTY = "bg-[#0d2b45] border border-dashed border-[#3d5b78] rounded px-2 py-1.5 text-sm text-[#8fa6ba] outline-none focus:border-[#c99a5b]";
@@ -30,42 +31,24 @@ export type ProfileForm = {
   areas: string[];
 };
 
-function loadImage(file: File): Promise<HTMLImageElement> {
+/** 讀成 dataURL 再建 Image，裁切期間都用同一個 src，不必管 objectURL 的回收時機。 */
+function loadImage(file: File): Promise<CropSource> {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("圖片讀取失敗")); };
-    img.src = url;
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error("圖片讀取失敗"));
+    fr.onload = () => {
+      const url = String(fr.result);
+      const img = new Image();
+      img.onload = () => resolve({
+        url, img,
+        w: img.naturalWidth || img.width,
+        h: img.naturalHeight || img.height,
+      });
+      img.onerror = () => reject(new Error("圖片讀取失敗"));
+      img.src = url;
+    };
+    fr.readAsDataURL(file);
   });
-}
-
-/**
- * 裁成正方形（取中央）並縮到 400px，JPEG 逐步降品質直到 ≤300KB。
- * 存的是 dataURL 進 DB，所以壓縮是必要的而不是加分項——
- * 這些 base64 會跟著公開列表一起送到每個訪客的瀏覽器。
- */
-async function toSquareDataUrl(file: File): Promise<string> {
-  const img = await loadImage(file);
-  const w = img.naturalWidth || img.width;
-  const h = img.naturalHeight || img.height;
-  const side = Math.min(w, h);
-  const sx = (w - side) / 2;
-  const sy = (h - side) / 2;
-  const size = 400;
-  const c = document.createElement("canvas");
-  c.width = size;
-  c.height = size;
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#0d2b45";
-  ctx.fillRect(0, 0, size, size);
-  ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
-
-  for (const q of [0.82, 0.7, 0.6, 0.5, 0.4]) {
-    const url = c.toDataURL("image/jpeg", q);
-    if (url.length <= 300_000) return url;
-  }
-  throw new Error("照片壓縮後仍過大，請換一張");
 }
 
 export default function ProfileEditor({
@@ -81,6 +64,7 @@ export default function ProfileEditor({
   const [f, setF] = useState<ProfileForm>(initial);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
+  const [crop, setCrop] = useState<CropSource | null>(null);
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -102,7 +86,7 @@ export default function ProfileEditor({
     if (!ACCEPT.includes(file.type)) { setPhotoErr("格式僅接受 PNG／JPG／WebP"); return; }
     if (file.size > MAX_FILE) { setPhotoErr("原始檔太大（上限 8MB）"); return; }
     try {
-      set("photoUrl", await toSquareDataUrl(file));
+      setCrop(await loadImage(file));
     } catch (err) {
       setPhotoErr(err instanceof Error ? err.message : "照片處理失敗");
     } finally {
@@ -127,6 +111,13 @@ export default function ProfileEditor({
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+      {crop && (
+        <PhotoCropper
+          src={crop}
+          onCancel={() => setCrop(null)}
+          onDone={(url) => { set("photoUrl", url); setCrop(null); }}
+        />
+      )}
       {/* 編輯 */}
       <div className="space-y-4">
         {!published && (
@@ -151,7 +142,7 @@ export default function ProfileEditor({
                 onChange={onPickPhoto}
                 className="text-xs text-[#a9bccf] file:mr-2 file:rounded-lg file:border file:border-white/15 file:bg-transparent file:px-3 file:py-1.5 file:text-[#a9bccf]" />
               <p className="text-[11px] text-[#6f869c]">
-                會自動裁成正方形並壓縮。清楚的正面照最有效。
+                選好照片後可以拖曳、縮放決定要框哪一塊，再裁成正方形壓縮。清楚的正面照最有效。
               </p>
               {f.photoUrl && (
                 <button type="button" className={BTN} disabled={pending}
