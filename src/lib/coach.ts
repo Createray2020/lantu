@@ -2,9 +2,9 @@
 // Clerk 負責「你是誰」；這裡負責「你能不能用」（coaches 表的 role/status）。
 import { cache } from "react";
 import { currentUser } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { coaches } from "@/Shared/db/schema";
+import { coaches, clients, compCases } from "@/Shared/db/schema";
 
 export type Coach = typeof coaches.$inferSelect;
 
@@ -141,4 +141,81 @@ export async function setCoachOrg(id: string, orgRank: string, uplineId: string 
   }
   await db.update(coaches).set({ orgRank, uplineId }).where(eq(coaches.id, id));
   return { ok: true as const };
+}
+
+// ── 教練離職／移除 ────────────────────────────────────────────────
+// 「移除帳號」是給誤建帳號用的稀有動作；正常離職一律走停權（setCoachStatus('suspended')），
+// 停權不動任何資料。移除之前必須把兩件事清乾淨，否則資料庫的 RESTRICT 也會擋下來：
+//   clients   —— 客戶與規劃是公司資產，要先轉移給接手教練
+//   compCases —— 分潤案件是財務紀錄，一旦有過就不可移除（只能停權）
+
+export type CoachWorkload = { clients: number; cases: number };
+
+// 一次算出所有教練的「名下客戶數 / 分潤案件數」，給 /admin 列表用。
+// 不逐列查：教練數會長，逐列查就是 N+1。
+export async function coachWorkloads(): Promise<Record<string, CoachWorkload>> {
+  const [cl, cs] = await Promise.all([
+    db.select({ id: clients.coachId, n: count() }).from(clients).groupBy(clients.coachId),
+    db.select({ id: compCases.executorId, n: count() }).from(compCases).groupBy(compCases.executorId),
+  ]);
+  const out: Record<string, CoachWorkload> = {};
+  for (const r of cl) {
+    if (!r.id) continue; // coachId 為 null＝自助客戶，不屬於任何教練
+    out[r.id] = { clients: Number(r.n), cases: 0 };
+  }
+  for (const r of cs) {
+    if (!r.id) continue;
+    out[r.id] = { clients: out[r.id]?.clients ?? 0, cases: Number(r.n) };
+  }
+  return out;
+}
+
+export async function coachWorkload(coachId: string): Promise<CoachWorkload> {
+  const [cl, cs] = await Promise.all([
+    db.select({ n: count() }).from(clients).where(eq(clients.coachId, coachId)),
+    db.select({ n: count() }).from(compCases).where(eq(compCases.executorId, coachId)),
+  ]);
+  return { clients: Number(cl[0]?.n ?? 0), cases: Number(cs[0]?.n ?? 0) };
+}
+
+// 把 from 名下的客戶整批轉給 to。只動 clients.coachId ——
+// 刻意不碰 compCases.executorId：改掉「誰執行了這個案子」會竄改已發分潤與晉升指標的依據。
+export async function transferClients(
+  fromCoachId: string,
+  toCoachId: string,
+): Promise<{ ok: true; moved: number } | { ok: false; error: string }> {
+  if (fromCoachId === toCoachId) return { ok: false, error: "接手教練不能是同一人" };
+  const to = await db.select().from(coaches).where(eq(coaches.id, toCoachId)).limit(1);
+  if (!to[0]) return { ok: false, error: "找不到接手教練" };
+  if (to[0].status !== "active") return { ok: false, error: "接手教練必須是已開通狀態" };
+
+  const moved = await db
+    .update(clients)
+    .set({ coachId: toCoachId, updatedAt: new Date() })
+    .where(eq(clients.coachId, fromCoachId))
+    .returning({ id: clients.id });
+  return { ok: true, moved: moved.length };
+}
+
+// 移除教練帳號。名下還有客戶或有任何分潤案件都拒絕 ——
+// DB 的 RESTRICT 是最後一道，這裡先擋是為了給得出人看得懂的理由。
+export async function removeCoach(
+  id: string,
+  operatorId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (id === operatorId) return { ok: false, error: "不能移除自己的帳號" };
+  const rows = await db.select().from(coaches).where(eq(coaches.id, id)).limit(1);
+  if (!rows[0]) return { ok: false, error: "找不到這個教練帳號" };
+
+  const w = await coachWorkload(id);
+  if (w.cases > 0) {
+    return { ok: false, error: `有 ${w.cases} 筆案件分潤紀錄，依稽核不可移除，請改用停權` };
+  }
+  if (w.clients > 0) {
+    return { ok: false, error: `名下還有 ${w.clients} 位客戶，請先轉移給接手教練` };
+  }
+
+  // 下線的 upline_id 是 SET NULL，會自己斷開；其餘 CASCADE 的都是這位教練自己的資料。
+  await db.delete(coaches).where(eq(coaches.id, id));
+  return { ok: true };
 }

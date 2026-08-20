@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { ensureCoach, isAdmin, listCoaches } from "@/lib/coach";
+import { ensureCoach, isAdmin, listCoaches, coachWorkloads } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
 import BrandSettings from "./BrandSettings";
 import OrgCell from "./OrgCell";
 import StatusActions from "./StatusActions";
+import RemoveCoach from "./RemoveCoach";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,12 @@ export default async function Admin() {
   const pending = coaches.filter((c) => c.status === "pending").length;
   const brand = await getBrand();
   const peers = coaches.map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
+  // 名下客戶／分潤案件數：一次撈完（逐列查就是 N+1）。移除帳號的兩道門檻都看它。
+  const workloads = await coachWorkloads();
+  // 接手候選人只列已開通的教練，且不能是自己。
+  const activePeers = coaches
+    .filter((c) => c.status === "active")
+    .map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
 
   return (
     <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
@@ -148,7 +155,16 @@ export default async function Admin() {
                         // 舊版是所有 admin 都不給操作 → 一旦某人成為 admin 就再也停不了權。
                         <span className="text-[#6f869c] text-xs block text-right">本人</span>
                       ) : (
-                        <StatusActions id={c.id} status={c.status} />
+                        <div className="flex flex-col items-end gap-1">
+                          <StatusActions id={c.id} status={c.status} />
+                          <RemoveCoach
+                            id={c.id}
+                            name={c.name || c.email || c.id}
+                            clientCount={workloads[c.id]?.clients ?? 0}
+                            caseCount={workloads[c.id]?.cases ?? 0}
+                            candidates={activePeers.filter((p) => p.id !== c.id)}
+                          />
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -166,7 +182,8 @@ export default async function Admin() {
         </div>
 
         <p className="mt-4 text-xs text-[#6f869c]">
-          運作方式：教練用 Google／Email 註冊後為「待審核」，無法進入系統；你在此按「核准開通」（確認收款後）即可啟用。停權可隨時收回存取。
+          運作方式：教練用 Google／Email 註冊後為「待審核」，無法進入系統；你在此按「核准開通」（確認收款後）即可啟用。停權可隨時收回存取，且不動任何資料 —— 離職請用停權。
+          「移除帳號」只給誤建的空帳號用：名下還有客戶要先轉移給接手教練，有過分潤案件的一律不可移除。
         </p>
 
         <BrandSettings currentLogo={brand.logoUrl} />

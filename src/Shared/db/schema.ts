@@ -72,7 +72,11 @@ export const clients = pgTable('clients', {
   id: uuid('id').defaultRandom().primaryKey(),
   // 教練建立的客戶：coachId 有值。自助客戶（人生護照）：coachId 為 null、clientUserId 指向登入帳號，
   // 待客戶授權／掛上教練後，coachId 才會被設上（＝「真的進入規劃」）。
-  coachId: text('coach_id').references(() => coaches.id, { onDelete: 'cascade' }),
+  //
+  // RESTRICT 不是 CASCADE：客戶與他們的規劃是公司資產，不能因為刪掉一位教練就整批消失
+  // （而且 UI 上完全看不出來發生了什麼）。要移除教練必須先把客戶轉移給接手人，
+  // 見 lib/coach.ts 的 transferClients()／removeCoach()。
+  coachId: text('coach_id').references(() => coaches.id, { onDelete: 'restrict' }),
   clientUserId: text('client_user_id').references(() => clientUsers.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   contact: jsonb('contact').$type<{ phone?: string; email?: string; line?: string }>().default({}),
@@ -395,7 +399,9 @@ export const compCases = pgTable('comp_cases', {
   fee: bigint('fee', { mode: 'number' }).default(0).notNull(),
   isCompanyLead: boolean('is_company_lead').default(false).notNull(),
   promoterId: text('promoter_id').references(() => coaches.id, { onDelete: 'set null' }),
-  executorId: text('executor_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  // RESTRICT：分潤案件是財務紀錄，稽核上不可因刪帳號而消失。
+  // 意即「曾經有過任何一筆案件的教練只能停權，不能移除」——這是刻意的。
+  executorId: text('executor_id').notNull().references(() => coaches.id, { onDelete: 'restrict' }),
   signedAt: date('signed_at'),
   paidAt: date('paid_at'),          // 公司實際收訖日（未收訖不發分潤）
   surveyAt: date('survey_at'),      // 回饋問卷回收日（結案要件）

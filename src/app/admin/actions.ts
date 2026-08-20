@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg } from "@/lib/coach";
+import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg, transferClients, removeCoach } from "@/lib/coach";
 import { saveBrand } from "@/lib/brand";
 
 // 後台動作的統一回傳型別：讓 client 端能顯示「已儲存 / 失敗原因」，
@@ -84,6 +84,38 @@ export async function suspendCoach(id: string) {
 
 export async function resetCoach(id: string) {
   return setStatus(id, "pending");
+}
+
+// 把某位教練名下的客戶整批轉給接手教練（移除帳號前的必要步驟）。
+export async function transferClientsAction(
+  fromId: string,
+  toId: string,
+): Promise<ActionResult & { moved?: number }> {
+  try {
+    await guard();
+    const r = await transferClients(fromId, toId);
+    if (!r.ok) return { ok: false, error: r.error };
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clients");
+    return { ok: true, moved: r.moved };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// 移除教練帳號。名下有客戶或有分潤案件都會被擋（正常離職請用停權）。
+export async function removeCoachAction(id: string): Promise<ActionResult> {
+  try {
+    const me = await guard();
+    const r = await removeCoach(id, me.id);
+    if (!r.ok) return { ok: false, error: r.error };
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 // 上傳／替換全組織品牌 Logo（logoUrl＝橫式、iconUrl＝方形），寫到 owner 那一列。
