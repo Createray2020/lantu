@@ -550,3 +550,33 @@ export const compSurveys = pgTable('comp_surveys', {
   // 一案一份 —— 重複提交是更新而不是長出第二份，否則「哪一份才算結案」沒有答案。
   uniqueIndex('comp_surveys_case_id_uidx').on(t.caseId),
 ]);
+
+
+// 教練公開檔案（教練自填，展示於官網 /coaches 與客戶選教練流程）。
+//
+// 為什麼獨立一張表而不是塞進 coaches：coaches 已經很寬，
+// 而且這裡的欄位性質完全不同 —— 那是帳號與制度，這是「對外的自我介紹」。
+// 一位教練一份（coachId 當主鍵）。
+//
+// specialties 同時服務兩處：客戶選教練時的篩選，以及公司派案的候選排序。
+// 清單本身在制度設定（settings.specialties），這裡存的是勾選結果。
+//
+// published：由**管理員**控制的下架開關（不是教練自選），預設公開。
+// 未填檔案的教練不會出現在公開列表 —— 只有姓名的卡片對客戶沒有意義。
+export const coachProfiles = pgTable('coach_profiles', {
+  coachId: text('coach_id').primaryKey().references(() => coaches.id, { onDelete: 'cascade' }),
+  headline: text('headline'),                  // 一句話標語
+  bio: text('bio'),                            // 自我介紹
+  specialties: text('specialties').array().default([]).notNull(),
+  photoUrl: text('photo_url'),                 // 正方形大頭照（dataURL，前端壓過）
+  yearsExp: integer('years_exp'),
+  prevRole: text('prev_role'),                 // 前一份工作／背景
+  credentials: text('credentials').array().default([]).notNull(),  // CFP／AFP…
+  serviceModes: text('service_modes').array().default([]).notNull(), // 線上／實體
+  areas: text('areas').array().default([]).notNull(),                // 服務地區
+  published: boolean('published').default(true).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 公開列表只撈上架的；未上架的不該進入客戶視野。
+  index('coach_profiles_published_idx').on(t.published),
+]);

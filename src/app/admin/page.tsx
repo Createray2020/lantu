@@ -34,13 +34,11 @@ export default async function Admin() {
   return (
     <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
       <header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]">
-        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          {brand.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
-          )}
-          <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
-        </Link>
+        {brand.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
+        )}
+        <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
         <span className="text-[#a9bccf] text-xs">教練管理後台</span>
         <div className="flex-1" />
         <Link href="/dashboard" className="text-[#a9bccf] text-sm hover:text-white">
@@ -80,6 +78,12 @@ export default async function Admin() {
             className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
           >
             訓練時數 →
+          </Link>
+          <Link
+            href="/admin/profiles"
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
+          >
+            教練公開檔案 →
           </Link>
         </div>
 

@@ -1,0 +1,148 @@
+// 教練公開檔案：讀寫與公開查詢。
+//
+// 公開面（官網 /coaches、客戶選教練）與內部面（教練自填、管理員下架）走同一份資料，
+// 差別只在「哪些欄位對外送出」——email、電話這類聯絡資訊永遠不會出現在公開查詢裡。
+
+import { and, asc, eq } from "drizzle-orm";
+import { db } from "@/Shared/db";
+import { coaches, coachProfiles } from "@/Shared/db/schema";
+
+export type ProfileRow = typeof coachProfiles.$inferSelect;
+
+/** 對外送出的教練卡片。刻意不含 email／電話／制度職級。 */
+export type PublicCoach = {
+  id: string;
+  name: string;
+  title: string | null;
+  headline: string | null;
+  bio: string | null;
+  specialties: string[];
+  photoUrl: string | null;
+  yearsExp: number | null;
+  prevRole: string | null;
+  credentials: string[];
+  serviceModes: string[];
+  areas: string[];
+};
+
+export type ProfileInput = {
+  headline?: string | null;
+  bio?: string | null;
+  specialties?: string[];
+  photoUrl?: string | null;
+  yearsExp?: number | null;
+  prevRole?: string | null;
+  credentials?: string[];
+  serviceModes?: string[];
+  areas?: string[];
+};
+
+export async function getProfile(coachId: string): Promise<ProfileRow | null> {
+  const r = await db.select().from(coachProfiles)
+    .where(eq(coachProfiles.coachId, coachId)).limit(1);
+  return r[0] ?? null;
+}
+
+export async function saveProfile(coachId: string, input: ProfileInput) {
+  const values = {
+    coachId,
+    headline: input.headline?.trim() || null,
+    bio: input.bio?.trim() || null,
+    specialties: input.specialties ?? [],
+    photoUrl: input.photoUrl ?? null,
+    yearsExp: input.yearsExp ?? null,
+    prevRole: input.prevRole?.trim() || null,
+    credentials: input.credentials ?? [],
+    serviceModes: input.serviceModes ?? [],
+    areas: input.areas ?? [],
+    updatedAt: new Date(),
+  };
+  await db.insert(coachProfiles).values(values).onConflictDoUpdate({
+    target: coachProfiles.coachId,
+    // published 不在這裡動 —— 那是管理員的下架開關，教練存檔不該把自己重新上架。
+    set: {
+      headline: values.headline, bio: values.bio, specialties: values.specialties,
+      photoUrl: values.photoUrl, yearsExp: values.yearsExp, prevRole: values.prevRole,
+      credentials: values.credentials, serviceModes: values.serviceModes, areas: values.areas,
+      updatedAt: values.updatedAt,
+    },
+  });
+}
+
+export async function setPublished(coachId: string, published: boolean) {
+  await db.update(coachProfiles).set({ published })
+    .where(eq(coachProfiles.coachId, coachId));
+}
+
+function toPublic(row: {
+  id: string; name: string | null; title: string | null; p: ProfileRow | null;
+}): PublicCoach {
+  return {
+    id: row.id,
+    name: row.name || "教練",
+    title: row.title,
+    headline: row.p?.headline ?? null,
+    bio: row.p?.bio ?? null,
+    specialties: row.p?.specialties ?? [],
+    photoUrl: row.p?.photoUrl ?? null,
+    yearsExp: row.p?.yearsExp ?? null,
+    prevRole: row.p?.prevRole ?? null,
+    credentials: row.p?.credentials ?? [],
+    serviceModes: row.p?.serviceModes ?? [],
+    areas: row.p?.areas ?? [],
+  };
+}
+
+/**
+ * 官網公開列表。
+ * 條件：帳號已開通 ＋ 有檔案 ＋ 未被下架。
+ * 「有檔案」是刻意的門檻——只有姓名的卡片對客戶沒有任何判斷價值，
+ * 放上去只會讓整頁看起來像沒做完。
+ */
+export async function listPublicCoaches(): Promise<PublicCoach[]> {
+  const rows = await db
+    .select({
+      id: coaches.id, name: coaches.name, title: coaches.title, p: coachProfiles,
+    })
+    .from(coaches)
+    .innerJoin(coachProfiles, eq(coaches.id, coachProfiles.coachId))
+    .where(and(eq(coaches.status, "active"), eq(coachProfiles.published, true)))
+    .orderBy(asc(coaches.createdAt));
+  return rows.map(toPublic);
+}
+
+export async function getPublicCoach(coachId: string): Promise<PublicCoach | null> {
+  const rows = await db
+    .select({ id: coaches.id, name: coaches.name, title: coaches.title, p: coachProfiles })
+    .from(coaches)
+    .innerJoin(coachProfiles, eq(coaches.id, coachProfiles.coachId))
+    .where(and(
+      eq(coaches.id, coachId),
+      eq(coaches.status, "active"),
+      eq(coachProfiles.published, true),
+    ))
+    .limit(1);
+  return rows[0] ? toPublic(rows[0]) : null;
+}
+
+/** 後台用：所有已開通教練＋其檔案（含未填、含已下架），供管理員檢視與下架。 */
+export async function listAllProfiles() {
+  return db
+    .select({
+      id: coaches.id, name: coaches.name, email: coaches.email,
+      title: coaches.title, status: coaches.status, p: coachProfiles,
+    })
+    .from(coaches)
+    .leftJoin(coachProfiles, eq(coaches.id, coachProfiles.coachId))
+    .orderBy(asc(coaches.createdAt));
+}
+
+/** 派案候選排序會用到：一次撈所有教練的專長。 */
+export async function specialtiesByCoach(): Promise<Map<string, string[]>> {
+  const rows = await db
+    .select({ coachId: coachProfiles.coachId, specialties: coachProfiles.specialties })
+    .from(coachProfiles);
+  return new Map(rows.map((r) => [r.coachId, r.specialties ?? []]));
+}
+
+export const SERVICE_MODES = ["線上", "實體"] as const;

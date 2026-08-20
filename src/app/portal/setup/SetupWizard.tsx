@@ -7,7 +7,7 @@ import type { ClientBasics } from "@/lib/clientPlan";
 import type { ActiveCoach, LinkStatus } from "@/lib/coachLink";
 import { normalizeIntent, defaultIntent, type Intent } from "@/lib/intent";
 import IntentPicker from "./IntentPicker";
-import { saveSetupAction, requestCoachAction, revokeCoachAction } from "./actions";
+import { saveSetupAction, revokeCoachAction } from "./actions";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -38,7 +38,6 @@ export default function SetupWizard({
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const [localLink, setLocalLink] = useState<LinkStatus>(link);
-  const [selCoach, setSelCoach] = useState<string>("");
   const [reqStatus, setReqStatus] = useState<"idle" | "sending" | "error">("idle");
   const [reqErr, setReqErr] = useState<string | null>(null);
 
@@ -57,25 +56,12 @@ export default function SetupWizard({
     } catch (e) { setSaveStatus("error"); setSaveErr(e instanceof Error ? e.message : "儲存失敗"); }
   }
 
-  async function onRequestCoach() {
-    if (!selCoach) return;
-    setReqStatus("sending"); setReqErr(null);
-    try {
-      const res = await requestCoachAction(selCoach);
-      if (res.ok) {
-        const co = coaches.find((x) => x.id === selCoach);
-        setLocalLink({ state: "pending", coachName: co?.name ?? null });
-        setReqStatus("idle");
-      } else { setReqStatus("error"); setReqErr(res.error || "送出失敗"); }
-    } catch (e) { setReqStatus("error"); setReqErr(e instanceof Error ? e.message : "送出失敗"); }
-  }
-
   async function onRevoke() {
     if (!confirm("確定要解除與教練的連結嗎？")) return;
     setReqStatus("sending"); setReqErr(null);
     try {
       const res = await revokeCoachAction();
-      if (res.ok) { setLocalLink({ state: "none" }); setSelCoach(""); setReqStatus("idle"); }
+      if (res.ok) { setLocalLink({ state: "none" }); setReqStatus("idle"); }
       else { setReqStatus("error"); setReqErr(res.error || "解除失敗"); }
     } catch (e) { setReqStatus("error"); setReqErr(e instanceof Error ? e.message : "解除失敗"); }
   }
@@ -179,28 +165,19 @@ export default function SetupWizard({
           </div>
         ) : (
           <>
-            <p className="text-[11px] text-[#6f869c] mb-4">選一位教練送出邀請，對方接受後就會和你一起規劃。</p>
-            {coaches.length === 0 ? (
-              <p className="text-[#a7bacb] text-sm">目前沒有可選的教練。</p>
-            ) : (
-              <div className="space-y-2">
-                {coaches.map((co) => (
-                  <label key={co.id} className={`flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer ${selCoach === co.id ? "border-[#c99a5b] bg-[#0d2b45]" : "border-white/10 hover:border-white/25"}`}>
-                    <input type="radio" name="coach" className="accent-[#c99a5b]" checked={selCoach === co.id} onChange={() => setSelCoach(co.id)} />
-                    <span className="flex-1">
-                      <span className="text-[#eef2f7]">{co.name || "教練"}</span>
-                      {co.title ? <span className="text-[#a7bacb] text-xs ml-2">{co.title}</span> : null}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            <div className="mt-5 flex items-center gap-3">
-              <button onClick={onRequestCoach} disabled={!selCoach || reqStatus === "sending"}
-                className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] disabled:opacity-50 px-6 py-2.5 rounded-lg">
-                {reqStatus === "sending" ? "送出中…" : "送出連結申請"}
-              </button>
-              {reqStatus === "error" && <span className="text-[#ff9b9b] text-sm">⚠ {reqErr}</span>}
+            {/* 選教練改到官網教練頁進行：那裡有每位教練自己寫的介紹、專長與服務方式，
+                比一排只有姓名的選項有判斷依據得多。連結關係仍是雙向確認，沒有變。 */}
+            <p className="text-[11px] text-[#6f869c] mb-4">
+              先看看每位教練的專長與自我介紹，挑一位合得來的送出邀請，對方接受後就會和你一起規劃。
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/coaches"
+                className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg">
+                瀏覽教練並選擇 →
+              </Link>
+              <span className="text-[11px] text-[#6f869c]">
+                目前有 {coaches.length} 位教練
+              </span>
             </div>
           </>
         )}

@@ -12,6 +12,7 @@ const isPublicRoute = createRouteMatcher([
   // 客戶端頁面：middleware 不強制導向（會導到教練 /sign-in）；改由頁面內 ensureClientUser
   // 自行守門並導向 /client/sign-in，避免客戶被丟到教練登入。
   '/portal(.*)',
+  '/coaches(.*)', // 官網公開教練頁：訪客要看得到，才有對外招客的意義
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀
   // Vercel Cron：帶的是 Bearer CRON_SECRET 不是 Clerk session，
