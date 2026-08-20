@@ -43,7 +43,7 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
 
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-2.5 bg-gradient-to-r from-[#081a2b] to-[#0d2b45] border-b border-white/10">
-      <Link href="/dashboard" className="flex items-center gap-2 mr-2">
+      <Link href="/home" className="flex items-center gap-2 mr-2" title="回官網首頁">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt="嵐途" className="h-[26px] w-auto max-w-[150px] object-contain" />

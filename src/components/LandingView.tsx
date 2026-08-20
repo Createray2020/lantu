@@ -8,7 +8,7 @@ export default function LandingView() {
       {/* 頂欄 */}
       <header className="sticky top-0 z-30 backdrop-blur bg-[#081a2b]/85 border-b border-white/10">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
             <span className="grid place-items-center w-9 h-9 rounded-xl border border-[#c99a5b]">
               <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
                 <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -19,7 +19,7 @@ export default function LandingView() {
               <span className="font-serif tracking-[0.16em] text-[15px]">嵐途 LAN TU</span>
               <span className="text-[9px] tracking-[0.3em] text-[#c99a5b]">FINANCIAL PLANNING</span>
             </span>
-          </div>
+          </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/coaches"
