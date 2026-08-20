@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import * as EngineExports from "./engine";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -217,11 +217,13 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(r.total).toBeCloseTo(r.lump, 6);
   });
 
-  it("estimateSocialPension：勞保身分維持原本的 1.55% ＋ 勞退新制；公保等身分不概算", () => {
+  it("estimateSocialPension：勞保身分走 A/B 式擇優 ＋ 勞退新制；公保等身分不概算", () => {
     const c = E.sampleCase();
     const labor = E.estimateSocialPension(c);
     expect(labor.kind).toBe("labor");
     expect(labor.fund).toBeGreaterThan(0);
+    // 正常分級表（≥29,500）且年資已滿 15 年時 B 式必勝，所以這裡仍應等於 1.55% 那條。
+    expect(labor.pick).toBe("B");
     expect(labor.monthly).toBeCloseTo(labor.ins * labor.years * 0.0155, 6);
     // 舊名要還能用（export 契約相容）
     expect(E.estimateLaborPension(c).total).toBeCloseTo(labor.total, 6);
@@ -231,5 +233,61 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     const other = E.estimateSocialPension(c);
     expect(other.kind).toBe("other");
     expect(other.total).toBe(0);
+  });
+});
+
+/**
+ * 勞保/勞退的雙實作對拍。
+ *
+ * 這一段用 jsdom 把 lantu-app.html 真的跑起來，拿同一份 case 餵兩邊的
+ * estimateSocialPension，逐欄比對。年資、A/B 擇優、15 年門檻、勞退專戶滾存
+ * 這四件事任何一邊改了沒同步，這裡就會紅。
+ */
+describe("雙實作對拍：estimateSocialPension（engine.ts ↔ lantu-app.html）", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let w: any;
+
+  beforeAll(async () => {
+    const { JSDOM } = await import("jsdom");
+    const dom = new JSDOM(HTML, { runScripts: "dangerously", url: "https://lantu.test/" });
+    w = dom.window;
+    await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const build = (over: Record<string, any>) => {
+    const c = E.sampleCase();
+    c.profile.age = over.age ?? 40;
+    c.profile.retireAge = over.retireAge ?? 65;
+    const pm = c.members[0];
+    pm.insType = over.insType ?? "勞保";
+    pm.insSalary = over.insSalary ?? 45800;
+    pm.worked = over.worked ?? 0;
+    pm.pensionBalance = over.pensionBalance ?? 0;
+    pm.pensionYears = over.pensionYears ?? 0;
+    return c;
+  };
+
+  const CASES: Array<[string, Record<string, number | string>]> = [
+    ["沒填年資的一般受僱者", {}],
+    ["已投保 15 年", { worked: 15 }],
+    ["年資未滿 15 年（只能領一次金）", { age: 57, worked: 0, insSalary: 40100 }],
+    ["部分工時低投保薪資（A 式勝）", { age: 45, insSalary: 11100 }],
+    ["有勞退專戶餘額", { worked: 12, pensionBalance: 800000 }],
+    ["專戶餘額由提繳年資回推", { worked: 12, pensionYears: 10 }],
+    ["國民年金", { insType: "國民年金", insSalary: 21103, worked: 9 }],
+    ["公保（不概算）", { insType: "公保" }],
+  ];
+
+  it.each(CASES)("%s：兩邊每一欄都相同", (_label, over) => {
+    const c = build(over);
+    const a = E.estimateSocialPension(c);
+    const b = w.estimateSocialPension(JSON.parse(JSON.stringify(c)));
+    for (const k of ["kind", "years", "past", "future", "pick", "eligible", "onceMonths", "fundEstimated"]) {
+      expect(b[k], k).toEqual(a[k]);
+    }
+    for (const k of ["ins", "pensionBase", "monthly", "lump", "fund", "fundNow", "fundNew", "insA", "insB", "npA", "npB", "total"]) {
+      expect(b[k], k).toBeCloseTo(a[k], 6);
+    }
   });
 });

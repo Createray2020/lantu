@@ -79,6 +79,38 @@ export const LABOR_PENSION_CAP = 150000;
 export const LABOR_PENSION_RATE = 0.06;
 /** 勞保老年年金 B 式給付率（平均月投保薪資 × 年資 × 1.55%） */
 export const LABOR_INS_ANNUITY_RATE = 0.0155;
+/**
+ * 勞保老年年金 A 式：平均月投保薪資 × 年資 × 0.775% ＋ 3,000 元。
+ * A、B 兩式**擇優**發給。低薪長年資的人 A 式常常比 B 式高
+ * （例：投保 29,500、年資 30 年 → A 式 9,858、B 式 13,718，B 勝；
+ *   投保 29,500、年資 15 年 → A 式 6,429、B 式 6,859，仍 B 勝；
+ *   但投保 29,500、年資 8 年 → A 式 4,829、B 式 3,658，A 勝）。
+ * 只算 B 式會系統性低估年資短的人。
+ */
+export const LABOR_INS_ANNUITY_RATE_A = 0.00775;
+export const LABOR_INS_ANNUITY_BONUS_A = 3000;
+/**
+ * 請領勞保「老年年金」的最低保險年資。未滿 15 年只能請領「老年一次金」
+ * （保險年資每滿 1 年發給 1 個月平均月投保薪資）。
+ */
+export const LABOR_ANNUITY_MIN_YEARS = 15;
+/** 勞退新制上路年月（民國 94 年 7 月 1 日）。之前的年資屬舊制，不在新制個人專戶裡。 */
+export const LABOR_PENSION_START_YM = '2005-07';
+/** 勞退新制個人專戶的概估年化報酬（保守值；法定有「不低於兩年期定存利率」的保證收益）。 */
+export const LABOR_PENSION_FUND_RATE = 0.03;
+
+/**
+ * 'YYYY-MM' → 到 asOf 為止的年資（取到小數一位）。
+ * 格式不對、空值、或起算日在未來，一律回 0 —— 年資寧可少算也不要憑空生出來。
+ */
+export function yearsSinceYm(ym: string | null | undefined, asOf: Date = new Date()): number {
+  if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return 0;
+  const y = Number(ym.slice(0, 4));
+  const m = Number(ym.slice(5, 7));
+  if (m < 1 || m > 12) return 0;
+  const v = (asOf.getFullYear() - y) + (asOf.getMonth() + 1 - m) / 12;
+  return v <= 0 ? 0 : Math.floor(v * 10) / 10;
+}
 
 /** 實際月薪 → 勞保月投保薪資 */
 export function laborInsSalary(monthly: number): number {

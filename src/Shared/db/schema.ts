@@ -586,3 +586,52 @@ export const coachProfiles = pgTable('coach_profiles', {
   // 公開列表只撈上架的；未上架的不該進入客戶視野。
   index('coach_profiles_published_idx').on(t.published),
 ]);
+
+// 收支資債的「細類」字典（平台級，只有 admin 能改；見 /admin/categories）。
+//
+// 為什麼不讓後台直接加「大類」：引擎公式是拿大類的字串當鍵在算的
+//   （支出 消費/其他＝可刪減、資產 可投資資產＝核心資產、負債 信貸＝消費性負債），
+// 後台隨手多一個大類，財務比率會靜默算錯而且沒人會發現。
+// 所以大類寫死在 financeCategories.defaults.ts 的 CAT_PARENTS，這張表只管細類，
+// 每一列都要指名它預設落在哪個大類（parent）。
+//
+// riskAsset / liquidity / consumer 是「選了這個細類就一起寫進該筆資料列」的旗標，
+// 因為引擎是純函式、讀不到這張表 —— 旗標必須跟著資料走（見 engine.ts isRiskAsset/isConsumerDebt）。
+//
+// isSystem 的列可停用、可改排序與大類，但不可刪：舊客戶的 plan.data 還指著這些字串。
+export const financeCategories = pgTable('finance_categories', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  kind: text('kind').notNull(),              // income | expense | asset | liability
+  parent: text('parent').notNull(),          // 引擎大類
+  label: text('label').notNull(),            // 細類名稱（同時是存進 plan.data 的值）
+  riskAsset: boolean('risk_asset').default(false).notNull(),
+  liquidity: text('liquidity'),              // 資產：流動 / 固定
+  consumer: boolean('consumer').default(false).notNull(),
+  needsNote: boolean('needs_note').default(false).notNull(), // 選了要提示補明細（「其他」）
+  sortOrder: integer('sort_order').default(0).notNull(),
+  active: boolean('active').default(true).notNull(),
+  isSystem: boolean('is_system').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 同一類別下不允許同名細類：label 就是寫進 plan.data 的字串，重名會讓資料無法回推設定。
+  uniqueIndex('finance_categories_kind_label_uq').on(t.kind, t.label),
+  index('finance_categories_kind_sort_idx').on(t.kind, t.sortOrder),
+]);
+
+// 各就學階段的教育費用參數（平台級，只有 admin 能改；見 /admin/edu-costs）。
+// 客戶端「子女教育」依孩子年齡推出所在學段後，用這張表預填金額；每一格仍可逐筆覆寫。
+// 金額一律「每學年（1 年）新台幣元」，且是**今日現值**——學費上漲率由引擎另外套。
+export const eduCostParams = pgTable('edu_cost_params', {
+  stage: text('stage').primaryKey(),         // 幼兒園 / 國小 / 國中 / 高中職 / 大學 / 研究所 / 博士班
+  startAge: integer('start_age').notNull(),  // 該學段起始年齡
+  years: integer('years').notNull(),         // 該學段年數
+  publicTuition: integer('public_tuition').default(0).notNull(),   // 公立 年學雜費
+  privateTuition: integer('private_tuition').default(0).notNull(), // 私立 年學雜費
+  overseasTuition: integer('overseas_tuition').default(0).notNull(),// 海外 年學雜費+生活費
+  extraFee: integer('extra_fee').default(0).notNull(),             // 年補習/才藝費
+  careFee: integer('care_fee').default(0).notNull(),               // 年撫養費（非學雜費的生活開銷）
+  sortOrder: integer('sort_order').default(0).notNull(),
+  source: text('source'),                    // 資料來源註記（後台顯示，避免數字來歷不明）
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

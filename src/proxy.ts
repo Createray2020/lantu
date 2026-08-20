@@ -15,6 +15,9 @@ const isPublicRoute = createRouteMatcher([
   '/coaches(.*)', // 官網公開教練頁：訪客要看得到，才有對外招客的意義
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀
+  // 收支資債細類字典與教育費用參數：iframe app 一載入就抓，客戶端未登入頁面也會用到。
+  // 內容是設定值而非客戶資料，公開讀取無虞。
+  '/api/finance-categories',
   // Vercel Cron：帶的是 Bearer CRON_SECRET 不是 Clerk session，
   // 走 auth.protect() 會被 401。路由自己驗 CRON_SECRET，沒設就一律拒絕。
   '/api/cron(.*)',

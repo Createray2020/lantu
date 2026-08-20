@@ -11,6 +11,8 @@ import {
   TAX_BR, EXEMPT_PER_PERSON, STD_DED_MARRIED, STD_DED_SINGLE, SALARY_SPECIAL,
   EST_BR, ESTATE_EXEMPT, ESTATE_SPOUSE_DED, ESTATE_LINEAL_DED, ESTATE_FUNERAL_DED,
   LABOR_INS_GRADES, LABOR_PENSION_RATE, LABOR_INS_ANNUITY_RATE, LABOR_PENSION_CAP,
+  LABOR_INS_ANNUITY_RATE_A, LABOR_INS_ANNUITY_BONUS_A, LABOR_ANNUITY_MIN_YEARS,
+  LABOR_PENSION_FUND_RATE, yearsSinceYm,
   laborInsSalary, laborPensionSalary,
   NP_YEAR, NP_INSURED_MONTHLY, NP_RATE_A, NP_BONUS_A, NP_RATE_B, LABOR_LIKE_INS,
   JOB_TYPES, NO_EMPLOYER_JOBS, isNoEmployerJob, jobInsType, ageFromBirth,
@@ -115,6 +117,14 @@ function creditScoreOf(c){return n(((c||{}).credit||{}).score)||n(((c||{}).profi
 function n(v){v=Number(v);return isNaN(v)?0:v}
 
 function sum(a,f){return (a||[]).reduce(function(s,x){return s+f(x)},0)}
+// 風險性資產 / 消費性負債的判定。
+// 後台細類（/admin/categories）帶的旗標在選類別時就寫進資料列了，優先採用；
+// 舊資料沒有旗標，退回改版前的字串比對，既有客戶的數字不會變。
+// public/lantu-app.html 有一份對照實作（engine.drift.test.ts 對拍），改這裡要一起改。
+function isRiskAsset(a){if(a&&(a.risk===true||a.risk===false))return a.risk;
+ return !!a&&(a.type==='股票'||a.type==='基金'||a.type==='債券'||(a.type==='不動產'&&a.mainCat==='可投資資產'));}
+function isConsumerDebt(l){if(l&&(l.consumerDebt===true||l.consumerDebt===false))return l.consumerDebt;
+ return !!l&&(l.mainCat==='信貸'||/信|卡|消費/.test(l.name||''));}
 
 // Infinity 不擋的話會原字串印到畫面上（例：月數為 0 的貸款試算 → 「月繳 Infinity」）。
 function fmt(v){v=n(v);if(!isFinite(v))return '—';v=Math.round(v);return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
@@ -258,9 +268,9 @@ function ratios(c){var m=metrics(c),r={};
  var incWork=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
  var livingCore=sum(c.expenses,function(e){return e.cat==='生活'?n(e.amount):0});
  var discretionary=sum(c.expenses,function(e){return (e.cat==='消費'||e.cat==='其他')?n(e.amount):0});
- var rent=sum(c.expenses,function(e){return (e.cat==='生活'&&/租/.test(e.name||''))?n(e.amount):0});
+ var rent=sum(c.expenses,function(e){return (e.cat==='生活'&&/租/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
  var insAll=sum(c.expenses,function(e){return e.cat==='保險'?n(e.amount):0});
- var social=sum(c.expenses,function(e){return (e.cat==='保險'&&/(勞保|健保|勞健保|社會|國保|國民年金)/.test(e.name||''))?n(e.amount):0});
+ var social=sum(c.expenses,function(e){return (e.cat==='保險'&&/(勞保|健保|勞健保|社會|國保|國民年金)/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
  var premium=Math.max(0,insAll-social);
  var loanPay=annualDebtPay(c);
  var eduNow=sum(c.education,function(e){var s=n(e.startIn);return (s<=0&&0<s+n(e.years))?n(e.annual):0});
@@ -269,7 +279,7 @@ function ratios(c){var m=metrics(c),r={};
  // 資產負債子聚合
  var selfUse=sum(c.assets,function(a){return a.mainCat==='自用資產'?aVal(a):0});
  var coreAsset=sum(c.assets,function(a){return a.mainCat==='可投資資產'?aVal(a):0});
- var riskAsset=sum(c.assets,function(a){return (a.type==='股票'||a.type==='基金'||a.type==='債券'||(a.type==='不動產'&&a.mainCat==='可投資資產'))?aVal(a):0});
+ var riskAsset=sum(c.assets,function(a){return isRiskAsset(a)?aVal(a):0});
  var conserv=sum(c.assets,function(a){return (a.type==='現金'||a.type==='定存'||/儲蓄|保單/.test(a.name||''))?aVal(a):0});
  var emReq=m.monthExp*6;
  var flow=m.save; // 年度(結餘+儲蓄+投資)：本模型合併為年結餘
@@ -535,20 +545,38 @@ function estateTax(c,netOverride){
 function propertyTax(c){var tp=c.taxParams||{};var house=n(tp.houseAssessed)*HOUSE_TAX_RATE,land=n(tp.landAssessed)*LAND_TAX_RATE,car=n(tp.carTax);return {house:house,land:land,car:car,total:house+land+car}}
 
 // 社會保險老年給付＋勞退新制概算。依「本人」的投保類型分流：
-//   勞保系 → 勞保老年年金 B 式 1.55% ＋ 勞退新制；
+//   勞保系 → 勞保老年年金 A/B 式擇優（未滿 15 年只能領老年一次金）＋ 勞退新制；
 //   國民年金 → A 式(0.65%＋加計)／B 式(1.3%) 擇優，無雇主提繳故無勞退；
 //   公保/軍保/農保/無 → 規則各異，不代為概算。
+//
+// 年資＝「已投保年資（過去）＋ 到退休還會投保的年數（未來）」。
+// ⚠️ 2026/08 修正：已投保年資（member.worked）在改版前**沒有任何輸入欄位**，
+//    永遠是 0，等於把客戶過去投保的十幾二十年整段丟掉，勞保年金一律嚴重低估。
+//    現在家庭成員卡有「勞保起保年月／已投保年資」可填。
+// ⚠️ 同時修正勞退：舊版拿 years(過去+未來) 當「未來提繳」的複利期數，
+//    等於讓過去那段年資的提繳也在未來複利一次。未來提繳只能用 future，
+//    過去的部分是「專戶現有累積餘額」滾存到退休。
+//
 // ⚠️ 勞退走的是「月提繳工資分級表」(上限 150,000)，不是勞保投保薪資分級表(上限 45,800)。
 //    兩張表混用會讓月薪 10 萬的客戶勞退提繳低估過半。
+function insuredYearsOf(m){
+ // 手填的年資是唯一真相；起保年月只是「幫忙算一次填進去」的便利欄（見 UI 的 setInsStart）。
+ var w=n(m&&m.worked);
+ return w>0?w:yearsSinceYm(m&&m.insStart);
+}
 function estimateSocialPension(c){
  var pm=primaryMember(c)||{};
  var ins=n(pm.insSalary);
  var insType=pm.insType||'勞保';
  var age=n(c.profile.age),ra=n(c.profile.retireAge);
- var years=Math.max(0,n(pm.worked)+Math.max(0,ra-age));
+ var past=insuredYearsOf(pm);
+ var future=Math.max(0,ra-age);
+ var years=Math.max(0,past+future);
  var r=c.retire||{};var rr=n(r.retireReturn)/100||0.04;var m=Math.max(0,n(c.profile.lifeExp)-ra);
  var kind=(LABOR_LIKE_INS.indexOf(insType)>=0)?'labor':(insType==='國民年金'?'np':'other');
- var out={kind:kind,insType:insType,ins:ins,pensionBase:0,years:years,monthly:0,lump:0,fund:0,total:0,npA:0,npB:0,pick:''};
+ var out={kind:kind,insType:insType,ins:ins,pensionBase:0,years:years,past:past,future:future,
+  monthly:0,lump:0,fund:0,fundNow:0,fundNew:0,fundEstimated:false,pensionPast:0,
+  total:0,npA:0,npB:0,insA:0,insB:0,pick:'',eligible:false,onceMonths:0};
  var pv=function(annual){return (rr>0)?annual*(1-Math.pow(1+rr,-m))/rr:annual*m;};
  if(kind==='np'){
   out.ins=ins>0?ins:NP_INSURED_MONTHLY;
@@ -556,6 +584,7 @@ function estimateSocialPension(c){
   out.npA=out.ins*years*NP_RATE_A+NP_BONUS_A;
   out.npB=out.ins*years*NP_RATE_B;
   out.pick=(out.npA>=out.npB)?'A':'B';
+  out.eligible=true;                            // 國保老年年金沒有 15 年門檻
   out.monthly=Math.max(out.npA,out.npB);
   out.lump=pv(out.monthly*12);
   out.fund=0;
@@ -564,11 +593,31 @@ function estimateSocialPension(c){
  }
  if(kind!=='labor')return out;
  out.pensionBase=laborPensionSalary(n(pm.monthlySalary)||n((c.profile||{}).monthlySalary)||ins);
- if(ins<=0||years<=0)return out;
- out.monthly=ins*years*LABOR_INS_ANNUITY_RATE;
- out.lump=pv(out.monthly*12);
- var g=0.03, annualContrib=out.pensionBase*LABOR_PENSION_RATE*12;
- out.fund=(g>0)?annualContrib*(Math.pow(1+g,years)-1)/g:annualContrib*years;
+ var g=LABOR_PENSION_FUND_RATE, annualContrib=out.pensionBase*LABOR_PENSION_RATE*12;
+ // 勞退專戶：有填實際餘額就用實際的；沒填但有「新制提繳起始年月」就回推概估。
+ out.pensionPast=n(pm.pensionYears)||yearsSinceYm(pm.pensionStart);
+ var bal=n(pm.pensionBalance);
+ if(bal<=0&&out.pensionPast>0&&annualContrib>0){
+  bal=(g>0)?annualContrib*(Math.pow(1+g,out.pensionPast)-1)/g:annualContrib*out.pensionPast;
+  out.fundEstimated=true;
+ }
+ out.fundNow=bal*Math.pow(1+g,future);
+ out.fundNew=(g>0)?annualContrib*(Math.pow(1+g,future)-1)/g:annualContrib*future;
+ out.fund=out.fundNow+out.fundNew;
+ if(ins>0&&years>0){
+  out.insA=ins*years*LABOR_INS_ANNUITY_RATE_A+LABOR_INS_ANNUITY_BONUS_A;
+  out.insB=ins*years*LABOR_INS_ANNUITY_RATE;
+  out.eligible=years>=LABOR_ANNUITY_MIN_YEARS;
+  if(out.eligible){
+   out.pick=(out.insA>=out.insB)?'A':'B';
+   out.monthly=Math.max(out.insA,out.insB);
+   out.lump=pv(out.monthly*12);
+  }else{
+   // 年資未滿 15 年：只能請領「老年一次金」＝每滿 1 年發 1 個月平均月投保薪資。
+   out.onceMonths=Math.floor(years);
+   out.lump=ins*out.onceMonths;
+  }
+ }
  out.total=out.lump+out.fund;
  return out;
 }
@@ -603,7 +652,7 @@ function crossTable(c){var m=metrics(c);
  var expTax=m.tax, expIns=m.ins, expOther=sum(c.expenses,function(e){return ['生活','消費','稅賦','保險'].indexOf(e.cat)<0?n(e.amount):0});
  var aSelf=sum(c.assets,function(a){return a.cls==='固定'?aVal(a):0});
  var aInv=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
- var dCons=sum(c.liabilities,function(l){return (l.mainCat==='信貸'||/信|卡|消費/.test(l.name))?lBal(l):0});
+ var dCons=sum(c.liabilities,function(l){return isConsumerDebt(l)?lBal(l):0});
  var dInv=m.debtTotal-dCons;
  return {incWork:incWork,incFin:incFin,incOther:incOther,incTotal:m.incTotal,expLive:expLive,expTax:expTax,expIns:expIns,expOther:expOther+annualDebtPay(c),expTotal:m.expTotal,
   aSelf:aSelf,aInv:aInv,aTotal:m.assetTotal,dCons:dCons,dInv:dInv,dTotal:m.debtTotal,net:m.net,monthBal:(m.incTotal-m.expTotal)/12};

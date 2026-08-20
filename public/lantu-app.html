@@ -172,6 +172,15 @@ html.embed .shell,html.embed-single .shell{grid-template-columns:1fr!important}
 .fintbl{overflow-x:auto;flex:1}
 td.calc{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .grp td{background:#0a1a20;color:var(--amber2);font-weight:700;font-size:12px}.grp .gm{color:var(--mut);font-weight:400}
+.edutog{display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 2px;font-size:.86rem;color:var(--mut)}
+.edutog label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.edulock{margin-left:4px;font-size:.66rem;padding:0 4px;border-radius:5px;background:rgba(201,154,91,.18);color:#c99a5b}
+.edunow{background:rgba(143,192,163,.07)}
+.edunowtag{font-size:.66rem;padding:0 5px;border-radius:5px;background:rgba(143,192,163,.18);color:#8fc0a3}
+.catsel{max-width:12rem}
+.catnote{margin-top:3px;display:flex;align-items:center;gap:4px}
+.catnote input{font-size:.78rem;padding:2px 5px}
+.catnote .todo{flex:none;font-size:.68rem;padding:1px 5px;border-radius:6px;background:rgba(201,154,91,.16);color:#c99a5b;white-space:nowrap}
 .exp-btn{background:none;border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:1px 7px;font-size:12px;line-height:1.4}
 .exp-btn.on{color:var(--amber2);border-color:var(--amber);background:rgba(201,154,91,.12)}
 .acts{white-space:nowrap;display:flex;gap:4px;align-items:center}
@@ -277,6 +286,85 @@ td.calc{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;whit
 <script>
 var KINDS=['壽險','意外險','住院醫療','初次罹癌','癌症住院','重病給付','每月照護'];
 var EDU_STAGES=['嬰兒','幼稚園','小學','國中','高中職','大學','研究所','博士班'];
+
+// ── 收支資債的「細類」字典 ───────────────────────────────────────────────
+// 兩層：大類（引擎在算的鍵，寫死不開放）＋ 細類（後台 /admin/categories 管理）。
+// 為什麼大類不能開放後台新增：引擎是拿大類的字串當鍵在算的——
+//   支出 消費/其他＝可刪減、資產 可投資資產＝核心資產、負債 信貸＝消費性負債、
+//   收入 執行業務所得＝走費用率扣除。後台隨手多一個大類，比率會靜默算錯而且沒人會發現。
+// 細類由 /api/finance-categories 在載入時抓進 window.LANTU_CATS；抓不到（離線、API 掛了、
+// 表還沒 seed）就用下面這份 fallback＝與後端 financeCategories.defaults.ts 同一份清單。
+// 兩份由 src/lib/financeCategories.drift.test.ts 對拍，任何一邊改了沒同步就會紅。
+var CAT_PARENTS={income:['工作','理財','其他'],expense:['生活','消費','稅賦','孝親','保險','其他'],asset:['自用資產','可投資資產'],liability:['房貸','車貸','信貸','其他']};
+var CAT_FALLBACK={
+ income:[{"label":"薪資","parent":"工作"},{"label":"執行業務所得","parent":"工作"},{"label":"年終獎金","parent":"工作"},{"label":"三節獎金","parent":"工作"},{"label":"績效/季獎金","parent":"工作"},{"label":"佣金/業績獎金","parent":"工作"},{"label":"加班費","parent":"工作"},{"label":"兼職","parent":"工作"},{"label":"差旅/交通補貼","parent":"工作"},{"label":"股票/員工分紅","parent":"工作"},{"label":"租金收入","parent":"理財"},{"label":"股利/利息","parent":"理財"},{"label":"存款利息","parent":"理財"},{"label":"基金/ETF 配息","parent":"理財"},{"label":"債券配息","parent":"理財"},{"label":"資本利得(已實現)","parent":"理財"},{"label":"事業盈餘分配","parent":"理財"},{"label":"版稅/權利金","parent":"理財"},{"label":"加密資產收益","parent":"理財"},{"label":"退休金/年金","parent":"其他"},{"label":"政府補助/津貼","parent":"其他"},{"label":"保險給付","parent":"其他"},{"label":"贍養費/扶養費","parent":"其他"},{"label":"親友資助","parent":"其他"},{"label":"贈與/中獎","parent":"其他"},{"label":"其他","parent":"其他","note":true}],
+ expense:[{"label":"餐食","parent":"生活"},{"label":"居住(房租)","parent":"生活"},{"label":"管理費/修繕","parent":"生活"},{"label":"水電瓦斯","parent":"生活"},{"label":"電信網路","parent":"生活"},{"label":"交通/油資","parent":"生活"},{"label":"通勤/停車","parent":"生活"},{"label":"日用品","parent":"生活"},{"label":"醫療/健康","parent":"生活"},{"label":"子女教養","parent":"生活"},{"label":"育兒/托育","parent":"生活"},{"label":"治裝/美容","parent":"消費"},{"label":"休閒娛樂","parent":"消費"},{"label":"旅遊","parent":"消費"},{"label":"3C/家電","parent":"消費"},{"label":"社交應酬","parent":"消費"},{"label":"人情往來(紅白包)","parent":"消費"},{"label":"訂閱服務","parent":"消費"},{"label":"寵物","parent":"消費"},{"label":"菸酒","parent":"消費"},{"label":"個人成長/進修","parent":"消費"},{"label":"奢侈品","parent":"消費"},{"label":"綜合所得稅","parent":"稅賦"},{"label":"房屋稅","parent":"稅賦"},{"label":"地價稅","parent":"稅賦"},{"label":"牌照稅/燃料費","parent":"稅賦"},{"label":"營業稅/營所稅","parent":"稅賦"},{"label":"遺產稅/贈與稅","parent":"稅賦"},{"label":"其他稅費","parent":"稅賦"},{"label":"孝親金","parent":"孝親"},{"label":"長輩生活費","parent":"孝親"},{"label":"長輩醫療/照護","parent":"孝親"},{"label":"壽險保費","parent":"保險"},{"label":"醫療/健康險保費","parent":"保險"},{"label":"意外險保費","parent":"保險"},{"label":"投資型保單保費","parent":"保險"},{"label":"年金險保費","parent":"保險"},{"label":"車險/住宅火險","parent":"保險"},{"label":"勞健保自付","parent":"保險"},{"label":"國民年金保費","parent":"保險"},{"label":"慈善捐贈","parent":"其他"},{"label":"投資扣款/定期定額","parent":"其他"},{"label":"其他","parent":"其他","note":true}],
+ asset:[{"label":"現金","parent":"自用資產","liq":"流動"},{"label":"活期存款","parent":"自用資產","liq":"流動"},{"label":"自住不動產","parent":"自用資產","liq":"固定"},{"label":"自用車輛","parent":"自用資產","liq":"固定"},{"label":"動產-珠寶名錶","parent":"自用資產","liq":"固定"},{"label":"動產-藝術/收藏","parent":"自用資產","liq":"固定"},{"label":"動產-3C/設備","parent":"自用資產","liq":"固定"},{"label":"動產-家具家電","parent":"自用資產","liq":"固定"},{"label":"定存","parent":"可投資資產","liq":"流動"},{"label":"外幣存款","parent":"可投資資產","liq":"流動"},{"label":"貨幣型基金","parent":"可投資資產","liq":"流動"},{"label":"儲蓄險現金價值","parent":"可投資資產","liq":"流動"},{"label":"保單現金價值","parent":"可投資資產","liq":"流動"},{"label":"股票","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"基金","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"ETF","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"債券","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"期貨/選擇權","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"投資型保單","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"加密貨幣","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"黃金/貴金屬","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"REITs","parent":"可投資資產","risk":true,"liq":"流動"},{"label":"不動產","parent":"可投資資產","risk":true,"liq":"固定"},{"label":"出租不動產","parent":"可投資資產","risk":true,"liq":"固定"},{"label":"土地","parent":"可投資資產","risk":true,"liq":"固定"},{"label":"車位","parent":"可投資資產","risk":true,"liq":"固定"},{"label":"未上市股權/事業投資","parent":"可投資資產","risk":true,"liq":"固定"},{"label":"私募/另類投資","parent":"可投資資產","risk":true,"liq":"固定"},{"label":"勞退專戶","parent":"可投資資產","liq":"固定"},{"label":"應收帳款/借出款","parent":"可投資資產","liq":"固定"},{"label":"互助會(會錢)","parent":"可投資資產","liq":"固定"},{"label":"信託資產","parent":"可投資資產","liq":"固定"},{"label":"其他","parent":"可投資資產","liq":"流動","note":true}],
+ liability:[{"label":"自住房貸","parent":"房貸"},{"label":"投資房貸","parent":"房貸"},{"label":"二胎房貸","parent":"房貸"},{"label":"房屋修繕貸款","parent":"房貸"},{"label":"汽車貸款","parent":"車貸"},{"label":"機車貸款","parent":"車貸"},{"label":"信用貸款","parent":"信貸","consumer":true},{"label":"信用卡循環","parent":"信貸","consumer":true},{"label":"現金卡/預借現金","parent":"信貸","consumer":true},{"label":"分期付款","parent":"信貸","consumer":true},{"label":"卡債協商","parent":"信貸","consumer":true},{"label":"就學貸款","parent":"信貸"},{"label":"私人借款(親友)","parent":"其他"},{"label":"民間借貸","parent":"其他","consumer":true},{"label":"保單借款","parent":"其他"},{"label":"股票質押借款","parent":"其他"},{"label":"不動產質借","parent":"其他"},{"label":"企業/營運週轉貸款","parent":"其他"},{"label":"融資租賃","parent":"其他"},{"label":"應付稅款","parent":"其他"},{"label":"其他","parent":"其他","note":true}]
+};
+var EDU_COST_FALLBACK=[
+ {"stage":"幼兒園","startAge":3,"years":3,"publicTuition":12000,"privateTuition":180000,"overseasTuition":0,"extraFee":10000,"careFee":190000},
+ {"stage":"國小","startAge":6,"years":6,"publicTuition":12000,"privateTuition":115000,"overseasTuition":1200000,"extraFee":60000,"careFee":190000},
+ {"stage":"國中","startAge":12,"years":3,"publicTuition":13000,"privateTuition":114000,"overseasTuition":1200000,"extraFee":45000,"careFee":190000},
+ {"stage":"高中職","startAge":15,"years":3,"publicTuition":20000,"privateTuition":54000,"overseasTuition":1400000,"extraFee":21000,"careFee":200000},
+ {"stage":"大學","startAge":18,"years":4,"publicTuition":55000,"privateTuition":65000,"overseasTuition":1500000,"extraFee":15000,"careFee":260000},
+ {"stage":"研究所","startAge":22,"years":2,"publicTuition":60000,"privateTuition":100000,"overseasTuition":1500000,"extraFee":0,"careFee":260000},
+ {"stage":"博士班","startAge":24,"years":4,"publicTuition":58000,"privateTuition":100000,"overseasTuition":1500000,"extraFee":0,"careFee":260000}
+];
+// 每個 kind 在資料列上的欄位名：sub＝細類、parent＝大類
+var CAT_FIELDS={income:{sub:'subType',parent:'type'},expense:{sub:'subCat',parent:'cat'},asset:{sub:'type',parent:'mainCat'},liability:{sub:'subCat',parent:'mainCat'}};
+function catList(kind){var s=(window.LANTU_CATS||{})[kind];return (s&&s.length)?s:(CAT_FALLBACK[kind]||[]);}
+function catFind(kind,label){var l=catList(kind);for(var i=0;i<l.length;i++){if(l[i].label===label)return l[i]}return null;}
+function eduCostList(){var s=window.LANTU_EDU_COSTS;return (s&&s.length)?s:EDU_COST_FALLBACK;}
+function eduCostOf(stage){var l=eduCostList();for(var i=0;i<l.length;i++){if(l[i].stage===stage)return l[i]}return null;}
+// 舊資料的學段名稱對照（2012 年起法定名稱是「幼兒園」「國小」）。
+var EDU_STAGE_ALIAS={'幼稚園':'幼兒園','小學':'國小','高中':'高中職','大專':'大學','碩士':'研究所','博士':'博士班'};
+function eduStageNorm(x){return EDU_STAGE_ALIAS[x]||x;}
+
+// 細類下拉：依大類分 optgroup。
+// 目前值若已被後台停用/改名，仍會以「（已停用/舊值）」保留在清單裡——
+// 否則顧問一打開舊客戶的資料，select 會自己跳到第一個選項，靜默改掉他的分類。
+function catSelect(kind,cur,onchangeAttr){
+ var list=catList(kind),order=[],map={};
+ list.forEach(function(x){if(!map[x.parent]){map[x.parent]=[];order.push(x.parent)}map[x.parent].push(x)});
+ var found=list.some(function(x){return x.label===cur});
+ var html='<option value="">（未分類）</option>';
+ order.forEach(function(g){
+  html+='<optgroup label="'+esc(g)+'">'+map[g].map(function(x){
+   return '<option '+(x.label===cur?'selected':'')+'>'+esc(x.label)+'</option>';
+  }).join('')+'</optgroup>';
+ });
+ if(cur&&!found)html+='<optgroup label="（已停用/舊值）"><option selected>'+esc(cur)+'</option></optgroup>';
+ return '<select class="catsel" '+onchangeAttr+'>'+html+'</select>';
+}
+// 選細類 → 同時把大類與旗標寫進這筆資料。
+// 旗標（risk / consumerDebt / cls）必須跟著資料走，因為引擎是純函式、讀不到後台字典：
+// 加了「加密貨幣」而沒有 risk 旗標，資產配置的分子就會默默漏掉它。
+function setCat(arr,i,kind,label){
+ var c=activeCase();if(!c)return;var row=listOf(c,arr)[i];if(!row)return;
+ var f=CAT_FIELDS[kind],meta=catFind(kind,label);
+ row[f.sub]=label;
+ if(meta){
+  if(meta.parent)row[f.parent]=meta.parent;
+  if(kind==='asset'){row.risk=!!meta.risk;if(meta.liq)row.cls=meta.liq;}
+  if(kind==='liability')row.consumerDebt=!!meta.consumer;
+ }
+ if(!meta||!meta.note)row.otherNote='';
+ save();render();
+}
+// 「其他」這類需要補明細的細類，選了就在同一格長出說明欄（選填，不擋存檔）。
+function catNote(arr,i,kind,row){
+ var f=CAT_FIELDS[kind],meta=catFind(kind,row[f.sub]);
+ if(!meta||!meta.note)return '';
+ var v=row.otherNote||'';
+ return '<div class="catnote">'+(v?'':'<span class="todo">待補明細</span>')+
+  '<input value="'+esc(v)+'" placeholder="請說明項目別（選填）" oninput="setLive(\''+arr+':'+i+'\',\'otherNote\',this.value)" onchange="set(\''+arr+':'+i+'\',\'otherNote\',this.value)"></div>';
+}
+function catCell(arr,i,kind,row){
+ var f=CAT_FIELDS[kind];
+ return catSelect(kind,row[f.sub],'onchange="setCat(\''+arr+'\','+i+',\''+kind+'\',this.value)"')+catNote(arr,i,kind,row);
+}
+// ────────────────────────────────────────────────────────────────────────
 var app={role:'coach',activeTab:'data',dataTab:'family',ownerView:'全家',activeId:null,cases:[],tools:{loan:{amt:5000000,rate:2,years:20},ret:{age:40,rAge:65,life:85,month:50000,infl:1.5,rr:4},comp:{target:15000000,years:20,rate:6,start:0},irr:{monthly:10000,months:73,fv:911097,start:0},car:{price:2500000,life:15,used:8,cc:2500,sellLoss:15,oil:36000,park:48000,other:45000},house:{oldPrice:12000000,newPrice:18000000,down:5400000,rate:1.7,years:30,deco:1700000},biz:{cash:500000,monthRev:300000,monthCost:250000,setup:1500000}}};
 function uid(){return 'c'+Math.floor(performance.now()*1000%1e9)+app.cases.length}
 
@@ -365,6 +453,16 @@ var LABOR_INS_GRADES=[29500,30300,31800,33300,34800,36300,38200,40100,42000,4390
 // 勞工退休金(新制)月提繳工資上限＝150,000，是**另一張表**，不是上面的勞保投保薪資分級表(上限 45,800)。
 // 兩張表混用會讓月薪 10 萬的客戶勞退提繳低估過半。
 var LABOR_PENSION_CAP=150000;
+// 勞保老年年金：A式＝平均月投保薪資 × 年資 × 0.775% ＋ 3,000；B式＝× 1.55%。兩式**擇優**發給。
+// 只算 B 式會系統性低估年資短的人（年資 8 年、投保 29,500：A 式 4,829 > B 式 3,658）。
+var LABOR_INS_ANNUITY_RATE=0.0155;
+var LABOR_INS_ANNUITY_RATE_A=0.00775, LABOR_INS_ANNUITY_BONUS_A=3000;
+// 請領「老年年金」的最低保險年資；未滿只能領「老年一次金」（每滿 1 年發 1 個月平均月投保薪資）。
+var LABOR_ANNUITY_MIN_YEARS=15;
+// 勞退新制上路年月（民國 94 年 7 月 1 日）；之前的年資屬舊制，不在新制個人專戶裡。
+var LABOR_PENSION_START_YM='2005-07';
+// 勞退個人專戶概估年化報酬（保守值；法定有「不低於兩年期定存利率」的保證收益）。
+var LABOR_PENSION_FUND_RATE=0.03;
 function laborPensionSalary(monthly){monthly=n(monthly);if(monthly<=0)return 0;
  for(var i=0;i<LABOR_INS_GRADES.length;i++){if(monthly<=LABOR_INS_GRADES[i])return LABOR_INS_GRADES[i]}
  return Math.min(Math.round(monthly),LABOR_PENSION_CAP);}
@@ -449,6 +547,14 @@ function importJSON(e){var f=e.target.files[0];if(!f)return;var r=new FileReader
 /* ===== ENGINE ===== */
 function activeCase(){return app.cases.find(function(x){return x.id===app.activeId})}
 function n(v){v=Number(v);return isNaN(v)?0:v}
+// 風險性資產 / 消費性負債的判定。
+// 後台細類帶的旗標（risk / consumerDebt）在選類別時就寫進資料列了，優先採用；
+// 舊資料沒有旗標，退回改版前的字串比對，數字不會變。
+// engine.ts 有一份對照實作（engine.drift.test.ts 對拍），改這裡要一起改。
+function isRiskAsset(a){if(a&&(a.risk===true||a.risk===false))return a.risk;
+ return !!a&&(a.type==='股票'||a.type==='基金'||a.type==='債券'||(a.type==='不動產'&&a.mainCat==='可投資資產'));}
+function isConsumerDebt(l){if(l&&(l.consumerDebt===true||l.consumerDebt===false))return l.consumerDebt;
+ return !!l&&(l.mainCat==='信貸'||/信|卡|消費/.test(l.name||''));}
 function sum(a,f){return (a||[]).reduce(function(s,x){return s+f(x)},0)}
 function fmt(v){v=n(v);if(!isFinite(v))return '—';v=Math.round(v);return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
@@ -679,8 +785,33 @@ function laborDetailHTML(c){var lp=estimateSocialPension(c);if(lp.total<=0)retur
    ['勞退新制','無（國民年金無雇主提繳）'],['合計可帶入已備',Math.round(lp.total),'var(--amber2)']];
   return detailBox('國民年金 老年年金計算明細',kvTbl(rows)+'<div class="hint" style="display:block;margin-top:8px;line-height:1.6">依勞動部勞工保險局公告：月投保金額 115 年起 '+fmt(NP_INSURED_MONTHLY)+' 元；A 式加計金額 113 年起 '+fmt(NP_BONUS_A)+' 元（調高至 5,000 之修法案尚在立法院審議，未通過前以現行公告值計算）。有欠繳保費、已領其他社會保險年金等情形者不得選 A 式。</div>');
  }
- var rows2=[['本人月投保薪資',lp.ins],['概估年資',lp.years+' 年'],['勞保老年年金月領 ＝ 投保薪資 × 年資 × 1.55%',Math.round(lp.monthly)],['年領',Math.round(lp.monthly*12)],['退休後餘命',m+' 年'],['勞保年金退休現值（折現 '+(rr*100).toFixed(1)+'%）',Math.round(lp.lump),'var(--ok)'],['勞退月提繳工資（上限 '+fmt(LABOR_PENSION_CAP)+'）',lp.pensionBase],['勞退：雇主月提繳 6% × 12',Math.round(lp.pensionBase*0.06*12)],['勞退新制累積（年化 3% 滾存至退休）',Math.round(lp.fund),'var(--ok)'],['合計可帶入已備',Math.round(lp.total),'var(--amber2)']];
- return detailBox('勞保 / 勞退 計算明細',kvTbl(rows2));}
+ var rows2=[['本人月投保薪資',lp.ins],
+  ['已投保年資（過去）',lp.past+' 年'],
+  ['到退休還會投保（未來）',lp.future+' 年'],
+  ['合計保險年資',lp.years+' 年'+(lp.eligible?'':'（未滿 '+LABOR_ANNUITY_MIN_YEARS+' 年）'),lp.eligible?null:'var(--warn)']];
+ if(lp.eligible){
+  rows2=rows2.concat([
+   ['A 式 ＝ 投保薪資 × 年資 × 0.775% ＋ '+fmt(LABOR_INS_ANNUITY_BONUS_A),Math.round(lp.insA)],
+   ['B 式 ＝ 投保薪資 × 年資 × 1.55%',Math.round(lp.insB)],
+   ['擇優計給 → 月領（'+lp.pick+' 式）',Math.round(lp.monthly),'var(--amber2)'],
+   ['年領',Math.round(lp.monthly*12)],['退休後餘命',m+' 年'],
+   ['勞保年金退休現值（折現 '+(rr*100).toFixed(1)+'%）',Math.round(lp.lump),'var(--ok)']]);
+ }else{
+  rows2=rows2.concat([
+   ['保險年資未滿 '+LABOR_ANNUITY_MIN_YEARS+' 年 → 只能請領「老年一次金」','（不能月領年金）'],
+   ['老年一次金 ＝ 投保薪資 × '+lp.onceMonths+' 個月（每滿 1 年給 1 個月）',Math.round(lp.lump),'var(--ok)']]);
+ }
+ rows2=rows2.concat([
+  ['勞退月提繳工資（上限 '+fmt(LABOR_PENSION_CAP)+'）',lp.pensionBase],
+  ['勞退：雇主月提繳 6% × 12',Math.round(lp.pensionBase*0.06*12)],
+  ['勞退專戶現有累積'+(lp.fundEstimated?'（由提繳年資 '+lp.pensionPast+' 年回推概估）':''),Math.round(lp.fundNow/Math.pow(1+LABOR_PENSION_FUND_RATE,lp.future))],
+  ['　→ 滾存至退休（年化 '+(LABOR_PENSION_FUND_RATE*100)+'%）',Math.round(lp.fundNow)],
+  ['未來 '+lp.future+' 年提繳累積',Math.round(lp.fundNew)],
+  ['勞退新制合計',Math.round(lp.fund),'var(--ok)'],
+  ['合計可帶入已備',Math.round(lp.total),'var(--amber2)']]);
+ var warn=lp.fundEstimated?'<div class="hint" style="display:block;margin-top:8px;line-height:1.6">⚠️ 勞退專戶餘額是<b>由提繳年資回推的概估值</b>，與實際差距可能不小（提繳工資變動、自願提繳、基金實際收益都會影響）。請客戶到<b>勞保局 e 化服務系統／勞保局行動服務 App</b> 查詢個人專戶實際累積金額，填進成員卡片的「勞退專戶現有累積」。</div>':'';
+ var yhint='<div class="hint" style="display:block;margin-top:8px;line-height:1.6">保險年資＝<b>已投保年資（過去）＋ 到退休還會投保的年數</b>。已投保年資請在「家庭 → 成員卡片 → 工作與投保」填勞保起保年月（會自動換算）或直接填年資；沒填的話系統只會算未來那一段，年金會嚴重低估。</div>';
+ return detailBox('勞保 / 勞退 計算明細',kvTbl(rows2)+yhint+warn);}
 // 教育金計算明細
 function eduDetailHTML(c){var edu=c.education||[];if(!edu.length)return '';var g=n(c.params.tuitionGrowth)/100;
  var rows=edu.map(function(e){var fv=n(e.annual)*n(e.years)*Math.pow(1+g,n(e.startIn));return [esc(e.child||'子女')+' · '+esc(e.stage||'')+'（'+esc(e.schoolType||'')+'）年費 '+fmt(n(e.annual))+' × '+n(e.years)+' 年 ×(1+'+(g*100)+'%)^'+n(e.startIn),Math.round(fv)];});
@@ -748,9 +879,9 @@ function ratios(c){var m=metrics(c),r={};
  var incWork=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
  var livingCore=sum(c.expenses,function(e){return e.cat==='生活'?n(e.amount):0});
  var discretionary=sum(c.expenses,function(e){return (e.cat==='消費'||e.cat==='其他')?n(e.amount):0});
- var rent=sum(c.expenses,function(e){return (e.cat==='生活'&&/租/.test(e.name||''))?n(e.amount):0});
+ var rent=sum(c.expenses,function(e){return (e.cat==='生活'&&/租/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
  var insAll=sum(c.expenses,function(e){return e.cat==='保險'?n(e.amount):0});
- var social=sum(c.expenses,function(e){return (e.cat==='保險'&&/(勞保|健保|勞健保|社會|國保|國民年金)/.test(e.name||''))?n(e.amount):0});
+ var social=sum(c.expenses,function(e){return (e.cat==='保險'&&/(勞保|健保|勞健保|社會|國保|國民年金)/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
  var premium=Math.max(0,insAll-social);
  var loanPay=annualDebtPay(c);
  var eduNow=sum(c.education,function(e){var s=n(e.startIn);return (s<=0&&0<s+n(e.years))?n(e.annual):0});
@@ -759,7 +890,7 @@ function ratios(c){var m=metrics(c),r={};
  // 資產負債子聚合
  var selfUse=sum(c.assets,function(a){return a.mainCat==='自用資產'?aVal(a):0});
  var coreAsset=sum(c.assets,function(a){return a.mainCat==='可投資資產'?aVal(a):0});
- var riskAsset=sum(c.assets,function(a){return (a.type==='股票'||a.type==='基金'||a.type==='債券'||(a.type==='不動產'&&a.mainCat==='可投資資產'))?aVal(a):0});
+ var riskAsset=sum(c.assets,function(a){return isRiskAsset(a)?aVal(a):0});
  var conserv=sum(c.assets,function(a){return (a.type==='現金'||a.type==='定存'||/儲蓄|保單/.test(a.name||''))?aVal(a):0});
  var emReq=m.monthExp*6;
  var flow=m.save; // 年度(結餘+儲蓄+投資)：本模型合併為年結餘
@@ -1109,7 +1240,7 @@ function crossTable(c){var m=metrics(c);
  var expTax=m.tax, expIns=m.ins, expOther=sum(c.expenses,function(e){return ['生活','消費','稅賦','保險'].indexOf(e.cat)<0?n(e.amount):0});
  var aSelf=sum(c.assets,function(a){return a.cls==='固定'?aVal(a):0});
  var aInv=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
- var dCons=sum(c.liabilities,function(l){return (l.mainCat==='信貸'||/信|卡|消費/.test(l.name))?lBal(l):0});
+ var dCons=sum(c.liabilities,function(l){return isConsumerDebt(l)?lBal(l):0});
  var dInv=m.debtTotal-dCons;
  return {incWork:incWork,incFin:incFin,incOther:incOther,incTotal:m.incTotal,expLive:expLive,expTax:expTax,expIns:expIns,expOther:expOther+annualDebtPay(c),expTotal:m.expTotal,
   aSelf:aSelf,aInv:aInv,aTotal:m.assetTotal,dCons:dCons,dInv:dInv,dTotal:m.debtTotal,net:m.net,monthBal:(m.incTotal-m.expTotal)/12};
@@ -1200,7 +1331,7 @@ function addRow(arr){var c=activeCase();if(!c)return;
  var m0=(c.members||[])[0]||{};
  var kid=(c.members||[]).filter(function(m){return m.role==='子女'})[0]||{};
  var TPL={
- members:function(){return {name:'',role:'子女',gender:'男',age:0,worked:0,insType:'健保眷屬',insSalary:0,depRatio:0,expRatio:0,indepAge:26}},
+ members:function(){return {name:'',role:'子女',gender:'男',age:0,worked:0,insStart:'',pensionStart:'',pensionYears:0,pensionBalance:0,insType:'健保眷屬',insSalary:0,depRatio:0,expRatio:0,indepAge:26}},
  incomes:function(){return {owner:m0.name||'',type:'工作',subType:'薪資',period:'年',amount:0,growth:0,start:A,end:65}},
  expenses:function(){return {name:'',cat:'生活',period:'年',amount:0,infl:true,start:A,end:85,cut:0}},
  assets:function(){return {name:'',owner:m0.name||'',mainCat:'可投資資產',type:'現金',cls:'流動',region:'台灣',currency:'台幣',fxRate:1,cost:0,value:0,ret:0,income:0,movable:true}},
@@ -1293,6 +1424,35 @@ function dataPane(c){
 var MEMBER_INS_TYPES=['勞保','職業工會','農保','公保','軍保','國民年金','勞工職業災害保險','就業保險','健保眷屬','退休','無'];
 var LABOR_YEAR_TXT='2026（115 年）';
 // ── 生日／年齡：兩個都能填，填生日就自動算足歲 ──
+// 勞保年資與勞退專戶。
+// 「已投保年資」是計算用的唯一真相；「起保年月」只是幫忙換算一次填進去的便利欄，
+// 顧問之後想手動改年資（例如中間有中斷投保）直接改數字即可，不會被起保年月蓋回去。
+function setInsStart(idx,ym){
+ var c=activeCase();if(!c)return;var m=(idx==null)?primaryMember(c):c.members[idx];if(!m)return;
+ m.insStart=ym;var y=ymYears(ym);if(y>0)m.worked=y;save();render();
+}
+function setPensionStart(idx,ym){
+ var c=activeCase();if(!c)return;var m=(idx==null)?primaryMember(c):c.members[idx];if(!m)return;
+ m.pensionStart=ym;var y=ymYears(ym);if(y>0)m.pensionYears=y;save();render();
+}
+function ymField(label,v,attr,hint){
+ return '<div class="f"><label>'+esc(label)+'</label><input type="month" value="'+esc(v||'')+'" '+attr+(hint?' title="'+esc(hint)+'"':'')+'></div>';
+}
+function seniorityBlock(m,idx,isLabor){
+ var mb=function(k,ty){return 'onchange="set(\'members:'+idx+'\',\''+k+'\',this.value'+(ty==='num'?',\'num\'':'')+')"';};
+ var derived=ymYears(m.insStart),shown=n(m.worked);
+ var fields=ymField('勞保起保年月',m.insStart,'onchange="setInsStart('+idx+',this.value)"','填了會自動換算成下面的已投保年資')+
+  '<div class="f"><label>已投保年資（年）</label><input type="number" step="0.1" value="'+esc(m.worked==null?'':m.worked)+'" '+mb('worked','num')+'></div>';
+ if(isLabor){
+  fields+=ymField('勞退新制提繳起始年月',m.pensionStart,'onchange="setPensionStart('+idx+',this.value)"','民國 94 年 7 月新制上路；更早的年資屬舊制，不在新制專戶裡')+
+   '<div class="f"><label>勞退專戶現有累積</label><input type="number" value="'+esc(m.pensionBalance==null?'':m.pensionBalance)+'" '+mb('pensionBalance','num')+' placeholder="勞保局 App 可查"></div>';
+ }
+ var hint='<div class="hint" style="margin-top:6px">保險年資＝<b>已投保年資 ＋ 到退休還會投保的年數</b>，直接決定老年年金月領金額'+
+  (isLabor?'（未滿 '+LABOR_ANNUITY_MIN_YEARS+' 年只能領老年一次金）':'')+'。'+
+  (derived>0&&Math.abs(derived-shown)>0.15?'<b style="color:var(--amber2)">（依起保年月推算為 '+derived+' 年，目前填的是 '+shown+' 年——中斷投保過就以實填為準）</b>':'')+
+  (isLabor?' 勞退專戶餘額留空時，系統會用提繳起始年月回推概估；請客戶到<b>勞保局 e 化服務／勞保局 App</b> 查實際金額會準得多。':'')+'</div>';
+ return '<div class="subhd">年資與退休金專戶</div><div class="fgrid">'+fields+'</div>'+hint;
+}
 function birthField(v,attr){
  return '<div class="f"><label>出生日期</label><input type="date" value="'+esc(v||'')+'" '+attr+'></div>';
 }
@@ -1497,9 +1657,11 @@ function personCard(c,m,idx,isPrimary){
   var hint=(jt==='企業主')?'<div class="hint" style="margin-top:6px">企業主投保多自行維持，月投保薪資請於上方手填。</div>'
     :noEmp?'<div class="hint" style="margin-top:6px">'+esc(jt)+'沒有雇主，預設以<b>國民年金</b>投保（月投保金額 '+fmt(NP_INSURED_MONTHLY)+' 元，'+NP_YEAR+' 年起），不計勞退提繳。'+(jt==='投資者'?' 投資／理財所得請於「收支資債」以<b>理財收入</b>登錄，不列為薪資。':'')+'</div>'
     :'<div class="hint" style="margin-top:6px">依 '+LABOR_YEAR_TXT+' 勞保投保薪資分級表自動帶入（級距天花板 45,800，可下拉改選或手填）。'+(jt==='業務工作者'?' 業務工作者收入常浮動、多以職業工會投保。':'')+'</div>';
-  workBlock='<div class="subhd">工作與投保</div><div class="fgrid">'+jobSel+salField+insField+'</div>'+hint+insGradeBox(m)+coHTML;
+  workBlock='<div class="subhd">工作與投保</div><div class="fgrid">'+jobSel+salField+insField+'</div>'+hint+insGradeBox(m)+coHTML
+   +seniorityBlock(m,idx,LABOR_LIKE_INS.indexOf(m.insType||'勞保')>=0);
  }else{
-  workBlock='<div class="subhd">投保</div><div class="fgrid">'+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES)+insSalaryField(m,idx)+'</div>'+insGradeBox(m);
+  workBlock='<div class="subhd">投保</div><div class="fgrid">'+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES)+insSalaryField(m,idx)+'</div>'+insGradeBox(m)
+   +((LABOR_LIKE_INS.indexOf(m.insType)>=0||m.insType==='國民年金')?seniorityBlock(m,idx,LABOR_LIKE_INS.indexOf(m.insType)>=0):'');
  }
  // 家庭分攤 · 財務獨立歲
  var ratioFields=fFld(mb('depRatio','num'),'家計負擔%',m.depRatio,'num')+fFld(mb('expRatio','num'),'支出比例%',m.expRatio,'num');
@@ -1609,14 +1771,33 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
 // 依「本人」的投保類型分流：勞保系 → 勞保老年年金 B式 1.55% ＋ 勞退新制；
 // 國民年金 → A式(0.65%＋加計)／B式(1.3%) 擇優、無勞退提繳；公保/軍保/農保/無 → 不試算。
 var LABOR_LIKE_INS=['勞保','職業工會','就業保險','勞工職業災害保險'];
+// 社會保險老年給付＋勞退新制概算。
+// 年資＝已投保年資（過去）＋ 到退休還會投保的年數（未來）。
+// ⚠️ 2026/08 修正：已投保年資(worked)改版前沒有輸入欄位、永遠是 0，
+//    等於把客戶過去投保的十幾二十年整段丟掉；現在成員卡有「勞保起保年月／已投保年資」。
+// ⚠️ 勞退同時修正：未來提繳只複利 future 年，過去的部分是「專戶餘額」滾存到退休。
+// ⚠️ 勞保老年年金改 A/B 式擇優，並加上「未滿 15 年只能領老年一次金」的門檻。
+// src/lib/engine.ts 有一份對照實作（engine.drift.test.ts 對拍），改這裡要一起改。
+function insuredYearsOf(m){var w=n(m&&m.worked);return w>0?w:ymYears(m&&m.insStart);}
+// 'YYYY-MM' → 到今天為止的年資（取到小數一位）。格式不對或起算日在未來一律回 0。
+function ymYears(ym){
+ if(!ym||!/^\d{4}-\d{2}$/.test(ym))return 0;
+ var y=+ym.slice(0,4),mo=+ym.slice(5,7);if(mo<1||mo>12)return 0;
+ var d=new Date(),v=(d.getFullYear()-y)+((d.getMonth()+1-mo)/12);
+ return v<=0?0:Math.floor(v*10)/10;
+}
 function estimateSocialPension(c){
  var pm=primaryMember(c)||{};var ins=n(pm.insSalary);
  var insType=pm.insType||'勞保';
  var age=n(c.profile.age),ra=n(c.profile.retireAge);
- var years=Math.max(0,n(pm.worked)+Math.max(0,ra-age));
+ var past=insuredYearsOf(pm);
+ var future=Math.max(0,ra-age);
+ var years=Math.max(0,past+future);
  var r=c.retire||{};var rr=n(r.retireReturn)/100||0.04;var m=Math.max(0,n(c.profile.lifeExp)-ra);
  var kind=(LABOR_LIKE_INS.indexOf(insType)>=0)?'labor':(insType==='國民年金'?'np':'other');
- var out={kind:kind,insType:insType,ins:ins,pensionBase:0,years:years,monthly:0,lump:0,fund:0,total:0,npA:0,npB:0,pick:''};
+ var out={kind:kind,insType:insType,ins:ins,pensionBase:0,years:years,past:past,future:future,
+  monthly:0,lump:0,fund:0,fundNow:0,fundNew:0,fundEstimated:false,pensionPast:0,
+  total:0,npA:0,npB:0,insA:0,insB:0,pick:'',eligible:false,onceMonths:0};
  var pv=function(annual){return (rr>0)?annual*(1-Math.pow(1+rr,-m))/rr:annual*m;};
  if(kind==='np'){
   out.ins=ins>0?ins:NP_INSURED_MONTHLY;
@@ -1624,6 +1805,7 @@ function estimateSocialPension(c){
   out.npA=out.ins*years*NP_RATE_A+NP_BONUS_A;   // A式：0.65% ＋ 加計金額
   out.npB=out.ins*years*NP_RATE_B;              // B式：1.3%
   out.pick=(out.npA>=out.npB)?'A':'B';
+  out.eligible=true;                            // 國保老年年金沒有 15 年門檻
   out.monthly=Math.max(out.npA,out.npB);
   out.lump=pv(out.monthly*12);
   out.fund=0;                                   // 國保無雇主提繳，沒有勞退新制
@@ -1632,11 +1814,29 @@ function estimateSocialPension(c){
  }
  if(kind!=='labor')return out;                  // 公保/軍保/農保/健保眷屬/退休/無：不概算
  out.pensionBase=laborPensionSalary(n(pm.monthlySalary)||n((c.profile||{}).monthlySalary)||ins);
- if(ins<=0||years<=0)return out;
- out.monthly=ins*years*0.0155;                  // 勞保老年年金 B式 1.55%
- out.lump=pv(out.monthly*12);
- var g=0.03, annualContrib=out.pensionBase*0.06*12; // 勞退：雇主月提繳6%(依月提繳工資)、基金概估年化3%
- out.fund=(g>0)?annualContrib*(Math.pow(1+g,years)-1)/g:annualContrib*years;
+ var g=LABOR_PENSION_FUND_RATE,annualContrib=out.pensionBase*0.06*12;
+ out.pensionPast=n(pm.pensionYears)||ymYears(pm.pensionStart);
+ var bal=n(pm.pensionBalance);
+ if(bal<=0&&out.pensionPast>0&&annualContrib>0){
+  bal=(g>0)?annualContrib*(Math.pow(1+g,out.pensionPast)-1)/g:annualContrib*out.pensionPast;
+  out.fundEstimated=true;                       // 專戶餘額是回推的，UI 要提醒去勞保局查實際值
+ }
+ out.fundNow=bal*Math.pow(1+g,future);
+ out.fundNew=(g>0)?annualContrib*(Math.pow(1+g,future)-1)/g:annualContrib*future;
+ out.fund=out.fundNow+out.fundNew;
+ if(ins>0&&years>0){
+  out.insA=ins*years*LABOR_INS_ANNUITY_RATE_A+LABOR_INS_ANNUITY_BONUS_A;
+  out.insB=ins*years*LABOR_INS_ANNUITY_RATE;
+  out.eligible=years>=LABOR_ANNUITY_MIN_YEARS;
+  if(out.eligible){
+   out.pick=(out.insA>=out.insB)?'A':'B';
+   out.monthly=Math.max(out.insA,out.insB);
+   out.lump=pv(out.monthly*12);
+  }else{
+   out.onceMonths=Math.floor(years);            // 老年一次金：每滿 1 年發 1 個月
+   out.lump=ins*out.onceMonths;
+  }
+ }
  out.total=out.lump+out.fund;
  return out;
 }
@@ -1657,7 +1857,7 @@ function laborPensionBox(c){var lp=estimateSocialPension(c);
  if(lp.total<=0)return '<div class="sec"><div class="hint">填寫「本人」'+insLabelOf(lp.insType)+'（於「工作類別」填月薪自動帶入，或在上方成員卡片選級距／手填）後，這裡會出現老年給付概算與一鍵帶入。</div></div>';
  var isNP=(lp.kind==='np');
  var head=isNP?('國民年金 概算 <span class="hint">依月投保金額 '+fmt(lp.ins)+' × 概估年資 '+lp.years+' 年，A／B 式擇優；非精算，僅供參考</span>')
-   :('勞保 / 勞退 概算 <span class="hint">依本人月投保薪資 '+fmt(lp.ins)+' × 概估年資 '+lp.years+' 年；非精算，僅供參考</span>');
+   :('勞保 / 勞退 概算 <span class="hint">依本人月投保薪資 '+fmt(lp.ins)+' × 保險年資 '+lp.years+' 年（已投保 '+lp.past+' ＋ 未來 '+lp.future+'）；非精算，僅供參考</span>');
  var cells=isNP
   ?'<div class="b"><div class="l">國保老年年金(月領)</div><div class="v">'+fmt(lp.monthly)+'</div></div>'+
    '<div class="b"><div class="l">擇優計給</div><div class="v" style="font-size:19px">'+lp.pick+' 式</div></div>'+
@@ -1667,7 +1867,7 @@ function laborPensionBox(c){var lp=estimateSocialPension(c);
    '<div class="b"><div class="l">勞退新制累積(概估)</div><div class="v">'+fmt(lp.fund)+'</div></div>';
  var note=isNP
   ?'國保老年年金採 A 式（月投保金額 × 年資 × 0.65% ＋ 加計 '+fmt(NP_BONUS_A)+'）與 B 式（× 1.3%）擇優計給；國民年金沒有雇主提繳，故無勞退新制。帶入後為「一次領」現值列，可於下方手動調整或刪除。'
-  :'勞保年金採 B 式 1.55%；勞退以雇主月提繳 6%、基金概估年化 3% 累積至退休。帶入後為「一次領」現值列，可於下方手動調整或刪除。';
+  :('勞保老年年金採 A 式（投保薪資 × 年資 × 0.775% ＋ '+fmt(LABOR_INS_ANNUITY_BONUS_A)+'）與 B 式（× 1.55%）擇優計給'+(lp.eligible?'':'；本案保險年資未滿 '+LABOR_ANNUITY_MIN_YEARS+' 年，只能請領老年一次金')+'。勞退＝專戶現有累積滾存＋未來提繳，年化 '+(LABOR_PENSION_FUND_RATE*100)+'%。帶入後為「一次領」現值列，可於下方手動調整或刪除。');
  return '<div class="sec"><h4>'+head+'</h4>'+
   '<div class="big3">'+cells+
   '<div class="b"><div class="l">合計可帶入已備</div><div class="v" style="color:var(--ok)">'+fmt(lp.total)+'</div></div></div>'+
@@ -1678,11 +1878,203 @@ function laborPensionBox(c){var lp=estimateSocialPension(c);
 function eduDerivedHTML(c){
  return '<div class="big3"><div class="b"><div class="l">教育金總需求(終值)</div><div class="v" style="color:var(--amber2)">'+fmt(eduTotal(c))+'</div></div></div>'+eduDetailHTML(c);
 }
+// ═══ 子女教育（協會問卷 G14）══════════════════════════════════════════
+// 孩子的年齡在「家庭」分頁已經有了，所以學段、剩餘年數、每年費用全部可以自動推出來，
+// 顧問只要確認與微調，不必從零填一張空白表。
+//
+// 資料仍然存回原本的 c.education[]（欄位只增不改），引擎的 eduTotal / projection 不用動：
+//   annual = 學雜費 + (含補習才藝 ? 補習才藝 : 0) + (含撫養費 ? 撫養費 : 0)
+//   years  = 該學段還要供給幾年、startIn = 幾年後開始
+// 新增欄位：mid(對應家庭成員)、stage、schoolType、tuition/extra/care、auto(自動產生)、lock(手動鎖定的欄位)
+function eduStageDefs(){
+ return eduCostList().map(function(x){return {stage:x.stage,startAge:n(x.startAge),years:n(x.years)}})
+  .sort(function(a,b){return a.startAge-b.startAge});
+}
+function eduStageOfAge(age){
+ var l=eduStageDefs();
+ for(var i=0;i<l.length;i++){var e=l[i].startAge+l[i].years;
+  if(age>=l[i].startAge&&age<e)return {stage:l[i].stage,startAge:l[i].startAge,years:l[i].years,remainYears:e-Math.floor(age),current:true};}
+ return null;
+}
+// 從現在起還沒念完的學段，供給到 top（期望最高學歷）為止；payTo＝支付學雜費至幾歲（0/空＝不限）。
+function eduRemainingStages(age,top,payTo){
+ var l=eduStageDefs(),ti=-1;
+ for(var k=0;k<l.length;k++)if(l[k].stage===top)ti=k;
+ var cut=(ti>=0)?ti:l.length-1;
+ var a=Math.max(0,Math.floor(n(age))),cap=n(payTo),out=[];
+ for(var i=0;i<=cut;i++){
+  var s=l[i],end=s.startAge+s.years;
+  if(a>=end)continue;                                   // 已念完
+  var from=Math.max(a,s.startAge),to=end;
+  if(cap>0)to=Math.min(to,cap);                         // 只供給到指定歲數
+  var rem=to-from;
+  if(rem<=0)continue;
+  out.push({stage:s.stage,startAge:s.startAge,years:s.years,startIn:Math.max(0,s.startAge-a),remainYears:rem,current:a>=s.startAge});
+ }
+ return out;
+}
+function eduDefaultAmounts(stage,schoolType){
+ var p=eduCostOf(stage)||{};
+ var t=(schoolType==='海外')?n(p.overseasTuition):(schoolType==='私立'?n(p.privateTuition):n(p.publicTuition));
+ return {tuition:t,extra:n(p.extraFee),care:n(p.careFee)};
+}
+function eduRowTotal(e){
+ return n(e.tuition)+(e.withExtra?n(e.extra):0)+(e.withCare?n(e.care):0);
+}
+function eduChildren(c){
+ ensureMemberIds(c);
+ return (c.members||[]).map(function(m,i){return {m:m,i:i}}).filter(function(x){return (x.m.role||'')==='子女'});
+}
+function eduChildAge(m){var a=m.birth?ageFromBirth(m.birth):null;return n(a!=null&&a!==''?a:m.age);}
+// 依孩子的年齡與期望學歷，把 c.education 裡屬於這個孩子的自動列對齊；
+// 手動改過的金額（lock）與手動加的列（auto!==true）一律保留。
+// 舊資料保護：既有客戶的 education 是顧問一列一列填的。
+// 如果直接自動生成各學段，會跟舊列雙重計算，教育金總需求瞬間翻倍而且沒人看得出來。
+// 所以自動帶入是「每個孩子各自的開關」（m.eduAuto）：
+//   - 這份案子完全沒有舊的教育金列（新客戶）→ 預設開啟，顧問一進來就看到推算結果。
+//   - 有舊列 → 預設關閉，卡片上出現按鈕請顧問自己決定要不要換成自動推算。
+function eduHasLegacy(c){return (c.education||[]).some(function(e){return e.auto!==true})}
+function eduAutoDefaults(c){
+ var legacy=eduHasLegacy(c);
+ eduChildren(c).forEach(function(x){if(x.m.eduAuto===undefined)x.m.eduAuto=!legacy;});
+}
+function enableEduAuto(mi){
+ var c=activeCase();if(!c)return;var m=(c.members||[])[mi];if(!m)return;
+ m.eduAuto=true;syncEduChild(c,m);save();render();
+}
+function disableEduAuto(mi){
+ var c=activeCase();if(!c)return;var m=(c.members||[])[mi];if(!m)return;
+ m.eduAuto=false;
+ c.education=(c.education||[]).filter(function(e){return !(e.mid===m.mid&&e.auto===true)});
+ save();render();
+}
+function syncEduChild(c,m){
+ c.education=c.education||[];
+ if(!m.eduAuto)return c;
+ var top=m.eduTop||'大學',age=eduChildAge(m);
+ var want=eduRemainingStages(age,top,m.eduPayTo);
+ var wantKey={};want.forEach(function(w){wantKey[w.stage]=w});
+ // 移除已不需要的自動列（念完了、或超出期望學歷）
+ c.education=c.education.filter(function(e){
+  if(e.mid!==m.mid||e.auto!==true)return true;
+  return !!wantKey[e.stage];
+ });
+ var byStage={};
+ c.education.forEach(function(e){if(e.mid===m.mid&&e.auto===true)byStage[e.stage]=e});
+ want.forEach(function(w){
+  var e=byStage[w.stage];
+  if(!e){e={mid:m.mid,auto:true,lock:{},stage:w.stage,schoolType:'公立'};c.education.push(e);}
+  e.lock=e.lock||{};
+  e.child=memberLabel(c,m,-1)||'子女';
+  e.startIn=w.startIn;e.years=w.remainYears;
+  e.withExtra=!!m.eduExtra;e.withCare=!!m.eduCare;
+  var d=eduDefaultAmounts(w.stage,e.schoolType||'公立');
+  if(!e.lock.tuition)e.tuition=d.tuition;
+  if(!e.lock.extra)e.extra=d.extra;
+  if(!e.lock.care)e.care=d.care;
+  e.annual=eduRowTotal(e);
+ });
+ return c;
+}
+function syncEduAll(c){eduAutoDefaults(c);eduChildren(c).forEach(function(x){syncEduChild(c,x.m)});return c;}
+// 手動列（沒有 mid 的舊資料）也要有 annual；舊資料 annual 本來就有，不動。
+function eduIdxOf(c,mid,stage){
+ var l=c.education||[];
+ for(var i=0;i<l.length;i++)if(l[i].mid===mid&&l[i].stage===stage)return i;
+ return -1;
+}
+function setEduOpt(mi,key,val,type){
+ var c=activeCase();if(!c)return;var m=(c.members||[])[mi];if(!m)return;
+ m[key]=(type==='num')?n(val):((type==='bool')?!!val:val);
+ syncEduChild(c,m);save();render();
+}
+function setEduSchool(mid,stage,val){
+ var c=activeCase();if(!c)return;var i=eduIdxOf(c,mid,stage);if(i<0)return;
+ var e=c.education[i];e.schoolType=val;
+ var d=eduDefaultAmounts(stage,val);
+ // 換學別＝換一組官方預設值；顧問手動改過的那幾格不覆蓋（那是他刻意填的實況）
+ if(!e.lock.tuition)e.tuition=d.tuition;
+ if(!e.lock.extra)e.extra=d.extra;
+ if(!e.lock.care)e.care=d.care;
+ e.annual=eduRowTotal(e);save();render();
+}
+function setEduAmt(mid,stage,field,val,live){
+ var c=activeCase();if(!c)return;var i=eduIdxOf(c,mid,stage);if(i<0)return;
+ var e=c.education[i];e[field]=n(val);e.lock=e.lock||{};e.lock[field]=1;
+ e.annual=eduRowTotal(e);
+ if(live){syncDerived();liveSave();}else{save();render();}
+}
+function resetEduRow(mid,stage){
+ var c=activeCase();if(!c)return;var i=eduIdxOf(c,mid,stage);if(i<0)return;
+ var e=c.education[i];e.lock={};
+ var d=eduDefaultAmounts(stage,e.schoolType||'公立');
+ e.tuition=d.tuition;e.extra=d.extra;e.care=d.care;e.annual=eduRowTotal(e);
+ save();render();
+}
+function eduNum(mid,stage,field,v){
+ return '<input type="number" value="'+esc(v==null?'':v)+'" oninput="setEduAmt(\'' + esc(mid) + '\',\''+esc(stage)+'\',\''+field+'\',this.value,1)" onchange="setEduAmt(\''+esc(mid)+'\',\''+esc(stage)+'\',\''+field+'\',this.value)">';
+}
+function eduChildCard(c,m,mi){
+ var age=eduChildAge(m),cur=eduStageOfAge(age);
+ var rows=(c.education||[]).filter(function(e){return e.mid===m.mid&&e.auto===true});
+ var top=m.eduTop||'大學';
+ var locked=rows.some(function(e){return e.lock&&(e.lock.tuition||e.lock.extra||e.lock.care)});
+ var nowTxt=cur?('目前就讀 <b>'+esc(cur.stage)+'</b>（'+esc(cur.stage)+'還剩 '+cur.remainYears+' 年）')
+  :(age<eduStageDefs()[0].startAge?'尚未入學（<b>'+(eduStageDefs()[0].startAge-Math.floor(age))+'</b> 年後上'+esc(eduStageDefs()[0].stage)+'）':'已完成學業');
+ var head='<h4>'+esc(memberLabel(c,m,-1)||'子女')+' <span class="hint">'+Math.floor(age)+' 歲 · '+nowTxt+'</span></h4>';
+ var opts='<div class="fgrid">'+
+  '<div class="f"><label>期望最高學歷</label><select onchange="setEduOpt('+mi+',\'eduTop\',this.value)">'+
+   eduStageDefs().filter(function(s){return ['高中職','大學','研究所','博士班'].indexOf(s.stage)>=0}).map(function(s){
+    return '<option '+(top===s.stage?'selected':'')+'>'+esc(s.stage)+'</option>'}).join('')+'</select></div>'+
+  '<div class="f"><label>支付學雜費至幾歲（留空＝供給到畢業）</label><input type="number" value="'+esc(m.eduPayTo==null?'':m.eduPayTo)+'" onchange="setEduOpt('+mi+',\'eduPayTo\',this.value,\'num\')"></div>'+
+  '<div class="f"><label>重要程度 1-5</label><input type="number" min="1" max="5" value="'+esc(m.eduImp==null?3:m.eduImp)+'" onchange="setEduOpt('+mi+',\'eduImp\',this.value,\'num\')"></div>'+
+  '</div>'+
+  '<div class="edutog">'+
+   '<label><input type="checkbox" '+(m.eduExtra?'checked':'')+' onchange="setEduOpt('+mi+',\'eduExtra\',this.checked,\'bool\')"> 補習／才藝費列入教育金</label>'+
+   '<label><input type="checkbox" '+(m.eduCare?'checked':'')+' onchange="setEduOpt('+mi+',\'eduCare\',this.checked,\'bool\')"> 撫養費（生活開銷）列入教育金</label>'+
+  '</div>'+
+  '<div class="hint" style="margin-top:4px">撫養費多半已經登在「收支資債」的支出裡；勾這格會讓它同時算進教育金總需求，<b>會重複計算</b>，只在支出沒登錄子女生活費時才勾。</div>';
+ var head2='<tr><th>學段</th><th>學別</th><th>幾年後開始</th><th>供給年數</th><th>學雜費/年</th><th>補習才藝/年</th><th>撫養費/年</th><th>合計/年</th><th></th></tr>';
+ var body=rows.map(function(e){
+  var lk=e.lock||{};
+  var tag=function(f){return lk[f]?'<span class="edulock" title="已手動調整，換學別時不會被官方預設值蓋掉">改</span>':''};
+  return '<tr'+(e.startIn===0?' class="edunow"':'')+'>'+
+   '<td>'+esc(e.stage)+(e.startIn===0?' <span class="edunowtag">進行中</span>':'')+'</td>'+
+   '<td><select onchange="setEduSchool(\''+esc(e.mid)+'\',\''+esc(e.stage)+'\',this.value)">'+
+    ['公立','私立','海外'].map(function(o){return '<option '+(e.schoolType===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></td>'+
+   '<td class="muted">'+n(e.startIn)+'</td>'+
+   '<td class="muted">'+n(e.years)+'</td>'+
+   '<td>'+eduNum(e.mid,e.stage,'tuition',e.tuition)+tag('tuition')+'</td>'+
+   '<td>'+(e.withExtra?eduNum(e.mid,e.stage,'extra',e.extra)+tag('extra'):'<span class="muted">未列入</span>')+'</td>'+
+   '<td>'+(e.withCare?eduNum(e.mid,e.stage,'care',e.care)+tag('care'):'<span class="muted">未列入</span>')+'</td>'+
+   '<td class="calc">'+fmt(eduRowTotal(e))+'</td>'+
+   '<td><button class="del" title="回復官方預設值" onclick="resetEduRow(\''+esc(e.mid)+'\',\''+esc(e.stage)+'\')">↺</button></td></tr>';
+ }).join('');
+ var tbl='<table>'+head2+(body||'<tr><td colspan="9" class="muted" style="padding:12px">依目前年齡與期望學歷，已無需要準備的學段。</td></tr>')+'</table>';
+ if(!m.eduAuto){
+  return '<div class="sec">'+head+
+   '<div class="hint" style="margin:6px 0 10px;line-height:1.7">這位子女目前用的是<b>手動填寫</b>的教育金列（見下方「手動列」）。<br>'+
+   '按下方按鈕會依他現在的年齡自動推算<b>還沒念完的每一個學段</b>與剩餘年數，並帶入官方公告的學雜費。'+
+   '<br><b style="color:var(--amber2)">舊的手動列不會自動刪除</b>——換成自動推算後，請自行把重複的手動列刪掉，否則會重複計算。</div>'+
+   '<button class="add" onclick="enableEduAuto('+mi+')">依年齡自動帶入各學段</button></div>';
+ }
+ return '<div class="sec">'+head+opts+tbl+
+  '<div class="hint" style="margin-top:6px">金額依<b>後台「類別與參數設定 → 教育費用參數」</b>的官方公告值自動帶入（今日現值），每一格都可以直接改；改過的格子會標「改」，換學別時不會被蓋掉，按 ↺ 可回復預設。'+
+  (locked?'':' 高中職公私立學費自 112 學年第 2 學期起全免，私立大專學士班另有每年 3.5 萬補助（碩博士不適用）——預設值已經扣掉了。')+
+  '</div>'+
+  '<div style="margin-top:8px"><button class="del" onclick="disableEduAuto('+mi+')" title="改回手動填寫，會移除這位子女的自動列">改回手動填寫</button></div></div>';
+}
 function eduSec(c){
- var tbl=tableSec('子女教育金','education',c.education,[['child','子女','memsel'],['stage','階段','sel:'+EDU_STAGES.join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','num'],['years','供給年數','num'],['startIn','幾年後開始','num']]);
+ syncEduAll(c);
+ var kids=eduChildren(c);
+ var manual=(c.education||[]).filter(function(e){return e.auto!==true});
+ var cards=kids.map(function(x){return eduChildCard(c,x.m,x.i)}).join('');
+ var empty=kids.length?'':'<div class="sec"><div class="hint">「家庭」分頁還沒有角色為<b>子女</b>的成員。加了子女並填上生日或年齡之後，這裡會自動推算他目前的就學階段、剩餘年數，並帶入官方公告的各階段學雜費。</div></div>';
+ var manualTbl=manual.length
+  ?tableSec('手動列（舊資料／未出生子女）','education',c.education,[['child','子女','text'],['stage','階段','sel:'+eduStageDefs().map(function(s){return s.stage}).join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','num'],['years','供給年數','num'],['startIn','幾年後開始','num']],'自動產生的列請在上方各子女卡片調整；這張表保留手動／舊資料列。')
+  :'';
  return '<div class="sec"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
-  '<div class="hint" style="margin:2px 0 8px">子女欄請從家庭成員選取；學別（公立/私立/海外）供分類與報告參考，年費用請依實況填寫（大學參考：公立約 6–10 萬、私立約 10–13 萬、海外差異大）。</div>'+
-  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+tbl;
+  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+empty+cards+manualTbl;
 }
 function taxSec(c){var t=c.taxParams||{},it=incomeTax(c),es=estateTax(c);
  var f='<div class="f"><label>婚姻</label><select onchange="setTax(\'married\',this.value===\'true\',\'bool\')"><option value="false" '+(!t.married?'selected':'')+'>單身</option><option value="true" '+(t.married?'selected':'')+'>有偶</option></select></div>'+
@@ -2265,12 +2657,11 @@ function finIncTable(c){
  var body=order.map(function(o){var sub=0;
   var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=n(x.amount);var per=x.period||'年';
    var tSel=['工作','理財','其他'].map(function(t){return '<option '+((x.type||'工作')===t?'selected':'')+'>'+t+'</option>'}).join('');
-   var sSel='<option value="" '+(!x.subType?'selected':'')+'></option>'+INC_SUB.map(function(s){return '<option '+((x.subType||'')===s?'selected':'')+'>'+s+'</option>'}).join('');
    var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
    return '<tr>'+
     '<td>'+finTxt('incomes',i,'owner',x.owner)+'</td>'+
     '<td><select onchange="set(\'incomes:'+i+'\',\'type\',this.value)">'+tSel+'</select></td>'+
-    '<td><select onchange="set(\'incomes:'+i+'\',\'subType\',this.value)">'+sSel+'</select></td>'+
+    '<td>'+catCell('incomes',i,'income',x)+'</td>'+
     '<td><select onchange="setAmtPeriod(\'incomes\','+i+',this.value)">'+pSel+'</select></td>'+
     '<td>'+finAmt('incomes',i,shownAmt(x))+'</td>'+
     '<td class="calc" data-fincalc="incomes:'+i+'">'+fmt(n(x.amount))+'</td>'+
@@ -2286,13 +2677,14 @@ function finIncTable(c){
 
 function finExpTable(c){
  var CATS=['生活','消費','稅賦','孝親','保險','其他'];
- var head='<tr><th>項目</th><th>分類</th><th>週期</th><th>金額</th><th>年化</th><th>通膨</th><th>起</th><th>訖</th><th>可刪減%</th><th></th></tr>';
+ var head='<tr><th>項目</th><th>分類</th><th>細項</th><th>週期</th><th>金額</th><th>年化</th><th>通膨</th><th>起</th><th>訖</th><th>可刪減%</th><th></th></tr>';
  var rows=(c.expenses||[]).map(function(x,i){var per=x.period||'年';
    var cSel=CATS.map(function(ct){return '<option '+((x.cat||'生活')===ct?'selected':'')+'>'+ct+'</option>'}).join('');
    var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
    return '<tr>'+
     '<td>'+finTxt('expenses',i,'name',x.name)+'</td>'+
     '<td><select onchange="set(\'expenses:'+i+'\',\'cat\',this.value)">'+cSel+'</select></td>'+
+    '<td>'+catCell('expenses',i,'expense',x)+'</td>'+
     '<td><select onchange="setAmtPeriod(\'expenses\','+i+',this.value)">'+pSel+'</select></td>'+
     '<td>'+finAmt('expenses',i,shownAmt(x))+'</td>'+
     '<td class="calc" data-fincalc="expenses:'+i+'">'+fmt(n(x.amount))+'</td>'+
@@ -2302,7 +2694,7 @@ function finExpTable(c){
     '<td>'+finNum('expenses',i,'cut',x.cut)+'</td>'+
     '<td><button class="del" onclick="delRow(\'expenses\','+i+')">✕</button></td></tr>';
  }).join('');
- return '<table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:12px">尚無資料，點「＋ 新增」。</td></tr>')+'</table>';
+ return '<table>'+head+(rows||'<tr><td colspan="11" class="muted" style="padding:12px">尚無資料，點「＋ 新增」。</td></tr>')+'</table>';
 }
 
 function finAstTable(c){
@@ -2315,7 +2707,7 @@ function finAstTable(c){
    var main='<tr>'+
     '<td>'+finTxt('assets',i,'name',x.name)+'</td>'+
     '<td>'+finMem(c,'assets',i,'owner',x.owner)+'</td>'+
-    '<td>'+finSel('assets',i,'type',x.type,['現金','定存','股票','基金','債券','不動產','其他'])+'</td>'+
+    '<td>'+catCell('assets',i,'asset',x)+'</td>'+
     '<td>'+finSel('assets',i,'currency',x.currency,['台幣','美金','人民幣','日圓','港幣','其他'])+'</td>'+
     '<td>'+finNum('assets',i,'value',x.value)+'</td>'+
     '<td class="calc" data-fincalc="assets:'+i+'">'+fmt(aVal(x))+'</td>'+
@@ -2329,6 +2721,7 @@ function finAstTable(c){
     finDF('報酬率 %',finNum('assets',i,'ret',x.ret))+
     finDF('被動現金流(原幣/年)',finNum('assets',i,'income',x.income))+
     finDF('可變動',finBool('assets',i,'movable',x.movable))+
+    finDF('計入風險性資產',finBool('assets',i,'risk',isRiskAsset(x)))+
     '</div></td></tr>':'';
    return main+detail;
   }).join('');
@@ -2341,17 +2734,18 @@ function finLiaTable(c){
  app.finOpen=app.finOpen||{assets:{},liabilities:{}};
  var idx=(c.liabilities||[]).map(function(x,i){return [x,i]}).filter(function(p){return finMatch(p[0].owner)});
  var order=[];idx.forEach(function(p){var o=p[0].owner||'(未指定)';if(order.indexOf(o)<0)order.push(o)});
- var head='<tr><th>項目</th><th>持有人</th><th>主分類</th><th>餘額(原幣)</th><th>台幣值</th><th></th></tr>';
+ var head='<tr><th>項目</th><th>持有人</th><th>主分類</th><th>細項</th><th>餘額(原幣)</th><th>台幣值</th><th></th></tr>';
  var body=order.map(function(o){var sub=0;
   var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=lBal(x);var open=!!app.finOpen.liabilities[i];
    var main='<tr>'+
     '<td>'+finTxt('liabilities',i,'name',x.name)+'</td>'+
     '<td>'+finMem(c,'liabilities',i,'owner',x.owner)+'</td>'+
     '<td>'+finSel('liabilities',i,'mainCat',x.mainCat,['房貸','車貸','信貸','其他'])+'</td>'+
+    '<td>'+catCell('liabilities',i,'liability',x)+'</td>'+
     '<td>'+finNum('liabilities',i,'balance',x.balance)+'</td>'+
     '<td class="calc" data-fincalc="liabilities:'+i+'">'+fmt(lBal(x))+'</td>'+
     '<td class="acts">'+finCaret('liabilities',i,open)+'<button class="del" onclick="delRow(\'liabilities\','+i+')">✕</button></td></tr>';
-   var detail=open?'<tr class="drow"><td colspan="6"><div class="dhead">進階欄</div><div class="dform">'+
+   var detail=open?'<tr class="drow"><td colspan="7"><div class="dhead">進階欄</div><div class="dform">'+
     finDF('幣別',finSel('liabilities',i,'currency',x.currency,['台幣','美金','其他']))+
     finDF('匯率',finNum('liabilities',i,'fxRate',x.fxRate))+
     finDF('年利率 %',finNum('liabilities',i,'rate',x.rate))+
@@ -2360,12 +2754,13 @@ function finLiaTable(c){
     finDF('剩餘月數',finNum('liabilities',i,'months',x.months))+
     finDF('寬限期(月)',finNum('liabilities',i,'grace',x.grace))+
     finDF('起始年齡',finNum('liabilities',i,'startAge',x.startAge))+
+    finDF('算消費性負債',finBool('liabilities',i,'consumerDebt',isConsumerDebt(x)))+
     '</div></td></tr>':'';
    return main+detail;
   }).join('');
-  return '<tr class="grp"><td colspan="6" data-fingrp="liabilities|'+esc(o)+'">'+esc(o)+' <span class="gm">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
+  return '<tr class="grp"><td colspan="7" data-fingrp="liabilities|'+esc(o)+'">'+esc(o)+' <span class="gm">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
  }).join('');
- return '<table>'+head+(body||'<tr><td colspan="6" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
+ return '<table>'+head+(body||'<tr><td colspan="7" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
 }
 
 function finTotals(c){
@@ -3169,6 +3564,25 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
     fetch('/api/brand',{cache:'no-store'})
       .then(function(r){return r&&r.ok?r.json():null;})
       .then(function(b){ if(!b)return; window.LANTU_BRAND=b; applyMark(b.logoUrl); })
+      .catch(function(){});
+  }catch(e){}
+})();
+
+/* 收支資債細類字典 + 教育費用參數：後台 /admin/categories 維護，這裡載入時抓一次。
+   抓不到就沿用內建的 CAT_FALLBACK / EDU_COST_FALLBACK —— 選項會少一點，但畫面不會壞。
+   抓到之後重畫一次，讓已經渲染出來的下拉換成完整清單。 */
+(function(){
+  window.LANTU_CATS=window.LANTU_CATS||null;
+  window.LANTU_EDU_COSTS=window.LANTU_EDU_COSTS||null;
+  try{
+    fetch('/api/finance-categories',{cache:'no-store'})
+      .then(function(r){return r&&r.ok?r.json():null;})
+      .then(function(d){
+        if(!d)return;
+        if(d.cats)window.LANTU_CATS=d.cats;
+        if(d.edu&&d.edu.length)window.LANTU_EDU_COSTS=d.edu;
+        try{ if(typeof render==='function')render(); }catch(e){}
+      })
       .catch(function(){});
   }catch(e){}
 })();
