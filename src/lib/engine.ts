@@ -10,8 +10,10 @@ import { defaultIntent, PURPOSES, TARGETS } from "@/lib/intent";
 import {
   TAX_BR, EXEMPT_PER_PERSON, STD_DED_MARRIED, STD_DED_SINGLE, SALARY_SPECIAL,
   EST_BR, ESTATE_EXEMPT, ESTATE_SPOUSE_DED, ESTATE_LINEAL_DED, ESTATE_FUNERAL_DED,
-  LABOR_INS_GRADES, LABOR_PENSION_RATE, LABOR_INS_ANNUITY_RATE,
+  LABOR_INS_GRADES, LABOR_PENSION_RATE, LABOR_INS_ANNUITY_RATE, LABOR_PENSION_CAP,
   laborInsSalary, laborPensionSalary,
+  NP_YEAR, NP_INSURED_MONTHLY, NP_RATE_A, NP_BONUS_A, NP_RATE_B, LABOR_LIKE_INS,
+  JOB_TYPES, NO_EMPLOYER_JOBS, isNoEmployerJob, jobInsType, ageFromBirth,
   PROF_EXPENSE, profStdRate, profExpenseRate,
   HOUSE_TAX_RATE, LAND_TAX_RATE,
 } from "@/lib/taiwan";
@@ -25,7 +27,7 @@ function uid(){return 'c'+Date.now().toString(36)+(__uidSeq++).toString(36)+Math
 
 function sampleCase(){return {
  id:uid(),
- profile:{name:'王大明(示範)',gender:'男',age:40,retireAge:65,lifeExp:85,credit:700},
+ profile:{name:'王大明(示範)',gender:'男',birth:'',age:40,retireAge:65,lifeExp:85,credit:700,jobTypeOther:''},
  params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,freeSaving:1,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
  tracking:[{year:2024,age:40,net:9500000},{year:2025,age:41,net:9950000}],
  riskQuiz:{ans:{0:1,1:2,2:2,3:2,4:1,5:2,6:2,7:2,8:2,9:2,10:2,11:2}},
@@ -101,7 +103,7 @@ function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['in
  c.profile.credit='';
  c.intent=defaultIntent();c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};
  // 與 lantu-app.html 的 newCase() 對齊：少了這幾個欄位，新客戶進 iframe 後價值輪與報告備註會是 undefined。
- c.profile.jobType='一般就業者';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';
+ c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';
  return c}
 
 // 「本人」成員；找不到就退回第一位。壽險缺口的流動資產抵充、勞保勞退概算都以他為準。
@@ -532,24 +534,46 @@ function estateTax(c,netOverride){
 
 function propertyTax(c){var tp=c.taxParams||{};var house=n(tp.houseAssessed)*HOUSE_TAX_RATE,land=n(tp.landAssessed)*LAND_TAX_RATE,car=n(tp.carTax);return {house:house,land:land,car:car,total:house+land+car}}
 
-// 勞保老年年金（B式）＋勞退新制概算。
+// 社會保險老年給付＋勞退新制概算。依「本人」的投保類型分流：
+//   勞保系 → 勞保老年年金 B 式 1.55% ＋ 勞退新制；
+//   國民年金 → A 式(0.65%＋加計)／B 式(1.3%) 擇優，無雇主提繳故無勞退；
+//   公保/軍保/農保/無 → 規則各異，不代為概算。
 // ⚠️ 勞退走的是「月提繳工資分級表」(上限 150,000)，不是勞保投保薪資分級表(上限 45,800)。
 //    兩張表混用會讓月薪 10 萬的客戶勞退提繳低估過半。
-function estimateLaborPension(c){
+function estimateSocialPension(c){
  var pm=primaryMember(c)||{};
  var ins=n(pm.insSalary);
- var pensionBase=laborPensionSalary(n(pm.monthlySalary)||n((c.profile||{}).monthlySalary)||ins);
+ var insType=pm.insType||'勞保';
  var age=n(c.profile.age),ra=n(c.profile.retireAge);
  var years=Math.max(0,n(pm.worked)+Math.max(0,ra-age));
  var r=c.retire||{};var rr=n(r.retireReturn)/100||0.04;var m=Math.max(0,n(c.profile.lifeExp)-ra);
- if(ins<=0||years<=0)return {ins:ins,pensionBase:pensionBase,years:years,monthly:0,lump:0,fund:0,total:0};
- var monthly=ins*years*LABOR_INS_ANNUITY_RATE;
- var annual=monthly*12;
- var lump=(rr>0)?annual*(1-Math.pow(1+rr,-m))/rr:annual*m;   // 退休時之年金現值
- var g=0.03, annualContrib=pensionBase*LABOR_PENSION_RATE*12; // 勞退：雇主月提繳 6%、基金概估年化 3%
- var fund=(g>0)?annualContrib*(Math.pow(1+g,years)-1)/g:annualContrib*years;
- return {ins:ins,pensionBase:pensionBase,years:years,monthly:monthly,lump:lump,fund:fund,total:lump+fund};
+ var kind=(LABOR_LIKE_INS.indexOf(insType)>=0)?'labor':(insType==='國民年金'?'np':'other');
+ var out={kind:kind,insType:insType,ins:ins,pensionBase:0,years:years,monthly:0,lump:0,fund:0,total:0,npA:0,npB:0,pick:''};
+ var pv=function(annual){return (rr>0)?annual*(1-Math.pow(1+rr,-m))/rr:annual*m;};
+ if(kind==='np'){
+  out.ins=ins>0?ins:NP_INSURED_MONTHLY;
+  if(years<=0)return out;
+  out.npA=out.ins*years*NP_RATE_A+NP_BONUS_A;
+  out.npB=out.ins*years*NP_RATE_B;
+  out.pick=(out.npA>=out.npB)?'A':'B';
+  out.monthly=Math.max(out.npA,out.npB);
+  out.lump=pv(out.monthly*12);
+  out.fund=0;
+  out.total=out.lump;
+  return out;
+ }
+ if(kind!=='labor')return out;
+ out.pensionBase=laborPensionSalary(n(pm.monthlySalary)||n((c.profile||{}).monthlySalary)||ins);
+ if(ins<=0||years<=0)return out;
+ out.monthly=ins*years*LABOR_INS_ANNUITY_RATE;
+ out.lump=pv(out.monthly*12);
+ var g=0.03, annualContrib=out.pensionBase*LABOR_PENSION_RATE*12;
+ out.fund=(g>0)?annualContrib*(Math.pow(1+g,years)-1)/g:annualContrib*years;
+ out.total=out.lump+out.fund;
+ return out;
 }
+/** @deprecated 舊名，改用 estimateSocialPension（保留 export 契約相容） */
+function estimateLaborPension(c){return estimateSocialPension(c);}
 
 function legacyNeed(c){var lg=c.legacy||{};return n(lg.heirs)*n(lg.perHeirCash)}
 
@@ -690,6 +714,19 @@ export {
   estateTax,
   propertyTax,
   estimateLaborPension,
+  estimateSocialPension,
+  NP_YEAR,
+  NP_INSURED_MONTHLY,
+  NP_RATE_A,
+  NP_BONUS_A,
+  NP_RATE_B,
+  LABOR_LIKE_INS,
+  LABOR_PENSION_CAP,
+  JOB_TYPES,
+  NO_EMPLOYER_JOBS,
+  isNoEmployerJob,
+  jobInsType,
+  ageFromBirth,
   LABOR_INS_GRADES,
   laborInsSalary,
   laborPensionSalary,

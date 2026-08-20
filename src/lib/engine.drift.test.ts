@@ -188,4 +188,48 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(E.STAGE.C.gate).toContain("20%");
     expect(E.STAGE.B.gate).toContain("60%");
   });
+
+  it("國民年金常數：engine.ts（來自 taiwan.ts）與 lantu-app.html 兩邊一致", () => {
+    expect(HTML).toContain("var NP_INSURED_MONTHLY=" + E.NP_INSURED_MONTHLY);
+    expect(HTML).toContain("NP_RATE_A=" + E.NP_RATE_A);
+    expect(HTML).toContain("NP_BONUS_A=" + E.NP_BONUS_A);
+    expect(HTML).toContain("NP_RATE_B=" + E.NP_RATE_B);
+    expect(HTML).toContain("var NP_YEAR=" + E.NP_YEAR);
+    // 工作類別與「沒有雇主」的判定
+    expect(HTML).toContain("var JOB_TYPES=['" + E.JOB_TYPES.join("','") + "']");
+    expect(HTML).toContain("var NO_EMPLOYER_JOBS=['" + E.NO_EMPLOYER_JOBS.join("','") + "']");
+    expect(HTML).toContain("var LABOR_LIKE_INS=['" + E.LABOR_LIKE_INS.join("','") + "']");
+  });
+
+  it("estimateSocialPension：國民年金身分走 A／B 擇優、且不給勞退新制", () => {
+    const c = E.sampleCase();
+    const pm = c.members.find((m: { role: string }) => m.role === "本人");
+    pm.insType = "國民年金";
+    pm.insSalary = E.NP_INSURED_MONTHLY;
+    pm.worked = 15;
+    const r = E.estimateSocialPension(c);
+    expect(r.kind).toBe("np");
+    expect(r.fund).toBe(0); // 沒有雇主提繳 → 沒有勞退
+    expect(r.monthly).toBeCloseTo(Math.max(r.npA, r.npB), 6);
+    expect(r.npA).toBeCloseTo(E.NP_INSURED_MONTHLY * r.years * E.NP_RATE_A + E.NP_BONUS_A, 6);
+    expect(r.npB).toBeCloseTo(E.NP_INSURED_MONTHLY * r.years * E.NP_RATE_B, 6);
+    expect(["A", "B"]).toContain(r.pick);
+    expect(r.total).toBeCloseTo(r.lump, 6);
+  });
+
+  it("estimateSocialPension：勞保身分維持原本的 1.55% ＋ 勞退新制；公保等身分不概算", () => {
+    const c = E.sampleCase();
+    const labor = E.estimateSocialPension(c);
+    expect(labor.kind).toBe("labor");
+    expect(labor.fund).toBeGreaterThan(0);
+    expect(labor.monthly).toBeCloseTo(labor.ins * labor.years * 0.0155, 6);
+    // 舊名要還能用（export 契約相容）
+    expect(E.estimateLaborPension(c).total).toBeCloseTo(labor.total, 6);
+
+    const pm = c.members.find((m: { role: string }) => m.role === "本人");
+    pm.insType = "公保";
+    const other = E.estimateSocialPension(c);
+    expect(other.kind).toBe("other");
+    expect(other.total).toBe(0);
+  });
 });

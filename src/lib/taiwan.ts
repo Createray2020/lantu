@@ -98,6 +98,60 @@ export function laborPensionSalary(monthly: number): number {
 }
 
 // ─────────────────────────────────────────────
+// 國民年金（勞動部勞工保險局公告）
+// ─────────────────────────────────────────────
+
+/** NP_* 所適用的年度。月投保金額 115（2026）年起適用。 */
+export const NP_YEAR = 2026;
+
+/**
+ * 國民年金月投保金額。全體被保險人同一金額，沒有分級表。
+ * 104–111 年 18,282／112–114 年 19,761／115 年起 21,103。
+ */
+export const NP_INSURED_MONTHLY = 21103;
+
+/** 老年年金 A 式給付率（月投保金額 × 年資 × 0.65% ＋ 加計金額） */
+export const NP_RATE_A = 0.0065;
+/**
+ * 老年年金 A 式加計金額。105–108 年 3,628／109–112 年 3,772／113 年起 4,049。
+ * ⚠️ 2026/05 提出調高至 5,000 的修法案仍在立法院審議，三讀前一律用現行公告值。
+ */
+export const NP_BONUS_A = 4049;
+/** 老年年金 B 式給付率（月投保金額 × 年資 × 1.3%） */
+export const NP_RATE_B = 0.013;
+
+/** 視同勞保系（可套勞保老年年金＋勞退新制）的投保類型 */
+export const LABOR_LIKE_INS = ['勞保', '職業工會', '就業保險', '勞工職業災害保險'] as const;
+
+/** 工作類別。家管／投資者沒有雇主：不套勞保投保薪資分級、無勞退提繳，預設以國民年金投保。 */
+export const JOB_TYPES = ['一般就業者', '業務工作者', '企業主', '家管', '投資者', '其他'] as const;
+export const NO_EMPLOYER_JOBS = ['家管', '投資者'] as const;
+
+export function isNoEmployerJob(jobType: string): boolean {
+  return (NO_EMPLOYER_JOBS as readonly string[]).includes(jobType);
+}
+
+/** 工作類別 → 預設投保類型 */
+export function jobInsType(jobType: string): string {
+  if (jobType === '業務工作者') return '職業工會';
+  if (isNoEmployerJob(jobType)) return '國民年金';
+  return '勞保';
+}
+
+/** 出生日期（YYYY-MM-DD）→ 足歲；格式不對或超出合理範圍回傳 null。 */
+export function ageFromBirth(birth: string | null | undefined): number | null {
+  if (!birth) return null;
+  const m = String(birth).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const [by, bm, bd] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const t = new Date();
+  let a = t.getFullYear() - by;
+  const mo = t.getMonth() + 1 - bm;
+  if (mo < 0 || (mo === 0 && t.getDate() < bd)) a--;
+  return a >= 0 && a <= 130 ? a : null;
+}
+
+// ─────────────────────────────────────────────
 // 執行業務者費用標準
 // ─────────────────────────────────────────────
 

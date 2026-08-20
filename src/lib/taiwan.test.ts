@@ -173,4 +173,47 @@ describe("稅額實算", () => {
     expect(E.pct(NaN)).toBe("—");
     expect(E.pct(0.1234)).toBe("12.34%");
   });
+
+  it("國民年金：月投保金額與 A／B 式給付率（115 年公告）", () => {
+    expect(T.NP_INSURED_MONTHLY).toBe(21_103);
+    expect(T.NP_BONUS_A).toBe(4_049);
+    expect(T.NP_RATE_A).toBeCloseTo(0.0065, 6);
+    expect(T.NP_RATE_B).toBeCloseTo(0.013, 6);
+    expect(new Date().getFullYear()).toBeLessThanOrEqual(T.NP_YEAR + 1);
+  });
+
+  it("國民年金：年資短時 A 式勝出、年資長時 B 式勝出（擇優的交叉點）", () => {
+    const a = (yrs: number) => T.NP_INSURED_MONTHLY * yrs * T.NP_RATE_A + T.NP_BONUS_A;
+    const b = (yrs: number) => T.NP_INSURED_MONTHLY * yrs * T.NP_RATE_B;
+    expect(a(10)).toBeGreaterThan(b(10)); // 短年資靠加計金額撐住
+    expect(b(40)).toBeGreaterThan(a(40)); // 長年資 1.3% 追過
+  });
+
+  it("工作類別 → 預設投保類型：家管／投資者沒有雇主，走國民年金", () => {
+    expect(T.jobInsType("一般就業者")).toBe("勞保");
+    expect(T.jobInsType("業務工作者")).toBe("職業工會");
+    expect(T.jobInsType("企業主")).toBe("勞保");
+    expect(T.jobInsType("家管")).toBe("國民年金");
+    expect(T.jobInsType("投資者")).toBe("國民年金");
+    expect(T.jobInsType("其他")).toBe("勞保");
+    expect(T.isNoEmployerJob("家管")).toBe(true);
+    expect(T.isNoEmployerJob("一般就業者")).toBe(false);
+    expect(T.JOB_TYPES).toHaveLength(6);
+  });
+
+  it("ageFromBirth：足歲計算（生日還沒到要少一歲），格式不對回 null", () => {
+    const t = new Date();
+    const y = t.getFullYear();
+    const pad = (v: number) => String(v).padStart(2, "0");
+    // 今天生日 → 剛好滿 30
+    const today = `${y - 30}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+    expect(T.ageFromBirth(today)).toBe(30);
+    // 明年的今天才滿 30 → 現在 29
+    const tomorrowish = new Date(t.getTime() + 86400000);
+    const notYet = `${tomorrowish.getFullYear() - 30}-${pad(tomorrowish.getMonth() + 1)}-${pad(tomorrowish.getDate())}`;
+    expect(T.ageFromBirth(notYet)).toBe(29);
+    expect(T.ageFromBirth("")).toBeNull();
+    expect(T.ageFromBirth("1990/01/01")).toBeNull();
+    expect(T.ageFromBirth("1800-01-01")).toBeNull(); // 超出合理範圍
+  });
 });

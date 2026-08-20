@@ -282,7 +282,7 @@ function uid(){return 'c'+Math.floor(performance.now()*1000%1e9)+app.cases.lengt
 
 function sampleCase(){return {
  id:uid(),
- profile:{name:'王大明(示範)',gender:'男',age:40,retireAge:65,lifeExp:85,credit:700,jobType:'一般就業者',monthlySalary:100000},
+ profile:{name:'王大明(示範)',gender:'男',birth:'',age:40,retireAge:65,lifeExp:85,credit:700,jobType:'一般就業者',jobTypeOther:'',monthlySalary:100000},
  company:defaultCompany(),
  params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,freeSaving:1,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
  tracking:[{year:2024,age:40,net:9500000},{year:2025,age:41,net:9950000}],
@@ -357,7 +357,7 @@ function sampleCase(){return {
  ]}
 };}
 function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
- c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.jobType='一般就業者';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
+ c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
 
 // ===== 工作類別 / 投保級距 =====
 // 2026(115年) 勞工保險投保薪資分級表：實際月薪 → 對應月投保薪資（第1級 29,500；天花板第11級 45,800，115.01.01 生效）。
@@ -369,15 +369,40 @@ function laborPensionSalary(monthly){monthly=n(monthly);if(monthly<=0)return 0;
  for(var i=0;i<LABOR_INS_GRADES.length;i++){if(monthly<=LABOR_INS_GRADES[i])return LABOR_INS_GRADES[i]}
  return Math.min(Math.round(monthly),LABOR_PENSION_CAP);}
 function laborInsSalary(monthly){monthly=n(monthly);if(monthly<=0)return 0;for(var i=0;i<LABOR_INS_GRADES.length;i++){if(monthly<=LABOR_INS_GRADES[i])return LABOR_INS_GRADES[i]}return LABOR_INS_GRADES[LABOR_INS_GRADES.length-1];}
-function jobInsType(jobType){return jobType==='業務工作者'?'職業工會':'勞保';}
+// ===== 工作類別 =====
+// 一般就業者/業務工作者/企業主＝有薪資來源；家管/投資者＝無雇主（不套勞保分級、無勞退提繳）；其他＝可自由填寫，計算沿用一般就業者。
+var JOB_TYPES=['一般就業者','業務工作者','企業主','家管','投資者','其他'];
+var NO_EMPLOYER_JOBS=['家管','投資者'];
+function isNoEmployerJob(jt){return NO_EMPLOYER_JOBS.indexOf(jt)>=0;}
+function jobInsType(jobType){return jobType==='業務工作者'?'職業工會':(isNoEmployerJob(jobType)?'國民年金':'勞保');}
+// ===== 國民年金（勞動部勞工保險局公告）=====
+// 月投保金額：115 年起 21,103 元（112–114 年為 19,761）。
+// 老年年金擇優計給：A式＝月投保金額 × 年資 × 0.65% ＋ 加計金額(113 年起 4,049)；B式＝月投保金額 × 年資 × 1.3%。
+// 註：加計金額調高至 5,000 的修法案 2026/05 提出、尚在立法院審議，未三讀前一律用現行公告值。
+var NP_YEAR=2026;
+var NP_INSURED_MONTHLY=21103;
+var NP_RATE_A=0.0065, NP_BONUS_A=4049, NP_RATE_B=0.013;
+// 依投保類型決定「月投保薪資/金額」的可選級距；國保是單一固定金額。
+function insGradeOptions(insType){return insType==='國民年金'?[NP_INSURED_MONTHLY]:LABOR_INS_GRADES;}
+// ===== 生日 → 足歲 =====
+function ageFromBirth(b){
+ if(!b)return null;
+ var m=String(b).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return null;
+ var by=+m[1],bm=+m[2],bd=+m[3];
+ var t=new Date(),a=t.getFullYear()-by,mo=(t.getMonth()+1)-bm;
+ if(mo<0||(mo===0&&t.getDate()<bd))a--;
+ return (a>=0&&a<=130)?a:null;
+}
 function defaultCompany(){return {name:'',taxId:'',industry:'',role:'負責人',sharePct:100,annualRevenue:0,netProfit:0,ownerLoan:0,note:''};}
-function ensureJobFields(c){if(!c.profile)c.profile={};if(!c.profile.jobType)c.profile.jobType='一般就業者';if(c.profile.monthlySalary==null)c.profile.monthlySalary='';if(!c.company)c.company=defaultCompany();return c;}
+function ensureJobFields(c){if(!c.profile)c.profile={};if(!c.profile.jobType)c.profile.jobType='一般就業者';if(c.profile.jobTypeOther==null)c.profile.jobTypeOther='';if(c.profile.birth==null)c.profile.birth='';if(c.profile.monthlySalary==null)c.profile.monthlySalary='';if(!c.company)c.company=defaultCompany();return c;}
 function primaryMember(c){return (c.members||[]).filter(function(m){return m.role==='本人'})[0]||(c.members||[])[0];}
 // 就業者/業務：以月薪帶入「本人」成員的投保類型與月投保薪資（企業主投保自行維持）。
-function applyInsFromSalary(c){if(c.profile.jobType==='企業主')return;var pm=primaryMember(c);if(!pm)return;pm.insSalary=laborInsSalary(c.profile.monthlySalary);pm.insType=jobInsType(c.profile.jobType);}
+function applyInsFromSalary(c){if(c.profile.jobType==='企業主')return;var pm=primaryMember(c);if(!pm)return;pm.insType=jobInsType(c.profile.jobType);
+ pm.insSalary=isNoEmployerJob(c.profile.jobType)?NP_INSURED_MONTHLY:laborInsSalary(c.profile.monthlySalary);}
 // 配偶／其他賺薪成員：工作類別與月薪存在成員物件上（本人維持存 c.profile/c.company）
-function ensureMemberJob(m){if(!m)return m;if(m.jobType==null)m.jobType='一般就業者';if(m.monthlySalary==null)m.monthlySalary='';if(!m.company)m.company=defaultCompany();return m;}
-function applyInsFromSalaryMember(m){if(!m||m.jobType==='企業主')return;m.insSalary=laborInsSalary(m.monthlySalary);m.insType=jobInsType(m.jobType);}
+function ensureMemberJob(m){if(!m)return m;if(m.jobType==null)m.jobType='一般就業者';if(m.jobTypeOther==null)m.jobTypeOther='';if(m.monthlySalary==null)m.monthlySalary='';if(!m.company)m.company=defaultCompany();return m;}
+function applyInsFromSalaryMember(m){if(!m||m.jobType==='企業主')return;m.insType=jobInsType(m.jobType);
+ m.insSalary=isNoEmployerJob(m.jobType)?NP_INSURED_MONTHLY:laborInsSalary(m.monthlySalary);}
 
 // ===== 舊資料防護：所有資料進入點（localStorage / 匯入 JSON / iframe lantu:init）一律先過 migrateCase =====
 // 引擎對 c.profile / c.params / 13 個陣列完全沒有防護，缺任何一個都會在 render() 丟例外 → 整頁白畫面。
@@ -407,6 +432,7 @@ function migrateCase(c){
  if(c.reportNote==null)c.reportNote='';
  ensureJobFields(c);
  c.members.forEach(function(m){if(m&&(m.role==='本人'||m.role==='配偶'))ensureMemberJob(m);});
+ ensureMemberIds(c);
  try{normalizeIntent(c);}catch(e){c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};}
  c.schemaVersion=CASE_SCHEMA_VERSION;
  return c;
@@ -641,10 +667,20 @@ function lifeNeedDetailHTML(c){var nds=c.needs||[];if(!nds.length)return '';var 
    var rows=[['家庭年生活費 '+fmt(famLiving)+' × 扶養比 '+(depR*100)+'% × 保障 '+n(nd.protectYears)+' 年',Math.round(living)],['負債餘額',Math.round(liab)],['教育金總需求',Math.round(edu)],['生命禮儀費',n(nd.funeral)],['遺產稅預留',n(nd.estateTax)],['＝ 壽險毛需求',Math.round(gross),'var(--amber2)'],['− 已備壽險',Math.round(existing)],['− 可動用流動資產',Math.round(liq)],['＝ 壽險淨缺口',Math.round(Math.max(0,gross-existing-liq)),'var(--warn)']];
    return '<div style="margin-bottom:8px"><div class="hint">'+esc(nd.member)+'</div>'+kvTbl(rows)+'</div>';}).join('');
  return detailBox('保障需求反推明細',blocks);}
-// 勞保/勞退計算明細
-function laborDetailHTML(c){var lp=estimateLaborPension(c);if(lp.total<=0)return '';var r=c.retire||{},m=Math.max(0,n(c.profile.lifeExp)-n(c.profile.retireAge)),rr=n(r.retireReturn)/100||0.04;
- var rows=[['本人月投保薪資',lp.ins],['概估年資',lp.years+' 年'],['勞保老年年金月領 ＝ 投保薪資 × 年資 × 1.55%',Math.round(lp.monthly)],['年領',Math.round(lp.monthly*12)],['退休後餘命',m+' 年'],['勞保年金退休現值（折現 '+(rr*100).toFixed(1)+'%）',Math.round(lp.lump),'var(--ok)'],['勞退：雇主月提繳 6% × 12',Math.round(lp.ins*0.06*12)],['勞退新制累積（年化 3% 滾存至退休）',Math.round(lp.fund),'var(--ok)'],['合計可帶入已備',Math.round(lp.total),'var(--amber2)']];
- return detailBox('勞保 / 勞退 計算明細',kvTbl(rows));}
+// 社會保險老年給付 / 勞退計算明細
+function laborDetailHTML(c){var lp=estimateSocialPension(c);if(lp.total<=0)return '';
+ var r=c.retire||{},m=Math.max(0,n(c.profile.lifeExp)-n(c.profile.retireAge)),rr=n(r.retireReturn)/100||0.04;
+ if(lp.kind==='np'){
+  var rows=[['本人月投保金額（'+NP_YEAR+' 年公告）',lp.ins],['概估年資',lp.years+' 年'],
+   ['A 式 ＝ 月投保金額 × 年資 × 0.65% ＋ 加計 '+fmt(NP_BONUS_A),Math.round(lp.npA)],
+   ['B 式 ＝ 月投保金額 × 年資 × 1.3%',Math.round(lp.npB)],
+   ['擇優計給 → 月領',Math.round(lp.monthly),'var(--amber2)'],['年領',Math.round(lp.monthly*12)],
+   ['退休後餘命',m+' 年'],['年金退休現值（折現 '+(rr*100).toFixed(1)+'%）',Math.round(lp.lump),'var(--ok)'],
+   ['勞退新制','無（國民年金無雇主提繳）'],['合計可帶入已備',Math.round(lp.total),'var(--amber2)']];
+  return detailBox('國民年金 老年年金計算明細',kvTbl(rows)+'<div class="hint" style="display:block;margin-top:8px;line-height:1.6">依勞動部勞工保險局公告：月投保金額 115 年起 '+fmt(NP_INSURED_MONTHLY)+' 元；A 式加計金額 113 年起 '+fmt(NP_BONUS_A)+' 元（調高至 5,000 之修法案尚在立法院審議，未通過前以現行公告值計算）。有欠繳保費、已領其他社會保險年金等情形者不得選 A 式。</div>');
+ }
+ var rows2=[['本人月投保薪資',lp.ins],['概估年資',lp.years+' 年'],['勞保老年年金月領 ＝ 投保薪資 × 年資 × 1.55%',Math.round(lp.monthly)],['年領',Math.round(lp.monthly*12)],['退休後餘命',m+' 年'],['勞保年金退休現值（折現 '+(rr*100).toFixed(1)+'%）',Math.round(lp.lump),'var(--ok)'],['勞退月提繳工資（上限 '+fmt(LABOR_PENSION_CAP)+'）',lp.pensionBase],['勞退：雇主月提繳 6% × 12',Math.round(lp.pensionBase*0.06*12)],['勞退新制累積（年化 3% 滾存至退休）',Math.round(lp.fund),'var(--ok)'],['合計可帶入已備',Math.round(lp.total),'var(--amber2)']];
+ return detailBox('勞保 / 勞退 計算明細',kvTbl(rows2));}
 // 教育金計算明細
 function eduDetailHTML(c){var edu=c.education||[];if(!edu.length)return '';var g=n(c.params.tuitionGrowth)/100;
  var rows=edu.map(function(e){var fv=n(e.annual)*n(e.years)*Math.pow(1+g,n(e.startIn));return [esc(e.child||'子女')+' · '+esc(e.stage||'')+'（'+esc(e.schoolType||'')+'）年費 '+fmt(n(e.annual))+' × '+n(e.years)+' 年 ×(1+'+(g*100)+'%)^'+n(e.startIn),Math.round(fv)];});
@@ -1142,6 +1178,15 @@ function setMemberJobType(i,v){var c=activeCase();var m=c.members[i];if(!m)retur
 function setMemberSalary(i,v){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m.monthlySalary=n(v);applyInsFromSalaryMember(m);save();render();}
 function setMemberCompany(i,k,v,type){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m.company[k]=(type==='num')?n(v):v;save();if(app.role==='client')render();}
 function setMemberRole(i,v){var c=activeCase();var m=c.members[i];if(!m)return;m.role=v;if(v==='本人'||v==='配偶')ensureMemberJob(m);save();render();}
+// 生日 → 年齡：填了生日就自動換算足歲寫回 age（age 仍是全系統唯一的運算來源；年齡欄仍可直接改）。
+function setBirth(v){var c=activeCase();ensureJobFields(c);c.profile.birth=v;var a=ageFromBirth(v);if(a!=null)c.profile.age=a;save();render();}
+function setMemberBirth(i,v){var c=activeCase();var m=c.members[i];if(!m)return;m.birth=v;var a=ageFromBirth(v);if(a!=null)m.age=a;save();render();}
+function setJobTypeOther(v){var c=activeCase();ensureJobFields(c);c.profile.jobTypeOther=v;save();if(app.role==='client')render();}
+function setMemberJobTypeOther(i,v){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m.jobTypeOther=v;save();if(app.role==='client')render();}
+// 月投保薪資：下拉選級距（選「其他」則沿用目前數值，改由旁邊的手填框輸入）
+function setInsGrade(i,v){var c=activeCase();var m=c.members[i];if(!m)return;if(v==='__other')return;m.insSalary=n(v);save();render();}
+// 族譜關係：父/母指向另一位成員（以成員索引存，-1＝未設定）
+function setMemberParent(i,slot,v){var c=activeCase();var m=c.members[i];if(!m)return;m[slot]=(v===''||v==null)?'':String(v);save();render();}
 // 月/年週期：資料一律存「年額」(引擎不變)，僅輸入層依 period 換算顯示。
 function setAmtPeriod(arr,idx,v){var c=activeCase();c[arr][idx].period=v;save();render();}
 function setAmtByPeriod(arr,idx,val){var c=activeCase();var it=c[arr][idx];var v=n(val);it.amount=(it.period==='月')?v*12:v;save();if(app.role==='client')render();syncDerived();}
@@ -1246,6 +1291,45 @@ function dataPane(c){
 }
 // ===== 家庭成員：全員卡片化（本人／配偶＝完整工作卡；其餘＝身分＋投保＋分攤＋財務獨立歲）=====
 var MEMBER_INS_TYPES=['勞保','職業工會','農保','公保','軍保','國民年金','勞工職業災害保險','就業保險','健保眷屬','退休','無'];
+var LABOR_YEAR_TXT='2026（115 年）';
+// ── 生日／年齡：兩個都能填，填生日就自動算足歲 ──
+function birthField(v,attr){
+ return '<div class="f"><label>出生日期</label><input type="date" value="'+esc(v||'')+'" '+attr+'></div>';
+}
+function ageField(age,birth,attr,label){
+ var auto=ageFromBirth(birth);
+ var note=(auto!=null)?'<div class="hint" style="margin-top:3px">由出生日期自動計算（'+auto+' 歲）'+((n(age)!==auto)?'，目前手動覆寫為 '+n(age)+' 歲':'')+'</div>':'<div class="hint" style="margin-top:3px">可直接填年齡，或改填上方出生日期自動換算</div>';
+ return '<div class="f"><label>'+(label||'目前年齡')+'</label><input type="number" value="'+esc(age==null?'':age)+'" '+attr+'>'+note+'</div>';
+}
+// ── 月投保薪資：下拉選公告級距 ＋ 仍可手填 ──
+function insLabelOf(insType){return insType==='國民年金'?'月投保金額':'月投保薪資';}
+function insSalaryField(m,idx){
+ var isNP=(m.insType==='國民年金'),opts=insGradeOptions(m.insType),cur=n(m.insSalary),hit=opts.indexOf(cur)>=0;
+ var os='<option value="">未設定</option>'+opts.map(function(g,i){
+   return '<option value="'+g+'" '+(cur===g?'selected':'')+'>'+(isNP?'公告金額':'第 '+(i+1)+' 級')+'　'+fmt(g)+'</option>';
+  }).join('')+'<option value="__other" '+((!hit&&cur>0)?'selected':'')+'>其他（右欄手填）</option>';
+ return '<div class="f"><label>'+insLabelOf(m.insType)+'（選級距）</label><select onchange="setInsGrade('+idx+',this.value)">'+os+'</select></div>'+
+  '<div class="f"><label>'+insLabelOf(m.insType)+'（手填）</label><input type="number" value="'+esc(m.insSalary==null?'':m.insSalary)+'" onchange="set(\'members:'+idx+'\',\'insSalary\',this.value,\'num\')"></div>';
+}
+function insGradeBox(m){
+ var cur=n(m&&m.insSalary);
+ if(m&&m.insType==='國民年金'){
+  return detailBox('國民年金月投保金額對照',
+   '<div class="hint" style="margin-bottom:6px">國民年金沒有分級表，全體被保險人同一個月投保金額（由主管機關公告調整）。</div>'+
+   kvTbl([['115 年（'+NP_YEAR+'）起',NP_INSURED_MONTHLY,(cur===NP_INSURED_MONTHLY?'var(--amber2)':null)],['112–114 年',19761],['104–111 年',18282]]));
+ }
+ var rows=LABOR_INS_GRADES.map(function(g,i){
+  var on=(cur===g),hl=on?'background:rgba(201,154,91,.16)':'';
+  return '<tr style="'+hl+'"><td class="k" style="white-space:nowrap'+(on?';color:var(--amber2)':'')+'">'+(on?'▶ ':'')+'第 '+(i+1)+' 級</td>'+
+   '<td style="font-weight:800'+(on?';color:var(--amber2)':'')+'">'+fmt(g)+'</td>'+
+   '<td style="color:var(--mut);font-size:12.5px">'+(i===0?'第 1 級＝基本工資':(i===LABOR_INS_GRADES.length-1?'勞保投保薪資上限':'月薪 '+fmt(LABOR_INS_GRADES[i-1]+1)+'–'+fmt(g)))+'</td></tr>';
+ }).join('');
+ return detailBox(LABOR_YEAR_TXT+' 勞保投保薪資分級表',
+  '<div class="hint" style="margin-bottom:6px">月薪落在哪一級，就以該級的金額投保（就低不就高；超過上限一律以 45,800 計）。</div>'+
+  '<table class="rtable"><tr><td class="k">級數</td><td class="k">月投保薪資</td><td class="k">適用月薪</td></tr>'+rows+'</table>'+
+  '<div class="hint" style="display:block;margin-top:8px;line-height:1.6">⚠️ <b>勞工退休金（新制）月提繳工資是另一張表</b>，上限 '+fmt(LABOR_PENSION_CAP)+' 元，不是這裡的 45,800。兩張表混用會讓高薪者的勞退提繳嚴重低估。</div>');
+}
+
 function fFld(bindAttr,label,val,type,opts){
  if(opts){var os=opts.map(function(o){return '<option '+(val===o?'selected':'')+'>'+esc(o)+'</option>'}).join('');
   return '<div class="f"><label>'+label+'</label><select '+bindAttr+'>'+os+'</select></div>';}
@@ -1258,6 +1342,107 @@ function companyGridHTML(co,onAttr){
   '<div class="f"><label>行業別</label><input list="industryList" value="'+esc(co.industry==null?'':co.industry)+'" '+onAttr('industry','text')+'><datalist id="industryList"><option value="批發/零售"></option><option value="餐飲/住宿"></option><option value="製造"></option><option value="營建/工程"></option><option value="資訊/科技"></option><option value="金融/保險"></option><option value="醫療/生技"></option><option value="教育/文創"></option><option value="農林漁牧"></option><option value="專業服務(法律/會計/顧問)"></option></datalist></div>'+
   cf('role','擔任角色')+cf('sharePct','持股比例%','num')+cf('annualRevenue','年營收(概略)','num')+
   cf('netProfit','年淨利(概略)','num')+cf('ownerLoan','負責人往來(股東往來/借貸)','num')+cf('note','備註')+'</div></div>';
+}
+// ===== 家族族譜（樹狀圖）=====
+// 關係以 parentA / parentB 指向另一位成員的 mid（穩定 id，刪成員不會錯位）；
+// 沒設定時給合理預設：子女＝本人＋配偶。世代由角色決定，有設父母者一律排到父母的下一代。
+// ⚠️ 不能用 uid()：它是 performance.now() 截位，同一輪迴圈連續呼叫會撞號（實測三位成員拿到同一個 id，
+//    整個族譜疊成一張卡）。這裡用獨立序號＋亂數，並順手把已經撞號的舊資料重新編號。
+var _midSeq=0;
+function newMid(){_midSeq++;return 'm'+Date.now().toString(36)+'-'+_midSeq.toString(36)+'-'+Math.floor(Math.random()*1e6).toString(36);}
+function ensureMemberIds(c){
+ var seen={};
+ (c.members||[]).forEach(function(m){
+  if(!m||typeof m!=='object')return;
+  if(!m.mid||seen[m.mid])m.mid=newMid();
+  seen[m.mid]=1;
+ });
+ return c;
+}
+function memberByMid(c,mid){return (c.members||[]).filter(function(m){return m.mid===mid})[0]||null;}
+function primaryIdx(c){var ms=c.members||[];for(var i=0;i<ms.length;i++)if(ms[i].role==='本人')return i;return 0;}
+function spouseMember(c){return (c.members||[]).filter(function(m){return m.role==='配偶'})[0]||null;}
+function memberLabel(c,m,i){var nm=(i===primaryIdx(c))?((c.profile||{}).name||m.name||'本人'):(m.name||'（未命名）');return nm;}
+function effParents(c,m){
+ var out=[];
+ if(m.parentA){var a=memberByMid(c,m.parentA);if(a&&a!==m)out.push(a);}
+ if(m.parentB){var b=memberByMid(c,m.parentB);if(b&&b!==m&&out.indexOf(b)<0)out.push(b);}
+ if(!m.parentA&&!m.parentB&&m.role==='子女'){
+  var ms=c.members||[],pm=ms[primaryIdx(c)],sp=spouseMember(c);
+  if(pm&&pm!==m)out.push(pm);
+  if(sp&&sp!==m)out.push(sp);
+ }
+ return out;
+}
+function familyGenerations(c){
+ ensureMemberIds(c);
+ var ms=c.members||[],pi=primaryIdx(c),gen={};
+ ms.forEach(function(m,i){
+  var r=(i===pi)?'本人':(m.role||'其他');
+  gen[m.mid]=(r==='父'||r==='母'||r==='長輩')?0:(r==='子女')?2:1;
+ });
+ for(var pass=0;pass<3;pass++){
+  ms.forEach(function(m){
+   var ps=effParents(c,m);if(!ps.length)return;
+   var mx=0;ps.forEach(function(x){mx=Math.max(mx,gen[x.mid]||0)});
+   if(gen[m.mid]<=mx)gen[m.mid]=mx+1;
+  });
+ }
+ return gen;
+}
+function familyTreeSVG(c,theme){
+ ensureMemberIds(c);
+ var ms=c.members||[];
+ if(!ms.length)return theme==='light'?'<p style="color:#5a6b72">尚未登錄家庭成員。</p>':'<div class="hint">尚未登錄家庭成員，新增後這裡會自動長出族譜。</div>';
+ var dark=theme!=='light',pi=primaryIdx(c),gen=familyGenerations(c);
+ var txt=dark?'#eef2f7':'#0d2b45',sub=dark?'#a7bacb':'#5a6b72',line=dark?'rgba(255,255,255,.22)':'rgba(0,0,0,.22)';
+ var cardBg=dark?'#12334f':'#f4f7f9',cardBd=dark?'rgba(255,255,255,.14)':'rgba(0,0,0,.12)';
+ var selfBd=dark?'#c99a5b':'#a3814a',spouseBd=dark?'#7fa8a0':'#4e7a72';
+ var W=150,H=64,GX=20,GY=58,PAD=14;
+ var rows={};ms.forEach(function(m,i){var g=gen[m.mid]||0;(rows[g]=rows[g]||[]).push({m:m,i:i});});
+ var gks=Object.keys(rows).map(Number).sort(function(a,b){return a-b});
+ var maxCols=0;gks.forEach(function(g){maxCols=Math.max(maxCols,rows[g].length)});
+ var totalW=PAD*2+maxCols*W+(maxCols-1)*GX;
+ var totalH=PAD*2+gks.length*H+(gks.length-1)*GY;
+ var pos={};
+ gks.forEach(function(g,gi){
+  var arr=rows[g],rw=arr.length*W+(arr.length-1)*GX,x0=(totalW-rw)/2,y=PAD+gi*(H+GY);
+  arr.forEach(function(o,ci){pos[o.m.mid]={x:x0+ci*(W+GX),y:y};});
+ });
+ // 連線：由父母卡片底部中點 → 子女卡片頂部中點（直角折線）
+ var links='';
+ ms.forEach(function(m){
+  var ps=effParents(c,m),cp=pos[m.mid];if(!ps.length||!cp)return;
+  var px=0,py=0,cnt=0;
+  ps.forEach(function(x){var q=pos[x.mid];if(q){px+=q.x+W/2;py=Math.max(py,q.y+H);cnt++;}});
+  if(!cnt)return;px/=cnt;
+  if(py>=cp.y)return; // 同代或反向，不畫
+  var midY=(py+cp.y)/2;
+  links+='<path d="M'+px.toFixed(1)+' '+py.toFixed(1)+' V'+midY.toFixed(1)+' H'+(cp.x+W/2).toFixed(1)+' V'+cp.y.toFixed(1)+'" fill="none" stroke="'+line+'" stroke-width="1.4"/>';
+  if(ps.length>1){
+   var xs=ps.map(function(x){var q=pos[x.mid];return q?q.x+W/2:null}).filter(function(v){return v!=null});
+   if(xs.length>1)links+='<line x1="'+Math.min.apply(null,xs)+'" y1="'+py.toFixed(1)+'" x2="'+Math.max.apply(null,xs)+'" y2="'+py.toFixed(1)+'" stroke="'+line+'" stroke-width="1.4"/>';
+  }
+ });
+ var cards=ms.map(function(m,i){
+  var q=pos[m.mid];if(!q)return '';
+  var isSelf=(i===pi),role=isSelf?'本人':(m.role||'其他');
+  var nm=memberLabel(c,m,i);
+  var jt=isSelf?((c.profile||{}).jobType||''):(m.jobType||'');
+  if(jt==='其他'){var jo=isSelf?((c.profile||{}).jobTypeOther||''):(m.jobTypeOther||'');if(jo)jt=jo;}
+  var age=isSelf?n((c.profile||{}).age):n(m.age);
+  var l2=[role,(age?age+' 歲':'')].filter(Boolean).join(' · ');
+  var l3=jt||m.insType||'';
+  var bd=isSelf?selfBd:(role==='配偶'?spouseBd:cardBd);
+  return '<g><rect x="'+q.x+'" y="'+q.y+'" width="'+W+'" height="'+H+'" rx="10" fill="'+cardBg+'" stroke="'+bd+'" stroke-width="'+(isSelf||role==='配偶'?'1.8':'1')+'"/>'+
+   '<text x="'+(q.x+12)+'" y="'+(q.y+22)+'" fill="'+txt+'" font-size="13" font-weight="800">'+esc(String(nm).slice(0,9))+'</text>'+
+   '<text x="'+(q.x+12)+'" y="'+(q.y+39)+'" fill="'+sub+'" font-size="11">'+esc(l2)+'</text>'+
+   '<text x="'+(q.x+12)+'" y="'+(q.y+54)+'" fill="'+sub+'" font-size="11">'+esc(String(l3).slice(0,12))+'</text></g>';
+ }).join('');
+ return '<div style="overflow-x:auto"><svg viewBox="0 0 '+Math.round(totalW)+' '+Math.round(totalH)+'" width="100%" style="max-width:'+Math.round(totalW)+'px;height:auto;display:block;margin:0 auto">'+links+cards+'</svg></div>';
+}
+function familyTreeSec(c){
+ return '<div class="sec"><h4>家族族譜 <span class="hint">依家庭成員的角色與父母設定自動生成；可在下方每張成員卡片的「族譜關係」改指定</span></h4>'+familyTreeSVG(c)+'</div>';
 }
 function personCard(c,m,idx,isPrimary){
  var p=c.profile;
@@ -1280,12 +1465,15 @@ function personCard(c,m,idx,isPrimary){
  if(isPrimary){
   idFields=fFld('oninput="setMeta(\'profile\',\'name\',this.value)"','姓名',p.name)+
    fFld('onchange="setMeta(\'profile\',\'gender\',this.value)"','性別',p.gender,null,['男','女'])+
-   fFld('oninput="setMeta(\'profile\',\'age\',this.value,\'num\')"','目前年齡',p.age,'num')+
+   birthField(p.birth,'onchange="setBirth(this.value)"')+
+   ageField(p.age,p.birth,'oninput="setMeta(\'profile\',\'age\',this.value,\'num\')"')+
    fFld('oninput="setMeta(\'profile\',\'retireAge\',this.value,\'num\')"','預計退休年齡',p.retireAge,'num')+
    fFld('oninput="setMeta(\'profile\',\'lifeExp\',this.value,\'num\')"','預估壽命',p.lifeExp,'num')+
    '<div class="f"><label>聯徵信用評分(200-800)</label><input type="number" data-creditinput value="'+esc(creditScoreOf(c)||'')+'" oninput="setCreditScore(this.value)"></div>';
  }else{
-  idFields=fFld(mb('name'),'姓名',m.name)+fFld(mb('gender'),'性別',m.gender,null,['男','女'])+fFld(mb('age','num'),'年齡',m.age,'num');
+  idFields=fFld(mb('name'),'姓名',m.name)+fFld(mb('gender'),'性別',m.gender,null,['男','女'])+
+   birthField(m.birth,'onchange="setMemberBirth('+idx+',this.value)"')+
+   ageField(m.age,m.birth,mb('age','num'),'年齡');
  }
  var idBlock='<div class="subhd">身分資料</div><div class="fgrid">'+idFields+'</div>'+(isPrimary?creditBandBox(creditScoreOf(c)):'');
  // 工作與投保
@@ -1299,31 +1487,53 @@ function personCard(c,m,idx,isPrimary){
    jobSelAttr='onchange="setMemberJobType('+idx+',this.value)"';salAttr='onchange="setMemberSalary('+idx+',this.value)"';sal=m.monthlySalary;
    coHTML=(jt==='企業主')?companyGridHTML(m.company||{},function(k,ty){return 'oninput="setMemberCompany('+idx+',\''+k+'\',this.value,\''+ty+'\')"';}):'';
   }
-  var jobSel='<div class="f"><label>工作類別</label><select '+jobSelAttr+'>'+['一般就業者','業務工作者','企業主'].map(function(o){return '<option '+(jt===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
-  var salField=(jt==='企業主')?'':'<div class="f"><label>月薪(投保計算用)</label><input type="number" value="'+esc(sal==null?'':sal)+'" '+salAttr+'></div>';
-  var insField=fFld(mb('insSalary','num'),'月投保薪資',m.insSalary,'num')+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES);
+  var otherAttr=isPrimary?'oninput="setJobTypeOther(this.value)"':'oninput="setMemberJobTypeOther('+idx+',this.value)"';
+  var jtOther=isPrimary?(p.jobTypeOther||''):(m.jobTypeOther||'');
+  var jobSel='<div class="f"><label>工作類別</label><select '+jobSelAttr+'>'+JOB_TYPES.map(function(o){return '<option '+(jt===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>'+
+   ((jt==='其他')?'<div class="f"><label>工作類別（自行填寫）</label><input value="'+esc(jtOther)+'" '+otherAttr+' placeholder="例：自由接案、退休、進修中"></div>':'');
+  var noEmp=isNoEmployerJob(jt);
+  var salField=(jt==='企業主'||noEmp)?'':'<div class="f"><label>月薪(投保計算用)</label><input type="number" value="'+esc(sal==null?'':sal)+'" '+salAttr+'></div>';
+  var insField=insSalaryField(m,idx)+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES);
   var hint=(jt==='企業主')?'<div class="hint" style="margin-top:6px">企業主投保多自行維持，月投保薪資請於上方手填。</div>'
-    :'<div class="hint" style="margin-top:6px">依 2026 勞保投保薪資分級表自動帶入（級距天花板 45,800，可手動微調）。'+(jt==='業務工作者'?' 業務工作者收入常浮動、多以職業工會投保。':'')+'</div>';
-  workBlock='<div class="subhd">工作與投保</div><div class="fgrid">'+jobSel+salField+insField+'</div>'+hint+coHTML;
+    :noEmp?'<div class="hint" style="margin-top:6px">'+esc(jt)+'沒有雇主，預設以<b>國民年金</b>投保（月投保金額 '+fmt(NP_INSURED_MONTHLY)+' 元，'+NP_YEAR+' 年起），不計勞退提繳。'+(jt==='投資者'?' 投資／理財所得請於「收支資債」以<b>理財收入</b>登錄，不列為薪資。':'')+'</div>'
+    :'<div class="hint" style="margin-top:6px">依 '+LABOR_YEAR_TXT+' 勞保投保薪資分級表自動帶入（級距天花板 45,800，可下拉改選或手填）。'+(jt==='業務工作者'?' 業務工作者收入常浮動、多以職業工會投保。':'')+'</div>';
+  workBlock='<div class="subhd">工作與投保</div><div class="fgrid">'+jobSel+salField+insField+'</div>'+hint+insGradeBox(m)+coHTML;
  }else{
-  workBlock='<div class="subhd">投保</div><div class="fgrid">'+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES)+fFld(mb('insSalary','num'),'月投保薪資',m.insSalary,'num')+'</div>';
+  workBlock='<div class="subhd">投保</div><div class="fgrid">'+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES)+insSalaryField(m,idx)+'</div>'+insGradeBox(m);
  }
  // 家庭分攤 · 財務獨立歲
  var ratioFields=fFld(mb('depRatio','num'),'家計負擔%',m.depRatio,'num')+fFld(mb('expRatio','num'),'支出比例%',m.expRatio,'num');
  if(!isEarner)ratioFields+=fFld(mb('indepAge','num'),'財務獨立歲',m.indepAge,'num');
  var ratioHint=(!isEarner&&m.indepAge!==''&&m.indepAge!=null)?'<div class="note">🔗 到 <b>'+esc(m.indepAge)+'</b> 歲後，其「支出比例」份額會自動從壽險保障需求（責任遞減）中移除。</div>':'';
  var ratioBlock='<div class="subhd">家庭分攤'+(!isEarner?' · 財務獨立':'')+'</div><div class="fgrid">'+ratioFields+'</div>'+ratioHint;
- return '<div class="pcard '+cls+'">'+hd+'<div class="pbody">'+idBlock+workBlock+ratioBlock+'</div></div>';
+ return '<div class="pcard '+cls+'">'+hd+'<div class="pbody">'+idBlock+workBlock+ratioBlock+kinBlock(c,m,idx,isPrimary)+'</div></div>';
+}
+// 族譜關係：指定這位成員的父、母是哪一位家庭成員（留空＝用預設推斷）
+function kinBlock(c,m,idx,isPrimary){
+ ensureMemberIds(c);
+ var ms=c.members||[],pi=primaryIdx(c);
+ var opts=function(sel){
+  return '<option value="">（未指定）</option>'+ms.map(function(x,i){
+   if(x.mid===m.mid)return '';
+   return '<option value="'+esc(x.mid)+'" '+(sel===x.mid?'selected':'')+'>'+esc(memberLabel(c,x,i))+'（'+esc(i===pi?'本人':(x.role||'其他'))+'）</option>';
+  }).join('');
+ };
+ var auto=(!m.parentA&&!m.parentB&&m.role==='子女')?'<div class="hint" style="margin-top:6px">未指定時預設為「本人＋配偶」的子女。</div>'
+   :(!m.parentA&&!m.parentB?'<div class="hint" style="margin-top:6px">未指定時，族譜依「身分角色」自動分代（父／母／長輩＝上一代，配偶＝同代，子女＝下一代）。</div>':'');
+ return '<div class="subhd">族譜關係</div><div class="fgrid">'+
+  '<div class="f"><label>父</label><select onchange="setMemberParent('+idx+',\'parentA\',this.value)">'+opts(m.parentA)+'</select></div>'+
+  '<div class="f"><label>母</label><select onchange="setMemberParent('+idx+',\'parentB\',this.value)">'+opts(m.parentB)+'</select></div>'+
+  '</div>'+auto;
 }
 function peopleSec(c){
- ensureJobFields(c);
+ ensureJobFields(c);ensureMemberIds(c);
  var members=c.members||[];
  var pi=members.findIndex(function(m){return m.role==='本人';});if(pi<0)pi=0;
  var primary=members[pi]||{name:c.profile.name,role:'本人',depRatio:100,expRatio:100};
  var cards=personCard(c,primary,pi,true);
  members.forEach(function(m,i){if(i===pi)return;cards+=personCard(c,m,i,false);});
  var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'members\')">＋ 新增家庭成員</button></div>';
- return '<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+paramsSec(c);
+ return familyTreeSec(c)+'<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+paramsSec(c);
 }
 function paramsSec(c){var pa=c.params;
  function fld(k,label,type){return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(pa[k]==null?'':pa[k])+'" oninput="setMeta(\'params\',\''+k+'\',this.value,\''+(type||'text')+'\')"></div>';}
@@ -1395,37 +1605,74 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
   '<div class="b"><div class="l">已準備退休金</div><div class="v">'+fmt(rn.prepared)+'</div></div>'+
   '<div class="b"><div class="l" style="color:var(--warn)">退休缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div>'+retireDetailHTML(c)+'</div>'+laborPensionBox(c)+laborDetailHTML(c)+prep;
 }
-// 勞保老年年金 + 勞退新制 概算（供退休已備參考；非精算，可手動覆寫）
-function estimateLaborPension(c){
+// 社會保險老年給付 + 勞退新制 概算（供退休已備參考；非精算，可手動覆寫）
+// 依「本人」的投保類型分流：勞保系 → 勞保老年年金 B式 1.55% ＋ 勞退新制；
+// 國民年金 → A式(0.65%＋加計)／B式(1.3%) 擇優、無勞退提繳；公保/軍保/農保/無 → 不試算。
+var LABOR_LIKE_INS=['勞保','職業工會','就業保險','勞工職業災害保險'];
+function estimateSocialPension(c){
  var pm=primaryMember(c)||{};var ins=n(pm.insSalary);
+ var insType=pm.insType||'勞保';
  var age=n(c.profile.age),ra=n(c.profile.retireAge);
  var years=Math.max(0,n(pm.worked)+Math.max(0,ra-age));
  var r=c.retire||{};var rr=n(r.retireReturn)/100||0.04;var m=Math.max(0,n(c.profile.lifeExp)-ra);
- var pensionBase=laborPensionSalary(n(pm.monthlySalary)||n((c.profile||{}).monthlySalary)||ins);
- if(ins<=0||years<=0)return {ins:ins,pensionBase:pensionBase,years:years,monthly:0,lump:0,fund:0,total:0};
- var monthly=ins*years*0.0155;                 // 勞保老年年金 B式 1.55%
- var annual=monthly*12;
- var lump=(rr>0)?annual*(1-Math.pow(1+rr,-m))/rr:annual*m;  // 退休時之年金現值
- var g=0.03, annualContrib=pensionBase*0.06*12; // 勞退：雇主月提繳6%(依月提繳工資)、基金概估年化3%
- var fund=(g>0)?annualContrib*(Math.pow(1+g,years)-1)/g:annualContrib*years;
- return {ins:ins,pensionBase:pensionBase,years:years,monthly:monthly,lump:lump,fund:fund,total:lump+fund};
+ var kind=(LABOR_LIKE_INS.indexOf(insType)>=0)?'labor':(insType==='國民年金'?'np':'other');
+ var out={kind:kind,insType:insType,ins:ins,pensionBase:0,years:years,monthly:0,lump:0,fund:0,total:0,npA:0,npB:0,pick:''};
+ var pv=function(annual){return (rr>0)?annual*(1-Math.pow(1+rr,-m))/rr:annual*m;};
+ if(kind==='np'){
+  out.ins=ins>0?ins:NP_INSURED_MONTHLY;
+  if(years<=0)return out;
+  out.npA=out.ins*years*NP_RATE_A+NP_BONUS_A;   // A式：0.65% ＋ 加計金額
+  out.npB=out.ins*years*NP_RATE_B;              // B式：1.3%
+  out.pick=(out.npA>=out.npB)?'A':'B';
+  out.monthly=Math.max(out.npA,out.npB);
+  out.lump=pv(out.monthly*12);
+  out.fund=0;                                   // 國保無雇主提繳，沒有勞退新制
+  out.total=out.lump;
+  return out;
+ }
+ if(kind!=='labor')return out;                  // 公保/軍保/農保/健保眷屬/退休/無：不概算
+ out.pensionBase=laborPensionSalary(n(pm.monthlySalary)||n((c.profile||{}).monthlySalary)||ins);
+ if(ins<=0||years<=0)return out;
+ out.monthly=ins*years*0.0155;                  // 勞保老年年金 B式 1.55%
+ out.lump=pv(out.monthly*12);
+ var g=0.03, annualContrib=out.pensionBase*0.06*12; // 勞退：雇主月提繳6%(依月提繳工資)、基金概估年化3%
+ out.fund=(g>0)?annualContrib*(Math.pow(1+g,years)-1)/g:annualContrib*years;
+ out.total=out.lump+out.fund;
+ return out;
 }
+// 舊名保留（呼叫端／匯出契約相容）
+function estimateLaborPension(c){return estimateSocialPension(c);}
 function addLaborPensionPrepared(){var c=activeCase();var e=estimateLaborPension(c);if(e.total<=0)return;
- c.retire=c.retire||{};c.retire.prepared=(c.retire.prepared||[]).filter(function(p){return p.item!=='勞保老年年金(概算)'&&p.item!=='勞退新制(概算)'});
+ c.retire=c.retire||{};c.retire.prepared=(c.retire.prepared||[]).filter(function(p){return ['勞保老年年金(概算)','勞退新制(概算)','國民年金老年年金(概算)'].indexOf(p.item)<0;});
  var ra=n(c.profile.retireAge);
- c.retire.prepared.push({item:'勞保老年年金(概算)',age:ra,amount:Math.round(e.lump),method:'一次領'});
- c.retire.prepared.push({item:'勞退新制(概算)',age:ra,amount:Math.round(e.fund),method:'一次領'});
+ if(e.kind==='np'){c.retire.prepared.push({item:'國民年金老年年金(概算)',age:ra,amount:Math.round(e.lump),method:'一次領'});}
+ else{
+  c.retire.prepared.push({item:'勞保老年年金(概算)',age:ra,amount:Math.round(e.lump),method:'一次領'});
+  if(e.fund>0)c.retire.prepared.push({item:'勞退新制(概算)',age:ra,amount:Math.round(e.fund),method:'一次領'});
+ }
  save();render();
 }
-function laborPensionBox(c){var lp=estimateLaborPension(c);
- if(lp.total<=0)return '<div class="sec"><div class="hint">填寫「本人」月投保薪資（於「工作類別」填月薪自動帶入，或家庭成員分頁手填）後，這裡會出現勞保/勞退概算與一鍵帶入。</div></div>';
- return '<div class="sec"><h4>勞保 / 勞退 概算 <span class="hint">依本人月投保薪資 '+fmt(lp.ins)+' × 概估年資 '+lp.years+' 年；非精算，僅供參考</span></h4>'+
-  '<div class="big3"><div class="b"><div class="l">勞保老年年金(月領)</div><div class="v">'+fmt(lp.monthly)+'</div></div>'+
-  '<div class="b"><div class="l">勞保年金退休現值</div><div class="v">'+fmt(lp.lump)+'</div></div>'+
-  '<div class="b"><div class="l">勞退新制累積(概估)</div><div class="v">'+fmt(lp.fund)+'</div></div>'+
+function laborPensionBox(c){var lp=estimateSocialPension(c);
+ if(lp.kind==='other')return '<div class="sec"><div class="hint">本人投保類型為「'+esc(lp.insType)+'」，老年給付規則各制不同（公教保／軍保／農保各有專屬公式），系統不代為概算；請於下方「已準備退休金」直接登錄預估金額。</div></div>';
+ if(lp.total<=0)return '<div class="sec"><div class="hint">填寫「本人」'+insLabelOf(lp.insType)+'（於「工作類別」填月薪自動帶入，或在上方成員卡片選級距／手填）後，這裡會出現老年給付概算與一鍵帶入。</div></div>';
+ var isNP=(lp.kind==='np');
+ var head=isNP?('國民年金 概算 <span class="hint">依月投保金額 '+fmt(lp.ins)+' × 概估年資 '+lp.years+' 年，A／B 式擇優；非精算，僅供參考</span>')
+   :('勞保 / 勞退 概算 <span class="hint">依本人月投保薪資 '+fmt(lp.ins)+' × 概估年資 '+lp.years+' 年；非精算，僅供參考</span>');
+ var cells=isNP
+  ?'<div class="b"><div class="l">國保老年年金(月領)</div><div class="v">'+fmt(lp.monthly)+'</div></div>'+
+   '<div class="b"><div class="l">擇優計給</div><div class="v" style="font-size:19px">'+lp.pick+' 式</div></div>'+
+   '<div class="b"><div class="l">年金退休現值</div><div class="v">'+fmt(lp.lump)+'</div></div>'
+  :'<div class="b"><div class="l">勞保老年年金(月領)</div><div class="v">'+fmt(lp.monthly)+'</div></div>'+
+   '<div class="b"><div class="l">勞保年金退休現值</div><div class="v">'+fmt(lp.lump)+'</div></div>'+
+   '<div class="b"><div class="l">勞退新制累積(概估)</div><div class="v">'+fmt(lp.fund)+'</div></div>';
+ var note=isNP
+  ?'國保老年年金採 A 式（月投保金額 × 年資 × 0.65% ＋ 加計 '+fmt(NP_BONUS_A)+'）與 B 式（× 1.3%）擇優計給；國民年金沒有雇主提繳，故無勞退新制。帶入後為「一次領」現值列，可於下方手動調整或刪除。'
+  :'勞保年金採 B 式 1.55%；勞退以雇主月提繳 6%、基金概估年化 3% 累積至退休。帶入後為「一次領」現值列，可於下方手動調整或刪除。';
+ return '<div class="sec"><h4>'+head+'</h4>'+
+  '<div class="big3">'+cells+
   '<div class="b"><div class="l">合計可帶入已備</div><div class="v" style="color:var(--ok)">'+fmt(lp.total)+'</div></div></div>'+
   '<div style="margin-top:10px"><button class="add" onclick="addLaborPensionPrepared()">＋ 一鍵帶入已準備退休金</button><a href="https://www.bli.gov.tw/" target="_blank" rel="noopener" style="color:var(--amber2);font-size:12.5px;margin-left:10px">開啟勞保局試算 ↗</a></div>'+
-  '<div class="hint" style="margin-top:6px">勞保年金採 B 式 1.55%；勞退以雇主月提繳 6%、基金概估年化 3% 累積至退休。帶入後為「一次領」現值列，可於下方手動調整或刪除。</div></div>';
+  '<div class="hint" style="margin-top:6px">'+note+'</div></div>';
 }
 // 教育分頁的衍生顯示（總需求＋明細）抽成獨立函式，供 data-calc 即時重算。
 function eduDerivedHTML(c){
@@ -1764,19 +2011,49 @@ var SAVING_EXP=['跟會','零存整付','定存','外幣存款','儲蓄型保單
 var INVEST_EXP=['共同基金','股票','債券','ETF','選擇權','期貨','不動產','黃金','其他'];
 var DOC_LIST=['人壽險保單','產險保單(車險/住宅火險)','薪資單','支出明細表','銀行對帳單(車貸/房貸)','股票投資對帳單','基金投資對帳單','信用卡分期帳單','財產清冊/國稅局'];
 // 人生價值環：以「人生財務目標清單」的價值觀與重要度生成放射圖
+// 版面重點：viewBox 左右各留 130px 給標籤（舊版固定 300×300，標籤畫在半徑 122 還要往外長字，直接被裁掉）。
 function valuesWheelSVG(c,theme){var gs=(c.lifeGoals||[]).filter(function(g){return g.name});
  if(!gs.length)return theme==='light'?'<p style="color:#5a6b72">尚未填寫人生財務目標，無法產生價值環。</p>':'<div style="color:#a7bacb;font-size:12px">在「人生財務目標清單」填入目標名稱後，這裡會即時生成價值環。</div>';
- var dark=theme!=='light',cx=150,cy=150,R=116;
- var txt=dark?'#eef2f7':'#0d2b45',sub=dark?'#a7bacb':'#5a6b72',ring=dark?'rgba(255,255,255,.12)':'rgba(0,0,0,.1)';
+ var dark=theme!=='light';
+ var VW=520,VH=340,cx=260,cy=170,R=112;
+ var txt=dark?'#eef2f7':'#0d2b45',sub=dark?'#a7bacb':'#5a6b72',ring=dark?'rgba(255,255,255,.13)':'rgba(0,0,0,.1)',ring2=dark?'rgba(255,255,255,.07)':'rgba(0,0,0,.05)';
  var PAL=['#c99a5b','#7f97ac','#8ba888','#b07d3d','#5a7186','#cbb488','#9c7bb0','#6f9f8a'];
- var rings='';[0.4,0.7,1].forEach(function(f){rings+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(R*f).toFixed(0)+'" fill="none" stroke="'+ring+'"/>';});
- var items=gs.map(function(g,i){var ang=-Math.PI/2+i/gs.length*2*Math.PI,imp=Math.max(1,Math.min(5,n(g.importance)||3));
-  var rr=R*(0.42+imp/5*0.58),x=cx+rr*Math.cos(ang),y=cy+rr*Math.sin(ang),col=PAL[i%PAL.length];
-  var lx=cx+(R+6)*Math.cos(ang),ly=cy+(R+6)*Math.sin(ang),anchor=Math.cos(ang)>0.3?'start':Math.cos(ang)<-0.3?'end':'middle';
-  return '<line x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+col+'" stroke-width="2"/><circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(4+imp).toFixed(0)+'" fill="'+col+'"/><text x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+'" fill="'+txt+'" font-size="11" font-weight="700" text-anchor="'+anchor+'">'+esc(String(g.name).slice(0,8))+'</text>';
+ var trunc=function(t,k){t=String(t);return t.length>k?t.slice(0,k)+'…':t;};
+ // 底圈：四層刻度＋外框
+ var rings='';
+ [0.25,0.5,0.75,1].forEach(function(f,i){
+  rings+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(R*f).toFixed(1)+'" fill="none" stroke="'+(i===3?ring:ring2)+'"/>';
+ });
+ var pts=gs.map(function(g,i){
+  var ang=-Math.PI/2+i/gs.length*2*Math.PI;
+  var imp=Math.max(1,Math.min(5,n(g.importance)||3));
+  var rr=R*(0.30+imp/5*0.62);
+  return {g:g,i:i,ang:ang,imp:imp,rr:rr,x:cx+rr*Math.cos(ang),y:cy+rr*Math.sin(ang),col:PAL[i%PAL.length]};
+ });
+ // 面積：把各點連成多邊形，重要度高的方向自然被撐大
+ var poly='<polygon points="'+pts.map(function(q){return q.x.toFixed(1)+','+q.y.toFixed(1)}).join(' ')+'" fill="'+(dark?'rgba(201,154,91,.13)':'rgba(163,129,74,.13)')+'" stroke="'+(dark?'rgba(201,154,91,.5)':'rgba(163,129,74,.5)')+'" stroke-width="1.2" stroke-linejoin="round"/>';
+ // 輻線＋節點＋外圈標籤（依方位決定對齊方向與垂直微調，避免上下標籤壓到圓）
+ var spokes=pts.map(function(q){
+  var cos=Math.cos(q.ang),sin=Math.sin(q.ang);
+  var lx=cx+(R+14)*cos,ly=cy+(R+14)*sin;
+  var anchor=cos>0.25?'start':cos<-0.25?'end':'middle';
+  var dy=sin<-0.7?-9:sin>0.7?13:4;
+  return '<line x1="'+cx+'" y1="'+cy+'" x2="'+q.x.toFixed(1)+'" y2="'+q.y.toFixed(1)+'" stroke="'+q.col+'" stroke-width="1.6" opacity=".75"/>'+
+   '<circle cx="'+q.x.toFixed(1)+'" cy="'+q.y.toFixed(1)+'" r="'+(3.5+q.imp*0.9).toFixed(1)+'" fill="'+q.col+'"/>'+
+   '<text x="'+lx.toFixed(1)+'" y="'+(ly+dy).toFixed(1)+'" fill="'+txt+'" font-size="11.5" font-weight="700" text-anchor="'+anchor+'">'+esc(trunc(q.g.name,8))+'</text>'+
+   '<text x="'+lx.toFixed(1)+'" y="'+(ly+dy+13).toFixed(1)+'" fill="'+sub+'" font-size="10" text-anchor="'+anchor+'">重要度 '+q.imp+'</text>';
  }).join('');
- var legend=gs.map(function(g,i){return '<div style="display:flex;gap:6px;font-size:12px;color:'+sub+';margin-bottom:3px"><span style="width:10px;height:10px;border-radius:50%;background:'+PAL[i%PAL.length]+';flex:none;margin-top:2px"></span><span><b style="color:'+txt+'">'+esc(g.name)+'</b>'+(g.value?' · '+esc(g.value):'')+(g.importance?'（重要度 '+n(g.importance)+'）':'')+'</span></div>';}).join('');
- return '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center"><svg width="300" height="300" viewBox="0 0 300 300">'+rings+'<circle cx="'+cx+'" cy="'+cy+'" r="26" fill="'+(dark?'#12334f':'#eef3f6')+'" stroke="'+ring+'"/><text x="'+cx+'" y="'+(cy-2)+'" fill="'+txt+'" font-size="12" font-weight="800" text-anchor="middle">人生</text><text x="'+cx+'" y="'+(cy+13)+'" fill="'+txt+'" font-size="12" font-weight="800" text-anchor="middle">價值</text>'+items+'</svg><div style="flex:1;min-width:200px">'+legend+'</div></div>';}
+ var hub='<circle cx="'+cx+'" cy="'+cy+'" r="34" fill="'+(dark?'#0d2b45':'#eef3f6')+'" stroke="'+ring+'"/>'+
+  '<text x="'+cx+'" y="'+(cy-3)+'" fill="'+txt+'" font-size="13" font-weight="800" text-anchor="middle">人生</text>'+
+  '<text x="'+cx+'" y="'+(cy+14)+'" fill="'+txt+'" font-size="13" font-weight="800" text-anchor="middle">價值</text>';
+ var svg='<svg viewBox="0 0 '+VW+' '+VH+'" width="100%" style="max-width:'+VW+'px;height:auto;display:block;margin:0 auto" preserveAspectRatio="xMidYMid meet">'+rings+poly+hub+spokes+'</svg>';
+ // 圖例：移到圖下方，一列兩欄，價值觀文字完整顯示不再被擠掉
+ var legend='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:6px 16px;margin-top:10px">'+
+  gs.map(function(g,i){
+   return '<div style="display:flex;gap:7px;font-size:12px;color:'+sub+';line-height:1.5"><span style="width:9px;height:9px;border-radius:50%;background:'+PAL[i%PAL.length]+';flex:none;margin-top:4px"></span>'+
+    '<span><b style="color:'+txt+'">'+esc(g.name)+'</b>'+(g.importance?'（重要度 '+n(g.importance)+'）':'')+(g.value?'<br>'+esc(g.value):'')+'</span></div>';
+  }).join('')+'</div>';
+ return '<div>'+svg+legend+'</div>';}
 function docChecklistHTML(c){var d=c.docCheck||{};
  var rows=DOC_LIST.map(function(name){return '<tr><td class="k">'+name+'</td>'+
    '<td><input type="number" style="width:70px" value="'+esc(d[name+'_n']==null?'':d[name+'_n'])+'" onchange="setObj(\'docCheck\',\''+name+'_n\',this.value,\'num\')"></td>'+
@@ -2771,6 +3048,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:1;min-width:230px">'+rBars([{label:'收支平衡',val:hp['收支平衡']},{label:'預備金',val:hp['預備金']},{label:'信用',val:hp['信用']},{label:'負債平衡',val:hp['負債平衡']},{label:'風險保全',val:hp['風險保全'],color:'#c99a5b'}])+'</div>'+
    '<div style="min-width:172px;text-align:center"><div style="color:#5a6b72;font-size:12px">財務階段</div><div style="font-size:30px;font-weight:800;letter-spacing:.04em;margin:4px 0 2px;color:'+stageColor(h.grade,1)+'">'+stageName(h.grade)+'</div><div style="font-size:12px;color:#33474e;line-height:1.6">'+stageTask(h.grade)+'</div><div style="font-size:11px;color:#5a6b72;margin-top:4px">'+stageReason(h)+'</div></div></div>'+stageReportNote(h)+
   '<table style="margin-top:12px"><tr><th>成員</th><th>稱謂</th><th>年齡</th><th>家計負擔</th></tr>'+(memRows||'<tr><td colspan=4>—</td></tr>')+'</table>'+
+  '<div style="margin-top:12px;color:#0d2b45;font-weight:700;font-size:13px">家族族譜</div>'+familyTreeSVG(c,'light')+
   '<table style="margin-top:8px">'+
    '<tr><td>工作類別</td><td>'+esc(p.jobType||'一般就業者')+((p.jobType==='企業主'&&(c.company||{}).name)?'（'+esc(c.company.name)+'）':'')+'</td></tr>'+
    ((p.jobType==='企業主')?'<tr><td>公司概況</td><td>'+esc((c.company||{}).industry||'—')+' ｜ 持股 '+n((c.company||{}).sharePct)+'% ｜ 年營收 '+fmt((c.company||{}).annualRevenue)+' ｜ 年淨利 '+fmt((c.company||{}).netProfit)+((c.company||{}).ownerLoan?' ｜ 負責人往來 '+fmt(c.company.ownerLoan):'')+'</td></tr>':'')+
