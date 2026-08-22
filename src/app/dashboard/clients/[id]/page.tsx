@@ -41,6 +41,17 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     basedOnDate: p.basedOnDate,
     updatedAt: p.updatedAt ? p.updatedAt.toISOString().slice(0, 10) : null,
   }));
+  // 客戶自己的人生護照：教練唯讀。刻意不放進上面的 plans 陣列——
+  // 那份清單的每一列都掛著編輯／複製／刪除／改狀態，架在客戶的資料上會出事。
+  const passportPlan = detail.passportPlan
+    ? {
+        id: detail.passportPlan.id,
+        year: detail.passportPlan.year,
+        healthGrade: detail.passportPlan.healthGrade,
+        netWorth: detail.passportPlan.netWorth,
+        updatedAt: detail.passportPlan.updatedAt ? detail.passportPlan.updatedAt.toISOString().slice(0, 10) : null,
+      }
+    : null;
   const reviews = detail.reviews.map((r) => ({
     id: r.id,
     date: r.date,
@@ -62,7 +73,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
       <DashboardHeader isAdmin={coach.role === "admin"} />
-      <ClientDetail client={client} plans={plans} reviews={reviews} actionItems={actionItems} compare={compare} />
+      <ClientDetail client={client} plans={plans} passportPlan={passportPlan} reviews={reviews} actionItems={actionItems} compare={compare} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { ensureCoach } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
 import { ensureActiveVersion, listVersions, loadParams } from "@/lib/comp/repo";
 import Simulator from "./Simulator";
+import AdminNav from "../../AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function SimulatorPage({
         <Link href="/dashboard" className="text-[#a9bccf] text-sm hover:text-white">← 回系統</Link>
         <UserButton />
       </header>
+      <AdminNav />
 
       <section className="p-6 max-w-5xl">
         <div className="mb-4 flex flex-wrap items-baseline gap-3">

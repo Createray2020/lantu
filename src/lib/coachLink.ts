@@ -51,6 +51,15 @@ export async function requestCoachLink(user: ClientUser, coachId: string, note?:
   const client = cRows[0];
   if (!client) return { ok: false, error: "請先完成人生護照" };
   if (client.coachId) return { ok: false, error: "你已經連結教練了" };
+  // coachId 直接來自表單，先驗它真的是一位已核可、可對外的教練。
+  // 少了這道，帶一個待審／已停權／已離職的 id 進來也能建出 pending 申請，
+  // 而那筆申請不會出現在任何人的待辦裡——客戶等一輩子也等不到回覆。
+  const okCoach = await db
+    .select({ id: coaches.id })
+    .from(coaches)
+    .where(and(eq(coaches.id, coachId), eq(coaches.status, "active")))
+    .limit(1);
+  if (!okCoach[0]) return { ok: false, error: "找不到這位教練，請重新選擇" };
   // 清掉這位客戶其他 pending（只留最新一筆），避免重複。
   await db
     .update(coachLinkRequests)

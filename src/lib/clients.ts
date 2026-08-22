@@ -4,6 +4,9 @@ import { db } from "@/Shared/db";
 import { actionItems, clients, plans, reviews } from "@/Shared/db/schema";
 import { newCaseData, planSnapshot } from "./snapshot";
 
+const COACH_TRACK = "coach";
+const CLIENT_TRACK = "client";
+
 export type Client = typeof clients.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
 export type Review = typeof reviews.$inferSelect;
@@ -53,7 +56,10 @@ export async function listClientsForCoach(coachId: string): Promise<ClientListIt
   const planRows = await db.select({
     id: plans.id, clientId: plans.clientId, year: plans.year, label: plans.label,
     status: plans.status, healthGrade: plans.healthGrade, netWorth: plans.netWorth, createdAt: plans.createdAt,
-  }).from(plans).where(inArray(plans.clientId, ids));
+    // 只取教練那一軌：客戶的人生護照份也掛在同一個 clientId 底下，
+    // 混進來會頂掉 latestPlan，讓列表的財務階段／淨值顯示護照骨架的數字（量級差很多），
+    // 依 net／stage 的排序也會整欄錯位。
+  }).from(plans).where(and(inArray(plans.clientId, ids), eq(plans.track, COACH_TRACK)));
   const reviewRows = await db.select({
     clientId: reviews.clientId, date: reviews.date, nextAppt: reviews.nextAppt,
   }).from(reviews).where(inArray(reviews.clientId, ids));
@@ -128,7 +134,8 @@ export type PlanMeta = Omit<Plan, "data">;
 
 export type ClientDetail = {
   client: Client;
-  plans: PlanMeta[];
+  plans: PlanMeta[];            // 只有教練那一軌（track='coach'）
+  passportPlan: PlanMeta | null; // 客戶自己的人生護照（track='client'）；教練唯讀
   reviews: Review[];
   actionItems: ActionItem[];
 };
@@ -144,10 +151,16 @@ export async function getClientDetail(coachId: string, clientId: string): Promis
       basedOnDate: plans.basedOnDate, healthGrade: plans.healthGrade, netWorth: plans.netWorth,
       createdAt: plans.createdAt, updatedAt: plans.updatedAt,
     }).from(plans).where(eq(plans.clientId, clientId)).orderBy(desc(plans.year), desc(plans.createdAt)),
+
     db.select().from(reviews).where(eq(reviews.clientId, clientId)).orderBy(desc(reviews.date)),
     db.select().from(actionItems).where(eq(actionItems.clientId, clientId)).orderBy(asc(actionItems.done), asc(actionItems.dueDate)),
   ]);
-  return { client, plans: planRows, reviews: reviewRows, actionItems: itemRows };
+  // 兩軌分開回：`plans` 只給教練的年度版（UI 上帶著編輯／複製／刪除／改狀態等操作），
+  // 客戶的人生護照另外單獨回一筆。混在同一份清單裡的話，那些操作鈕就等於架在客戶的資料上——
+  // 刪除會連 plan_revisions 一起 CASCADE，客戶整條版本歷史永久消失。
+  const coachPlans = planRows.filter((p) => p.track === COACH_TRACK);
+  const passportPlan = planRows.find((p) => p.track === CLIENT_TRACK) ?? null;
+  return { client, plans: coachPlans, passportPlan, reviews: reviewRows, actionItems: itemRows };
 }
 
 export async function updateClient(coachId: string, clientId: string, patch: Partial<ClientInput>): Promise<void> {

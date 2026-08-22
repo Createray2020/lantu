@@ -5,6 +5,7 @@ import { ensureCoach, isAdmin } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
 import { ensureActiveVersion, listVersions, loadParams } from "@/lib/comp/repo";
 import SystemEditor from "./SystemEditor";
+import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +38,10 @@ export default async function SystemPage({
         </Link>
         <span className="text-[#a9bccf] text-xs">業務制度</span>
         <div className="flex-1" />
-        <Link href="/admin" className="text-[#a9bccf] text-sm hover:text-white">← 回後台</Link>
+        
         <UserButton />
       </header>
+      <AdminNav />
 
       <section className="p-6 max-w-6xl">
         <div className="mb-4">

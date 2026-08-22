@@ -1,5 +1,5 @@
 // 教練儀表板彙總（教練隔離）。
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { actionItems, clients, plans, reviews } from "@/Shared/db/schema";
 
@@ -46,8 +46,10 @@ export async function getCoachDashboard(coachId: string): Promise<CoachDashboard
     [reviewRows, itemRows, planRows] = await Promise.all([
       db.select().from(reviews).where(inArray(reviews.clientId, ids)),
       db.select().from(actionItems).where(inArray(actionItems.clientId, ids)),
+      // 只算教練那一軌：客戶自己的人生護照 healthGrade 是護照骨架算出來的，
+      // 混進來會頂掉教練版，讓首頁的階段分佈失準。
       db.select({ clientId: plans.clientId, year: plans.year, createdAt: plans.createdAt, healthGrade: plans.healthGrade })
-        .from(plans).where(inArray(plans.clientId, ids)),
+        .from(plans).where(and(inArray(plans.clientId, ids), eq(plans.track, "coach"))),
     ]);
   }
 

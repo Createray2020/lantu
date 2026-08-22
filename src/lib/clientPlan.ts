@@ -125,8 +125,8 @@ export async function getClientOwnPlan(clientUserId: string): Promise<ClientOwnP
 }
 
 // 存檔結果：已有護照份而呼叫端沒帶 overwrite 時，先回 needs-confirm 讓使用者決定，不直接蓋。
-// 覆蓋是不可逆的（plan.data 整份換掉），而公開試算註冊回來會「自動存檔」——
-// 沒有這道確認，一個已經有規劃的人在官網隨手試算一次就會把自己的規劃洗掉。
+// 覆蓋是不可逆的（plan.data 整份換掉）。公開試算註冊回來時會把草稿帶回並提示存檔，
+// 沒有這道確認，一個已經有規劃的人在官網隨手試算一次、回來按下存檔就把自己的規劃洗掉了。
 export type SavePassportOutcome =
   | { status: "saved"; result: PassportResult }
   | { status: "needs-confirm"; existingUpdatedAt: string };

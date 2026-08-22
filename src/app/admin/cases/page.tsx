@@ -7,6 +7,7 @@ import { listBatches, listCases, listAdvisors, listPayouts } from "@/lib/comp/ca
 import { ensureActiveVersion, listVersions, loadParams } from "@/lib/comp/repo";
 import { listSurveys, questionsOf } from "@/lib/comp/survey";
 import CasesBoard, { type CaseView, type ModuleOption, type PayoutView } from "./CasesBoard";
+import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -86,9 +87,10 @@ export default async function CasesPage() {
         </Link>
         <span className="text-[#a9bccf] text-xs">案件與分潤</span>
         <div className="flex-1" />
-        <Link href="/admin" className="text-[#a9bccf] text-sm hover:text-white">← 回後台</Link>
+        
         <UserButton />
       </header>
+      <AdminNav />
 
       <section className="p-6 max-w-6xl">
         <div className="mb-4">

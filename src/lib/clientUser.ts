@@ -32,5 +32,10 @@ export async function ensureClientUser(): Promise<ClientUser | null> {
     .from(clientUsers)
     .where(eq(clientUsers.id, user.id))
     .limit(1);
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  // 停權要真的擋得住。此前 status 只是被寫進去、全系統沒有任何一支在讀，
+  // 停權的帳號照樣能進 /portal 讀寫自己的規劃——等於這個欄位是裝飾用的。
+  // 與 ensureCoach 的 pending/suspended 判斷對稱。
+  if (row && row.status !== "active") return null;
+  return row;
 }

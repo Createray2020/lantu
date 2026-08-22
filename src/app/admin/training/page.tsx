@@ -7,6 +7,7 @@ import { listAdvisors, listTrainingRecords, listTrainingSessions } from "@/lib/c
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import { trainingHours } from "@/lib/comp/stats";
 import TrainingBoard, { type ExternalView, type HoursRow, type SessionView } from "./TrainingBoard";
+import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -64,9 +65,10 @@ export default async function TrainingPage() {
         </Link>
         <span className="text-[#a9bccf] text-xs">訓練時數</span>
         <div className="flex-1" />
-        <Link href="/admin" className="text-[#a9bccf] text-sm hover:text-white">← 回後台</Link>
+        
         <UserButton />
       </header>
+      <AdminNav />
 
       <section className="p-6 max-w-6xl">
         <div className="mb-4">

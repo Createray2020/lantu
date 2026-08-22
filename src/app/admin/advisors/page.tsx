@@ -9,6 +9,7 @@ import {
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import { buildOverview } from "@/lib/comp/view";
 import AdvisorsBoard, { type AdvisorView, type TrackView } from "./AdvisorsBoard";
+import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -100,9 +101,10 @@ export default async function AdvisorsPage() {
         </Link>
         <span className="text-[#a9bccf] text-xs">顧問職級與晉升</span>
         <div className="flex-1" />
-        <Link href="/admin" className="text-[#a9bccf] text-sm hover:text-white">← 回後台</Link>
+        
         <UserButton />
       </header>
+      <AdminNav />
 
       <section className="p-6 max-w-7xl">
         <div className="mb-4">

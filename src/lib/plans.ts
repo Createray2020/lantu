@@ -1,4 +1,10 @@
 // 年度版本資料層。所有存取都驗證該版本屬於當前教練（plans → clients.coachId）。
+//
+// ⚠️ 這支檔案只處理「教練那一軌」（track='coach'）。客戶自己的人生護照（track='client'）
+// 一律走 lib/clientPlan.ts，教練不得經由這裡讀寫。
+// track 條件寫在 ownedPlan / ownedPlanLite / ownedTrackedRows 裡面而不是交給呼叫端加，
+// 因為「忘記加 where」正是這個模型出過事的地方——邊界要守在資料層，不是守在每個呼叫點。
+const COACH_TRACK = "coach";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
@@ -16,7 +22,7 @@ async function ownedPlan(coachId: string, planId: string): Promise<Plan | null> 
     .select({ plan: plans })
     .from(plans)
     .innerJoin(clients, eq(plans.clientId, clients.id))
-    .where(and(eq(plans.id, planId), eq(clients.coachId, coachId)))
+    .where(and(eq(plans.id, planId), eq(clients.coachId, coachId), eq(plans.track, COACH_TRACK)))
     .limit(1);
   return row?.plan ?? null;
 }
@@ -24,13 +30,13 @@ async function ownedPlan(coachId: string, planId: string): Promise<Plan | null> 
 // 輕量版：只做「這份 plan 是不是我的」驗證，不撈 data。
 // PlanEditor 是 700ms debounce 自動存檔，一小時編輯約 100 次；
 // 每次都因為權限檢查回讀 20KB 的 jsonb 是純浪費。
-type PlanLite = { id: string; clientId: string; year: number; label: string | null; status: string };
+type PlanLite = { id: string; clientId: string; year: number; label: string | null; status: string; track: string };
 async function ownedPlanLite(coachId: string, planId: string): Promise<PlanLite | null> {
   const [row] = await db
-    .select({ id: plans.id, clientId: plans.clientId, year: plans.year, label: plans.label, status: plans.status })
+    .select({ id: plans.id, clientId: plans.clientId, year: plans.year, label: plans.label, status: plans.status, track: plans.track })
     .from(plans)
     .innerJoin(clients, eq(plans.clientId, clients.id))
-    .where(and(eq(plans.id, planId), eq(clients.coachId, coachId)))
+    .where(and(eq(plans.id, planId), eq(clients.coachId, coachId), eq(plans.track, COACH_TRACK)))
     .limit(1);
   return row ?? null;
 }
@@ -91,7 +97,7 @@ export async function clonePlan(coachId: string, planId: string): Promise<string
   const yearsRows = await db
     .select({ year: plans.year })
     .from(plans)
-    .where(and(eq(plans.clientId, src.clientId), eq(plans.track, "coach")));
+    .where(and(eq(plans.clientId, src.clientId), eq(plans.track, COACH_TRACK)));
   const maxYear = yearsRows.reduce((m, r) => Math.max(m, r.year), src.year);
   const newYear = maxYear + 1;
   const snap = planSnapshot(src.data);
@@ -149,7 +155,13 @@ export type PlanComparison = {
 // 版本比較：用引擎從各版 data 算跨年對照。
 export async function comparePlans(coachId: string, clientId: string): Promise<PlanComparison[]> {
   if (!(await ownedClientId(coachId, clientId))) throw new Error("forbidden");
-  const rows = await db.select().from(plans).where(eq(plans.clientId, clientId)).orderBy(asc(plans.year), asc(plans.createdAt));
+  // 只比教練那一軌。客戶的護照份是同一年的另一筆，混進來會變成兩欄一樣的年份，
+  // 而且它只有五面向推估、沒有完整現況，跨年趨勢會直接失真。
+  const rows = await db
+    .select({ id: plans.id, year: plans.year, label: plans.label, status: plans.status, data: plans.data })
+    .from(plans)
+    .where(and(eq(plans.clientId, clientId), eq(plans.track, COACH_TRACK)))
+    .orderBy(asc(plans.year), asc(plans.createdAt));
   return rows.map((p) => ({
     id: p.id,
     year: p.year,

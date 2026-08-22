@@ -6,6 +6,7 @@ import { getBrand } from "@/lib/brand";
 import { listCategories } from "@/lib/financeCategories";
 import { listEduCosts, defaultEduCosts } from "@/lib/eduCosts";
 import CategoriesBoard from "./CategoriesBoard";
+import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,10 @@ export default async function CategoriesPage() {
         </Link>
         <span className="text-[#a9bccf] text-xs">類別與參數設定</span>
         <div className="flex-1" />
-        <Link href="/admin" className="text-[#a9bccf] text-sm hover:text-white">← 回後台</Link>
+        
         <UserButton />
       </header>
+      <AdminNav />
 
       <section className="p-6 max-w-6xl">
         <div className="mb-4">

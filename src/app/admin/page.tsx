@@ -3,10 +3,10 @@ import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin, listCoaches, coachWorkloads } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
-import BrandSettings from "./BrandSettings";
 import OrgCell from "./OrgCell";
 import StatusActions from "./StatusActions";
 import RemoveCoach from "./RemoveCoach";
+import AdminNav from "./AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -55,52 +55,9 @@ export default async function Admin() {
         </Link>
         <UserButton />
       </header>
+      <AdminNav />
 
       <section className="p-6 max-w-4xl">
-        <div className="mb-5 flex flex-wrap gap-2">
-          <Link
-            href="/admin/system"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
-          >
-            業務制度設定 →
-          </Link>
-          <Link
-            href="/admin/system/simulator"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
-          >
-            分潤試算器 →
-          </Link>
-          <Link
-            href="/admin/categories"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
-          >
-            類別與參數設定 →
-          </Link>
-          <Link
-            href="/admin/cases"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
-          >
-            案件與分潤 →
-          </Link>
-          <Link
-            href="/admin/advisors"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
-          >
-            顧問職級與晉升 →
-          </Link>
-          <Link
-            href="/admin/training"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
-          >
-            訓練時數 →
-          </Link>
-          <Link
-            href="/admin/profiles"
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]"
-          >
-            教練公開檔案 →
-          </Link>
-        </div>
 
         <div className="flex items-center gap-4 mb-5">
           <h1 className="text-xl font-bold">教練帳號</h1>
@@ -191,8 +148,6 @@ export default async function Admin() {
           運作方式：教練用 Google／Email 註冊後為「待審核」，無法進入系統；你在此按「核准開通」（確認收款後）即可啟用。停權可隨時收回存取，且不動任何資料 —— 離職請用停權。
           「移除帳號」只給誤建的空帳號用：名下還有客戶要先轉移給接手教練，有過分潤案件的一律不可移除。
         </p>
-
-        <BrandSettings currentLogo={brand.logoUrl} />
       </section>
     </main>
   );

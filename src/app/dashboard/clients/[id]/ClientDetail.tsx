@@ -31,6 +31,7 @@ import {
 
 type Contact = { phone?: string; email?: string; line?: string };
 type ClientLite = { id: string; name: string; contact: Contact; source: string | null; tags: string[]; status: string; birthDate: string | null };
+type PassportPlan = { id: string; year: number; healthGrade: string | null; netWorth: number | null; updatedAt: string | null };
 type PlanLite = { id: string; year: number; label: string | null; status: string; healthGrade: string | null; netWorth: number | null; basedOnDate: string | null; updatedAt: string | null };
 type ReviewLite = { id: string; date: string; type: string; planId: string | null; attendees: string | null; summary: string | null; nextAppt: string | null };
 type ItemLite = { id: string; title: string; owner: string | null; dueDate: string | null; done: boolean; reviewId: string | null };
@@ -44,6 +45,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 export default function ClientDetail({
   client,
   plans,
+  passportPlan,
   reviews,
   actionItems,
   compare,
@@ -53,6 +55,7 @@ export default function ClientDetail({
   reviews: ReviewLite[];
   actionItems: ItemLite[];
   compare: Compare[];
+  passportPlan: PassportPlan | null;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"overview" | "plans" | "reviews">("overview");
@@ -113,6 +116,7 @@ export default function ClientDetail({
           reviews={reviews}
           openItems={openItems}
           planYear={planYear}
+          passportPlan={passportPlan}
           onToggle={(id, done) => run(() => setActionItemDoneAction(client.id, id, done))}
         />
       )}
@@ -223,8 +227,8 @@ function ClientHeader({ client, onSave, onArchive, pending }: { client: ClientLi
 }
 
 // ── 概況分頁 ───────────────────────────────────────
-function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, planYear, onToggle }: {
-  latest: PlanLite | null; latestCmp: Compare | null; planCount: number; nextAppt: string | null;
+function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, planYear, passportPlan, onToggle }: {
+  latest: PlanLite | null; latestCmp: Compare | null; planCount: number; nextAppt: string | null; passportPlan: PassportPlan | null;
   reviews: ReviewLite[]; openItems: ItemLite[]; planYear: Map<string, number>; onToggle: (id: string, done: boolean) => void;
 }) {
   const [showStageGuide, setShowStageGuide] = useState(false);
@@ -251,6 +255,25 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
         <Card label="年度版本"><span className="text-2xl font-bold">{planCount}<span className="text-sm text-[#6b7d8f]"> 版</span></span></Card>
         <Card label="下次預約"><span className={"text-xl font-bold " + (nextAppt ? "text-[#e0bd8b]" : "text-[#6b7d8f]")}>{nextAppt ?? "—"}</span></Card>
       </div>
+
+      {passportPlan && (
+        <div className="rounded-xl border border-[#c99a5b]/30 bg-[#0d2b45] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11px] tracking-[0.18em] text-[#c99a5b] mb-0.5">客戶自己的規劃</div>
+            <div className="text-sm text-[#cdd9e5]">
+              這位客戶做過<b className="text-[#e0bd8b]"> 人生護照 </b>
+              {passportPlan.updatedAt && <span className="text-[#6b7d8f]">（最後更新 {passportPlan.updatedAt}）</span>}
+            </div>
+            <div className="text-[11px] text-[#6b7d8f] mt-0.5">這份屬於客戶，你可以看、不能改。</div>
+          </div>
+          <Link
+            href={`/dashboard/plans/${passportPlan.id}/history`}
+            className="shrink-0 text-[13px] text-[#a9bccf] hover:text-white border border-white/15 rounded-lg px-3 py-1.5"
+          >
+            看版本紀錄 →
+          </Link>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-5">
         <section>
