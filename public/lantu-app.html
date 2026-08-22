@@ -498,7 +498,7 @@ function sampleCase(){return {
   {name:'生活預備金',pct:6,ret:1,benefit:'流動安全網'}
  ]}
 };}
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
  c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
 
 // ===== 工作類別 / 投保級距 =====
@@ -616,6 +616,9 @@ function newCompany(){var o=defaultCompany();
  o.oversea='否';o.overseaPlace='';o.overseaUse='';
  // 第二批：十二個財報訊號要掃描的原料。留空＝該項訊號顯示「待補資料」，不會誤判成正常。
  o.cash='';o.monthlyFixed='';o.retained='';o.ar='';o.inventory='';o.insExpense='';o.topClientPct='';o.bookDiffPct='';
+ // 股東權益：選填。填了才驗得動「資產＝負債＋權益」——三個數字是財報上分別印出來的，
+ // key 錯一個當場就會露餡；只有兩個數字的話那條恆等式是恆真的，驗了等於沒驗。
+ o.equity='';
  delete o.ownerLoan;   // 股東往來改用 c.ownerLoans 逐筆登錄，方向與計息狀態才說得清楚
  return o;}
 function companiesOf(c){return (c&&Array.isArray(c.companies))?c.companies:[]}
@@ -653,7 +656,7 @@ function applyInsFromSalaryMember(m){if(!m||m.jobType==='企業主')return;m.ins
 // ===== 舊資料防護：所有資料進入點（localStorage / 匯入 JSON / iframe lantu:init）一律先過 migrateCase =====
 // 引擎對 c.profile / c.params / 13 個陣列完全沒有防護，缺任何一個都會在 render() 丟例外 → 整頁白畫面。
 var CASE_SCHEMA_VERSION=2;
-var CASE_ARRAYS=['members','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','lifeGoals','companies','bizYears','vat401','ownerLoans','guarantees','bizAssets','channels','compScenarios'];
+var CASE_ARRAYS=['members','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','lifeGoals','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'];
 function _fill(dflt,cur){var o={};Object.keys(dflt||{}).forEach(function(k){o[k]=dflt[k]});Object.keys(cur||{}).forEach(function(k){if(cur[k]!==undefined)o[k]=cur[k]});return o;}
 function migrateCase(c){
  if(!c||typeof c!=='object'||Array.isArray(c))c={};
@@ -701,8 +704,9 @@ function migrateCase(c){
 // 並在備註標明是舊資料轉入，讓教練回頭確認。
 function migrateCompanies(c){
  if(!Array.isArray(c.companies))c.companies=[];
- ['bizYears','vat401','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){if(!Array.isArray(c[k]))c[k]=[]});
+ ['bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){if(!Array.isArray(c[k]))c[k]=[]});
  if(!c.bizRisk||typeof c.bizRisk!=='object')c.bizRisk={};
+ if(!c.auditNotes||typeof c.auditNotes!=='object')c.auditNotes={};
  if(!c.bizExit||typeof c.bizExit!=='object')c.bizExit={};
  if(!c.bizExit.deboss||typeof c.bizExit.deboss!=='object')c.bizExit.deboss={};
  var old=c.company;
@@ -1749,7 +1753,9 @@ function addRow(arr){var c=activeCase();if(!c)return;
  companies:function(){return newCompany()},
  bizYears:function(){var ys=(c.bizYears||[]).map(function(x){return n(x.year)}).filter(Boolean);
   return {cid:(mainCompany(c)||{}).cid||'',year:(ys.length?Math.min.apply(null,ys)-1:new Date().getFullYear()-1),rev:0,gross:0,op:0,net:0,asset:0,debt:0}},
- vat401:function(){return {cid:(mainCompany(c)||{}).cid||'',period:'',sales:0,zeroRate:0,payable:0,carry:0}},
+ vat401:function(){return {cid:(mainCompany(c)||{}).cid||'',period:'',sales:0,zeroRate:0,outTax:'',inTax:'',payable:0,carry:0}},
+ reconcile:function(){var ys=(c.bizYears||[]).map(function(x){return n(x.year)}).filter(Boolean);
+  return {year:(ys.length?Math.max.apply(null,ys):new Date().getFullYear()-1),reason:RECONCILE_REASONS[0],amount:0,note:''}},
  ownerLoans:function(){return {cid:(mainCompany(c)||{}).cid||'',dir:'我借公司',amount:0,hasNote:'否',interest:'否',crossYear:'是',note:''}},
  guarantees:function(){return {owner:m0.name||'',bank:'',item:'公司借款',limit:0,balance:0,due:'',coGuarantor:'',note:''}},
  bizAssets:function(){return {cid:(mainCompany(c)||{}).cid||'',name:'',type:'不動產',value:0,user:'公司營運',note:''}},
@@ -3209,6 +3215,211 @@ function riskSec(c){
    1) 公司股權與股東往來**不寫進 c.assets / c.liabilities**，一律由 ownerBalanceSheet() 現算。
    2) 第一批只要五個數字就算「填了」——輸入量一大就沒人填，模組會空轉。
    ========================================================= */
+/* ── 財報勾稽檢核（驗算層）──
+   唯一真相在 src/lib/bizAudit.ts；這裡是 lantu-app.html 用的鏡像實作，
+   src/lib/bizModule.test.ts 會「跑同一份 fixture 比對兩邊輸出」，改一邊沒改另一邊測試會紅。
+
+   為什麼要有這一層：財報與 401 是少數「可以自我驗算」的文件。有恆等式在，
+   一個 key 錯的數字（78,000,000 打成 7,800,000）當場就會露餡；沒有的話，
+   它會安靜地把整合式個人資產負債表、股權估值、遺產稅全部帶偏，畫面上完全看不出來。
+
+   這一層也是「財報拍照擷取」的落地基礎（見專案記憶 財報擷取_待金鑰）：
+   擷取只是換掉輸入方式，回來的數字一樣要跑這一套才准自動填。
+
+   三個語意原則（別「順手優化」掉）：
+     1. 原料不足一律 'na'，絕不當成 'ok'。
+     2. 只說「對不起來」，不改資料、不擋存檔。
+     3. 「對不起來不是罪，說不出理由才是」——填了原因就從 fail 降成 warn。 */
+var AUDIT_TOL=1000, AUDIT_TOL_RATE=0.02;
+var RECONCILE_REASONS=['開票時點與收入認列時點差異','外銷零稅率（收入認列與報關時點不同）','非營業收入（利息、租金、處分資產）未開發票','預收款已開票但尚未認列收入','視為銷貨（自用、贈送、樣品）','跨期折讓與退回','免稅銷售額','其他（請於備註說明）'];
+var AUDIT_ID_TITLE={'vat.outTax':'銷項稅額 ＝（銷售額 − 零稅率）× 5%','vat.payable':'111 本期應納 ≤ 107 − 108（上期留抵會再抵掉一段）','vat.exclusive':'應納與留抵不會同時大於 0','vat.zero':'零稅率銷售額 ≤ 總銷售額'};
+// 「有填」與「填 0」是兩回事：沒填要回 na，填 0 是一個真實的答案。
+function aHas(v){return v!==''&&v!==null&&v!==undefined&&isFinite(Number(v))}
+function aNear(a,b){return Math.abs(a-b)<=Math.max(AUDIT_TOL,Math.abs(b)*0.001)}
+function aRate(a,b){return b===0?0:Math.abs(a)/Math.abs(b)}
+function aFmt(v){return Math.round(v).toLocaleString('zh-TW')}
+
+function crossCheck(c){
+ var years=Array.isArray(c&&c.bizYears)?c.bizYears:[];
+ var vats=Array.isArray(c&&c.vat401)?c.vat401:[];
+ var recs=Array.isArray(c&&c.reconcile)?c.reconcile:[];
+ var empty={vatTotal:0,bookRev:0,diff:0,rate:0,explained:0,unexplained:0,year:0};
+ if(!vats.length||!years.length)return Object.assign({},empty,{status:'na',detail:(!vats.length?'尚未填 401 期別':'尚未填三年財務摘要')});
+ var latest=years.slice().sort(function(a,b){return n(b.year)-n(a.year)})[0];
+ var year=n(latest.year),bookRev=n(latest.rev);
+ if(!bookRev)return Object.assign({},empty,{status:'na',year:year,detail:year+' 年度尚未填營收'});
+ var vatTotal=sum(vats,function(v){return n(v.sales)});
+ var diff=vatTotal-bookRev;
+ var explained=sum(recs,function(r){return n(r.year)===year?n(r.amount):0});
+ var unexplained=diff-explained;
+ var rate=aRate(unexplained,bookRev);
+ var status=rate<=AUDIT_TOL_RATE?'ok':(rate<=0.1?'warn':'fail');
+ return {status:status,vatTotal:vatTotal,bookRev:bookRev,diff:diff,rate:rate,explained:explained,unexplained:unexplained,year:year,detail:''};
+}
+
+function bizAudit(c){
+ var co=(Array.isArray(c&&c.companies)?c.companies[0]:null)||{};
+ var years=Array.isArray(c&&c.bizYears)?c.bizYears:[];
+ var vats=Array.isArray(c&&c.vat401)?c.vat401:[];
+ var notes=(c&&c.auditNotes&&typeof c.auditNotes==='object')?c.auditNotes:{};
+ var out=[];
+ function push(id,group,title,level,detail,fix){
+  var why=String(notes[id]||'').trim();
+  if(level==='fail'&&why)out.push({id:id,group:group,title:title,level:'warn',detail:detail+'　｜　已說明：'+why,fix:fix});
+  else out.push({id:id,group:group,title:title,level:level,detail:detail,fix:fix});
+ }
+ var ta=n(co.totalAsset),td=n(co.totalDebt),eq=co.equity;
+ if(!aHas(co.totalAsset)||!aHas(co.totalDebt)||!aHas(eq))
+  push('bs.identity','資產負債表','資產 ＝ 負債 ＋ 權益','na','尚未填「股東權益」（選填）——填了才驗得動這條恆等式','在公司概況補上財報上的股東權益數字');
+ else push('bs.identity','資產負債表','資產 ＝ 負債 ＋ 權益',aNear(ta,td+n(eq))?'ok':'fail',
+  '資產 '+aFmt(ta)+'　負債 '+aFmt(td)+'　權益 '+aFmt(n(eq))+'　差額 '+aFmt(ta-(td+n(eq))),
+  '三個數字是財報上分別印出來的，對不起來通常是其中一個 key 錯了');
+
+ var parts=[['現金',co.cash],['應收帳款',co.ar],['存貨',co.inventory]];
+ var filled=parts.filter(function(p){return aHas(p[1])});
+ if(!aHas(co.totalAsset)||!filled.length)
+  push('bs.parts','資產負債表','現金＋應收＋存貨 ≤ 總資產','na','尚未填總資產或三項科目','補上第二批的訊號原料');
+ else{var sub=sum(filled,function(p){return n(p[1])});
+  push('bs.parts','資產負債表','現金＋應收＋存貨 ≤ 總資產',sub<=ta+AUDIT_TOL?'ok':'fail',
+   filled.map(function(p){return p[0]+' '+aFmt(n(p[1]))}).join('　')+'　合計 '+aFmt(sub)+'　總資產 '+aFmt(ta),
+   '流動資產科目的合計不可能超過總資產，先確認單位（千元 vs 元）');}
+
+ if(!aHas(co.retained)||!aHas(eq))
+  push('bs.retained','資產負債表','累積未分配盈餘 ≤ 股東權益','na','尚未填未分配盈餘或股東權益','兩個都填了才驗得動');
+ else push('bs.retained','資產負債表','累積未分配盈餘 ≤ 股東權益',n(co.retained)<=n(eq)+AUDIT_TOL?'ok':'fail',
+  '未分配盈餘 '+aFmt(n(co.retained))+'　股東權益 '+aFmt(n(eq)),'未分配盈餘是權益的一部分，不可能比權益大');
+
+ var sorted=years.slice().sort(function(a,b){return n(b.year)-n(a.year)});
+ if(!sorted.length){
+  push('is.structure','損益表','毛利 ≥ 營業利益，且都 ≤ 營收','na','尚未填三年財務摘要','在公司概況的「三年財務摘要」補上');
+  push('is.nonop','損益表','淨利與營業利益的差＝業外損益','na','尚未填三年財務摘要','同上');
+  push('is.trend','損益表','三年趨勢無異常跳動','na','至少要兩個年度才看得出趨勢','同上');
+ }else{
+  var bad=sorted.filter(function(y){return aHas(y.rev)&&aHas(y.gross)&&aHas(y.op)&&(n(y.gross)>n(y.rev)+AUDIT_TOL||n(y.op)>n(y.gross)+AUDIT_TOL)});
+  push('is.structure','損益表','毛利 ≥ 營業利益，且都 ≤ 營收',bad.length?'fail':'ok',
+   bad.length?bad.map(function(y){return n(y.year)+'：營收 '+aFmt(n(y.rev))+'　毛利 '+aFmt(n(y.gross))+'　營業利益 '+aFmt(n(y.op))}).join('；')
+    :sorted.filter(function(y){return aHas(y.rev)}).map(function(y){return n(y.year)+' 毛利率 '+(aRate(n(y.gross),n(y.rev))*100).toFixed(1)+'%'}).join('　'),
+   '毛利不可能大於營收、營業利益不可能大於毛利；先確認欄位有沒有填錯格');
+
+  var nonop=sorted.filter(function(y){return aHas(y.op)&&aHas(y.net)&&n(y.op)!==0&&aRate(n(y.net)-n(y.op),n(y.op))>0.3});
+  push('is.nonop','損益表','淨利與營業利益的差＝業外損益',nonop.length?'fail':'ok',
+   nonop.length?nonop.map(function(y){return n(y.year)+'：營業利益 '+aFmt(n(y.op))+' → 稅後淨利 '+aFmt(n(y.net))+'（差 '+aFmt(n(y.net)-n(y.op))+'）'}).join('；')
+    :'各年度的業外損益都在營業利益的 30% 以內',
+   '先看營業利益、不要先看淨利——淨利可能是賣掉一台車撐起來的，那不是本業能力。差距大請說明業外項目');
+
+  if(sorted.length<2)push('is.trend','損益表','三年趨勢無異常跳動','na','只有一個年度，看不出趨勢','補上前兩年');
+  else{var jumps=[];
+   for(var i=0;i<sorted.length-1;i++){var ya=sorted[i],yb=sorted[i+1];
+    if(aHas(ya.rev)&&aHas(yb.rev)&&n(yb.rev)>0&&aRate(n(ya.rev)-n(yb.rev),n(yb.rev))>0.5)jumps.push(n(yb.year)+'→'+n(ya.year)+' 營收 '+aFmt(n(yb.rev))+' → '+aFmt(n(ya.rev)));}
+   push('is.trend','損益表','三年趨勢無異常跳動',jumps.length?'fail':'ok',
+    jumps.length?jumps.join('；'):sorted.length+' 個年度，年增率都在 ±50% 以內',
+    '單年變動超過五成通常有事（單一大案、業務轉型、或 key 錯位數），請確認並說明');}
+ }
+
+ if(!vats.length){
+  ['vat.outTax','vat.payable','vat.exclusive','vat.zero'].forEach(function(id){
+   push(id,'401 內部',AUDIT_ID_TITLE[id],'na','尚未填 401 期別','在公司概況的「近 6 期 401」補上')});
+ }else{
+  var withTax=vats.filter(function(v){return aHas(v.outTax)});
+  if(!withTax.length)push('vat.outTax','401 內部',AUDIT_ID_TITLE['vat.outTax'],'na','尚未填「銷項稅額(107)」（選填）','填了才驗得動 5% 這條');
+  else{var wrong=withTax.filter(function(v){return !aNear(n(v.outTax),(n(v.sales)-n(v.zeroRate))*0.05)});
+   push('vat.outTax','401 內部',AUDIT_ID_TITLE['vat.outTax'],wrong.length?'fail':'ok',
+    wrong.length?wrong.map(function(v){return v.period+'：應稅 '+aFmt(n(v.sales)-n(v.zeroRate))+' × 5% ＝ '+aFmt((n(v.sales)-n(v.zeroRate))*0.05)+'，表上是 '+aFmt(n(v.outTax))}).join('；')
+     :withTax.length+' 期都對得上',
+    '二聯式發票金額是含稅的，換算時要除以 1.05——這是最常見的填報錯誤之一');}
+
+  var withBoth=vats.filter(function(v){return aHas(v.outTax)&&aHas(v.inTax)});
+  if(!withBoth.length)push('vat.payable','401 內部',AUDIT_ID_TITLE['vat.payable'],'na','尚未填銷項(107)與進項(108)稅額（選填）','兩欄都填了才驗得動這條');
+  // 刻意只驗上界，不驗等號：111 還會被**上期留抵**再抵掉一段，
+  // 而表上只有「本期累積留抵(115)」、沒有「上期留抵」，硬要求相等會把正常的案子誤判成錯。
+  else{var w2=withBoth.filter(function(v){var net=n(v.outTax)-n(v.inTax);return net>=0?n(v.payable)>net+AUDIT_TOL:!aNear(n(v.payable),0)});
+   push('vat.payable','401 內部',AUDIT_ID_TITLE['vat.payable'],w2.length?'fail':'ok',
+    w2.length?w2.map(function(v){return v.period+'：107 '+aFmt(n(v.outTax))+' − 108 '+aFmt(n(v.inTax))+' ＝ '+aFmt(n(v.outTax)-n(v.inTax))+'，111 卻填 '+aFmt(n(v.payable))}).join('；')
+     :withBoth.length+' 期都在合理範圍',
+    '應納稅額不可能超過「銷項減進項」；進項大於銷項時 111 應為 0，差額走 112 溢付與 115 留抵');}
+
+  var both=vats.filter(function(v){return n(v.payable)>0&&n(v.carry)>0});
+  push('vat.exclusive','401 內部',AUDIT_ID_TITLE['vat.exclusive'],both.length?'fail':'ok',
+   both.length?both.map(function(v){return v.period+'：應納 '+aFmt(n(v.payable))+' 與留抵 '+aFmt(n(v.carry))+' 同時大於 0'}).join('；')
+    :vats.length+' 期都沒有同時出現',
+   '同一期要嘛應納、要嘛留抵，不會兩個都有——通常是把不同期的數字填在同一列');
+
+  var zb=vats.filter(function(v){return n(v.zeroRate)>n(v.sales)+AUDIT_TOL});
+  push('vat.zero','401 內部',AUDIT_ID_TITLE['vat.zero'],zb.length?'fail':'ok',
+   zb.length?zb.map(function(v){return v.period+'：零稅率 '+aFmt(n(v.zeroRate))+' > 銷售額 '+aFmt(n(v.sales))}).join('；')
+    :vats.length+' 期的零稅率都在銷售額之內',
+   '零稅率銷售額是總銷售額的一部分，不可能比它大');
+ }
+
+ var rc=crossCheck(c);
+ if(rc.status==='na')push('x.vat-vs-is','跨文件','6 期 401 銷售額合計 vs 損益表營業收入','na',rc.detail,'兩邊都填了才對得起來');
+ else push('x.vat-vs-is','跨文件','6 期 401 銷售額合計 vs 損益表營業收入',rc.status,
+  '401 合計 '+aFmt(rc.vatTotal)+'　帳載營收 '+aFmt(rc.bookRev)+'　差額 '+aFmt(rc.diff)+'（'+(rc.rate*100).toFixed(1)+'%）'+
+  (rc.explained?'　已說明 '+aFmt(rc.explained)+'　未解釋 '+aFmt(rc.unexplained):''),
+  '這是國稅局最基本的查核動作。對不起來不是罪，說不出理由才是——用下方的差異調節表逐項說明');
+
+ var b1=[['年營收',co.annualRevenue,'rev'],['稅後淨利',co.netProfit,'net'],['總資產',co.totalAsset,'asset'],['總負債',co.totalDebt,'debt']];
+ var latest=sorted[0];
+ if(!latest)push('x.batch1','跨文件','第一批五個數字 vs 三年財務摘要','na','尚未填三年財務摘要','補上最新年度即可比對');
+ else{var mm=b1.filter(function(f){return aHas(f[1])&&aHas(latest[f[2]])&&!aNear(n(f[1]),n(latest[f[2]]))});
+  push('x.batch1','跨文件','第一批五個數字 vs 三年財務摘要',mm.length?'fail':'ok',
+   mm.length?mm.map(function(f){return f[0]+'：第一批 '+aFmt(n(f[1]))+'　'+n(latest.year)+' 年度 '+aFmt(n(latest[f[2]]))}).join('；')
+    :'與 '+n(latest.year)+' 年度一致',
+   '兩邊指的是同一年就該一樣。常見成因是先填了第一批，後來補三年財報時改了數字卻沒回頭改');}
+ return out;
+}
+function auditSummary(items){
+ var by=function(l){return items.filter(function(x){return x.level===l}).length};
+ return {ok:by('ok'),warn:by('warn'),fail:by('fail'),na:by('na'),total:items.length};
+}
+function setAuditNote(id,v){var c=activeCase();c.auditNotes=c.auditNotes||{};c.auditNotes[id]=v;save();render()}
+
+function bizAuditHTML(c){
+ var items=bizAudit(c),s=auditSummary(items);
+ var LV={ok:['✓','var(--ok)','通過'],warn:['!','var(--amber2)','已說明'],fail:['✕','var(--warn)','對不起來'],na:['○','var(--mut2)','資料不足']};
+ var groups=[];items.forEach(function(x){if(groups.indexOf(x.group)<0)groups.push(x.group)});
+ var body=groups.map(function(g){
+  return '<tr><td colspan="3" style="padding-top:10px"><b style="color:var(--amber2);font-size:12.5px">'+g+'</b></td></tr>'+
+   items.filter(function(x){return x.group===g}).map(function(x){var L=LV[x.level];
+    return '<tr><td class="k" style="text-align:center;color:'+L[1]+';font-weight:800">'+L[0]+'</td>'+
+     '<td>'+x.title+'<div class="muted" style="font-size:12px;margin-top:2px">'+esc(x.detail)+'</div>'+
+     (x.level==='fail'?'<div class="hint" style="margin-top:4px">'+x.fix+'</div>'+
+       '<input style="margin-top:5px;width:100%" placeholder="說得出理由就填在這裡（填了會從「對不起來」轉為「已說明」）" value="'+esc((c.auditNotes||{})[x.id]||'')+'" onchange="setAuditNote(\''+x.id+'\',this.value)">':'')+
+     '</td><td style="color:'+L[1]+';white-space:nowrap;font-size:12.5px">'+L[2]+'</td></tr>';
+   }).join('');
+ }).join('');
+ var head=s.fail>0?['對不起來 '+s.fail+' 項','var(--warn)']:(s.na>0?['資料不足 '+s.na+' 項','var(--mut2)']:['全部通過','var(--ok)']);
+ return '<div class="sec"><h4>財報勾稽檢核 <span class="hint" style="color:'+head[1]+'">'+head[0]+
+  '　（通過 '+s.ok+'／已說明 '+s.warn+'／對不起來 '+s.fail+'／資料不足 '+s.na+'）</span></h4>'+
+  '<div class="tw"><table class="rtable"><tr><th></th><th>檢核項目</th><th>結果</th></tr>'+body+'</table></div>'+
+  '<div class="hint" style="margin-top:8px">這一層<b>不會改你填的任何數字、也不擋存檔</b>，它只告訴你哪裡對不起來。'+
+  '<br><b>「對不起來不是罪，說不出理由才是」</b>——每一項都可以填原因，填了就轉成「已說明」並留下紀錄。'+
+  '<br>需要原料才驗得動的項目會顯示「資料不足」，<b>不會當成通過</b>。</div></div>';
+}
+
+// 401 與帳載收入差異調節表。手冊：建議每年結帳時做一張，被函查時可以直接交出去。
+function vatReconcileHTML(c){
+ var rc=crossCheck(c);
+ var tbl=tableSec('差異調節明細','reconcile',c.reconcile,[['year','年度','num'],['reason','差異來源','sel:'+RECONCILE_REASONS.join(',')],['amount','金額','money'],['note','備註','text']],
+  '逐項說明「401 為什麼跟帳載營收對不起來」。金額以「401 多出來」為正、「401 少了」為負。');
+ if(rc.status==='na')return '<div class="sec"><h4>401 與帳載收入差異調節表</h4><div class="hint">'+esc(rc.detail)+'——三年財務摘要與 401 期別都填了，這張表才算得出來。</div></div>'+tbl;
+ var col=rc.status==='ok'?'var(--ok)':rc.status==='warn'?'var(--amber2)':'var(--warn)';
+ return '<div class="sec"><h4>401 與帳載收入差異調節表 <span class="hint">'+rc.year+' 年度</span></h4>'+
+  '<div class="big3"><div class="b"><div class="l">6 期 401 銷售額合計</div><div class="v">'+fmt(rc.vatTotal)+'</div></div>'+
+  '<div class="b"><div class="l">損益表營業收入</div><div class="v">'+fmt(rc.bookRev)+'</div></div>'+
+  '<div class="b"><div class="l">未解釋差額</div><div class="v" style="color:'+col+'">'+fmt(rc.unexplained)+'<span style="font-size:13px">（'+(rc.rate*100).toFixed(1)+'%）</span></div></div></div>'+
+  detailBox('調節過程',kvTbl([
+   ['6 期 401 銷售額合計',Math.round(rc.vatTotal)],
+   ['減：損益表營業收入',-Math.round(rc.bookRev)],
+   ['＝ 總差額',Math.round(rc.diff)],
+   ['減：已逐項說明的差異',-Math.round(rc.explained)],
+   ['＝ 無法解釋的差額',Math.round(rc.unexplained),col]
+  ]))+
+  '<div class="hint" style="margin-top:8px">國稅局最基本的查核動作，就是拿 6 期 401 的銷售額總和去對損益表的營業收入。'+
+  '兩者本來就會有差（開票時點、零稅率、非營業收入、預收款、視為銷貨…），<b>對不起來不是罪，說不出理由才是</b>。'+
+  '<br>未解釋差額在 2% 以內視為正常，10% 以上就要認真找原因。建議每年結帳時做一張——<b>被函查時可以直接交出去</b>。</div></div>'+tbl;
+}
+
 function setCo(k,v,type){var c=activeCase();var co=mainCompany(c);if(!co)return;
  co[k]=(type==='num')?n(v):v;save();render();}
 function coF(co,k,label,type,opts){
@@ -3233,7 +3444,7 @@ function companySec(c){
  if(!co)return '<div class="sec"><h4>公司概況</h4><div class="hint">尚未建立公司資料。</div><button class="tbtn amber" style="margin-top:8px" onclick="addRow(\'companies\')">＋ 建立公司</button></div>';
  var batch1='<div class="bizbox"><div class="bh">第一批 · 五個數字 <span class="hint" style="font-weight:400">首次會談就問得到；填完這五格，下面的整合式個人資產負債表就算得出來</span></div>'+
   '<div class="fgrid">'+coF(co,'annualRevenue','年營收','num')+coF(co,'netProfit','稅後淨利','num')+
-  coF(co,'totalAsset','總資產','num')+coF(co,'totalDebt','總負債','num')+coF(co,'sharePct','本人持股 %','num')+'</div></div>';
+  coF(co,'totalAsset','總資產','num')+coF(co,'totalDebt','總負債','num')+coF(co,'sharePct','本人持股 %','num')+coF(co,'equity','股東權益（選填）','num')+'</div>'+'<div class="hint" style="margin-top:6px">股東權益是<b>選填</b>，但填了才驗得動「資產 ＝ 負債 ＋ 權益」——這三個數字是財報上分別印出來的，key 錯一個當場就會露餡。</div></div>';
  var basic='<div class="sec"><h4>公司基本</h4><div class="fgrid">'+
   coF(co,'name','公司名稱')+coF(co,'taxId','統一編號')+
   '<div class="f"><label>行業別</label><input list="industryList" value="'+esc(co.industry==null?'':co.industry)+'" onchange="setCo(\'industry\',this.value)"><datalist id="industryList"><option value="批發/零售"></option><option value="餐飲/住宿"></option><option value="製造"></option><option value="營建/工程"></option><option value="資訊/科技"></option><option value="金融/保險"></option><option value="醫療/生技"></option><option value="教育/文創"></option><option value="農林漁牧"></option><option value="專業服務(法律/會計/顧問)"></option></datalist></div>'+
@@ -3259,11 +3470,11 @@ function companySec(c){
   (co.oversea==='有'?'<div class="hint" style="margin-top:8px;color:var(--amber2)">⚠ 台灣三道反避稅關卡：<b>CFC 受控外國企業制度</b>（已上路，符合定義又不符豁免者，不分配也要課稅）、<b>PEM 實際管理處所</b>（立法完成、尚未施行）、<b>移轉訂價</b>。2023 年之後，單純為節稅而設境外公司對多數中小企業已不划算。請與會計師確認申報義務。</div>':'')+'</div>';
  var years=tableSec('三年財務摘要','bizYears',c.bizYears,[['year','年度','num'],['rev','營收','money'],['gross','毛利','money'],['op','營業利益','money'],['net','稅後淨利','money'],['asset','總資產','money'],['debt','總負債','money']],
   '先看營業利益、不要先看淨利——淨利可能是賣掉一台車撐起來的，那不是本業能力。');
- var vat=tableSec('近 6 期 401','vat401',c.vat401,[['period','期別(如 115-01/02)','text'],['sales','銷售額','money'],['zeroRate','其中零稅率','money'],['payable','本期應納(111)','money'],['carry','累積留抵(115)','money']],
-  '401 是兩個月一筆、已經送進國稅局的真實營收趨勢線，可信度高於任何自製報表。欄 115 累積留抵長期偏高＝有一筆公司現金卡在國稅局，值得和記帳士確認能否轉為退稅。');
+ var vat=tableSec('近 6 期 401','vat401',c.vat401,[['period','期別(如 115-01/02)','text'],['sales','銷售額','money'],['zeroRate','其中零稅率','money'],['outTax','銷項稅額(107)','money'],['inTax','得扣抵進項(108)','money'],['payable','本期應納(111)','money'],['carry','累積留抵(115)','money']],
+  '401 是兩個月一筆、已經送進國稅局的真實營收趨勢線，可信度高於任何自製報表。欄 115 累積留抵長期偏高＝有一筆公司現金卡在國稅局，值得和記帳士確認能否轉為退稅。<br>107 與 108 是<b>選填</b>，填了才驗得動「銷項 ＝ 應稅銷售額 × 5%」與「111 ＝ 107 − 108」。');
  return '<div class="folded" style="border-style:solid;border-color:rgba(143,192,163,.32);color:var(--mut);display:block">'+
    '企業主體 · 公司概況<span>資料分三批索取，隨信任度推進：第一批五個數字就能產出交付物，後兩批是漸進解鎖，不用一次問完。</span></div>'+
-  batch1+basic+equity+batch2+oversea+years+vat;
+  bizAuditHTML(c)+batch1+basic+equity+batch2+oversea+years+vat+vatReconcileHTML(c);
 }
 
 // ── E2 公私勾稽：整合式個人資產負債表的原料 ──
@@ -4552,8 +4763,15 @@ function bizAnalysisHTML(c){
  var g=gateLevel(c),L=GATE_LAMP[g.lv];
  var lamp='<div class="sec"><h4>企業主診斷 <span class="hint">規劃可信度：<b style="color:'+L[1]+'">'+L[0]+'</b></span></h4>'+
   '<div class="hint">'+L[2]+(g.lv==='na'?' <button class="tbtn" onclick="jumpTab(\'bizgate\')">前往合規閘 →</button>':'')+'</div></div>';
- return '<div class="ppband">企業主診斷 <span class="hint">整合式個人資產負債表 · 十二個財報訊號 · 規劃可信度</span></div>'+
-  lamp+ownerBalanceSheetHTML(c)+bizSignalsHTML(c);
+ var au=auditSummary(bizAudit(c));
+ var auCol=au.fail>0?'var(--warn)':(au.na>0?'var(--mut2)':'var(--ok)');
+ var auTxt=au.fail>0?('財報勾稽有 '+au.fail+' 項對不起來'):(au.na>0?('財報勾稽尚有 '+au.na+' 項資料不足'):'財報勾稽全部通過');
+ var auBar='<div class="sec"><h4>財報勾稽 <span class="hint" style="color:'+auCol+'">'+auTxt+'</span></h4>'+
+  '<div class="hint">通過 '+au.ok+'／已說明 '+au.warn+'／對不起來 '+au.fail+'／資料不足 '+au.na+'　'+
+  '<button class="tbtn" onclick="jumpTab(\'company\')">前往公司概況 →</button></div>'+
+  (au.fail>0?'<div class="hint" style="margin-top:6px;color:var(--warn)">⚠ 底下所有數字都建立在這些財報數字上。先把對不起來的項目確認完，再看下面的分析。</div>':'')+'</div>';
+ return '<div class="ppband">企業主診斷 <span class="hint">財報勾稽 · 整合式個人資產負債表 · 十二個財報訊號 · 規劃可信度</span></div>'+
+  lamp+auBar+ownerBalanceSheetHTML(c)+bizSignalsHTML(c);
 }
 function gauge(t,v){v=Math.max(0,Math.min(100,v));var col=v>=70?'var(--ok)':v>=40?'var(--amber)':'var(--warn)';
  var ang=-90+v/100*180,r=62,cx=75,cy=75,x=cx+r*Math.cos(ang*Math.PI/180),y=cy+r*Math.sin(ang*Math.PI/180);

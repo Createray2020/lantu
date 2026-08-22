@@ -4,6 +4,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { JSDOM } from "jsdom";
 import * as BizTax from "./bizTax";
 import * as BizCheck from "./bizCheck";
+import * as BizAudit from "./bizAudit";
 
 /**
  * 企業主模組（第 ④ 群）的接線與地基語意測試。
@@ -812,5 +813,295 @@ describe("法規常數可由後台覆蓋（applyBizTax）", () => {
     expect(() => w.applyBizTax(null)).not.toThrow();
     expect(() => w.applyBizTax("nope")).not.toThrow();
     expect(() => w.applyBizTax({})).not.toThrow();
+  });
+});
+
+// ── 驗算層 ──
+
+describe("財報勾稽檢核（驗算層）", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const clean = (): any => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.companies = [{
+      ...w.newCompany(), name: "測試",
+      annualRevenue: 100000000, netProfit: 6000000, totalAsset: 80000000, totalDebt: 50000000,
+      equity: 30000000, cash: 5000000, ar: 20000000, inventory: 12000000, retained: 18000000,
+    }];
+    c.bizYears = [
+      { cid: c.companies[0].cid, year: 2024, rev: 100000000, gross: 20000000, op: 8000000, net: 6000000, asset: 80000000, debt: 50000000 },
+      { cid: c.companies[0].cid, year: 2023, rev: 90000000, gross: 18000000, op: 7000000, net: 5200000, asset: 74000000, debt: 46000000 },
+    ];
+    // 6 期合計 = 100,000,000，與帳載營收一致
+    c.vat401 = [1, 2, 3, 4, 5, 6].map((i) => ({
+      cid: c.companies[0].cid, period: `114-0${i}`, sales: 16000000, zeroRate: 2000000,
+      outTax: 700000, inTax: 500000, payable: 200000, carry: 0,
+    }));
+    c.vat401[0].sales = 20000000;
+    c.vat401[0].outTax = 900000;
+    c.vat401[0].payable = 400000;
+    return c;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lv = (c: any, id: string) => w.bizAudit(c).find((x: { id: string }) => x.id === id)?.level;
+
+  it("一份對得起來的資料：全部通過，沒有任何 fail", () => {
+    const items = w.bizAudit(clean());
+    expect(items.filter((x: { level: string }) => x.level === "fail")).toEqual([]);
+    expect(w.auditSummary(items).ok).toBe(items.length);
+  });
+
+  it("資產 ≠ 負債 ＋ 權益 → fail，而且算得出差多少", () => {
+    const c = clean();
+    c.companies[0].equity = 25000000; // 差 500 萬
+    const item = w.bizAudit(c).find((x: { id: string }) => x.id === "bs.identity");
+    expect(item.level).toBe("fail");
+    expect(item.detail).toContain("5,000,000");
+  });
+
+  it("⚠️ 沒填股東權益＝資料不足，不會當成通過（只有兩個數字時那條恆等式是恆真的）", () => {
+    const c = clean();
+    c.companies[0].equity = "";
+    expect(lv(c, "bs.identity")).toBe("na");
+  });
+
+  it("填 0 與沒填是兩回事：填 0 要真的去驗", () => {
+    const c = clean();
+    c.companies[0].equity = 0;
+    expect(lv(c, "bs.identity")).toBe("fail");   // 8000 萬 ≠ 5000 萬 + 0
+  });
+
+  it("現金＋應收＋存貨 > 總資產 → fail（通常是單位打成千元）", () => {
+    const c = clean();
+    c.companies[0].ar = 70000000;
+    expect(lv(c, "bs.parts")).toBe("fail");
+  });
+
+  it("未分配盈餘 > 股東權益 → fail", () => {
+    const c = clean();
+    c.companies[0].retained = 40000000;
+    expect(lv(c, "bs.retained")).toBe("fail");
+  });
+
+  it("毛利 > 營收 或 營業利益 > 毛利 → fail", () => {
+    const c = clean();
+    c.bizYears[0].gross = 120000000;
+    expect(lv(c, "is.structure")).toBe("fail");
+  });
+
+  it("淨利與營業利益差超過三成 → fail（提醒業外損益要說明）", () => {
+    const c = clean();
+    c.bizYears[0].net = 20000000;   // 營業利益只有 800 萬
+    expect(lv(c, "is.nonop")).toBe("fail");
+  });
+
+  it("單年營收跳動超過五成 → fail", () => {
+    const c = clean();
+    c.bizYears[1].rev = 30000000;
+    expect(lv(c, "is.trend")).toBe("fail");
+  });
+
+  it("銷項稅額 ≠ 應稅銷售額 × 5% → fail（二聯式含稅沒除 1.05 的典型）", () => {
+    const c = clean();
+    c.vat401[2].outTax = 800000;
+    const item = w.bizAudit(c).find((x: { id: string }) => x.id === "vat.outTax");
+    expect(item.level).toBe("fail");
+    expect(item.detail).toContain("114-03");
+  });
+
+  it("111 只驗上界：應納不可超過 107 − 108（上期留抵會再抵掉一段，所以不驗等號）", () => {
+    const c = clean();
+    c.vat401[1].payable = 999999;          // 銷項減進項只有 200,000
+    expect(lv(c, "vat.payable")).toBe("fail");
+
+    // ⚠️ 被上期留抵抵掉一部分是正常的，不能誤判成錯
+    const c2 = clean();
+    c2.vat401[1].payable = 50000;
+    expect(lv(c2, "vat.payable")).toBe("ok");
+
+    // 進項大於銷項時 111 應為 0
+    const c3 = clean();
+    c3.vat401.forEach((v: Record<string, number>) => { v.inTax = 900000; v.payable = 0; v.carry = 200000; });
+    expect(lv(c3, "vat.payable")).toBe("ok");
+    c3.vat401[0].payable = 50000;   // 容差是 1,000 元（財報常有千元位四捨五入），要超過才算錯
+    expect(lv(c3, "vat.payable")).toBe("fail");
+  });
+
+  it("同一期應納與留抵不會同時 > 0", () => {
+    const c = clean();
+    c.vat401[3].carry = 50000;   // payable 已經是 200,000
+    expect(lv(c, "vat.exclusive")).toBe("fail");
+  });
+
+  it("零稅率 > 銷售額 → fail", () => {
+    const c = clean();
+    c.vat401[4].zeroRate = 99000000;
+    expect(lv(c, "vat.zero")).toBe("fail");
+  });
+
+  it("107 / 108 沒填 → 資料不足，不是通過", () => {
+    const c = clean();
+    c.vat401.forEach((v: Record<string, unknown>) => { v.outTax = ""; v.inTax = ""; });
+    expect(lv(c, "vat.outTax")).toBe("na");
+    expect(lv(c, "vat.payable")).toBe("na");
+    expect(lv(c, "vat.exclusive")).toBe("ok");   // 這一項不需要 107/108
+  });
+
+  it("第一批五個數字與三年財報打架 → fail", () => {
+    const c = clean();
+    c.companies[0].annualRevenue = 88000000;
+    const item = w.bizAudit(c).find((x: { id: string }) => x.id === "x.batch1");
+    expect(item.level).toBe("fail");
+    expect(item.detail).toContain("年營收");
+  });
+
+  it("⚠️「說得出理由」就從 fail 轉成 warn，並把理由留在紀錄裡", () => {
+    const c = clean();
+    c.companies[0].equity = 25000000;
+    expect(lv(c, "bs.identity")).toBe("fail");
+    c.auditNotes = { "bs.identity": "財報是千元為單位，權益那格漏乘 1000" };
+    const item = w.bizAudit(c).find((x: { id: string }) => x.id === "bs.identity");
+    expect(item.level).toBe("warn");
+    expect(item.detail).toContain("已說明");
+    expect(item.detail).toContain("漏乘 1000");
+  });
+
+  it("空白案子：全部 na，一項 fail 都沒有（不會嚇到剛開案的教練）", () => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.companies = [w.newCompany()];
+    const items = w.bizAudit(c);
+    expect(items.filter((x: { level: string }) => x.level === "fail")).toEqual([]);
+    expect(w.auditSummary(items).na).toBe(items.length);
+  });
+
+  it("檢核不改任何資料、也不擋存檔", () => {
+    const c = clean();
+    const before = JSON.stringify({ co: c.companies, y: c.bizYears, v: c.vat401 });
+    w.bizAudit(c);
+    w.bizAudit(c);
+    expect(JSON.stringify({ co: c.companies, y: c.bizYears, v: c.vat401 })).toBe(before);
+  });
+});
+
+describe("401 與帳載收入差異調節表", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withGap = (): any => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.companies = [{ ...w.newCompany(), annualRevenue: 100000000, totalAsset: 1, totalDebt: 1 }];
+    c.bizYears = [{ cid: "x", year: 2024, rev: 100000000, gross: 20000000, op: 8000000, net: 6000000, asset: 1, debt: 1 }];
+    // 401 合計 108,000,000 → 多出 800 萬（8%）
+    c.vat401 = [1, 2, 3, 4, 5, 6].map((i) => ({ cid: "x", period: `114-0${i}`, sales: 18000000, zeroRate: 0, outTax: "", inTax: "", payable: 900000, carry: 0 }));
+    return c;
+  };
+
+  it("差額 8% 未說明 → warn；逐項說明完就變 ok", () => {
+    const c = withGap();
+    let rc = w.crossCheck(c);
+    expect(rc.diff).toBe(8000000);
+    expect(rc.unexplained).toBe(8000000);
+    expect(rc.status).toBe("warn");
+
+    c.reconcile = [
+      { year: 2024, reason: "預收款已開票但尚未認列收入", amount: 6000000, note: "12 月大單" },
+      { year: 2024, reason: "視為銷貨（自用、贈送、樣品）", amount: 2000000, note: "" },
+    ];
+    rc = w.crossCheck(c);
+    expect(rc.explained).toBe(8000000);
+    expect(rc.unexplained).toBe(0);
+    expect(rc.status).toBe("ok");
+  });
+
+  it("未解釋差額超過 10% → fail", () => {
+    const c = withGap();
+    c.vat401.forEach((v: Record<string, number>) => { v.sales = 20000000; });   // 合計 1.2 億，差 20%
+    expect(w.crossCheck(c).status).toBe("fail");
+  });
+
+  it("只算當年度的調節列，別年的不算進來", () => {
+    const c = withGap();
+    c.reconcile = [{ year: 2023, reason: "免稅銷售額", amount: 8000000, note: "" }];
+    expect(w.crossCheck(c).explained).toBe(0);
+    expect(w.crossCheck(c).unexplained).toBe(8000000);
+  });
+
+  it("兩邊有一邊沒填就 na，不會給出假的 0%", () => {
+    const c = withGap();
+    c.vat401 = [];
+    expect(w.crossCheck(c).status).toBe("na");
+    const c2 = withGap();
+    c2.bizYears = [];
+    expect(w.crossCheck(c2).status).toBe("na");
+  });
+
+  it("公司概況分頁掛得出檢核卡與調節表", () => {
+    withGap();
+    const h = renderTab("company");
+    expect(h).toContain("財報勾稽檢核");
+    expect(h).toContain("401 與帳載收入差異調節表");
+    expect(h).toContain("被函查時可以直接交出去");
+  });
+
+  it("分析頁的企業主診斷區帶出勾稽摘要", () => {
+    withGap();
+    w.app.activeTab = "analysis"; w.render();
+    expect(pane()).toContain("財報勾稽");
+  });
+});
+
+describe("⚠️ 驗算層雙實作對拍：bizAudit.ts ↔ lantu-app.html", () => {
+  // 這一組不是比字串，是「跑同一份 fixture、斷言兩邊輸出逐項完全相同」——
+  // 比正則守常數強得多，而且財報擷取上線時後端會直接用 TS 那份，
+  // 兩邊漂移＝擷取結果的驗算跟畫面上看到的不一樣。
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fixtures: [string, any][] = [
+    ["空白", { companies: [{}], bizYears: [], vat401: [], reconcile: [] }],
+    ["完全乾淨", {
+      companies: [{ annualRevenue: 100000000, netProfit: 6000000, totalAsset: 80000000, totalDebt: 50000000, equity: 30000000, cash: 5000000, ar: 20000000, inventory: 12000000, retained: 18000000 }],
+      bizYears: [{ year: 2024, rev: 100000000, gross: 20000000, op: 8000000, net: 6000000, asset: 80000000, debt: 50000000 }],
+      vat401: [{ period: "114-01", sales: 100000000, zeroRate: 0, outTax: 5000000, inTax: 3000000, payable: 2000000, carry: 0 }],
+      reconcile: [],
+    }],
+    ["到處都對不起來", {
+      companies: [{ annualRevenue: 88000000, netProfit: 6000000, totalAsset: 80000000, totalDebt: 50000000, equity: 25000000, cash: 40000000, ar: 40000000, inventory: 30000000, retained: 90000000 }],
+      bizYears: [
+        { year: 2024, rev: 100000000, gross: 120000000, op: 8000000, net: 30000000, asset: 80000000, debt: 50000000 },
+        { year: 2023, rev: 20000000, gross: 4000000, op: 1000000, net: 800000, asset: 30000000, debt: 20000000 },
+      ],
+      vat401: [{ period: "114-01", sales: 10000000, zeroRate: 99000000, outTax: 900000, inTax: 100000, payable: 12345, carry: 6789 }],
+      reconcile: [],
+    }],
+    ["有說明的", {
+      companies: [{ totalAsset: 80000000, totalDebt: 50000000, equity: 25000000 }],
+      bizYears: [], vat401: [], reconcile: [],
+      auditNotes: { "bs.identity": "財報是千元為單位" },
+    }],
+    ["調節表有填", {
+      companies: [{ annualRevenue: 100000000, totalAsset: 1, totalDebt: 1 }],
+      bizYears: [{ year: 2024, rev: 100000000, gross: 20000000, op: 8000000, net: 6000000, asset: 1, debt: 1 }],
+      vat401: [{ period: "114-01", sales: 108000000, zeroRate: 0, outTax: "", inTax: "", payable: 0, carry: 0 }],
+      reconcile: [{ year: 2024, reason: "免稅銷售額", amount: 8000000, note: "" }],
+    }],
+  ];
+
+  it.each(fixtures)("bizAudit：%s", (_name, fx) => {
+    expect(w.bizAudit(fx)).toEqual(BizAudit.auditBiz(fx));
+  });
+
+  it.each(fixtures)("crossCheck：%s", (_name, fx) => {
+    expect(w.crossCheck(fx)).toEqual(BizAudit.crossCheck(fx));
+  });
+
+  it("合理差異清單兩邊一致", () => {
+    const m = readFileSync(fileURLToPath(new URL("../../public/lantu-app.html", import.meta.url)), "utf8")
+      .match(/var RECONCILE_REASONS=\[([\s\S]*?)\];/);
+    if (!m) throw new Error("lantu-app.html 找不到 RECONCILE_REASONS");
+    expect(Array.from(m[1].matchAll(/'([^']*)'/g)).map((x) => x[1])).toEqual([...BizAudit.RECONCILE_REASONS]);
+  });
+
+  it("容差兩邊一致", () => {
+    expect(w.AUDIT_TOL).toBe(BizAudit.TOLERANCE_ABS);
+    expect(w.AUDIT_TOL_RATE).toBe(BizAudit.TOLERANCE_RATE);
   });
 });

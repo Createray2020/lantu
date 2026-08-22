@@ -134,11 +134,12 @@ function buildCase(): any {
     cid: CO, name: "宏昇精密工業股份有限公司", taxId: "27418365", industry: "製造",
     org: "股份有限公司", setupYear: 2009, role: "董事長兼總經理", sharePct: 70,
     annualRevenue: 180000000, netProfit: 12000000, totalAsset: 120000000, totalDebt: 78000000,
+    equity: 42000000,   // ＝ 總資產 − 總負債；填了才驗得動「資產 ＝ 負債 ＋ 權益」
     bookkeep: "查帳", accountant: "誠信聯合會計師事務所 · 王會計師 04-2258-xxxx",
     valueMethod: "淨值法", peMultiple: 4, valueManual: 0,
     oversea: "否", overseaPlace: "", overseaUse: "",
     // 第二批：十二個財報訊號的原料
-    cash: 8000000, monthlyFixed: 9000000, retained: 50000000,
+    cash: 8000000, monthlyFixed: 9000000, retained: 36500000,
     ar: 54000000, inventory: 31000000, insExpense: 80000,
     topClientPct: 45, bookDiffPct: 12,
     note: "與兩位前同事共同創立，另兩位股東各持 15%。",
@@ -148,14 +149,34 @@ function buildCase(): any {
     { cid: CO, year: 2023, rev: 168000000, gross: 31900000, op: 15100000, net: 11500000, asset: 112000000, debt: 68000000 },
     { cid: CO, year: 2022, rev: 155000000, gross: 30200000, op: 14300000, net: 10800000, asset: 104000000, debt: 63000000 },
   ];
-  c.vat401 = [
-    { cid: CO, period: "114-11/12", sales: 31200000, zeroRate: 6800000, payable: 780000, carry: 0 },
-    { cid: CO, period: "114-09/10", sales: 29800000, zeroRate: 6100000, payable: 720000, carry: 0 },
-    { cid: CO, period: "114-07/08", sales: 28400000, zeroRate: 5900000, payable: 0, carry: 340000 },
-    { cid: CO, period: "114-05/06", sales: 30600000, zeroRate: 6400000, payable: 690000, carry: 0 },
-    { cid: CO, period: "114-03/04", sales: 29100000, zeroRate: 5700000, payable: 710000, carry: 0 },
-    { cid: CO, period: "114-01/02", sales: 30900000, zeroRate: 6300000, payable: 750000, carry: 0 },
+  // 401 六期。銷項稅額由「(銷售額 − 零稅率) × 5%」直接算出來，進項稅額才是給定值——
+  // 這樣驗算層的「銷項 ＝ 應稅 × 5%」與「111 ＝ 107 − 108」一定對得上，
+  // 對不上就代表我把資料寫錯了，而不是檢核寫錯了。
+  //
+  // 六期銷售額合計 1.86 億，比損益表的 1.8 億多 600 萬（3.3%）——這是刻意的：
+  // 401 與帳載收入本來就會有差，示範案例要讓「差異調節表」有東西可以調。
+  const vatRaw: [string, number, number, number][] = [
+    // [期別, 銷售額, 其中零稅率, 得扣抵進項稅額]
+    ["114-11/12", 32400000, 6800000, 520000],
+    ["114-09/10", 30900000, 6100000, 510000],
+    ["114-07/08", 29200000, 5900000, 1520000],   // 這一期進項大於銷項 → 走留抵
+    ["114-05/06", 31600000, 6400000, 560000],
+    ["114-03/04", 30000000, 5700000, 490000],
+    ["114-01/02", 31900000, 6300000, 530000],
   ];
+  // ⚠️ 留抵是「往後累積」的，一定要依時序算：vatRaw 是新的在前，所以先反轉成舊→新算完再轉回來。
+  // 直接照顯示順序算會把上期留抵套到錯的期別上，畫面看起來很合理、數字卻是錯的。
+  let carry = 0;
+  c.vat401 = vatRaw.slice().reverse().map(([period, sales, zeroRate, inTax]) => {
+    const outTax = Math.round((sales - zeroRate) * 0.05);
+    const net = outTax - inTax;
+    const payable = net >= 0 ? Math.max(0, net - carry) : 0;
+    if (net < 0) carry += -net; else carry = Math.max(0, carry - net);
+    return { cid: CO, period, sales, zeroRate, outTax, inTax, payable, carry };
+  }).reverse();
+  // 差異調節表刻意留空——那正是教練該做的事：逐項說明 401 為什麼跟帳載對不起來。
+  c.reconcile = [];
+  c.auditNotes = {};
 
   // ── E2 公私勾稽 ──
   c.ownerLoans = [
