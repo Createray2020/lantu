@@ -1,4 +1,4 @@
-// 首頁彙總層：依角色（教練／主管／老闆）把各卡片要的數字算出來。
+// 首頁彙總層：依角色（教練／主管／核心成員）把各卡片要的數字算出來。
 // 有真實資料源的（客戶／待辦／約訪、組織樹、成員名冊）直接接；
 // 業績／活動量／增員／公告等由 member_metrics / recruits / announcements 承載（可編輯的模擬資料）。
 import { and, inArray, eq, desc } from "drizzle-orm";
@@ -39,7 +39,7 @@ export type Metric = typeof memberMetrics.$inferSelect;
 export type Announcement = typeof announcements.$inferSelect;
 
 // period 條件要下推到 SQL。舊版把該教練「所有期間」的列全撈回 Node 再 filter，
-// 100 位教練 × 36 個月＝3600 列拉回來丟掉 97%，而老闆首頁一次 render 會呼叫 2~4 次。
+// 100 位教練 × 36 個月＝3600 列拉回來丟掉 97%，而核心成員首頁一次 render 會呼叫 2~4 次。
 async function metricsFor(period: string, coachIds: string[]): Promise<Map<string, Metric>> {
   if (!coachIds.length) return new Map();
   const rows = await db.select().from(memberMetrics)
@@ -206,7 +206,7 @@ export async function getManagerHome(manager: CoachRow, all: CoachRow[], period:
   };
 }
 
-// ---------- 老闆（owner）----------
+// ---------- 核心成員（owner）----------
 export type OwnerHome = {
   kpis: { income: number; growthPct: number; headcount: number; retention: number; activity: number };
   healthScore: number;

@@ -5,6 +5,7 @@ import { ensureClientUser } from "@/lib/clientUser";
 import { listClientCases } from "@/lib/comp/survey";
 import { getClientOwnPlan, getClientSetup } from "@/lib/clientPlan";
 import { normalizeIntent } from "@/lib/intent";
+import UiScaleToggle from "@/components/UiScaleToggle";
 import { wan, ntfmt } from "@/lib/passport";
 import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
@@ -54,6 +55,7 @@ export default async function Portal() {
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
         <div className="flex items-center gap-2">
+          <UiScaleToggle compact />
           {isCoach && (
             <Link
               href="/dashboard"

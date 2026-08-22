@@ -1,5 +1,6 @@
 import Link from "next/link";
 import HeroCalc from "./HeroCalc";
+import UiScaleToggle from "./UiScaleToggle";
 import { getLandingStats } from "@/lib/landing";
 import { listPublicCoaches } from "@/lib/coachProfile";
 
@@ -35,6 +36,8 @@ export default async function LandingView() {
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* 字級切換：官網也放，看不清楚字的人在第一屏就要能放大，不必先登入 */}
+            <UiScaleToggle compact />
             <Link href="/coaches" className="hidden sm:inline text-sm text-[#a7bacb] hover:text-white px-3 py-2 rounded-lg whitespace-nowrap">認識教練</Link>
             <Link href="/login" className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-white/15 whitespace-nowrap">登入</Link>
             <Link href="/passport" className="text-[13px] sm:text-sm font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-3.5 sm:px-4 py-2 rounded-lg whitespace-nowrap">免費試算</Link>

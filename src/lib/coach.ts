@@ -105,10 +105,17 @@ export async function applyAsCoach(): Promise<Coach | null> {
   return syncAdminRole(row, isAdmin);
 }
 
-// admin 必須同時是 admin 且 active。舊版只看 role，導致被停權的管理員
-// /dashboard 進不去、/admin 照樣進得去（還能核准帳號、把自己升成 owner、竄改品牌）。
+// 後台權限有兩條來源，任一成立即可，但都必須 active：
+//   1. role==='admin'  —— LANTU_ADMIN_EMAILS 白名單同步出來的系統管理員
+//   2. orgRank==='owner' —— 核心成員（2026/08/22 Ray 拍板：核心成員等同 admin，後台全開）
+// 必須同時是 active。舊版只看 role，導致被停權的管理員 /dashboard 進不去、
+// /admin 照樣進得去（還能核准帳號、把自己升成核心成員、竄改品牌）。
+//
+// 注意：orgRank 的 DB 值仍是 'owner'（brand.getOrgOwnerId / visibleCoachIds 都吃它），
+// 只有顯示字串改成「核心成員」。
 export async function isAdmin(coach: Coach | null): Promise<boolean> {
-  return !!coach && coach.role === "admin" && coach.status === "active";
+  if (!coach || coach.status !== "active") return false;
+  return coach.role === "admin" || coach.orgRank === "owner";
 }
 
 export async function listCoaches(): Promise<Coach[]> {
@@ -124,7 +131,7 @@ export async function setCoachStatus(id: string, status: "pending" | "active" | 
 
 // 設定組織職級與上線（後台維護組織樹）。
 // uplineId 會先做「整條上線鏈」的環狀檢查：A→B→A 這種多層環雖然不會讓 downlineIds 無限迴圈
-// （有 seen Set），但會讓兩位主管互看對方團隊，且該子樹在老闆視角整段消失。
+// （有 seen Set），但會讓兩位主管互看對方團隊，且該子樹在核心成員視角整段消失。
 export async function setCoachOrg(id: string, orgRank: string, uplineId: string | null) {
   if (uplineId) {
     if (uplineId === id) return { ok: false as const, error: "上線不能是自己" };

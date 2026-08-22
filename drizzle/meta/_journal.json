@@ -134,6 +134,13 @@
       "when": 1787405314065,
       "tag": "0018_dark_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787423042440,
+      "tag": "0019_amazing_songbird",
+      "breakpoints": true
     }
   ]
 }

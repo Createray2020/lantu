@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
+import { licenseState, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { saveProfile, setPublished, type ProfileInput } from "@/lib/coachProfile";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -51,6 +52,7 @@ export async function saveMyProfileAction(input: ProfileInput): Promise<ActionRe
     const me = await ensureCoach();
     if (!me) throw new Error("not-coach");
     if (me.status !== "active") throw new Error("not-active");
+    if (licenseState(me).expired) throw new Error(LICENSE_LOCKED_MESSAGE);
     if ((input.bio ?? "").length > 1000) throw new Error("bio-too-long");
 
     await saveProfile(me.id, {

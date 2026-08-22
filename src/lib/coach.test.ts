@@ -69,7 +69,7 @@ vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 vi.mock("@clerk/nextjs/server", () => ({ currentUser: h.currentUser }));
 
-import { ensureCoach, applyAsCoach, transferClients, removeCoach } from "./coach";
+import { ensureCoach, applyAsCoach, transferClients, removeCoach, isAdmin } from "./coach";
 
 function signedInAs(email: string) {
   h.currentUser.mockResolvedValue({
@@ -250,5 +250,36 @@ describe("transferClients", () => {
     const r = await transferClients("coach_from", "coach_to");
     expect(r.ok).toBe(false);
     expect(h.state.updates).toHaveLength(0);
+  });
+});
+
+// 2026/08/22 Ray 拍板：核心成員（orgRank='owner'）等同 admin，後台全開。
+// 兩條來源任一成立即可，但一律要 active —— 停權的人不管哪條線都不該進得了後台。
+describe("isAdmin：白名單 admin 與核心成員兩條來源", () => {
+  const c = (o: any) => ({ role: "coach", status: "active", orgRank: "member", ...o }) as any;
+
+  it("白名單 admin + active → true", async () => {
+    expect(await isAdmin(c({ role: "admin" }))).toBe(true);
+  });
+
+  it("核心成員（owner）即使 role 是 coach 也 → true", async () => {
+    expect(await isAdmin(c({ orgRank: "owner" }))).toBe(true);
+  });
+
+  it("被停權的核心成員 → false（停權要能真的把後台關掉）", async () => {
+    expect(await isAdmin(c({ orgRank: "owner", status: "suspended" }))).toBe(false);
+  });
+
+  it("被停權的 admin → false", async () => {
+    expect(await isAdmin(c({ role: "admin", status: "suspended" }))).toBe(false);
+  });
+
+  it("主管（manager）不會因為看得到下線就拿到後台", async () => {
+    expect(await isAdmin(c({ orgRank: "manager" }))).toBe(false);
+  });
+
+  it("一般教練 / null → false", async () => {
+    expect(await isAdmin(c({}))).toBe(false);
+    expect(await isAdmin(null)).toBe(false);
   });
 });

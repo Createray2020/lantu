@@ -18,6 +18,17 @@ export type RankRow = {
   promoPct?: number | null;
   /** 執案端分潤率（%），null＝未設定 */
   execPct?: number | null;
+  /**
+   * 使用權益（2026/08/22）。只有預設表（moduleCode 空）的這三欄有意義：
+   * 模塊自訂職級表是拿來調分潤率的，客戶上限與定價屬於「這個人買了什麼」，
+   * 跟他這一案賣哪個模塊無關。
+   */
+  /** 客戶資料庫上限（位）。null＝未設定＝沿用 lib/license.ts 的內建級距 */
+  clientCap?: number | null;
+  /** 月費（元），null＝未設定 */
+  priceMonth?: number | null;
+  /** 年費（元），null＝未設定 */
+  priceYear?: number | null;
 };
 
 /**

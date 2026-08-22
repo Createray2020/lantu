@@ -17,6 +17,7 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin", label: "教練帳號" },
       { href: "/admin/profiles", label: "對外檔案" },
       { href: "/admin/training", label: "訓練時數" },
+      { href: "/admin/learn", label: "學習區" },
     ],
   },
   {

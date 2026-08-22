@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ClientListItem } from "@/lib/clients";
+import type { QuotaState } from "@/lib/license";
+import { QUOTA_FULL_MESSAGE, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { createClientAction } from "./actions";
 import { StageGuideModal } from "./StageGuide";
 import {
@@ -17,7 +19,17 @@ import {
 
 type SortKey = "updated" | "next" | "net" | "stage";
 
-export default function ClientList({ clients }: { clients: ClientListItem[] }) {
+export default function ClientList({
+  clients,
+  quota,
+  readOnly = false,
+}: {
+  clients: ClientListItem[];
+  /** 客戶數上限（依級別）。未定級或不限時 cap 為 null。 */
+  quota?: QuotaState;
+  /** 使用期限到期＝唯讀。 */
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
@@ -65,14 +77,35 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <h1 className="font-serif text-xl tracking-wide mr-1">客戶</h1>
         <span className="text-[#6b7d8f] text-sm">{rows.length} / {clients.length}</span>
+        {quota?.cap != null && (
+          <span
+            className={`text-xs font-bold px-2 py-1 rounded-md border ${
+              quota.full
+                ? "border-[#e5484d]/60 text-[#ff9d9f] bg-[#e5484d]/10"
+                : quota.left != null && quota.left <= 3
+                  ? "border-[#c99a5b]/60 text-[#e0bd8b] bg-[#c99a5b]/10"
+                  : "border-white/15 text-[#a9bccf]"
+            }`}
+            title="客戶數上限依教練級別。封存的客戶不計入。"
+          >
+            額度 {quota.used} / {quota.cap}
+          </span>
+        )}
         <div className="flex-1" />
         <button
           onClick={() => setShowNew(true)}
-          className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold text-sm px-3.5 py-1.5"
+          disabled={readOnly || !!quota?.full}
+          title={readOnly ? LICENSE_LOCKED_MESSAGE : quota?.full ? QUOTA_FULL_MESSAGE(quota.cap ?? 0) : ""}
+          className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold text-sm px-3.5 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           ＋ 新增客戶
         </button>
       </div>
+      {quota?.full && quota.cap != null && (
+        <p className="mb-4 text-xs text-[#e0bd8b] bg-[#c99a5b]/10 border border-[#c99a5b]/40 rounded-lg px-3 py-2">
+          {QUOTA_FULL_MESSAGE(quota.cap)}
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-4">
         <input
@@ -219,14 +252,16 @@ export default function ClientList({ clients }: { clients: ClientListItem[] }) {
           : source || null;
       start(async () => {
         try {
-          const id = await createClientAction({
+          const r = await createClientAction({
             name: name.trim(),
             source: finalSource,
             tags: tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean),
             contact: phone ? { phone } : {},
             birthDate: birthDate || null,
           });
-          onCreated(id);
+          // 額度已滿／期限到期是「使用者要看到理由」的情況，原樣顯示伺服器的訊息。
+          if (!r.ok) setErr(r.error);
+          else onCreated(r.id);
         } catch {
           setErr("建立失敗，請重試。");
         }

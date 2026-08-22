@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import DashboardHeader from "@/app/dashboard/DashboardHeader";
+import { headerProps } from "@/app/dashboard/headerProps";
 import {
   BIZ_TAX_BASIS, PROFIT_TAX_RATE, UNDISTRIBUTED_RATE, DIVIDEND_SEPARATE_RATE,
   DIVIDEND_CREDIT_RATE, DIVIDEND_CREDIT_CAP, NHI_SUPP_RATE, NHI_SUPP_MIN,
@@ -71,10 +72,11 @@ export default async function BizGuidePage() {
   const me = await ensureCoach();
   if (!me) redirect("/dashboard");
   if (me.status !== "active") redirect("/dashboard");
+  const hp = await headerProps(me);
 
   return (
     <main className="min-h-dvh bg-[#081a2b] text-[#eef2f7]">
-      <DashboardHeader />
+      <DashboardHeader {...hp} />
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         <div>
           <h1 className="font-serif text-2xl">企業主財務規劃 · 作業手冊</h1>

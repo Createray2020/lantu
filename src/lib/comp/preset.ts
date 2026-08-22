@@ -8,14 +8,21 @@
 
 import type { CompParams, CompSettings, ModuleRow, RankRow, ThresholdRow } from "./types";
 
+// 職級表。seq 小＝低階。
+//
+// 2026/08/22 Ray 拍板：教練分四個階段的級別 —— 實習教練（半年學習期）／認證教練 C1–C3／
+// 資深教練 S1–S3／首席教練。實習教練的**權限與 C1 完全相同**（含客戶上限 20 位），
+// 差別只在「使用期限固定半年」，所以分潤率直接比照 C1，不另外開一組數字。
+// clientCap 是各級的客戶資料庫上限；留空＝不限制（見 lib/license.ts）。
 export const V4_RANKS: RankRow[] = [
-  { code: "C1", seq: 1, groupName: "認證顧問", tierLabel: "一階", promoPct: 15, execPct: 30 },
-  { code: "C2", seq: 2, groupName: "認證顧問", tierLabel: "二階", promoPct: 18, execPct: 33 },
-  { code: "C3", seq: 3, groupName: "認證顧問", tierLabel: "三階", promoPct: 21, execPct: 36 },
-  { code: "S1", seq: 4, groupName: "資深顧問", tierLabel: "一階", promoPct: 24, execPct: 43 },
-  { code: "S2", seq: 5, groupName: "資深顧問", tierLabel: "二階", promoPct: 26, execPct: 50 },
-  { code: "S3", seq: 6, groupName: "資深顧問", tierLabel: "三階", promoPct: 28, execPct: 57 },
-  { code: "CHIEF", seq: 7, groupName: "首席顧問", tierLabel: "—", promoPct: 30, execPct: 60 },
+  { code: "INTERN", seq: 0, groupName: "實習教練", tierLabel: "—", promoPct: 15, execPct: 30, clientCap: 20 },
+  { code: "C1", seq: 1, groupName: "認證教練", tierLabel: "一階", promoPct: 15, execPct: 30, clientCap: 20 },
+  { code: "C2", seq: 2, groupName: "認證教練", tierLabel: "二階", promoPct: 18, execPct: 33, clientCap: 20 },
+  { code: "C3", seq: 3, groupName: "認證教練", tierLabel: "三階", promoPct: 21, execPct: 36, clientCap: 20 },
+  { code: "S1", seq: 4, groupName: "資深教練", tierLabel: "一階", promoPct: 24, execPct: 43, clientCap: 50 },
+  { code: "S2", seq: 5, groupName: "資深教練", tierLabel: "二階", promoPct: 26, execPct: 50, clientCap: 50 },
+  { code: "S3", seq: 6, groupName: "資深教練", tierLabel: "三階", promoPct: 28, execPct: 57, clientCap: 100 },
+  { code: "CHIEF", seq: 7, groupName: "首席教練", tierLabel: "—", promoPct: 30, execPct: 60, clientCap: 100 },
 ];
 
 export const V4_THRESHOLDS: ThresholdRow[] = [

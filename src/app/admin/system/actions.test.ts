@@ -133,7 +133,8 @@ describe("loadV4Action", () => {
     expect(asMock(saveSettings).mock.calls[0][1].splitExecPct).toBe(60);
     expect(asMock(saveModules).mock.calls[0][1].map((m: { code: string }) => m.code))
       .toEqual(["FULL", "SPOT"]);
-    expect(asMock(saveRanks).mock.calls[0][1]).toHaveLength(7);
+    // 八個職級：實習 ＋ 認證 C1–C3 ＋ 資深 S1–S3 ＋ 首席（2026/08/22 加入實習教練）
+    expect(asMock(saveRanks).mock.calls[0][1]).toHaveLength(8);
     const kinds = asMock(saveThresholds).mock.calls.map((c) => c[1]);
     expect(kinds).toEqual(["promotion_a", "promotion_b", "tenure"]);
   });

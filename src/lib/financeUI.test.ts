@@ -27,6 +27,8 @@ beforeAll(async () => {
 });
 
 const pane = () => w.document.querySelector("#app").innerHTML as string;
+// 分析頁的模組預設收合、展開才算（2026/08/22 改版）。測試要看內容就得先全部展開。
+const analysisPaneHTML = () => { w.app.activeTab = "analysis"; w.render(); w.anExpandAll(true); return pane(); };
 
 describe("收支資債：細類下拉吃的是字典，不是寫死的短清單", () => {
   it("四張表都渲染得出細類選項（含改版後才有的細顆粒選項）", () => {
@@ -158,9 +160,7 @@ describe("收入逐筆明細：分析頁與報告書都看得到錢從哪來", (
       { name: "民生東路租金", owner: "王大明", type: "理財", subType: "租金收入", amount: 360000, start: 40, end: 85 },
       { name: "育兒津貼", owner: "王太太", type: "其他", subType: "政府補助/津貼", amount: 60000, start: 40, end: 46 },
     ];
-    w.app.activeTab = "analysis";
-    w.render();
-    const h = pane();
+    const h = analysisPaneHTML();
     expect(h).toContain("收入逐筆明細");
     for (const nm of ["主業薪資", "家教", "民生東路租金", "育兒津貼"]) expect(h, nm).toContain(nm);
     // 兩筆同屬「工作」的收入不再被壓成一個數字
@@ -180,17 +180,13 @@ describe("收入逐筆明細：分析頁與報告書都看得到錢從哪來", (
   it("沒填項目名稱的舊資料仍列得出來，只是標「（未命名）」而不是空白列", () => {
     const c = w.activeCase();
     c.incomes = [{ owner: "王大明", type: "工作", subType: "薪資", amount: 1200000, start: 40, end: 65 }];
-    w.app.activeTab = "analysis";
-    w.render();
-    expect(pane()).toContain("（未命名）");
+    expect(analysisPaneHTML()).toContain("（未命名）");
   });
 
   it("完全沒有收入時不硬擠一張空表", () => {
     const c = w.activeCase();
     c.incomes = [];
-    w.app.activeTab = "analysis";
-    w.render();
-    expect(pane()).not.toContain("收入逐筆明細");
+    expect(analysisPaneHTML()).not.toContain("收入逐筆明細");
   });
 });
 

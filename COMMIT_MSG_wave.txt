@@ -1,0 +1,45 @@
+核心成員權限、全站字級、分析模組收合、教練級別期限、學習區
+
+一、核心成員（原「老闆」）等同管理員
+- isAdmin() 改成 role==='admin' || orgRank==='owner'，且一律要 active。
+- 顯示字串「老闆」全面改「核心成員」；DB 值仍是 owner
+  （brand.getOrgOwnerId / visibleCoachIds 都吃它，改值等於連鎖 migration）。
+
+二、全站字級縮放（老花友善）
+- coaches.ui_scale（100/115/130），頂欄切換、存帳號、跨裝置一致。
+- :root font-size 縮放（Tailwind 全是 rem，字與間距等比放大不爆版）；
+  head 內 boot script 於首次繪製前套上，避免導頁閃動。
+- 官網、客戶端 portal 也有同一顆切換（未登入吃 localStorage）。
+- 規劃器 iframe 是 px 版面，改用 zoom：父層 postMessage lantu:uiscale。
+
+三、客戶分析頁模組化
+- analysisPane 拆成 19 個模組，預設收合、展開才算
+  （蒙地卡羅 1000 條路徑不再是進頁面的必經成本）。
+- 模組列可拖曳排序、可隱藏、全部展開/收合、恢復預設。
+- 偏好逐客戶存 localStorage，不寫進 plan data（否則版本比較的 diff 會被排版偏好洗版）。
+
+四、教練級別與使用期限
+- 職級表加入實習教練（INTERN，權限比照 C1），並加 client_cap/price_month/price_year。
+- coaches 加 license_from/until/unit/qty 與 client_cap_override。
+- 到期＝唯讀鎖定：教練端所有寫入 action 走 requireWritableCoach()，
+  iframe 也切唯讀；讀取一律照常。頂欄顯示剩餘天數，每頁掛唯讀橫幅。
+- 客戶數上限：實習與 C1–C3 20 位、S1–S2 50 位、S3 與首席 100 位（封存不計）。
+  個人可在後台覆寫。列表顯示額度、額滿擋新增並說明理由。
+- 後台「級別 · 使用期限」格：選級別、起算日、月/年 × 數量 → 自動算到期日；
+  實習固定半年且鎖住不給改。
+- guard.drift.test.ts：掃描教練端每支 actions.ts 是否接上唯讀閘，例外要寫理由。
+
+五、教練學習區
+- learn_courses / learn_lessons / learn_progress 三張表。
+- /dashboard/learn 課程卡＋完成率 → 單元頁（YouTube/Vimeo/雲端硬碟內嵌）
+  →「標記完成」；認不出的連結顯示「用新分頁開啟」而不是空白 iframe。
+- /admin/learn 管課程與單元、看完課名單；課程可設認列時數，
+  全部單元完成時補寫一筆 comp_training_records（接上維持資格計算）。
+- 學習進度刻意不受期限鎖限制：到期的人正是最需要把課補完的人。
+
+其他：depcruise 的 engine-is-pure 排除 .test.ts（漂移測試本來就要兩邊都 import）。
+migration 0019 已套上 Neon。703 測試綠、tsc/lint/depcruise/build 全過。
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QbP92q258v4VAUtywT6qJK
+

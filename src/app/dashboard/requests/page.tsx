@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { ensureCoach } from "@/lib/coach";
 import { listPendingRequestsForCoach } from "@/lib/coachLink";
 import DashboardHeader from "../DashboardHeader";
+import { headerProps } from "../headerProps";
+import ReadOnlyBanner from "../ReadOnlyBanner";
 import RequestList from "./RequestList";
 import InviteBox from "./InviteBox";
 
@@ -18,9 +20,12 @@ export default async function RequestsPage() {
   if (coach.status !== "active") redirect("/dashboard");
   const requests = await listPendingRequestsForCoach(coach.id);
 
+  const hp = await headerProps(coach);
+
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
-      <DashboardHeader isAdmin={coach.role === "admin"} />
+      <DashboardHeader {...hp} />
+      <ReadOnlyBanner license={hp.license} />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
         <h1 className="font-serif text-2xl mb-1">客戶連結申請</h1>
         <p className="text-[#a7bacb] text-sm mb-5">客戶從人生護照送出的連結邀請；接受後對方就掛到你名下、可一起規劃。</p>

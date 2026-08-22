@@ -203,6 +203,7 @@ export default function SystemEditor({
               )}
             </div>
             <RanksTable
+              isDefault={rankModule === ""}
               rows={rankRowsOfModule}
               setRows={(f) => setRanks((rs) => [
                 ...rs.filter((r) => (r.moduleCode ?? "") !== rankModule),
@@ -594,11 +595,13 @@ function ModulesTable({
 /* ────────────────────────── 職級表 ────────────────────────── */
 
 function RanksTable({
-  rows, setRows, disabled,
+  rows, setRows, disabled, isDefault = false,
 }: {
   rows: RankRow[];
   setRows: (f: (r: RankRow[]) => RankRow[]) => void;
   disabled: boolean;
+  /** 預設表才顯示「使用權益」三欄（客戶上限與定價跟賣哪個模塊無關）。 */
+  isDefault?: boolean;
 }) {
   function upd(i: number, patch: Partial<RankRow>) {
     setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...patch } : r)));
@@ -636,6 +639,9 @@ function RanksTable({
               <th className="px-2 py-2">推廣端 %</th>
               <th className="px-2 py-2">執案端 %</th>
               <th className="px-2 py-2">合計</th>
+              {isDefault && <th className="px-2 py-2">客戶上限</th>}
+              {isDefault && <th className="px-2 py-2">月費</th>}
+              {isDefault && <th className="px-2 py-2">年費</th>}
               <th className="px-2 py-2 text-right">操作</th>
             </tr>
           </thead>
@@ -673,6 +679,27 @@ function RanksTable({
                       className={`${r.execPct == null ? EMPTY : FILLED} w-20`} />
                   </td>
                   <td className={`${cell} text-[#a9bccf]`}>{both ? `${total}%` : "—"}</td>
+                  {isDefault && (
+                    <td className={cell}>
+                      <input type="number" step="1" min="0" value={fmtInt(r.clientCap)} disabled={disabled} placeholder="不限"
+                        onChange={(e) => upd(i, { clientCap: e.target.value === "" ? null : Number(e.target.value) })}
+                        className={`${r.clientCap == null ? EMPTY : FILLED} w-20`} />
+                    </td>
+                  )}
+                  {isDefault && (
+                    <td className={cell}>
+                      <input type="number" step="1" min="0" value={fmtInt(r.priceMonth)} disabled={disabled} placeholder="未設定"
+                        onChange={(e) => upd(i, { priceMonth: e.target.value === "" ? null : Number(e.target.value) })}
+                        className={`${r.priceMonth == null ? EMPTY : FILLED} w-24`} />
+                    </td>
+                  )}
+                  {isDefault && (
+                    <td className={cell}>
+                      <input type="number" step="1" min="0" value={fmtInt(r.priceYear)} disabled={disabled} placeholder="未設定"
+                        onChange={(e) => upd(i, { priceYear: e.target.value === "" ? null : Number(e.target.value) })}
+                        className={`${r.priceYear == null ? EMPTY : FILLED} w-24`} />
+                    </td>
+                  )}
                   <td className={`${cell} text-right whitespace-nowrap`}>
                     <button type="button" disabled={disabled} onClick={() => move(i, -1)} className="px-1 text-[#a9bccf] disabled:opacity-30">↑</button>
                     <button type="button" disabled={disabled} onClick={() => move(i, 1)} className="px-1 text-[#a9bccf] disabled:opacity-30">↓</button>
@@ -684,8 +711,9 @@ function RanksTable({
               );
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-[#6f869c]">
-                尚未設定任何職級。按上方「載入 V4 辦法數值」可帶入辦法的七個職級。
+              <tr><td colSpan={isDefault ? 11 : 8} className="px-3 py-8 text-center text-[#6f869c]">
+                尚未設定任何職級。按上方「載入 V4 辦法數值」可帶入辦法的八個級別
+                （實習教練 · 認證教練 C1–C3 · 資深教練 S1–S3 · 首席教練）。
               </td></tr>
             )}
           </tbody>

@@ -7,6 +7,9 @@ import OrgCell from "./OrgCell";
 import StatusActions from "./StatusActions";
 import RemoveCoach from "./RemoveCoach";
 import AdminNav from "./AdminNav";
+import LicenseCell from "./LicenseCell";
+import { rankCaps } from "@/lib/quota";
+import { clientCapOf, RANK_ORDER } from "@/lib/license";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +36,11 @@ export default async function Admin() {
   const peers = coaches.map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
   // 名下客戶／分潤案件數：一次撈完（逐列查就是 N+1）。移除帳號的兩道門檻都看它。
   const workloads = await coachWorkloads();
+  // 使用期限那一格要的兩樣：各級別的客戶上限（生效版本的職級表），以及可選的級別清單。
+  const caps = await rankCaps();
+  // 四個級別一律選得到：生效中的制度版本是加入「實習教練」之前建的，職級表裡沒有那一列，
+  // 而「載入 V4 辦法數值」只在職級表完全空白時才帶入 —— 只讀 DB 的話實習教練永遠選不到。
+  const rankCodes = [...RANK_ORDER, ...Object.keys(caps).filter((c) => !RANK_ORDER.includes(c as never))];
   // 接手候選人只列已開通的教練，且不能是自己。
   const activePeers = coaches
     .filter((c) => c.status === "active")
@@ -74,6 +82,7 @@ export default async function Admin() {
                 <th className="px-3 py-2 font-semibold">角色</th>
                 <th className="px-3 py-2 font-semibold">狀態</th>
                 <th className="px-3 py-2 font-semibold">組織（職級 / 上線）</th>
+                <th className="px-3 py-2 font-semibold">級別 · 使用期限</th>
                 <th className="px-3 py-2 font-semibold">申請日</th>
                 <th className="px-3 py-2 font-semibold">開通日</th>
                 <th className="px-3 py-2 font-semibold text-right">動作</th>
@@ -110,6 +119,21 @@ export default async function Admin() {
                         peers={peers}
                       />
                     </td>
+                    <td className="px-3 py-2 align-top">
+                      <LicenseCell
+                        id={c.id}
+                        rankCode={c.rankCode}
+                        licenseFrom={c.licenseFrom}
+                        licenseUntil={c.licenseUntil}
+                        licenseUnit={c.licenseUnit}
+                        licenseQty={c.licenseQty}
+                        clientCapOverride={c.clientCapOverride}
+                        status={c.status}
+                        rankCodes={rankCodes}
+                        capFromRank={clientCapOf({ rankCode: c.rankCode }, caps)}
+                        usedClients={workloads[c.id]?.clients ?? 0}
+                      />
+                    </td>
                     <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.createdAt)}</td>
                     <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.approvedAt)}</td>
                     <td className="px-3 py-2">
@@ -135,7 +159,7 @@ export default async function Admin() {
               })}
               {coaches.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-[#6f869c]">
+                  <td colSpan={8} className="px-3 py-8 text-center text-[#6f869c]">
                     尚無教練註冊。
                   </td>
                 </tr>
@@ -147,6 +171,10 @@ export default async function Admin() {
         <p className="mt-4 text-xs text-[#6f869c]">
           運作方式：教練用 Google／Email 註冊後為「待審核」，無法進入系統；你在此按「核准開通」（確認收款後）即可啟用。停權可隨時收回存取，且不動任何資料 —— 離職請用停權。
           「移除帳號」只給誤建的空帳號用：名下還有客戶要先轉移給接手教練，有過分潤案件的一律不可移除。
+          <br />
+          使用期限：實習教練固定半年，其餘級別可按月或年開通。到期未延長會變成<b className="text-[#e0bd8b]">唯讀</b>——
+          仍可登入檢視所有客戶與規劃，但不能新增或修改，延長後立即恢復。沒有設定期限的帳號不受限制。
+          客戶數上限依級別（實習與 C1–C3 為 20 位、S1–S2 為 50 位、S3 與首席為 100 位），封存的客戶不計入。
         </p>
       </section>
     </main>

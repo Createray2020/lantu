@@ -214,7 +214,7 @@ function ManagerView({ d }: { d: ManagerHome }) {
   );
 }
 
-// ══════════ 老闆 ══════════
+// ══════════ 核心成員 ══════════
 function OwnerView({ d }: { d: OwnerHome }) {
   const k = d.kpis;
   const tmax = Math.max(1, ...d.teams.map((t) => t.income));

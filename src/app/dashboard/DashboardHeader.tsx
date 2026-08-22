@@ -4,9 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
+import type { LicenseState } from "@/lib/license";
+import UiScaleToggle from "@/components/UiScaleToggle";
+import LicenseBadge from "./LicenseBadge";
 
-// 各頁共用頂欄：品牌 + 首頁/客戶/儀表板切換 + 後台 + Clerk 頭貼。
-export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean }) {
+// 各頁共用頂欄：品牌 + 首頁/客戶/儀表板/學習區切換 + 字級 + 剩餘天數 + 後台 + Clerk 頭貼。
+export default function DashboardHeader({
+  isAdmin = false,
+  uiScale = 100,
+  license,
+}: {
+  isAdmin?: boolean;
+  uiScale?: number;
+  license?: LicenseState;
+}) {
   const pathname = usePathname();
   const onHome = pathname === "/dashboard";
   const onClients = pathname.startsWith("/dashboard/clients");
@@ -14,6 +25,7 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
   const onRequests = pathname.startsWith("/dashboard/requests");
   const onBusiness = pathname.startsWith("/dashboard/my-business");
   const onBizGuide = pathname.startsWith("/dashboard/bizguide");
+  const onLearn = pathname.startsWith("/dashboard/learn");
 
   // 全組織品牌 Logo：有上傳就換掉預設標記（保留「嵐途」文字）。
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -70,8 +82,11 @@ export default function DashboardHeader({ isAdmin = false }: { isAdmin?: boolean
         </Link>
         <Link href="/dashboard/my-business" className={tab(onBusiness)}>我的業務</Link>
         <Link href="/dashboard/bizguide" className={tab(onBizGuide)}>企業主手冊</Link>
+        <Link href="/dashboard/learn" className={tab(onLearn)}>學習區</Link>
       </nav>
       <div className="flex-1" />
+      <UiScaleToggle initial={uiScale} persist />
+      {license && <LicenseBadge license={license} />}
       <Link
         href="/dashboard/profile"
         className="text-[#a9bccf] hover:text-[#eef2f7] text-xs font-bold px-2.5 py-1.5 rounded-md border border-white/15"

@@ -3,6 +3,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* 介面縮放（老花友善）。1 / 1.15 / 1.3，由頂欄的字級切換寫入，跟著教練帳號走。
+     Tailwind v4 的字級與間距全是 rem，所以只動根字級，字與版面會等比放大而不爆版。
+     ⚠️ 不要寫成 calc(1rem * …)：rem 就是根字級本身，那會變成遞迴定義。 */
+  --ui-scale: 1;
+  font-size: calc(16px * var(--ui-scale));
 }
 
 @theme inline {

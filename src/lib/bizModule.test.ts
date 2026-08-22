@@ -42,6 +42,8 @@ const freshCase = (): any => {
   return c;
 };
 const pane = () => w.document.querySelector("#app").innerHTML as string;
+// 分析頁的模組預設收合、展開才算（2026/08/22 改版）。要驗內容就得先全部展開。
+const analysisPaneHTML = () => { w.app.activeTab = "analysis"; w.render(); w.anExpandAll(true); return pane(); };
 const renderTab = (tab: string) => { w.app.activeTab = "data"; w.app.dataTab = tab; w.render(); return pane(); };
 
 describe("c.company → c.companies[] 遷移", () => {
@@ -386,14 +388,13 @@ describe("分頁渲染", () => {
 
   it("分析頁掛上企業主診斷；主體沒開的客戶完全看不到", () => {
     bizCase();
-    w.app.activeTab = "analysis"; w.render();
-    expect(pane()).toContain("企業主診斷");
-    expect(pane()).toContain("整合式個人資產負債表");
+    const h = analysisPaneHTML();
+    expect(h).toContain("企業主診斷");
+    expect(h).toContain("整合式個人資產負債表");
 
     const c2 = freshCase();
     c2.intent.entities = {};
-    w.app.activeTab = "analysis"; w.render();
-    expect(pane()).not.toContain("企業主診斷");
+    expect(analysisPaneHTML()).not.toContain("企業主診斷");
   });
 });
 
@@ -1045,8 +1046,7 @@ describe("401 與帳載收入差異調節表", () => {
 
   it("分析頁的企業主診斷區帶出勾稽摘要", () => {
     withGap();
-    w.app.activeTab = "analysis"; w.render();
-    expect(pane()).toContain("財報勾稽");
+    expect(analysisPaneHTML()).toContain("財報勾稽");
   });
 });
 

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import { getCoachDashboard } from "@/lib/dashboard";
 import DashboardHeader from "../DashboardHeader";
+import { headerProps } from "../headerProps";
+import ReadOnlyBanner from "../ReadOnlyBanner";
 import { STATUS_LABEL, REVIEW_TYPE_LABEL, STAGE_LABEL, STAGE_ORDER, stageColor } from "../format";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +23,12 @@ export default async function OverviewPage() {
     </div>
   );
 
+  const hp = await headerProps(coach);
+
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
-      <DashboardHeader isAdmin={coach.role === "admin"} />
+      <DashboardHeader {...hp} />
+      <ReadOnlyBanner license={hp.license} />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 grid gap-6">
         <h1 className="font-serif text-xl tracking-wide">教練儀表板</h1>
 

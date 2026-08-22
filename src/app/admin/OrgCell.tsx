@@ -13,7 +13,7 @@ import { updateOrg } from "./actions";
 export const RANK_LABEL: Record<string, string> = {
   member: "教練",
   manager: "主管",
-  owner: "老闆",
+  owner: "核心成員",
 };
 
 export type Peer = { id: string; label: string };

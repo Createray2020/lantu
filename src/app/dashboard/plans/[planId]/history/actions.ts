@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach } from "@/lib/coach";
+import { licenseState, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { getPlan } from "@/lib/plans";
 import { restoreRevision } from "@/lib/revisions";
 
@@ -11,6 +12,7 @@ export async function restoreCoachRevisionAction(planId: string, revisionId: str
   try {
     const coach = await ensureCoach();
     if (!coach || coach.status !== "active") return { ok: false as const, error: "沒有權限" };
+    if (licenseState(coach).expired) return { ok: false as const, error: LICENSE_LOCKED_MESSAGE };
     // getPlan 會驗這份 plan 屬於這位教練的客戶；少了它，帶別人的 planId 進來就能寫別人的規劃。
     const plan = await getPlan(coach.id, planId);
     if (!plan) return { ok: false as const, error: "找不到這份規劃" };

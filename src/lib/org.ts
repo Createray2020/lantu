@@ -1,5 +1,5 @@
 // 組織樹與可見範圍（岔路 #2 的權限骨架）。
-// orgRank：member（教練，只看自己）/ manager（主管，看下線子樹）/ owner（老闆，看全組織）。
+// orgRank：member（教練，只看自己）/ manager（主管，看下線子樹）/ owner（核心成員，看全組織）。
 // uplineId：組織樹父節點（自參照）。可見範圍一律以「active 教練」為母體。
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/Shared/db";
@@ -58,7 +58,7 @@ export function visibleCoachIds(me: CoachRow, all: CoachRow[]): string[] {
 }
 
 // 團隊分組：以「owner 的直屬下線」為各團隊隊長（manager），各自帶下線子樹。
-// 回傳 [{ manager, memberIds }]，供老闆視角做各團隊對比。
+// 回傳 [{ manager, memberIds }]，供核心成員視角做各團隊對比。
 export type Team = { manager: CoachRow; memberIds: string[] };
 export function teamsUnder(ownerId: string, all: CoachRow[]): Team[] {
   const kids = childrenMap(all);

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { savePlanDataAction } from "../../../actions";
+import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
+import { LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 
@@ -16,12 +18,16 @@ export default function PlanEditor({
   year,
   label,
   data,
+  uiScale = 100,
+  readOnly = false,
 }: {
   planId: string;
   clientId: string;
   year: number;
   label: string | null;
   data: unknown;
+  uiScale?: number;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -30,8 +36,21 @@ export default function PlanEditor({
   const [state, setState] = useState<SaveState>("idle");
 
   useEffect(() => {
+    // 規劃器是 px 版面，父層的 rem 縮放對它無效 —— 一併把字級與唯讀狀態送進去。
+    // 以 localStorage 為準：使用者剛在頂欄按過字級，帳號欄位還沒重新讀進來。
+    function currentScale() {
+      try {
+        return normalizeScale(localStorage.getItem(UI_SCALE_KEY) ?? uiScale);
+      } catch {
+        return normalizeScale(uiScale);
+      }
+    }
+
     function postInit() {
-      iframeRef.current?.contentWindow?.postMessage({ type: "lantu:init", data }, window.location.origin);
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "lantu:init", data, uiScale: currentScale(), readOnly },
+        window.location.origin,
+      );
     }
 
     function onMessage(e: MessageEvent) {
@@ -42,6 +61,7 @@ export default function PlanEditor({
       if (msg.type === "lantu:ready") {
         postInit();
       } else if (msg.type === "lantu:save") {
+        if (readOnly) return; // 到期唯讀：不寫回（server action 也會擋，這裡只是不要一直跳「儲存失敗」）
         latest.current = msg.data;
         setState("saving");
         if (timer.current) clearTimeout(timer.current);
@@ -61,7 +81,7 @@ export default function PlanEditor({
       window.removeEventListener("message", onMessage);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [planId, data]);
+  }, [planId, data, uiScale, readOnly]);
 
   const statusText: Record<SaveState, string> = {
     idle: "",
@@ -82,6 +102,14 @@ export default function PlanEditor({
           ← 返回客戶
         </Link>
         <span className="text-sm font-bold">{year} 年度版本{label ? ` · ${label}` : ""}</span>
+        {readOnly && (
+          <span
+            className="text-[11px] font-bold px-2 py-0.5 rounded border border-[#e5484d]/60 text-[#ff9d9f] bg-[#e5484d]/10"
+            title={LICENSE_LOCKED_MESSAGE}
+          >
+            唯讀
+          </span>
+        )}
         <div className="flex-1" />
         <Link href={`/dashboard/plans/${planId}/history`} className="text-xs text-[#a9bccf] hover:text-[#eef2f7] mr-3">版本紀錄</Link>
         <span className={"text-xs " + (state === "error" ? "text-[#d9773f]" : state === "saved" ? "text-[#7bbf6a]" : "text-[#6b7d8f]")}>
@@ -93,7 +121,12 @@ export default function PlanEditor({
         src="/lantu-app.html?embed=1"
         title={`嵐途規劃 ${year}`}
         className="flex-1 w-full border-0"
-        onLoad={() => iframeRef.current?.contentWindow?.postMessage({ type: "lantu:init", data }, window.location.origin)}
+        onLoad={() =>
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly },
+            window.location.origin,
+          )
+        }
       />
     </div>
   );

@@ -3,9 +3,19 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
+import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
 
 // 客戶端唯讀檢視：把自己的 case 餵進 /lantu-app.html?embed=1&role=client。
 // 握手同教練端：iframe 'lantu:ready' → 父層 postMessage 'lantu:init'。客戶唯讀，不接 save。
+// 客戶端沒有帳號欄位存字級，就吃 localStorage（官網頂欄那顆切換寫的同一個 key）。
+function readScale() {
+  try {
+    return normalizeScale(localStorage.getItem(UI_SCALE_KEY) ?? 100);
+  } catch {
+    return 100;
+  }
+}
+
 export default function ClientPlanFrame({ data }: { data: unknown }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -13,7 +23,10 @@ export default function ClientPlanFrame({ data }: { data: unknown }) {
     // targetOrigin 一律指定本站 origin（教練端 PlanEditor 已是如此）。
     // 用 "*" 廣播的是含姓名/統編/保單號/資產負債的完整財務資料，而且下面還有 350ms×8 次重試。
     function post() {
-      iframeRef.current?.contentWindow?.postMessage({ type: "lantu:init", data }, window.location.origin);
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "lantu:init", data, uiScale: readScale() },
+        window.location.origin,
+      );
     }
     function onMsg(e: MessageEvent) {
       if (e.source !== iframeRef.current?.contentWindow) return;
@@ -48,7 +61,12 @@ export default function ClientPlanFrame({ data }: { data: unknown }) {
         src="/lantu-app.html?embed=1&role=client"
         title="我的財務藍圖"
         className="flex-1 w-full border-0"
-        onLoad={() => iframeRef.current?.contentWindow?.postMessage({ type: "lantu:init", data }, window.location.origin)}
+        onLoad={() =>
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: "lantu:init", data, uiScale: readScale() },
+            window.location.origin,
+          )
+        }
       />
     </div>
   );

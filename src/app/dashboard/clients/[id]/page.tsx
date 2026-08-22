@@ -3,6 +3,8 @@ import { ensureCoach } from "@/lib/coach";
 import { getClientDetail } from "@/lib/clients";
 import { comparePlans } from "@/lib/plans";
 import DashboardHeader from "../../DashboardHeader";
+import { headerProps } from "../../headerProps";
+import ReadOnlyBanner from "../../ReadOnlyBanner";
 import ClientDetail from "./ClientDetail";
 
 export const dynamic = "force-dynamic";
@@ -70,9 +72,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     reviewId: i.reviewId,
   }));
 
+  const hp = await headerProps(coach);
+
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
-      <DashboardHeader isAdmin={coach.role === "admin"} />
+      <DashboardHeader {...hp} />
+      <ReadOnlyBanner license={hp.license} />
       <ClientDetail client={client} plans={plans} passportPlan={passportPlan} reviews={reviews} actionItems={actionItems} compare={compare} />
     </div>
   );

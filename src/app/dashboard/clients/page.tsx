@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import { listClientsForCoach } from "@/lib/clients";
+import { clientQuota } from "@/lib/quota";
 import DashboardHeader from "../DashboardHeader";
+import { headerProps } from "../headerProps";
+import ReadOnlyBanner from "../ReadOnlyBanner";
 import ClientList from "../ClientList";
 
 export const dynamic = "force-dynamic";
@@ -11,11 +14,13 @@ export default async function ClientsPage() {
   const coach = await ensureCoach();
   if (!coach) redirect("/dashboard"); // 非教練/未登入 → 由 /dashboard 統一分流
   if (coach.status !== "active") redirect("/dashboard");
-  const clients = await listClientsForCoach(coach.id);
+  const [clients, quota] = await Promise.all([listClientsForCoach(coach.id), clientQuota(coach)]);
+  const hp = await headerProps(coach);
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
-      <DashboardHeader isAdmin={coach.role === "admin"} />
-      <ClientList clients={clients} />
+      <DashboardHeader {...hp} />
+      <ReadOnlyBanner license={hp.license} />
+      <ClientList clients={clients} quota={quota} readOnly={hp.license.expired} />
     </div>
   );
 }

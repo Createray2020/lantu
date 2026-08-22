@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import { getPlan } from "@/lib/plans";
+import { licenseState } from "@/lib/license";
+import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
 import PlanEditor from "./PlanEditor";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +24,8 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
       year={plan.year}
       label={plan.label}
       data={plan.data}
+      uiScale={coach.uiScale ?? DEFAULT_UI_SCALE}
+      readOnly={licenseState(coach).expired}
     />
   );
 }

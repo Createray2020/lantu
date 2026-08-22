@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import type { OrgRank } from "@/lib/org";
 
-// 首頁視角切換（教練／主管／老闆）＋ 團隊/成員預覽選擇。
+// 首頁視角切換（教練／主管／核心成員）＋ 團隊/成員預覽選擇。
 // 用網址查詢參數驅動（?as=&focus=），伺服器端重新彙總對應視角。
-const LABEL: Record<OrgRank, string> = { member: "教練", manager: "主管", owner: "老闆" };
+const LABEL: Record<OrgRank, string> = { member: "教練", manager: "主管", owner: "核心成員" };
 
 export default function HomeSwitcher({
   rank, views, focusId, teamOptions, memberOptions,

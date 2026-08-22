@@ -56,6 +56,7 @@ export async function loadParams(versionId: string): Promise<CompParams> {
     ranks: ranks.map((r) => ({
       code: r.code, seq: r.seq, moduleCode: r.moduleCode, groupName: r.groupName,
       tierLabel: r.tierLabel, promoPct: r.promoPct, execPct: r.execPct,
+      clientCap: r.clientCap, priceMonth: r.priceMonth, priceYear: r.priceYear,
     })),
     modules: mods.map((m) => ({
       code: m.code, seq: m.seq, name: m.name,
@@ -111,6 +112,10 @@ export async function saveRanks(versionId: string, rows: RankRow[], moduleCode =
       versionId, seq: r.seq ?? i + 1, code: r.code, moduleCode,
       groupName: r.groupName ?? null, tierLabel: r.tierLabel ?? null,
       promoPct: r.promoPct ?? null, execPct: r.execPct ?? null,
+      // 使用權益只寫在預設表；模塊自訂表一律留空，免得兩張表各有一個上限、查表時看排序運氣。
+      clientCap: moduleCode ? null : (r.clientCap ?? null),
+      priceMonth: moduleCode ? null : (r.priceMonth ?? null),
+      priceYear: moduleCode ? null : (r.priceYear ?? null),
     })),
   );
 }

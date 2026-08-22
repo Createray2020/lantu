@@ -15,7 +15,7 @@ import {
 // role: coach（一般教練）/ admin（管理員，可進後台）
 // status: pending（待審核）/ active（已開通）/ suspended（停權）
 // orgRank（組織職級，決定首頁視角與可見範圍）：
-//   member（教練，只看自己）/ manager（主管，看下線子樹）/ owner（老闆，看全組織）
+//   member（教練，只看自己）/ manager（主管，看下線子樹）/ owner（核心成員，看全組織）
 // uplineId：上線教練（自參照），組織樹的父節點；null＝頂點。
 export const coaches = pgTable('coaches', {
   id: text('id').primaryKey(), // Clerk userId
@@ -45,6 +45,21 @@ export const coaches = pgTable('coaches', {
   // 資格覆寫：null＝依維持資格自動判定；true/false＝管理員手動覆寫。
   recruitAllowed: boolean('recruit_allowed'),
   leadAllowed: boolean('lead_allowed'),
+
+  // ── 使用期限（2026/08/22 Ray 拍板）────────────────────────────
+  // 依級別開通，到期未延長就「唯讀鎖定」（能看不能改，見 lib/license.ts）。
+  // licenseUntil 為 null＝尚未設定期限＝不鎖 —— 舊帳號與尚未正式收費前一律照常使用，
+  // 「沒設定＝不檢查」與業務制度的門檻語意一致，絕對不要改成 null 視同過期。
+  // 實習教練固定半年；其餘可按月／年設定，unit/qty 留著是為了續約時沿用上次條件。
+  licenseFrom: date('license_from'),
+  licenseUntil: date('license_until'),
+  licenseUnit: text('license_unit'),                  // month / year
+  licenseQty: integer('license_qty'),
+  // 單一教練的客戶數上限覆寫：null＝依級別（comp_ranks.client_cap）判定。
+  clientCapOverride: integer('client_cap_override'),
+
+  // 介面縮放百分比（老花友善）：100 / 115 / 130。
+  uiScale: integer('ui_scale').default(100).notNull(),
 }, (t) => [
   // 自參照 FK：刪除教練時的 ON DELETE SET NULL 需要它，否則每次刪除都要全表掃。
   index('coaches_upline_id_idx').on(t.uplineId),
@@ -216,7 +231,7 @@ export const memberMetrics = pgTable('member_metrics', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   // 「每位教練每月一筆」是這張表的前提（home.ts 的 map.set 直接假設一筆）。
-  // 少了這條約束，同一 (coach, period) 有兩筆時老闆頁的 trend 是 `+=` 累加 → 同一筆業績算兩次、
+  // 少了這條約束，同一 (coach, period) 有兩筆時核心成員頁的 trend 是 `+=` 累加 → 同一筆業績算兩次、
   // 達成率直接翻倍，而且畫面上看不出是 bug。
   uniqueIndex('member_metrics_coach_period_uidx').on(t.coachId, t.period),
 ]);
@@ -331,6 +346,12 @@ export const compRanks = pgTable('comp_ranks', {
   moduleCode: text('module_code').default('').notNull(),
   promoPct: doublePrecision('promo_pct'),
   execPct: doublePrecision('exec_pct'),
+  // ── 使用權益（2026/08/22）──
+  // 只有預設表（module_code=''）的這三欄有意義：模塊自訂職級表是拿來調分潤率的，
+  // 客戶上限與定價是「這個人買了什麼」，跟他這一案賣哪個模塊無關。
+  clientCap: integer('client_cap'),                   // 客戶資料庫上限；留空＝不限制
+  priceMonth: bigint('price_month', { mode: 'number' }),  // 月費（元）
+  priceYear: bigint('price_year', { mode: 'number' }),    // 年費（元）
 }, (t) => [
   index('comp_ranks_version_id_idx').on(t.versionId),
   // 同一版本、同一模塊內職級代號唯一 —— 引擎全部以 code 查表，重複會靜默算錯人。
@@ -663,3 +684,55 @@ export const bizTaxParams = pgTable('biz_tax_params', {
   sortOrder: integer('sort_order').default(0).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ── 教練學習區（2026/08/22）──────────────────────────────────────────
+// 課程 → 單元 → 完成紀錄。定位是「內部教育訓練的教材庫」，跟 comp_training_*
+// （制度用的訓練時數帳）刻意分開：那邊算的是「時數認列」，這邊管的是「教材與看完沒」。
+// 兩者的接點只有一個：課程可設 trainingHours，全部單元完成時補寫一筆時數紀錄。
+//
+// 影片與檔案一律存「外部連結」（YouTube / Vimeo / Google Drive / 雲端硬碟）——
+// 專案沒有檔案儲存服務，直接收上傳會讓 500KB 的 base64 塞進 Postgres。
+export const learnCourses = pgTable('learn_courses', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  summary: text('summary'),
+  category: text('category').default('').notNull(),   // 分類（新人必修／保障／企業主…），自由文字
+  coverUrl: text('cover_url'),
+  // 最低可見級別：對照 comp_ranks.seq。留空＝所有教練都看得到。
+  // 存 seq 不存 code：職級表可以在後台改代號，seq 是排序語意，改代號不會讓可見範圍錯位。
+  minRankSeq: integer('min_rank_seq'),
+  trainingHours: doublePrecision('training_hours'),   // 完課認列時數；留空＝不認列
+  sortOrder: integer('sort_order').default(0).notNull(),
+  published: boolean('published').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('learn_courses_published_idx').on(t.published, t.sortOrder),
+]);
+
+// 單元。kind: video（可內嵌影片連結）/ doc（文件連結）/ link（一般連結）/ text（純文字講義）
+export const learnLessons = pgTable('learn_lessons', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  courseId: uuid('course_id').notNull().references(() => learnCourses.id, { onDelete: 'cascade' }),
+  seq: integer('seq').default(0).notNull(),
+  title: text('title').notNull(),
+  kind: text('kind').default('video').notNull(),
+  url: text('url'),
+  body: text('body'),                                  // kind='text' 時的講義內容
+  durationMin: integer('duration_min'),
+  note: text('note'),
+}, (t) => [
+  index('learn_lessons_course_seq_idx').on(t.courseId, t.seq),
+]);
+
+// 完成紀錄。一人一單元只有一筆 —— 少了唯一鍵，重複點「標記完成」會讓完成率超過 100%。
+export const learnProgress = pgTable('learn_progress', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  lessonId: uuid('lesson_id').notNull().references(() => learnLessons.id, { onDelete: 'cascade' }),
+  courseId: uuid('course_id').notNull().references(() => learnCourses.id, { onDelete: 'cascade' }),
+  completedAt: timestamp('completed_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('learn_progress_coach_lesson_uidx').on(t.coachId, t.lessonId),
+  index('learn_progress_coach_course_idx').on(t.coachId, t.courseId),
+]);
