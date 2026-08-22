@@ -10,7 +10,7 @@
 // liq     = 資產：預設流動性（流動／固定）
 // consumer= 負債：是否算「消費性負債」（同上，寫進資料列）
 // note    = 選了要提示補明細（目前只有「其他」）
-export type CatKind = "income" | "expense" | "asset" | "liability";
+export type CatKind = "income" | "expense" | "saving" | "asset" | "liability";
 
 export type CatSeed = {
   kind: CatKind;
@@ -25,7 +25,8 @@ export type CatSeed = {
 // 各 kind 的合法大類（引擎語意層，固定不開放編輯）
 export const CAT_PARENTS: Record<CatKind, readonly string[]> = {
   income: ["工作", "理財", "其他"],
-  expense: ["生活", "消費", "稅賦", "孝親", "保險", "其他"],
+  expense: ["生活", "貸款", "消費", "稅賦", "孝親", "保險", "其他"],
+  saving: ["儲蓄理財"],
   asset: ["自用資產", "可投資資產"],
   liability: ["房貸", "車貸", "信貸", "其他"],
 } as const;
@@ -33,6 +34,7 @@ export const CAT_PARENTS: Record<CatKind, readonly string[]> = {
 export const CAT_KIND_LABEL: Record<CatKind, string> = {
   income: "收入",
   expense: "支出",
+  saving: "儲蓄理財投入",
   asset: "資產",
   liability: "負債",
 };
@@ -57,8 +59,11 @@ const income: CatSeed[] = [
   { kind: "income", parent: "理財", label: "事業盈餘分配" },
   { kind: "income", parent: "理財", label: "版稅/權利金" },
   { kind: "income", parent: "理財", label: "加密資產收益" },
+  { kind: "income", parent: "理財", label: "其他理財收入" },
   { kind: "income", parent: "其他", label: "退休金/年金" },
   { kind: "income", parent: "其他", label: "政府補助/津貼" },
+  { kind: "income", parent: "其他", label: "育兒津貼" },
+  { kind: "income", parent: "其他", label: "子女孝養金" },
   { kind: "income", parent: "其他", label: "保險給付" },
   { kind: "income", parent: "其他", label: "贍養費/扶養費" },
   { kind: "income", parent: "其他", label: "親友資助" },
@@ -78,6 +83,14 @@ const expense: CatSeed[] = [
   { kind: "expense", parent: "生活", label: "醫療/健康" },
   { kind: "expense", parent: "生活", label: "子女教養" },
   { kind: "expense", parent: "生活", label: "育兒/托育" },
+  { kind: "expense", parent: "貸款", label: "自用住宅貸款" },
+  { kind: "expense", parent: "貸款", label: "投資性房屋貸款" },
+  { kind: "expense", parent: "貸款", label: "汽車貸款" },
+  { kind: "expense", parent: "貸款", label: "機車貸款" },
+  { kind: "expense", parent: "貸款", label: "信用貸款" },
+  { kind: "expense", parent: "貸款", label: "信用卡分期/零卡分期" },
+  { kind: "expense", parent: "貸款", label: "就學貸款" },
+  { kind: "expense", parent: "貸款", label: "其他貸款支出", note: true },
   { kind: "expense", parent: "消費", label: "治裝/美容" },
   { kind: "expense", parent: "消費", label: "休閒娛樂" },
   { kind: "expense", parent: "消費", label: "旅遊" },
@@ -88,6 +101,7 @@ const expense: CatSeed[] = [
   { kind: "expense", parent: "消費", label: "寵物" },
   { kind: "expense", parent: "消費", label: "菸酒" },
   { kind: "expense", parent: "消費", label: "個人成長/進修" },
+  { kind: "expense", parent: "消費", label: "醫美/非生活必需治裝" },
   { kind: "expense", parent: "消費", label: "奢侈品" },
   { kind: "expense", parent: "稅賦", label: "綜合所得稅" },
   { kind: "expense", parent: "稅賦", label: "房屋稅" },
@@ -110,6 +124,21 @@ const expense: CatSeed[] = [
   { kind: "expense", parent: "其他", label: "慈善捐贈" },
   { kind: "expense", parent: "其他", label: "投資扣款/定期定額" },
   { kind: "expense", parent: "其他", label: "其他", note: true },
+];
+
+// 儲蓄理財投入（Excel「家庭支出綜合統計表」下半段）。
+// 這一塊在原表是放在「總支出」之外的——它不是花掉，是換一個口袋放。
+// 引擎的「有效儲蓄率」分子就是它，所以獨立成一個 kind，不混進 expense。
+const saving: CatSeed[] = [
+  { kind: "saving", parent: "儲蓄理財", label: "零存整付存款" },
+  { kind: "saving", parent: "儲蓄理財", label: "儲蓄保險保費" },
+  { kind: "saving", parent: "儲蓄理財", label: "定期定額ETF/基金" },
+  { kind: "saving", parent: "儲蓄理財", label: "定期定額股票" },
+  { kind: "saving", parent: "儲蓄理財", label: "勞退自提" },
+  { kind: "saving", parent: "儲蓄理財", label: "投資型保單投資保費" },
+  { kind: "saving", parent: "儲蓄理財", label: "定期定額海外/複委託" },
+  { kind: "saving", parent: "儲蓄理財", label: "跟會(互助會)" },
+  { kind: "saving", parent: "儲蓄理財", label: "其他儲蓄投資", note: true },
 ];
 
 const asset: CatSeed[] = [
@@ -175,6 +204,7 @@ const liability: CatSeed[] = [
 export const DEFAULT_FINANCE_CATEGORIES: readonly CatSeed[] = [
   ...income,
   ...expense,
+  ...saving,
   ...asset,
   ...liability,
 ];

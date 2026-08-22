@@ -15,7 +15,7 @@ import { CAT_PARENTS, CAT_KIND_LABEL, type CatKind } from "@/lib/financeCategori
 import type { FinCatRow } from "@/lib/financeCategories";
 import type { EduCostRow } from "@/lib/eduCosts";
 
-const KINDS: CatKind[] = ["income", "expense", "asset", "liability"];
+const KINDS: CatKind[] = ["income", "expense", "saving", "asset", "liability"];
 
 // 每個 kind 的引擎語意提示：讓管理員知道「大類選錯會壞掉什麼」，而不是隨手亂挑。
 const KIND_HINT: Record<CatKind, string> = {
@@ -23,6 +23,8 @@ const KIND_HINT: Record<CatKind, string> = {
     "大類決定稅務歸屬：工作＝薪資所得（其中「執行業務所得」走費用率扣除）、理財＝股利利息租金、其他＝不課綜所稅的收入。",
   expense:
     "大類決定財務比率：生活＋消費＝家庭生活費、消費＋其他＝可刪減支出、稅賦／保險／孝親各自入表。放錯會讓儲蓄率與可刪減空間算錯。",
+  saving:
+    "儲蓄理財投入不是「花掉」、不計入總支出，它是「有效儲蓄率」的分子。放進支出會讓儲蓄率被自己吃掉一次。",
   asset:
     "大類決定淨值結構：自用資產不計入核心資產、可投資資產才是累積進度的分母。「計入風險性資產」另外決定資產配置與風險承受度的分子。",
   liability:

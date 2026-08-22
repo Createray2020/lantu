@@ -34,7 +34,7 @@ export type FinCatPayload = Record<
 >;
 
 export const isCatKind = (v: string): v is CatKind =>
-  v === "income" || v === "expense" || v === "asset" || v === "liability";
+  v === "income" || v === "expense" || v === "saving" || v === "asset" || v === "liability";
 
 export async function listCategories(): Promise<FinCatRow[]> {
   const rows = await db
@@ -58,7 +58,7 @@ export async function listCategories(): Promise<FinCatRow[]> {
 
 // 把資料列摺成前端用的 payload；停用的不給出去。
 export function toPayload(rows: FinCatRow[]): FinCatPayload {
-  const out: FinCatPayload = { income: [], expense: [], asset: [], liability: [] };
+  const out: FinCatPayload = { income: [], expense: [], saving: [], asset: [], liability: [] };
   for (const r of rows) {
     if (!r.active) continue;
     if (!out[r.kind]) continue;
@@ -77,7 +77,7 @@ export function toPayload(rows: FinCatRow[]): FinCatPayload {
 // 表還沒 seed（或連不上）時，回預設清單 —— 前端也有同一份 fallback，
 // 但這裡先擋一層，避免後台開起來是空白畫面。
 export function defaultPayload(): FinCatPayload {
-  const out: FinCatPayload = { income: [], expense: [], asset: [], liability: [] };
+  const out: FinCatPayload = { income: [], expense: [], saving: [], asset: [], liability: [] };
   for (const s of DEFAULT_FINANCE_CATEGORIES) {
     out[s.kind].push({
       label: s.label,

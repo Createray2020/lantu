@@ -20,7 +20,14 @@ import {
   HOUSE_TAX_RATE, LAND_TAX_RATE,
 } from "@/lib/taiwan";
 
-var KINDS=['壽險','意外險','住院醫療','初次罹癌','癌症住院','重病給付','每月照護'];
+// 保障險種。2026/08 對齊 Excel 需求分析三大塊（責任／重病重殘／醫療）：
+//  ・「意外險」更名「意外傷殘」——需求分析問的是傷殘失能，不是意外醫療雜支。
+//  ・新增「醫療雜費」（住院雜費，實支實付的主戰場）與「薪資補償」（失能所得）。
+//  ・「癌症住院」保留不刪：既有案子已經填了值，拿掉會靜默歸零；UI 收進選填區。
+// 舊資料的 coverages[].kind 仍可能是「意外險」，由 KIND_ALIAS 正規化，不會對不上。
+var KINDS=['壽險','意外傷殘','住院醫療','醫療雜費','薪資補償','初次罹癌','癌症住院','重病給付','每月照護'];
+var KIND_ALIAS={'意外險':'意外傷殘'};
+function kindNorm(k){return KIND_ALIAS[k]||k;}
 
 var EDU_STAGES=['嬰兒','幼稚園','小學','國中','高中職','大學','研究所','博士班'];
 
@@ -69,18 +76,22 @@ function sampleCase(){return {
  hobby:[{sub:'體能類',start:40,end:75,freq:12,amount:3000,minAmount:2000,imp:2}],
  luxury:[{sub:'首飾配件',start:41,end:41,freq:1,amount:300000,minAmount:0,imp:2}],
  needs:[
-  {member:'王大明',funeral:600000,protectYears:5,estateTax:0,room:2000,selfPay:1500,nursing:1500,firstCancer:300000,cancerHosp:2000,critical:2000000,monthCare:30000,careMonths:120}
+  {member:'王大明',funeral:600000,protectYears:5,estateTax:0,room:2000,selfPay:1500,nursing:1500,miscDaily:3000,incomeComp:50000,disability:3000000,firstCancer:300000,cancerHosp:2000,critical:2000000,monthCare:30000,careMonths:120}
  ],
  coverages:[
   {member:'王大明',kind:'壽險',comm:0,social:0},
   {member:'王大明',kind:'住院醫療',comm:0,social:0}
  ],
  policies:[
-  {insured:'王大明',name:'國泰終身醫療',premium:47536,life:0,accident:0,medical:2000,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0},
+  {insured:'王大明',name:'國泰終身醫療',premium:47536,life:0,accident:0,medical:2000,medMisc:100000,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0},
   {insured:'王大明',name:'重大傷病定期',premium:20100,life:0,accident:0,medical:0,firstCancer:0,cancerHosp:0,critical:2000000,monthCare:0,cashValue:0},
   {insured:'王大明',name:'定期壽險',premium:8864,life:3000000,accident:1000000,medical:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0}
  ],
  intent:{purposes:['想增加收入','想進行投資、活化資產','有節稅需求，想進行節稅'],targets:['退休生活規劃','子女教養規劃','購屋規劃','孝親規劃'],mustHave:['退休生活規劃','子女教養規劃']},
+ savings:[
+  {name:'定期定額 ETF',subCat:'定期定額ETF/基金',period:'月',amount:120000},
+  {name:'儲蓄險保費',subCat:'儲蓄保險保費',period:'年',amount:60000}
+ ],
  legacy:{heirs:2,perHeirCash:20000000,perHeirNote:'每人一間房',feedEstate:true},
  nextReview:'2025-06-01',
  career:{plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:2},
@@ -99,7 +110,7 @@ function sampleCase(){return {
 
 function defaultCompany(){return {name:'',taxId:'',industry:'',role:'負責人',sharePct:100,annualRevenue:0,netProfit:0,ownerLoan:0,note:''};}
 
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0,estateDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0,estateDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
  // profile.credit 是信用評分的舊欄位（與 credit.score 雙寫）。sampleCase 帶 700 分，
  // 這裡若不一併清掉，新客戶會憑空拿到示範資料的評分並白送約 12.5 分財務安全度。
  c.profile.credit='';
@@ -138,6 +149,33 @@ function annualDebtInterest(c){var a0=n(c.profile.age);return sum(c.liabilities,
 function annualDebtPay(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;var elapsed=(a0-sa)*12;return (a0>=sa&&(n(l.months)-elapsed)>0)?lPay(l)*12:0})}
 
 function familyAnnualLiving(c){return sum(c.expenses,function(e){return (e.cat==='生活'||e.cat==='消費')?n(e.amount):0})}
+
+// 父母奉養費。責任遞減圖一直有把它算進身故責任，但 lifeNeed() 的需求反推漏了，
+// 兩張圖對同一個客戶會給出不同的壽險缺口。2026/08 補進 lifeNeed。
+function familyAnnualParentSupport(c){return sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0})}
+
+// 支出側手動登錄的貸款支出（大類「貸款」）。
+// 負債表那邊由 annualDebtPay() 反推，兩者相加＝家庭貸款總支出；
+// 手動列是給「沒登在負債表的貸款」用的，UI 會標出可能重複的細類。
+function manualLoanPay(c){return sum(c.expenses,function(e){return e.cat==='貸款'?n(e.amount):0})}
+
+// 儲蓄理財投入（c.savings[]）。不進總支出——在原表它就放在總支出之外。
+function savingInvest(c){return sum(c.savings,function(x){return n(x.amount)})}
+
+// 資產布局（Excel「資產布局規劃」）：核心／衛星／短期保留／生活用。
+// 預設由既有欄位推導，a.layer 有值才視為顧問手動覆寫。
+// 只用於呈現，不改任何既有比率的分母分子——換算法會讓所有舊案的指標跳動。
+function assetLayer(a){
+ if(a&&a.layer)return a.layer;
+ if(!a)return '核心';
+ if(a.mainCat==='自用資產')return '生活用';
+ return isRiskAsset(a)?'衛星':'核心';
+}
+function assetLayout(c){
+ var out={'核心':0,'衛星':0,'短期保留':0,'生活用':0};
+ (c.assets||[]).forEach(function(a){var k=assetLayer(a);if(out[k]==null)out[k]=0;out[k]+=aVal(a);});
+ return out;
+}
 
 function aVal(a){return n(a.value)*(n(a.fxRate)||1)}
 
@@ -191,6 +229,7 @@ function lifeNeed(c,nd){
  var famLiving=familyAnnualLiving(c);
  // 負債一律走 lBal()（有乘匯率）。直接用 n(l.balance) 會讓外幣房貸在「缺口」與「準備度」兩頁差一個匯率。
  var need=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
+   + familyAnnualParentSupport(c)*n(nd.protectYears)
    + sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax);
  var existing=existingCover(c,nd.member,'壽險');
  var liquid=liquidMovable(c);
@@ -201,10 +240,10 @@ function medicalDailyNeed(nd){return n(nd.room)+n(nd.selfPay)+n(nd.nursing)}
 
 function memberDep(c,name){var m=(c.members||[]).find(function(x){return x.name===name});return m?n(m.depRatio):100}
 
-var POLICY_MAP={'壽險':'life','意外險':'accident','住院醫療':'medical','初次罹癌':'firstCancer','癌症住院':'cancerHosp','重病給付':'critical','每月照護':'monthCare'};
+var POLICY_MAP={'壽險':'life','意外傷殘':'accident','住院醫療':'medical','醫療雜費':'medMisc','薪資補償':'incomeComp','初次罹癌':'firstCancer','癌症住院':'cancerHosp','重病給付':'critical','每月照護':'monthCare'};
 
 function existingCover(c,member,kind){
- var fromCov=sum(c.coverages,function(cv){return (cv.member===member&&cv.kind===kind)?(n(cv.comm)+n(cv.social)):0});
+ var fromCov=sum(c.coverages,function(cv){return (cv.member===member&&kindNorm(cv.kind)===kindNorm(kind))?(n(cv.comm)+n(cv.social)):0});
  var f=POLICY_MAP[kind];var fromPol=f?sum(c.policies,function(p){return p.insured===member?n(p[f]):0}):0;
  return fromCov+fromPol;
 }
@@ -214,7 +253,10 @@ function coverageGaps(c){
  (c.needs||[]).forEach(function(nd){
   var map={
    '壽險':lifeNeed(c,nd),
+   '意外傷殘':n(nd.disability),
    '住院醫療':medicalDailyNeed(nd),
+   '醫療雜費':n(nd.miscDaily),
+   '薪資補償':n(nd.incomeComp),
    '初次罹癌':n(nd.firstCancer),
    '癌症住院':n(nd.cancerHosp),
    '重病給付':n(nd.critical),
@@ -250,13 +292,14 @@ function metrics(c){
  var tax=sum(c.expenses,function(e){return e.cat==='稅賦'?n(e.amount):0});
  var ins=sum(c.expenses,function(e){return e.cat==='保險'?n(e.amount):0});
  var expTotal=sum(c.expenses,function(e){return n(e.amount)})+annualDebtPay(c);
+ var saveInvest=savingInvest(c);
  var cash=sum(c.assets,function(a){return (a.type==='現金'||a.type==='定存')?aVal(a):0});
  var liquid=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
  var assetTotal=sum(c.assets,function(a){return aVal(a)});
  var debtTotal=sum(c.liabilities,function(l){return lBal(l)});
  var net=assetTotal-debtTotal, save_=incTotal-expTotal, interest=annualDebtInterest(c), monthExp=expTotal/12;
  var proj=projection(c);
- return {incTotal:incTotal,incFinancial:incFinancial,living:living,tax:tax,ins:ins,expTotal:expTotal,cash:cash,liquid:liquid,
+ return {incTotal:incTotal,incFinancial:incFinancial,living:living,tax:tax,ins:ins,expTotal:expTotal,saveInvest:saveInvest,cash:cash,liquid:liquid,
   assetTotal:assetTotal,debtTotal:debtTotal,net:net,save:save_,interest:interest,monthExp:monthExp,visionNeed:proj.totalOutflow,proj:proj};
 }
 
@@ -272,10 +315,12 @@ function ratios(c){var m=metrics(c),r={};
  var insAll=sum(c.expenses,function(e){return e.cat==='保險'?n(e.amount):0});
  var social=sum(c.expenses,function(e){return (e.cat==='保險'&&/(勞保|健保|勞健保|社會|國保|國民年金)/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
  var premium=Math.max(0,insAll-social);
- var loanPay=annualDebtPay(c);
+ var loanPay=annualDebtPay(c)+manualLoanPay(c);
  var eduNow=sum(c.education,function(e){var s=n(e.startIn);return (s<=0&&0<s+n(e.years))?n(e.annual):0});
  var support=sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0})+eduNow;
- var saveActive=n(c.params.planYearly)||Math.max(0,m.save);
+ // 有效儲蓄率的分子：有登錄「儲蓄理財投入」就用它（對齊原表），
+ // 沒有才退回舊的參數欄／年結餘——既有案子的數字不變。
+ var saveActive=m.saveInvest>0?m.saveInvest:(n(c.params.planYearly)||Math.max(0,m.save));
  // 資產負債子聚合
  var selfUse=sum(c.assets,function(a){return a.mainCat==='自用資產'?aVal(a):0});
  var coreAsset=sum(c.assets,function(a){return a.mainCat==='可投資資產'?aVal(a):0});
@@ -783,6 +828,12 @@ export {
   profStdRate,
   profExpenseRate,
   legacyNeed,
+  familyAnnualParentSupport,
+  manualLoanPay,
+  savingInvest,
+  assetLayer,
+  assetLayout,
+  kindNorm,
   allocInfo,
   scenario,
   crossTable,

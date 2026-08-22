@@ -44,7 +44,7 @@ export default function AdminNav() {
 
   return (
     <nav className="border-b border-white/10 bg-[#0b2036]">
-      <div className="max-w-6xl mx-auto px-5 py-3 flex flex-wrap items-start gap-x-7 gap-y-3">
+      <div className="px-5 py-3 flex flex-wrap items-start gap-x-7 gap-y-3">
         {GROUPS.map((g) => (
           <div key={g.title} className="min-w-0">
             <div className="text-[10px] tracking-[0.22em] text-[#6b7d8f] mb-1.5">{g.title}</div>
