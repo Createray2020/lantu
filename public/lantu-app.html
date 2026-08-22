@@ -341,7 +341,16 @@ var EDU_COST_FALLBACK=[
 ];
 // 每個 kind 在資料列上的欄位名：sub＝細類、parent＝大類
 var CAT_FIELDS={income:{sub:'subType',parent:'type'},expense:{sub:'subCat',parent:'cat'},saving:{sub:'subCat',parent:'cat'},asset:{sub:'type',parent:'mainCat'},liability:{sub:'subCat',parent:'mainCat'}};
-function catList(kind){var s=(window.LANTU_CATS||{})[kind];return (s&&s.length)?s:(CAT_FALLBACK[kind]||[]);}
+// 後台字典優先，抓不到就用內建 CAT_FALLBACK。
+// 額外一層自癒：字典裡整個「大類」都沒有細類時（例如程式先上、migration 還沒跑），
+// 把那個大類的內建細類補回來——不然顧問在下拉看得到「貸款」這個分類，底下卻一個細項都選不到。
+function catList(kind){
+ var s=(window.LANTU_CATS||{})[kind],fb=CAT_FALLBACK[kind]||[];
+ if(!s||!s.length)return fb;
+ var have={};s.forEach(function(x){if(x&&x.parent)have[x.parent]=1;});
+ var miss=fb.filter(function(x){return !have[x.parent];});
+ return miss.length?s.concat(miss):s;
+}
 function catFind(kind,label){var l=catList(kind);for(var i=0;i<l.length;i++){if(l[i].label===label)return l[i]}return null;}
 function eduCostList(){var s=window.LANTU_EDU_COSTS;return (s&&s.length)?s:EDU_COST_FALLBACK;}
 function eduCostOf(stage){var l=eduCostList();for(var i=0;i<l.length;i++){if(l[i].stage===stage)return l[i]}return null;}

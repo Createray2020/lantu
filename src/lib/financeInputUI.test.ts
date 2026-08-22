@@ -127,6 +127,31 @@ describe("支出的貸款入口", () => {
   });
 });
 
+describe("後台字典缺整個大類時的自癒（程式先上、migration 還沒跑）", () => {
+  it("字典有 expense 但沒有『貸款』細類時，會把內建的那組補回來", () => {
+    const orig = w.LANTU_CATS;
+    try {
+      // 模擬 migration 還沒跑：字典裡 expense 只有舊的大類
+      w.LANTU_CATS = { expense: [{ label: "餐食", parent: "生活" }] };
+      const labels = w.catList("expense").map((x: { label: string }) => x.label);
+      expect(labels).toContain("餐食");
+      expect(labels).toContain("自用住宅貸款"); // 補回來的
+    } finally {
+      w.LANTU_CATS = orig;
+    }
+  });
+
+  it("字典完全沒有 saving 這個 kind 時，整份用內建的", () => {
+    const orig = w.LANTU_CATS;
+    try {
+      w.LANTU_CATS = { expense: [{ label: "餐食", parent: "生活" }] };
+      expect(w.catList("saving").map((x: { label: string }) => x.label)).toContain("勞退自提");
+    } finally {
+      w.LANTU_CATS = orig;
+    }
+  });
+});
+
 describe("儲蓄理財投入面板", () => {
   it("是獨立的一區，明講不計入支出", () => {
     const h = pane();
