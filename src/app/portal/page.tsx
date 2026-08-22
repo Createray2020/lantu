@@ -6,6 +6,9 @@ import { listClientCases } from "@/lib/comp/survey";
 import { getClientOwnPlan, getClientSetup } from "@/lib/clientPlan";
 import { normalizeIntent } from "@/lib/intent";
 import { wan, ntfmt } from "@/lib/passport";
+import { eq } from "drizzle-orm";
+import { db } from "@/Shared/db";
+import { coaches } from "@/Shared/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +26,10 @@ export default async function Portal() {
   // 待填回饋問卷：制度上問卷回收才算結案，所以這是客戶端的主動提示而不是被動等通知。
   const pendingSurveys = (await listClientCases(client.id)).filter((c) => !c.surveyAt).length;
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
+  // 教練↔客戶是雙棲的：教練也會用客戶介面做自己的規劃。
+  // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。
+  // 教練端頁首早就有「我的規劃」指過來，這條是把單向補成雙向。
+  const isCoach = (await db.select({ id: coaches.id }).from(coaches).where(eq(coaches.id, client.id)).limit(1)).length > 0;
 
   const rows = r
     ? [
@@ -46,9 +53,19 @@ export default async function Portal() {
           </span>
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
-        <SignOutButton redirectUrl="/">
-          <button className="text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-3 py-1.5">登出</button>
-        </SignOutButton>
+        <div className="flex items-center gap-2">
+          {isCoach && (
+            <Link
+              href="/dashboard"
+              className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              教練工作台
+            </Link>
+          )}
+          <SignOutButton redirectUrl="/">
+            <button className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-2.5 sm:px-3 py-1.5">登出</button>
+          </SignOutButton>
+        </div>
       </header>
 
       <main className="flex-1 px-6 py-12">
