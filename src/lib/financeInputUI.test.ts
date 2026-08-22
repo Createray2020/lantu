@@ -272,6 +272,64 @@ describe("保障需求：責任 / 重病重殘 / 醫療 三大塊", () => {
   });
 });
 
+describe("退休分頁：三段式金流", () => {
+  it("三段對照表列出階段、權重、家庭年生活費", () => {
+    const c = w.activeCase();
+    c.members[1].retireAge = 60; // 王太太 38 歲 → 本人 62 歲時退休
+    w.app.dataTab = "retire";
+    w.render();
+    const h = pane();
+    expect(h).toContain("退休時點");
+    expect(h).toContain("已退休權重");
+    expect(h).toContain("混合期");
+    expect(h).toContain("全退休");
+    expect(h).toContain("退休順序");
+  });
+
+  it("退休期支出明細表可逐列設起訖歲，並標明是「都退休後」的金額", () => {
+    const h = pane();
+    expect(h).toContain("退休期支出明細");
+    expect(h).toContain("賺薪成員都退休後的家庭年支出");
+    expect(h).toContain("起歲");
+    expect(h).toContain("訖歲");
+  });
+
+  it("「依工作期帶入」把生活＋消費列複製過來乘上取代率", () => {
+    const c = w.activeCase();
+    c.expenses = [
+      { name: "生活費用", cat: "生活", amount: 1_000_000, infl: true, start: 40, end: 85, cut: 0 },
+      { name: "旅遊", cat: "消費", amount: 200_000, infl: true, start: 40, end: 85, cut: 0 },
+      { name: "保險費", cat: "保險", amount: 120_000, infl: false, start: 40, end: 85, cut: 0 },
+    ];
+    c.retireExpenses = [];
+    c.retire.replaceRate = 75;
+    w.fillRetireFromWork();
+    const re = w.activeCase().retireExpenses;
+    expect(re).toHaveLength(2); // 保險費不帶入
+    expect(re[0].amount).toBe(750_000);
+    expect(re[1].amount).toBe(150_000);
+    expect(re[0].startAge).toBe(""); // 起歲留空＝從本人退休起
+  });
+
+  it("成員卡：配偶有自己的預計退休年齡（本人的仍在身分資料那格）", () => {
+    w.app.dataTab = "family";
+    w.render();
+    const h = pane();
+    expect(h).toContain("預計退休年齡");
+    w.set("members:1", "retireAge", "62", "num");
+    expect(w.activeCase().members[1].retireAge).toBe(62);
+  });
+
+  it("退休期支出的金額欄也是千分位，改了會重畫（三段表要跟著更新）", () => {
+    w.app.dataTab = "retire";
+    w.render();
+    const h = pane();
+    expect(h).toContain('data-fincalc="retireExpenses:0"');
+    // moneyCell 會把 this.value 改寫成 amtRaw(this.value)（千分位輸入的解碼）
+    expect(h).toContain("setAmtByPeriod('retireExpenses',0,amtRaw(this.value));render()");
+  });
+});
+
 describe("重要度標示", () => {
   it("下拉直接寫出哪一端最重要（不用猜 1 還是 5）", () => {
     w.app.dataTab = "goals";

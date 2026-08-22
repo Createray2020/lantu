@@ -142,6 +142,49 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     }
   });
 
+  // ── 2026/08 退休期三段式金流 ──
+  it("三段權重 retiredWeight()：公式與降級路徑兩邊一致", () => {
+    expect(HTML).toContain("var done=0;pts.forEach(function(p){if(age>p.at)done+=p.share;});");
+    expect(HTML).toContain("return done/tot;");
+    // 支出比例全空時退回「本人退休即全面切換」，不可除以零
+    expect(HTML).toContain("var p0=null;pts.forEach(function(p){if(p.primary)p0=p;});p0=p0||pts[0];");
+  });
+
+  it("退休時點換算成本人年齡的算式兩邊一致", () => {
+    expect(HTML).toContain("out.push({name:m.name||'',primary:isP,share:Math.max(0,n(m.expRatio)),at:a0+(ra-ma)});");
+    const c = E.sampleCase();
+    c.members[1].retireAge = 60; // 配偶 38 歲
+    const spouse = E.earnerRetirePoints(c).find((p: { primary: boolean }) => !p.primary);
+    expect(spouse.at).toBe(E.n(c.profile.age) + (60 - E.n(c.members[1].age)));
+  });
+
+  it("工作期支出只縮減生活＋消費兩類，兩邊一致", () => {
+    expect(HTML).toContain("s+=isLivingCat(e.cat)?v*(1-w):v;");
+    expect(HTML).toContain("function isLivingCat(cat){return cat==='生活'||cat==='消費';}");
+  });
+
+  it("projection／monteCarlo 的退休期支出都是 retireAnnual×w（不再是 monthLiving 硬加）", () => {
+    expect(HTML).toContain("var retireDraw=retireAnnual(c,age,inflF)*w;");
+    expect(HTML).toContain("var retireDraw=retireAnnual(c,age,cumI)*wMC;");
+    expect(HTML).not.toContain("age>n(c.profile.retireAge))? n(c.retire&&c.retire.monthLiving)*12");
+  });
+
+  it("退休期支出明細表空著時，退回舊的 monthLiving×12", () => {
+    expect(HTML).toContain("if(!list.length)return n(c.retire&&c.retire.monthLiving)*12*inflFactor;");
+    const c = E.sampleCase();
+    c.retireExpenses = [];
+    expect(E.retireAnnual(c, 70, 1)).toBe(E.n(c.retire.monthLiving) * 12);
+  });
+
+  it("retireNeed：有明細表走逐年折現、沒有走封閉式年金，兩邊一致", () => {
+    expect(HTML).toContain("total+=retireAnnual(c,ra+1+k,Math.pow(1+infl,years)*Math.pow(1+g,k))/Math.pow(1+rr,k+1);");
+    expect(HTML).toContain("else{total=annualFV*(1-Math.pow((1+g)/(1+rr),m))/(rr-g);}");
+  });
+
+  it("延後退休會推每位賺薪成員的退休年齡，兩邊一致", () => {
+    expect(HTML).toContain("(after.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&n(m.retireAge)>0)m.retireAge=n(m.retireAge)+n((c.plan||{}).retireDelay);});");
+  });
+
   it("負債一律換匯（lBal），不可直接讀 l.balance", () => {
     // 兩邊的 lifeNeed 都要用 lBal，否則外幣房貸在「缺口」與「準備度」兩頁會差一個匯率
     expect(HTML).toContain("+ sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c)");

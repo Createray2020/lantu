@@ -435,7 +435,14 @@ function sampleCase(){return {
   {name:'自住房',owner:'王大明',mainCat:'自用資產',type:'不動產',cls:'固定',region:'台灣',currency:'台幣',fxRate:1,cost:14000000,value:15000000,ret:0,income:0,movable:false}
  ],
  liabilities:[{name:'房貸',owner:'王大明',mainCat:'房貸',currency:'台幣',fxRate:1,balance:10000000,rate:2,repay:'本息攤還',pay:42000,months:300,grace:0,startAge:38}],
- retire:{monthLiving:55000,retireReturn:4,retireInflation:1.5,prepared:[{item:'勞退',age:65,amount:3000000,method:'一次領'}]},
+ retire:{monthLiving:55000,replaceRate:75,retireReturn:4,retireInflation:1.5,prepared:[{item:'勞退',age:65,amount:3000000,method:'一次領'}]},
+ // 退休期支出＝「賺薪成員都退休後」的家庭年支出；每列可各自設起訖歲。
+ retireExpenses:[
+  {name:'退休生活費',cat:'生活',subCat:'餐食',period:'年',amount:480000,infl:true,startAge:'',endAge:''},
+  {name:'醫療與保健',cat:'生活',subCat:'醫療/健康',period:'年',amount:120000,infl:true,startAge:'',endAge:''},
+  {name:'退休旅遊(前十年)',cat:'消費',subCat:'旅遊',period:'年',amount:200000,infl:true,startAge:65,endAge:75},
+  {name:'長期照護',cat:'生活',subCat:'醫療/健康',period:'年',amount:360000,infl:true,startAge:80,endAge:''}
+ ],
  education:[
   {child:'王小寶',stage:'大學',annual:250000,years:4,startIn:12},
   {child:'王小寶',stage:'研究所',annual:280000,years:2,startIn:16}
@@ -488,7 +495,7 @@ function sampleCase(){return {
   {name:'生活預備金',pct:6,ret:1,benefit:'流動安全網'}
  ]}
 };}
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
  c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
 
 // ===== 工作類別 / 投保級距 =====
@@ -549,7 +556,7 @@ function applyInsFromSalaryMember(m){if(!m||m.jobType==='企業主')return;m.ins
 // ===== 舊資料防護：所有資料進入點（localStorage / 匯入 JSON / iframe lantu:init）一律先過 migrateCase =====
 // 引擎對 c.profile / c.params / 13 個陣列完全沒有防護，缺任何一個都會在 render() 丟例外 → 整頁白畫面。
 var CASE_SCHEMA_VERSION=2;
-var CASE_ARRAYS=['members','incomes','expenses','savings','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','lifeGoals'];
+var CASE_ARRAYS=['members','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','lifeGoals'];
 function _fill(dflt,cur){var o={};Object.keys(dflt||{}).forEach(function(k){o[k]=dflt[k]});Object.keys(cur||{}).forEach(function(k){if(cur[k]!==undefined)o[k]=cur[k]});return o;}
 function migrateCase(c){
  if(!c||typeof c!=='object'||Array.isArray(c))c={};
@@ -740,14 +747,86 @@ function eduTotal(c){var g=n(c.params.tuitionGrowth)/100;
  return sum(c.education,function(e){return n(e.annual)*n(e.years)*Math.pow(1+g,n(e.startIn))})}
 
 // 退休需求
+// ===== 退休期：三段式金流 =====
+// 家庭的生活/消費支出不是「某一天整批切換」——本人先退、配偶後退，中間有一段混合期。
+// 權重 w = 已退休賺薪成員的支出比例合計 ÷ 全體賺薪成員的支出比例合計（0→1）：
+//   家庭該年支出 = 非生活類（各自照起訖歲）＋ 工作期生活消費×(1−w) ＋ 退休期支出×w
+// 舊版的錯：生活費列跑到 85 歲，retire.monthLiving 又疊一次 → 退休後的生活費被算兩次。
+// 降級路徑（既有客戶不會壞）：配偶沒填退休年齡／支出比例全空 → 只剩本人一個切換點，w 直接 0→1。
+function isLivingCat(cat){return cat==='生活'||cat==='消費';}
+// 每位賺薪成員的退休，換算成「本人幾歲時發生」——投影的時間軸是本人年齡。
+function earnerRetirePoints(c){
+ var a0=n((c.profile||{}).age),out=[];
+ ((c||{}).members||[]).forEach(function(m){
+  if(!m||!isEarnerRole(m.role))return;
+  var isP=(m.role==='本人');
+  var ra=isP?n((c.profile||{}).retireAge):n(m.retireAge);
+  var ma=isP?a0:n(m.age);
+  if(!(ra>0))return;
+  out.push({name:m.name||'',primary:isP,share:Math.max(0,n(m.expRatio)),at:a0+(ra-ma)});
+ });
+ return out;
+}
+// 某一年的「已退休權重」0~1。
+function retiredWeight(c,age){
+ var pts=earnerRetirePoints(c);
+ if(!pts.length)return 0;
+ var tot=0;pts.forEach(function(p){tot+=p.share;});
+ if(tot<=0){
+  // 支出比例% 沒填 → 退回「本人退休即全面切換」，不要除以零
+  var p0=null;pts.forEach(function(p){if(p.primary)p0=p;});p0=p0||pts[0];
+  return age>p0.at?1:0;
+ }
+ var done=0;pts.forEach(function(p){if(age>p.at)done+=p.share;});
+ return done/tot;
+}
+// 退休期支出（＝賺薪成員都退休後的家庭年支出）。
+// c.retireExpenses[] 有列就逐列算（可各自設起訖歲：照護費 80 歲後才上來、旅遊前十年高），
+// 沒有就退回舊的 retire.monthLiving×12——既有客戶的數字不變。
+function retireAnnual(c,age,inflFactor){
+ var list=(c||{}).retireExpenses||[];
+ var ra=n((c.profile||{}).retireAge),le=n((c.profile||{}).lifeExp)||n((c.params||{}).horizon)||999;
+ if(!list.length)return n(c.retire&&c.retire.monthLiving)*12*inflFactor;
+ var s=0;
+ list.forEach(function(e){
+  var st=n(e.startAge)||ra, en=n(e.endAge)||le;
+  if(age<st||age>en)return;
+  s+=n(e.amount)*(e.infl===false?1:inflFactor);
+ });
+ return s;
+}
+// 工作期側的家庭支出：非生活類照舊，生活＋消費只算「還沒退休的那部分」。
+function workPhaseExpense(c,age,inflFactor,w){
+ var s=0;
+ ((c||{}).expenses||[]).forEach(function(e){
+  if(age<n(e.start)||age>n(e.end))return;
+  var v=n(e.amount)*(e.infl?inflFactor:1);
+  s+=isLivingCat(e.cat)?v*(1-w):v;
+ });
+ return s;
+}
+
 function retireNeed(c){
  var r=c.retire||{},age=n(c.profile.age),ra=n(c.profile.retireAge),le=n(c.profile.lifeExp);
  var infl=n(c.params.inflation)/100, g=n(r.retireInflation)/100, rr=n(r.retireReturn)/100;
  var years=Math.max(0,ra-age), m=Math.max(0,le-ra);
- var monthFV=n(r.monthLiving)*Math.pow(1+infl,years);
- var annualFV=monthFV*12;
+ // 分子改吃「退休期支出表」：退休當年的家庭年支出（終值）。沒填明細表就退回 monthLiving。
+ var hasList=!!((c.retireExpenses||[]).length);
+ var annualFV=hasList?retireAnnual(c,ra,Math.pow(1+infl,years)):n(r.monthLiving)*12*Math.pow(1+infl,years);
+ var monthFV=annualFV/12;
  var total;
- if(Math.abs(rr-g)<1e-6){total=annualFV*m/(1+rr);}
+ if(hasList){
+  // 退休期支出可以逐列設起訖歲（照護費 80 歲後才上來、旅遊只到 75），
+  // 年金封閉式公式吃不到這種分段 → 逐年折現加總。
+  // 註：金額一律相同時，這個迴圈的結果與下面的封閉式完全等價。
+  // 第 k+1 期在退休後第 k+1 年年底 → 對應年齡 ra+1+k（與封閉式年金的期數定義一致，
+  // 也與 projection() 的「age > 退休年齡才計退休期支出」對得上）。
+  total=0;
+  for(var k=0;k<m;k++){
+   total+=retireAnnual(c,ra+1+k,Math.pow(1+infl,years)*Math.pow(1+g,k))/Math.pow(1+rr,k+1);
+  }
+ }
+ else if(Math.abs(rr-g)<1e-6){total=annualFV*m/(1+rr);}
  else{total=annualFV*(1-Math.pow((1+g)/(1+rr),m))/(rr-g);}
  var prepared=sum(r.prepared,function(p){return n(p.amount)});
  return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,gap:Math.max(0,total-prepared)};
@@ -929,8 +1008,8 @@ function setCreditScore(v){var c=activeCase();if(!c)return;var s=n(v);
 // 退休需求計算明細
 function retireDetailHTML(c){var r=c.retire||{},rn=retireNeed(c),age=n(c.profile.age),ra=n(c.profile.retireAge),le=n(c.profile.lifeExp);
  var infl=n(c.params.inflation)/100,g=n(r.retireInflation)/100,rr=n(r.retireReturn)/100,years=Math.max(0,ra-age),m=Math.max(0,le-ra);
- var monthFV=n(r.monthLiving)*Math.pow(1+infl,years);
- var rows=[['退休月生活費(現值)',n(r.monthLiving)],['距退休年數',years+' 年'],['退休時月生活費(終值)',Math.round(monthFV)],['退休時年支出(終值)',Math.round(monthFV*12)],['退休後餘命',m+' 年'],['退休後報酬率 / 通膨',(rr*100).toFixed(1)+'% / '+(g*100).toFixed(1)+'%'],['退休總需求(成長型年金現值)',Math.round(rn.total),'var(--amber2)']];
+ var monthFV=rn.monthFV;
+ var rows=[['退休月生活費(現值)',Math.round(monthFV/Math.pow(1+infl,years))],['距退休年數',years+' 年'],['退休時月生活費(終值)',Math.round(monthFV)],['退休時年支出(終值)',Math.round(monthFV*12)],['退休後餘命',m+' 年'],['退休後報酬率 / 通膨',(rr*100).toFixed(1)+'% / '+(g*100).toFixed(1)+'%'],['退休總需求(成長型年金現值)',Math.round(rn.total),'var(--amber2)']];
  var prepRows=(r.prepared||[]).map(function(p){return [(p.item||'已備')+(p.age?'（'+p.age+'歲'+(p.method?'·'+p.method:'')+'）':''),n(p.amount)]});
  var prep=prepRows.length?kvTbl(prepRows.concat([['已備合計',Math.round(rn.prepared),'var(--ok)']])):'<div class="hint">尚未登錄已備退休金（可用勞保/勞退一鍵帶入）。</div>';
  return detailBox('退休需求計算明細','<div class="hint" style="margin-bottom:4px">需求＝退休後每年支出(終值)折現至退休時點的成長型年金現值。</div>'+kvTbl(rows)+'<div class="hint" style="margin:8px 0 4px">已準備明細</div>'+prep);}
@@ -1118,7 +1197,10 @@ function projection(c){
   var finIncome=sum(c.incomes,function(i){return (i.type==='理財'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0})+assetPassive(c);
   var otherIncome=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
   var income=workIncome+finIncome+otherIncome;
-  var expense=sum(c.expenses,function(e){return (age>=n(e.start)&&age<=n(e.end))?n(e.amount)*(e.infl?Math.pow(1+infl,t):1):0});
+  // 三段式：w＝已退休賺薪成員的支出比例權重。生活/消費依 w 從工作期換到退休期。
+  var inflF=Math.pow(1+infl,t);
+  var w=retiredWeight(c,age);
+  var expense=workPhaseExpense(c,age,inflF,w);
   var debt=sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;var el=(age-sa)*12;return (age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0});
   var goalOut=sum(c.goals,function(gg){if(age<n(gg.start)||age>n(gg.end))return 0;
     var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;
@@ -1126,7 +1208,7 @@ function projection(c){
     return n(gg.present)*Math.pow(1+gr,t);});
   var edu=eduByYear[age]||0;
   var life=lifestyleFactor(c,age,Math.pow(1+infl,t));
-  var retireDraw=(age>n(c.profile.retireAge))? n(c.retire&&c.retire.monthLiving)*12*Math.pow(1+infl,t):0;
+  var retireDraw=retireAnnual(c,age,inflF)*w;
   var bal=income-expense-debt-goalOut-edu-life-retireDraw;
   invest=(invest>0?invest*(1+ret):invest)+bal;
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
@@ -1163,12 +1245,13 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
    var other=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount):0});
    var fin=sum(c.incomes,function(i){return (i.type==='理財'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount):0})+passive;
    var income=work+other+fin;
-   var expense=sum(c.expenses,function(e){return (age>=n(e.start)&&age<=n(e.end))?n(e.amount)*(e.infl?cumI:1):0});
+   var wMC=retiredWeight(c,age);
+   var expense=workPhaseExpense(c,age,cumI,wMC);
    var debt=sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;var el=(age-sa)*12;return (age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0});
    var goalOut=sum(c.goals,function(gg){if(age<n(gg.start)||age>n(gg.end))return 0;var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;var gr=gg.growth==='通膨'?cumI:1;return n(gg.present)*gr});
    var eduY=edu[age]||0;
    var lifeY=lifestyleFactor(c,age,cumI);
-   var retireDraw=(age>n(c.profile.retireAge))?n(c.retire&&c.retire.monthLiving)*12*cumI:0;
+   var retireDraw=retireAnnual(c,age,cumI)*wMC;
    invest=(invest>0?invest*(1+ret):invest)+(income-expense-debt-goalOut-eduY-lifeY-retireDraw);
    if(invest<0)broke=true;
    traj.push(invest);
@@ -1395,13 +1478,16 @@ function allocInfo(c){var al=(c.plan&&c.plan.allocations)||[];
 function scenario(c){
  var after=JSON.parse(JSON.stringify(c));
  after.profile.retireAge=n(c.profile.retireAge)+n((c.plan||{}).retireDelay);
+ // 延後退休要連配偶等賺薪成員一起推，否則三段權重會停在原本的切換點。
+ (after.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&n(m.retireAge)>0)m.retireAge=n(m.retireAge)+n((c.plan||{}).retireDelay);});
  // 延後退休：延長工作收入到新退休年齡
  after.incomes.forEach(function(i){if(i.type==='工作'&&n(i.end)<after.profile.retireAge)i.end=after.profile.retireAge});
  var before={metrics:metrics(c),retire:retireNeed(c),health:health(c),estate:estateTax(c),incomeTax:incomeTax(c)};
  var mAfter=metrics(after);
  var netAfter=mAfter.net-n((c.plan||{}).movableToOverseas); // 資產移轉降低境內帳面淨值(遺產稅基)
  var after2={metrics:mAfter,retire:retireNeed(after),health:health(after),estate:estateTax(after,netAfter),incomeTax:incomeTax(after)};
- return {before:before,after:after2};
+ // afterCase＝套用方案後的完整個案（延後退休已推到每位賺薪成員），供測試與明細追溯。
+ return {before:before,after:after2,afterCase:after};
 }
 /* ===== 財務十字表 ===== */
 function crossTable(c){var m=metrics(c);
@@ -1511,6 +1597,7 @@ function addRow(arr){var c=activeCase();if(!c)return;
  incomes:function(){return {name:'',owner:m0.name||'',type:'工作',subType:'薪資',period:'年',amount:0,growth:0,start:A,end:65}},
  expenses:function(){return {name:'',cat:'生活',period:'年',amount:0,infl:true,start:A,end:85,cut:0}},
  savings:function(){return {name:'',cat:'儲蓄理財',subCat:'',period:'月',amount:0,start:A,end:65}},
+ retireExpenses:function(){return {name:'',cat:'生活',subCat:'',period:'年',amount:0,infl:true,startAge:'',endAge:''}},
  assets:function(){return {name:'',owner:m0.name||'',mainCat:'可投資資產',type:'現金',cls:'流動',region:'台灣',currency:'台幣',fxRate:1,cost:0,value:0,ret:0,income:0,movable:true}},
  liabilities:function(){return {name:'',owner:m0.name||'',mainCat:'房貸',currency:'台幣',fxRate:1,balance:0,rate:0,repay:'本息攤還',pay:0,months:0,grace:0,startAge:A}},
  education:function(){return {child:kid.name||'',stage:'大學',schoolType:'公立',annual:0,years:4,startIn:0}},
@@ -1832,6 +1919,9 @@ function personCard(c,m,idx,isPrimary){
   var noEmp=isNoEmployerJob(jt);
   var salField=(jt==='企業主'||noEmp)?'':'<div class="f"><label>月薪(投保計算用)</label><input type="number" value="'+esc(sal==null?'':sal)+'" '+salAttr+'></div>';
   var insField=insSalaryField(m,idx)+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES);
+  // 每位賺薪成員各有自己的退休時點——三段式金流就是靠這個算的。
+  // 本人的仍存在 profile.retireAge（身分資料那一格），這裡只補其他賺薪成員。
+  if(!isPrimary)insField+=fFld(mb('retireAge','num'),'預計退休年齡',m.retireAge,'num');
   var hint=(jt==='企業主')?'<div class="hint" style="margin-top:6px">企業主投保多自行維持，月投保薪資請於上方手填。</div>'
     :noEmp?'<div class="hint" style="margin-top:6px">'+esc(jt)+'沒有雇主，預設以<b>國民年金</b>投保（月投保金額 '+fmt(NP_INSURED_MONTHLY)+' 元，'+NP_YEAR+' 年起），不計勞退提繳。'+(jt==='投資者'?' 投資／理財所得請於「收支資債」以<b>理財收入</b>登錄，不列為薪資。':'')+'</div>'
     :'<div class="hint" style="margin-top:6px">依 '+LABOR_YEAR_TXT+' 勞保投保薪資分級表自動帶入（級距天花板 45,800，可下拉改選或手填）。'+(jt==='業務工作者'?' 業務工作者收入常浮動、多以職業工會投保。':'')+'</div>';
@@ -1962,16 +2052,119 @@ function expensesSec(c){
  var note=(app.ownerView&&app.ownerView!=='全家')?'<div class="hint" style="margin-bottom:6px;color:var(--amber2)">目前為「'+esc(app.ownerView)+'」視角；支出屬家庭層級、不分持有人，以下仍顯示全部。</div>':'';
  return '<div class="sec"><h4>支出 <button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></h4>'+note+'<table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table><div class="hint">金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。</div></div>';
 }
+// ===== 退休分頁 =====
+// ① 退休時點（每位賺薪成員各一個）② 退休期支出明細表 ③ 三段對照
+// 這裡不設「家庭都退休了」的開關——都退休只是第二個人退休之後的那一段，
+// 金流本來就由每個人自己的退休時點推出來。
+
+// 把三段（或兩段／四段）切出來：以「本人年齡」為時間軸的區段清單。
+function retirePhaseSegs(c){
+ var a0=n(c.profile.age),le=n(c.profile.lifeExp)||n(c.params.horizon)||85;
+ var pts=earnerRetirePoints(c).slice().sort(function(x,y){return x.at-y.at;});
+ var bounds=[];
+ pts.forEach(function(p){if(p.at>=a0&&p.at<le&&bounds.indexOf(p.at)<0)bounds.push(p.at);});
+ var segs=[],st=a0;
+ for(var i=0;i<bounds.length;i++){segs.push([st,bounds[i]]);st=bounds[i]+1;}
+ segs.push([st,le]);
+ return segs.filter(function(g){return g[1]>=g[0];}).map(function(g){
+  var w=retiredWeight(c,g[0]);
+  var retired=pts.filter(function(p){return g[0]>p.at;}).map(function(p){return p.name||'（未命名）';});
+  var work=sum(c.incomes,function(x){return (x.type==='工作'&&g[0]>=n(x.start)&&g[0]<=n(x.end))?n(x.amount):0;});
+  var living=0;(c.expenses||[]).forEach(function(e){if(g[0]>=n(e.start)&&g[0]<=n(e.end)&&isLivingCat(e.cat))living+=n(e.amount);});
+  var famLiving=living*(1-w)+retireAnnual(c,g[0],1)*w;
+  var label=w<=0?'工作期':(w>=1?'全退休':'混合期');
+  return {from:g[0],to:g[1],w:w,retired:retired,work:work,famLiving:famLiving,label:label};
+ });
+}
+function retirePhaseHTML(c){
+ var segs=retirePhaseSegs(c);
+ var pts=earnerRetirePoints(c);
+ var noShare=pts.length&&pts.reduce(function(t,p){return t+p.share;},0)<=0;
+ var rows=segs.map(function(g){
+  var who=g.retired.length?g.retired.join('、')+' 已退休':'全員仍在工作';
+  return '<tr><td class="k">'+g.label+'</td><td>'+g.from+'–'+g.to+' 歲</td>'+
+   '<td class="muted" style="font-size:11.5px">'+esc(who)+'</td>'+
+   '<td>'+Math.round(g.w*100)+'%</td>'+
+   '<td class="calc">'+fmt(g.famLiving)+'</td>'+
+   '<td class="calc">'+fmt(g.work)+'</td></tr>';
+ }).join('');
+ var ptTxt=pts.length?pts.slice().sort(function(x,y){return x.at-y.at;}).map(function(p){
+   return esc(p.name||'—')+'（本人 '+p.at+' 歲時，支出比例 '+Math.round(p.share)+'%）';
+  }).join(' → '):'尚未設定任何賺薪成員的退休年齡';
+ var warn=noShare?'<div class="hint" style="color:var(--amber2);margin-top:6px">⚠ 成員卡的「支出比例%」都是 0，目前退回「本人退休即全面切換」。要跑出混合期，請到家庭分頁把本人與配偶的支出比例填上。</div>':'';
+ return '<div class="sec"><h4>退休時點 <span class="hint">每位賺薪成員各一個；「都退休」只是第二個人退休之後的那一段</span></h4>'+
+  '<div class="hint" style="margin-bottom:8px">退休順序：'+ptTxt+'</div>'+
+  '<table class="rtable"><tr><th>階段</th><th>本人年齡</th><th>狀態</th><th>已退休權重</th><th>家庭年生活費(現值)</th><th>工作收入(現值)</th></tr>'+
+  (rows||'<tr><td colspan="6" class="muted" style="padding:12px">先在家庭分頁填每位賺薪成員的預計退休年齡。</td></tr>')+'</table>'+
+  '<div class="hint" style="margin-top:8px">家庭年生活費＝工作期生活消費×(1−權重) ＋ 退休期支出×權重。權重取自成員卡的「支出比例%」——本人 40%、配偶 30% 時，配偶先退休那段的權重就是 43%。</div>'+warn+'</div>';
+}
+
+// 退休期支出明細表（＝賺薪成員都退休後的家庭年支出）
+function retireExpTable(c){
+ c.retireExpenses=c.retireExpenses||[];
+ var ra=n(c.profile.retireAge),le=n(c.profile.lifeExp);
+ var head='<tr><th>項目</th><th>分類</th><th>細項</th><th>週期</th><th>金額</th><th>年化</th><th>通膨</th><th>起歲</th><th>訖歲</th><th></th></tr>';
+ var CATS=CAT_PARENTS.expense;
+ var rows=c.retireExpenses.map(function(x,i){var per=x.period||'年';
+  var cSel=CATS.map(function(ct){return '<option '+((x.cat||'生活')===ct?'selected':'')+'>'+ct+'</option>'}).join('');
+  var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
+  var ageIn=function(k,ph){return '<input type="number" placeholder="'+ph+'" value="'+esc(x[k]==null?'':x[k])+'" onchange="set(\'retireExpenses:'+i+'\',\''+k+'\',this.value,\'num\');render()">';};
+  return '<tr '+dropAttrs('retireExpenses',i)+'>'+
+   '<td>'+finName('retireExpenses',i,'expense',x)+'</td>'+
+   '<td><select onchange="set(\'retireExpenses:'+i+'\',\'cat\',this.value)">'+cSel+'</select></td>'+
+   '<td>'+catCell('retireExpenses',i,'expense',x)+'</td>'+
+   '<td><select onchange="setAmtPeriod(\'retireExpenses\','+i+',this.value)">'+pSel+'</select></td>'+
+   '<td>'+moneyCell('oninput="setAmtByPeriodLive(\'retireExpenses\','+i+',this.value)" onchange="setAmtByPeriod(\'retireExpenses\','+i+',this.value);render()"',shownAmt(x))+'</td>'+
+   '<td class="calc" data-fincalc="retireExpenses:'+i+'">'+fmt(n(x.amount))+'</td>'+
+   '<td style="text-align:center"><input type="checkbox" '+(x.infl!==false?'checked':'')+' onchange="set(\'retireExpenses:'+i+'\',\'infl\',this.checked,\'bool\')"></td>'+
+   '<td>'+ageIn('startAge',String(ra||'退休'))+'</td>'+
+   '<td>'+ageIn('endAge',String(le||'終老'))+'</td>'+
+   '<td class="acts">'+dragHandle('retireExpenses',i)+'<button class="del" onclick="delRow(\'retireExpenses\','+i+')">✕</button></td></tr>';
+ }).join('');
+ var tot=sum(c.retireExpenses,function(x){return n(x.amount);});
+ return '<table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:12px">尚無資料。按「依工作期帶入」一鍵複製，或點「＋ 新增」逐列填。留空時系統會退回上面的「期望退休月生活費」。</td></tr>')+'</table>'+
+  '<div class="hint" style="margin-top:6px">合計 <b>'+fmt(tot)+'</b> 元/年（現值）。起歲留空＝從本人退休（'+(ra||'—')+' 歲）起、訖歲留空＝到預估壽命（'+(le||'—')+' 歲）。照護費 80 歲後才上來、旅遊只到 75 歲，就逐列設起訖歲。</div>';
+}
+// 一鍵把工作期的生活＋消費列複製過來乘上取代率。不自動觸發，免得洗掉已經調好的。
+function fillRetireFromWork(){
+ var c=activeCase();if(!c)return;
+ var rate=n((c.retire||{}).replaceRate)||75;
+ var src=(c.expenses||[]).filter(function(e){return isLivingCat(e.cat);});
+ if(!src.length){alert('工作期還沒有生活／消費類的支出可以帶入。');return;}
+ if((c.retireExpenses||[]).length&&!confirm('這會覆蓋現有的 '+c.retireExpenses.length+' 列退休期支出，確定？'))return;
+ c.retireExpenses=src.map(function(e){
+  return {name:e.name||'',cat:e.cat,subCat:e.subCat||'',period:'年',
+   amount:Math.round(n(e.amount)*rate/100),infl:e.infl!==false,startAge:'',endAge:''};
+ });
+ save();render();
+}
+function retireExpSec(c){
+ var r=c.retire||{};
+ var rate=n(r.replaceRate)||75;
+ return '<div class="sec"><h4>退休期支出明細 <span class="hint">賺薪成員都退休後的家庭年支出；混合期系統自動按權重取比例</span>'+
+  '<button class="add" onclick="addRow(\'retireExpenses\')">＋ 新增</button>'+sortBtn('retireExpenses','expense')+
+  '</div><div class="fgrid" style="margin-bottom:8px">'+
+  fFld('onchange="setRetire(\'replaceRate\',this.value,\'num\')"','所得替代率 %（帶入用）',rate,'num')+
+  '<div class="f"><label>&nbsp;</label><button class="tbtn amber" onclick="fillRetireFromWork()">↓ 依工作期帶入（'+rate+'%）</button></div>'+
+  '</div>'+retireExpTable(c)+'</div>';
+}
+
 function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
+ var hasList=!!((c.retireExpenses||[]).length);
  var pf=[['monthLiving','期望退休月生活費(現值)','num'],['retireReturn','退休後報酬率%','num'],['retireInflation','退休後通膨%','num']]
   .map(function(x){return '<div class="f"><label>'+x[1]+'</label><input type="number" value="'+esc(r[x[0]])+'" onchange="setRetire(\''+x[0]+'\',this.value,\'num\');render()"></div>'}).join('');
+ var srcNote=hasList
+  ? '<div class="hint" style="margin:-4px 0 9px;color:var(--ok)">退休需求已改吃下方的「退休期支出明細」（'+(c.retireExpenses||[]).length+' 列）；上面的「期望退休月生活費」只在明細表清空時才會被用到。</div>'
+  : '<div class="hint" style="margin:-4px 0 9px">目前用「期望退休月生活費」單一數字估算。到下方填退休期支出明細，就能分項規劃（醫療、照護、旅遊各自的起訖歲）。</div>';
  var prep=tableSec('已準備退休金','prepared',r.prepared||[],[['item','項目','text'],['age','領取年齡','num'],['amount','金額','money'],['method','方式','sel:一次領,月領']]);
- return '<div class="sec"><h4>退休規劃需求試算 <span class="hint">現值月生活費 → 終值 → 年金現值總需求</span></h4><div class="fgrid">'+pf+'</div>'+
+ return retirePhaseHTML(c)+
+  '<div class="sec"><h4>退休規劃需求試算 <span class="hint">退休當年家庭年支出(終值) → 逐年折現 → 總需求</span></h4><div class="fgrid">'+pf+'</div>'+srcNote+
   '<div class="big3"><div class="b"><div class="l">退休後餘年</div><div class="v">'+rn.余年+' 年</div></div>'+
   '<div class="b"><div class="l">退休月生活費(終值)</div><div class="v">'+fmt(rn.monthFV)+'</div></div>'+
   '<div class="b"><div class="l">預估退休總需求</div><div class="v">'+fmt(rn.total)+'</div></div>'+
   '<div class="b"><div class="l">已準備退休金</div><div class="v">'+fmt(rn.prepared)+'</div></div>'+
-  '<div class="b"><div class="l" style="color:var(--warn)">退休缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div>'+retireDetailHTML(c)+'</div>'+laborPensionBox(c)+laborDetailHTML(c)+prep;
+  '<div class="b"><div class="l" style="color:var(--warn)">退休缺口</div><div class="v" style="color:'+(rn.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(rn.gap)+'</div></div></div>'+retireDetailHTML(c)+'</div>'+
+  retireExpSec(c)+laborPensionBox(c)+laborDetailHTML(c)+prep;
 }
 // 社會保險老年給付 + 勞退新制 概算（供退休已備參考；非精算，可手動覆寫）
 // 依「本人」的投保類型分流：勞保系 → 勞保老年年金 B式 1.55% ＋ 勞退新制；
@@ -2345,7 +2538,11 @@ function crossTableHTML(x){
 }
 function timelineHTML(c,theme){var A=n(c.profile.age);var evs=[];
  (c.goals||[]).forEach(function(g){evs.push({age:n(g.start),label:g.name})});
- if(c.retire&&n(c.retire.monthLiving)>0)evs.push({age:n(c.profile.retireAge),label:'退休'});
+ if((c.retire&&n(c.retire.monthLiving)>0)||((c.retireExpenses||[]).length)){
+  var rp=earnerRetirePoints(c);
+  if(rp.length)rp.forEach(function(pt){evs.push({age:pt.at,label:(pt.name||'')+' 退休'})});
+  else evs.push({age:n(c.profile.retireAge),label:'退休'});
+ }
  (c.education||[]).forEach(function(e){evs.push({age:A+n(e.startIn),label:'教育·'+e.stage})});
  [].concat(c.travel||[],c.hobby||[],c.luxury||[]).forEach(function(x){evs.push({age:n(x.start),label:(x.cat||'')+(x.sub||'願望')})});
  if(!evs.length)return '<div class="muted" style="color:'+(theme==='light'?'#5a6b72':'')+'">尚無目標</div>';
@@ -2581,7 +2778,7 @@ function tabFilled(c,tab){
  if(tab==='coverage')return ((c.policies||[]).length+(c.coverages||[]).length)>0;
  if(tab==='credit')return n((c.credit||{}).cards)>0||!!(c.credit||{}).score||(c.overseas||{}).hasAssets==='是';
  if(tab==='tax')return !!(c.taxParams&&Object.keys(c.taxParams).length)&&(n((c.taxParams||{}).dependents)>0||!!(c.taxParams||{}).married||n((c.taxParams||{}).houseAssessed)>0||n((c.taxParams||{}).otherDeduction)>0);
- if(tab==='retire')return n((c.profile||{}).retireAge)>0&&n((c.retire||{}).monthLiving)>0;
+ if(tab==='retire')return n((c.profile||{}).retireAge)>0&&(n((c.retire||{}).monthLiving)>0||((c.retireExpenses||[]).length>0));
  if(tab==='education')return ((c.education||[]).length>0)||((c.children||[]).length>0);
  if(tab==='goals')return (c.goals||[]).some(function(g){return n(g.present)>0});
  if(tab==='intent')return n((c.legacy||{}).heirs)>0||(c.career||{}).plan!=='無'||(c.marriage||{}).plan==='是';
@@ -3036,15 +3233,17 @@ function finTotals(c){
  var sav=sum(c.savings,function(x){return n(x.amount)});
  return {inc:inc,exp:exp,sav:sav,ast:ast,lia:lia,bal:inc-exp-sav,net:ast-lia};
 }
-function syncFinSummary(){var probe=document.getElementById('finSum_inc');if(!probe)return;var c=activeCase();if(!c)return;var t=finTotals(c);
+function syncFinSummary(){var c=activeCase();if(!c)return;
+ // 逐列衍生欄（年化 / 台幣值）先做——退休期支出表不在四合一面板裡，
+ // 但用的是同一個 data-fincalc 機制，被下面那道 probe 擋住就永遠不更新。
+ document.querySelectorAll('[data-fincalc]').forEach(function(el){var q=el.getAttribute('data-fincalc').split(':');
+  var x=(c[q[0]]||[])[+q[1]];if(x)el.textContent=fmt(finRowVal(q[0],x));});
+ var probe=document.getElementById('finSum_inc');if(!probe)return;var t=finTotals(c);
  function T(id,v){var e=document.getElementById(id);if(e)e.textContent=fmt(v);}
  function S(id,v){var e=document.getElementById(id);if(e){e.textContent=fmt(v);e.className='v big '+(v>=0?'pos':'neg');}}
  T('finSum_inc',t.inc);T('finSum_exp',t.exp);S('finSum_bal',t.bal);
  T('finSum_ast',t.ast);T('finSum_lia',t.lia);S('finSum_net',t.net);
  T('finSub_inc',t.inc);T('finSub_exp',t.exp);T('finSub_ast',t.ast);T('finSub_lia',t.lia);T('finSub_sav',t.sav);T('finSum_sav',t.sav);
- // 逐列衍生欄（年化 / 台幣值）
- document.querySelectorAll('[data-fincalc]').forEach(function(el){var q=el.getAttribute('data-fincalc').split(':');
-  var x=(c[q[0]]||[])[+q[1]];if(x)el.textContent=fmt(finRowVal(q[0],x));});
  // 依持有人分組的小計
  document.querySelectorAll('[data-fingrp]').forEach(function(el){var q=el.getAttribute('data-fingrp').split('|');
   var arr=q[0],own=q[1],s=0;
