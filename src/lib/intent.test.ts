@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  PURPOSES, TARGETS, TARGET_META, ALL_SIM, DEFAULT_TARGET, BASE_TABS,
-  normalizeIntent, defaultIntent, goalTabs,
+  PURPOSES, TARGETS, TARGET_META, ALL_SIM, DEFAULT_TARGET, BASE_TABS, BIZ_BASE_TABS,
+  normalizeIntent, defaultIntent, goalTabs, baseTabs, visibleTargetMeta, PURPOSE_TO_ENTITY,
 } from "./intent";
 
 describe("normalizeIntent · 舊資料遷移", () => {
@@ -68,8 +68,65 @@ describe("defaultIntent / goalTabs", () => {
   });
 
   it("每個目標的 tab 都指向真實存在的分頁 id", () => {
-    const known = new Set(["intent", "goals", "education", "retire", "family", "finance", "coverage", "credit", "tax", "lifestyle"]);
+    const known = new Set([
+      "intent", "goals", "education", "retire", "family", "finance", "coverage", "credit", "tax", "lifestyle",
+      "company", "linkage", "bizgate", "bizcomp", "bizrisk", "bizexit",
+    ]);
     for (const m of TARGET_META) expect(known.has(m.tab)).toBe(true);
+  });
+});
+
+// ── 企業主體（2026-08-22）──
+describe("entities · 企業主體", () => {
+  const biz = TARGET_META.filter((m) => m.entity === "company").map((m) => m.name);
+
+  it("新客戶不開任何額外主體", () => {
+    expect(defaultIntent().entities).toEqual({});
+  });
+
+  it("舊資料沒有 entities 欄位也不會炸，正規化成空物件", () => {
+    expect(normalizeIntent({ purposes: [], targets: [], mustHave: [] }).entities).toEqual({});
+  });
+
+  it("只留認得的 key，值一律 boolean", () => {
+    const r = normalizeIntent({ purposes: [], targets: [], mustHave: [], entities: { company: 1, ghost: true } as never });
+    expect(r.entities).toEqual({ company: true });
+  });
+
+  it("主體沒開時，企業目標選不到、也留不住（避免優先序 index 對不上）", () => {
+    const r = normalizeIntent({ purposes: [], targets: biz, mustHave: biz });
+    expect(r.mustHave).toEqual([]);
+    expect(visibleTargetMeta(r).map((m) => m.name)).not.toContain(biz[0]);
+  });
+
+  it("主體開了，企業目標就留得住且看得到", () => {
+    const r = normalizeIntent({ purposes: [], targets: biz, mustHave: biz, entities: { company: true } });
+    expect(r.mustHave).toEqual(biz);
+    expect(visibleTargetMeta(r).map((m) => m.name)).toEqual(expect.arrayContaining(biz));
+  });
+
+  it("勾對應議題＝自動開主體（客戶端沒有開關，這是唯一路徑）", () => {
+    const p = Object.keys(PURPOSE_TO_ENTITY)[0];
+    const r = normalizeIntent({ purposes: [p], targets: [], mustHave: [] });
+    expect(r.entities.company).toBe(true);
+  });
+
+  it("baseTabs：主體開了才追加第 ④ 群，且不動原本五頁", () => {
+    expect(baseTabs(null)).toEqual(BASE_TABS);
+    expect(baseTabs({ entities: {} })).toEqual(BASE_TABS);
+    expect(baseTabs({ entities: { company: true } })).toEqual(BASE_TABS.concat(BIZ_BASE_TABS));
+  });
+
+  it("goalTabs 不會帶出主體沒開的分頁", () => {
+    expect(goalTabs(biz)).toEqual([]);
+    const on = { entities: { company: true } };
+    expect(goalTabs(biz, on).map((t) => t.tab)).toEqual(["bizcomp", "bizrisk", "bizexit"]);
+  });
+
+  it("冪等：帶 entities 跑兩次結果相同", () => {
+    const once = normalizeIntent({ purposes: ["想處理公司與個人的財務界線"], targets: biz, mustHave: biz });
+    const twice = normalizeIntent(JSON.parse(JSON.stringify(once)));
+    expect(twice).toEqual(once);
   });
 });
 
@@ -93,20 +150,33 @@ describe("lantu-app.html 常數與 intent.ts 一致", () => {
     expect(rows.map((r) => r[0])).toEqual(TARGETS);
   });
 
-  it("TARGET_META 的 tab / 分頁名 / goalType 兩邊一致", () => {
+  it("TARGET_META 的 tab / 分頁名 / goalType / 主體 兩邊一致", () => {
     const rows = pick("TARGET_META").split("],").map((r) => strings(r)).filter((r) => r.length);
     rows.forEach((r, i) => {
       expect(r[1]).toBe(TARGET_META[i].tab);
       expect(r[2]).toBe(TARGET_META[i].tabName);
       expect(r[3]).toBe(TARGET_META[i].hint);
-      expect(r[4] ?? undefined).toBe(TARGET_META[i].goalType);
+      // html 端沒有 goalType 時寫成 ''（因為後面還有主體欄），所以用 || 收斂成 undefined
+      expect(r[4] || undefined).toBe(TARGET_META[i].goalType);
+      expect(r[5] || undefined).toBe(TARGET_META[i].entity);
     });
   });
 
-  it("BASE_TABS 兩邊一致", () => {
-    const rows = pick("BASE_TABS").split("],").map((r) => strings(r)).filter((r) => r.length);
-    expect(rows.map((r) => r[0])).toEqual(BASE_TABS.map((b) => b.tab));
-    expect(rows.map((r) => r[1])).toEqual(BASE_TABS.map((b) => b.tabName));
+  it("BASE_TABS / BIZ_BASE_TABS 兩邊一致", () => {
+    const cmp = (name: string, ts: { tab: string; tabName: string }[]) => {
+      const rows = pick(name).split("],").map((r) => strings(r)).filter((r) => r.length);
+      expect(rows.map((r) => r[0])).toEqual(ts.map((b) => b.tab));
+      expect(rows.map((r) => r[1])).toEqual(ts.map((b) => b.tabName));
+    };
+    cmp("BASE_TABS", BASE_TABS);
+    cmp("BIZ_BASE_TABS", BIZ_BASE_TABS);
+  });
+
+  it("PURPOSE_TO_ENTITY 兩邊一致", () => {
+    const m = html.match(/var PURPOSE_TO_ENTITY=\{([\s\S]*?)\};/);
+    if (!m) throw new Error("lantu-app.html 找不到 PURPOSE_TO_ENTITY");
+    const pairs = Array.from(m[1].matchAll(/'([^']*)':'([^']*)'/g)).map((x) => [x[1], x[2]]);
+    expect(Object.fromEntries(pairs)).toEqual(PURPOSE_TO_ENTITY);
   });
 
   it("ALL_SIM / DEFAULT_TARGET 兩邊一致", () => {

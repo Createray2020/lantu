@@ -1,24 +1,41 @@
 "use client";
 
-import { PURPOSES, TARGET_META, ALL_SIM, DEFAULT_TARGET, type Intent } from "@/lib/intent";
+import { PURPOSES, ALL_SIM, DEFAULT_TARGET, PURPOSE_TO_ENTITY, visibleTargetMeta, type Intent } from "@/lib/intent";
 
 // 客戶端「你想解決什麼」：關注議題（多選）＋人生目標（二態：選了＝必須達成）＋拖曳優先序。
 // 手機為主，所以拖曳一定配 ◀ ▶ 按鈕，不能只靠拖。
 export default function IntentPicker({ value, onChange }: { value: Intent; onChange: (next: Intent) => void }) {
   const must = value.mustHave;
+  // ⚠️ 一律用 ...value 開頭：intent 上還有 entities（企業主體），漏掉會在每次勾選時把它洗掉。
   const set = (next: Partial<Intent>) => {
     const m = next.mustHave ?? must;
-    onChange({ purposes: next.purposes ?? value.purposes, mustHave: m, targets: m.slice() });
+    onChange({ ...value, ...next, mustHave: m, targets: m.slice() });
   };
+
+  // 企業主體開了才看得到企業目標；勾「想處理公司與個人的財務界線」就會自動開（見 intent.ts）。
+  const entities = value.entities || {};
+  const metas = visibleTargetMeta({ entities });
+  const allNames = () => metas.map((t) => t.name);
 
   const togglePurpose = (p: string) => {
     const i = value.purposes.indexOf(p);
     if (i < 0) {
       const purposes = [...value.purposes, p];
+      const ek = PURPOSE_TO_ENTITY[p];
+      const ent = ek ? { ...entities, [ek]: true } : entities;
       // 勾「人生模擬」＝目標全選（要跑完整一生金流，就是把所有目標打開）
-      set(p === ALL_SIM ? { purposes, mustHave: TARGET_META.map((t) => t.name) } : { purposes });
+      set(p === ALL_SIM
+        ? { purposes, entities: ent, mustHave: visibleTargetMeta({ entities: ent }).map((t) => t.name) }
+        : { purposes, entities: ent });
     } else {
-      set({ purposes: value.purposes.filter((x) => x !== p) });
+      const purposes = value.purposes.filter((x) => x !== p);
+      // 取消議題要一併關掉它帶出來的主體，否則 normalizeIntent 下一輪又會打開
+      const ek = PURPOSE_TO_ENTITY[p];
+      const stillOn = ek && purposes.some((x) => PURPOSE_TO_ENTITY[x] === ek);
+      const ent = ek && !stillOn ? { ...entities, [ek]: false } : entities;
+      // 主體關掉 → 它帶出的目標退出必達清單，否則優先序的 index 會對不上（拖曳排錯人）
+      const names = new Set(visibleTargetMeta({ entities: ent }).map((m) => m.name));
+      set({ purposes, entities: ent, mustHave: must.filter((t) => names.has(t)) });
     }
   };
 
@@ -46,7 +63,7 @@ export default function IntentPicker({ value, onChange }: { value: Intent; onCha
 
   const selectAll = () =>
     set({
-      mustHave: TARGET_META.map((t) => t.name),
+      mustHave: allNames(),
       purposes: value.purposes.includes(ALL_SIM) ? value.purposes : [...value.purposes, ALL_SIM],
     });
 
@@ -79,7 +96,7 @@ export default function IntentPicker({ value, onChange }: { value: Intent; onCha
         </button>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
-        {TARGET_META.map((m) => {
+        {metas.map((m) => {
           const i = must.indexOf(m.name);
           const on = i >= 0;
           return (
