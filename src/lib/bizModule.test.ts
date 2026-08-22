@@ -714,3 +714,103 @@ describe("bizCheck：客戶端十題檢核（公開頁）與教練端合規閘�
     }
   });
 });
+
+describe("五條資金通道 → 收支資債（顯式同步，不自動加總）", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withChannels = (): any => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.intent.mustHave = ["報酬結構優化"];
+    c.intent.targets = ["報酬結構優化"];
+    c.companies = [w.newCompany()];
+    c.profile.age = 45;
+    c.profile.retireAge = 60;
+    c.channels = [
+      { cid: c.companies[0].cid, kind: "薪資", annual: 1200000, withhold: "已辦", doc: "齊全", note: "" },
+      { cid: c.companies[0].cid, kind: "盈餘分配(股利)", annual: 800000, withhold: "不適用", doc: "齊全", note: "" },
+      { cid: c.companies[0].cid, kind: "租金", annual: 240000, withhold: "已辦", doc: "齊全", note: "" },
+      { cid: c.companies[0].cid, kind: "借款", annual: 500000, withhold: "不適用", doc: "齊全", note: "" },
+      { cid: c.companies[0].cid, kind: "費用報銷", annual: 100000, withhold: "不適用", doc: "齊全", note: "" },
+    ];
+    return c;
+  };
+
+  it("只有薪資／董監／股利／租金會變成所得；借款與報銷不是所得", () => {
+    const rows = w.channelIncomeRows(withChannels());
+    expect(rows.map((r: { src: string }) => r.src)).toEqual(["ch:薪資", "ch:盈餘分配(股利)", "ch:租金"]);
+    expect(rows.find((r: { src: string }) => r.src === "ch:借款")).toBeUndefined();
+  });
+
+  it("薪資走「工作」、股利與租金走「理財」，細類對得上字典", () => {
+    const rows = w.channelIncomeRows(withChannels());
+    expect(rows[0]).toMatchObject({ type: "工作", subType: "薪資", amount: 1200000, start: 45, end: 60 });
+    expect(rows[1]).toMatchObject({ type: "理財", subType: "事業盈餘分配" });
+    expect(rows[2]).toMatchObject({ type: "理財", subType: "租金收入" });
+  });
+
+  it("⚠️ 沒按同步鈕之前，通道一毛錢都不會進 c.incomes（不自動加總）", () => {
+    const c = withChannels();
+    c.incomes = [];
+    renderTab("bizcomp");
+    expect(c.incomes).toHaveLength(0);
+    expect(w.metrics(c).incTotal).toBe(0);
+  });
+
+  it("同步是冪等的：重跑只會取代帶標記的列，不會愈長愈多", () => {
+    const c = withChannels();
+    c.incomes = [{ name: "配偶薪資", owner: "配偶", type: "工作", subType: "薪資", amount: 600000, growth: 0, start: 45, end: 60 }];
+    const rows = w.channelIncomeRows(c);
+    // 模擬 syncChannels 的核心（避開 confirm 對話框）
+    const apply = () => { c.incomes = c.incomes.filter((i: { src?: string }) => String(i.src || "").indexOf("ch:") !== 0).concat(w.channelIncomeRows(c)); };
+    apply(); apply(); apply();
+    expect(c.incomes).toHaveLength(1 + rows.length);
+    expect(c.incomes.filter((i: { src?: string }) => i.src).length).toBe(rows.length);
+    expect(c.incomes[0].name).toBe("配偶薪資");   // 手動登錄的那筆不受影響
+  });
+
+  it("同步狀態卡：帶入前顯示「尚未同步」，帶入後顯示「已同步」", () => {
+    const c = withChannels();
+    c.incomes = [];
+    expect(w.channelSyncStatus(c).synced).toBe(false);
+    expect(renderTab("bizcomp")).toContain("尚未同步");
+
+    c.incomes = w.channelIncomeRows(c);
+    expect(w.channelSyncStatus(c).synced).toBe(true);
+    expect(w.channelSyncStatus(c).wantTotal).toBe(1200000 + 800000 + 240000);
+    expect(renderTab("bizcomp")).toContain("已同步");
+  });
+
+  it("畫面要明說系統不會偵測重複（這是唯一的防呆）", () => {
+    withChannels();
+    expect(renderTab("bizcomp")).toContain("系統不會自動偵測重複");
+  });
+});
+
+describe("法規常數可由後台覆蓋（applyBizTax）", () => {
+  it("後台改了營所稅率，試算就跟著變；改完再改回來也還原得了", () => {
+    const c = freshCase();
+    c.taxParams = { married: false, dependents: 0, otherDeduction: 0 };
+    const base = w.compScenario(c, { salary: 1000000, dividend: 0, rent: 0 });
+    w.applyBizTax({ values: { PROFIT_TAX_RATE: 0.15 }, basis: "2027-01" });
+    const changed = w.compScenario(c, { salary: 1000000, dividend: 0, rent: 0 });
+    expect(changed.corpSave).toBeLessThan(base.corpSave);
+    expect(w.bizBasisNote()).toContain("2027-01");
+    w.applyBizTax({ values: { PROFIT_TAX_RATE: BizTax.PROFIT_TAX_RATE }, basis: BizTax.BIZ_TAX_BASIS });
+    expect(w.compScenario(c, { salary: 1000000, dividend: 0, rent: 0 }).corpSave).toBeCloseTo(base.corpSave, 6);
+  });
+
+  it("⚠️ 後台誤刪或填壞一列，常數不會變成 NaN（否則試算會靜靜地算出一堆 NaN）", () => {
+    const before = w.compScenario(freshCase(), { salary: 1000000, dividend: 500000, rent: 0 });
+    w.applyBizTax({ values: { PROFIT_TAX_RATE: null, NHI_SUPP_RATE: "", DIVIDEND_SEPARATE_RATE: undefined, VAT_RATE: "壞掉的字" } });
+    const after = w.compScenario(freshCase(), { salary: 1000000, dividend: 500000, rent: 0 });
+    expect(Number.isFinite(after.corpSave)).toBe(true);
+    expect(Number.isFinite(after.nhi)).toBe(true);
+    expect(after.corpSave).toBeCloseTo(before.corpSave, 6);
+  });
+
+  it("payload 是空的或型別不對，直接略過不炸", () => {
+    expect(() => w.applyBizTax(null)).not.toThrow();
+    expect(() => w.applyBizTax("nope")).not.toThrow();
+    expect(() => w.applyBizTax({})).not.toThrow();
+  });
+});

@@ -577,7 +577,28 @@ var BIZ_STAGES=[
  ['成長期','股權設定、第一輪外部資金、單位經濟效益驗證'],
  ['擴張期','擴編、資本支出決策、財務基礎建設、長短期資金配置'],
  ['成熟期','IPO 或控股架構、傳承與退場規劃']];
-function bizBasisNote(){return '<div class="hint" style="margin-top:8px">法規資料基準：'+BIZ_TAX_BASIS+'。稅法與函釋時有修正，個案認定高度依賴具體事實。<b>本頁為結構試算，不構成稅務或法律建議</b>，實際執行請與客戶的記帳士／會計師共同確認。</div>'}
+function bizBasisNote(){return '<div class="hint" style="margin-top:8px">法規資料基準：'+esc(BIZ_TAX_BASIS)+'。稅法與函釋時有修正，個案認定高度依賴具體事實。<b>本頁為結構試算，不構成稅務或法律建議</b>，實際執行請與客戶的記帳士／會計師共同確認。</div>'}
+// 後台 /admin/categories 的「企業稅務法規常數」一存，這裡就會被覆蓋。
+// ⚠️ 只覆蓋「本來就存在、且是有限數字」的 key——後台誤刪或填壞一列，
+//    不能讓這裡的常數變成 undefined／NaN，那會讓試算靜靜地算出一堆 NaN 而沒有任何錯誤訊息。
+function applyBizTax(payload){
+ if(!payload||typeof payload!=='object')return;
+ var v=payload.values||{};
+ var setters={
+  PROFIT_TAX_RATE:function(x){PROFIT_TAX_RATE=x},UNDISTRIBUTED_RATE:function(x){UNDISTRIBUTED_RATE=x},
+  DIVIDEND_SEPARATE_RATE:function(x){DIVIDEND_SEPARATE_RATE=x},DIVIDEND_CREDIT_RATE:function(x){DIVIDEND_CREDIT_RATE=x},
+  DIVIDEND_CREDIT_CAP:function(x){DIVIDEND_CREDIT_CAP=x},NHI_SUPP_RATE:function(x){NHI_SUPP_RATE=x},
+  NHI_SUPP_MIN:function(x){NHI_SUPP_MIN=x},RENT_EXPENSE_RATE:function(x){RENT_EXPENSE_RATE=x},
+  VAT_RATE:function(x){VAT_RATE=x},CAR_DEPRECIATION_CAP:function(x){CAR_DEPRECIATION_CAP=x},
+  CAR_LEASE_DEPRECIATION_CAP:function(x){CAR_LEASE_DEPRECIATION_CAP=x},CAR_RENTAL_BIZ_CAP:function(x){CAR_RENTAL_BIZ_CAP=x},
+  PENALTY_VAT_MULT:function(x){PENALTY_VAT_MULT=x},PENALTY_VOUCHER_RATE:function(x){PENALTY_VOUCHER_RATE=x}
+ };
+ Object.keys(setters).forEach(function(k){
+  var x=Number(v[k]);
+  if(isFinite(x)&&v[k]!==null&&v[k]!==undefined&&v[k]!=='')setters[k](x);
+ });
+ if(payload.basis)BIZ_TAX_BASIS=String(payload.basis);
+}
 
 // ===== 企業主體 =====
 // 舊版只有 c.company（9 欄、不進任何計算）。2026/08/22 起改成 c.companies[] 陣列：
@@ -3408,6 +3429,70 @@ function compScenario(c,s){
   loanCapacity:salary*8,                       // 銀行常用的年收入倍數，粗估
   hasPension:salary>0};
 }
+/* 五條資金通道 → 收支資債的收入列。
+   刻意做成「按一下才寫入」而不是自動加總：教練很可能已經在收支資債登過一筆薪資，
+   自動加會靜靜地把同一筆錢算兩次，而畫面上完全看不出來。
+   同步方式＝先清掉所有帶 src='ch:*' 標記的列再重建，所以是冪等的；
+   代價是手動改過那幾列的欄位（成長率、起訖歲）會被蓋掉，按鈕的 confirm 有講。 */
+var CHANNEL_INCOME_MAP={
+ '薪資':{type:'工作',subType:'薪資',name:'公司薪資'},
+ '董監酬勞':{type:'工作',subType:'薪資',name:'董監事酬勞'},
+ '盈餘分配(股利)':{type:'理財',subType:'事業盈餘分配',name:'公司盈餘分配'},
+ '租金':{type:'理財',subType:'租金收入',name:'出租給公司的租金'}
+ // 借款（股東往來）與費用報銷不是所得，不進收入
+};
+function channelIncomeRows(c){
+ var pm=primaryMember(c)||{},age=n((c.profile||{}).age)||40;
+ var retire=n((c.profile||{}).retireAge)||n(pm.retireAge)||65;
+ var out=[];
+ (c.channels||[]).forEach(function(x){
+  var m=CHANNEL_INCOME_MAP[x.kind];if(!m||n(x.annual)<=0)return;
+  out.push({src:'ch:'+x.kind,name:m.name,owner:pm.name||'本人',type:m.type,subType:m.subType,
+   period:'年',amount:n(x.annual),growth:m.type==='工作'?2:0,start:age,end:m.type==='工作'?retire:n((c.params||{}).horizon)||85});
+ });
+ return out;
+}
+function syncChannels(){
+ var c=activeCase();
+ var rows=channelIncomeRows(c);
+ var had=(c.incomes||[]).filter(function(i){return String(i.src||'').indexOf('ch:')===0}).length;
+ if(!confirm('把五條資金通道帶進「收支資債」的收入表。\n\n'+
+  '・會先移除上一次帶入的 '+had+' 筆，再依目前的通道重建 '+rows.length+' 筆\n'+
+  '・手動改過的成長率／起訖歲會被蓋掉\n'+
+  '・借款與費用報銷不是所得，不會帶入\n\n'+
+  '⚠️ 如果你已經在收支資債自己登過同一筆薪資，請先刪掉，否則會算兩次。\n\n確定帶入嗎？'))return;
+ c.incomes=(c.incomes||[]).filter(function(i){return String(i.src||'').indexOf('ch:')!==0}).concat(rows);
+ save();render();
+}
+function channelSyncStatus(c){
+ var want=channelIncomeRows(c);
+ var wantTotal=sum(want,function(x){return n(x.amount)});
+ var linked=(c.incomes||[]).filter(function(i){return String(i.src||'').indexOf('ch:')===0});
+ var linkedTotal=sum(linked,function(i){return n(i.amount)});
+ var pm=primaryMember(c)||{};
+ var ownTotal=sum(c.incomes,function(i){return (i.owner===pm.name)?n(i.amount):0});
+ return {want:want,wantTotal:wantTotal,linked:linked,linkedTotal:linkedTotal,ownTotal:ownTotal,
+  synced:want.length===linked.length&&Math.abs(wantTotal-linkedTotal)<1};
+}
+function channelSyncHTML(c){
+ var s=channelSyncStatus(c);
+ if(!s.want.length&&!s.linked.length)return '';
+ var col=s.synced?'var(--ok)':'var(--amber2)';
+ return '<div style="margin-top:12px;padding:12px 14px;border-radius:8px;background:var(--card);border:1px solid var(--line)">'+
+  '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+   '<b style="font-size:13.5px">帶入收支資債</b>'+
+   '<span style="color:'+col+';font-size:12.5px;font-weight:700">'+(s.synced?'已同步':'尚未同步')+'</span>'+
+   '<span style="flex:1"></span>'+
+   '<button class="tbtn amber" onclick="syncChannels()">'+(s.linked.length?'重新帶入':'帶入收入表')+'</button>'+
+   (s.linked.length?'<button class="tbtn" onclick="jumpTab(\'finance\')">去看收支資債 →</button>':'')+'</div>'+
+  kvTbl([
+   ['可帶入的通道合計（薪資／董監／股利／租金）',s.wantTotal],
+   ['目前已帶入收入表的金額',s.linkedTotal],
+   ['收入表裡掛在「本人」名下的總額（含手動登錄）',s.ownTotal]
+  ])+
+  '<div class="hint" style="margin-top:6px">通道只有薪資、董監酬勞、股利、租金會變成<b>所得</b>；借款（股東往來）與費用報銷不是所得，不會帶入。'+
+  '<br>⚠️ 帶入前請先確認收支資債裡沒有自己登過同一筆薪資——<b>系統不會自動偵測重複</b>，兩邊都留著就會算兩次。</div></div>';
+}
 function bizCompSec(c){
  var co=mainCompany(c);
  var cur=(c.channels||[]);
@@ -3435,7 +3520,8 @@ function bizCompSec(c){
  return '<div class="folded" style="border-style:solid;border-color:rgba(143,192,163,.32);color:var(--mut);display:block">'+
    '企業主體 · 報酬結構<span>公司的錢合法變成你的錢只有五條路。規劃師的價值在於把五條放在一起做總稅負＋總保障＋總退休準備的最適化，而不是單看某一條。</span></div>'+
   '<div class="sec"><h4>現況 · 五條通道 <span class="hint">來自「公私勾稽」分頁的逐筆登錄</span></h4>'+curRow+
-   (cur.length?'':'<div class="hint" style="margin-top:6px">尚未登錄任何通道。<button class="tbtn" onclick="jumpTab(\'linkage\')">前往公私勾稽 →</button></div>')+'</div>'+
+   (cur.length?'':'<div class="hint" style="margin-top:6px">尚未登錄任何通道。<button class="tbtn" onclick="jumpTab(\'linkage\')">前往公私勾稽 →</button></div>')+
+   channelSyncHTML(c)+'</div>'+
   tbl+
   '<div class="sec"><h4>組合對照 <span class="hint">同一筆錢，走不同通道的六個面向差異</span></h4>'+
    '<div class="tw"><table class="rtable">'+head+rows+'</table></div>'+
@@ -5174,6 +5260,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
         if(!d)return;
         if(d.cats)window.LANTU_CATS=d.cats;
         if(d.edu&&d.edu.length)window.LANTU_EDU_COSTS=d.edu;
+        if(d.biz){window.LANTU_BIZTAX=d.biz;try{applyBizTax(d.biz)}catch(e){}}
         try{ if(typeof render==='function')render(); }catch(e){}
       })
       .catch(function(){});

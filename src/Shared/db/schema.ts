@@ -643,3 +643,23 @@ export const eduCostParams = pgTable('edu_cost_params', {
   source: text('source'),                    // 資料來源註記（後台顯示，避免數字來歷不明）
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// 企業／稅務法規常數（平台級，只有 admin 能改；見 /admin/categories 的第三區）。
+//
+// 為什麼這一塊要進 DB 而個人稅制不用：它改得比個人稅制勤，而且「改了沒更新」比「沒寫」更危險
+// ——例如稅捐稽徵法 §41 的罰金上限 110 年修法後從 6 萬提高到 1,000 萬，
+// 網路上仍有大量資料寫舊法。放進後台，Ray 或會計師發現法規變了可以當天改完，不必等改版。
+//
+// 程式端的 src/lib/bizTax.ts 是 seed 與 fallback：DB 沒有這一列就用內建值。
+// basis = 這個數字的資料基準日（每個數字各自有效期不同，不共用一個全域日期才誠實）。
+export const bizTaxParams = pgTable('biz_tax_params', {
+  key: text('key').primaryKey(),              // 對應 bizTax.ts 的常數名，例如 PROFIT_TAX_RATE
+  label: text('label').notNull(),             // 後台顯示名稱
+  grp: text('grp').default('稅率').notNull(), // 分組：稅率 / 查核準則 / 罰則 / 水位
+  unit: text('unit').default('rate').notNull(), // rate=比率(存小數) / money=金額 / x=倍數
+  value: doublePrecision('value').notNull(),
+  basis: text('basis'),                       // 資料基準日，例如 2026-08
+  note: text('note'),                         // 法源或備註（避免數字來歷不明）
+  sortOrder: integer('sort_order').default(0).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

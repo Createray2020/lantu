@@ -5,7 +5,9 @@ import { ensureCoach, isAdmin } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
 import { listCategories } from "@/lib/financeCategories";
 import { listEduCosts, defaultEduCosts } from "@/lib/eduCosts";
+import { listBizTaxParams, defaultBizTaxRows, getBizTaxPayload } from "@/lib/bizTaxParams";
 import CategoriesBoard from "./CategoriesBoard";
+import BizTaxBoard from "./BizTaxBoard";
 import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +17,12 @@ export default async function CategoriesPage() {
   if (!me) redirect("/dashboard"); // 非教練/未登入 → 由 /dashboard 統一分流
   if (!(await isAdmin(me))) redirect("/dashboard");
 
-  const [rows, eduRows, brand] = await Promise.all([listCategories(), listEduCosts(), getBrand()]);
+  const [rows, eduRows, brand, bizRows, bizPayload] = await Promise.all([
+    listCategories(), listEduCosts(), getBrand(), listBizTaxParams(), getBizTaxPayload(),
+  ]);
+  // DB 有就用 DB 的，沒有那一列就顯示程式內建值（和前端 fallback 同一套語意）
+  const bizByKey = new Map(bizRows.map((r) => [r.key, r]));
+  const bizMerged = defaultBizTaxRows().map((d) => bizByKey.get(d.key) ?? d);
 
   return (
     <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
@@ -43,6 +50,7 @@ export default async function CategoriesPage() {
           </p>
         </div>
         <CategoriesBoard rows={rows} eduRows={eduRows.length ? eduRows : defaultEduCosts()} />
+        <BizTaxBoard rows={bizMerged} basis={bizPayload.basis} />
       </section>
     </main>
   );

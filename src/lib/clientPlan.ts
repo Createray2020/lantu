@@ -238,3 +238,37 @@ export async function getClientPlanCase(clientUserId: string): Promise<{ planId:
   if (!plan) return null;
   return { planId: plan.id, data: plan.data };
 }
+
+/**
+ * 存企業主十題自我檢核（/bizcheck 公開頁 → 註冊 → 存檔）。
+ *
+ * 只寫兩個東西：`c.bizGate.ans` 與 `intent.entities.company`。
+ * 刻意不碰任何金額欄位——十題問的是「有沒有做到」，不是財務數字，
+ * 拿它去改 incomes/assets 會覆蓋掉客戶或教練已經填好的資料。
+ *
+ * 開啟企業主體是這一步真正的價值：客戶端沒有主體開關，
+ * 這裡是客戶自己把企業模組打開、讓教練接手時就看得到第 ④ 群的唯一路徑。
+ */
+export async function saveBizCheck(clientUserId: string, ans: Record<number, string>): Promise<void> {
+  const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
+  const client = cRows[0];
+  if (!client) throw new Error("no-passport");
+  const plan = await ownPlanRow(client.id);
+  if (!plan) throw new Error("no-passport");
+
+  const c: any = plan.data || {};
+  const clean: Record<number, string> = {};
+  for (const [k, v] of Object.entries(ans)) {
+    const i = Number(k);
+    if (Number.isInteger(i) && i >= 0 && i < 10 && (v === "是" || v === "否")) clean[i] = v;
+  }
+  if (!Object.keys(clean).length) throw new Error("empty-answers");
+
+  c.bizGate = { ans: clean, savedAt: new Date().toISOString() };
+  c.intent = normalizeIntent({ ...(c.intent || {}), entities: { ...((c.intent || {}).entities || {}), company: true } });
+
+  const snap = planSnapshot(c);
+  await db.update(plans)
+    .set({ data: c, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })
+    .where(eq(plans.id, plan.id));
+}

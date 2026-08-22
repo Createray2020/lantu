@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { GATE_Q, GATE_GUIDE, GATE_LAMP, GATE_VETO_INDEX, gateLevelOf, topGaps, MAX_GAPS_AT_ONCE } from "@/lib/bizCheck";
+import { readBizDraft, saveBizDraft, clearBizDraft, type BizCheckAnswers } from "@/lib/bizCheckDraft";
+import { saveBizCheckAction } from "./actions";
+
+// hydration-safe 的「我在瀏覽器了嗎」。用 useSyncExternalStore 而不是 useEffect+setState：
+// 專案的 eslint 有 react-hooks/set-state-in-effect，而且 effect 版本會先閃一次 SSR 的內容。
+const noopSubscribe = () => () => {};
 
 // 企業主十題自我檢核（公開頁）。
 // 全程純前端計算、不送任何資料到後端——所以訪客可以放心填，我們也沒有蒐集個資。
@@ -15,8 +21,23 @@ const LAMP_STYLE: Record<string, { ring: string; text: string; bg: string }> = {
   na: { ring: "border-white/12", text: "text-[#a7bacb]", bg: "bg-[#12334f]" },
 };
 
-export default function BizCheckForm() {
-  const [ans, setAns] = useState<Record<number, "是" | "否">>({});
+export default function BizCheckForm({ signedIn = false }: { signedIn?: boolean }) {
+  const [ans, setAns] = useState<BizCheckAnswers>({});
+  const [draftChecked, setDraftChecked] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saved">("idle");
+  const [err, setErr] = useState<string | null>(null);
+  const [needPassport, setNeedPassport] = useState(false);
+  const [pending, start] = useTransition();
+  const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
+
+  // render 期間校正 state（React 允許、也不會像 effect 那樣先閃一幀空白）。
+  // 註冊繞一圈回到這一頁時，草稿還在同一個分頁的 sessionStorage 裡，答案就接得回來。
+  if (isClient && !draftChecked) {
+    setDraftChecked(true);
+    const d = readBizDraft();
+    if (d) setAns(d);
+  }
+
   const g = gateLevelOf(ans);
   const lamp = GATE_LAMP[g.lv];
   const st = LAMP_STYLE[g.lv];
@@ -28,7 +49,15 @@ export default function BizCheckForm() {
       const next = { ...prev };
       if (next[i] === v) delete next[i];
       else next[i] = v;
+      saveBizDraft(next);
       return next;
+    });
+
+  const save = () =>
+    start(async () => {
+      const r = await saveBizCheckAction(ans);
+      if (r.ok) { setStatus("saved"); setErr(null); setNeedPassport(false); clearBizDraft(); }
+      else { setErr(r.error); setNeedPassport(!!r.needPassport); }
     });
 
   const btn = (i: number, v: "是" | "否") => {
@@ -129,19 +158,56 @@ export default function BizCheckForm() {
             把公司股權、股東往來與個人連帶保證一起攤開之後，算出你真正可以動用的<b className="text-[#e0bd8b]">流動性淨值</b>。
             多數企業主算完會嚇一跳。
           </p>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/client/sign-up" className="rounded-lg bg-[#c99a5b] text-[#08202a] font-bold text-[13.5px] px-4 py-2.5 hover:bg-[#e0bd8b]">
-              開始我的財務規劃
-            </Link>
-            <Link href="/coaches" className="rounded-lg border border-white/15 text-[#a7bacb] font-bold text-[13.5px] px-4 py-2.5 hover:border-[#e0bd8b] hover:text-[#e0bd8b]">
-              找一位教練談談
-            </Link>
-          </div>
+          {status === "saved" ? (
+            <div className="rounded-lg bg-[#14332a] border border-[#6f8f74] p-4">
+              <p className="text-[13.5px] text-[#8fc0a3] font-bold">已存進你的規劃</p>
+              <p className="text-[12.5px] text-[#cfdcea] mt-1 leading-relaxed">
+                企業財務規劃已經在你的規劃裡打開了——之後接上教練時，他會直接看到公司概況、公私勾稽與這份檢核。
+              </p>
+              <Link href="/portal" className="inline-block mt-3 rounded-lg bg-[#c99a5b] text-[#08202a] font-bold text-[13.5px] px-4 py-2.5 hover:bg-[#e0bd8b]">
+                去看我的規劃 →
+              </Link>
+            </div>
+          ) : (
+            <>
+              {err && (
+                <p className="text-[12.5px] text-[#ff9b9b] mb-3 leading-relaxed">
+                  {err}
+                  {needPassport && (
+                    <Link href="/passport" className="ml-2 underline underline-offset-4 text-[#e0bd8b]">先做人生護照 →</Link>
+                  )}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {signedIn ? (
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={pending}
+                    className="rounded-lg bg-[#c99a5b] text-[#08202a] font-bold text-[13.5px] px-4 py-2.5 hover:bg-[#e0bd8b] disabled:opacity-50"
+                  >
+                    {pending ? "存檔中…" : "存進我的規劃"}
+                  </button>
+                ) : (
+                  // 帶 redirect_url 繞回這一頁：答案還在同一分頁的 sessionStorage 裡，回來就接得回去
+                  <Link
+                    href="/client/sign-up?redirect_url=/bizcheck"
+                    className="rounded-lg bg-[#c99a5b] text-[#08202a] font-bold text-[13.5px] px-4 py-2.5 hover:bg-[#e0bd8b]"
+                  >
+                    註冊並存下這份檢核
+                  </Link>
+                )}
+                <Link href="/coaches" className="rounded-lg border border-white/15 text-[#a7bacb] font-bold text-[13.5px] px-4 py-2.5 hover:border-[#e0bd8b] hover:text-[#e0bd8b]">
+                  找一位教練談談
+                </Link>
+              </div>
+            </>
+          )}
         </section>
       )}
 
       <p className="text-[11px] text-[#6f869c] leading-relaxed">
-        本頁全程在你的瀏覽器裡計算，不會把你的答案送到任何伺服器，離開頁面即消失。
+        本頁全程在你的瀏覽器裡計算，答案只留在這個分頁，關掉就消失——<b>按下「存進我的規劃」才會送出</b>。
         內容為觀念釐清與風險辨識，不構成稅務、法律或投資建議；涉及具體情況請與會計師或律師諮詢。
       </p>
     </div>

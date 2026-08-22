@@ -55,7 +55,7 @@ export default async function BizCheckPage() {
           </p>
         </div>
 
-        <BizCheckForm />
+        <BizCheckForm signedIn={!!userId} />
       </div>
     </div>
   );
