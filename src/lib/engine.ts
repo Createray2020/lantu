@@ -694,12 +694,16 @@ function crossTable(c){var m=metrics(c);
  var incFin=sum(c.incomes,function(i){return i.type==='理財'?n(i.amount):0});
  var incOther=sum(c.incomes,function(i){return i.type==='其他'?n(i.amount):0});
  var expLive=sum(c.expenses,function(e){return (e.cat==='生活'||e.cat==='消費')?n(e.amount):0});
- var expTax=m.tax, expIns=m.ins, expOther=sum(c.expenses,function(e){return ['生活','消費','稅賦','保險'].indexOf(e.cat)<0?n(e.amount):0});
+ var expTax=m.tax, expIns=m.ins;
+ // 對齊 Excel 收支損益表：貸款與撫育（孝親＋教育）各自成列，不要全部倒進「其他」。
+ var expLoan=manualLoanPay(c)+annualDebtPay(c);
+ var expSupport=sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0});
+ var expOther=sum(c.expenses,function(e){return ['生活','消費','稅賦','保險','孝親','貸款'].indexOf(e.cat)<0?n(e.amount):0});
  var aSelf=sum(c.assets,function(a){return a.cls==='固定'?aVal(a):0});
  var aInv=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
  var dCons=sum(c.liabilities,function(l){return isConsumerDebt(l)?lBal(l):0});
  var dInv=m.debtTotal-dCons;
- return {incWork:incWork,incFin:incFin,incOther:incOther,incTotal:m.incTotal,expLive:expLive,expTax:expTax,expIns:expIns,expOther:expOther+annualDebtPay(c),expTotal:m.expTotal,
+ return {incWork:incWork,incFin:incFin,incOther:incOther,incTotal:m.incTotal,expLive:expLive,expLoan:expLoan,expSupport:expSupport,expTax:expTax,expIns:expIns,expOther:expOther,expTotal:m.expTotal,saveInvest:m.saveInvest,
   aSelf:aSelf,aInv:aInv,aTotal:m.assetTotal,dCons:dCons,dInv:dInv,dTotal:m.debtTotal,net:m.net,monthBal:(m.incTotal-m.expTotal)/12};
 }
 

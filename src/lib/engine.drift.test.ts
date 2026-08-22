@@ -98,6 +98,50 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     }
   });
 
+  // ── 2026/08 對齊 Excel 那一輪新增的共用語意 ──
+  it("KINDS 與 POLICY_MAP：險種清單與保單欄位對照兩邊一致", () => {
+    expect(HTML).toContain("var KINDS=['壽險','意外傷殘','住院醫療','醫療雜費','薪資補償','初次罹癌','癌症住院','重病給付','每月照護'];");
+    expect(HTML).toContain("var POLICY_MAP={'壽險':'life','意外傷殘':'accident','住院醫療':'medical','醫療雜費':'medMisc','薪資補償':'incomeComp','初次罹癌':'firstCancer','癌症住院':'cancerHosp','重病給付':'critical','每月照護':'monthCare'};");
+    expect(E.KINDS).toEqual(["壽險", "意外傷殘", "住院醫療", "醫療雜費", "薪資補償", "初次罹癌", "癌症住院", "重病給付", "每月照護"]);
+  });
+
+  it("existingCover 兩邊都經 kindNorm 正規化（舊資料的『意外險』不能對不上）", () => {
+    expect(HTML).toContain("kindNorm(cv.kind)===kindNorm(kind)");
+    expect(E.kindNorm("意外險")).toBe("意外傷殘");
+    expect(E.kindNorm("壽險")).toBe("壽險");
+  });
+
+  it("lifeNeed 兩邊都把父母奉養費 × 保障年數 算進責任", () => {
+    expect(HTML).toContain("familyAnnualParentSupport(c)*n(nd.protectYears)");
+    const c = E.sampleCase();
+    const nd = c.needs[0];
+    const before = E.lifeNeed(c, nd);
+    const c2 = JSON.parse(JSON.stringify(c));
+    c2.expenses.push({ name: "加碼孝親", cat: "孝親", amount: 100000, infl: false, start: 40, end: 70, cut: 0 });
+    expect(E.lifeNeed(c2, c2.needs[0]) - before).toBe(100000 * E.n(nd.protectYears));
+  });
+
+  it("貸款壓力比：兩邊都是『負債表反推 + 支出側手動貸款列』", () => {
+    expect(HTML).toContain("var loanPay=annualDebtPay(c)+manualLoanPay(c);");
+  });
+
+  it("有效儲蓄率：兩邊都優先吃 c.savings[]，沒有才退回舊參數欄", () => {
+    expect(HTML).toContain("var saveActive=m.saveInvest>0?m.saveInvest:(n(c.params.planYearly)||Math.max(0,m.save));");
+  });
+
+  it("assetLayer：資產布局的推導規則兩邊一致", () => {
+    expect(HTML).toContain("return isRiskAsset(a)?'衛星':'核心';");
+    expect(HTML).toContain("if(a.mainCat==='自用資產')return '生活用';");
+  });
+
+  it("crossTable：貸款／撫育／儲蓄理財投入的分列兩邊一致", () => {
+    expect(HTML).toContain("var expOther=sum(c.expenses,function(e){return ['生活','消費','稅賦','保險','孝親','貸款'].indexOf(e.cat)<0?n(e.amount):0});");
+    const ct = E.crossTable(E.sampleCase());
+    for (const k of ["expLoan", "expSupport", "expOther", "saveInvest"]) {
+      expect(ct[k], k).toBeTypeOf("number");
+    }
+  });
+
   it("負債一律換匯（lBal），不可直接讀 l.balance", () => {
     // 兩邊的 lifeNeed 都要用 lBal，否則外幣房貸在「缺口」與「準備度」兩頁會差一個匯率
     expect(HTML).toContain("+ sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c)");

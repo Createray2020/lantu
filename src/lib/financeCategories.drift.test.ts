@@ -31,7 +31,7 @@ type HtmlCat = { label: string; parent: string; risk?: boolean; liq?: string; co
 
 describe("細類字典雙實作對拍：financeCategories.defaults.ts ↔ lantu-app.html", () => {
   const fallback = htmlConst("CAT_FALLBACK") as Record<CatKind, HtmlCat[]>;
-  const kinds: CatKind[] = ["income", "expense", "asset", "liability"];
+  const kinds: CatKind[] = ["income", "expense", "saving", "asset", "liability"];
 
   it("CAT_PARENTS 兩邊一致（大類是引擎在算的鍵，多一個少一個都會讓比率算錯）", () => {
     const htmlParents = htmlConst("CAT_PARENTS") as Record<CatKind, string[]>;
@@ -40,7 +40,7 @@ describe("細類字典雙實作對拍：financeCategories.defaults.ts ↔ lantu-
     }
   });
 
-  it.each(["income", "expense", "asset", "liability"] as CatKind[])(
+  it.each(["income", "expense", "saving", "asset", "liability"] as CatKind[])(
     "%s：細類清單、大類歸屬與旗標完全一致",
     (kind) => {
       const ts = DEFAULT_FINANCE_CATEGORIES.filter((s) => s.kind === kind).map((s) => ({
@@ -68,11 +68,13 @@ describe("細類字典雙實作對拍：financeCategories.defaults.ts ↔ lantu-
     }
   });
 
-  it("四個 kind 都至少有一個「其他」，而且會提示補明細", () => {
+  it("每個 kind 都有一個「其他」收尾，而且會提示補明細", () => {
+    // label 不一定剛好是「其他」——同一個 kind 底下有多個大類時會加上大類名
+    // （例如支出的「其他貸款支出」、儲蓄的「其他儲蓄投資」），重點是 note 旗標要在。
     for (const k of kinds) {
-      const other = DEFAULT_FINANCE_CATEGORIES.find((s) => s.kind === k && s.label === "其他");
-      expect(other, k).toBeTruthy();
-      expect(other!.note, k).toBe(true);
+      const others = DEFAULT_FINANCE_CATEGORIES.filter((s) => s.kind === k && s.label.startsWith("其他"));
+      expect(others.length, k).toBeGreaterThan(0);
+      expect(others.some((s) => s.note === true), k).toBe(true);
     }
   });
 
