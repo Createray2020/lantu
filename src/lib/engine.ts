@@ -305,12 +305,21 @@ function retireNeed(c){
  return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,gap:Math.max(0,total-prepared),valid:m>0};
 }
 
+// 某位成員簽下的連帶保證餘額。沒指定保證人的舊列一律歸給「本人」。
+// ⚠️ 這一份算的是寫進 DB 的快照（plans.health_grade / net_worth），
+//    必須和 public/lantu-app.html 的同名函式保持一致，engine.drift.test.ts 會擋。
+function guaranteeFor(c,member){var pm=(primaryMember(c)||{}).name;
+ return sum(c.guarantees,function(g){return ((g.owner||pm)===member)?n(g.balance):0})}
+
 function lifeNeed(c,nd){
  var famLiving=familyAnnualLiving(c);
  // 負債一律走 lBal()（有乘匯率）。直接用 n(l.balance) 會讓外幣房貸在「缺口」與「準備度」兩頁差一個匯率。
+ // 企業主的個人連帶保證也是責任的一部分——一般人算壽險需求只算「房貸＋生活費＋教育金」，
+ // 漏掉保證金額會讓額度嚴重不足（實務上這一項往往讓需求倍增）。
  var need=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
    + familyAnnualParentSupport(c)*n(nd.protectYears)
-   + sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax);
+   + sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax)
+   + guaranteeFor(c,nd.member);
  var existing=existingCover(c,nd.member,'壽險');
  var liquid=liquidMovable(c);
  return Math.max(0,need - existing - liquid);

@@ -77,6 +77,38 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(row.have).toBe(0);
   });
 
+  // 2026/08/22 企業主模組：連帶保證進 lifeNeed()，兩份實作必須同時改。
+  // 這一項會經由 totalGap() 影響 health() → plans.health_grade，漂移的代價很直接。
+  it("lifeNeed()：本人簽的個人連帶保證要加進壽險需求", () => {
+    expect(HTML).toContain("+ guaranteeFor(c,nd.member)");
+    expect(HTML).toContain("function guaranteeFor(c,member){var pm=(primaryMember(c)||{}).name;");
+
+    const c = E.sampleCase();
+    const nd = c.needs[0];
+    const before = E.lifeNeed(c, nd);
+    c.guarantees = [{ owner: nd.member, bank: "A 銀行", item: "公司借款", limit: 30_000_000, balance: 20_000_000 }];
+    expect(E.lifeNeed(c, nd)).toBe(before + 20_000_000);
+  });
+
+  it("lifeNeed()：別人簽的連帶保證不算在這個人頭上；沒填保證人的舊列歸「本人」", () => {
+    const c = E.sampleCase();
+    const nd = c.needs[0];
+    const before = E.lifeNeed(c, nd);
+    c.guarantees = [{ owner: "王太太", bank: "A 銀行", item: "公司借款", limit: 0, balance: 9_000_000 }];
+    expect(E.lifeNeed(c, nd)).toBe(before);
+    c.guarantees = [{ bank: "A 銀行", item: "公司借款", limit: 0, balance: 9_000_000 }]; // 無 owner
+    expect(E.lifeNeed(c, nd)).toBe(before + 9_000_000);
+  });
+
+  it("沒有 guarantees 欄位的舊案子不會炸，也不會改變任何既有數字", () => {
+    const c = E.sampleCase();
+    delete c.guarantees;
+    expect(() => E.health(c)).not.toThrow();
+    const c2 = E.sampleCase();
+    c2.guarantees = [];
+    expect(E.health(c).grade).toBe(E.health(c2).grade);
+  });
+
   it("ratios()：兩邊都是協會 25 項體檢（分組＋理想值＋紅黃綠燈）", () => {
     const r = E.ratios(E.sampleCase());
     const names = Object.keys(r);

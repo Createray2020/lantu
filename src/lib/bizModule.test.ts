@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect, beforeAll } from "vitest";
 import { JSDOM } from "jsdom";
+import * as BizTax from "./bizTax";
+import * as BizCheck from "./bizCheck";
 
 /**
  * 企業主模組（第 ④ 群）的接線與地基語意測試。
@@ -390,5 +393,324 @@ describe("分頁渲染", () => {
     c2.intent.entities = {};
     w.app.activeTab = "analysis"; w.render();
     expect(pane()).not.toContain("企業主診斷");
+  });
+});
+
+// ── 波 3～5 ──
+
+describe("bizTax 常數：兩份實作不得漂移", () => {
+  const html = readFileSync(fileURLToPath(new URL("../../public/lantu-app.html", import.meta.url)), "utf8");
+  const num = (name: string) => {
+    const m = html.match(new RegExp("var " + name + "=([0-9.]+)[;,]"));
+    if (!m) throw new Error(`lantu-app.html 找不到 ${name}`);
+    return Number(m[1]);
+  };
+
+  it("稅率與門檻兩邊一致", () => {
+    expect(num("PROFIT_TAX_RATE")).toBe(BizTax.PROFIT_TAX_RATE);
+    expect(num("UNDISTRIBUTED_RATE")).toBe(BizTax.UNDISTRIBUTED_RATE);
+    expect(num("DIVIDEND_SEPARATE_RATE")).toBe(BizTax.DIVIDEND_SEPARATE_RATE);
+    expect(num("DIVIDEND_CREDIT_RATE")).toBe(BizTax.DIVIDEND_CREDIT_RATE);
+    expect(num("DIVIDEND_CREDIT_CAP")).toBe(BizTax.DIVIDEND_CREDIT_CAP);
+    expect(num("NHI_SUPP_RATE")).toBe(BizTax.NHI_SUPP_RATE);
+    expect(num("NHI_SUPP_MIN")).toBe(BizTax.NHI_SUPP_MIN);
+    expect(num("RENT_EXPENSE_RATE")).toBe(BizTax.RENT_EXPENSE_RATE);
+    expect(num("VAT_RATE")).toBe(BizTax.VAT_RATE);
+  });
+
+  it("查核準則的三個車輛上限兩邊一致（租車繞不過 250 萬，112 年度起已補上）", () => {
+    expect(num("CAR_DEPRECIATION_CAP")).toBe(BizTax.CAR_DEPRECIATION_CAP);
+    expect(num("CAR_LEASE_DEPRECIATION_CAP")).toBe(BizTax.CAR_LEASE_DEPRECIATION_CAP);
+    expect(BizTax.CAR_LEASE_DEPRECIATION_CAP).toBe(BizTax.CAR_DEPRECIATION_CAP);
+    expect(num("CAR_RENTAL_BIZ_CAP")).toBe(BizTax.CAR_RENTAL_BIZ_CAP);
+  });
+
+  it("資料基準日兩邊一致，且畫面上真的印得出來", () => {
+    expect(html).toContain(`var BIZ_TAX_BASIS='${BizTax.BIZ_TAX_BASIS}'`);
+    expect(html).toContain("法規資料基準：");
+  });
+
+  it("退場三條路與企業四階段兩邊一致", () => {
+    const pick = (name: string) => {
+      const m = html.match(new RegExp("var " + name + "=\\[([\\s\\S]*?)\\];"));
+      if (!m) throw new Error(`lantu-app.html 找不到 ${name}`);
+      return m[1].split("],").map((r) => Array.from(r.matchAll(/'([^']*)'/g)).map((x) => x[1])).filter((r) => r.length);
+    };
+    expect(pick("EXIT_PATHS").map((r) => r[0])).toEqual(BizTax.EXIT_PATHS.map((p) => p.name));
+    expect(pick("EXIT_PATHS").map((r) => r[2])).toEqual(BizTax.EXIT_PATHS.map((p) => p.years));
+    expect(pick("BIZ_STAGES").map((r) => r[0])).toEqual(BizTax.BIZ_STAGES.map((s) => s.name));
+    expect(Array.from((html.match(/var MONEY_CHANNELS=\[([\s\S]*?)\];/) || ["", ""])[1].matchAll(/'([^']*)'/g)).map((x) => x[1]))
+      .toEqual([...BizTax.MONEY_CHANNELS]);
+  });
+});
+
+describe("連帶保證回流壽險需求", () => {
+  it("本人簽的保證會加進壽險需求；別人簽的不算", () => {
+    const c = freshCase();
+    c.needs = [{ member: "本人", funeral: 600000, protectYears: 5, estateTax: 0, room: 0, selfPay: 0, nursing: 0, miscDaily: 0, incomeComp: 0, disability: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0 }];
+    const before = w.lifeNeed(c, c.needs[0]);
+    c.guarantees = [{ owner: "本人", bank: "A", item: "公司借款", limit: 0, balance: 6000000 }];
+    expect(w.lifeNeed(c, c.needs[0])).toBe(before + 6000000);
+    c.guarantees = [{ owner: "配偶", bank: "A", item: "公司借款", limit: 0, balance: 6000000 }];
+    expect(w.lifeNeed(c, c.needs[0])).toBe(before);
+  });
+
+  it("責任遞減圖：保證是不遞減的一層，最後一年仍留著", () => {
+    const c = freshCase();
+    c.needs = [{ member: "本人", funeral: 0, protectYears: 3, estateTax: 0, room: 0, selfPay: 0, nursing: 0, miscDaily: 0, incomeComp: 0, disability: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0 }];
+    c.guarantees = [{ owner: "本人", bank: "A", item: "公司借款", limit: 0, balance: 5000000 }];
+    const rp = w.responsibilityProjection(c, c.needs[0]);
+    expect(rp.rows[rp.rows.length - 1].funeral).toBe(5000000);
+  });
+});
+
+describe("報酬結構試算", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const run = (s: Record<string, number>): any => {
+    const c = freshCase();
+    c.taxParams = { married: false, dependents: 0, otherDeduction: 0 };
+    return w.compScenario(c, s);
+  };
+
+  it("薪資與租金算公司可列費用、股利不算；勞退 6% 也是公司成本", () => {
+    const r = run({ salary: 1200000, dividend: 500000, rent: 240000 });
+    expect(r.pension).toBe(1200000 * 0.06);
+    expect(r.deductible).toBe(1200000 + 240000 + 1200000 * 0.06);
+    expect(r.corpSave).toBeCloseTo(r.deductible * 0.2, 6);
+  });
+
+  it("勞退提繳吃月提繳工資 15 萬的上限，不是照薪資全額算", () => {
+    const r = run({ salary: 6000000, dividend: 0, rent: 0 });
+    expect(r.pension).toBe(150000 * 12 * 0.06);
+  });
+
+  it("股利兩制擇優，取比較低的那一個", () => {
+    const r = run({ salary: 600000, dividend: 3000000, rent: 0 });
+    expect(r.incomeTax).toBe(Math.min(r.merged, r.separate));
+    expect(r.mergedBetter).toBe(r.merged <= r.separate);
+  });
+
+  it("二代健保補充保費有起扣門檻，低於門檻不扣", () => {
+    expect(run({ salary: 0, dividend: 19999, rent: 0 }).nhi).toBe(0);
+    expect(run({ salary: 0, dividend: 20000, rent: 0 }).nhi).toBeCloseTo(20000 * 0.0211, 6);
+  });
+
+  it("租金可減除必要費用 43% 才進個人所得", () => {
+    const r = run({ salary: 0, dividend: 0, rent: 1000000 });
+    expect(r.rentNet).toBeCloseTo(570000, 4);
+  });
+
+  it("只領股利＝不累積勞退，這是取捨不是缺點", () => {
+    expect(run({ salary: 0, dividend: 2000000, rent: 0 }).hasPension).toBe(false);
+    expect(run({ salary: 1000000, dividend: 0, rent: 0 }).hasPension).toBe(true);
+  });
+
+  it("畫面一定要標「結構試算，不構成稅務建議」與資料基準日", () => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.companies = [w.newCompany()];
+    c.intent.mustHave = ["報酬結構優化"];
+    c.intent.targets = ["報酬結構優化"];
+    const h = renderTab("bizcomp");
+    expect(h).toContain("不構成稅務或法律建議");
+    expect(h).toContain("法規資料基準");
+  });
+});
+
+describe("退場與傳承", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const exitCase = (): any => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.intent.mustHave = ["事業退場規劃"];
+    c.intent.targets = ["事業退場規劃"];
+    c.companies = [{ ...w.newCompany(), totalAsset: 60000000, totalDebt: 10000000, sharePct: 100 }];
+    return c;
+  };
+
+  it("去老闆化評分：五題全是＝100%，沒答完不會灌水", () => {
+    const c = exitCase();
+    expect(w.debossScore(c).pct).toBe(0);
+    c.bizExit = { deboss: { 0: "是", 1: "是", 2: "是", 3: "是", 4: "是" } };
+    expect(w.debossScore(c).pct).toBe(100);
+    c.bizExit = { deboss: { 0: "是", 1: "否" } };
+    expect(w.debossScore(c).pct).toBe(20);
+    expect(w.debossScore(c).answered).toBe(2);
+  });
+
+  it("股權會墊高遺產稅：診斷書要算得出「含股權 vs 不含股權」的差", () => {
+    const c = exitCase();
+    const m = w.metrics(c);
+    const withEq = w.estateTax(c, m.net + w.equityTotal(c)).tax;
+    const without = w.estateTax(c, m.net).tax;
+    expect(w.equityTotal(c)).toBe(50000000);
+    expect(withEq).toBeGreaterThan(without);
+  });
+
+  it("三條路徑與四個階段都渲染得出來，並標明準備時間", () => {
+    exitCase();
+    const h = renderTab("bizexit");
+    expect(h).toContain("傳承接班");
+    expect(h).toContain("出售事業");
+    expect(h).toContain("收攤清算");
+    expect(h).toContain("5～10 年");
+    expect(h).toContain("生存期");
+    expect(h).toContain("成熟期");
+  });
+
+  it("沒選這個目標時分頁收合，不會硬跳一整頁空表單", () => {
+    const c = exitCase();
+    c.intent.mustHave = [];
+    c.intent.targets = [];
+    const h = renderTab("bizexit");
+    expect(h).toContain("客戶未選此目標");
+    expect(h).not.toContain("去老闆化評分");
+  });
+});
+
+describe("企業主財務診斷書", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withGate = (): any => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.companies = [{ ...w.newCompany(), name: "嵐途實業", totalAsset: 40000000, totalDebt: 10000000, sharePct: 100 }];
+    c.bizGate = { ans: {} };
+    for (let i = 0; i < 10; i++) c.bizGate.ans[i] = "否";
+    return c;
+  };
+
+  it("診斷書帶得出燈號、整合式資產表與核心命題", () => {
+    const c = withGate();
+    const h = w.bizReportHTML(c);
+    expect(h).toContain("企業主財務診斷書");
+    expect(h).toContain("紅燈");
+    expect(h).toContain("流動性淨值");
+    expect(h).toContain("與人身脫鉤");
+  });
+
+  it("同一份 case，家庭版報告書仍然不含燈號（兩份是分開的）", () => {
+    const c = withGate();
+    expect(w.reportHTML(c)).not.toContain("紅燈");
+    expect(w.bizReportHTML(c)).toContain("紅燈");
+  });
+
+  it("診斷書一定帶免責與專業邊界", () => {
+    const h = w.bizReportHTML(withGate());
+    expect(h).toContain("不構成稅務、法律或投資建議");
+    expect(h).toContain("應轉介專業人士");
+  });
+
+  it("報告頁可以切換兩份文件；非企業主客戶沒有這個切換", () => {
+    withGate();
+    w.app.activeTab = "report"; w.app.reportDoc = "biz"; w.render();
+    expect(pane()).toContain("企業主財務診斷書");
+    w.app.reportDoc = "family"; w.render();
+    expect(pane()).toContain("輸出哪一份");
+
+    const c2 = freshCase();
+    c2.intent.entities = {};
+    w.app.activeTab = "report"; w.render();
+    expect(pane()).not.toContain("輸出哪一份");
+  });
+});
+
+describe("建議頁：一次最多三個缺口（這是內容規則，不是 UI 偏好）", () => {
+  it("亮燈超過三個時只列前三，其餘收進「其他觀察」", () => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.companies = [{ ...w.newCompany(), totalAsset: 10000000, totalDebt: 9000000, cash: 100000, monthlyFixed: 1000000, retained: 99000000, netProfit: 1000000, ar: 99000000, annualRevenue: 10000000, insExpense: 0, topClientPct: 90, bookDiffPct: 50 }];
+    c.ownerLoans = [{ cid: c.companies[0].cid, dir: "公司借我", amount: 500000, hasNote: "否", interest: "否", crossYear: "是", note: "" }];
+    c.guarantees = [{ owner: "本人", bank: "A", item: "公司借款", limit: 0, balance: 5000000 }];
+    c.bizAssets = [{ cid: c.companies[0].cid, name: "車", type: "車輛", value: 1000000, user: "本人", note: "" }];
+    const on = w.bizSignals(c).filter((s: { st: string }) => s.st === "on");
+    expect(on.length).toBeGreaterThan(3);
+
+    w.app.activeTab = "advice"; w.render();
+    const h = pane();
+    expect(h).toContain("一次不超過三個缺口");
+    expect(h).toContain("其他觀察（" + (on.length - 3) + " 項，本次先不處理）");
+  });
+
+  it("八大面向會依燈號標出本階段重點", () => {
+    const c = freshCase();
+    c.intent.entities = { company: true };
+    c.companies = [w.newCompany()];
+    c.bizGate = { ans: {} };
+    for (let i = 0; i < 10; i++) c.bizGate.ans[i] = "否";
+    w.app.activeTab = "advice"; w.render();
+    expect(pane()).toContain("聚焦「止血」");
+  });
+});
+
+describe("工具箱：企業現金流三件工具", () => {
+  it("13 週表算得出最早跌破安全水位的那一週", () => {
+    w.app.tools.cash13 = { open: 1000000, inflow: 100000, outflow: 300000, vat: 0, profitTax: 0, safe: 500000 };
+    w.app.activeTab = "tools"; w.render();
+    const h = pane();
+    expect(h).toContain("13 週現金流量預測表");
+    expect(h).toContain("第 3 週");     // 1,000,000 每週 −200,000 → W3 收 400,000 < 500,000
+  });
+
+  it("五漏斗：還本金不在損益表上，會被算進現金差額", () => {
+    w.app.tools.leak = { profit: 1000000, ar: 400000, inv: 300000, capex: 500000, principal: 200000, tax: 250000, dep: 300000 };
+    w.app.activeTab = "tools"; w.render();
+    const h = pane();
+    expect(h).toContain("償還本金不在損益表上");
+    expect(h).toContain("-350,000");   // 100−40−30−50−20−25+30 = −35 萬
+  });
+
+  it("健康度五指標都算得出來", () => {
+    w.app.activeTab = "tools"; w.render();
+    const h = pane();
+    expect(h).toContain("現金轉換循環");
+    expect(h).toContain("獲利品質");
+    expect(h).toContain("利息保障倍數");
+  });
+});
+
+describe("bizCheck：客戶端十題檢核（公開頁）與教練端合規閘同一份題目", () => {
+  const html = readFileSync(fileURLToPath(new URL("../../public/lantu-app.html", import.meta.url)), "utf8");
+
+  it("題目兩邊一字不差（改了一邊就會紅）", () => {
+    const m = html.match(/var GATE_Q=\[([\s\S]*?)\];/);
+    if (!m) throw new Error("lantu-app.html 找不到 GATE_Q");
+    const qs = Array.from(m[1].matchAll(/'([^']*)'/g)).map((x) => x[1]);
+    expect(qs).toEqual([...BizCheck.GATE_Q]);
+  });
+
+  it("第 4 題是一票否決，兩邊的 index 一致", () => {
+    expect(BizCheck.GATE_VETO_INDEX).toBe(3);
+    expect(html).toContain("ans[3]==='否'");
+  });
+
+  it("分級：0～2 綠、3～5 黃、6 以上紅", () => {
+    const mk = (noIdx: number[]) => {
+      const a: Record<number, "是" | "否"> = {};
+      for (let i = 0; i < BizCheck.GATE_Q.length; i++) a[i] = noIdx.includes(i) ? "否" : "是";
+      return a;
+    };
+    expect(BizCheck.gateLevelOf(mk([0, 1])).lv).toBe("green");
+    expect(BizCheck.gateLevelOf(mk([0, 1, 2, 4])).lv).toBe("amber");
+    expect(BizCheck.gateLevelOf(mk([0, 1, 2, 4, 5, 6])).lv).toBe("red");
+    expect(BizCheck.gateLevelOf(mk([3])).lv).toBe("red");     // 一票否決
+  });
+
+  it("沒答完不判定，不會假裝綠燈", () => {
+    expect(BizCheck.gateLevelOf({ 0: "是" }).lv).toBe("na");
+    expect(BizCheck.gateLevelOf({}).lv).toBe("na");
+  });
+
+  it("最多只給三個缺口，且有時效性的第 4 題永遠排第一", () => {
+    const gaps = BizCheck.topGaps([0, 1, 2, 3, 5, 6]);
+    expect(gaps).toHaveLength(BizCheck.MAX_GAPS_AT_ONCE);
+    expect(gaps[0].q).toBe(BizCheck.GATE_Q[BizCheck.GATE_VETO_INDEX]);
+  });
+
+  it("每一題都有對應的導引，不會有勾了否卻沒有下一步的題目", () => {
+    expect(BizCheck.GATE_GUIDE).toHaveLength(BizCheck.GATE_Q.length);
+    for (const g of BizCheck.GATE_GUIDE) {
+      expect(g.mean.length).toBeGreaterThan(0);
+      expect(g.next.length).toBeGreaterThan(0);
+    }
   });
 });

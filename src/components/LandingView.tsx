@@ -188,6 +188,21 @@ export default async function LandingView() {
         </div>
       </section>
 
+      {/* 企業主分流卡：客單價最高的客群，入口與人生護照對等但不搶首頁主動線 */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-10">
+        <div className="rounded-2xl border border-white/10 bg-[#0d2b45] px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-left">
+            <div className="font-serif text-lg text-[#e0bd8b]">你是企業主嗎？</div>
+            <p className="text-[#a7bacb] text-sm mt-1">
+              十個問題、兩分鐘，看清楚你的公司與個人財務界線在哪裡。同樣不用註冊。
+            </p>
+          </div>
+          <Link href="/bizcheck" className="shrink-0 text-sm font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg">
+            企業主財務自我檢核 →
+          </Link>
+        </div>
+      </section>
+
       {/* 頁尾招募分流卡：接住剛好逛進來的同業，但不佔首頁版位 */}
       <section className="max-w-6xl mx-auto px-5 sm:px-8 py-10">
         <div className="rounded-2xl border border-white/10 bg-[#0d2b45] px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">

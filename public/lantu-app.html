@@ -405,7 +405,10 @@ function finName(arr,i,kind,row){
  return '<div class="finname">'+finTxt(arr,i,'name',row.name)+catTodo(kind,row)+'</div>';
 }
 // ────────────────────────────────────────────────────────────────────────
-var app={role:'coach',activeTab:'data',dataTab:'family',ownerView:'全家',activeId:null,cases:[],tools:{loan:{amt:5000000,rate:2,years:20},ret:{age:40,rAge:65,life:85,month:50000,infl:1.5,rr:4},comp:{target:15000000,years:20,rate:6,start:0},irr:{monthly:10000,months:73,fv:911097,start:0},car:{price:2500000,life:15,used:8,cc:2500,sellLoss:15,oil:36000,park:48000,other:45000},house:{oldPrice:12000000,newPrice:18000000,down:5400000,rate:1.7,years:30,deco:1700000},biz:{cash:500000,monthRev:300000,monthCost:250000,setup:1500000}}};
+var app={role:'coach',activeTab:'data',dataTab:'family',reportDoc:'family',ownerView:'全家',activeId:null,cases:[],tools:{loan:{amt:5000000,rate:2,years:20},ret:{age:40,rAge:65,life:85,month:50000,infl:1.5,rr:4},comp:{target:15000000,years:20,rate:6,start:0},irr:{monthly:10000,months:73,fv:911097,start:0},car:{price:2500000,life:15,used:8,cc:2500,sellLoss:15,oil:36000,park:48000,other:45000},house:{oldPrice:12000000,newPrice:18000000,down:5400000,rate:1.7,years:30,deco:1700000},biz:{cash:500000,monthRev:300000,monthCost:250000,setup:1500000},
+ cash13:{open:2000000,inflow:800000,outflow:750000,vat:250000,profitTax:600000,safe:1500000},
+ leak:{profit:1000000,ar:400000,inv:300000,capex:500000,principal:200000,tax:250000,dep:300000},
+ cashh:{cash:3000000,fixed:1000000,arDays:75,invDays:45,apDays:40,ocf:1200000,netProfit:1000000,capex:500000,ebt:1250000,interest:300000}}};
 function uid(){return 'c'+Math.floor(performance.now()*1000%1e9)+app.cases.length}
 
 function sampleCase(){return {
@@ -495,7 +498,7 @@ function sampleCase(){return {
   {name:'生活預備金',pct:6,ret:1,benefit:'流動安全網'}
  ]}
 };}
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','ownerLoans','guarantees','bizAssets','channels'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
  c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
 
 // ===== 工作類別 / 投保級距 =====
@@ -542,6 +545,40 @@ function ageFromBirth(b){
  if(mo<0||(mo===0&&t.getDate()<bd))a--;
  return (a>=0&&a<=130)?a:null;
 }
+// ===== 企業／稅務法規常數（台灣）=====
+// 唯一真相在 src/lib/bizTax.ts；這裡是 lantu-app.html 用的鏡像，
+// src/lib/bizModule.test.ts 會正則比對兩邊，改一邊沒改另一邊測試會紅。
+// ⚠️ 這一塊的數字改得比個人稅制勤（而且網路上大量資料還停在舊法），
+//    一律集中在這裡並在畫面上標示資料基準日，不要散進 UI 字串。
+var BIZ_TAX_BASIS='2026-08';
+var PROFIT_TAX_RATE=0.2;            // 營利事業所得稅
+var UNDISTRIBUTED_RATE=0.05;        // 未分配盈餘加徵
+var DIVIDEND_SEPARATE_RATE=0.28;    // 股利分開計稅
+var DIVIDEND_CREDIT_RATE=0.085;     // 股利合併計稅可抵減率
+var DIVIDEND_CREDIT_CAP=80000;      // 抵減上限（每一申報戶）
+var NHI_SUPP_RATE=0.0211;           // 二代健保補充保費
+var NHI_SUPP_MIN=20000;             // 補充保費單筆起扣門檻
+var RENT_EXPENSE_RATE=0.43;         // 租賃所得必要費用標準減除率
+var VAT_RATE=0.05;                  // 加值型營業稅
+var CAR_DEPRECIATION_CAP=2500000;   // 自購自用小客車折舊成本上限
+var CAR_LEASE_DEPRECIATION_CAP=2500000; // 使用權資產提折舊的上限（112 年度起同為 250 萬）
+var CAR_RENTAL_BIZ_CAP=5000000;     // 租賃業者本身購車的上限（出租方的優惠，不是承租企業的）
+var PENALTY_VAT_MULT=5;             // 營業稅法 §51 漏稅罰倍數上限
+var PENALTY_VOUCHER_RATE=0.05;      // 稅捐稽徵法 §44 憑證罰鍰比率
+var CORP_RESERVE_MONTHS=[3,6];      // 公司週轉金建議水位（月）
+var OWNER_EMERGENCY_MONTHS=[6,12];  // 企業主家庭緊急預備金建議水位（月）
+var MONEY_CHANNELS=['薪資','董監酬勞','盈餘分配(股利)','租金','借款','費用報銷'];
+var EXIT_PATHS=[
+ ['傳承接班','接班人培養、股權移轉安排、稅負規劃、治理制度','5～10 年'],
+ ['出售事業','財務透明化、去老闆化（降低對他個人的依賴）、估值提升','3～5 年'],
+ ['收攤清算','清算稅負、員工安置、資產處分','1～2 年']];
+var BIZ_STAGES=[
+ ['生存期','現金流管理、帳務基礎、稅務合規'],
+ ['成長期','股權設定、第一輪外部資金、單位經濟效益驗證'],
+ ['擴張期','擴編、資本支出決策、財務基礎建設、長短期資金配置'],
+ ['成熟期','IPO 或控股架構、傳承與退場規劃']];
+function bizBasisNote(){return '<div class="hint" style="margin-top:8px">法規資料基準：'+BIZ_TAX_BASIS+'。稅法與函釋時有修正，個案認定高度依賴具體事實。<b>本頁為結構試算，不構成稅務或法律建議</b>，實際執行請與客戶的記帳士／會計師共同確認。</div>'}
+
 // ===== 企業主體 =====
 // 舊版只有 c.company（9 欄、不進任何計算）。2026/08/22 起改成 c.companies[] 陣列：
 // v1 介面只做「主體公司」一家，但結構先開成陣列，日後夫妻各有公司不必再遷移一次。
@@ -577,6 +614,11 @@ function equityTotal(c){return sum(companiesOf(c),function(co){return companyEqu
 function ownerLoanSigned(x){return (x.dir==='我借公司'?1:-1)*n(x.amount)}
 function ownerLoanNet(c){return sum(c.ownerLoans,function(x){return ownerLoanSigned(x)})}
 function guaranteeTotal(c){return sum(c.guarantees,function(g){return n(g.balance)})}
+// 某位成員簽下的連帶保證餘額。沒指定保證人的舊列一律歸給「本人」。
+// 這一項會進 lifeNeed()：一般人算壽險需求是「房貸＋生活費＋教育金」，
+// 企業主還要加上他簽下的保證金額——這往往讓需求額度倍增。
+function guaranteeFor(c,member){var pm=(primaryMember(c)||{}).name;
+ return sum(c.guarantees,function(g){return ((g.owner||pm)===member)?n(g.balance):0})}
 function ensureJobFields(c){if(!c.profile)c.profile={};if(!c.profile.jobType)c.profile.jobType='一般就業者';if(c.profile.jobTypeOther==null)c.profile.jobTypeOther='';if(c.profile.birth==null)c.profile.birth='';if(c.profile.monthlySalary==null)c.profile.monthlySalary='';if(!c.company)c.company=defaultCompany();return c;}
 function primaryMember(c){return (c.members||[]).filter(function(m){return m.role==='本人'})[0]||(c.members||[])[0];}
 // 就業者/業務：以月薪帶入「本人」成員的投保類型與月投保薪資（企業主投保自行維持）。
@@ -590,7 +632,7 @@ function applyInsFromSalaryMember(m){if(!m||m.jobType==='企業主')return;m.ins
 // ===== 舊資料防護：所有資料進入點（localStorage / 匯入 JSON / iframe lantu:init）一律先過 migrateCase =====
 // 引擎對 c.profile / c.params / 13 個陣列完全沒有防護，缺任何一個都會在 render() 丟例外 → 整頁白畫面。
 var CASE_SCHEMA_VERSION=2;
-var CASE_ARRAYS=['members','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','lifeGoals','companies','bizYears','vat401','ownerLoans','guarantees','bizAssets','channels'];
+var CASE_ARRAYS=['members','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','lifeGoals','companies','bizYears','vat401','ownerLoans','guarantees','bizAssets','channels','compScenarios'];
 function _fill(dflt,cur){var o={};Object.keys(dflt||{}).forEach(function(k){o[k]=dflt[k]});Object.keys(cur||{}).forEach(function(k){if(cur[k]!==undefined)o[k]=cur[k]});return o;}
 function migrateCase(c){
  if(!c||typeof c!=='object'||Array.isArray(c))c={};
@@ -624,6 +666,7 @@ function migrateCase(c){
  });
  if(!c.members.length)c.members=JSON.parse(JSON.stringify(d.members));
  if(c.reportNote==null)c.reportNote='';
+ if(c.bizReportNote==null)c.bizReportNote='';
  ensureJobFields(c);
  c.members.forEach(function(m){if(m&&(m.role==='本人'||m.role==='配偶'))ensureMemberJob(m);});
  ensureMemberIds(c);
@@ -637,7 +680,10 @@ function migrateCase(c){
 // 並在備註標明是舊資料轉入，讓教練回頭確認。
 function migrateCompanies(c){
  if(!Array.isArray(c.companies))c.companies=[];
- ['bizYears','vat401','ownerLoans','guarantees','bizAssets','channels'].forEach(function(k){if(!Array.isArray(c[k]))c[k]=[]});
+ ['bizYears','vat401','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){if(!Array.isArray(c[k]))c[k]=[]});
+ if(!c.bizRisk||typeof c.bizRisk!=='object')c.bizRisk={};
+ if(!c.bizExit||typeof c.bizExit!=='object')c.bizExit={};
+ if(!c.bizExit.deboss||typeof c.bizExit.deboss!=='object')c.bizExit.deboss={};
  var old=c.company;
  var filled=old&&typeof old==='object'&&(String(old.name||'').trim()||n(old.annualRevenue)||n(old.netProfit)||n(old.ownerLoan)||String(old.taxId||'').trim());
  if(!c.companies.length&&filled){
@@ -901,7 +947,8 @@ function lifeNeed(c,nd){
  var famLiving=familyAnnualLiving(c);
  var need=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
    + familyAnnualParentSupport(c)*n(nd.protectYears)
-   + sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax);
+   + sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax)
+   + guaranteeFor(c,nd.member);
  var existing=existingCover(c,nd.member,'壽險');
  var liquid=liquidMovable(c);
  return Math.max(0,need - existing - liquid);
@@ -945,7 +992,8 @@ function totalGap(c){return sum(coverageGaps(c),function(g){return Math.max(0,g.
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
  return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
   +familyAnnualParentSupport(c)*n(nd.protectYears)
-  +sum(c.liabilities,function(l){return lBal(l)})+eduTotal(c)+n(nd.funeral)+n(nd.estateTax);}
+  +sum(c.liabilities,function(l){return lBal(l)})+eduTotal(c)+n(nd.funeral)+n(nd.estateTax)
+  +guaranteeFor(c,nd.member);}
 function coverageReadiness(c){var out=[],pm=(primaryMember(c)||{}).name;
  (c.needs||[]).forEach(function(nd){
   var defs=[['壽險',grossLifeNeed(c,nd),existingCover(c,nd.member,'壽險')+(nd.member===pm?liquidMovable(c):0)],
@@ -972,7 +1020,9 @@ function responsibilityProjection(c,nd){var a0=n(c.profile.age),g=n(c.params.tui
  var depR=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100;
  var livingShare=depR*familyAnnualLiving(c);
  var parentAnnual=sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0});
- var funeral=n(nd.funeral)+n(nd.estateTax);
+ // 連帶保證是「不隨時間遞減」的一層責任——債務沒清償前，簽下去的金額一直都在。
+ // 併進 funeral 這一條水平線，圖上就看得出責任遞減之後仍然墊高的那一段。
+ var funeral=n(nd.funeral)+n(nd.estateTax)+guaranteeFor(c,nd.member);
  var edu=c.education||[],liabs=c.liabilities||[];
  var coverage=existingCover(c,nd.member,'壽險')+((primaryMember(c)||{}).name===nd.member?liquidMovable(c):0);
  var rows=[];
@@ -1680,9 +1730,11 @@ function addRow(arr){var c=activeCase();if(!c)return;
   return {cid:(mainCompany(c)||{}).cid||'',year:(ys.length?Math.min.apply(null,ys)-1:new Date().getFullYear()-1),rev:0,gross:0,op:0,net:0,asset:0,debt:0}},
  vat401:function(){return {cid:(mainCompany(c)||{}).cid||'',period:'',sales:0,zeroRate:0,payable:0,carry:0}},
  ownerLoans:function(){return {cid:(mainCompany(c)||{}).cid||'',dir:'我借公司',amount:0,hasNote:'否',interest:'否',crossYear:'是',note:''}},
- guarantees:function(){return {bank:'',item:'公司借款',limit:0,balance:0,due:'',coGuarantor:'',note:''}},
+ guarantees:function(){return {owner:m0.name||'',bank:'',item:'公司借款',limit:0,balance:0,due:'',coGuarantor:'',note:''}},
  bizAssets:function(){return {cid:(mainCompany(c)||{}).cid||'',name:'',type:'不動產',value:0,user:'公司營運',note:''}},
- channels:function(){return {cid:(mainCompany(c)||{}).cid||'',kind:'薪資',annual:0,withhold:'已辦',doc:'齊全',note:''}}
+ channels:function(){return {cid:(mainCompany(c)||{}).cid||'',kind:'薪資',annual:0,withhold:'已辦',doc:'齊全',note:''}},
+ compScenarios:function(){var k=(c.compScenarios||[]).length;
+  return {name:['薪資為主','股利為主','混合'][k]||('情境 '+(k+1)),salary:0,dividend:0,rent:0}}
 };
  var mk=TPL[arr];
  if(!mk){console.warn('addRow: 未知的資料表 '+arr);return;}
@@ -1761,6 +1813,9 @@ function dataPane(c){
  else if(app.dataTab==='company')body=companySec(c);
  else if(app.dataTab==='linkage')body=linkageSec(c);
  else if(app.dataTab==='bizgate')body=bizGateSec(c);
+ else if(app.dataTab==='bizcomp')body=(targetOn(c,'報酬結構優化')?goalHead(c,'報酬結構優化')+bizCompSec(c):foldedGoal(c,'報酬結構優化',''));
+ else if(app.dataTab==='bizrisk')body=(targetOn(c,'企業風險保障')?goalHead(c,'企業風險保障')+bizRiskSec(c):foldedGoal(c,'企業風險保障',''));
+ else if(app.dataTab==='bizexit')body=(targetOn(c,'事業退場規劃')?goalHead(c,'事業退場規劃')+bizExitSec(c):foldedGoal(c,'事業退場規劃',''));
  else body=trackingSec(c);
  if(['incomes','expenses','assets','liabilities'].indexOf(app.dataTab)>=0)body=ownerBar(c)+body;
  return '<div class="dgroups">'+tb+'</div>'+completenessHTML(c)+body;
@@ -3195,7 +3250,7 @@ function linkageSec(c){
  var bs=ownerBalanceSheet(c);
  var loans=tableSec('股東往來','ownerLoans',c.ownerLoans,[['dir','方向','sel:我借公司,公司借我'],['amount','餘額','money'],['hasNote','有借據','sel:否,是'],['interest','有計息','sel:否,是'],['crossYear','跨年度掛帳','sel:是,否'],['note','說明','text']],
   '方向決定後果，完全不同：<b>「公司借我」（掛資產方）</b>稅法上可能要設算利息課稅，銀行也會解讀成「公司的錢被老闆拿走」而扣授信分數；<b>「我借公司」（掛負債方）</b>則是老闆的個人資金被鎖在公司裡，個人流動性通常已經很差。');
- var gua=tableSec('個人連帶保證','guarantees',c.guarantees,[['bank','銀行 / 債權人','text'],['item','項目','sel:公司借款,租賃,票貼,信保基金,其他'],['limit','額度','money'],['balance','目前餘額','money'],['due','到期日','text'],['coGuarantor','共同保證人','text'],['note','備註','text']],
+ var gua=tableSec('個人連帶保證','guarantees',c.guarantees,[['owner','保證人','memsel'],['bank','銀行 / 債權人','text'],['item','項目','sel:公司借款,租賃,票貼,信保基金,其他'],['limit','額度','money'],['balance','目前餘額','money'],['due','到期日','text'],['coGuarantor','共同保證人','text'],['note','備註','text']],
   '這是<b>或有負債</b>——不一定會發生，一旦發生就是全額。不列進來，個人負債會被嚴重低估、壽險額度也會算錯。');
  var ba=tableSec('公司名下非營運資產','bizAssets',c.bizAssets,[['name','項目','text'],['type','類型','sel:不動產,車輛,保單,投資,其他'],['value','市值','money'],['user','實際使用人','sel:公司營運,本人,配偶,子女,其他'],['note','備註','text']],
   '名義上是公司的、實質上誰在用？非供本業使用者，進項不得扣抵、費用也會被剔除，金額大時可能被認定為變相盈餘分配。');
@@ -3318,6 +3373,197 @@ function bizSignalsHTML(c){
   '<div class="hint" style="margin-top:8px">把 1～12 掃過一遍，通常會得到同一個結論：<b>這位企業主的個人財務，其實是公司財務的「殘值」——公司先用，剩下的才是他的。</b>而財務規劃要做的第一件事，就是把這個順序翻轉過來。'+
   '<br>※ 一次不要跟客戶講超過三個缺口——缺口講太多會癱瘓，不會行動。</div></div>';
 }
+/* ── E3 報酬結構 ──
+   五條通道的最適化不是「哪一條最省稅」，是「總稅負 ＋ 總保障 ＋ 總退休準備」一起看。
+   例如：薪資可以壓低營所稅，但會拉高個人綜所稅與勞健保成本——
+   同時它也是唯一能累積勞保勞退年資、撐起貸款條件的一條。沒有標準答案。
+   ⚠️ 專業邊界：本區塊只做結構試算與取捨呈現，不對具體稅額或申報方式做保證。 */
+function compScenario(c,s){
+ var tp=c.taxParams||{};
+ var salary=n(s.salary),div=n(s.dividend),rent=n(s.rent);
+ // 公司端：薪資與租金可列費用（連同雇主負擔的勞退），股利來自稅後盈餘、不可列費用
+ var pension=Math.min(salary,LABOR_PENSION_CAP*12)*0.06;   // 雇主勞退提繳 6%，上限吃月提繳工資 15 萬
+ var deductible=salary+rent+pension;
+ var corpSave=deductible*PROFIT_TAX_RATE;
+ // 個人端：薪資走薪資特別扣除，租金可減除必要費用，股利兩制擇優
+ var rentNet=rent*(1-RENT_EXPENSE_RATE);
+ var people=1+(tp.married?1:0)+n(tp.dependents);
+ // 這三個數字與 incomeTax() 用的是同一組（免稅額 / 標準扣除 / 薪資特別扣除）
+ var exempt=97000*people;
+ var stdDed=tp.married?262000:131000;
+ var salarySpecial=Math.min(salary,218000);
+ var baseNet=function(extra){return Math.max(0,salary+rentNet+extra-exempt-stdDed-salarySpecial-n(tp.otherDeduction))};
+ var merged=bracket(baseNet(div),TAX_BR).tax-Math.min(div*DIVIDEND_CREDIT_RATE,DIVIDEND_CREDIT_CAP);
+ var separate=bracket(baseNet(0),TAX_BR).tax+div*DIVIDEND_SEPARATE_RATE;
+ var mergedBetter=merged<=separate;
+ var incomeTaxAmt=Math.max(0,Math.min(merged,separate));
+ // 二代健保補充保費：股利單筆達門檻才扣
+ var nhi=div>=NHI_SUPP_MIN?div*NHI_SUPP_RATE:0;
+ var personal=incomeTaxAmt+nhi;
+ return {name:s.name,salary:salary,dividend:div,rent:rent,pension:pension,
+  deductible:deductible,corpSave:corpSave,rentNet:rentNet,
+  merged:merged,separate:separate,mergedBetter:mergedBetter,incomeTax:incomeTaxAmt,nhi:nhi,
+  personal:personal,netCost:personal-corpSave,
+  takeHome:salary+div+rent-personal,
+  loanCapacity:salary*8,                       // 銀行常用的年收入倍數，粗估
+  hasPension:salary>0};
+}
+function bizCompSec(c){
+ var co=mainCompany(c);
+ var cur=(c.channels||[]);
+ var curSum=function(ks){return sum(cur,function(x){return ks.indexOf(x.kind)>=0?n(x.annual):0})};
+ var curRow=kvTbl([
+  ['薪資 ＋ 董監酬勞',curSum(['薪資','董監酬勞'])],
+  ['盈餘分配（股利）',curSum(['盈餘分配(股利)'])],
+  ['租金',curSum(['租金'])],
+  ['借款（股東往來）',curSum(['借款'])],
+  ['費用報銷',curSum(['費用報銷'])]
+ ]);
+ var scs=(c.compScenarios||[]).map(function(s){return compScenario(c,s)});
+ var head='<tr><th>組合</th><th>薪資</th><th>股利</th><th>租金</th><th>公司可列費用</th><th>公司稅負節省</th><th>個人綜所稅</th><th>二代健保</th><th>合計淨成本</th><th>可支配</th><th>勞退提繳</th><th>貸款能力(粗估)</th></tr>';
+ var best=scs.length?scs.reduce(function(a,b){return b.netCost<a.netCost?b:a}):null;
+ var rows=scs.map(function(r){return '<tr>'+
+  '<td class="k">'+esc(r.name||'—')+(best&&r===best?' <span class="tagMust">淨成本最低</span>':'')+'</td>'+
+  '<td>'+fmt(r.salary)+'</td><td>'+fmt(r.dividend)+'</td><td>'+fmt(r.rent)+'</td>'+
+  '<td>'+fmt(r.deductible)+'</td><td class="good">−'+fmt(r.corpSave)+'</td>'+
+  '<td class="bad">'+fmt(r.incomeTax)+'<div class="muted" style="font-size:11px">'+(r.dividend>0?(r.mergedBetter?'合併計稅較優':'分開計稅較優'):'—')+'</div></td>'+
+  '<td class="bad">'+fmt(r.nhi)+'</td><td><b>'+fmt(r.netCost)+'</b></td><td>'+fmt(r.takeHome)+'</td>'+
+  '<td>'+fmt(r.pension)+'</td><td>'+fmt(r.loanCapacity)+'</td></tr>'}).join('')
+  ||'<tr><td colspan="12" class="muted" style="padding:14px">尚無組合，點「＋ 新增」建一個情境（建議至少三個：薪資為主／股利為主／混合）。</td></tr>';
+ var tbl=tableSec('報酬組合情境','compScenarios',c.compScenarios,[['name','情境名稱','text'],['salary','薪資(年)','money'],['dividend','股利(年)','money'],['rent','租金(年)','money']],
+  '建議至少建三個：<b>薪資為主</b>（退休年資與貸款條件最好，但綜所稅與勞健保成本最高）、<b>股利為主</b>（不負擔勞健保，但要先被公司課 '+(PROFIT_TAX_RATE*100)+'%，而且完全不累積年資）、<b>混合</b>。每年五月前重算一次，不要沿用去年。');
+ return '<div class="folded" style="border-style:solid;border-color:rgba(143,192,163,.32);color:var(--mut);display:block">'+
+   '企業主體 · 報酬結構<span>公司的錢合法變成你的錢只有五條路。規劃師的價值在於把五條放在一起做總稅負＋總保障＋總退休準備的最適化，而不是單看某一條。</span></div>'+
+  '<div class="sec"><h4>現況 · 五條通道 <span class="hint">來自「公私勾稽」分頁的逐筆登錄</span></h4>'+curRow+
+   (cur.length?'':'<div class="hint" style="margin-top:6px">尚未登錄任何通道。<button class="tbtn" onclick="jumpTab(\'linkage\')">前往公私勾稽 →</button></div>')+'</div>'+
+  tbl+
+  '<div class="sec"><h4>組合對照 <span class="hint">同一筆錢，走不同通道的六個面向差異</span></h4>'+
+   '<div class="tw"><table class="rtable">'+head+rows+'</table></div>'+
+   (best?detailBox('「'+esc(best.name||'最佳組合')+'」怎麼算的',kvTbl([
+    ['薪資（公司可列費用）',best.salary],
+    ['＋ 雇主勞退提繳 6%（上限月提繳工資 '+fmt(LABOR_PENSION_CAP)+'）',Math.round(best.pension)],
+    ['＋ 租金（公司可列費用，個人可減除必要費用 '+(RENT_EXPENSE_RATE*100)+'%）',best.rent],
+    ['＝ 公司可列費用合計',Math.round(best.deductible)],
+    ['公司稅負節省 ＝ 可列費用 × 營所稅 '+(PROFIT_TAX_RATE*100)+'%',-Math.round(best.corpSave),'var(--ok)'],
+    ['股利合併計稅（可抵減 '+(DIVIDEND_CREDIT_RATE*100)+'%，上限 '+fmt(DIVIDEND_CREDIT_CAP)+'）',Math.round(best.merged)],
+    ['股利分開計稅 '+(DIVIDEND_SEPARATE_RATE*100)+'%',Math.round(best.separate)],
+    ['個人綜所稅（兩制擇優）',Math.round(best.incomeTax),'var(--warn)'],
+    ['二代健保補充保費 '+(NHI_SUPP_RATE*100)+'%（單筆達 '+fmt(NHI_SUPP_MIN)+' 才扣）',Math.round(best.nhi),'var(--warn)'],
+    ['合計淨成本 ＝ 個人稅費 − 公司稅負節省',Math.round(best.netCost),'var(--amber2)']
+   ])):'')+
+   '<div class="hint" style="margin-top:8px"><b>關鍵取捨</b>：薪資可以壓低營所稅，但會拉高個人綜所稅並增加勞健保成本；不過它也是唯一能累積<b>勞保勞退年資</b>、撐起<b>貸款條件</b>的一條。股利要先被公司課 '+(PROFIT_TAX_RATE*100)+'%，但不用負擔勞健保。<b>沒有標準答案，只有依個人邊際稅率的試算結果。</b>'+
+   '<br>租金要有租賃契約與合理租金；借款要有借據與合理利率；報銷必須是真實公司支出。<b>前提都是要有契約、要辦扣繳、要有合理性。</b></div>'+
+   bizBasisNote()+'</div>'+
+  '<div class="sec"><h4>盈餘：留在公司 vs 發給股東 <span class="hint">每年五月的固定決策題</span></h4>'+
+   kvTbl([
+    ['公司稅後盈餘（來自公司概況）',n((co||{}).netProfit)],
+    ['不分配 → 加徵未分配盈餘稅 '+(UNDISTRIBUTED_RATE*100)+'%',Math.round(n((co||{}).netProfit)*UNDISTRIBUTED_RATE),'var(--warn)'],
+    ['目前累積未分配盈餘',n((co||{}).retained)]
+   ])+
+   '<div class="hint" style="margin-top:8px">決策關鍵是<b>你個人的邊際稅率</b>，而且要看時間軸而不是單一年度：今年少繳的未分配盈餘稅，可能墊高十年後的遺贈稅——因為未上市櫃股權以<b>淨值</b>估算，公司越賺、盈餘累積越多，課稅價值就越高。另可評估產創條例 §23-3 的<b>實質投資減除</b>。</div></div>';
+}
+
+/* ── E4 企業風險與保障 ──
+   企業主比一般人多兩層：關鍵人與股東。而個人層的壽險額度，
+   還要再加上他簽下的連帶保證——這一項往往讓需求額度倍增。 */
+function bizRiskSec(c){
+ var pm=(primaryMember(c)||{}).name||'本人';
+ var gua=guaranteeTotal(c);
+ var guaMe=guaranteeFor(c,pm);
+ var layers=[
+  ['企業層','火災、產品責任、營業中斷、員工職災','產險、責任險、營業中斷險、團體保險','bizCorp'],
+  ['關鍵人層','老闆或核心幹部身故／失能 → 營運中斷、銀行抽銀根、客戶流失','關鍵人壽險／失能險（受益人為公司）','bizKey'],
+  ['股東層','股東身故 → 股權落入不熟悉經營的繼承人手中','股權買賣協議（Buy-Sell）＋ 以保險作為履約資金','bizShare']
+ ];
+ var g=c.bizRisk||{};
+ var rows=layers.map(function(L){
+  var k=L[3];
+  return '<tr><td class="k">'+L[0]+'</td><td>'+L[1]+'</td><td>'+L[2]+'</td>'+
+   '<td><select onchange="setObj(\'bizRisk\',\''+k+'\',this.value)">'+
+   ['未評估','已有規劃','有缺口','不適用'].map(function(o){return '<option '+((g[k]||'未評估')===o?'selected':'')+'>'+o+'</option>'}).join('')+
+   '</select></td>'+
+   '<td>'+moneyCell('onchange="setObj(\'bizRisk\',\''+k+'Amt\',this.value,\'num\')"',g[k+'Amt'])+'</td></tr>';
+ }).join('');
+ return '<div class="folded" style="border-style:solid;border-color:rgba(143,192,163,.32);color:var(--mut);display:block">'+
+   '企業主體 · 企業風險與保障<span>個人與家庭那一層仍在「保障中心」；這裡處理企業主多出來的三層。</span></div>'+
+  '<div class="sec"><h4>三層架構 <span class="hint">企業層 · 關鍵人層 · 股東層</span></h4>'+
+   '<div class="tw"><table class="rtable"><tr><th>層次</th><th>風險</th><th>常見工具</th><th>現況</th><th>已備額度</th></tr>'+rows+'</table></div>'+
+   '<div class="hint" style="margin-top:8px"><b>股權買賣協議需要「錢」才能執行</b>——協議寫得再好，剩下的股東沒錢買下股份就是廢紙，保險是最常見的資金來源設計。另外，<b>公司投保與個人投保的稅務與受益歸屬不同</b>，要事前釐清受益人、保費列支與給付課稅。</div></div>'+
+  '<div class="sec"><h4>個人層：連帶保證已進壽險需求 <span class="hint">這是企業主與受薪者最大的差別</span></h4>'+
+   kvTbl([
+    ['連帶保證總額（全家）',gua],
+    ['其中「'+esc(pm)+'」簽的',guaMe,'var(--warn)'],
+    ['已加進「'+esc(pm)+'」的壽險需求',guaMe,'var(--amber2)']
+   ])+
+   '<div class="hint" style="margin-top:8px">一般人算壽險需求是「房貸 ＋ 生活費 ＋ 教育金」；企業主還要加上他簽下的保證金額——<b>這往往讓需求額度倍增</b>。'+
+   (gua>0?' 目前的缺口已反映在<b>保障中心</b>與分析頁的缺口表。':' 尚未登錄任何連帶保證。<button class="tbtn" onclick="jumpTab(\'linkage\')">前往登錄 →</button>')+
+   '</div>'+
+   '<div style="margin-top:9px"><button class="tbtn amber" onclick="jumpTab(\'coverage\')">前往保障中心 →</button></div></div>';
+}
+
+/* ── E6 退場與傳承 ──
+   企業主的退休不是「存夠錢 ＋ 停止工作」，是「把股權變現或交棒」——
+   一個需要三到十年準備的專案，不是一個存錢目標。三條路的準備方式完全不同，必須先選定。 */
+var DEBOSS_Q=[
+ '公司有我以外的人可以做最終決策',
+ '主要客戶關係不是只綁在我個人身上',
+ '關鍵作業有書面流程，新人照著做得起來',
+ '財務報表即時、可信，外部人看得懂',
+ '我可以連續離開一個月，公司照常運作'
+];
+function setExit(k,v,type){var c=activeCase();c.bizExit=c.bizExit||{};c.bizExit[k]=(type==='num')?n(v):v;save();render()}
+function setDeboss(i,v){var c=activeCase();c.bizExit=c.bizExit||{};c.bizExit.deboss=c.bizExit.deboss||{};
+ if(c.bizExit.deboss[i]===v)delete c.bizExit.deboss[i];else c.bizExit.deboss[i]=v;save();render()}
+function debossScore(c){var d=((c.bizExit||{}).deboss)||{};
+ var yes=Object.keys(d).filter(function(k){return d[k]==='是'}).length;
+ return {yes:yes,answered:Object.keys(d).length,pct:Math.round(yes/DEBOSS_Q.length*100)};}
+function bizExitSec(c){
+ var x=c.bizExit||{},co=mainCompany(c);
+ var eq=equityTotal(c);
+ var m=metrics(c);
+ var esNow=estateTax(c,m.net),esWith=estateTax(c,m.net+eq);
+ var ds=debossScore(c);
+ var pathRows=EXIT_PATHS.map(function(p){var on=x.path===p[0];
+  return '<tr'+(on?' style="background:rgba(201,154,91,.10)"':'')+'><td class="k"><button class="tbtn'+(on?' amber':'')+'" onclick="setExit(\'path\',\''+p[0]+'\')">'+(on?'✓ ':'')+p[0]+'</button></td>'+
+   '<td>'+p[1]+'</td><td style="white-space:nowrap">'+p[2]+'</td></tr>'}).join('');
+ var stageRows=BIZ_STAGES.map(function(s){var on=x.stage===s[0];
+  return '<tr'+(on?' style="background:rgba(201,154,91,.10)"':'')+'><td class="k"><button class="tbtn'+(on?' amber':'')+'" onclick="setExit(\'stage\',\''+s[0]+'\')">'+(on?'✓ ':'')+s[0]+'</button></td><td>'+s[1]+'</td></tr>'}).join('');
+ var debossRows=DEBOSS_Q.map(function(q,i){var a=((x.deboss)||{})[i];
+  var btn=function(v){return '<button class="tbtn'+(a===v?' amber':'')+'" style="min-width:42px" onclick="setDeboss('+i+',\''+v+'\')">'+v+'</button>'};
+  return '<tr><td class="k">'+(i+1)+'</td><td>'+q+'</td><td style="white-space:nowrap">'+btn('是')+' '+btn('否')+'</td></tr>'}).join('');
+ return '<div class="folded" style="border-style:solid;border-color:rgba(143,192,163,.32);color:var(--mut);display:block">'+
+   '企業主體 · 退場與傳承<span>「如果明天你想退休，這家公司在沒有你的情況下還值多少錢？」——多數企業主答不出來，而這個答案決定了他的退休金到底存不存在。</span></div>'+
+  '<div class="sec"><h4>退場路徑 <span class="hint">必須先選定，因為準備方式完全不同</span></h4>'+
+   '<div class="tw"><table class="rtable"><tr><th>路徑</th><th>關鍵準備</th><th>需要的時間</th></tr>'+pathRows+'</table></div>'+
+   '<div class="fgrid" style="margin-top:10px">'+
+    '<div class="f"><label>預計退場年齡</label><input type="number" value="'+esc(x.age==null?'':x.age)+'" onchange="setExit(\'age\',this.value,\'num\')"></div>'+
+    '<div class="f"><label>接班人 / 買方</label><input value="'+esc(x.successor||'')+'" onchange="setExit(\'successor\',this.value)"></div>'+
+    '<div class="f"><label>期望變現金額</label>'+moneyCell('onchange="setExit(\'targetValue\',this.value,\'num\')"',x.targetValue)+'</div></div>'+
+   (x.path?'<div class="hint" style="margin-top:8px">已選「'+esc(x.path)+'」，建議準備期 '+esc((EXIT_PATHS.filter(function(p){return p[0]===x.path})[0]||[])[2]||'')+'。'+
+     (n(x.age)>0&&n(c.profile.age)>0?' 距今 '+Math.max(0,n(x.age)-n(c.profile.age))+' 年。':'')+'</div>':'')+'</div>'+
+  '<div class="sec"><h4>去老闆化評分 <span class="hint">公司在沒有你的情況下，還剩多少價值</span></h4>'+
+   '<div class="tw"><table class="rtable"><tr><th>#</th><th>檢核項目</th><th>是 / 否</th></tr>'+debossRows+'</table></div>'+
+   '<div class="big3" style="margin-top:12px"><div class="b"><div class="l">去老闆化程度</div><div class="v" style="color:'+(ds.pct>=80?'var(--ok)':ds.pct>=40?'var(--amber2)':'var(--warn)')+'">'+ds.pct+'%</div></div>'+
+   '<div class="b"><div class="l">已回答</div><div class="v">'+ds.answered+' / '+DEBOSS_Q.length+'</div></div>'+
+   '<div class="b"><div class="l">本人股權估值</div><div class="v">'+fmt(eq)+'</div></div></div>'+
+   '<div class="hint" style="margin-top:8px">分數越低，代表公司價值越綁在他個人身上——<b>要出售就折價，要交棒就交不出去</b>。「出售事業」這條路的核心準備工作，就是把這五題從否變成是。</div></div>'+
+  '<div class="sec"><h4>股權對遺贈稅的影響 <span class="hint">未上市櫃股權以淨值估算：公司越賺、盈餘累積越多，課稅價值越高</span></h4>'+
+   kvTbl([
+    ['個人淨值（不含公司股權）',m.net],
+    ['＋ 本人股權估值',Math.round(eq)],
+    ['預估遺產稅（不含股權）',Math.round(esNow.tax)],
+    ['預估遺產稅（含股權）',Math.round(esWith.tax),'var(--warn)'],
+    ['股權造成的稅負增加',Math.round(esWith.tax-esNow.tax),'var(--amber2)']
+   ])+
+   '<div class="hint" style="margin-top:8px">這正是「四稅要一起看」的地方：<b>今年少繳的未分配盈餘稅，可能墊高十年後的遺贈稅。</b>這是時間軸上的最適化，不是單一年度的最小化。'+
+   '<br>公平性設計：有人接班、有人不接班時，需要用保險或其他資產做<b>分配平衡</b>，否則家族糾紛的機率很高。'+
+   '<br>股權架構、傳承工具、家族協議<b>須有律師參與</b>；規劃師負責提出議題與整合，執行要與會計師、律師共同進行。</div>'+
+   bizBasisNote()+'</div>'+
+  '<div class="sec"><h4>企業階段 → 該解的題 <span class="hint">最常見的錯誤是跨階段操作</span></h4>'+
+   '<div class="tw"><table class="rtable"><tr><th>階段</th><th>財務重心</th></tr>'+stageRows+'</table></div>'+
+   '<div class="hint" style="margin-top:8px">生存期就在談 IPO、成長期就在做複雜的控股架構——<b>提早處理下一階段的題目，通常只會消耗掉解決當下問題的資源</b>。第一層（帳務與現金流）沒站穩就跳到第二層，結果通常是「募到錢，然後燒得更快」。</div></div>';
+}
+
 /* ── E5 稅務合規閘 ──
    語意上這不是一個「填完就好」的分頁，是一個會蓋在整個案子上的**狀態**：
    客戶的帳與稅本身有問題，前面所有規劃都建立在不穩定的基礎上。
@@ -4420,10 +4666,46 @@ function retireCashflowHTML(c){var proj=projection(c),ra=n(c.profile.retireAge),
   return '<tr'+(r.age===ra?' style="background:rgba(246,169,43,.12)"':'')+'><td class="k">'+r.age+(r.age===ra?' 退休':'')+'</td><td>'+fmt(r.work)+'</td><td>'+fmt(r.fin)+'</td><td>'+fmt(out)+'</td><td class="'+(r.bal>=0?'good':'bad')+'">'+fmt(r.bal)+'</td></tr>'}).join('');
  return '<div class="sec"><h4>退休金流逐年試算 <span class="hint">'+from+'–'+to+' 歲</span></h4><table class="rtable"><tr><th>年齡</th><th>工作收入</th><th>理財收入</th><th>年支出</th><th>年度結餘</th></tr>'+rows+'</table></div>';
 }
+/* ── 八大面向 × 三階段提案矩陣 ──
+   ⚠️ 這裡有一條「內容規則」而不是 UI 偏好：一次最多顯示三個缺口。
+   原文在兩個地方重複強調——缺口講太多會癱瘓，不會行動。
+   系統天生傾向把 12 個訊號 ＋ 10 題檢核 ＋ 8 大面向全噴出來，所以要硬性擋。 */
+var BIZ_ASPECTS=[
+ ['流動性與現金流','雙層設計：公司週轉金 '+CORP_RESERVE_MONTHS[0]+'～'+CORP_RESERVE_MONTHS[1]+' 個月固定支出；家庭緊急預備金 '+OWNER_EMERGENCY_MONTHS[0]+'～'+OWNER_EMERGENCY_MONTHS[1]+' 個月家庭支出。兩層必須分開，個人層不能被公司挪用。','止血'],
+ ['報酬結構設計','五條通道的總稅負＋總保障＋總退休準備最適化，而不是單看某一條。','優化'],
+ ['風險保障','企業層／關鍵人層／股東層，加上個人層——壽險額度須覆蓋連帶保證債務。','止血'],
+ ['稅務效率','營所稅→未分配盈餘稅→綜所稅→遺贈稅四層一起看，是時間軸上的最適化。','優化'],
+ ['資產配置與公私分離','哪些資產該放公司、哪些該放個人？個人投資是否與本業風險重疊？有沒有與公司完全脫鉤的資產池？','優化'],
+ ['退休與退場','三條路先選定：傳承接班／出售事業／收攤清算，準備方式完全不同。','傳承'],
+ ['傳承與股權','未上市櫃股權以淨值估算；移轉方式、架構工具、家族治理、公平性設計。','傳承'],
+ ['治理與制度基礎','公私帳分離、帳務即時性、股東往來結清機制、公司預算制度。這一項通常不是規劃師自己執行，但要能辨識並轉介。','止血']
+];
+function bizAdviceHTML(c){
+ if(!entityOn(c,'company'))return '';
+ var g=gateLevel(c);
+ var on=bizSignals(c).filter(function(s){return s.st==='on'});
+ var top3=on.slice(0,3),rest=on.length-top3.length;
+ var focusStage=g.lv==='red'?'止血':g.lv==='amber'?'優化':null;
+ var rows=BIZ_ASPECTS.map(function(a){
+  var hot=focusStage&&a[2]===focusStage;
+  return '<tr'+(hot?' style="background:rgba(201,154,91,.10)"':'')+'><td class="k">'+a[0]+(hot?' <span class="tagMust">本階段重點</span>':'')+'</td><td>'+a[1]+'</td><td style="white-space:nowrap">'+a[2]+'</td></tr>'}).join('');
+ var top=top3.length
+  ? '<ol style="margin:0;padding-left:20px;line-height:1.85;font-size:13.5px;color:var(--mut)">'+
+    top3.map(function(s){return '<li style="margin-bottom:6px"><b>'+s.title+'</b><br>'+s.mean+'<br><span style="color:var(--amber2)">建議：'+s.act+'</span></li>'}).join('')+'</ol>'+
+    (rest>0?'<details style="margin-top:8px"><summary style="cursor:pointer;color:var(--mut2);font-size:12.5px">其他觀察（'+rest+' 項，本次先不處理）</summary><ul style="margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--mut2);line-height:1.8">'+
+     on.slice(3).map(function(s){return '<li>'+s.title+'</li>'}).join('')+'</ul></details>':'')
+  : '<div class="hint">目前沒有掃到亮燈的訊號。若多數項目顯示「待補資料」，代表資料還沒收齊，<b>不等於沒有問題</b>。</div>';
+ return '<div class="sec"><h4>企業主 · 優先處理的三件事 <span class="hint">一次不超過三個缺口——講太多會癱瘓，不會行動</span></h4>'+top+'</div>'+
+  '<div class="sec"><h4>八大面向 × 分階段 <span class="hint">止血 3 個月內 · 優化 6～12 個月 · 傳承 1～3 年'+(focusStage?'；目前建議聚焦「'+focusStage+'」':'')+'</span></h4>'+
+   '<div class="tw"><table class="rtable"><tr><th>面向</th><th>要處理什麼</th><th>階段</th></tr>'+rows+'</table></div>'+
+   '<div class="hint" style="margin-top:8px">八大面向全部服務同一個核心命題：把集中、不流動、與人身綁定的資產，逐步轉換成分散、流動、與人身脫鉤的資產。'+
+   '<br>治理與制度基礎是<b>所有規劃的前提</b>——客戶的帳務不透明，前面七項全部做不紮實。能指出「你要先做 A 才能做 B」的顧問，比急著賣 B 的顧問更值得信任。</div></div>';
+}
 function advicePane(c){var list=advice(c),h=health(c),m=metrics(c),rn=retireNeed(c),acts=actionList(c);
  var cards=list.map(function(a,i){return '<div class="advcard"><h4>'+(i+1)+'. '+a[0]+'</h4><p>'+a[1]+'</p></div>'}).join('');
  var actRows=acts.map(function(a){return '<tr><td class="k" style="text-align:center;color:var(--amber2)">'+a.axis+'</td><td class="k">'+esc(a.title)+'</td><td>'+esc(a.detail)+'</td></tr>'}).join('');
- return '<div class="sec"><h4>規劃建議（'+stageName(h.grade)+' · '+stageTask(h.grade)+'）</h4>'+cards+'</div>'+
+ return bizAdviceHTML(c)+
+  '<div class="sec"><h4>規劃建議（'+stageName(h.grade)+' · '+stageTask(h.grade)+'）</h4>'+cards+'</div>'+
   '<div class="sec"><h4>執行行動清單（依軸線 A/B/C/D）</h4><table class="rtable"><tr><th>軸線</th><th>動作</th><th>說明</th></tr>'+actRows+'</table></div>'+
   '<div class="sec"><h4>動態調整（PDCA）</h4><div class="muted">計畫(Plan) → 行動(Do) → 確認(Check) → 調整(Act)，每年至少檢視一次。<br>下次檢視日期：<b style="color:var(--amber2)">'+(esc(c.nextReview)||'尚未設定')+'</b></div></div>'+
   '<div class="sec"><h4>缺口總表 <span class="hint">依「必須達成」優先序排列，順位在前的先滿足</span></h4><table class="rtable">'+
@@ -4441,6 +4723,7 @@ function toolsPane(c){var L=app.tools.loan,R=app.tools.ret;
  return '<div class="sec"><h4>貸款試算（本息平均攤還）</h4><div class="fgrid">'+loanF+'</div><div class="big3" style="margin-top:12px"><div class="b"><div class="l">每月應繳</div><div class="v">'+fmt(mp)+'</div></div><div class="b"><div class="l">總還款</div><div class="v">'+fmt(totalPay)+'</div></div><div class="b"><div class="l">總利息</div><div class="v" style="color:var(--warn)">'+fmt(totalInt)+'</div></div></div>'+detailBox('逐期攤還明細',amortTbl(n(L.amt),n(L.rate),months))+'</div>'+
   '<div class="sec"><h4>退休快速試算</h4><div class="fgrid">'+retF+'</div><div class="big3" style="margin-top:12px"><div class="b"><div class="l">退休後餘年</div><div class="v">'+m2+' 年</div></div><div class="b"><div class="l">退休月生活費(終值)</div><div class="v">'+fmt(monthFV)+'</div></div><div class="b"><div class="l">退休總需求</div><div class="v" style="color:var(--amber2)">'+fmt(total)+'</div></div></div>'+detailBox('年金計算明細',kvTbl([['退休月生活費(現值)',n(R.month)],['距退休 '+years+' 年 → 月生活費(終值)',Math.round(monthFV)],['退休時年支出(終值)',Math.round(annualFV)],['退休後餘命',m2+' 年'],['報酬率 / 通膨',(rr*100).toFixed(1)+'% / '+(infl*100).toFixed(1)+'%'],['退休總需求(成長型年金現值)',Math.round(total),'var(--amber2)']]))+'</div>'+
   compToolHTML()+irrToolHTML()+houseToolHTML()+carToolHTML()+bizToolHTML()+
+  cash13ToolHTML()+leakToolHTML()+cashHealthToolHTML()+
   '<div class="muted">工具箱為獨立快速試算，不影響客戶案件資料。</div>';
 }
 function toolF(g,defs){return defs.map(function(x){return '<div class="f"><label>'+x[1]+'</label><input type="number" value="'+esc(app.tools[g][x[0]])+'" oninput="setTool(\''+g+'\',\''+x[0]+'\',this.value)"></div>'}).join('');}
@@ -4503,7 +4786,152 @@ function bizToolHTML(){var T=app.tools.biz,net=n(T.monthRev)-n(T.monthCost);
  var runway=net>=0?'—（獲利）':Math.floor(n(T.cash)/Math.max(1,-net))+' 個月';
  return '<div class="sec"><h4>公司開辦 · 營運資金試算 <span class="hint">適用企業主客戶</span></h4><div class="fgrid">'+toolF('biz',[['setup','開辦資金'],['cash','現有可用資金'],['monthRev','每月營業額'],['monthCost','每月成本']])+'</div>'+
   toolBig([['每月淨流'+(net>=0?'入':'出'),fmt(Math.abs(net)),net>=0?'var(--ok)':'var(--warn)'],['現金可撐',runway,net>=0?'var(--ok)':'var(--warn)'],['開辦＋半年週轉',fmt(n(T.setup)+Math.max(0,-net)*6),'var(--amber2)']])+'</div>';}
-function reportPane(c){return '<div style="margin-bottom:10px" class="muted">客戶交付報告預覽（圖表化），右上「列印報告」輸出 PDF。</div>'+
+/* ── 企業主財務診斷書 ──
+   刻意「不」塞進家庭版報告書：既有報告書已經很長，硬加一章會爆；
+   而且獨立輸出反而更有價值——這是一份可以獨立交付、甚至獨立收費的東西。
+   ⚠️ 合規閘燈號只出現在這一份與顧問端，家庭版客戶報告書不顯示（Ray 2026/08/22 拍板）。 */
+function setReportDoc(v){app.reportDoc=v;render()}
+function bizReportHTML(c){
+ var p=c.profile||{},co=mainCompany(c)||{},bs=ownerBalanceSheet(c),g=gateLevel(c),L=GATE_LAMP[g.lv];
+ var sg=bizSignals(c),on=sg.filter(function(s){return s.st==='on'});
+ var m=metrics(c),eq=equityTotal(c),ds=debossScore(c);
+ var lampCol=g.lv==='green'?'#3f7d54':g.lv==='amber'?'#b5852f':g.lv==='red'?'#b05a4a':'#777';
+ var bsRow=function(x){return '<tr><td>'+x.label+(x.illiquid?'（不流動）':'')+'</td><td style="text-align:right">'+fmt(x.v)+'</td><td style="color:#5a6b72">'+(x.note||'')+'</td></tr>'};
+ var sigRows=sg.map(function(s){
+  var col=s.st==='on'?'#b05a4a':s.st==='ok'?'#3f7d54':'#999';
+  var txt=s.st==='on'?'亮燈':s.st==='ok'?'正常':'待補資料';
+  return '<tr><td>'+s.no+'</td><td>'+s.title+'</td><td style="color:'+col+';font-weight:700">'+txt+'</td><td style="color:#5a6b72">'+(s.st==='on'?s.act:'—')+'</td></tr>'}).join('');
+ var top3=on.slice(0,3).map(function(s,i){return '<li style="margin-bottom:6px"><b>'+(i+1)+'. '+s.title+'</b><br><span style="color:#5a6b72">'+s.mean+'</span><br>建議：'+s.act+'</li>'}).join('')
+  ||'<li style="color:#5a6b72">目前沒有掃到亮燈的訊號。若多數項目顯示「待補資料」，代表資料還沒收齊，不等於沒有問題。</li>';
+ var phases=[
+  ['第一階段 · 止血','3 個月內','個人緊急預備金、覆蓋連帶保證的保障、公私帳分離'],
+  ['第二階段 · 優化','6～12 個月','報酬結構重設計、稅務效率、資產配置分散'],
+  ['第三階段 · 傳承','1～3 年','退場路徑選定、股權與傳承架構、家族治理']
+ ].map(function(x){return '<tr><td><b>'+x[0]+'</b></td><td style="white-space:nowrap">'+x[1]+'</td><td>'+x[2]+'</td></tr>'}).join('');
+ return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 企業主財務規劃</div><h1>企業主財務診斷書</h1></div>'+
+  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
+  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+(co.name?' · '+esc(co.name):'')+'</div></div>'+
+
+  '<h2>一、核心命題</h2>'+
+  '<p style="font-size:14px;line-height:1.9">企業主的財務規劃，本質是<b>「把一個高度集中、不流動、與人身高度綁定的資產，逐步轉換成分散、流動、與人身脫鉤的資產」</b>的過程。'+
+  '一般受薪者的資產是分散的；企業主通常有 60～90% 是自家公司股權——不流通、不可分割、估值困難，而且高度依賴他本人。'+
+  '更關鍵的是<b>收入與資產同源</b>：受薪者失業，資產還在；企業主的公司出事，收入和資產會同時消失。</p>'+
+
+  '<h2>二、規劃可信度</h2>'+
+  '<table><tr><td>判定</td><td style="color:'+lampCol+';font-weight:700">'+L[0]+'</td></tr>'+
+  '<tr><td>十題檢核勾「否」</td><td>'+g.no+' / '+g.answered+'</td></tr>'+
+  '<tr><td>財報訊號亮燈</td><td>'+g.scanOn+'</td></tr></table>'+
+  '<p style="font-size:13px;color:#5a6b72;margin-top:6px">'+L[2]+'</p>'+
+
+  '<h2>三、整合式個人資產負債表</h2>'+
+  '<table><tr><th>資產</th><th style="text-align:right">金額</th><th>備註</th></tr>'+bs.A.map(bsRow).join('')+
+  '<tr><td><b>資產合計</b></td><td style="text-align:right"><b>'+fmt(bs.assetTotal)+'</b></td><td></td></tr></table>'+
+  '<table style="margin-top:8px"><tr><th>負債</th><th style="text-align:right">金額</th><th>備註</th></tr>'+bs.L.map(bsRow).join('')+
+  '<tr><td><b>負債合計</b></td><td style="text-align:right"><b>'+fmt(bs.liabTotal)+'</b></td><td></td></tr>'+
+  '<tr><td>個人連帶保證</td><td style="text-align:right;color:#b05a4a">'+fmt(bs.guarantee)+'</td><td style="color:#5a6b72">或有負債，不計入淨值但必須揭露</td></tr></table>'+
+  '<table style="margin-top:8px"><tr><td><b>淨值</b></td><td style="text-align:right"><b>'+fmt(bs.net)+'</b></td></tr>'+
+  '<tr><td><b>流動性淨值</b>（扣除公司股權、自住不動產、對公司債權）</td><td style="text-align:right;color:#b07d3d;font-weight:800">'+fmt(bs.liquidNet)+'</td></tr>'+
+  '<tr><td><b>連帶保證覆蓋率</b>（流動性淨值 ÷ 連帶保證）</td><td style="text-align:right;font-weight:800">'+(bs.coverage==null?'—':(bs.coverage*100).toFixed(0)+'%')+'</td></tr></table>'+
+  '<p style="font-size:13px;color:#5a6b72;margin-top:6px">覆蓋率遠低於 1，代表這個家庭暴露在極大的風險中。</p>'+
+
+  '<h2>四、十二個財報訊號</h2>'+
+  '<table><tr><th>#</th><th>訊號</th><th>判定</th><th>可切入的規劃</th></tr>'+sigRows+'</table>'+
+
+  '<h2>五、優先處理的三件事</h2>'+
+  '<ol style="font-size:13.5px;line-height:1.8;padding-left:20px">'+top3+'</ol>'+
+  '<p style="font-size:13px;color:#5a6b72">一次不處理超過三項——缺口講太多會癱瘓，不會行動。</p>'+
+
+  '<h2>六、分階段提案</h2>'+
+  '<table><tr><th>階段</th><th>時間感</th><th>內容</th></tr>'+phases+'</table>'+
+
+  '<h2>七、退場與股權</h2>'+
+  '<table><tr><td>本人股權估值（'+esc(co.valueMethod||'淨值法')+'）</td><td style="text-align:right">'+fmt(eq)+'</td></tr>'+
+  '<tr><td>佔個人總資產比例</td><td style="text-align:right">'+(bs.assetTotal>0?(eq/bs.assetTotal*100).toFixed(0)+'%':'—')+'</td></tr>'+
+  '<tr><td>退場路徑</td><td style="text-align:right">'+esc((c.bizExit||{}).path||'尚未選定')+'</td></tr>'+
+  '<tr><td>去老闆化程度</td><td style="text-align:right">'+(ds.answered?ds.pct+'%':'—')+'</td></tr></table>'+
+  '<p style="font-size:13px;color:#5a6b72;margin-top:6px">「如果明天你想退休，這家公司在沒有你的情況下，還值多少錢？」——這個答案決定了退休金到底存不存在。</p>'+
+
+  '<h2>八、注意事項</h2>'+
+  '<p style="font-size:12.5px;color:#5a6b72;line-height:1.9">本診斷書為財務規劃用途的結構分析，依 '+BIZ_TAX_BASIS+' 台灣現行法規環境撰寫。'+
+  '文中所有稅務、法律相關內容<b>僅供理解架構之用，不構成稅務、法律或投資建議</b>。'+
+  '稅法與函釋時有修正，個別企業與家庭情況差異極大，實際執行請與客戶的會計師、律師及相關專業人士共同確認。<br>'+
+  '財務規劃師可以做的是：解讀財報、指出結構性缺口、整合式資產負債表與現金流分析、報酬結構的試算框架、保障缺口分析、退休與傳承的議題盤點。'+
+  '應轉介專業人士的是：記帳與稅務申報、財稅簽證、認定特定稅務處理的合法性、法律文件撰擬、公司架構的設立與變更。</p>'+
+  (c.bizReportNote?'<h2>九、教練總結</h2><p style="font-size:13.5px;line-height:1.9;white-space:pre-wrap">'+esc(c.bizReportNote)+'</p>':'')+
+  '</div>';
+}
+/* ── 企業現金流三件工具 ──
+   刻意放工具箱而不是規劃案裡：13 週表是「每週滾動更新」的營運工具，
+   塞進年度規劃案只會變成一張永遠沒人填的表。填不完的表等於沒有表。 */
+function cash13ToolHTML(){var T=app.tools.cash13;
+ var rows=[],cash=n(T.open),minWeek=null,minCash=null;
+ for(var w=1;w<=13;w++){
+  var inflow=n(T.inflow),outflow=n(T.outflow)+((w%2===1)?n(T.vat)/1:0)/1;
+  // 營業稅每兩個月一期（1、3、5、7、9、11 月），13 週約含 1.5 期 → 每 8 週攤一次
+  outflow=n(T.outflow)+((w===2||w===10)?n(T.vat):0)+((w===6)?n(T.profitTax):0);
+  var open=cash,close=open+inflow-outflow;
+  var low=close<n(T.safe);
+  if(low&&minWeek===null){minWeek=w;minCash=close}
+  rows.push('<tr'+(low?' style="background:rgba(176,90,74,.12)"':'')+'><td>W'+w+'</td><td>'+fmt(open)+'</td><td class="good">'+fmt(inflow)+'</td><td class="bad">'+fmt(outflow)+'</td><td>'+fmt(close-open)+'</td><td'+(low?' style="color:var(--warn);font-weight:800"':'')+'>'+fmt(close)+'</td><td>'+(low?'⚠ 跌破安全水位':'')+'</td></tr>');
+  cash=close;
+ }
+ return '<div class="sec"><h4>13 週現金流量預測表 <span class="hint">比任何財務報表都重要，因為它看的是未來</span></h4>'+
+  '<div class="fgrid">'+toolF('cash13',[['open','期初現金'],['inflow','每週現金流入'],['outflow','每週固定流出'],['vat','營業稅(每期)'],['profitTax','營所稅/暫繳'],['safe','安全水位']])+'</div>'+
+  toolBig([['第 13 週期末現金',fmt(cash),cash>=n(T.safe)?'var(--ok)':'var(--warn)'],
+   ['最早跌破安全水位',minWeek?('第 '+minWeek+' 週'):'未跌破',minWeek?'var(--warn)':'var(--ok)'],
+   ['13 週淨變動',fmt(cash-n(T.open)),cash>=n(T.open)?'var(--ok)':'var(--warn)']])+
+  detailBox('逐週明細','<div class="tw"><table class="rtable"><tr><th>週</th><th>期初</th><th>流入</th><th>流出</th><th>淨變動</th><th>期末</th><th></th></tr>'+rows.join('')+'</table></div>')+
+  '<div class="hint" style="margin-top:8px">三個使用要點：<b>每週滾動更新一次</b>，永遠往前看 13 週；先設定安全水位（通常是 1～2 個月固定支出），哪一週跌破就是要立刻處理的時間點；<b>稅金要單獨一列</b>——1、3、5、7、9、11 月的營業稅、5 月的營所稅、9 月的暫繳，都是可預測的大額支出，卻最常被漏掉。</div></div>';}
+
+function leakToolHTML(){var T=app.tools.leak;
+ var netCash=n(T.profit)-n(T.ar)-n(T.inv)-n(T.capex)-n(T.principal)-n(T.tax)+n(T.dep);
+ return '<div class="sec"><h4>「有獲利卻沒現金」五個漏斗 <span class="hint">損益表賺錢，銀行帳戶卻在減少——差額跑去哪了</span></h4>'+
+  '<div class="fgrid">'+toolF('leak',[['profit','稅後淨利'],['ar','應收帳款增加'],['inv','存貨增加'],['capex','資本支出'],['principal','償還借款本金'],['tax','繳稅'],['dep','折舊攤銷(加回)']])+'</div>'+
+  toolBig([['實際現金變動',fmt(netCash),netCash>=0?'var(--ok)':'var(--warn)'],
+   ['帳面與現金的差額',fmt(netCash-n(T.profit)),'var(--warn)'],
+   ['最大的單一漏斗',(function(){var ks=[['應收帳款',n(T.ar)],['存貨',n(T.inv)],['資本支出',n(T.capex)],['還本金',n(T.principal)],['繳稅',n(T.tax)]];
+     ks.sort(function(a,b){return b[1]-a[1]});return ks[0][1]>0?ks[0][0]+' '+fmt(ks[0][1]):'—'})(),'var(--amber2)']])+
+  detailBox('每個漏斗的性質與處理方向',kvTbl([
+   ['① 應收帳款　可逆，靠管理','縮短帳期、加強催收、分級授信'],
+   ['② 存貨　可逆，靠管理','降低安全庫存、處理呆滯料'],
+   ['③ 資本支出　決策問題','改用租賃或分期，避免一次性大額支出'],
+   ['④ 償還本金　<b>損益表完全看不到</b>','拉長還款年限、轉貸'],
+   ['⑤ 繳稅　可預測但常被遺忘','提前預留稅金專戶']
+  ]))+
+  '<div class="hint" style="margin-top:8px"><b>償還本金不在損益表上。</b>很多老闆看到損益表賺錢就放心，卻忘了每月要還的本金是實實在在的現金流出——這是中小企業現金斷鏈最常見的單一原因。</div></div>';}
+
+function cashHealthToolHTML(){var T=app.tools.cashh;
+ var months=n(T.fixed)>0?n(T.cash)/n(T.fixed):0;
+ var ccc=n(T.arDays)+n(T.invDays)-n(T.apDays);
+ var quality=n(T.netProfit)!==0?n(T.ocf)/n(T.netProfit):0;
+ var fcf=n(T.ocf)-n(T.capex);
+ var icov=n(T.interest)>0?(n(T.ebt)+n(T.interest))/n(T.interest):0;
+ var col=function(ok){return ok?'var(--ok)':'var(--warn)'};
+ return '<div class="sec"><h4>企業現金流健康度 · 五個指標 <span class="hint">如果只能追一個數字，追第一個</span></h4>'+
+  '<div class="fgrid">'+toolF('cashh',[['cash','現金及約當現金'],['fixed','每月固定支出'],['arDays','應收天數'],['invDays','存貨天數'],['apDays','應付天數'],['ocf','營業活動現金流'],['netProfit','稅後淨利'],['capex','資本支出'],['ebt','稅前淨利'],['interest','利息費用']])+'</div>'+
+  '<div class="tw" style="margin-top:12px"><table class="rtable"><tr><th>指標</th><th>現況</th><th>健康標準</th><th>公式</th></tr>'+
+   '<tr><td class="k">現金水位（可支撐月數）</td><td style="color:'+col(months>=3)+';font-weight:800">'+months.toFixed(1)+' 個月</td><td class="muted">至少 3 個月，波動大的行業 6 個月</td><td><code>現金 ÷ 每月固定支出</code></td></tr>'+
+   '<tr><td class="k">現金轉換循環</td><td style="color:'+col(ccc<=60)+';font-weight:800">'+ccc.toFixed(0)+' 天</td><td class="muted">越短越好；負數代表你在用別人的錢做生意</td><td><code>應收 ＋ 存貨 − 應付</code></td></tr>'+
+   '<tr><td class="k">獲利品質</td><td style="color:'+col(quality>=1)+';font-weight:800">'+quality.toFixed(2)+'</td><td class="muted">&gt; 1 為佳；長期 &lt; 0.5 代表獲利收不回來</td><td><code>營業現金流 ÷ 稅後淨利</code></td></tr>'+
+   '<tr><td class="k">自由現金流</td><td style="color:'+col(fcf>0)+';font-weight:800">'+fmt(fcf)+'</td><td class="muted">正數才有能力分紅、還債、擴張</td><td><code>營業現金流 − 資本支出</code></td></tr>'+
+   '<tr><td class="k">利息保障倍數</td><td style="color:'+col(icov>=3)+';font-weight:800">'+(n(T.interest)>0?icov.toFixed(1)+' 倍':'—')+'</td><td class="muted">&gt; 3 倍；&lt; 2 倍要立即處理</td><td><code>(稅前淨利＋利息) ÷ 利息</code></td></tr>'+
+   '</table></div>'+
+  '<div class="hint" style="margin-top:8px">現金不足時要<b>先判斷是哪一種問題</b>：有獲利但缺現金＝時機問題（收付週期錯配）；本業就在虧損＝結構問題，融資只是延後死亡，必須先解決商業模式。'+
+  '<br>處理順序由內而外、成本由低到高：①加速流入 ②延緩流出 ③釋放卡住的錢（含 401 欄 115 的累積留抵——有外銷零稅率或購置固定資產時，留抵可能轉為退稅）④內部調度 ⑤外部融資 ⑥結構性調整。</div></div>';}
+
+function reportPane(c){
+ var isBiz=entityOn(c,'company')&&app.reportDoc==='biz';
+ var sw=entityOn(c,'company')
+  ? '<div class="sec"><h4>輸出哪一份 <span class="hint">企業主客戶有兩份可交付的文件</span></h4>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    '<button class="tbtn'+(isBiz?'':' amber')+'" onclick="setReportDoc(\'family\')">財務規劃報告書（客戶版）</button>'+
+    '<button class="tbtn'+(isBiz?' amber':'')+'" onclick="setReportDoc(\'biz\')">企業主財務診斷書</button></div>'+
+    '<div class="hint" style="margin-top:8px">兩份分開輸出：家庭版已經很長，硬塞企業專章會爆版；而診斷書本身就是一份可以獨立交付的東西。<b>合規閘燈號只出現在診斷書，不會進客戶版報告書。</b></div></div>'
+  : '';
+ if(isBiz)return '<div style="margin-bottom:10px" class="muted">企業主財務診斷書預覽，右上「列印報告」輸出 PDF。</div>'+sw+
+  '<div class="sec"><h4>教練總結（診斷書用）</h4><textarea onchange="setCase(\'bizReportNote\',this.value)" placeholder="例：目前最急的是連帶保證的保障缺口與公私帳分離，投資與傳承建議暫緩…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.bizReportNote||'')+'</textarea></div>'+
+  bizReportHTML(c);
+ return '<div style="margin-bottom:10px" class="muted">客戶交付報告預覽（圖表化），右上「列印報告」輸出 PDF。</div>'+sw+
  '<div class="sec"><h4>教練總結 <span class="hint">教練可編輯；填寫後會出現在報告書結尾（客戶版）</span></h4><textarea onchange="setCase(\'reportNote\',this.value)" placeholder="例：整體財務結構穩健，建議優先補強壽險缺口與提高緊急預備金…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.reportNote||'')+'</textarea></div>'+
  reportHTML(c)}
 /* ===== 報告用淺色圖表元件 ===== */
