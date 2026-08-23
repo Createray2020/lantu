@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { saveBizTaxAction, resetBizTaxAction, type ActionResult } from "./actions";
 import type { BizTaxRow } from "@/lib/bizTaxParams";
+import { fmtMoney } from "@/lib/money";
+import MoneyInput from "@/components/MoneyInput";
 
 // 企業稅務法規常數的後台面板。
 //
@@ -27,7 +29,7 @@ const UNIT_HINT: Record<string, string> = {
 function display(v: number, unit: string) {
   if (unit === "rate") return `${+(v * 100).toFixed(4)}%`;
   if (unit === "x") return `${v} 倍`;
-  return v.toLocaleString("zh-TW");
+  return fmtMoney(v);
 }
 
 export default function BizTaxBoard({ rows, basis }: { rows: BizTaxRow[]; basis: string }) {
@@ -89,8 +91,15 @@ export default function BizTaxBoard({ rows, basis }: { rows: BizTaxRow[]; basis:
                         <div className="text-[11px] text-[#6f869c]">{UNIT_HINT[r.unit]}</div>
                       </td>
                       <td className="px-3 py-2 border-t border-white/8 align-top w-[130px]">
-                        <input className={inputCls} value={d.value} inputMode="decimal"
-                          onChange={(e) => set({ value: e.target.value })} />
+                        {/* 金額欄補千分位；比率／倍數是小數，維持自由輸入。 */}
+                        {r.unit === "money" ? (
+                          <MoneyInput className={inputCls} allowEmpty
+                            value={d.value === "" ? null : Number(d.value)}
+                            onChange={(v) => set({ value: v === null ? "" : String(v) })} />
+                        ) : (
+                          <input className={inputCls} value={d.value} inputMode="decimal"
+                            onChange={(e) => set({ value: e.target.value })} />
+                        )}
                       </td>
                       <td className="px-3 py-2 border-t border-white/8 align-top w-[110px]">
                         <input className={inputCls} value={d.basis} placeholder="2026-08"

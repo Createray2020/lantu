@@ -6,6 +6,7 @@ import { getBrand } from "@/lib/brand";
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import { TABS } from "@/app/admin/system/spec";
 import { questionsOf } from "@/lib/comp/survey";
+import { fmtMoney } from "@/lib/money";
 import type { CompSettings } from "@/lib/comp/types";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +19,9 @@ function show(v: unknown, type: string): string {
   if (v === undefined || v === null || v === "") return "未設定";
   if (type === "bool") return v ? "是" : "否";
   if (type === "pct") return `${v}%`;
-  if (type === "money") return `${Number(v).toLocaleString("zh-TW")} 元`;
+  if (type === "money") return `${fmtMoney(v)} 元`;
   if (Array.isArray(v)) return v.join("、");
-  if (typeof v === "number") return v.toLocaleString("zh-TW");
+  if (typeof v === "number") return fmtMoney(v);
   return String(v);
 }
 
@@ -96,7 +97,7 @@ export default async function HandbookPage() {
                           ? (m.flatExecPct ?? "—") + "%"
                           : (m.splitExecPct ?? s.splitExecPct ?? "—") + "%"}
                       </td>
-                      <td className={td}>{m.price == null ? "依實際收入" : m.price.toLocaleString("zh-TW")}</td>
+                      <td className={td}>{m.price == null ? "依實際收入" : fmtMoney(m.price)}</td>
                       <td className={td}>{m.countPromotion === false ? "否" : "是"}</td>
                     </tr>
                   ))}
@@ -164,7 +165,7 @@ export default async function HandbookPage() {
                         <tr key={t.toCode}>
                           <td className={td}>{t.fromCode} → {t.toCode}</td>
                           <td className={td}>{t.cases ?? "不檢查"}</td>
-                          <td className={td}>{t.fees ? t.fees.toLocaleString("zh-TW") : "不檢查"}</td>
+                          <td className={td}>{t.fees ? fmtMoney(t.fees) : "不檢查"}</td>
                           {kind === "promotion_b" && (
                             <>
                               <td className={td}>{t.teamCases ?? "不檢查"}</td>
@@ -204,7 +205,7 @@ export default async function HandbookPage() {
                     <tr key={t.toCode}>
                       <td className={td}>{t.toCode}</td>
                       <td className={td}>{t.cases ?? "不檢查"}</td>
-                      <td className={td}>{t.fees ? t.fees.toLocaleString("zh-TW") : "不檢查"}</td>
+                      <td className={td}>{t.fees ? fmtMoney(t.fees) : "不檢查"}</td>
                       <td className={td}>{t.extraNote ?? (t.mentorCount ? `育成 ${t.mentorCount} 位` : "—")}</td>
                     </tr>
                   ))}

@@ -5,8 +5,15 @@
 // 把制度翻成行動語言（「團隊再完成 14 案即可晉升」）比列一堆數字有用。
 
 import { Fragment, useState } from "react";
+import { fmtMoney } from "@/lib/money";
 
-export type GapView = { label: string; need: number; have: number; met: boolean };
+export type GapView = { label: string; need: number; have: number; met: boolean; unit?: "money" | "count" };
+
+/** 金額門檻補千分位，件／人數維持裸數字（「累計個案數 1,2」很怪）。 */
+function gapNum(g: GapView, which: "have" | "need" = "have"): string {
+  const v = which === "have" ? g.have : g.need;
+  return g.unit === "money" ? fmtMoney(v) : String(v);
+}
 export type TrackView = { toCode: string; gaps: GapView[]; met: boolean } | null;
 
 export type MyView = {
@@ -63,7 +70,8 @@ function advice(v: MyView): string | null {
   const worst = best.t.gaps.filter((g) => !g.met).sort((x, y) => (y.need - y.have) - (x.need - x.have))[0];
   if (!worst) return null;
   const left = worst.need - worst.have;
-  return `你目前 ${best.name} 較接近，${worst.label}再 ${left.toLocaleString()} 即可晉升 ${best.t.toCode}。`;
+  const leftTxt = worst.unit === "money" ? fmtMoney(left) : String(left);
+  return `你目前 ${best.name} 較接近，${worst.label}再 ${leftTxt} 即可晉升 ${best.t.toCode}。`;
 }
 
 export default function MyBusiness({ v }: { v: MyView }) {
@@ -96,7 +104,7 @@ export default function MyBusiness({ v }: { v: MyView }) {
           )}
         </Tile>
         <Tile title="待發放分潤">
-          <div className="text-2xl font-bold tabular-nums">{v.pendingAmount.toLocaleString()}</div>
+          <div className="text-2xl font-bold tabular-nums">{fmtMoney(v.pendingAmount)}</div>
           <div className="text-xs text-[#a9bccf] mt-0.5">
             {v.payoutDay ? `每月 ${v.payoutDay} 日發放` : "發放日未設定"} · 共 {v.payouts.filter((p) => p.status !== "paid").length} 筆
           </div>
@@ -158,7 +166,7 @@ export default function MyBusiness({ v }: { v: MyView }) {
                             <div className="flex justify-between text-xs">
                               <span className="text-[#cfdcea]">{g.label}</span>
                               <span className={g.met ? "text-[#7fb894]" : "text-[#a9bccf]"}>
-                                {g.have.toLocaleString()} / {g.need.toLocaleString()}
+                                {gapNum(g)} / {gapNum(g, "need")}
                               </span>
                             </div>
                             <div className="h-1.5 rounded bg-[#081a2b] overflow-hidden mt-0.5">
@@ -182,7 +190,7 @@ export default function MyBusiness({ v }: { v: MyView }) {
         )}
         <div className="mt-3 flex flex-wrap gap-4 text-xs text-[#a9bccf]">
           <span>終身累計 <b className="text-[#cfdcea]">{v.stats.personalCases}</b> 案</span>
-          <span>累計顧問費 <b className="text-[#cfdcea]">{v.stats.personalFees.toLocaleString()}</b> 元</span>
+          <span>累計顧問費 <b className="text-[#cfdcea]">{fmtMoney(v.stats.personalFees)}</b> 元</span>
           <span>團隊輔導業績 <b className="text-[#cfdcea]">{v.stats.teamCases}</b> 案</span>
         </div>
       </div>
@@ -208,7 +216,7 @@ export default function MyBusiness({ v }: { v: MyView }) {
                     <td className="px-3 py-2">{p.clientName}</td>
                     <td className="px-3 py-2 text-[#a9bccf] text-xs">{p.role}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{p.totalPct}%</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{p.amount.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmtMoney(p.amount)}</td>
                     <td className="px-3 py-2 text-xs">
                       <span className={p.status === "paid" ? "text-[#7fb894]" : "text-[#e0bd8b]"}>
                         {p.status === "paid" ? "已發放" : p.status === "batched" ? "已入批" : "待入批"}

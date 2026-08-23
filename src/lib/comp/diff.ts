@@ -4,6 +4,7 @@
 // 版本管理只是一個安心用的名詞——沒人知道按下發布之後制度到底變成什麼樣。
 
 import type { CompParams, ModuleRow, RankRow, ThresholdRow } from "./types";
+import { fmtMoney } from "@/lib/money";
 
 export type Change = {
   /** 分類：讓畫面能照制度分頁分組 */
@@ -20,7 +21,7 @@ function show(v: unknown): string {
   if (v === undefined || v === null || v === "") return UNSET;
   if (typeof v === "boolean") return v ? "開" : "關";
   if (Array.isArray(v)) return v.length ? v.join("／") : UNSET;
-  if (typeof v === "number") return v.toLocaleString("zh-TW");
+  if (typeof v === "number") return fmtMoney(v);
   return String(v);
 }
 

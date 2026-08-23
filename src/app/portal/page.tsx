@@ -34,8 +34,8 @@ export default async function Portal() {
 
   const rows = r
     ? [
-        { icon: "🏠", label: "購房", head: `可購房價 ${wan(r.house.price).toLocaleString("en-US")} 萬`, monthly: r.house.monthly },
-        { icon: "🚗", label: "購車", head: `可購車價 ${wan(r.car.price).toLocaleString("en-US")} 萬`, monthly: r.car.monthly },
+        { icon: "🏠", label: "購房", head: `可購房價 ${wan(r.house.price)} 萬`, monthly: r.house.monthly },
+        { icon: "🚗", label: "購車", head: `可購車價 ${wan(r.car.price)} 萬`, monthly: r.car.monthly },
         { icon: "🌴", label: "退休", head: `退休月領 ${ntfmt(r.retire.totalMonthly)} 元`, monthly: r.retire.monthly },
         { icon: "👨‍👩‍👧", label: "扶養", head: `可扶養約 ${r.support.kids.toFixed(2)} 位`, monthly: r.support.monthly },
         { icon: "✈️", label: "旅遊", head: `旅遊基金 ${ntfmt(r.travel.fund)} 元`, monthly: r.travel.monthly },

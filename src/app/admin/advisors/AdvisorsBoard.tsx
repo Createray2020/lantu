@@ -5,13 +5,15 @@
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { recomputeAllAction, saveAdvisorAction, setRankAction } from "./actions";
+import { fmtMoney } from "@/lib/money";
+import MoneyInput from "@/components/MoneyInput";
 
 const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1 text-sm text-[#eef2f7] outline-none";
 const EMPTY = "bg-[#0d2b45] border border-dashed border-[#3d5b78] rounded px-2 py-1 text-sm text-[#8fa6ba] outline-none";
 const BTN = "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
 const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-[#1d5c8a] border border-[#2b7cb5] text-white hover:bg-[#226ba0] disabled:opacity-40";
 
-export type GapView = { label: string; need: number; have: number; met: boolean };
+export type GapView = { label: string; need: number; have: number; met: boolean; unit?: "money" | "count" };
 export type TrackView = { toCode: string; gaps: GapView[]; met: boolean } | null;
 export type EventView = { id: string; fromCode: string | null; toCode: string | null; reason: string; effectiveAt: string | null; note: string | null };
 
@@ -150,7 +152,7 @@ export default function AdvisorsBoard({
                       : "—"}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{a.personalCases}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{a.personalFees.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(a.personalFees)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{a.teamCases}</td>
                   <td className="px-3 py-2"><TrackCell t={a.trackA} /></td>
                   <td className="px-3 py-2"><TrackCell t={a.trackB} /></td>
@@ -198,13 +200,19 @@ export default function AdvisorsBoard({
   );
 }
 
+/** 金額門檻補千分位，件／人數維持裸數字（「累計個案數 1,2」很怪）。 */
+function gapNum(g: GapView, which: "have" | "need" = "have"): string {
+  const v = which === "have" ? g.have : g.need;
+  return g.unit === "money" ? fmtMoney(v) : String(v);
+}
+
 function TrackCell({ t }: { t: TrackView }) {
   if (!t) return <span className="text-xs text-[#6f869c]">n/a</span>;
   if (t.met) return <span className="text-xs text-[#7fb894]">✓ 達標 → {t.toCode}</span>;
   const worst = t.gaps.filter((g) => !g.met)[0];
   return (
     <span className="text-xs text-[#a9bccf]">
-      {worst ? `${worst.label} ${worst.have}/${worst.need}` : "未設門檻"}
+      {worst ? `${worst.label} ${gapNum(worst)}/${gapNum(worst, "need")}` : "未設門檻"}
     </span>
   );
 }
@@ -255,7 +263,7 @@ function AdvisorDetail({
                       <div className="flex justify-between text-xs">
                         <span className="text-[#cfdcea]">{g.label}</span>
                         <span className={g.met ? "text-[#7fb894]" : "text-[#a9bccf]"}>
-                          {g.have.toLocaleString()} / {g.need.toLocaleString()}
+                          {gapNum(g)} / {gapNum(g, "need")}
                         </span>
                       </div>
                       <div className="h-1.5 rounded bg-[#0a2138] overflow-hidden mt-0.5">
@@ -325,7 +333,8 @@ function AdvisorDetail({
               className={`${INPUT} w-full mt-0.5`} />
           </label>
           <label className="text-xs text-[#a9bccf]">期初顧問費
-            <input type="number" value={f.initialFees} onChange={(e) => setF({ ...f, initialFees: e.target.value })}
+            <MoneyInput value={f.initialFees === "" ? null : Number(f.initialFees)} allowEmpty
+              onChange={(v) => setF({ ...f, initialFees: v === null ? "" : String(v) })}
               className={`${INPUT} w-full mt-0.5`} />
           </label>
           <div className="grid grid-cols-2 gap-2">

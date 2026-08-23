@@ -10,6 +10,8 @@ import {
   previewImportAction, recalcCaseAction, refundCaseAction, submitSurveyByCoachAction,
   updateCaseAction, type ImportPreview,
 } from "./actions";
+import { fmtMoney } from "@/lib/money";
+import MoneyInput from "@/components/MoneyInput";
 
 const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1 text-sm text-[#eef2f7] outline-none";
 const EMPTY = "bg-[#0d2b45] border border-dashed border-[#3d5b78] rounded px-2 py-1 text-sm text-[#8fa6ba] outline-none";
@@ -126,7 +128,7 @@ export default function CasesBoard({
                   if (!m) return null;
                   const tags = [
                     m.splitMode === "flat" ? "固定比例分潤" : "差％逐層",
-                    m.price == null ? "看實收" : `定價 ${m.price.toLocaleString()}`,
+                    m.price == null ? "看實收" : `定價 ${fmtMoney(m.price)}`,
                     m.countPromotion ? "計入晉升" : "不計晉升",
                     m.countMaintenance ? "計入維持資格" : "不計維持資格",
                   ];
@@ -136,7 +138,8 @@ export default function CasesBoard({
             </label>
             <label className="flex items-center gap-2 text-sm">
               <span className="w-20 text-[#a9bccf]">顧問費</span>
-              <input type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: e.target.value })}
+              <MoneyInput value={form.fee === "" ? null : Number(form.fee)} allowEmpty
+                onChange={(v) => setForm({ ...form, fee: v === null ? "" : String(v) })}
                 placeholder="0" className={`${form.fee ? INPUT : EMPTY} w-36`} />
               <span className="text-xs text-[#7f9ab2]">元</span>
             </label>
@@ -271,9 +274,9 @@ export default function CasesBoard({
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
-                      {c.fee.toLocaleString()}
+                      {fmtMoney(c.fee)}
                       {c.refundAmount > 0 && (
-                        <div className="text-[11px] text-[#e08b7a]">退 {c.refundAmount.toLocaleString()}</div>
+                        <div className="text-[11px] text-[#e08b7a]">退 {fmtMoney(c.refundAmount)}</div>
                       )}
                     </td>
                     <td className="px-3 py-2 text-[#a9bccf]">{c.isCompanyLead ? "公司" : nameOf(c.promoterId)}</td>
@@ -328,7 +331,7 @@ export default function CasesBoard({
                                     <td className="px-3 py-1.5 text-right tabular-nums">{p.execPct || "—"}</td>
                                     <td className="px-3 py-1.5 text-right tabular-nums">{p.bonusPct || "—"}</td>
                                     <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{p.totalPct}%</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">{p.amount.toLocaleString()}</td>
+                                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(p.amount)}</td>
                                     <td className="px-3 py-1.5 text-[11px] text-[#a9bccf]">
                                       {p.status === "pending" ? "待入批" : p.status === "batched" ? "已入批" : "已發放"}
                                     </td>
@@ -354,7 +357,7 @@ export default function CasesBoard({
                                   {c.payouts.reduce((a, p) => a + p.totalPct, 0).toFixed(2).replace(/\.00$/, "")}%
                                 </td>
                                 <td className="px-3 py-1.5 text-right font-bold tabular-nums">
-                                  {c.payouts.reduce((a, p) => a + p.amount, 0).toLocaleString()}
+                                  {fmtMoney(c.payouts.reduce((a, p) => a + p.amount, 0))}
                                 </td>
                                 <td colSpan={2}></td>
                               </tr>
@@ -440,7 +443,7 @@ export default function CasesBoard({
                 <tr key={b.id} className="border-t border-white/8">
                   <td className="px-3 py-2 font-semibold">{b.period}</td>
                   <td className="px-3 py-2 text-[#a9bccf]">{b.payoutDate ?? "—"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{b.totalAmount.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(b.totalAmount)}</td>
                   <td className="px-3 py-2">
                     <span className={b.status === "paid" ? "text-[#7fb894]" : "text-[#e0bd8b]"}>
                       {b.status === "paid" ? "已發放" : "待發放"}
@@ -454,7 +457,7 @@ export default function CasesBoard({
                     {b.status !== "paid" && (
                       <button type="button" disabled={pending} className={BTN}
                         onClick={() => {
-                          if (confirm(`確定把 ${b.period} 批次（${b.totalAmount.toLocaleString()} 元）標記為已發放？發放後不可重算。`))
+                          if (confirm(`確定把 ${b.period} 批次（${fmtMoney(b.totalAmount)} 元）標記為已發放？發放後不可重算。`))
                             run(() => markBatchPaidAction(b.id), "已標記發放");
                         }}>
                         標記已發放
@@ -629,12 +632,13 @@ function RefundBox({
   const [amt, setAmt] = useState("");
   return (
     <span className="flex items-center gap-1">
-      <input type="number" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="退費金額"
+      <MoneyInput value={amt === "" ? null : Number(amt)} allowEmpty
+        onChange={(v) => setAmt(v === null ? "" : String(v))} placeholder="退費金額"
         className={`${amt ? INPUT : EMPTY} w-28`} />
       <button type="button" disabled={disabled || !amt} className={BTN}
         onClick={() => {
           const n = Number(amt);
-          if (confirm(`退費 ${n.toLocaleString()} 元（原 ${fee.toLocaleString()}）？系統會依實收比例重算全鏈分潤。`))
+          if (confirm(`退費 ${fmtMoney(n)} 元（原 ${fmtMoney(fee)}）？系統會依實收比例重算全鏈分潤。`))
             onRefund(n);
         }}>
         退費重算

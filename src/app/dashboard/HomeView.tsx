@@ -1,7 +1,8 @@
 // 首頁三角色版面（伺服器元件，純呈現）。設計對齊嵐途 v12 深藍＋琥珀金色票。
 import type { HomeView, MemberHome, ManagerHome, OwnerHome } from "@/lib/home";
+import { fmtMoney, fmtNTD, fmtWan } from "@/lib/money";
 
-function nt(n: number): string { return "NT$" + n.toLocaleString("en-US"); }
+const nt = fmtNTD;
 
 const TAG: Record<string, string> = {
   blue: "bg-[#8fb2d6]/15 text-[#8fb2d6]",
@@ -121,9 +122,13 @@ function Gauge({ score }: { score: number }) {
   );
 }
 
-function Spark({ vals }: { vals: number[] }) {
+// 折線圖原本完全沒有數值標籤——看得到形狀、讀不出數字。
+// preserveAspectRatio="none" 會把 SVG 內的文字一起拉扁，所以刻度用 HTML 疊在上下兩側。
+function Spark({ vals, fmtVal }: { vals: number[]; fmtVal?: (v: number) => string }) {
   const w = 320, h = 70;
+  if (!vals.length) return <div className="text-[11.5px] text-[#6f869c]">尚無資料</div>;
   const mx = Math.max(...vals), mn = Math.min(...vals), rng = (mx - mn) || 1;
+  const f = fmtVal ?? ((v: number) => String(v));
   const pts = vals.map((v, i) => {
     const x = i / (vals.length - 1) * (w - 8) + 4;
     const y = h - 6 - (v - mn) / rng * (h - 16);
@@ -131,12 +136,19 @@ function Spark({ vals }: { vals: number[] }) {
   });
   const area = `4,${h - 2} ${pts.join(" ")} ${w - 4},${h - 2}`;
   return (
-    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block">
-      <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#c99a5b" stopOpacity=".38" /><stop offset="1" stopColor="#c99a5b" stopOpacity="0" /></linearGradient></defs>
-      <polygon points={area} fill="url(#sg)" />
-      <polyline points={pts.join(" ")} fill="none" stroke="#e0bd8b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      {pts.map((p, i) => { const [cx, cy] = p.split(","); return <circle key={i} cx={cx} cy={cy} r="2.6" fill="#e0bd8b" />; })}
-    </svg>
+    <div>
+      <div className="flex justify-between text-[10.5px] text-[#6f869c] tabular-nums mb-0.5">
+        <span>最高 {f(mx)}</span>
+        <span>最新 {f(vals[vals.length - 1])}</span>
+      </div>
+      <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block">
+        <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#c99a5b" stopOpacity=".38" /><stop offset="1" stopColor="#c99a5b" stopOpacity="0" /></linearGradient></defs>
+        <polygon points={area} fill="url(#sg)" />
+        <polyline points={pts.join(" ")} fill="none" stroke="#e0bd8b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        {pts.map((p, i) => { const [cx, cy] = p.split(","); return <circle key={i} cx={cx} cy={cy} r="2.6" fill="#e0bd8b" />; })}
+      </svg>
+      <div className="text-[10.5px] text-[#6f869c] tabular-nums mt-0.5">最低 {f(mn)}</div>
+    </div>
   );
 }
 
@@ -197,7 +209,7 @@ function ManagerView({ d }: { d: ManagerHome }) {
 
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <Section title="📈 團隊本週約訪熱度">
-          <Spark vals={d.weekly} />
+          <Spark vals={d.weekly} fmtVal={(v) => `${v} 場`} />
           <div className="text-[#6f869c] text-[11.5px] mt-1.5">週日 → 週六 · 本週合計 {d.weekly.reduce((a, b) => a + b, 0)} 場約訪</div>
         </Section>
         <Section title="✅ 待審核與簽核" more="成員審核">
@@ -220,7 +232,7 @@ function OwnerView({ d }: { d: OwnerHome }) {
   const tmax = Math.max(1, ...d.teams.map((t) => t.income));
   return (
     <>
-      <Hero k="全組織健康度" h1={`組織健康度 ${d.healthScore} 分 · 本月業績 ${Math.round(k.income / 10000)} 萬，月成長 ${k.growthPct >= 0 ? "+" : ""}${k.growthPct}%`}
+      <Hero k="全組織健康度" h1={`組織健康度 ${d.healthScore} 分 · 本月業績 ${fmtWan(k.income)} 萬，月成長 ${k.growthPct >= 0 ? "+" : ""}${k.growthPct}%`}
         sub={<>{d.teams.length} 個團隊 · {k.headcount} 位夥伴 · 客戶留存率 {k.retention}%</>}
         right={<>
           <div className="inline-flex items-center gap-1.5 bg-[#12334f] border border-white/10 rounded-lg px-3 py-2 text-[12.5px] text-[#a7bacb]">🏢 團隊 <b className="text-[#eef2f7]">{d.teams.length}</b></div>
@@ -264,7 +276,7 @@ function OwnerView({ d }: { d: OwnerHome }) {
         <div>
           <Section title="🔻 全組織活動漏斗（本月）"><Funnel steps={d.funnel} /></Section>
           <Section title="📈 業績月成長趨勢">
-            <Spark vals={d.trend.map((t) => t.value)} />
+            <Spark vals={d.trend.map((t) => t.value)} fmtVal={(v) => `${fmtMoney(v)} 萬`} />
             <div className="text-[#6f869c] text-[11.5px] mt-1.5">近 {d.trend.length} 個月業績（萬）<Demo /></div>
           </Section>
         </div>

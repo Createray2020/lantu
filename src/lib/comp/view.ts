@@ -102,6 +102,5 @@ export function pctOf(have: number, need: number | null | undefined): number | n
   return Math.min(100, Math.round((have / need) * 100));
 }
 
-export function fmtMoney(n: number | null | undefined): string {
-  return n === null || n === undefined ? "—" : n.toLocaleString("zh-TW");
-}
+// 全站金額格式集中在 @/lib/money，這裡保留同名 re-export，呼叫端不用一次全改。
+export { fmtMoney } from "@/lib/money";

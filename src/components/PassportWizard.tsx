@@ -101,7 +101,7 @@ function LoanCard({ title, icon, r, rate }: { title: string; icon: string; r: Lo
         <div className="text-[#a7bacb] text-sm mb-1">
           {icon} 可購買的{title}（{r.targetYear} 年）
         </div>
-        <div className="font-serif text-3xl text-[#e0bd8b] mb-3">{wan(r.price).toLocaleString("en-US")} 萬</div>
+        <div className="font-serif text-3xl text-[#e0bd8b] mb-3">{wan(r.price)} 萬</div>
         <div className="text-[#cdd9e5] text-sm leading-relaxed">
           自備 {wan(r.down)} 萬（月存 {ntfmt(r.monthly * 10000)}）<br />
           貸款 {wan(r.loan)} 萬

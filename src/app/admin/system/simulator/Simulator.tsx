@@ -7,6 +7,8 @@ import { Fragment, useMemo, useState } from "react";
 import { ranksForModule, splitForModule, type ChainNode } from "@/lib/comp/engine";
 import { SCENARIOS, isApplicable } from "@/lib/comp/scenarios";
 import type { CompParams } from "@/lib/comp/types";
+import { fmtMoney } from "@/lib/money";
+import MoneyInput from "@/components/MoneyInput";
 
 const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1 text-sm text-[#eef2f7] outline-none";
 const BTN = "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf] hover:bg-[#17406a]";
@@ -90,7 +92,7 @@ export default function Simulator({ params }: { params: CompParams }) {
                   <span className="block text-[11px] text-[#6f869c] mt-0.5">
                     {activeModule.splitMode === "flat" ? "固定比例分潤（不沿輔導鏈）" : "差％逐層"}
                     {" · "}
-                    {activeModule.price == null ? "看實收" : `定價 ${activeModule.price.toLocaleString()}`}
+                    {activeModule.price == null ? "看實收" : `定價 ${fmtMoney(activeModule.price)}`}
                     {ranksForModule(params, moduleCode).some((r) => (r.moduleCode ?? "")) && " · 使用本模塊自訂職級表"}
                   </span>
                 )}
@@ -99,7 +101,7 @@ export default function Simulator({ params }: { params: CompParams }) {
           )}
           <label className="flex items-center gap-2 text-sm">
             <span className="w-24 text-[#a9bccf]">顧問費</span>
-            <input type="number" value={fee} onChange={(e) => setFee(Number(e.target.value) || 0)}
+            <MoneyInput value={fee} onChange={(v) => setFee(v ?? 0)}
               className={`${INPUT} w-36`} />
             <span className="text-xs text-[#7f9ab2]">元</span>
           </label>
@@ -200,7 +202,7 @@ export default function Simulator({ params }: { params: CompParams }) {
                     <td className="px-3 py-2 text-right tabular-nums">{l.execPct || "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{l.bonusPct || "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold">{l.totalPct}%</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{l.amount.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(l.amount)}</td>
                     <td className="px-3 py-2 text-right">
                       <button type="button" className="text-xs text-[#a9bccf] underline"
                         onClick={() => setOpenTrace(openTrace === i ? null : i)}>
@@ -221,7 +223,7 @@ export default function Simulator({ params }: { params: CompParams }) {
                 <td className="px-3 py-2 font-bold">驗算</td>
                 <td colSpan={3}></td>
                 <td className="px-3 py-2 text-right font-bold tabular-nums">{res.totalPct}%</td>
-                <td className="px-3 py-2 text-right font-bold tabular-nums">{res.totalAmount.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right font-bold tabular-nums">{fmtMoney(res.totalAmount)}</td>
                 <td></td>
               </tr>
             </tbody>

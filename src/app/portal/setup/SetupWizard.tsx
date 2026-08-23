@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { computeGap, ntfmt, wan, type CrossInputs } from "@/lib/passport";
+import MoneyInput from "@/components/MoneyInput";
 import type { ClientBasics } from "@/lib/clientPlan";
 import type { ActiveCoach, LinkStatus } from "@/lib/coachLink";
 import { normalizeIntent, defaultIntent, type Intent } from "@/lib/intent";
@@ -105,10 +106,10 @@ export default function SetupWizard({
         <h2 className="font-serif text-lg mb-1">➕ 財務現況十字表</h2>
         <p className="text-[11px] text-[#6f869c] mb-4">收入支出填「每月」，資產負債填「目前總額」（單位：元）。</p>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="每月收入"><input type="number" inputMode="numeric" className={inputCls} value={numVal(c.income)} placeholder="0" onChange={(e) => setCross("income", parseFloat(e.target.value) || 0)} /></Field>
-          <Field label="每月支出"><input type="number" inputMode="numeric" className={inputCls} value={numVal(c.expense)} placeholder="0" onChange={(e) => setCross("expense", parseFloat(e.target.value) || 0)} /></Field>
-          <Field label="總資產"><input type="number" inputMode="numeric" className={inputCls} value={numVal(c.assets)} placeholder="0" onChange={(e) => setCross("assets", parseFloat(e.target.value) || 0)} /></Field>
-          <Field label="總負債"><input type="number" inputMode="numeric" className={inputCls} value={numVal(c.liabilities)} placeholder="0" onChange={(e) => setCross("liabilities", parseFloat(e.target.value) || 0)} /></Field>
+          <Field label="每月收入"><MoneyInput className={inputCls} value={c.income} placeholder="0" onChange={(v) => setCross("income", v ?? 0)} /></Field>
+          <Field label="每月支出"><MoneyInput className={inputCls} value={c.expense} placeholder="0" onChange={(v) => setCross("expense", v ?? 0)} /></Field>
+          <Field label="總資產"><MoneyInput className={inputCls} value={c.assets} placeholder="0" onChange={(v) => setCross("assets", v ?? 0)} /></Field>
+          <Field label="總負債"><MoneyInput className={inputCls} value={c.liabilities} placeholder="0" onChange={(v) => setCross("liabilities", v ?? 0)} /></Field>
         </div>
         <div className="mt-5 flex items-center gap-3">
           <button onClick={onSubmitCurrent} disabled={saveStatus === "saving"}
@@ -135,7 +136,7 @@ export default function SetupWizard({
               <div className="flex justify-between"><span>每月應存（目標）</span><b>NT$ {ntfmt(gap.monthlyNeed)}</b></div>
               <div className="flex justify-between"><span>每月可存（收入−支出）</span><b>NT$ {ntfmt(gap.monthlyCapacity)}</b></div>
               <div className="flex justify-between text-[#ffb4a2]"><span>每月缺口</span><b>NT$ {ntfmt(gap.monthlyGap)}</b></div>
-              <div className="flex justify-between border-t border-white/10 pt-1.5"><span>目前淨資產</span><b>{wan(gap.netWorth).toLocaleString("en-US")} 萬</b></div>
+              <div className="flex justify-between border-t border-white/10 pt-1.5"><span>目前淨資產</span><b>{wan(gap.netWorth)} 萬</b></div>
             </div>
           </div>
           <p className="text-[11px] text-[#6f869c] mt-4">

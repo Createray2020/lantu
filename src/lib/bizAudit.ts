@@ -19,6 +19,8 @@
 //   2. 檢核只說「對不起來」，不改資料、不擋存檔。
 //   3. 「對不起來不是罪，說不出理由才是」——每一項都能填原因，填了就從 fail 降成 warn 並留紀錄。
 
+import { fmtMoney } from "@/lib/money";
+
 export type AuditLevel = "ok" | "warn" | "fail" | "na";
 
 export type AuditItem = {
@@ -38,7 +40,7 @@ const n = (v: unknown): number => {
 };
 // 「有填」與「填 0」是兩回事：沒填要回 na，填 0 是一個真實的答案。
 const has = (v: unknown): boolean => v !== "" && v !== null && v !== undefined && Number.isFinite(Number(v));
-const fmt = (v: number): string => Math.round(v).toLocaleString("zh-TW");
+const fmt = fmtMoney; // 格式規格集中在 @/lib/money
 const pctOf = (a: number, b: number): number => (b === 0 ? 0 : Math.abs(a) / Math.abs(b));
 
 /** 容差：財報上的數字常有千元位四捨五入，差幾百塊不算對不起來。 */

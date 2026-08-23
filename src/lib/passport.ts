@@ -2,6 +2,8 @@
 // 模型＝「輸入每月能存多少＋條件 → 直接算出能達成的結果」（1:1 比照關鍵理財網原版，見記憶 人生護照規格.md）。
 // 五面向：購房 / 購車 / 退休 / 扶養 / 旅遊。左欄彙總「每月應存」＝五面向月存加總。
 
+import { fmtMoney0, fmtWan } from "@/lib/money";
+
 export const BASE_YEAR = 2026;
 
 // ---------- 財務基本函式 ----------
@@ -184,9 +186,11 @@ export const FACES: { key: keyof PassportInputs; label: string; icon: string }[]
   { key: "travel", label: "旅遊", icon: "✈️" },
 ];
 
-// 顯示輔助
-export const wan = (nt: number) => Math.round(nt / 10000); // 元→萬（整數）
-export const ntfmt = (nt: number) => Math.round(nt || 0).toLocaleString("en-US");
+// 顯示輔助。格式規格集中在 @/lib/money，這裡只是給護照用的別名。
+// ⚠️ wan() 回的是「已經帶千分位的字串」，不是 number——破千萬的房貸要顯示 1,234 萬。
+//    改版前它回裸數字，呼叫端各自補 .toLocaleString()，補了三處漏了四處。
+export const wan = (nt: number): string => fmtWan(nt); // 元→萬（整數＋千分位）
+export const ntfmt = (nt: number): string => fmtMoney0(nt);
 
 // ---------- 現況十字表 → 缺口 / 願景達成率 ----------
 export type CrossInputs = { income: number; expense: number; assets: number; liabilities: number }; // 月收入/月支出/總資產/總負債（元）

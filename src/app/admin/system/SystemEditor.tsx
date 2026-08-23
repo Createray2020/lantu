@@ -32,6 +32,8 @@ type VersionLite = {
 const INPUT =
   "bg-[#0d2b45] rounded px-2 py-1 text-sm text-[#eef2f7] outline-none focus:border-[#e0bd8b]";
 const FILLED = `${INPUT} border border-white/15`;
+import MoneyInput from "@/components/MoneyInput";
+
 const EMPTY = `${INPUT} border border-dashed border-[#3d5b78] text-[#8fa6ba]`;
 const BTN =
   "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
@@ -331,6 +333,23 @@ function FieldRow({
   const cls = unset ? EMPTY : FILLED;
 
   function numInput(unit?: string) {
+    // 金額欄要千分位（<input type=number> 規格上顯示不了逗號 → 改 MoneyInput）。
+    // ⚠️ 「留空＝該門檻不檢查，不是 0」是業務制度的地基語意，所以 allowEmpty。
+    if (unit === "元") {
+      return (
+        <div className="flex items-center gap-1">
+          <MoneyInput
+            value={value === undefined || value === null ? null : Number(value)}
+            allowEmpty
+            disabled={disabled}
+            placeholder="未設定"
+            onChange={(v) => onChange(v === null ? undefined : v)}
+            className={`${cls} w-28`}
+          />
+          <span className="text-xs text-[#7f9ab2]">{unit}</span>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center gap-1">
         <input
@@ -487,8 +506,8 @@ function ModulesTable({
                     </select>
                   </td>
                   <td className={cell}>
-                    <input type="number" value={fmtInt(m.price)} disabled={disabled} placeholder="看實收"
-                      onChange={(e) => upd(i, { price: e.target.value === "" ? null : Number(e.target.value) })}
+                    <MoneyInput value={m.price} allowEmpty disabled={disabled} placeholder="看實收"
+                      onChange={(v) => upd(i, { price: v })}
                       className={`${m.price == null ? EMPTY : FILLED} w-28`} />
                   </td>
                   <td className={cell}>
@@ -688,15 +707,15 @@ function RanksTable({
                   )}
                   {isDefault && (
                     <td className={cell}>
-                      <input type="number" step="1" min="0" value={fmtInt(r.priceMonth)} disabled={disabled} placeholder="未設定"
-                        onChange={(e) => upd(i, { priceMonth: e.target.value === "" ? null : Number(e.target.value) })}
+                      <MoneyInput value={r.priceMonth} allowEmpty disabled={disabled} placeholder="未設定"
+                        onChange={(v) => upd(i, { priceMonth: v })}
                         className={`${r.priceMonth == null ? EMPTY : FILLED} w-24`} />
                     </td>
                   )}
                   {isDefault && (
                     <td className={cell}>
-                      <input type="number" step="1" min="0" value={fmtInt(r.priceYear)} disabled={disabled} placeholder="未設定"
-                        onChange={(e) => upd(i, { priceYear: e.target.value === "" ? null : Number(e.target.value) })}
+                      <MoneyInput value={r.priceYear} allowEmpty disabled={disabled} placeholder="未設定"
+                        onChange={(v) => upd(i, { priceYear: v })}
                         className={`${r.priceYear == null ? EMPTY : FILLED} w-24`} />
                     </td>
                   )}
@@ -802,8 +821,8 @@ function ThresholdTable({
                     className={numCls(r.cases)} />
                 </td>
                 <td className={cell}>
-                  <input type="number" value={fmtInt(r.fees)} disabled={disabled} placeholder="未設定"
-                    onChange={(e) => upd(idx, { fees: e.target.value === "" ? null : Number(e.target.value) })}
+                  <MoneyInput value={r.fees} allowEmpty disabled={disabled} placeholder="未設定"
+                    onChange={(v) => upd(idx, { fees: v })}
                     className={`${r.fees == null ? EMPTY : FILLED} w-32`} />
                 </td>
                 {cols.team && (

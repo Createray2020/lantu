@@ -1,4 +1,5 @@
 "use client";
+import MoneyInput from "@/components/MoneyInput";
 
 import { useMemo, useState, useTransition } from "react";
 import {
@@ -455,6 +456,15 @@ function EduTable({
     />
   );
 
+  // 學雜費等金額欄要千分位（起始年齡／年數維持 type=number）。
+  const money = (r: EduCostRow, key: keyof EduCostRow) => (
+    <MoneyInput
+      className={inputCls + " w-28"}
+      value={Number(val(r)[key] ?? 0)}
+      onChange={(v) => patch(r, { [key]: v ?? 0 } as Partial<EduCostRow>)}
+    />
+  );
+
   return (
     <div>
       <p className="mb-3 rounded-lg border border-white/10 bg-[#0b2136] px-3 py-2 text-xs leading-relaxed text-[#a9bccf]">
@@ -491,11 +501,11 @@ function EduTable({
                 </td>
                 <td className="px-2 py-1.5">{num(r, "startAge")}</td>
                 <td className="px-2 py-1.5">{num(r, "years")}</td>
-                <td className="px-2 py-1.5">{num(r, "publicTuition")}</td>
-                <td className="px-2 py-1.5">{num(r, "privateTuition")}</td>
-                <td className="px-2 py-1.5">{num(r, "overseasTuition")}</td>
-                <td className="px-2 py-1.5">{num(r, "extraFee")}</td>
-                <td className="px-2 py-1.5">{num(r, "careFee")}</td>
+                <td className="px-2 py-1.5">{money(r, "publicTuition")}</td>
+                <td className="px-2 py-1.5">{money(r, "privateTuition")}</td>
+                <td className="px-2 py-1.5">{money(r, "overseasTuition")}</td>
+                <td className="px-2 py-1.5">{money(r, "extraFee")}</td>
+                <td className="px-2 py-1.5">{money(r, "careFee")}</td>
                 <td className="px-2 py-1.5 text-right">
                   <button
                     disabled={pending}

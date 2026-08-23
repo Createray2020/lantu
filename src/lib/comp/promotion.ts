@@ -10,7 +10,9 @@ import { seqOf } from "./chain";
 import type { AdvisorStats } from "./stats";
 import type { CompParams, ThresholdRow } from "./types";
 
-export type Gap = { label: string; need: number; have: number; met: boolean };
+// unit：畫面要知道這個門檻是「錢」還是「件／人」，才能決定要不要補千分位。
+// 沒有它的時候，UI 對個案數也套了 toLocaleString，而摘要格連顧問費都沒補。
+export type Gap = { label: string; need: number; have: number; met: boolean; unit: "money" | "count" };
 
 export type TrackEval = {
   threshold: ThresholdRow;
@@ -29,9 +31,14 @@ export type PromotionEval = {
   blocked?: string;
 };
 
-function check(need: number | null | undefined, have: number, label: string): Gap | null {
+function check(
+  need: number | null | undefined,
+  have: number,
+  label: string,
+  unit: "money" | "count" = "count",
+): Gap | null {
   if (need === null || need === undefined) return null; // 留空＝不檢查
-  return { label, need, have, met: have >= need };
+  return { label, need, have, met: have >= need, unit };
 }
 
 /** 雙指標制：有設定的項目都要達標；關閉時任一達標即可。 */
@@ -71,16 +78,16 @@ export function evalPromotion(
     const gaps: Gap[] = [];
     const c = check(t.cases, stats.personalCases, "累計個案數");
     if (c) gaps.push(c);
-    const f = check(t.fees, stats.personalFees, "累計顧問費");
+    const f = check(t.fees, stats.personalFees, "累計顧問費", "money");
     if (f) gaps.push(f);
     if (withTeam) {
-      const tc = check(t.teamCases, stats.teamCases, "團隊輔導業績");
+      const tc = check(t.teamCases, stats.teamCases, "團隊輔導業績") // ⚠️ 名字叫「業績」，值其實是 stats.teamCases＝團隊件數，不是金額;
       if (tc) gaps.push(tc);
       if (t.mentorCount !== null && t.mentorCount !== undefined) {
         const have = opts?.mentoredCount?.(t.mentorRankCode) ?? advisor.mentored ?? 0;
         gaps.push({
           label: `育成 ${t.mentorRankCode ?? ""} 以上`,
-          need: t.mentorCount, have, met: have >= t.mentorCount,
+          need: t.mentorCount, have, met: have >= t.mentorCount, unit: "count",
         });
       }
     }
@@ -145,12 +152,12 @@ export function evalTenure(
     const gaps: Gap[] = [];
     const c = check(t.cases, periodStats.cases, "真除期間個案數");
     if (c) gaps.push(c);
-    const f = check(t.fees, periodStats.fees, "真除期間顧問費");
+    const f = check(t.fees, periodStats.fees, "真除期間顧問費", "money");
     if (f) gaps.push(f);
     if (t.mentorCount !== null && t.mentorCount !== undefined) {
       const have = periodStats.mentored ?? 0;
       gaps.push({
-        label: t.extraNote || "育成條件", need: t.mentorCount, have, met: have >= t.mentorCount,
+        label: t.extraNote || "育成條件", need: t.mentorCount, have, met: have >= t.mentorCount, unit: "count",
       });
     }
     return { gaps, met: metOf(gaps, dual) };

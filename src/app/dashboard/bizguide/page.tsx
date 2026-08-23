@@ -9,6 +9,7 @@ import {
   CAR_RENTAL_BIZ_CAP, PENALTY_EVASION, PENALTY_ASSIST, PENALTY_FALSE_BOOK,
   PENALTY_VAT_MULT, ASSESSMENT_YEARS, CORP_RESERVE_MONTHS, OWNER_EMERGENCY_MONTHS,
 } from "@/lib/bizTax";
+import { fmtMoney } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 //
 // 所有法規數字一律從 @/lib/bizTax 讀，不在本頁寫死。
 
-const money = (v: number) => v.toLocaleString("zh-TW");
+const money = fmtMoney;
 const pct = (v: number) => `${+(v * 100).toFixed(2)}%`;
 
 function Card({ id, title, sub, children }: { id?: string; title: string; sub?: string; children: React.ReactNode }) {

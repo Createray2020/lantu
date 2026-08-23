@@ -1,8 +1,6 @@
 // 客戶管理前端共用的格式化 / 標籤（純函式，client 元件可用）。
-export function fmtMoney(v: number | null | undefined): string {
-  if (v === null || v === undefined) return "—";
-  return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
+// 金額格式的唯一真相在 @/lib/money；這裡保留同名 re-export，呼叫端不用一次全改。
+export { fmtMoney } from "@/lib/money";
 
 export function fmtDate(v: string | null | undefined): string {
   return v ? v : "—";

@@ -7,6 +7,7 @@
 import { csvToObjects, normalizeDate, normalizeNumber } from "./csv";
 import type { CaseInput } from "./caseRepo";
 import type { ModuleRow } from "./types";
+import { fmtMoney } from "@/lib/money";
 
 export const IMPORT_HEADERS = [
   "客戶姓名", "服務模塊代號", "顧問費", "推廣者Email", "執案者Email",
@@ -113,7 +114,7 @@ export function validateImport(
       display: {
         clientName: clientName || "（空白）",
         moduleName: mod?.name ?? (moduleCode || "未指定"),
-        fee: fee === null ? (raw["顧問費"] || "") : fee.toLocaleString("zh-TW"),
+        fee: fee === null ? (raw["顧問費"] || "") : fmtMoney(fee),
         promoter: isCompanyLead ? "公司派案" : (promoter?.name || promoter?.email || "同執案者"),
         executor: exec?.name || exec?.email || execEmail || "—",
         signedAt: signedAt ?? "—",
