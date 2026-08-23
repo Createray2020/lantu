@@ -602,17 +602,30 @@ describe("企業主財務診斷書", () => {
     expect(h).toContain("應轉介專業人士");
   });
 
-  it("報告頁可以切換兩份文件；非企業主客戶沒有這個切換", () => {
+  // 2026/08/23 起可交付文件變三份（多了「調整方案書」，見 planSolver.test.ts）。
+  // 切換列因此對每個客戶都出現，但「企業主財務診斷書」那顆按鈕仍然只有企業主看得到。
+  it("報告頁可以切換三份文件；非企業主客戶看不到診斷書那一顆", () => {
     withGate();
     w.app.activeTab = "report"; w.app.reportDoc = "biz"; w.render();
     expect(pane()).toContain("企業主財務診斷書");
     w.app.reportDoc = "family"; w.render();
     expect(pane()).toContain("輸出哪一份");
+    expect(pane()).toContain("調整方案書");
 
     const c2 = freshCase();
     c2.intent.entities = {};
     w.app.activeTab = "report"; w.render();
-    expect(pane()).not.toContain("輸出哪一份");
+    expect(pane()).toContain("輸出哪一份");
+    expect(pane()).toContain("調整方案書");
+    expect(pane()).not.toContain("企業主財務診斷書");
+  });
+
+  it("企業主客戶把 reportDoc 停在 biz、之後關掉企業主體，報告頁會退回客戶版而不是空白", () => {
+    const c2 = freshCase();
+    c2.intent.entities = {};
+    w.app.activeTab = "report"; w.app.reportDoc = "biz"; w.render();
+    expect(pane()).toContain("財務規劃報告書");
+    expect(pane()).not.toContain("企業主財務診斷書");
   });
 });
 

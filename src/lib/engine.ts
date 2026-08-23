@@ -780,6 +780,94 @@ function planLevers(c){
  return s;
 }
 
+// ---------- 調整方案 → 具體行動 ----------
+// 求解器算出來的是「支出要砍 12.4%」這種比例，但教練跟客戶講的必須是
+// 「每個月少花 8,300 元」「換屋從 1,200 萬降到 1,050 萬」。這一段負責翻譯。
+// ⚠️ 回傳的是純資料，畫面（分析頁／報告書／方案書）三處共用同一份，不要各自再算一次。
+
+/** 套用某個願景壓縮幅度後，逐項的「理想 → 調整後」。x 為 0~100。 */
+function visionChanges(c,x){
+ var vx=n(x)/100,out=[];
+ if(vx<=0)return out;
+ (c.goals||[]).forEach(function(g){
+  var f=goalFloor(g),from=n(g.present),to=from-vx*Math.max(0,from-f);
+  if(from-to>0.5)out.push({kind:'目標',name:(g.name||g.type||'目標'),from:from,to:to,floor:f,unit:'元'});
+ });
+ [['旅遊',c.travel],['休閒',c.hobby],['奢侈品',c.luxury]].forEach(function(pair){
+  (pair[1]||[]).forEach(function(w){
+   var f=wishFloor(w),from=n(w.amount),to=from-vx*Math.max(0,from-f);
+   if(from-to>0.5)out.push({kind:pair[0],name:(w.sub||w.cat||pair[0]),from:from,to:to,floor:f,unit:'元/次'});
+  });
+ });
+ return out;
+}
+
+/**
+ * 把一組槓桿翻成可執行清單。set 留空＝用這份規劃已採用的方案。
+ * 每一列：{axis 面向, title 做什麼, detail 做到什麼程度, note 補充}
+ */
+function planActions(c,set){
+ set=set||planLevers(c);
+ var led=gapLedger(c),acts=[],m=metrics(c);
+ var after=applyLevers(c,set),gapAfter=projection(after).shortPV;
+
+ if(led.total>0.5){
+  acts.push({axis:'累積',title:'把缺口補起來',
+   detail:(led.years<=1
+     ? '現金流最快在 '+led.negAge+' 歲轉負，'+fmt(led.total)+' 元的缺口沒有攤提空間，必須立即處理'
+     : '在 '+led.years+' 年內每年存入 '+fmt(led.annual)+' 元，以 '+(+led.rate.toFixed(2))+'% 複利累積'),
+   note:'現值缺口 '+fmt(led.total)+' 元（保守情境 '+fmt(led.conservative)+' 元）'});
+ }
+
+ var incNow=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
+ if(n(set.income)){
+  var incAdd=incNow*n(set.income)/100;
+  acts.push({axis:'收入',title:'提高工作收入',
+   detail:'整體調升 '+(+n(set.income).toFixed(1))+'％＝每年多 '+fmt(incAdd)+' 元（每月 '+fmt(incAdd/12)+' 元）',
+   note:'目前工作收入合計 '+fmt(incNow)+' 元/年'});
+ }
+ var expNow=sum(c.expenses,function(e){return isLivingCat(e.cat)?n(e.amount):0});
+ if(n(set.expense)){
+  var expCut=expNow*n(set.expense)/100;
+  acts.push({axis:'支出',title:'降低生活與消費支出',
+   detail:'削減 '+(+n(set.expense).toFixed(1))+'％＝每年少花 '+fmt(expCut)+' 元（每月 '+fmt(expCut/12)+' 元）',
+   note:'目前生活＋消費 '+fmt(expNow)+' 元/年'});
+ }
+ if(set.rate!==undefined&&set.rate!==null&&set.rate!==''&&n(set.rate)>effReturn(c)){
+  var al=allocInfo(c);
+  acts.push({axis:'效率',title:'調整資產配置以提高長期報酬',
+   detail:'報酬率假設由 '+(+effReturn(c).toFixed(2))+'％ 提高到 '+(+n(set.rate).toFixed(2))+'％',
+   note:(al.totalPct>0?'目前建議配置的加權報酬為 '+al.wRet.toFixed(2)+'％，需要重新檢視配置':'尚未填建議資產配置')+
+        '；規劃上限 '+CAP_RATE+'％，此為假設不是承諾'});
+ }
+ if(n(set.retire)){
+  acts.push({axis:'時間',title:'延後退休',
+   detail:'退休年齡由 '+n(c.profile.retireAge)+' 歲改為 '+n(after.profile.retireAge)+' 歲（延後 '+Math.round(n(set.retire))+' 年）',
+   note:'工作收入同步延長，退休期縮短——這一根同時作用在兩端'});
+ }
+ if(n(set.retireLevel)){
+  var rNow=retireAnnual(c,n(c.profile.retireAge)+1,1);
+  acts.push({axis:'願景',title:'調降退休生活水準',
+   detail:'退休期支出調降 '+(+n(set.retireLevel).toFixed(1))+'％'+(rNow>0?'＝退休首年由 '+fmt(rNow)+' 元降為 '+fmt(rNow*(1-n(set.retireLevel)/100))+' 元':''),
+   note:'退休期支出明細在「退休」分頁逐列調整'});
+ }
+ var vc=visionChanges(c,set.vision);
+ if(vc.length){
+  acts.push({axis:'願景',title:'壓縮目標與生活願望',
+   detail:'整體壓縮 '+(+n(set.vision).toFixed(1))+'％，共 '+vc.length+' 項調整（逐項見下表）',
+   note:'壓縮下限＝各項填的「金額(最低)」；重要度 5 的項目不動'});
+ }
+
+ (led.now||[]).forEach(function(x){
+  acts.push({axis:(x.kind==='保障'?'保障':'流動性'),
+   title:(x.kind==='保障'?'補足保障缺口':'補足緊急預備金'),
+   detail:x.name+' 尚差 '+fmt(x.amount)+' 元',
+   note:'不併入現值缺口——這是事件發生才要的錢／隨時要能動用的錢'});
+ });
+
+ return {actions:acts,visionChanges:vc,gapBefore:led.total,gapAfter:gapAfter,ledger:led,after:after,levers:set};
+}
+
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296}}
 
 function hashStr(s){s=s||'x';var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
@@ -1253,6 +1341,8 @@ export {
   greedyFill,
   prescriptions,
   planLevers,
+  planActions,
+  visionChanges,
   GAP_CATS,
   PLAN_DISCOUNT,
   CAP_INCOME_UP,

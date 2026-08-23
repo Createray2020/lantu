@@ -373,3 +373,66 @@ describe("相容性（既有客戶的數字不能被動到）", () => {
     expect(E.planLevers(c)).toEqual({});
   });
 });
+
+describe("方案 → 具體行動（planActions）", () => {
+  it("把比例翻成金額：支出 12% ＝ 每年少花多少、每月少花多少", () => {
+    const c = E.sampleCase();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const living = c.expenses.filter((e: any) => E.isLivingCat(e.cat)).reduce((s: number, e: any) => s + E.n(e.amount), 0);
+    const r = E.planActions(c, { expense: 12 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const a = r.actions.find((x: any) => x.axis === "支出");
+    expect(a).toBeTruthy();
+    expect(a.detail).toContain(Math.round(living * 0.12).toLocaleString("en-US"));
+    expect(a.detail).toContain(Math.round(living * 0.12 / 12).toLocaleString("en-US"));
+  });
+
+  it("延後退休寫的是「幾歲改為幾歲」，不是「延後幾年」而已", () => {
+    const c = E.sampleCase();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const a = E.planActions(c, { retire: 3 }).actions.find((x: any) => x.axis === "時間");
+    expect(a.detail).toContain(String(E.n(c.profile.retireAge)));
+    expect(a.detail).toContain(String(E.n(c.profile.retireAge) + 3));
+  });
+
+  it("願景壓縮逐項給「原本 → 調整後」，而且不會低於各自的下限", () => {
+    const c = E.sampleCase();
+    const vc = E.visionChanges(c, 100);
+    expect(vc.length).toBeGreaterThan(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vc.forEach((v: any) => {
+      expect(v.to).toBeGreaterThanOrEqual(v.floor - 1e-6);
+      expect(v.to).toBeLessThanOrEqual(v.from);
+    });
+    expect(E.visionChanges(c, 0)).toHaveLength(0);   // 壓縮 0 ＝ 沒有任何調整
+  });
+
+  it("即時缺口會逐條進執行清單，但不算進現值缺口", () => {
+    const c = poorCase();
+    const r = E.planActions(c, {});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nowItems = r.actions.filter((x: any) => x.axis === "保障" || x.axis === "流動性");
+    expect(nowItems.length).toBe(r.ledger.now.length);
+    expect(r.gapBefore).toBe(E.gapPV(c));
+  });
+
+  it("採用的方案真的把缺口補平時，gapAfter 為 0", () => {
+    const c = E.sampleCase();
+    const rx = E.prescriptions(c).find((x: { ok: boolean }) => x.ok);
+    if (rx) {
+      const r = E.planActions(c, rx.levers);
+      expect(r.gapAfter).toBeLessThanOrEqual(0.5);
+      expect(r.gapBefore).toBeGreaterThan(r.gapAfter);
+    }
+  });
+
+  it("沒採用任何方案時不會爆，行動清單只剩缺口與即時缺口", () => {
+    const c = E.sampleCase();
+    delete c.plan;
+    expect(() => E.planActions(c)).not.toThrow();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    E.planActions(c).actions.forEach((a: any) => {
+      expect(["累積", "保障", "流動性"]).toContain(a.axis);
+    });
+  });
+});
