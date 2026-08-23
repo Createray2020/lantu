@@ -177,3 +177,69 @@ describe("版面：首屏必須是圖，不是報表", () => {
     expect(pane()).not.toContain(">調整後</text>");
   });
 });
+
+/**
+ * 2026/08/23 踩過的 bug：兩張配置表傳給 tableSec 的陣列鍵是 'plan.invest'，
+ * 但 set/addRow/delRow 的對照表 PLAN_ARRS 用的是 'planInvest' —— 對不起來，
+ * 「＋ 新增」按下去完全沒反應，改欄位還會丟例外。
+ *
+ * 當時的測試直接呼叫 addRow('planInvest')，等於**繞過了按鈕本身**，所以測試全綠、功能全壞。
+ * 這一組改成「從畫面上把 onclick 的字串挖出來執行」，才真的驗到那條線有沒有接上。
+ */
+describe("配置表的按鈕真的接得上（不是繞過按鈕直接呼叫函式）", () => {
+  const secOf = (title: string) => {
+    const h = [...w.document.querySelectorAll("h4")].find((e: Element) => (e.textContent || "").includes(title));
+    return h ? h.closest(".sec") : null;
+  };
+
+  it("兩張表的「＋ 新增」按鈕，按下去真的會多一列", () => {
+    w.app.dataTab = "plan"; w.render();
+    const c = cur();
+    ([["投資型配置", "invest"], ["保障型配置", "protect"]] as [string, string][]).forEach(([title, key]) => {
+      const sec = secOf(title);
+      expect(sec, title + " 這一區塊要存在").toBeTruthy();
+      const btn = sec!.querySelector("button.add") as HTMLElement;
+      expect(btn, title + " 要有新增鈕").toBeTruthy();
+      const before = (c.plan[key] || []).length;
+      // 直接執行按鈕上掛的那段字串——鍵名對不上的話這裡就會爆或沒有效果
+      w.eval(btn.getAttribute("onclick") as string);
+      expect((cur().plan[key] || []).length, title + " 應該多一列").toBe(before + 1);
+    });
+  });
+
+  it("表格欄位的 onchange 寫得進 c.plan 底下的陣列", () => {
+    w.app.dataTab = "plan"; w.render();
+    const sec = secOf("投資型配置")!;
+    const inputs = sec.querySelectorAll("input, select");
+    expect(inputs.length).toBeGreaterThan(0);
+    // 找「每年投入」那一欄（money 欄位帶 data-money）
+    const row0 = sec.querySelectorAll("table tr")[1];
+    const cells = row0.querySelectorAll("input");
+    expect(cells.length).toBeGreaterThan(2);
+    const oc = (cells[2] as HTMLElement).getAttribute("onchange") as string;
+    expect(oc).toContain("planInvest:");        // ⚠️ 鍵名必須是 PLAN_ARRS 認得的那一個
+    expect(() => w.eval(oc.replace(/this\.value/g, "'12345'"))).not.toThrow();
+  });
+
+  it("刪除鈕刪的是 c.plan 底下那一列，不是頂層陣列", () => {
+    w.app.dataTab = "plan"; w.render();
+    const c = cur();
+    const before = (c.plan.invest || []).length;
+    expect(before).toBeGreaterThan(0);
+    const sec = secOf("投資型配置")!;
+    const del = sec.querySelector("button.del") as HTMLElement;
+    w.eval(del.getAttribute("onclick") as string);
+    expect((cur().plan.invest || []).length).toBe(before - 1);
+  });
+
+  it("PLAN_ARRS 的每一個鍵都要有 addRow 範本，否則按鈕會靜靜地沒反應", () => {
+    Object.keys(w.PLAN_ARRS).forEach((k) => {
+      w.app.dataTab = "plan"; w.render();
+      const c = cur();
+      const path = w.PLAN_ARRS[k];
+      const before = (c.plan[path] || []).length;
+      w.addRow(k);
+      expect((cur().plan[path] || []).length, k + " 沒有 addRow 範本").toBe(before + 1);
+    });
+  });
+});

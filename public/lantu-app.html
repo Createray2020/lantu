@@ -3684,7 +3684,7 @@ function allocSecHTML(c){
  var ap=rec.alloc;
  // 保障配置的「對應缺口」下拉，選項就是這個個案實際算出來的即時缺口
  var gapOpts='（未指定）'+(rec.led.now.length?','+rec.led.now.map(function(x){return x.name}).join(','):'');
- var invTbl=tableSec('投資型配置','plan.invest',allocInvest(c),[
+ var invTbl=tableSec('投資型配置','planInvest',allocInvest(c),[
    ['name','標的（可留空）','text'],
    ['src','資金來源','sel:'+ALLOC_SRC.join(',')],
    ['principal','本金','money'],
@@ -3693,7 +3693,7 @@ function allocSecHTML(c){
    ['ret','預期報酬%','num'],
    ['note','備註 / 條件','text']],
    '「新增投入」才算補缺口；「既有轉入」是把現有可投資資產換個地方放，只影響加權報酬率。年投入不會被當成支出（那是把消費轉成投資，不是花掉）。');
- var proTbl=tableSec('保障型配置','plan.protect',allocProtect(c),[
+ var proTbl=tableSec('保障型配置','planProtect',allocProtect(c),[
    ['gapKey','對應缺口','sel:'+gapOpts],
    ['name','險種 / 結構（可留空）','text'],
    ['cover','保額 / 配置金額','money'],
