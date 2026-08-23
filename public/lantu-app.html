@@ -1817,6 +1817,9 @@ function hoverChart(evt,key){var d=(window.__charts||{})[key];if(!d)return;
  var cur=document.getElementById(key+'Cursor');if(cur){cur.setAttribute('x1',x);cur.setAttribute('x2',x);cur.style.display='block'}
  var ro=document.getElementById(key+'Readout');if(!ro)return;var age=d.a0+i;
  if(key==='mc'){var b=d.bands[i];ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b> ｜ 中位數(P50) <b>'+fmt(b[1])+'</b> ｜ 悲觀(P10) '+fmt(b[0])+' ｜ 樂觀(P90) '+fmt(b[2])}
+ else if(d.gapChart){var af=d.after?(' ｜ 調整後 <b style="color:#f0c34e">'+fmt(d.after[i])+'</b>'):'';
+  var bal=d.bals?(' ｜ 年度結餘 <b style="color:'+(d.bals[i]>=0?'#e6bd6a':'#ef6f6f')+'">'+fmt(d.bals[i])+'</b>'):'';
+  ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b>'+bal+' ｜ 未調整 <b>'+fmt(d.rows[i])+'</b>'+af;}
  else if(key==='tk'){var act=d.actual[age];ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b> ｜ 模擬淨資產 <b>'+fmt(d.rows[i])+'</b>'+(act!=null?' ｜ 實際 <b style="color:#fff">'+fmt(act)+'</b>（差 '+fmt(act-d.rows[i])+'）':'')}
  else if(key==='blp'){ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b> ｜ 收入 <b style="color:#e0bd8b">'+fmt(d.incs[i])+'</b> ｜ 支出 <b style="color:#8ea3b5">'+fmt(d.exps[i])+'</b> ｜ 累積資產 <b>'+fmt(d.nets[i])+'</b>'} else{var exb=d.bals?(' ｜ 年度結餘 <b style="color:'+(d.bals[i]>=0?'#e6bd6a':'#ef6f6f')+'">'+fmt(d.bals[i])+'</b>'):'';ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b>'+exb+' ｜ 可投資資產 <b>'+fmt(d.rows[i])+'</b>'}
 }
@@ -3101,9 +3104,217 @@ function taxSec(c){var t=c.taxParams||{},it=incomeTax(c),es=estateTax(c);
   '<div class="sec"><h4>遺產稅估算 <span class="hint">淨資產 − 免稅額 1,333 萬 − 配偶/卑親屬/喪葬扣除額 → 課稅遺產淨額</span></h4>'+
   '<table class="rtable"><tr><td class="k">課稅遺產淨額</td><td>'+fmt(es.base)+'</td></tr><tr><td class="k">適用稅率</td><td>'+(es.rate*100)+'%</td></tr><tr><td class="k">預估遺產稅</td><td class="bad">'+fmt(es.tax)+'</td></tr></table></div>';
 }
+// ===== 調整方案：圖表元件 =====
+//
+// 2026/08/23 第二輪。Ray 的回饋：「有點難看得懂，很多東西不夠簡化，沒有圖表會看得很辛苦。」
+// 病因是我把求解器的內部狀態整片攤成表格——那是除錯視角，不是諮詢現場視角。
+//
+// 顏色語意刻意與既有的現金流投影圖（expenseSourceSVG）一致，不另創一套：
+//   #8ea3b5 中性 ＝ 未調整的基準線（它是參照不是主角，所以刻意不搶眼）
+//   #f0c34e 強調 ＝ 套用方案後（＝那張圖的「可投資資產本金」同色）
+//   #ef6f6f 紅   ＝ 缺口（＝那張圖的「缺口」同色）
+// ⚠️ 兩條線一律在線末端直接標名字，不靠顏色分辨（色盲與黑白列印都要讀得出來）。
+//
+// 深淺兩版共用同一份函式，靠 theme 參數切換——教練端（深色可互動）與
+// 調整方案書（淺色可列印）看到的是同一張圖，不會各畫各的。
+
+function planChartColors(theme){
+ var dark=theme!=='light';
+ return {dark:dark,
+  AX:dark?'#6f869c':'#5a6b72', GRID:dark?'rgba(255,255,255,.08)':'rgba(0,0,0,.07)',
+  TICK:dark?'#71858c':'#8a9aa2', ZERO:dark?'rgba(255,255,255,.30)':'#b9c6ca',
+  BASE:dark?'#8ea3b5':'#5a7186', AFT:dark?'#f0c34e':'#b07d3d', GAP:'#ef6f6f',
+  LAB:dark?'#e9f0f2':'#22333a', OK:dark?'#8fc0a3':'#3f7d54', MUT:dark?'#6f869c':'#8a9aa2',
+  TRACK:dark?'rgba(255,255,255,.09)':'#e6ecee', AMB:dark?'#c99a5b':'#b07d3d'};
+}
+
+/**
+ * 座標刻度取「好看的數字」（1/2/2.5/5 × 10^k），而且**一定包含 0**。
+ * 直接把 min~max 均分會得到 109萬 / −2894萬 / −5896萬 這種讀不出來的刻度，
+ * 而這張圖的全部意義就是「有沒有掉到零以下」，零線沒有標籤等於沒講重點。
+ */
+function niceTicks(mn,mx,target){
+ var span=mx-mn;if(!(span>0))return [0];
+ var raw=span/(target||3),mag=Math.pow(10,Math.floor(Math.log(raw)/Math.LN10));
+ var norm=raw/mag,step=(norm<=1?1:norm<=2?2:norm<=2.5?2.5:norm<=5?5:10)*mag;
+ var out=[],v=Math.ceil(mn/step-1e-9)*step;
+ for(;v<=mx+step*1e-6;v+=step)out.push(Math.abs(v)<step*1e-6?0:v);
+ if(mn<0&&mx>0){var has=false;for(var i=0;i<out.length;i++)if(Math.abs(out[i])<step*1e-6)has=true;if(!has)out.push(0);}
+ out.sort(function(a,b){return a-b});
+ return out;
+}
+
+/**
+ * 主圖：一生可投資資產曲線 ＋ 缺口陰影。
+ * 這張圖就是「你和你想要的未來差多少」的答案——曲線掉到零線以下的那塊紅色，
+ * 折現回今天就是現值缺口。拉桿一動，金線會被抬起來、紅色會縮小。
+ */
+function gapChartSVG(c,set,theme,idKey){
+ var K=planChartColors(theme),pb=projection(c),rows=pb.rows;
+ if(!rows.length)return '<div class="muted">無資料</div>';
+ var hasSet=set&&Object.keys(set).length>0;
+ var ra=hasSet?projection(applyLevers(c,set)).rows:null;
+ var W=760,H=258,pL=56,pR=78,pT=20,pB=30,plotW=W-pL-pR,plotH=H-pT-pB;
+ var vals=rows.map(function(r){return r.invest});
+ if(ra)vals=vals.concat(ra.map(function(r){return r.invest}));
+ vals.push(0);
+ var mx=Math.max.apply(null,vals),mn=Math.min.apply(null,vals),span=(mx-mn)||1;
+ function X(i){return pL+(rows.length>1?i/(rows.length-1):0)*plotW}
+ function Y(v){return pT+(1-(v-mn)/span)*plotH}
+ function path(rs){return rs.map(function(r,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Y(r.invest).toFixed(1)}).join(' ')}
+ var zeroY=Y(0);
+
+ // 缺口區＝基準線落在零線以下的每一段（可能不只一段）
+ function seg(a,b){
+  var d='M'+X(a).toFixed(1)+' '+zeroY.toFixed(1);
+  for(var i=a;i<=b;i++)d+='L'+X(i).toFixed(1)+' '+Y(rows[i].invest).toFixed(1);
+  d+='L'+X(b).toFixed(1)+' '+zeroY.toFixed(1)+'Z';
+  return '<path d="'+d+'" fill="'+K.GAP+'" fill-opacity="'+(K.dark?0.24:0.17)+'"/>';
+ }
+ var gapArea='',run=null;
+ rows.forEach(function(r,i){
+  if(r.invest<0){if(run===null)run=i;}
+  else if(run!==null){gapArea+=seg(run,i-1);run=null;}
+ });
+ if(run!==null)gapArea+=seg(run,rows.length-1);
+
+ // 格線刻意稀疏——這張圖要看的是形狀不是讀數；但 0 那一條一定要標出來。
+ var grid='';
+ niceTicks(mn,mx,3).forEach(function(v){
+  var y=Y(v),isZero=Math.abs(v)<1e-6;
+  grid+='<line x1="'+pL+'" y1="'+y.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+y.toFixed(1)+'" stroke="'+(isZero?'transparent':K.GRID)+'"/>'+
+   '<text x="'+(pL-7)+'" y="'+(y+3).toFixed(1)+'" fill="'+(isZero?K.LAB:K.AX)+'" font-size="'+(isZero?'10.5':'9.5')+'"'+(isZero?' font-weight="800"':'')+' text-anchor="end">'+(isZero?'0':cfAxis(v))+'</text>';
+ });
+ var ticks='';
+ for(var i2=0;i2<rows.length;i2+=10)ticks+='<text x="'+X(i2).toFixed(1)+'" y="'+(H-9)+'" fill="'+K.TICK+'" font-size="9.5" text-anchor="middle">'+rows[i2].age+'</text>';
+ ticks+='<text x="'+X(rows.length-1).toFixed(1)+'" y="'+(H-9)+'" fill="'+K.TICK+'" font-size="9.5" text-anchor="middle">'+rows[rows.length-1].age+'</text>';
+
+ // 轉負年標記
+ var mark='';
+ if(pb.turnNeg!=null){
+  var ti=pb.turnNeg-rows[0].age,tx=X(Math.max(0,Math.min(rows.length-1,ti)));
+  // 標籤預設放線的右邊；太靠右就翻到左邊，並壓低一點避開最上面那個 Y 軸刻度。
+  var flip=tx>W-pR-90,lx=flip?tx-5:tx+5;
+  mark='<line x1="'+tx.toFixed(1)+'" y1="'+pT+'" x2="'+tx.toFixed(1)+'" y2="'+(pT+plotH)+'" stroke="'+K.GAP+'" stroke-width="1" stroke-opacity=".55"/>'+
+   '<text x="'+lx.toFixed(1)+'" y="'+(pT+26)+'" fill="'+K.GAP+'" font-size="10" font-weight="700" text-anchor="'+(flip?'end':'start')+'">'+pb.turnNeg+' 歲轉負</text>';
+ }
+
+ // 線末端直接標名字（不靠顏色分辨）。兩個標籤太近就上下推開。
+ var yB=Y(rows[rows.length-1].invest),lab='';
+ var xEnd=X(rows.length-1)+7;
+ if(ra){
+  var yA=Y(ra[ra.length-1].invest);
+  if(Math.abs(yA-yB)<15){var mid=(yA+yB)/2;yA=mid-8;yB=mid+8;}
+  lab+='<text x="'+xEnd.toFixed(1)+'" y="'+(yA+3.5).toFixed(1)+'" fill="'+K.AFT+'" font-size="10.5" font-weight="800">調整後</text>';
+ }
+ lab+='<text x="'+xEnd.toFixed(1)+'" y="'+(yB+3.5).toFixed(1)+'" fill="'+K.BASE+'" font-size="10.5" font-weight="700">未調整</text>';
+
+ // 缺口金額直接註記在紅色區塊旁邊——不用去別的地方對數字
+ var note='';
+ if(pb.shortPV>0.5&&pb.turnNeg!=null){
+  var ni=Math.min(rows.length-1,Math.max(0,(pb.shortAge!=null?pb.shortAge:pb.turnNeg)-rows[0].age));
+  var nx=Math.min(W-pR-52,Math.max(pL+52,X(ni)));
+  // 標在紅色區塊的垂直中央，一眼就知道那塊紅色是什麼
+  var ny=Math.min(pT+plotH-6,Math.max(pT+12,(zeroY+Y(rows[ni].invest))/2+4));
+  note='<text x="'+nx.toFixed(1)+'" y="'+ny.toFixed(1)+'" fill="'+K.GAP+'" font-size="12" font-weight="800" text-anchor="middle">缺口 '+cfAxis(pb.shortPV)+'</text>';
+ }
+
+ var hov='',cursor='',read='';
+ if(idKey){
+  window.__charts=window.__charts||{};
+  window.__charts[idKey]={a0:rows[0].age,rows:rows.map(function(r){return r.invest}),
+   after:ra?ra.map(function(r){return r.invest}):null,bals:rows.map(function(r){return r.bal}),
+   W:W,pad:pL,padR:pR,n:rows.length,gapChart:true};
+  hov=' style="cursor:crosshair;touch-action:none" onmousemove="hoverChart(event,\''+idKey+'\')" ontouchmove="hoverChart(event,\''+idKey+'\')"';
+  cursor='<line id="'+idKey+'Cursor" x1="0" y1="'+pT+'" x2="0" y2="'+(pT+plotH)+'" stroke="'+K.LAB+'" stroke-width="1" stroke-opacity=".45" style="display:none"/>';
+  read='<div id="'+idKey+'Readout" style="background:#0a1a20;border:1px solid var(--line);border-radius:9px;padding:7px 11px;margin-bottom:7px;font-size:12.5px;color:var(--mut)">移動滑鼠／手指到圖上任一年齡，看該年的可投資資產</div>';
+ }
+
+ var legend='<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:'+(K.dark?'var(--mut)':'#5a6b72')+';margin-top:5px">'+
+  '<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:2px;background:'+K.BASE+';display:inline-block"></span>未調整</span>'+
+  (ra?'<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:3px;background:'+K.AFT+';display:inline-block"></span>調整後</span>':'')+
+  '<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:12px;height:10px;border-radius:2px;background:'+K.GAP+';opacity:.45;display:inline-block"></span>缺口（資產轉負的那一段）</span>'+
+  '</div>';
+
+ return read+'<svg width="100%" viewBox="0 0 '+W+' '+H+'"'+hov+'>'+
+  grid+gapArea+
+  '<line x1="'+pL+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+zeroY.toFixed(1)+'" stroke="'+K.ZERO+'" stroke-width="1"/>'+
+  mark+
+  '<path d="'+path(rows)+'" fill="none" stroke="'+K.BASE+'" stroke-width="2" stroke-linejoin="round"/>'+
+  (ra?'<path d="'+path(ra)+'" fill="none" stroke="'+K.AFT+'" stroke-width="2.6" stroke-linejoin="round"/>':'')+
+  ticks+lab+note+cursor+'</svg>'+legend;
+}
+
+/**
+ * 六根槓桿量表。一條橫條＝一根槓桿，條長是「要動到多少」、軌道長是規劃上限，
+ * 衝出軌道就是紅色的「此路不通」。六根一眼看完，不用一列一列讀文字。
+ */
+function leverBarsHTML(c,solo,theme,withAct){
+ var K=planChartColors(theme);
+ var rows=solo.rows.map(function(r){
+  var st,col,txt,frac;
+  if(!r.needed){st='🟢';col=K.OK;txt='不需動用';frac=0;}
+  else if(r.blocked){st='⚪';col=K.MUT;txt='現階段不建議動用';frac=0;}
+  else if(r.feasible){st='🟢';col=K.OK;
+   frac=Math.max(0.02,Math.min(1,(r.cap-r.lo)>0?(r.x-r.lo)/(r.cap-r.lo):1));
+   txt=(r.id==='rate'?('拉到 '+r.x.toFixed(2)+'%'):(r.id==='retire'?('延後 '+Math.round(r.x)+' 年'):((r.id==='income'?'增加':r.id==='expense'?'削減':r.id==='vision'?'壓縮':'調降')+' '+r.x.toFixed(1)+'%')));}
+  else {st='🔴';col=K.GAP;frac=1;
+   txt='拉到上限仍差 '+cfAxis(r.gap);}
+  var capTxt=(r.id==='retire'?r.cap+' 年':(+r.cap.toFixed(1))+'%');
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;flex-wrap:wrap">'+
+   '<div style="width:104px;flex:none;font-size:13px;color:'+K.LAB+'">'+st+' '+esc(r.name)+'</div>'+
+   '<div style="flex:1;min-width:120px;height:12px;border-radius:6px;background:'+K.TRACK+';position:relative;overflow:visible">'+
+     '<div style="position:absolute;left:0;top:0;bottom:0;width:'+(frac*100).toFixed(1)+'%;border-radius:6px;background:'+col+(frac>=1&&!r.feasible&&r.needed?';box-shadow:6px 0 0 -2px '+K.GAP:'')+'"></div>'+
+   '</div>'+
+   '<div style="width:186px;flex:none;font-size:12.5px;color:'+col+';font-weight:700;text-align:right">'+esc(txt)+
+     '<span style="color:'+K.MUT+';font-weight:400"> ／上限 '+capTxt+'</span></div>'+
+   (withAct&&r.feasible&&r.needed?'<button class="tbtn" style="padding:3px 9px;font-size:12px;flex:none" onclick="adoptSolo(\''+r.id+'\')">套用</button>':'')+
+   '</div>'+
+   (r.reason?'<div style="font-size:11.5px;color:'+K.MUT+';margin:-4px 0 8px 114px">'+esc(r.reason)+'</div>':'');
+ }).join('');
+ return '<div>'+rows+'</div>';
+}
+
+/** 缺口組成：水平長條（單一顏色，依金額排序）。比堆疊條或圓餅好讀，也不用挑配色。 */
+function gapBarsHTML(led,theme){
+ var K=planChartColors(theme);
+ if(!led.flow.length)return '';
+ var mxv=led.flow[0].pv||1;
+ return led.flow.map(function(f){
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+   '<div style="width:78px;flex:none;font-size:12.5px;color:'+K.LAB+'">'+esc(f.name)+'</div>'+
+   '<div style="flex:1;min-width:80px;height:14px;border-radius:4px;background:'+K.TRACK+'">'+
+     '<div style="height:100%;width:'+(f.pv/mxv*100).toFixed(1)+'%;border-radius:4px;background:'+K.AMB+'"></div></div>'+
+   '<div style="width:132px;flex:none;text-align:right;font-size:12.5px;color:'+K.LAB+'">'+fmt(f.pv)+
+     '<span style="color:'+K.MUT+'"> · '+(f.share*100).toFixed(0)+'%</span></div></div>';
+ }).join('');
+}
+
+/** 調整前後的四個變化。用箭頭與顏色講「往好還是往壞」，不是七列數字表。 */
+function deltaCardsHTML(c,set,theme){
+ var K=planChartColors(theme);
+ var pb=projection(c),after=applyLevers(c,set||{}),pa=projection(after);
+ var hb=health(c),ha=health(after);
+ var items=[
+  {t:'現值缺口',b:fmt(pb.shortPV),a:fmt(pa.shortPV),good:pa.shortPV<pb.shortPV,same:Math.abs(pa.shortPV-pb.shortPV)<0.5,zero:pa.shortPV<=0.5},
+  {t:'願景達成度',b:visionRateOf(pb)+'%',a:visionRateOf(pa)+'%',good:visionRateOf(pa)>visionRateOf(pb),same:visionRateOf(pa)===visionRateOf(pb),zero:visionRateOf(pa)>=100},
+  {t:'資產轉負年齡',b:pb.turnNeg?pb.turnNeg+' 歲':'無',a:pa.turnNeg?pa.turnNeg+' 歲':'無',
+   good:(pa.turnNeg||999)>(pb.turnNeg||999),same:(pa.turnNeg||999)===(pb.turnNeg||999),zero:!pa.turnNeg},
+  {t:'財務階段',b:stageName(hb.grade),a:stageName(ha.grade),good:ha.grade<hb.grade,same:ha.grade===hb.grade,zero:false}
+ ];
+ return '<div style="display:flex;gap:9px;flex-wrap:wrap">'+items.map(function(x){
+  var col=x.zero?K.OK:(x.same?K.MUT:(x.good?K.OK:K.GAP));
+  var arrow=x.same?'＝':(x.good?'↗':'↘');
+  return '<div style="flex:1;min-width:132px;background:'+(K.dark?'#0a1a20':'#f7f4ee')+';border:1px solid '+(K.dark?'var(--line)':'#e4dfd4')+';border-radius:10px;padding:9px 11px">'+
+   '<div style="font-size:11.5px;color:'+K.MUT+'">'+x.t+'</div>'+
+   '<div style="font-size:12.5px;color:'+K.MUT+';margin-top:3px;text-decoration:'+(x.same?'none':'line-through')+'">'+x.b+'</div>'+
+   '<div style="font-size:17px;font-weight:800;color:'+col+';line-height:1.3">'+arrow+' '+x.a+'</div></div>';
+ }).join('')+'</div>';
+}
+
 // ===== 調整方案：狀態與操作 =====
 // 拉桿的當前值存在 c.plan.draft（跟著存檔走，教練切分頁不會掉）。
-// c.plan.levers 才是「已採用」的方案——scenario()／報告書吃的是它。
+// c.plan.levers 才是「已採用」的方案——scenario()／報告書／追蹤線吃的是它。
 function planDraft(c){var p=c.plan||{};return p.draft||{}}
 function setLever(id,v){var c=activeCase();c.plan=c.plan||{};c.plan.draft=c.plan.draft||{};
  var x=n(v);if(id==='rate'&&(v===''||v===null))x='';c.plan.draft[id]=x;save();render();}
@@ -3131,81 +3342,111 @@ function useAllocRate(){var c=activeCase();var al=allocInfo(c);if(!(al.totalPct>
  c.params.invReturn=+al.wRet.toFixed(2);save();render();}
 
 // ===== 調整方案：畫面 =====
-function gapChip(v,label,sub,tone){
- var col=tone==='ok'?'var(--ok)':(tone==='bad'?'var(--warn)':'var(--amber2)');
- return '<div class="b"><div class="l">'+esc(label)+'</div><div class="v" style="color:'+col+'">'+fmt(v)+'</div>'+
-  (sub?'<div class="hint" style="display:block;margin-top:2px">'+sub+'</div>':'')+'</div>';
-}
-function gapLedgerHTML(c,led){
- var ok=led.total<=0.5;
- var head='<div class="big3">'+
-  gapChip(led.total,'現值缺口（假設報酬 '+(+led.rate.toFixed(2))+'%）',ok?'一生現金流不會轉負':'今天要多放進去的金額',ok?'ok':'bad')+
-  gapChip(led.conservative,'保守情境（折現率 '+led.conservativeRate+'%）',led.conservative>led.total*1.5?'⚠ 高度依賴報酬率假設':'與上方接近，假設風險低',led.conservative<=0.5?'ok':'bad')+
-  '<div class="b"><div class="l">願景達成度</div><div class="v" style="color:'+(led.visionRate>=60?'var(--ok)':'var(--warn)')+'">'+led.visionRate+'%</div><div class="hint" style="display:block;margin-top:2px">1 −（缺口 ÷ 一生需求現值）</div></div>'+
-  '</div>';
- var warn='';
- if(led.rateOverCap)warn+='<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 目前的報酬率假設 '+(+led.rate.toFixed(2))+'% 已超過規劃上限 '+CAP_RATE+'%——缺口會被這個假設壓低，請以右邊的保守情境為準。</div>';
- if(!ok&&led.conservative>led.total*3)warn+='<div class="hint" style="display:block;margin-top:6px;color:var(--warn)">⚠ 兩個讀數差距 '+(led.total>0?(led.conservative/led.total).toFixed(1):'—')+' 倍：這份規劃的成敗幾乎完全押在報酬率假設上，務必與客戶說明。</div>';
- if(ok)return '<div class="sec"><h4>缺口帳</h4>'+head+
-  '<div class="hint" style="display:block;margin-top:10px;color:var(--ok)">✅ 依目前假設，一生的可投資資產不會轉負——沒有現金流缺口。下方仍請確認「即時缺口」。</div>'+warn+gapNowHTML(led)+'</div>';
- var per=led.years<=1
-  ? '<b style="color:var(--warn)">現金流最快在 '+led.negAge+' 歲就轉負，缺口必須立即處理</b>'
-  : '在 '+led.years+' 年內（到 '+(n(c.profile.age)+led.years)+' 歲）每年存入 <b style="color:var(--amber2)">'+fmt(led.annual)+'</b> 元，並以 '+(+led.rate.toFixed(2))+'% 複利累積';
- var rows=led.flow.map(function(f){
-  return '<tr><td class="k">'+esc(f.name)+'</td><td>'+fmt(f.pv)+'</td><td>'+(f.share*100).toFixed(1)+'%</td></tr>';
- }).join('');
- var flowTbl='<table class="rtable"><tr><th>造成缺口的支出</th><th>現值</th><th>占比</th></tr>'+rows+
-  '<tr><td class="k"><b>合計</b></td><td class="bad"><b>'+fmt(led.total)+'</b></td><td>100%</td></tr></table>'+
-  '<div class="hint" style="display:block;margin-top:6px">依「第一個不足年（'+led.negAge+' 歲）之後」的折現支出組成歸因，各列相加＝現值缺口。</div>';
- return '<div class="sec"><h4>缺口帳</h4>'+head+
-  '<div style="margin-top:10px">補平的方式：'+per+'。</div>'+warn+
-  '<div style="margin-top:14px">'+flowTbl+'</div>'+gapNowHTML(led)+'</div>';
-}
-function gapNowHTML(led){
- if(!led.now.length)return '';
- var rows=led.now.map(function(x){return '<tr><td class="k">'+esc(x.name)+'</td><td>'+fmt(x.amount)+'</td><td>'+esc(x.kind)+'</td></tr>'}).join('');
- return '<div style="margin-top:16px"><div style="color:var(--amber2);font-weight:700;margin-bottom:6px">即時缺口（不併入上方總額）</div>'+
-  '<table class="rtable"><tr><th>項目</th><th>金額</th><th>性質</th></tr>'+rows+'</table>'+
-  '<div class="hint" style="display:block;margin-top:6px">保障缺口是「事件發生才要的錢」、預備金是「隨時要能動用的錢」，和一生現金流不同時點也不同性質，<b>刻意不相加</b>。</div></div>';
-}
-function soloHTML(c,solo,noAct){
- var gate=solo.gate;
- var rows=solo.rows.map(function(r){
-  var light,txt,act='';
-  if(!r.needed){light='🟢';txt='<span style="color:var(--ok)">不需動用這一根</span>';}
-  else if(r.blocked){light='⚪';txt='<span style="color:var(--mut2)">階段閘門鎖住</span>';}
-  else if(r.feasible){light='🟢';
-   txt='<b style="color:var(--ok)">'+(r.id==='rate'?('需拉到 '+r.x.toFixed(2)+'%'):(r.id==='retire'?('需延後 '+Math.round(r.x)+' 年'):('需'+(r.id==='income'?'增加':(r.id==='expense'?'削減':(r.id==='vision'?'壓縮':'調降')))+' '+r.x.toFixed(1)+'%')))+'</b>';
-   act=noAct?'':'<button class="tbtn" style="padding:4px 9px;font-size:12px" onclick="adoptSolo(\''+r.id+'\')">套用</button>';}
-  else {light='🔴';
-   txt='<span style="color:var(--warn)">拉到上限（'+(r.id==='rate'?r.cap+'%':(r.id==='retire'?r.cap+' 年':r.cap+'%'))+'）仍差 '+fmt(r.gap)+'</span>';}
-  var why=r.reason?'<div class="hint" style="display:block;color:var(--mut2)">'+esc(r.reason)+'</div>':
-    (r.needed&&!r.feasible&&!r.blocked&&r.reduce<=0.5?'<div class="hint" style="display:block;color:var(--mut2)">這份規劃裡沒有這一根可動的資料（例如沒有工作收入列、或願景都沒填「金額(最低)」）。</div>':'');
-  return '<tr><td class="k">'+light+' '+esc(r.name)+'</td><td>'+txt+why+'</td><td style="text-align:right">'+act+'</td></tr>';
- }).join('');
- var allRed=solo.rows.every(function(r){return r.needed&&!r.feasible});
- var verdict=allRed
-  ? '<div class="hint" style="display:block;margin-top:8px;color:var(--warn)"><b>六根槓桿全紅——單靠任何一根都補不平。</b>請直接看下方「調願景型」處方：這是系統認為唯一走得通的方向。</div>'
-  : '<div class="hint" style="display:block;margin-top:8px">每一列都是「其他都不動、只動這一根」的反解結果。🔴 代表拉到規劃上限仍補不平＝此路不通。</div>';
- var gateNote=gate.grade==='D'||gate.grade==='C'
-  ? '<div class="hint" style="display:block;margin-bottom:8px">目前階段 <b>'+stageName(gate.grade)+'</b>：'+esc(stageTask(gate.grade))+'。'+
-    (gate.block.rate?'<span style="color:var(--warn)">提高報酬率已被鎖住</span>——'+esc(gate.reason.rate):'報酬率上限已收緊為 '+gate.rateCap+'%')+'</div>'
-  : '';
- return '<div class="sec"><h4>該解什麼：六根槓桿各自反解</h4>'+gateNote+
-  '<table class="rtable"><tr><th>槓桿</th><th>只動這一根，要動到多少？</th><th></th></tr>'+rows+'</table>'+verdict+'</div>';
+// 排版原則（2026/08/23 第二輪重排）：首屏只有「一張圖 ＋ 三個數字 ＋ 拉桿」，
+// 其餘一律收合。教練打開這一頁的第一眼要是一張圖，不是一張報表。
+function foldSec(title,hint,inner,open){
+ return '<div class="sec"><details'+(open?' open':'')+'><summary style="cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:8px">'+
+  '<span style="color:var(--amber2);font-weight:700;font-size:14px">'+title+'</span>'+
+  (hint?'<span class="hint">'+hint+'</span>':'')+
+  '<span style="flex:1"></span><span class="hint">展開 ▾</span></summary>'+
+  '<div style="margin-top:12px">'+inner+'</div></details></div>';
 }
 function leverLabel(id,v){
- if(id==='rate')return (v===''||v==null)?'未指定（沿用 '+'假設）':(+v).toFixed(2)+'%';
+ if(id==='rate')return (v===''||v==null)?'未指定':(+v).toFixed(2)+'%';
  if(id==='retire')return Math.round(n(v))+' 年';
  return (+n(v)).toFixed(1)+'%';
 }
+function leverSummary(set){
+ var s=[];for(var i=0;i<LEVERS.length;i++){var id=LEVERS[i].id;if(set&&n(set[id]))s.push(LEVERS[i].name+' '+leverLabel(id,set[id]));}
+ return s.length?s.join('、'):'未調整';
+}
+
+/** 首屏：三個數字 ＋ 主圖 ＋ 拉桿 ＋ 四張變化卡。圖與拉桿必須貼在一起，拉了要當場看到線動。 */
+function gapHeroHTML(c,led,gate){
+ var d=planDraft(c),hasDraft=Object.keys(d).length>0;
+ var ok=led.total<=0.5;
+ var big='<div class="big3">'+
+  '<div class="b"><div class="l">現值缺口<span class="hint"> 假設報酬 '+(+led.rate.toFixed(2))+'%</span></div>'+
+   '<div class="v" style="color:'+(ok?'var(--ok)':'var(--warn)')+'">'+fmt(led.total)+'</div>'+
+   '<div class="hint" style="display:block">'+(ok?'一生現金流不會轉負':'今天要多放進去的金額')+'</div></div>'+
+  '<div class="b"><div class="l">保守情境<span class="hint"> 折現率 '+led.conservativeRate+'%</span></div>'+
+   '<div class="v" style="color:'+(led.conservative<=0.5?'var(--ok)':'var(--warn)')+'">'+fmt(led.conservative)+'</div>'+
+   '<div class="hint" style="display:block">'+(led.conservative>led.total*1.5?'⚠ 高度依賴報酬率假設':'與左邊接近，假設風險低')+'</div></div>'+
+  '<div class="b"><div class="l">願景達成度</div>'+
+   '<div class="v" style="color:'+(led.visionRate>=60?'var(--ok)':'var(--warn)')+'">'+led.visionRate+'%</div>'+
+   '<div class="hint" style="display:block">填得平就是 100%</div></div></div>';
+
+ var warn='';
+ if(led.rateOverCap)warn+='<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 報酬率假設 '+(+led.rate.toFixed(2))+'% 已超過規劃上限 '+CAP_RATE+'%，缺口會被這個假設壓低，請以「保守情境」為準。</div>';
+ else if(!ok&&led.conservative>led.total*3)warn+='<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 兩個讀數差 '+(led.conservative/led.total).toFixed(1)+' 倍：這份規劃的成敗幾乎完全押在報酬率假設上，務必與客戶說明。</div>';
+
+ var how=ok?'<span style="color:var(--ok)">✅ 依目前假設不會轉負。仍請確認下方「缺口組成與即時缺口」裡的保障與預備金。</span>'
+  :(led.years<=1?'<b style="color:var(--warn)">現金流最快在 '+led.negAge+' 歲轉負，缺口沒有攤提空間，必須立即處理。</b>'
+   :'補平的方式：'+led.years+' 年內（到 '+(n(c.profile.age)+led.years)+' 歲）每年存入 <b style="color:var(--amber2)">'+fmt(led.annual)+'</b> 元，以 '+(+led.rate.toFixed(2))+'% 複利累積。');
+
+ var sliders=LEVERS.map(function(L){return leverSliderHTML(c,L.id,gate)}).join('');
+ var btns='<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">'+
+  '<button class="tbtn amber" onclick="adoptDraft()">採用為正式方案</button>'+
+  '<button class="tbtn" onclick="saveTrial()">存成方案</button>'+
+  '<button class="tbtn" onclick="clearDraft()">歸零</button></div>';
+ var adopted=(c.plan||{}).levers&&Object.keys((c.plan||{}).levers).length;
+ var adoptNote=adopted
+  ?'<div class="hint" style="display:block;margin-top:7px;color:var(--ok)">目前正式方案：'+esc(leverSummary((c.plan||{}).levers))+'（報告書、生涯模擬與真實追蹤吃的是這一組）</div>'
+  :'<div class="hint" style="display:block;margin-top:7px">尚未採用任何正式方案——報告書仍以「未調整」呈現。</div>';
+
+ return '<div class="sec"><h4>缺口 <span class="hint">曲線掉到零線以下的那塊紅色，折現回今天就是缺口</span></h4>'+
+  big+warn+
+  '<div style="margin:12px 0 4px">'+gapChartSVG(c,d,'dark','gap')+'</div>'+
+  '<div style="margin-top:8px">'+how+'</div>'+
+  '<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">'+
+   '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:9px"><b style="color:var(--amber2)">拉拉看</b>'+
+   '<span class="hint">拉完放開，上面的曲線會當場被抬起來</span></div>'+
+   '<div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1.3;min-width:290px">'+sliders+btns+adoptNote+'</div>'+
+   '<div style="flex:1;min-width:270px">'+(hasDraft?deltaCardsHTML(c,d,'dark'):'<div class="muted" style="font-size:13px">還沒拉任何一根。可以直接拉左邊的桿子，或用下面「該解什麼」的套用鈕、三張處方卡帶入。</div>')+'</div>'+
+   '</div></div></div>';
+}
+
+function leverSliderHTML(c,id,gate){
+ var d=planDraft(c),r=leverRange(c,id,gate),v=d[id];
+ var L=null;for(var i=0;i<LEVERS.length;i++)if(LEVERS[i].id===id)L=LEVERS[i];
+ var cur=(v===''||v===undefined||v===null)?r.lo:n(v);
+ if(cur<r.lo)cur=r.lo;if(cur>r.hi)cur=r.hi;
+ var step=r.step?r.step:(id==='rate'?0.1:0.5);
+ var dis=gate.block[id]?' disabled':'';
+ var on=n(v)>0||(id==='rate'&&v!==''&&v!==undefined&&n(v)>r.lo);
+ return '<div style="margin-bottom:9px;opacity:'+(gate.block[id]?'.45':'1')+'">'+
+  '<div style="display:flex;align-items:center;gap:8px">'+
+   '<span style="font-weight:700;font-size:13px;min-width:92px;color:'+(on?'var(--amber2)':'var(--tx)')+'">'+esc(L.name)+'</span>'+
+   '<input type="range" min="'+r.lo+'" max="'+r.hi+'" step="'+step+'" value="'+cur+'" onchange="setLever(\''+id+'\',this.value)" style="flex:1;min-width:90px;accent-color:var(--amber)"'+dis+'>'+
+   '<input type="number" step="'+step+'" min="'+r.lo+'" max="'+r.hi+'" value="'+(+cur.toFixed(2))+'" onchange="setLever(\''+id+'\',this.value)" style="width:72px;background:#0b2136;border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:3px 6px;text-align:right"'+dis+'>'+
+   '<span class="hint" style="width:20px">'+esc(L.unit)+'</span>'+
+  '</div>'+
+  (gate.block[id]?'<div class="hint" style="display:block;margin-left:100px;color:var(--mut2)">'+esc(gate.reason[id]||'已鎖住')+'</div>':'')+
+  '</div>';
+}
+
+/** 該解什麼：六條量表。條長＝要動到多少，軌道＝規劃上限，衝出去就是此路不通。 */
+function soloHTML(c,solo,noAct){
+ var gate=solo.gate;
+ var allRed=solo.rows.every(function(r){return r.needed&&!r.feasible});
+ var gateNote=(gate.grade==='D'||gate.grade==='C')
+  ? '<div class="hint" style="display:block;margin-bottom:10px">目前階段 <b>'+stageName(gate.grade)+'</b>：'+esc(stageTask(gate.grade))+'。'+
+    (gate.block.rate?'<span style="color:var(--warn)">「提高報酬」已鎖住</span>':'報酬率上限已收緊為 '+gate.rateCap+'%')+'</div>'
+  : '';
+ var verdict=allRed
+  ? '<div class="hint" style="display:block;margin-top:8px;color:var(--warn)"><b>六根全紅——單靠任何一根都補不平。</b>請看下方「調願景型」處方，那是系統認為唯一走得通的方向。</div>'
+  : '<div class="hint" style="display:block;margin-top:8px">每一條都是「其他都不動、只動這一根」的反解。條子衝出軌道＝拉到規劃上限仍補不平。</div>';
+ return '<div class="sec"><h4>該解什麼 <span class="hint">六根槓桿各自反解</span></h4>'+gateNote+
+  leverBarsHTML(c,solo,'dark',!noAct)+verdict+'</div>';
+}
+
 function rxCardsHTML(c,rxs){
  var cards=rxs.map(function(r){
   var steps=(r.steps||[]).filter(function(s){return s.needed}).map(function(s){
    if(s.blocked)return '<li style="color:var(--mut2)">'+esc(s.name)+'：階段閘門鎖住，未採用</li>';
    var v=r.levers[s.id];
    if(v===undefined)return '';
-   return '<li>'+esc(s.name)+' → <b style="color:var(--amber2)">'+leverLabel(s.id,v)+'</b>'+(s.feasible?'':'（已拉到上限）')+'</li>';
+   return '<li>'+esc(s.name)+' → <b style="color:var(--amber2)">'+leverLabel(s.id,v)+'</b>'+(s.feasible?'':'（已到上限）')+'</li>';
   }).join('');
   if(!steps)steps='<li style="color:var(--ok)">不需要調整——目前就補得平</li>';
   var badge=r.ok?'<span style="color:var(--ok);font-weight:700">✅ 可以填平</span>':'<span style="color:var(--warn);font-weight:700">❌ 仍差 '+fmt(r.gap)+'</span>';
@@ -3219,59 +3460,32 @@ function rxCardsHTML(c,rxs){
  return '<div class="sec"><h4>三個處方 <span class="hint">模板永遠只有三張，內容每次由求解器現算</span></h4>'+
   '<div style="display:flex;gap:12px;flex-wrap:wrap">'+cards+'</div></div>';
 }
-function leverSliderHTML(c,id,gate){
- var d=planDraft(c),r=leverRange(c,id,gate),v=d[id];
- var L=null;for(var i=0;i<LEVERS.length;i++)if(LEVERS[i].id===id)L=LEVERS[i];
- var cur=(v===''||v===undefined||v===null)?r.lo:n(v);
- if(cur<r.lo)cur=r.lo;if(cur>r.hi)cur=r.hi;
- var step=r.step?r.step:(id==='rate'?0.1:0.5);
- var dis=gate.block[id]?' disabled':'';
- var lock=gate.block[id]?'<span style="color:var(--mut2)">（'+esc(gate.reason[id]||'已鎖住')+'）</span>':'';
- return '<div style="margin-bottom:11px;opacity:'+(gate.block[id]?'.5':'1')+'">'+
-  '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span style="font-weight:700;min-width:92px">'+esc(L.name)+'</span>'+
-  '<input type="number" step="'+step+'" min="'+r.lo+'" max="'+r.hi+'" value="'+(+cur.toFixed(2))+'" onchange="setLever(\''+id+'\',this.value)" style="width:88px;background:#0b2136;border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:4px 7px"'+dis+'>'+
-  '<span class="hint">'+esc(L.unit)+'　上限 '+(+r.hi.toFixed(2))+'　'+esc(L.hint)+' '+lock+'</span></div>'+
-  '<input type="range" min="'+r.lo+'" max="'+r.hi+'" step="'+step+'" value="'+cur+'" onchange="setLever(\''+id+'\',this.value)" style="width:100%;margin-top:3px;accent-color:var(--amber)"'+dis+'>'+
-  '</div>';
-}
-function leverPanelHTML(c,gate){
- var d=planDraft(c),after=applyLevers(c,d);
- var b=projection(c),a=projection(after),hb=health(c),ha=health(after);
- var rb=retireNeed(c),ra=retireNeed(after);
- function row(l,x,y,better,f){
-  var bv=f?f(x):x,av=f?f(y):y;
-  var imp=(better==='down')?(y<x):(y>x);
-  var same=Math.abs(y-x)<1e-9;
-  return '<tr><td class="k">'+l+'</td><td>'+bv+'</td><td style="color:'+(same?'var(--mut)':(imp?'var(--ok)':'var(--warn)'))+'">'+av+'</td></tr>';
+
+function gapDetailHTML(c,led){
+ var bars=gapBarsHTML(led,'dark');
+ var flowPart=bars
+  ? '<div style="color:var(--amber2);font-weight:700;margin-bottom:8px;font-size:13px">現金流缺口的組成（各條相加＝現值缺口）</div>'+bars+
+    '<div class="hint" style="display:block;margin-top:6px">依「第一個不足年（'+led.negAge+' 歲）之後」的折現支出組成歸因。</div>'
+  : '<div class="muted">目前沒有現金流缺口。</div>';
+ var nowPart='';
+ if(led.now.length){
+  var mxn=led.now[0].amount||1;
+  nowPart='<div style="margin-top:16px"><div style="color:var(--amber2);font-weight:700;margin-bottom:8px;font-size:13px">即時缺口（不併入上方總額）</div>'+
+   led.now.map(function(x){
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+     '<div style="width:132px;flex:none;font-size:12.5px">'+esc(x.name)+'</div>'+
+     '<div style="flex:1;min-width:70px;height:14px;border-radius:4px;background:rgba(255,255,255,.09)">'+
+       '<div style="height:100%;width:'+(x.amount/mxn*100).toFixed(1)+'%;border-radius:4px;background:#e08a68"></div></div>'+
+     '<div style="width:110px;flex:none;text-align:right;font-size:12.5px">'+fmt(x.amount)+'</div></div>';
+   }).join('')+
+   '<div class="hint" style="display:block;margin-top:6px">保障缺口是「事件發生才要的錢」、預備金是「隨時要能動用的錢」，和一生現金流不同時點也不同性質，<b>刻意不相加</b>。</div></div>';
  }
- var sliders=LEVERS.map(function(L){return leverSliderHTML(c,L.id,gate)}).join('');
- var cmp='<table class="rtable"><tr><th>指標</th><th>調整前</th><th>調整後</th></tr>'+
-  row('現值缺口',b.shortPV,a.shortPV,'down',fmt)+
-  row('願景達成度',visionRateOf(b),visionRateOf(a),'up',function(v){return v+'%'})+
-  row('資產轉負年齡',b.turnNeg||9999,a.turnNeg||9999,'up',function(v){return v>=9999?'無':v+' 歲'})+
-  row('退休缺口',rb.gap,ra.gap,'down',fmt)+
-  row('財務自由度',hb.freedom,ha.freedom,'up',function(v){return v+'%'})+
-  row('財務安全度',hb.safety,ha.safety,'up',function(v){return v+' 分'})+
-  '<tr><td class="k">財務階段</td><td>'+stageName(hb.grade)+'</td><td style="color:'+(ha.grade<hb.grade?'var(--ok)':'var(--mut)')+'">'+stageName(ha.grade)+'</td></tr>'+
-  '</table>';
- var adopted=(c.plan||{}).levers&&Object.keys((c.plan||{}).levers).length;
- return '<div class="sec"><h4>手動微調 <span class="hint">拉完放開才重算；六根可以任意組合</span></h4>'+
-  '<div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1;min-width:290px">'+sliders+
-  '<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">'+
-  '<button class="tbtn amber" onclick="adoptDraft()">採用為正式方案</button>'+
-  '<button class="tbtn" onclick="saveTrial()">存成方案</button>'+
-  '<button class="tbtn" onclick="clearDraft()">歸零</button></div>'+
-  (adopted?'<div class="hint" style="display:block;margin-top:7px;color:var(--ok)">目前正式方案：'+esc(leverSummary((c.plan||{}).levers))+'（報告書與生涯模擬吃的是這一組）</div>'
-          :'<div class="hint" style="display:block;margin-top:7px">尚未採用任何正式方案——報告書仍以「未調整」呈現。</div>')+
-  '</div><div style="flex:1;min-width:270px">'+cmp+'</div></div></div>';
+ return flowPart+nowPart;
 }
-function leverSummary(set){
- var s=[];for(var i=0;i<LEVERS.length;i++){var id=LEVERS[i].id;if(set&&n(set[id]))s.push(LEVERS[i].name+' '+leverLabel(id,set[id]));}
- return s.length?s.join('、'):'未調整';
-}
+
 function trialsHTML(c){
  var ts=(c.plan||{}).trials||[];
- if(!ts.length)return '<div class="sec"><h4>方案比較</h4><div class="muted">還沒有存過方案。在上面拉出一組組合後按「存成方案」，最多可以並排比較 5 組。</div></div>';
+ if(!ts.length)return '<div class="muted">還沒有存過方案。在上面拉出一組組合後按「存成方案」，最多可以並排比較 5 組。</div>';
  var head='<tr><th>方案</th>'+LEVERS.map(function(L){return '<th>'+esc(L.name)+'</th>'}).join('')+'<th>剩餘缺口</th><th></th></tr>';
  var rows=ts.map(function(t,i){
   var cells=LEVERS.map(function(L){var v=(t.levers||{})[L.id];return '<td>'+(n(v)?leverLabel(L.id,v):'—')+'</td>'}).join('');
@@ -3279,8 +3493,9 @@ function trialsHTML(c){
    '<td style="color:'+(t.gap>0.5?'var(--warn)':'var(--ok)')+'">'+(t.gap>0.5?fmt(t.gap):'✅ 0')+'</td>'+
    '<td style="white-space:nowrap"><button class="tbtn" style="padding:3px 8px;font-size:12px" onclick="useTrial('+i+')">帶回</button> <button class="tbtn" style="padding:3px 8px;font-size:12px" onclick="delTrial('+i+')">刪</button></td></tr>';
  }).join('');
- return '<div class="sec"><h4>方案比較 <span class="hint">教練多次模擬的收納處，最多 5 組</span></h4><div style="overflow-x:auto"><table class="rtable" style="min-width:640px">'+head+rows+'</table></div></div>';
+ return '<div style="overflow-x:auto"><table class="rtable" style="min-width:640px">'+head+rows+'</table></div>';
 }
+
 function allocLinkHTML(c){
  var al=allocInfo(c),p=c.plan||{};
  var cur=n(c.params.invReturn),eff=effReturn(c);
@@ -3292,16 +3507,16 @@ function allocLinkHTML(c){
      ? '<div class="hint" style="display:block;margin-top:8px;color:var(--ok)">目前試算採用「配置加權報酬 '+al.wRet.toFixed(2)+'%」。改配置就會直接改變缺口。</div>'
      : (diff?'<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 配置加權報酬 '+al.wRet.toFixed(2)+'% 與目前的報酬率假設 '+cur+'% 不一致——現在所有數字吃的是 '+cur+'%，配置只是畫面上的圖。</div>'
             :'<div class="hint" style="display:block;margin-top:8px">配置加權報酬與報酬率假設一致。</div>'));
- return '<div class="sec"><h4>報酬率假設 ↔ 資產配置</h4>'+
-  '<div class="big3"><div class="b"><div class="l">試算採用的報酬率</div><div class="v">'+(+eff.toFixed(2))+'%</div></div>'+
+ return '<div class="big3"><div class="b"><div class="l">試算採用的報酬率</div><div class="v">'+(+eff.toFixed(2))+'%</div></div>'+
   '<div class="b"><div class="l">配置比例合計</div><div class="v">'+al.totalPct+'%'+warn+'</div></div>'+
   '<div class="b"><div class="l">配置加權報酬</div><div class="v">'+al.wRet.toFixed(2)+'%</div></div></div>'+note+
   '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
   '<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" '+(p.useAllocReturn?'checked':'')+' onchange="setUseAlloc(this.checked)"> 讓試算直接跟著配置的加權報酬走</label>'+
   (al.totalPct>0?'<button class="tbtn" onclick="useAllocRate()">改以 '+al.wRet.toFixed(2)+'% 寫入報酬率參數</button>':'')+'</div>'+
   '<div class="hint" style="display:block;margin-top:8px">改版前這個加權報酬只餵給圓餅圖與報告書文案，<b>完全沒有進到任何試算</b>。上面的勾選就是把它接上去；預設關閉，既有客戶的數字不會被動到。</div>'+
-  '<div style="margin-top:14px">'+pieSVG(al.list)+'</div></div>';
+  '<div style="margin-top:14px">'+pieSVG(al.list)+'</div>';
 }
+
 function planSec(c){
  var p=c.plan||{};
  var led=gapLedger(c),solo=soloSolve(c),gate=solo.gate,rxs=prescriptions(c);
@@ -3309,14 +3524,15 @@ function planSec(c){
  var f='<div class="f"><label>資產移轉海外金額(降遺產稅基)</label>'+moneyCell('onchange="setPlan(\'movableToOverseas\',this.value,\'num\')"',p.movableToOverseas)+'</div>'+
   '<div class="f"><label>下次檢視日期</label><input type="date" value="'+esc(c.nextReview)+'" onchange="setCase(\'nextReview\',this.value)"></div>';
  var tbl=tableSec('建議資產配置','allocations',p.allocations||[],[['name','標的','text'],['pct','比例%','num'],['ret','預期報酬%','num'],['benefit','效益','text']]);
- return gapLedgerHTML(c,led)+
+ return gapHeroHTML(c,led,gate)+
   soloHTML(c,solo)+
   rxCardsHTML(c,rxs)+
-  leverPanelHTML(c,gate)+
-  trialsHTML(c)+
-  allocLinkHTML(c)+tbl+
-  '<div class="sec"><h4>其他方案參數</h4><div class="fgrid">'+f+'</div></div>';
+  foldSec('缺口組成與即時缺口','缺口是哪些支出造成的，另有保障與預備金要補',gapDetailHTML(c,led))+
+  foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c))+
+  foldSec('報酬率假設 ↔ 資產配置','把建議配置的加權報酬接進試算',allocLinkHTML(c)+tbl)+
+  foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>');
 }
+
 function pieSVG(list){list=(list||[]).filter(function(x){return n(x.pct)>0});if(!list.length)return '<div class="muted">尚未設定配置</div>';
  var tot=sum(list,function(x){return n(x.pct)})||1,cx=90,cy=90,r=80,acc=0,cols=['#e0bd8b','#a9bccf','#b7c6b0','#c99a5b','#8fc0a3','#e08a68','#cbb488','#8aa0b3'];
  var segs=list.map(function(x,i){var frac=n(x.pct)/tot,a0=acc*2*Math.PI-Math.PI/2;acc+=frac;var a1=acc*2*Math.PI-Math.PI/2;
@@ -6111,20 +6327,8 @@ function planReportHTML(c){
  var col=function(ok){return ok?'#3f7d54':'#b05a4a'};
  var hb=s.before.health,ha=s.after.health;
 
- var flowRows=led.flow.map(function(f){
-  return '<tr><td>'+esc(f.name)+'</td><td style="text-align:right">'+fmt(f.pv)+'</td><td style="text-align:right">'+(f.share*100).toFixed(1)+'%</td></tr>'}).join('');
  var nowRows=led.now.map(function(x){
   return '<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+fmt(x.amount)+'</td><td style="color:#5a6b72">'+esc(x.kind)+'</td></tr>'}).join('');
-
- var soloRows=solo.rows.map(function(r){
-  var verdict,vcol;
-  if(!r.needed){verdict='不需動用';vcol='#3f7d54';}
-  else if(r.blocked){verdict='現階段不建議動用';vcol='#8a9aa2';}
-  else if(r.feasible){vcol='#3f7d54';
-   verdict=(r.id==='rate'?('需拉到 '+r.x.toFixed(2)+'%'):(r.id==='retire'?('需延後 '+Math.round(r.x)+' 年'):('需'+(r.id==='income'?'增加':(r.id==='expense'?'削減':(r.id==='vision'?'壓縮':'調降')))+' '+r.x.toFixed(1)+'%')));}
-  else {verdict='拉到上限仍差 '+fmt(r.gap);vcol='#b05a4a';}
-  return '<tr><td>'+esc(r.name)+'</td><td style="color:'+vcol+';font-weight:700">'+verdict+'</td><td style="color:#5a6b72">'+esc(r.reason||'')+'</td></tr>';
- }).join('');
 
  var actRows=pa.actions.map(function(a){
   return '<tr><td style="text-align:center;font-weight:700;color:#c99a5b;white-space:nowrap">'+esc(a.axis)+'</td>'+
@@ -6153,6 +6357,7 @@ function planReportHTML(c){
   '<p style="font-size:14px;line-height:1.9">這份方案書只回答兩件事：<b>缺口是多少</b>，以及<b>用什麼方式補</b>。'+
   '缺口不是把退休、保障、目標的數字加起來——那是三個不同時點、不同性質的東西。'+
   '這裡的「現值缺口」指的是：<b>為了讓你一生的可投資資產永遠不落到負數，今天必須額外準備的一筆錢。</b></p>'+
+  '<div style="margin:14px 0 4px">'+gapChartSVG(c,lv,'light')+'</div>'+
   '<table><tr><td>現值缺口（以預期報酬 '+(+led.rate.toFixed(2))+'% 計）</td><td style="text-align:right;font-weight:800;color:'+col(led.total<=0.5)+'">'+fmt(led.total)+' 元</td></tr>'+
   '<tr><td>保守情境（折現率 '+led.conservativeRate+'%）</td><td style="text-align:right;font-weight:700">'+fmt(led.conservative)+' 元</td></tr>'+
   '<tr><td>願景達成度</td><td style="text-align:right;font-weight:700">'+led.visionRate+'%</td></tr>'+
@@ -6164,18 +6369,17 @@ function planReportHTML(c){
    ? '<p style="font-size:13px;color:#b05a4a;margin-top:8px">⚠ 兩個數字差了 '+(led.conservative/led.total).toFixed(1)+' 倍。這代表這份規劃的成敗高度取決於投資報酬率是否真的達到假設值。報酬率是假設，不是承諾。</p>'
    : '')+
 
-  (flowRows?'<h2>二、缺口是怎麼形成的</h2>'+
-   '<table><tr><th>造成缺口的支出</th><th style="text-align:right">現值</th><th style="text-align:right">占比</th></tr>'+flowRows+
-   '<tr><td style="font-weight:800">合計</td><td style="text-align:right;font-weight:800">'+fmt(led.total)+'</td><td style="text-align:right">100%</td></tr></table>'+
-   '<p style="font-size:12px;color:#5a6b72">依「第一個不足年（'+led.negAge+' 歲）之後」的折現支出組成歸因，各列相加等於現值缺口。</p>'
+  (led.flow.length?'<h2>二、缺口是怎麼形成的</h2>'+
+   '<div style="margin-top:10px">'+gapBarsHTML(led,'light')+'</div>'+
+   '<p style="font-size:12px;color:#5a6b72;margin-top:8px">依「第一個不足年（'+led.negAge+' 歲）之後」的折現支出組成歸因，各條相加等於現值缺口 '+fmt(led.total)+' 元。</p>'
    :'<h2>二、缺口是怎麼形成的</h2><p style="font-size:14px">依目前的假設，一生的可投資資產不會轉為負數，沒有現金流缺口。以下的「另需準備」仍請一併確認。</p>')+
 
-  (nowRows?'<h3 style="margin-top:14px">另需準備（不併入上方缺口）</h3>'+
+  (led.now.length?'<h3 style="margin-top:14px">另需準備（不併入上方缺口）</h3>'+
    '<table><tr><th>項目</th><th style="text-align:right">金額</th><th>性質</th></tr>'+nowRows+'</table>'+
    '<p style="font-size:12px;color:#5a6b72">保障缺口是「事件發生才要的錢」、緊急預備金是「隨時要能動用的錢」，和一生現金流的時點與性質都不同，因此分開列示。</p>':'')+
 
   '<h2>三、有哪些補法（每一條都是「其他都不動、只動這一項」）</h2>'+
-  '<table><tr><th>方向</th><th>要做到什麼程度</th><th>說明</th></tr>'+soloRows+'</table>'+
+  '<div style="margin-top:10px">'+leverBarsHTML(c,solo,'light',false)+'</div>'+
   '<p style="font-size:12px;color:#5a6b72">標示「拉到上限仍差」＝這條路單獨走不通。上限是規劃的合理性界線，不是不能努力，而是不應該把計畫建立在超出常態的假設上。</p>'+
 
   '<h2>四、三種組合方式</h2>'+
@@ -6184,14 +6388,12 @@ function planReportHTML(c){
   '<h2>五、本次採用的方案</h2>'+
   (adopted
    ? '<p style="font-size:14px;line-height:1.9">採用：<b>'+esc(leverSummary(lv))+'</b></p>'+
-     '<table><tr><th>指標</th><th style="text-align:right">調整前</th><th style="text-align:right">調整後</th></tr>'+
-     '<tr><td>現值缺口</td><td style="text-align:right">'+fmt(pa.gapBefore)+'</td><td style="text-align:right;font-weight:700;color:'+col(pa.gapAfter<=0.5)+'">'+fmt(pa.gapAfter)+'</td></tr>'+
-     '<tr><td>願景達成度</td><td style="text-align:right">'+hb.vision+'%</td><td style="text-align:right;font-weight:700">'+ha.vision+'%</td></tr>'+
-     '<tr><td>資產轉負年齡</td><td style="text-align:right">'+(s.before.metrics.proj.turnNeg?s.before.metrics.proj.turnNeg+' 歲':'無')+'</td><td style="text-align:right;font-weight:700">'+(s.after.metrics.proj.turnNeg?s.after.metrics.proj.turnNeg+' 歲':'無')+'</td></tr>'+
+     '<div style="margin:10px 0 12px">'+deltaCardsHTML(c,lv,'light')+'</div>'+
+     '<p style="font-size:12px;color:#5a6b72">上方第一章的圖已經畫出調整前後兩條線；金色那條就是採用本方案之後的走勢。</p>'+
+     '<table style="margin-top:10px"><tr><th>其他指標</th><th style="text-align:right">調整前</th><th style="text-align:right">調整後</th></tr>'+
      '<tr><td>退休年齡</td><td style="text-align:right">'+n(c.profile.retireAge)+' 歲</td><td style="text-align:right;font-weight:700">'+n(s.afterCase.profile.retireAge)+' 歲</td></tr>'+
      '<tr><td>退休缺口</td><td style="text-align:right">'+fmt(s.before.retire.gap)+'</td><td style="text-align:right;font-weight:700">'+fmt(s.after.retire.gap)+'</td></tr>'+
-     '<tr><td>財務自由度</td><td style="text-align:right">'+hb.freedom+'%</td><td style="text-align:right;font-weight:700">'+ha.freedom+'%</td></tr>'+
-     '<tr><td>財務階段</td><td style="text-align:right">'+stageName(hb.grade)+'</td><td style="text-align:right;font-weight:700">'+stageName(ha.grade)+'</td></tr></table>'
+     '<tr><td>財務自由度</td><td style="text-align:right">'+hb.freedom+'%</td><td style="text-align:right;font-weight:700">'+ha.freedom+'%</td></tr></table>'
    : '<p style="font-size:14px;color:#b05a4a">尚未採用任何方案。請在「調整方案」分頁拉出一組組合後按「採用為正式方案」，這一章才會有內容。</p>')+
 
   (vcRows?'<h3 style="margin-top:14px">願景的具體調整</h3>'+
