@@ -549,7 +549,13 @@ var CAP_RATE_STARTER=6;     // 啟程期(C) 的報酬率上限，比一般更保
 // 預設關閉，既有客戶的數字一位都不會動。
 function effReturn(c){
  var p=(c||{}).plan||{};
- if(p.useAllocReturn){var al=allocInfo(c);if(al.totalPct>0&&isFinite(al.wRet))return al.wRet;}
+ if(p.useAllocReturn){
+  // 新的投資配置表優先（以現值權重加權）；沒有才退回舊的 allocations（比例%）。
+  var ap=allocPV(c);
+  if(ap.weight>0&&isFinite(ap.wRet))return ap.wRet;
+  var al=allocInfo(c);
+  if(al.totalPct>0&&isFinite(al.wRet))return al.wRet;
+ }
  return n((c.params||{}).invReturn);
 }
 
@@ -769,6 +775,123 @@ function applyPlanCaps(values){
   var x=Number(values[k]);
   if(isFinite(x)&&values[k]!==null&&values[k]!==undefined&&values[k]!=='')setters[k](x);
  });
+}
+
+// ===== 配置與對帳（缺口 → 用什麼填）=====
+//
+// Ray 2026/08/23：「缺口跟配置結果出來了之後，底下需要有對應的配置內容跟預期報酬率，
+// 然後滿足上面的缺口。不用具體的商品，先予以留空。」
+//
+// ⚠️ 地基語意（很容易做錯的三件事）：
+//
+// 1) **只有「新增投入」的錢才算填補缺口。** 「既有轉入」是把本來就在 projection 裡的
+//    可投資資產換個地方放——它會改變加權報酬率，但不會憑空多出一塊錢。
+//    把既有資產也算成填補來源，等於把同一筆錢用兩次。
+//
+// 2) **年投入不當成支出。** 它是「從消費轉到投資」，不是消失的錢；真要減少消費是
+//    「減少支出」那根槓桿的事。兩邊都算會重複扣。
+//    **保費不一樣——那是真的消耗掉的錢**，所以畫面會提醒教練另外登錄到支出→保險。
+//
+// 3) **保障配置不進現值對帳。** 保額填的是「即時缺口」（事件發生才要的錢），
+//    和一生現金流缺口不同性質，所以走另一條逐項掛勾的對帳，不併入總額。
+//
+// 商品名稱一律留空：嵐途是一般顧問公司，不做商品推薦。這張表登錄的是
+// 「結構與條件」（本金/報酬率/保額/條件內容），不是「買哪一張」。
+
+var ALLOC_SRC=['新增投入','既有轉入'];
+
+function allocInvest(c){return ((c.plan||{}).invest)||[]}
+function allocProtect(c){return ((c.plan||{}).protect)||[]}
+
+/** 這一列的投入年數：留空＝從現在到退休。 */
+function allocYears(c,r){
+ var y=n(r.years);
+ if(y>0)return y;
+ return Math.max(1,n(c.profile.retireAge)-(n(c.profile.age)||40));
+}
+
+/** 年金現值：每年投入 pmt、共 n 年、折現率 r%。r≈0 時退回單純相乘（不可除以零）。 */
+function annuityPV(pmt,yrs,ratePct){
+ pmt=n(pmt);yrs=n(yrs);
+ if(pmt<=0||yrs<=0)return 0;
+ var r=n(ratePct)/100;
+ if(Math.abs(r)<1e-9)return pmt*yrs;
+ return pmt*(1-Math.pow(1+r,-yrs))/r;
+}
+
+/**
+ * 每一列投資配置的「現值貢獻」＝這筆新錢今天值多少。
+ * 與缺口同為現值口徑，可以直接相比。折現率用**該列自己的預期報酬率**——
+ * 那是這筆錢的機會成本，也是教練填在同一列的假設，最不會前後矛盾。
+ */
+function allocPV(c){
+ var rows=allocInvest(c).map(function(r){
+  var isNew=(r.src||'新增投入')==='新增投入';
+  var yrs=allocYears(c,r);
+  var pvPrincipal=isNew?n(r.principal):0;
+  var pvYearly=isNew?annuityPV(r.yearly,yrs,r.ret):0;
+  var base=n(r.principal)+annuityPV(r.yearly,yrs,r.ret);   // 含既有，只給加權報酬用
+  return {row:r,isNew:isNew,years:yrs,pv:pvPrincipal+pvYearly,weight:base};
+ });
+ var pv=sum(rows,function(x){return x.pv});
+ var wTot=sum(rows,function(x){return x.weight});
+ var wRet=wTot?sum(rows,function(x){return x.weight*n(x.row.ret)})/wTot:0;
+ return {rows:rows,pv:pv,weight:wTot,wRet:wRet,
+  yearly:sum(allocInvest(c),function(r){return n(r.yearly)}),
+  premium:sum(allocProtect(c),function(r){return n(r.premium)})};
+}
+
+/**
+ * 對帳：這組配置補得起缺口嗎？
+ * set＝拉桿組合（缺口要用「拉桿之後」的，因為配置補的是剩下那一段）。
+ */
+function allocReconcile(c,set){
+ var after=applyLevers(c,set||{});
+ var led=gapLedger(after);
+ var ap=allocPV(c);
+ var gap=led.total;
+ // 保障：逐項掛勾。沒有被任何一列指到的即時缺口 → unassigned。
+ var byKey={};
+ allocProtect(c).forEach(function(r){
+  var k=r.gapKey||'';
+  if(!k||k==='（未指定）')return;
+  byKey[k]=(byKey[k]||0)+n(r.cover);
+ });
+ var protect=led.now.map(function(x){
+  var have=byKey[x.name]||0;
+  return {name:x.name,kind:x.kind,need:x.amount,have:have,short:Math.max(0,x.amount-have),ok:have>=x.amount-0.5};
+ });
+ var unassigned=protect.filter(function(p){return !p.ok});
+ var orphan=Object.keys(byKey).filter(function(k){
+  for(var i=0;i<led.now.length;i++)if(led.now[i].name===k)return false;
+  return true;
+ });
+ return {gap:gap,pv:ap.pv,alloc:ap,led:led,
+  coverRate:gap>0.5?ap.pv/gap:(ap.pv>0?1:1),
+  remain:Math.max(0,gap-ap.pv),over:Math.max(0,ap.pv-gap),
+  ok:ap.pv>=gap-0.5,
+  protect:protect,unassigned:unassigned,orphan:orphan};
+}
+
+/** 舊的 allocations（標的/比例%/預期報酬%/效益）搬到新結構。只跑一次，跑完刪掉舊欄位。 */
+function migrateAlloc(c){
+ if(!c||!c.plan)return c;
+ var p=c.plan;
+ if(!p.invest)p.invest=[];
+ if(!p.protect)p.protect=[];
+ if(p.allocations&&p.allocations.length&&!p._allocMigrated){
+  // 比例% 換算成本金：以目前的可投資資產為基數，來源標「既有轉入」——
+  // 舊表講的本來就是「現有資產怎麼分」，不是「再拿新錢出來」。
+  var liquid=sum((c.assets||[]),function(a){return a.cls==='流動'?aVal(a):0});
+  p.allocations.forEach(function(a){
+   if(!(n(a.pct)>0)&&!a.name)return;
+   p.invest.push({kind:'投資',name:a.name||'',src:'既有轉入',
+    principal:Math.round(liquid*n(a.pct)/100),yearly:0,years:0,
+    ret:n(a.ret),note:a.benefit||''});
+  });
+  p._allocMigrated=1;
+ }
+ return c;
 }
 
 /** 這份規劃目前採用的槓桿組合（相容舊欄位 plan.retireDelay）。 */
@@ -1342,6 +1465,14 @@ export {
   prescriptions,
   planLevers,
   planActions,
+  ALLOC_SRC,
+  allocInvest,
+  allocProtect,
+  allocYears,
+  annuityPV,
+  allocPV,
+  allocReconcile,
+  migrateAlloc,
   visionChanges,
   GAP_CATS,
   PLAN_DISCOUNT,

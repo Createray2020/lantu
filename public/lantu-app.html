@@ -696,6 +696,10 @@ function migrateCase(c){
  if(!Array.isArray(c.retire.prepared))c.retire.prepared=[];
  c.plan=_fill(d.plan,c.plan);
  if(!Array.isArray(c.plan.allocations))c.plan.allocations=[];
+ if(!Array.isArray(c.plan.invest))c.plan.invest=[];
+ if(!Array.isArray(c.plan.protect))c.plan.protect=[];
+ if(!Array.isArray(c.plan.trials))c.plan.trials=[];
+ migrateAlloc(c);   // 舊的 allocations（比例%）搬進新的 invest（本金/年投入），只跑一次
  c.taxParams=_fill(d.taxParams,c.taxParams);
  c.credit=_fill(d.credit,c.credit);
  c.overseas=_fill(d.overseas,c.overseas);
@@ -1447,7 +1451,13 @@ var CAP_RATE_STARTER=6;     // 啟程期(C) 的報酬率上限，比一般更保
 // 預設關閉，既有客戶的數字一位都不會動。
 function effReturn(c){
  var p=(c||{}).plan||{};
- if(p.useAllocReturn){var al=allocInfo(c);if(al.totalPct>0&&isFinite(al.wRet))return al.wRet;}
+ if(p.useAllocReturn){
+  // 新的投資配置表優先（以現值權重加權）；沒有才退回舊的 allocations（比例%）。
+  var ap=allocPV(c);
+  if(ap.weight>0&&isFinite(ap.wRet))return ap.wRet;
+  var al=allocInfo(c);
+  if(al.totalPct>0&&isFinite(al.wRet))return al.wRet;
+ }
  return n((c.params||{}).invReturn);
 }
 
@@ -1667,6 +1677,123 @@ function applyPlanCaps(values){
   var x=Number(values[k]);
   if(isFinite(x)&&values[k]!==null&&values[k]!==undefined&&values[k]!=='')setters[k](x);
  });
+}
+
+// ===== 配置與對帳（缺口 → 用什麼填）=====
+//
+// Ray 2026/08/23：「缺口跟配置結果出來了之後，底下需要有對應的配置內容跟預期報酬率，
+// 然後滿足上面的缺口。不用具體的商品，先予以留空。」
+//
+// ⚠️ 地基語意（很容易做錯的三件事）：
+//
+// 1) **只有「新增投入」的錢才算填補缺口。** 「既有轉入」是把本來就在 projection 裡的
+//    可投資資產換個地方放——它會改變加權報酬率，但不會憑空多出一塊錢。
+//    把既有資產也算成填補來源，等於把同一筆錢用兩次。
+//
+// 2) **年投入不當成支出。** 它是「從消費轉到投資」，不是消失的錢；真要減少消費是
+//    「減少支出」那根槓桿的事。兩邊都算會重複扣。
+//    **保費不一樣——那是真的消耗掉的錢**，所以畫面會提醒教練另外登錄到支出→保險。
+//
+// 3) **保障配置不進現值對帳。** 保額填的是「即時缺口」（事件發生才要的錢），
+//    和一生現金流缺口不同性質，所以走另一條逐項掛勾的對帳，不併入總額。
+//
+// 商品名稱一律留空：嵐途是一般顧問公司，不做商品推薦。這張表登錄的是
+// 「結構與條件」（本金/報酬率/保額/條件內容），不是「買哪一張」。
+
+var ALLOC_SRC=['新增投入','既有轉入'];
+
+function allocInvest(c){return ((c.plan||{}).invest)||[]}
+function allocProtect(c){return ((c.plan||{}).protect)||[]}
+
+/** 這一列的投入年數：留空＝從現在到退休。 */
+function allocYears(c,r){
+ var y=n(r.years);
+ if(y>0)return y;
+ return Math.max(1,n(c.profile.retireAge)-(n(c.profile.age)||40));
+}
+
+/** 年金現值：每年投入 pmt、共 n 年、折現率 r%。r≈0 時退回單純相乘（不可除以零）。 */
+function annuityPV(pmt,yrs,ratePct){
+ pmt=n(pmt);yrs=n(yrs);
+ if(pmt<=0||yrs<=0)return 0;
+ var r=n(ratePct)/100;
+ if(Math.abs(r)<1e-9)return pmt*yrs;
+ return pmt*(1-Math.pow(1+r,-yrs))/r;
+}
+
+/**
+ * 每一列投資配置的「現值貢獻」＝這筆新錢今天值多少。
+ * 與缺口同為現值口徑，可以直接相比。折現率用**該列自己的預期報酬率**——
+ * 那是這筆錢的機會成本，也是教練填在同一列的假設，最不會前後矛盾。
+ */
+function allocPV(c){
+ var rows=allocInvest(c).map(function(r){
+  var isNew=(r.src||'新增投入')==='新增投入';
+  var yrs=allocYears(c,r);
+  var pvPrincipal=isNew?n(r.principal):0;
+  var pvYearly=isNew?annuityPV(r.yearly,yrs,r.ret):0;
+  var base=n(r.principal)+annuityPV(r.yearly,yrs,r.ret);   // 含既有，只給加權報酬用
+  return {row:r,isNew:isNew,years:yrs,pv:pvPrincipal+pvYearly,weight:base};
+ });
+ var pv=sum(rows,function(x){return x.pv});
+ var wTot=sum(rows,function(x){return x.weight});
+ var wRet=wTot?sum(rows,function(x){return x.weight*n(x.row.ret)})/wTot:0;
+ return {rows:rows,pv:pv,weight:wTot,wRet:wRet,
+  yearly:sum(allocInvest(c),function(r){return n(r.yearly)}),
+  premium:sum(allocProtect(c),function(r){return n(r.premium)})};
+}
+
+/**
+ * 對帳：這組配置補得起缺口嗎？
+ * set＝拉桿組合（缺口要用「拉桿之後」的，因為配置補的是剩下那一段）。
+ */
+function allocReconcile(c,set){
+ var after=applyLevers(c,set||{});
+ var led=gapLedger(after);
+ var ap=allocPV(c);
+ var gap=led.total;
+ // 保障：逐項掛勾。沒有被任何一列指到的即時缺口 → unassigned。
+ var byKey={};
+ allocProtect(c).forEach(function(r){
+  var k=r.gapKey||'';
+  if(!k||k==='（未指定）')return;
+  byKey[k]=(byKey[k]||0)+n(r.cover);
+ });
+ var protect=led.now.map(function(x){
+  var have=byKey[x.name]||0;
+  return {name:x.name,kind:x.kind,need:x.amount,have:have,short:Math.max(0,x.amount-have),ok:have>=x.amount-0.5};
+ });
+ var unassigned=protect.filter(function(p){return !p.ok});
+ var orphan=Object.keys(byKey).filter(function(k){
+  for(var i=0;i<led.now.length;i++)if(led.now[i].name===k)return false;
+  return true;
+ });
+ return {gap:gap,pv:ap.pv,alloc:ap,led:led,
+  coverRate:gap>0.5?ap.pv/gap:(ap.pv>0?1:1),
+  remain:Math.max(0,gap-ap.pv),over:Math.max(0,ap.pv-gap),
+  ok:ap.pv>=gap-0.5,
+  protect:protect,unassigned:unassigned,orphan:orphan};
+}
+
+/** 舊的 allocations（標的/比例%/預期報酬%/效益）搬到新結構。只跑一次，跑完刪掉舊欄位。 */
+function migrateAlloc(c){
+ if(!c||!c.plan)return c;
+ var p=c.plan;
+ if(!p.invest)p.invest=[];
+ if(!p.protect)p.protect=[];
+ if(p.allocations&&p.allocations.length&&!p._allocMigrated){
+  // 比例% 換算成本金：以目前的可投資資產為基數，來源標「既有轉入」——
+  // 舊表講的本來就是「現有資產怎麼分」，不是「再拿新錢出來」。
+  var liquid=sum((c.assets||[]),function(a){return a.cls==='流動'?aVal(a):0});
+  p.allocations.forEach(function(a){
+   if(!(n(a.pct)>0)&&!a.name)return;
+   p.invest.push({kind:'投資',name:a.name||'',src:'既有轉入',
+    principal:Math.round(liquid*n(a.pct)/100),yearly:0,years:0,
+    ret:n(a.ret),note:a.benefit||''});
+  });
+  p._allocMigrated=1;
+ }
+ return c;
 }
 
 /** 這份規劃目前採用的槓桿組合（相容舊欄位 plan.retireDelay）。 */
@@ -2060,10 +2187,16 @@ function crossTable(c){var m=metrics(c);
 }
 
 /* ===== edit helpers ===== */
-function listOf(c,arr){if(arr==='allocations')return c.plan.allocations;if(arr==='prepared')return c.retire.prepared;return c[arr]}
+// c.plan 底下的陣列不是頂層 case 陣列，set/addRow/delRow 都得經過這張對照表。
+var PLAN_ARRS={allocations:'allocations',planInvest:'invest',planProtect:'protect'};
+function listOf(c,arr){
+ if(PLAN_ARRS[arr]){c.plan=c.plan||{};var k=PLAN_ARRS[arr];c.plan[k]=c.plan[k]||[];return c.plan[k];}
+ if(arr==='prepared')return c.retire.prepared;
+ return c[arr];
+}
 function set(id,field,val,type){var c=activeCase();var t=id.split(':'),arr=t[0],i=t[1];
  var v=type==='num'?n(val):val;if(i==null)c[arr][field]=v;else listOf(c,arr)[i][field]=v;save();
- if(app.activeTab!=='data'||app.role==='client'||arr==='allocations')render();
+ if(app.activeTab!=='data'||app.role==='client'||PLAN_ARRS[arr])render();
  syncDerived();}
 // 打字時即時更新畫面上的計算值（不整頁 render，才不會打斷游標）；存檔延後 700ms 合併，
 // 離開欄位時的 onchange 仍會走 set() 正式存一次。
@@ -2161,6 +2294,9 @@ function addRow(arr){var c=activeCase();if(!c)return;
  luxury:function(){return {sub:'首飾配件',start:A,end:A,freq:1,amount:0,minAmount:0,imp:2}},
  prepared:function(){return {item:'',age:65,amount:0,method:'一次領'}},
  allocations:function(){return {name:'',pct:0,ret:0,benefit:''}},
+ // 商品名稱一律留空：嵐途不做商品推薦，這兩張表登錄的是結構與條件。
+ planInvest:function(){return {name:'',src:'新增投入',principal:0,yearly:0,years:'',ret:n(c.params.invReturn)||5,note:''}},
+ planProtect:function(){return {gapKey:'（未指定）',name:'',cover:0,premium:0,terms:'',note:''}},
  lifeGoals:function(){return {name:'',priority:(c.lifeGoals||[]).length+1,value:'',importance:3,linkModule:'退休',note:''}},
  companies:function(){return newCompany()},
  bizYears:function(){var ys=(c.bizYears||[]).map(function(x){return n(x.year)}).filter(Boolean);
@@ -2179,10 +2315,10 @@ function addRow(arr){var c=activeCase();if(!c)return;
  if(!mk){console.warn('addRow: 未知的資料表 '+arr);return;}
  var tpl=mk();
  if(arr==='prepared'){c.retire=c.retire||{};c.retire.prepared=c.retire.prepared||[];c.retire.prepared.push(tpl)}
- else if(arr==='allocations'){c.plan=c.plan||{};c.plan.allocations=c.plan.allocations||[];c.plan.allocations.push(tpl)}
+ else if(PLAN_ARRS[arr]){listOf(c,arr).push(tpl)}
  else{c[arr]=c[arr]||[];c[arr].push(tpl)}
  save();render()}
-function delRow(arr,i){var c=activeCase();if(arr==='prepared'){c.retire.prepared.splice(i,1)}else if(arr==='allocations'){c.plan.allocations.splice(i,1)}else{c[arr].splice(i,1)}save();render()}
+function delRow(arr,i){var c=activeCase();if(arr==='prepared'){c.retire.prepared.splice(i,1)}else if(PLAN_ARRS[arr]){listOf(c,arr).splice(i,1)}else{c[arr].splice(i,1)}save();render()}
 
 /* ===== render ===== */
 function render(){document.querySelectorAll('#roleSw button').forEach(function(b){b.classList.toggle('on',b.dataset.r===app.role)});
@@ -3496,25 +3632,106 @@ function trialsHTML(c){
  return '<div style="overflow-x:auto"><table class="rtable" style="min-width:640px">'+head+rows+'</table></div>';
 }
 
-function allocLinkHTML(c){
- var al=allocInfo(c),p=c.plan||{};
- var cur=n(c.params.invReturn),eff=effReturn(c);
- var diff=al.totalPct>0&&Math.abs(al.wRet-cur)>0.05;
- var warn=Math.abs(al.totalPct-100)>0.5?'<span style="color:var(--warn)"> ⚠ 比例合計 '+al.totalPct+'%，未達 100%</span>':'';
- var note=al.totalPct<=0
-  ? '<div class="hint" style="display:block;margin-top:8px">尚未填建議資產配置。</div>'
-  : (p.useAllocReturn
-     ? '<div class="hint" style="display:block;margin-top:8px;color:var(--ok)">目前試算採用「配置加權報酬 '+al.wRet.toFixed(2)+'%」。改配置就會直接改變缺口。</div>'
-     : (diff?'<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 配置加權報酬 '+al.wRet.toFixed(2)+'% 與目前的報酬率假設 '+cur+'% 不一致——現在所有數字吃的是 '+cur+'%，配置只是畫面上的圖。</div>'
-            :'<div class="hint" style="display:block;margin-top:8px">配置加權報酬與報酬率假設一致。</div>'));
- return '<div class="big3"><div class="b"><div class="l">試算採用的報酬率</div><div class="v">'+(+eff.toFixed(2))+'%</div></div>'+
-  '<div class="b"><div class="l">配置比例合計</div><div class="v">'+al.totalPct+'%'+warn+'</div></div>'+
-  '<div class="b"><div class="l">配置加權報酬</div><div class="v">'+al.wRet.toFixed(2)+'%</div></div></div>'+note+
+// ===== 配置與對帳：畫面 =====
+// 一句話版：上面算出缺口，這裡回答「那要放什麼進去」。
+// 商品名稱留空——嵐途不做商品推薦，這張表登錄的是結構與條件。
+
+/** 對帳條：一條橫槓，左邊是已配置的現值、右邊是還沒補到的。 */
+function allocBarHTML(rec,theme){
+ var K=planChartColors(theme);
+ var gap=rec.gap,pv=rec.pv;
+ if(gap<=0.5){
+  return '<div style="padding:10px 0"><span style="color:'+K.OK+';font-weight:700">✅ 目前沒有現金流缺口</span>'+
+   (pv>0?'<span style="color:'+K.MUT+'"> ；已登錄的新增投入現值 '+fmt(pv)+' 元，等於多出來的餘裕。</span>':'')+'</div>';
+ }
+ var w=Math.max(0,Math.min(1,pv/gap));
+ return '<div>'+
+  '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:'+K.MUT+';margin-bottom:5px">'+
+   '<span>已配置 <b style="color:'+(rec.ok?K.OK:K.AMB)+'">'+fmt(pv)+'</b></span>'+
+   '<span>缺口 <b style="color:'+K.LAB+'">'+fmt(gap)+'</b></span></div>'+
+  '<div style="height:18px;border-radius:9px;background:'+K.TRACK+';position:relative;overflow:hidden">'+
+   '<div style="position:absolute;left:0;top:0;bottom:0;width:'+(w*100).toFixed(1)+'%;background:'+(rec.ok?K.OK:K.AMB)+'"></div></div>'+
+  '<div style="margin-top:7px;font-size:13px">'+
+   (rec.ok
+    ? '<span style="color:'+K.OK+';font-weight:700">✅ 補得起來</span><span style="color:'+K.MUT+'">（覆蓋 '+Math.round(rec.coverRate*100)+'%'+(rec.over>0.5?'，多出 '+fmt(rec.over)+' 元的餘裕':'')+'）</span>'
+    : '<span style="color:'+K.GAP+';font-weight:700">還差 '+fmt(rec.remain)+' 元</span><span style="color:'+K.MUT+'">（目前覆蓋 '+Math.round(rec.coverRate*100)+'%）</span>')+
+  '</div></div>';
+}
+
+/** 保障對帳：逐項掛勾，沒被指到的缺口用紅字列出來。 */
+function protectMatchHTML(rec,theme){
+ var K=planChartColors(theme);
+ if(!rec.protect.length)return '<div class="muted" style="font-size:13px">目前沒有偵測到保障缺口或預備金缺口。</div>';
+ var mxn=Math.max.apply(null,rec.protect.map(function(p){return p.need}).concat([1]));
+ var rows=rec.protect.map(function(p){
+  var w=Math.max(0,Math.min(1,p.have/(p.need||1)));
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+   '<div style="width:132px;flex:none;font-size:12.5px;color:'+K.LAB+'">'+(p.ok?'✅':'❌')+' '+esc(p.name)+'</div>'+
+   '<div style="flex:1;min-width:80px;height:13px;border-radius:4px;background:'+K.TRACK+';position:relative">'+
+     '<div style="position:absolute;left:0;top:0;bottom:0;width:'+(w*100).toFixed(1)+'%;border-radius:4px;background:'+(p.ok?K.OK:K.GAP)+'"></div></div>'+
+   '<div style="width:196px;flex:none;text-align:right;font-size:12.5px;color:'+(p.ok?K.OK:K.GAP)+'">'+
+     fmt(p.have)+' / '+fmt(p.need)+(p.ok?'':'　<b>差 '+fmt(p.short)+'</b>')+'</div></div>';
+ }).join('');
+ var orphan=rec.orphan.length
+  ? '<div class="hint" style="display:block;margin-top:6px;color:'+K.AMB+'">⚠ 有 '+rec.orphan.length+' 列指到的缺口項目已經不存在（'+rec.orphan.map(esc).join('、')+'）——保障資料改過之後，記得回來重選。</div>'
+  : '';
+ return rows+orphan;
+}
+
+function allocSecHTML(c){
+ var d=planDraft(c);
+ var rec=allocReconcile(c,d);
+ var ap=rec.alloc;
+ // 保障配置的「對應缺口」下拉，選項就是這個個案實際算出來的即時缺口
+ var gapOpts='（未指定）'+(rec.led.now.length?','+rec.led.now.map(function(x){return x.name}).join(','):'');
+ var invTbl=tableSec('投資型配置','plan.invest',allocInvest(c),[
+   ['name','標的（可留空）','text'],
+   ['src','資金來源','sel:'+ALLOC_SRC.join(',')],
+   ['principal','本金','money'],
+   ['yearly','每年投入','money'],
+   ['years','投入年數(空=到退休)','num'],
+   ['ret','預期報酬%','num'],
+   ['note','備註 / 條件','text']],
+   '「新增投入」才算補缺口；「既有轉入」是把現有可投資資產換個地方放，只影響加權報酬率。年投入不會被當成支出（那是把消費轉成投資，不是花掉）。');
+ var proTbl=tableSec('保障型配置','plan.protect',allocProtect(c),[
+   ['gapKey','對應缺口','sel:'+gapOpts],
+   ['name','險種 / 結構（可留空）','text'],
+   ['cover','保額 / 配置金額','money'],
+   ['premium','年繳保費','money'],
+   ['terms','條件內容','text'],
+   ['note','備註','text']],
+   '選了「對應缺口」才會進下面的對帳。保額不進現值缺口——那是事件發生才要的錢。');
+
+ var premiumNote=ap.premium>0
+  ? '<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 年繳保費合計 '+fmt(ap.premium)+' 元<b>是真的花掉的錢</b>，但這裡不會自動改現金流——請一併登錄到「收支資債 → 支出 → 保險」，缺口才算得準。</div>'
+  : '';
+ var pie=ap.weight>0
+  ? '<div style="margin-top:14px">'+pieSVG(ap.rows.filter(function(x){return x.weight>0}).map(function(x){
+      return {name:(x.row.name||'（未命名）'),pct:+(x.weight/ap.weight*100).toFixed(1),benefit:(n(x.row.ret)||0)+'%'};
+    }))+'</div>'
+  : '';
+ var cur=n(c.params.invReturn),eff=effReturn(c),p=c.plan||{};
+ var diff=ap.weight>0&&Math.abs(ap.wRet-cur)>0.05;
+ var rateBox='<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">'+
+  '<div class="big3"><div class="b"><div class="l">試算採用的報酬率</div><div class="v">'+(+eff.toFixed(2))+'%</div></div>'+
+  '<div class="b"><div class="l">配置加權報酬</div><div class="v">'+ap.wRet.toFixed(2)+'%</div></div>'+
+  '<div class="b"><div class="l">每年新增投入</div><div class="v">'+fmt(ap.yearly)+'</div></div></div>'+
+  (ap.weight<=0?'<div class="hint" style="display:block;margin-top:8px">尚未登錄任何投資配置。</div>'
+   :(p.useAllocReturn
+     ?'<div class="hint" style="display:block;margin-top:8px;color:var(--ok)">試算已跟著配置的加權報酬 '+ap.wRet.toFixed(2)+'% 走——改配置就會直接改變上面的缺口。</div>'
+     :(diff?'<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 配置加權報酬 '+ap.wRet.toFixed(2)+'% 與目前的報酬率假設 '+cur+'% 不一致——現在所有數字吃的是 '+cur+'%。</div>'
+           :'<div class="hint" style="display:block;margin-top:8px">配置加權報酬與報酬率假設一致。</div>')))+
   '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
   '<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" '+(p.useAllocReturn?'checked':'')+' onchange="setUseAlloc(this.checked)"> 讓試算直接跟著配置的加權報酬走</label>'+
-  (al.totalPct>0?'<button class="tbtn" onclick="useAllocRate()">改以 '+al.wRet.toFixed(2)+'% 寫入報酬率參數</button>':'')+'</div>'+
-  '<div class="hint" style="display:block;margin-top:8px">改版前這個加權報酬只餵給圓餅圖與報告書文案，<b>完全沒有進到任何試算</b>。上面的勾選就是把它接上去；預設關閉，既有客戶的數字不會被動到。</div>'+
-  '<div style="margin-top:14px">'+pieSVG(al.list)+'</div>';
+  (ap.weight>0?'<button class="tbtn" onclick="useAllocRate()">改以 '+ap.wRet.toFixed(2)+'% 寫入報酬率參數</button>':'')+'</div>'+
+  pie+'</div>';
+
+ return '<div class="sec"><h4>配置與對帳 <span class="hint">上面算出缺口，這裡回答「那要放什麼進去」</span></h4>'+
+  allocBarHTML(rec,'dark')+
+  '<div style="margin-top:16px"><div style="color:var(--amber2);font-weight:700;font-size:13px;margin-bottom:8px">保障對帳（逐項掛勾，不併入上方缺口）</div>'+
+  protectMatchHTML(rec,'dark')+'</div>'+
+  premiumNote+rateBox+'</div>'+
+  invTbl+proTbl;
 }
 
 function planSec(c){
@@ -3523,13 +3740,12 @@ function planSec(c){
  // 金額欄一律走 moneyCell（千分位），與 406c5ec 的全站標準化一致。
  var f='<div class="f"><label>資產移轉海外金額(降遺產稅基)</label>'+moneyCell('onchange="setPlan(\'movableToOverseas\',this.value,\'num\')"',p.movableToOverseas)+'</div>'+
   '<div class="f"><label>下次檢視日期</label><input type="date" value="'+esc(c.nextReview)+'" onchange="setCase(\'nextReview\',this.value)"></div>';
- var tbl=tableSec('建議資產配置','allocations',p.allocations||[],[['name','標的','text'],['pct','比例%','num'],['ret','預期報酬%','num'],['benefit','效益','text']]);
  return gapHeroHTML(c,led,gate)+
   soloHTML(c,solo)+
   rxCardsHTML(c,rxs)+
+  allocSecHTML(c)+
   foldSec('缺口組成與即時缺口','缺口是哪些支出造成的，另有保障與預備金要補',gapDetailHTML(c,led))+
   foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c))+
-  foldSec('報酬率假設 ↔ 資產配置','把建議配置的加權報酬接進試算',allocLinkHTML(c)+tbl)+
   foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>');
 }
 
@@ -6323,6 +6539,16 @@ function cashHealthToolHTML(){var T=app.tools.cashh;
 function planReportHTML(c){
  var p=c.profile||{};
  var pa=planActions(c),led=pa.ledger,solo=soloSolve(c),rxs=prescriptions(c);
+ var rec=allocReconcile(c,planLevers(c)),ap=rec.alloc;
+ var invRows=ap.rows.map(function(x){var r=x.row;
+  return '<tr><td>'+esc(r.name||'（未指定）')+'</td><td>'+esc(r.src||'新增投入')+'</td>'+
+   '<td style="text-align:right">'+fmt(r.principal)+'</td><td style="text-align:right">'+fmt(r.yearly)+'</td>'+
+   '<td style="text-align:right">'+(n(r.yearly)>0?x.years+' 年':'—')+'</td><td style="text-align:right">'+(+n(r.ret))+'%</td>'+
+   '<td style="text-align:right;font-weight:700">'+(x.pv>0?fmt(x.pv):'—')+'</td></tr>'}).join('');
+ var proRows=allocProtect(c).map(function(r){
+  return '<tr><td>'+esc(r.gapKey||'（未指定）')+'</td><td>'+esc(r.name||'（未指定）')+'</td>'+
+   '<td style="text-align:right">'+fmt(r.cover)+'</td><td style="text-align:right">'+fmt(r.premium)+'</td>'+
+   '<td>'+esc(r.terms||'')+'</td></tr>'}).join('');
  var s=scenario(c),lv=pa.levers,adopted=Object.keys(lv).length>0;
  var col=function(ok){return ok?'#3f7d54':'#b05a4a'};
  var hb=s.before.health,ha=s.after.health;
@@ -6400,7 +6626,23 @@ function planReportHTML(c){
    '<table><tr><th>類別</th><th>項目</th><th style="text-align:right">原本</th><th style="text-align:right">調整後</th><th style="text-align:right">可接受的最低</th></tr>'+vcRows+'</table>'+
    '<p style="font-size:12px;color:#5a6b72">「可接受的最低」是先前一起填下的金額。調整不是放棄，是把資源讓給更重要的事。</p>':'')+
 
-  '<h2>六、執行清單</h2>'+
+  '<h2>六、要放什麼進去</h2>'+
+  '<div style="margin-top:10px">'+allocBarHTML(rec,'light')+'</div>'+
+  (invRows
+   ? '<h3 style="margin-top:14px">投資型配置</h3>'+
+     '<table><tr><th>標的</th><th>資金來源</th><th style="text-align:right">本金</th><th style="text-align:right">每年投入</th><th style="text-align:right">年數</th><th style="text-align:right">預期報酬</th><th style="text-align:right">現值貢獻</th></tr>'+invRows+'</table>'+
+     '<p style="font-size:12px;color:#5a6b72">「現值貢獻」只算<b>新增投入</b>的錢——既有資產轉入是換個地方放，不會憑空多出一筆。年投入以該列自己的預期報酬率折現。</p>'
+   : '')+
+  (proRows
+   ? '<h3 style="margin-top:14px">保障型配置</h3>'+
+     '<table><tr><th>對應缺口</th><th>險種 / 結構</th><th style="text-align:right">保額</th><th style="text-align:right">年繳保費</th><th>條件內容</th></tr>'+proRows+'</table>'
+   : '')+
+  '<h3 style="margin-top:14px">保障對帳</h3>'+
+  '<div style="margin-top:8px">'+protectMatchHTML(rec,'light')+'</div>'+
+  (rec.alloc.premium>0?'<p style="font-size:12px;color:#b05a4a;margin-top:8px">年繳保費合計 '+fmt(rec.alloc.premium)+' 元是實際支出，會影響現金流，請一併登錄到收支表的保險科目。</p>':'')+
+  '<p style="font-size:12px;color:#5a6b72;margin-top:8px">本表登錄的是<b>結構與條件</b>，不是特定商品。商品的選擇與適配請由客戶與各該領域的專業人士確認。</p>'+
+
+  '<h2>七、執行清單</h2>'+
   (chk?'<ul style="padding-left:2px;font-size:14px;line-height:1.8">'+chk+'</ul>':'<p style="font-size:14px">目前沒有待辦事項。</p>')+
   '<table style="margin-top:10px"><tr><th>面向</th><th>做什麼</th><th>做到什麼程度</th></tr>'+actRows+'</table>'+
   '<p style="font-size:13px;margin-top:10px">下次檢視日期：<b>'+esc(c.nextReview||'（未設定）')+'</b>。'+

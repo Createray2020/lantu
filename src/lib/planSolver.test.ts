@@ -436,3 +436,113 @@ describe("方案 → 具體行動（planActions）", () => {
     });
   });
 });
+
+describe("配置與對帳（缺口 → 用什麼填）", () => {
+  it("年金現值：常見情境算得對，r≈0 時退回單純相乘而不是除以零", () => {
+    // 每年 12,000、25 年、6%：12000 × (1−1.06^-25)/0.06
+    const want = 12000 * (1 - Math.pow(1.06, -25)) / 0.06;
+    expect(E.annuityPV(12000, 25, 6)).toBeCloseTo(want, 6);
+    expect(E.annuityPV(12000, 25, 0)).toBe(300000);
+    expect(E.annuityPV(0, 25, 6)).toBe(0);
+    expect(E.annuityPV(12000, 0, 6)).toBe(0);
+  });
+
+  it("⚠️ 只有『新增投入』算補缺口，『既有轉入』不貢獻現值", () => {
+    const c = E.sampleCase();
+    c.plan.invest = [
+      { name: "", src: "既有轉入", principal: 5_000_000, yearly: 0, years: 0, ret: 5 },
+      { name: "", src: "新增投入", principal: 1_000_000, yearly: 0, years: 0, ret: 5 },
+    ];
+    const ap = E.allocPV(c);
+    expect(ap.pv).toBe(1_000_000);              // 既有那 500 萬完全不算
+    expect(ap.weight).toBe(6_000_000);          // 但兩筆都進加權報酬的分母
+  });
+
+  it("投入年數留空＝從現在算到退休", () => {
+    const c = E.sampleCase();
+    const yrs = E.n(c.profile.retireAge) - E.n(c.profile.age);
+    expect(E.allocYears(c, { years: "" })).toBe(yrs);
+    expect(E.allocYears(c, { years: 0 })).toBe(yrs);
+    expect(E.allocYears(c, { years: 10 })).toBe(10);
+  });
+
+  it("對帳：覆蓋率＝新增投入現值 ÷ 缺口，補得起來才標 ok", () => {
+    const c = E.sampleCase();
+    const gap = E.gapPV(c);
+    expect(gap).toBeGreaterThan(0);
+    c.plan.invest = [{ name: "", src: "新增投入", principal: gap * 0.5, yearly: 0, years: 0, ret: 5 }];
+    let rec = E.allocReconcile(c, {});
+    expect(rec.ok).toBe(false);
+    expect(rec.coverRate).toBeCloseTo(0.5, 6);
+    expect(rec.remain).toBeCloseTo(gap * 0.5, 6);
+    c.plan.invest = [{ name: "", src: "新增投入", principal: gap * 1.2, yearly: 0, years: 0, ret: 5 }];
+    rec = E.allocReconcile(c, {});
+    expect(rec.ok).toBe(true);
+    expect(rec.over).toBeCloseTo(gap * 0.2, 6);
+  });
+
+  it("對帳的缺口是「拉桿之後」的——配置補的是剩下那一段", () => {
+    const c = E.sampleCase();
+    const solo = E.solveLever(c, "expense", {});
+    expect(solo.feasible).toBe(true);
+    const rec = E.allocReconcile(c, { expense: solo.x });
+    expect(rec.gap).toBeLessThanOrEqual(0.5);   // 拉桿已經補平，配置不必再補
+  });
+
+  it("保障逐項掛勾：選了對應缺口才算，沒被指到的會被列出來", () => {
+    const c = E.sampleCase();
+    const led = E.gapLedger(c);
+    expect(led.now.length).toBeGreaterThan(0);
+    const first = led.now[0];
+    c.plan.protect = [
+      { gapKey: first.name, name: "", cover: first.amount, premium: 5000, terms: "" },
+      { gapKey: "（未指定）", name: "", cover: 9_999_999, premium: 0, terms: "" },  // 沒指定＝不算
+    ];
+    const rec = E.allocReconcile(c, {});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hit = rec.protect.find((x: any) => x.name === first.name);
+    expect(hit.ok).toBe(true);
+    expect(rec.unassigned.length).toBe(led.now.length - 1);
+    expect(rec.pv).toBe(0);                     // 保額不進現值缺口
+  });
+
+  it("保障資料改過、掛勾指到不存在的缺口時會被標成 orphan", () => {
+    const c = E.sampleCase();
+    c.plan.protect = [{ gapKey: "保障・這個項目已經不存在", name: "", cover: 100, premium: 0, terms: "" }];
+    expect(E.allocReconcile(c, {}).orphan).toEqual(["保障・這個項目已經不存在"]);
+  });
+
+  it("舊的 allocations（比例%）會搬進 invest，而且只搬一次", () => {
+    const c = E.sampleCase();
+    c.plan = { allocations: [{ name: "美股", pct: 50, ret: 7, benefit: "資產增值" }], invest: [], protect: [] };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const liquid = c.assets.filter((a: any) => a.cls === "流動").reduce((s: number, a: any) => s + E.aVal(a), 0);
+    E.migrateAlloc(c);
+    expect(c.plan.invest).toHaveLength(1);
+    expect(c.plan.invest[0].src).toBe("既有轉入");     // 舊表講的是「現有資產怎麼分」
+    expect(c.plan.invest[0].principal).toBe(Math.round(liquid * 0.5));
+    expect(c.plan.invest[0].ret).toBe(7);
+    E.migrateAlloc(c);
+    expect(c.plan.invest).toHaveLength(1);             // 再跑一次不會重複搬
+  });
+
+  it("加權報酬率改吃新的 invest 表；沒打開開關時仍然不影響試算", () => {
+    const c = E.sampleCase();
+    c.plan = { invest: [
+      { name: "", src: "既有轉入", principal: 6_000_000, yearly: 0, years: 0, ret: 10 },
+      { name: "", src: "既有轉入", principal: 4_000_000, yearly: 0, years: 0, ret: 5 },
+    ], protect: [] };
+    expect(E.allocPV(c).wRet).toBeCloseTo(0.6 * 10 + 0.4 * 5, 6);
+    expect(E.effReturn(c)).toBe(E.n(c.params.invReturn));   // 預設關閉
+    c.plan.useAllocReturn = true;
+    expect(E.effReturn(c)).toBeCloseTo(8, 6);
+  });
+
+  it("兩張表都空著時不會爆，也不會算出 NaN", () => {
+    const c = E.newCase();
+    const rec = E.allocReconcile(c, {});
+    expect(Number.isFinite(rec.pv)).toBe(true);
+    expect(Number.isFinite(rec.coverRate)).toBe(true);
+    expect(Number.isFinite(E.allocPV(c).wRet)).toBe(true);
+  });
+});

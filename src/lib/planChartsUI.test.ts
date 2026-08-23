@@ -139,13 +139,24 @@ describe("缺口組成與變化卡", () => {
 });
 
 describe("版面：首屏必須是圖，不是報表", () => {
-  it("只有三個區塊預設展開，其餘一律收合", () => {
+  it("收合區塊維持三塊，不會有人偷偷把明細塞回首屏", () => {
     w.app.dataTab = "plan"; w.render();
     const h = pane();
-    const secs = (h.match(/class="sec"/g) || []).length;
     const folds = (h.match(/<details>/g) || []).length;   // foldSec 產生的都不帶 open
-    expect(folds).toBe(4);                                 // 缺口組成／方案比較／報酬率配置／其他參數
-    expect(secs - folds).toBeLessThanOrEqual(4);           // 缺口(含拉桿)／該解什麼／三個處方（＋資料完整度列）
+    expect(folds).toBe(3);                                 // 缺口組成／方案比較／其他參數
+  });
+
+  it("展開的區塊依序是：缺口(含拉桿) → 該解什麼 → 三個處方 → 配置與對帳", () => {
+    const h = pane();
+    const order = ["曲線掉到零線以下", "該解什麼", "三個處方", "配置與對帳"];
+    let prev = -1;
+    order.forEach((t) => {
+      const i = h.indexOf(t);
+      expect(i).toBeGreaterThan(prev);
+      prev = i;
+    });
+    // 四塊都要在第一個收合區之前
+    expect(prev).toBeLessThan(h.indexOf("<details>"));
   });
 
   it("首屏就有主圖與拉桿，兩者在同一個區塊裡（拉了要當場看到線動）", () => {
