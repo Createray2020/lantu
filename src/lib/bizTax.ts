@@ -86,3 +86,23 @@ export const BIZ_STAGES: { name: string; focus: string }[] = [
   { name: "擴張期", focus: "擴編、資本支出決策、財務基礎建設、長短期資金配置" },
   { name: "成熟期", focus: "IPO 或控股架構、傳承與退場規劃" },
 ];
+
+// ── 規劃求解參數（調整方案的缺口求解器）──
+// 這一組不是法規，是「什麼樣的建議算得上合理」的天花板。放進後台是為了讓它可被治理：
+// 教練不能自己把報酬率上限拉到 15% 再宣稱缺口補平了——那樣紅綠燈就失去意義。
+/** 保守情境折現率 %（缺口的第二個讀數，不採客戶自己的預期報酬）。 */
+export const PLAN_DISCOUNT = 2.5;
+/** 工作收入可調升上限 %。 */
+export const CAP_INCOME_UP = 30;
+/** 生活/消費支出可削減上限 %。 */
+export const CAP_EXPENSE_CUT = 30;
+/** 投資報酬率假設上限 %。 */
+export const CAP_RATE = 8;
+/** 延後退休上限（年）。 */
+export const CAP_RETIRE_DELAY = 10;
+/** 退休生活水準可調降上限 %。 */
+export const CAP_RETIRE_CUT = 25;
+/** 願景下修上限 %（100 ＝ 一路走到每一項的「金額(最低)」）。 */
+export const CAP_VISION_CUT = 100;
+/** 啟程期(C) 的報酬率上限，比一般更保守。 */
+export const CAP_RATE_STARTER = 6;

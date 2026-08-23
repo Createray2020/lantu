@@ -214,7 +214,48 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   });
 
   it("延後退休會推每位賺薪成員的退休年齡，兩邊一致", () => {
-    expect(HTML).toContain("(after.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&n(m.retireAge)>0)m.retireAge=n(m.retireAge)+n((c.plan||{}).retireDelay);});");
+    // 2026/08/23：這段從 scenario() 抽成 applyRetireDelay()，scenario 與六根槓桿共用同一份。
+    expect(HTML).toContain("(c.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&n(m.retireAge)>0)m.retireAge=n(m.retireAge)+years});");
+    const c = E.sampleCase();
+    c.members.push({ name: "配偶", role: "配偶", age: 38, retireAge: 60, expRatio: 40 });
+    const after = E.applyLevers(c, { retire: 5 });
+    expect(after.profile.retireAge).toBe(E.n(c.profile.retireAge) + 5);
+    expect(after.members[after.members.length - 1].retireAge).toBe(65);
+  });
+
+  it("現值缺口的封閉解：兩邊是同一條公式", () => {
+    // shortPV = max over t ( −raw_t ÷ (1+r)^(t+1) )
+    expect(HTML).toContain("if(raw<0){if(negAge===null)negAge=age;var need_=-raw/df;if(need_>shortPV){shortPV=need_;shortAge=age;}}");
+    expect(HTML).toContain("raw=raw*(1+ret)+bal;");
+  });
+
+  it("願景達成度：兩邊都改成 1 −（現值缺口 ÷ 一生需求現值）", () => {
+    expect(HTML).toContain("return Math.round(Math.max(0,Math.min(1,1-proj.shortPV/proj.needPV))*100);");
+    expect(HTML).toContain("var vision=visionRateOf(m.proj);");
+    // 舊公式不可以再存在於任何一邊
+    expect(HTML).not.toContain("var vision=Math.round(Math.min(1,m.net/(m.visionNeed||1))*100);");
+  });
+
+  it("願景彈性度沿用既有欄位（minPresent / minAmount / imp），兩邊一致", () => {
+    expect(HTML).toContain("function goalFloor(g){var v=n(g.minPresent);if(v>0)return Math.min(v,n(g.present));return n(g.imp)>=5?n(g.present):0}");
+    expect(HTML).toContain("function wishFloor(w){var v=n(w.minAmount);if(v>0)return Math.min(v,n(w.amount));return n(w.imp)>=5?n(w.amount):0}");
+  });
+
+  it("求解上限常數：兩邊的預設值一致，且都吃得到後台覆蓋", () => {
+    expect(HTML).toContain("var CAP_RATE=8;");
+    expect(HTML).toContain("var PLAN_DISCOUNT=2.5;");
+    expect(HTML).toContain("function applyPlanCaps(values){");
+    expect(E.CAP_RATE).toBe(8);
+    expect(E.PLAN_DISCOUNT).toBe(2.5);
+  });
+
+  it("effReturn：預設不跟著配置走（既有客戶的數字一位都不能動）", () => {
+    expect(HTML).toContain("function effReturn(c){");
+    const c = E.sampleCase();
+    c.plan = { allocations: [{ name: "股票", pct: 100, ret: 12 }] };
+    expect(E.effReturn(c)).toBe(E.n(c.params.invReturn));   // 沒打開開關 → 還是參數頁那個值
+    c.plan.useAllocReturn = true;
+    expect(E.effReturn(c)).toBe(12);
   });
 
   it("負債一律換匯（lBal），不可直接讀 l.balance", () => {

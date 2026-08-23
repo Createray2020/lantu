@@ -451,18 +451,25 @@ function ratios(c){var m=metrics(c),r={};
  add(g2,'資產成長動力比',pct(growth),'>10%','年結餘 ÷ 資產淨值',bandLow(growth*100,10));
  if(tr.length>=2){var pv=n(tr[tr.length-2].net),cv=n(tr[tr.length-1].net);var gr=pv?(cv-pv)/Math.abs(pv):0;add(g2,'資產淨值增長率',pct(gr),'愈高愈好','(今年淨值−去年淨值) ÷ 去年淨值',bandLow(gr*100,0.01));}
  else add(g2,'資產淨值增長率','—（需兩年度資料）','愈高愈好','需連續兩年淨值','na');
- add(g2,'願景達成率',pct(m.net/(m.visionNeed||1)),'≥100%','現有淨資產 ÷ 願景總需求',bandLow(m.net/(m.visionNeed||1)*100,100));
+ var _vr=visionRateOf(m.proj);
+ add(g2,'願景達成率',pct(_vr/100),'≥100%','1 −（現值缺口 ÷ 一生需求現值）',bandLow(_vr,100));
  return r;
 }
 
-function projection(c){
- var a0=n(c.profile.age)||40,aEnd=n(c.params.horizon)||85,infl=n(c.params.inflation)/100,ret=n(c.params.invReturn)/100;
- var invest=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
+function projection(c,lump,rateOverride){
+ var a0=n(c.profile.age)||40,aEnd=n(c.params.horizon)||85,infl=n(c.params.inflation)/100;
+ // rateOverride＝求解器拿「同一份個案、換一個報酬率假設」再跑一次時用；lump＝今天先塞一筆錢進去。
+ var ret=((rateOverride!==undefined&&rateOverride!==null&&rateOverride!=='')?n(rateOverride):effReturn(c))/100;
+ var invest=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0})+n(lump);
  var fixedAssets=sum(c.assets,function(a){return a.cls==='固定'?aVal(a):0});
  var rows=[],turnNeg=null,totalOut=0;
  var eduByYear={}; var g=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){var ag=s+yy;eduByYear[ag]=(eduByYear[ag]||0)+n(e.annual)*Math.pow(1+g,n(e.startIn)+yy)}});
  var rn=retireNeed(c);
+ // 無條件複利路徑（負餘額也照樣計息）。現值缺口＝這條路徑上最深的一筆負值折現回今天，
+ //   shortPV = max over t ( −raw_t ÷ (1+r)^(t+1) )。實際路徑永遠比它好看，所以這是保守上界。
+ var raw=invest,shortPV=0,shortAge=null,negAge=null,needPV=0;
+ var pvOut={base:0,debt:0,goal:0,edu:0,life:0,retire:0},pvLate={base:0,debt:0,goal:0,edu:0,life:0,retire:0};
  for(var age=a0;age<=aEnd;age++){
   var t=age-a0;
   var workIncome=sum(c.incomes,function(i){return (i.type==='工作'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
@@ -483,13 +490,294 @@ function projection(c){
   var retireDraw=retireAnnual(c,age,inflF)*w;
   var bal=income-expense-debt-goalOut-edu-life-retireDraw;
   invest=(invest>0?invest*(1+ret):invest)+bal;
+  raw=raw*(1+ret)+bal;
+  var df=Math.pow(1+ret,t+1);
+  if(raw<0){if(negAge===null)negAge=age;var need_=-raw/df;if(need_>shortPV){shortPV=need_;shortAge=age;}}
+  // 折現後的支出組成：pvOut 供「一生需求現值」，pvLate 只累計第一個不足年之後的，供缺口歸因。
+  var comp={base:expense,debt:debt,goal:goalOut,edu:edu,life:life,retire:retireDraw};
+  for(var ck in comp){if(!comp.hasOwnProperty(ck))continue;var cv=comp[ck]/df;pvOut[ck]+=cv;needPV+=cv;if(negAge!==null)pvLate[ck]+=cv;}
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
   if(turnNeg===null&&invest<0)turnNeg=age;
   var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)});
   var netEst=invest+fixedAssets-remDebt;
-  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,bal:bal,invest:invest,net:netEst});
+  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,net:netEst});
  }
- return {rows:rows,turnNeg:turnNeg,totalOutflow:totalOut};
+ return {rows:rows,turnNeg:turnNeg,totalOutflow:totalOut,
+  shortPV:shortPV,shortAge:shortAge,negAge:negAge,needPV:needPV,pvOut:pvOut,pvLate:pvLate,rate:ret*100};
+}
+
+// ===== 調整方案：缺口求解器 =====
+//
+// 地基語意（動這一段之前務必讀完）：
+//
+// 1)「現值缺口 shortPV」＝為了讓一生的可投資資產永遠不落到負值，**今天**必須額外
+//    放進去的一筆錢。它不是把退休缺口、保障缺口、目標缺口硬加起來——那三個是
+//    不同時點、不同性質的數字，相加沒有意義（這是改版前最大的錯）。
+//    解法是封閉解，不需要疊代：
+//        shortPV = max over t ( −raw_t ÷ (1+r)^(t+1) )，全程為正時取 0
+//    其中 raw_t 是 projection() 裡「負餘額也照樣計息」的那條路徑。
+//    實際路徑（負餘額不計息）永遠比 raw 好看，所以 shortPV 是保守上界——
+//    寧可高估缺口，也不要讓教練規劃不足。
+//
+// 2) 缺口帳分兩區，**刻意不相加**：
+//    ・現金流缺口（flow[]）＝ shortPV 依「第一個負值年之後的折現支出組成」歸因，
+//      各列加總＝shortPV，可以放心加。
+//    ・即時缺口（now[]）＝保障缺口與緊急預備金。它們是「事件發生才要的錢」與
+//      「隨時要能動用的錢」，不是一生現金流的一部分，另列不進總額。
+//
+// 3) 報酬率假設會自我實現：假設拉高、缺口自然變小。兩道防線——
+//    ・CAP_RATE 是求解器能開到的天花板，超過就判「此路不通」。
+//    ・同時用保守情境折現率 PLAN_DISCOUNT 再算一次（conservative），
+//      兩個數字並列給教練看，假設風險攤在陽光下。
+//
+// 4) 願景的彈性度**不需要新欄位**——goals 的 minPresent（金額最低）與 imp（重要度）、
+//    travel/hobby/luxury 的 minAmount 與 imp 早就存在，只是從來沒有進過計算。
+//    goalFloor()/wishFloor() 就是把這批既有資料接上引擎。
+
+// 後台 /admin/categories「規劃求解參數」可覆蓋（走 bizTaxParams 同一張表，grp='規劃求解'）。
+var PLAN_DISCOUNT=2.5;      // 保守情境折現率 %（不採客戶自己的預期報酬）
+var CAP_INCOME_UP=30;       // 工作收入可調升上限 %
+var CAP_EXPENSE_CUT=30;     // 生活/消費可削減上限 %
+var CAP_RATE=8;             // 投資報酬率假設上限 %
+var CAP_RETIRE_DELAY=10;    // 延後退休上限（年）
+var CAP_RETIRE_CUT=25;      // 退休生活水準可調降上限 %
+var CAP_VISION_CUT=100;     // 願景下修上限 %（100＝一路走到「金額(最低)」）
+var CAP_RATE_STARTER=6;     // 啟程期(C) 的報酬率上限，比一般更保守
+
+// 目前這份規劃實際採用的報酬率假設。
+// c.plan.useAllocReturn 打開時才跟著「建議資產配置」的加權報酬走——
+// 預設關閉，既有客戶的數字一位都不會動。
+function effReturn(c){
+ var p=(c||{}).plan||{};
+ if(p.useAllocReturn){var al=allocInfo(c);if(al.totalPct>0&&isFinite(al.wRet))return al.wRet;}
+ return n((c.params||{}).invReturn);
+}
+
+var GAP_CATS=[['base','日常支出'],['debt','貸款本息'],['goal','人生目標'],['edu','子女教育'],['life','生活願望'],['retire','退休生活']];
+
+function gapPV(c){return projection(c).shortPV}
+function gapPVAt(c,rate){return projection(c,0,rate).shortPV}
+
+// 願景達成度。舊公式是「淨資產 ÷ 一生總流出」——分子是存量、分母是流量，
+// 而且完全不看未來收入，導致幾乎所有客戶永遠只有兩三成，教練無從判斷嚴重程度。
+// 新公式＝1 −（現值缺口 ÷ 一生需求現值），填得平就是 100%。
+function visionRateOf(proj){
+ if(!proj||!proj.needPV)return 100;
+ return Math.round(Math.max(0,Math.min(1,1-proj.shortPV/proj.needPV))*100);
+}
+function visionRate(c){return visionRateOf(projection(c))}
+
+// ---------- 願景彈性度（沿用既有欄位，不新增） ----------
+// 有填「金額(最低)」就以它為下限；沒填則看重要度——5 分視為不可動，其餘可歸零。
+function goalFloor(g){var v=n(g.minPresent);if(v>0)return Math.min(v,n(g.present));return n(g.imp)>=5?n(g.present):0}
+function wishFloor(w){var v=n(w.minAmount);if(v>0)return Math.min(v,n(w.amount));return n(w.imp)>=5?n(w.amount):0}
+// 願景還有多少可壓縮空間（現值口徑的粗估，只用來判斷「這根槓桿有沒有得動」）。
+function visionRoom(c){
+ var s=sum(c.goals,function(g){return Math.max(0,n(g.present)-goalFloor(g))});
+ [c.travel,c.hobby,c.luxury].forEach(function(arr){s+=sum(arr,function(w){return Math.max(0,n(w.amount)-wishFloor(w))*(n(w.freq)||1)})});
+ return s;
+}
+
+// ---------- 槓桿 ----------
+// 四個方向拆成六根：收入、支出、效率(報酬率)、時間(延後退休)、退休水準、願景。
+// ⚠️「時間×報酬」是獨立的一根，不要併進收入——併了會讓歸因整個錯掉。
+var LEVERS=[
+ {id:'income',     name:'增加收入',     unit:'%',  hint:'工作收入整體調升',        dir:'up'},
+ {id:'expense',    name:'減少支出',     unit:'%',  hint:'生活與消費類支出削減',    dir:'up'},
+ {id:'rate',       name:'提高報酬',     unit:'%',  hint:'投資報酬率假設',          dir:'abs'},
+ // step:1 ＝ 只能整數年。projection() 的時間軸是整數歲，退休年齡帶小數會讓某一年的
+ // 退休權重 w 整段跳掉——反解會收斂到「延後 0.0001 年就填平了」這種假答案。
+ {id:'retire',     name:'延後退休',     unit:'年', hint:'工作收入延長、退休期縮短',dir:'up',step:1},
+ {id:'retireLevel',name:'降低退休水準', unit:'%',  hint:'退休期支出調降',          dir:'up'},
+ {id:'vision',     name:'調整願景',     unit:'%',  hint:'目標與生活願望往「最低金額」壓縮',dir:'up'}
+];
+function leverName(id){for(var i=0;i<LEVERS.length;i++)if(LEVERS[i].id===id)return LEVERS[i].name;return id}
+function leverUnit(id){for(var i=0;i<LEVERS.length;i++)if(LEVERS[i].id===id)return LEVERS[i].unit;return ''}
+
+// 財務階段閘門：不同階段允許動的槓桿不一樣。
+// 整裝期(D) 收支還沒轉正、基本保障還沒備齊，先談「把報酬率拉高」是本末倒置，
+// 也是實務上最容易出事的一種建議 —— 直接鎖起來，並把理由寫在畫面上。
+function leverGate(c,grade){
+ grade=grade||health(c).grade;
+ var block={},reason={};
+ if(grade==='D'){block.rate=1;reason.rate='整裝期：收支尚未轉正或基本保障未備，先不談提高報酬率——順序錯了風險會反咬。';}
+ var rateCap=(grade==='C')?Math.min(CAP_RATE,CAP_RATE_STARTER):CAP_RATE;
+ if(visionRoom(c)<=0){block.vision=1;reason.vision='目標與生活願望都沒有填「金額(最低)」、或重要度都是 5——沒有可壓縮空間。';}
+ return {grade:grade,block:block,reason:reason,rateCap:rateCap};
+}
+
+function leverRange(c,id,gate){
+ gate=gate||leverGate(c);
+ if(id==='rate')return {lo:effReturn(c),hi:Math.max(effReturn(c),gate.rateCap),step:0};
+ if(id==='retire')return {lo:0,hi:CAP_RETIRE_DELAY,step:1};
+ if(id==='income')return {lo:0,hi:CAP_INCOME_UP};
+ if(id==='expense')return {lo:0,hi:CAP_EXPENSE_CUT};
+ if(id==='retireLevel')return {lo:0,hi:CAP_RETIRE_CUT};
+ return {lo:0,hi:CAP_VISION_CUT};
+}
+
+// 延後退休：本人與其他賺薪成員一起推，工作收入的結束歲跟著延長。
+// scenario() 與 applyLevers() 共用同一份，避免兩邊各推各的。
+function applyRetireDelay(c,years){
+ years=n(years);if(!years)return c;
+ c.profile.retireAge=n(c.profile.retireAge)+years;
+ (c.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&n(m.retireAge)>0)m.retireAge=n(m.retireAge)+years});
+ (c.incomes||[]).forEach(function(i){if(i.type==='工作'&&n(i.end)<n(c.profile.retireAge))i.end=n(c.profile.retireAge)});
+ return c;
+}
+
+/** 套用一組槓桿值，回傳新的個案（不動原件）。 */
+function applyLevers(c,set){
+ set=set||{};
+ var a=JSON.parse(JSON.stringify(c));
+ var inc=n(set.income);
+ if(inc)(a.incomes||[]).forEach(function(i){if(i.type==='工作')i.amount=n(i.amount)*(1+inc/100)});
+ var cut=n(set.expense);
+ if(cut)(a.expenses||[]).forEach(function(e){if(isLivingCat(e.cat))e.amount=n(e.amount)*(1-cut/100)});
+ if(set.rate!==undefined&&set.rate!==null&&set.rate!==''){
+  a.params=a.params||{};a.params.invReturn=n(set.rate);
+  a.plan=a.plan||{};a.plan.useAllocReturn=false;   // 手動指定報酬率就不再跟著配置走
+ }
+ if(n(set.retire))applyRetireDelay(a,n(set.retire));
+ var rl=n(set.retireLevel)/100;
+ if(rl>0){
+  (a.retireExpenses||[]).forEach(function(r){r.amount=n(r.amount)*(1-rl)});
+  if(a.retire)a.retire.monthLiving=n(a.retire.monthLiving)*(1-rl);
+ }
+ var vx=n(set.vision)/100;
+ if(vx>0){
+  (a.goals||[]).forEach(function(g){var f=goalFloor(g);g.present=n(g.present)-vx*Math.max(0,n(g.present)-f)});
+  [a.travel,a.hobby,a.luxury].forEach(function(arr){(arr||[]).forEach(function(w){var f=wishFloor(w);w.amount=n(w.amount)-vx*Math.max(0,n(w.amount)-f)})});
+ }
+ return a;
+}
+
+function gapWith(c,set){return projection(applyLevers(c,set)).shortPV}
+
+/**
+ * 單槓桿反解：「如果只動這一根，要動到多少才填得平？」
+ * 二分法 24 次（≈1e-7 相對精度就夠，畫面只顯示到整數）。
+ * 回傳 feasible=false 代表拉到上限仍補不平——這就是「此路不通」，
+ * 教練該往下一根、或往調整願景走。
+ */
+function solveLever(c,id,base,gate){
+ base=base||{};gate=gate||leverGate(c);
+ var r=leverRange(c,id,gate);
+ var mk=function(x){var s={};for(var k in base)if(base.hasOwnProperty(k))s[k]=base[k];s[id]=x;return s};
+ var blocked=!!gate.block[id];
+ var g0=gapWith(c,mk(r.lo));
+ if(g0<=0)return {id:id,name:leverName(id),unit:leverUnit(id),x:r.lo,lo:r.lo,cap:r.hi,gap:0,base:0,needed:false,feasible:true,blocked:blocked,reason:gate.reason[id]||''};
+ if(blocked)return {id:id,name:leverName(id),unit:leverUnit(id),x:r.lo,lo:r.lo,cap:r.hi,gap:g0,base:g0,needed:true,feasible:false,blocked:true,reason:gate.reason[id]||'',reduce:0};
+ var g1=gapWith(c,mk(r.hi));
+ if(g1>0)return {id:id,name:leverName(id),unit:leverUnit(id),x:r.hi,lo:r.lo,cap:r.hi,gap:g1,base:g0,needed:true,feasible:false,blocked:false,reason:'',reduce:g0-g1};
+ if(r.step){
+  // 整數槓桿：直接掃，二分法在離散軸上會收斂到沒有意義的小數。
+  for(var x=r.lo+r.step;x<=r.hi+1e-9;x+=r.step){if(gapWith(c,mk(x))<=0)return {id:id,name:leverName(id),unit:leverUnit(id),x:x,lo:r.lo,cap:r.hi,gap:0,base:g0,needed:true,feasible:true,blocked:false,reason:'',reduce:g0,step:r.step};}
+  return {id:id,name:leverName(id),unit:leverUnit(id),x:r.hi,lo:r.lo,cap:r.hi,gap:g1,base:g0,needed:true,feasible:false,blocked:false,reason:'',reduce:g0-g1,step:r.step};
+ }
+ var lo=r.lo,hi=r.hi;
+ for(var i=0;i<24;i++){var mid=(lo+hi)/2;if(gapWith(c,mk(mid))>0)lo=mid;else hi=mid;}
+ return {id:id,name:leverName(id),unit:leverUnit(id),x:hi,lo:r.lo,cap:r.hi,gap:0,base:g0,needed:true,feasible:true,blocked:false,reason:'',reduce:g0};
+}
+
+/** 六根槓桿各自反解一次——這張表就是「教練該解什麼」的自動提醒。 */
+function soloSolve(c){
+ var gate=leverGate(c);
+ return {gate:gate,rows:LEVERS.map(function(L){return solveLever(c,L.id,{},gate)})};
+}
+
+// ---------- 三個處方 ----------
+// 模板數量永遠固定三個，內容每次由求解器現算——這樣才不會「模板一多版面就亂」。
+var RX_DEFS=[
+ {key:'stable',name:'穩健型',desc:'不假設加薪、不拉高報酬率。先從支出與退休水準下手，最後才用時間換。',
+  order:['expense','retireLevel','retire']},
+ {key:'growth',name:'進取型',desc:'假設職涯與投資都往上走。先要收入，再要報酬，最後用時間補。',
+  order:['income','rate','retire']},
+ // 第三張刻意從願景開始，而不是「其他都拉到上限之後才調願景」——
+ // 教練真正需要當場回答的是「如果什麼都做不到，願景要砍多少才做得到」，
+ // 把它擺在最後一位會讓這個答案永遠算不出來。
+ {key:'vision',name:'調願景型',desc:'不動收入與支出，先算「願景要壓縮多少才做得到」；壓到上限仍不夠才動其他槓桿。',
+  order:['vision','expense','income','rate','retire','retireLevel']}
+];
+
+function greedyFill(c,order,gate){
+ gate=gate||leverGate(c);
+ var set={},steps=[];
+ for(var i=0;i<order.length;i++){
+  var id=order[i];
+  var r=solveLever(c,id,set,gate);
+  if(!r.needed){steps.push(r);break;}          // 前面幾根已經填平了
+  if(r.blocked){steps.push(r);continue;}        // 階段閘門擋住，跳過但要留痕
+  set[id]=r.x;steps.push(r);
+  if(r.feasible)break;                          // 這一根就夠了
+ }
+ var gap=gapWith(c,set);
+ return {levers:set,steps:steps,gap:gap,ok:gap<=0.5};
+}
+
+function prescriptions(c){
+ var gate=leverGate(c);
+ return RX_DEFS.map(function(d){
+  var r=greedyFill(c,d.order,gate);
+  return {key:d.key,name:d.name,desc:d.desc,levers:r.levers,steps:r.steps,gap:r.gap,ok:r.ok};
+ });
+}
+
+// ---------- 缺口帳 ----------
+function gapLedger(c){
+ var p=projection(c),m=metrics(c);
+ var total=p.shortPV;
+ var lateTot=0;GAP_CATS.forEach(function(k){lateTot+=p.pvLate[k[0]]});
+ var flow=[];
+ GAP_CATS.forEach(function(k){
+  var share=lateTot?p.pvLate[k[0]]/lateTot:0;var pvv=total*share;
+  if(pvv>0.5)flow.push({key:k[0],name:k[1],pv:pvv,share:share});
+ });
+ flow.sort(function(a,b){return b.pv-a.pv});
+ var now=[];
+ var covs={};
+ coverageGaps(c).forEach(function(g){if(g.gap>0)covs[g.kind]=(covs[g.kind]||0)+g.gap});
+ Object.keys(covs).forEach(function(k){now.push({name:'保障・'+k,amount:covs[k],kind:'保障'})});
+ var emReq=m.monthExp*(n(c.params.emergencyMonths)||6),emGap=Math.max(0,emReq-m.cash);
+ if(emGap>0)now.push({name:'緊急預備金',amount:emGap,kind:'流動性'});
+ now.sort(function(a,b){return b.amount-a.amount});
+ // 每年要補多少：用償債基金公式（不是把現值缺口直接除以年數——那會低估到離譜）。
+ // 期數取「到退休」與「到第一個不足年」孰早：錢要在缺口發生之前就位，
+ // 而退休之後通常也沒有薪資可以再存。
+ var a0_=n(c.profile.age)||40,ra_=n(c.profile.retireAge);
+ var end_=(p.negAge!=null)?Math.min(p.negAge,ra_):ra_;
+ var yrs=Math.max(1,end_-a0_);
+ var r_=p.rate/100;
+ var annual_=(Math.abs(r_)<1e-9)?(total/yrs):(total*r_/(Math.pow(1+r_,yrs)-1));
+ return {total:total,needPV:p.needPV,rate:p.rate,negAge:p.negAge,shortAge:p.shortAge,
+  flow:flow,now:now,years:yrs,annual:annual_,
+  conservative:gapPVAt(c,PLAN_DISCOUNT),conservativeRate:PLAN_DISCOUNT,
+  visionRate:visionRateOf(p),rateOverCap:effReturn(c)>CAP_RATE};
+}
+
+// 後台 /admin/categories 的「規劃求解參數」一存，這些上限就會被覆蓋。
+// 與 applyBizTax 同一套防呆：只覆蓋「本來就存在、而且是有限數字」的 key。
+function applyPlanCaps(values){
+ if(!values||typeof values!=='object')return;
+ var setters={
+  PLAN_DISCOUNT:function(x){PLAN_DISCOUNT=x},CAP_INCOME_UP:function(x){CAP_INCOME_UP=x},
+  CAP_EXPENSE_CUT:function(x){CAP_EXPENSE_CUT=x},CAP_RATE:function(x){CAP_RATE=x},
+  CAP_RETIRE_DELAY:function(x){CAP_RETIRE_DELAY=x},CAP_RETIRE_CUT:function(x){CAP_RETIRE_CUT=x},
+  CAP_VISION_CUT:function(x){CAP_VISION_CUT=x},CAP_RATE_STARTER:function(x){CAP_RATE_STARTER=x}
+ };
+ Object.keys(setters).forEach(function(k){
+  var x=Number(values[k]);
+  if(isFinite(x)&&values[k]!==null&&values[k]!==undefined&&values[k]!=='')setters[k](x);
+ });
+}
+
+/** 這份規劃目前採用的槓桿組合（相容舊欄位 plan.retireDelay）。 */
+function planLevers(c){
+ var p=c.plan||{},s={};
+ var lv=p.levers||{};
+ for(var k in lv)if(lv.hasOwnProperty(k)&&n(lv[k]))s[k]=n(lv[k]);
+ if(n(p.retireDelay)&&!s.retire)s.retire=n(p.retireDelay);
+ return s;
 }
 
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296}}
@@ -550,7 +838,10 @@ function health(c){
  // 五項加權滿分 100；clamp 是防呆，任何一項若因資料異常超出 0~1 都不該讓總分破表。
  var safety=Math.max(0,Math.min(100,Math.round((balScore*25+reserve*15+credit*15+debtBal*15+riskCover*30))));
  var freedom=Math.round(Math.min(1,m.incFinancial/(m.expTotal||1))*100);
- var vision=Math.round(Math.min(1,m.net/(m.visionNeed||1))*100);
+ // 願景達成度＝1 −（現值缺口 ÷ 一生需求現值）。舊公式是「淨資產 ÷ 一生總流出」——
+ // 分子存量、分母流量，而且完全不看未來收入，導致幾乎每個客戶都卡在兩三成、教練無從判斷輕重。
+ // m.proj 是 metrics() 已經跑過的那一份，這裡不會多跑一次 projection。
+ var vision=visionRateOf(m.proj);
  var grade=(safety<60||balScore<1)?'D':(freedom<20?'C':(vision<60?'B':'A'));
  return {safety:safety,freedom:freedom,vision:vision,grade:grade,
   raw:{balScore:balScore,reserve:reserve,credit:credit,debtBal:debtBal,riskCover:riskCover},
@@ -577,7 +868,7 @@ var STAGE={
 var STAGE_METRICS=[
  ['財務安全度','收支平衡×25 ＋ 緊急預備金×15 ＋ 信用×15 ＋ 負債平衡×15 ＋ 風險保全×30，滿分 100 分'],
  ['財務自由度','理財收入 ÷ 家庭總支出 × 100%（理財收入能覆蓋多少比例的支出）'],
- ['願景達成度','資產淨值 ÷ 願景總需求 × 100%（退休、教育、置產等目標的累積進度）']
+ ['願景達成度','1 −（現值缺口 ÷ 一生需求現值）× 100%；填得平就是 100%（退休、教育、置產等目標的達成進度）']
 ];
 function stageGate(g){return (STAGE[g]||{}).gate||''}
 function stageDesc(g){return (STAGE[g]||{}).desc||''}
@@ -771,16 +1062,13 @@ function allocInfo(c){var al=(c.plan&&c.plan.allocations)||[];
 }
 
 function scenario(c){
- var after=JSON.parse(JSON.stringify(c));
- after.profile.retireAge=n(c.profile.retireAge)+n((c.plan||{}).retireDelay);
- // 延後退休要連配偶等賺薪成員一起推，否則三段權重會停在原本的切換點。
- (after.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&n(m.retireAge)>0)m.retireAge=n(m.retireAge)+n((c.plan||{}).retireDelay);});
- // 延後退休：延長工作收入到新退休年齡
- after.incomes.forEach(function(i){if(i.type==='工作'&&n(i.end)<after.profile.retireAge)i.end=after.profile.retireAge});
- var before={metrics:metrics(c),retire:retireNeed(c),health:health(c),estate:estateTax(c),incomeTax:incomeTax(c)};
+ // 2026/08/23 起「規劃後」＝套用 c.plan.levers 的完整槓桿組合（六根），
+ // 不再只有延後退休一根。舊欄位 plan.retireDelay 由 planLevers() 相容進來。
+ var after=applyLevers(c,planLevers(c));
+ var before={metrics:metrics(c),retire:retireNeed(c),health:health(c),estate:estateTax(c),incomeTax:incomeTax(c),gap:gapPV(c)};
  var mAfter=metrics(after);
  var netAfter=mAfter.net-n((c.plan||{}).movableToOverseas); // 資產移轉降低境內帳面淨值(遺產稅基)
- var after2={metrics:mAfter,retire:retireNeed(after),health:health(after),estate:estateTax(after,netAfter),incomeTax:incomeTax(after)};
+ var after2={metrics:mAfter,retire:retireNeed(after),health:health(after),estate:estateTax(after,netAfter),incomeTax:incomeTax(after),gap:mAfter.proj.shortPV};
  // afterCase＝套用方案後的完整個案（延後退休已推到每位賺薪成員），供測試與明細追溯。
  return {before:before,after:after2,afterCase:after};
 }
@@ -942,6 +1230,39 @@ export {
   kindNorm,
   allocInfo,
   scenario,
+  // 調整方案：缺口求解器
+  effReturn,
+  gapPV,
+  gapPVAt,
+  visionRate,
+  visionRateOf,
+  gapLedger,
+  goalFloor,
+  wishFloor,
+  visionRoom,
+  LEVERS,
+  leverName,
+  leverGate,
+  leverRange,
+  applyRetireDelay,
+  applyLevers,
+  gapWith,
+  solveLever,
+  soloSolve,
+  RX_DEFS,
+  greedyFill,
+  prescriptions,
+  planLevers,
+  GAP_CATS,
+  PLAN_DISCOUNT,
+  CAP_INCOME_UP,
+  CAP_EXPENSE_CUT,
+  CAP_RATE,
+  CAP_RETIRE_DELAY,
+  CAP_RETIRE_CUT,
+  CAP_VISION_CUT,
+  CAP_RATE_STARTER,
+  applyPlanCaps,
   crossTable,
   gradeColor,
   PURPOSES,

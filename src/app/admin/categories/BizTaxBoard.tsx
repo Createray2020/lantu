@@ -24,11 +24,13 @@ const UNIT_HINT: Record<string, string> = {
   rate: "比率（填小數：20% → 0.2）",
   money: "金額（新台幣元）",
   x: "倍數",
+  num: "數值（%／年，直接填 8 就是 8%）",
 };
 
 function display(v: number, unit: string) {
   if (unit === "rate") return `${+(v * 100).toFixed(4)}%`;
   if (unit === "x") return `${v} 倍`;
+  if (unit === "num") return `${v}`;
   return fmtMoney(v);
 }
 

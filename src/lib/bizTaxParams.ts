@@ -12,11 +12,13 @@ import {
   DIVIDEND_CREDIT_RATE, DIVIDEND_CREDIT_CAP, NHI_SUPP_RATE, NHI_SUPP_MIN,
   RENT_EXPENSE_RATE, VAT_RATE, CAR_DEPRECIATION_CAP, CAR_LEASE_DEPRECIATION_CAP,
   CAR_RENTAL_BIZ_CAP, PENALTY_VAT_MULT, PENALTY_VOUCHER_RATE,
+  PLAN_DISCOUNT, CAP_INCOME_UP, CAP_EXPENSE_CUT, CAP_RATE, CAP_RETIRE_DELAY,
+  CAP_RETIRE_CUT, CAP_VISION_CUT, CAP_RATE_STARTER,
 } from "./bizTax";
 
 export const BIZ_TAX_TAG = "biz-tax";
 
-export type BizTaxUnit = "rate" | "money" | "x";
+export type BizTaxUnit = "rate" | "money" | "x" | "num";
 export type BizTaxRow = {
   key: string;
   label: string;
@@ -45,6 +47,16 @@ const seed: Omit<BizTaxRow, "sortOrder">[] = [
   { key: "CAR_RENTAL_BIZ_CAP", label: "租賃業者本身購車折舊上限", grp: "查核準則", unit: "money", value: CAR_RENTAL_BIZ_CAP, basis: BIZ_TAX_BASIS, note: "出租方的優惠，不是承租企業的" },
   { key: "PENALTY_VAT_MULT", label: "虛報進項漏稅罰倍數上限", grp: "罰則", unit: "x", value: PENALTY_VAT_MULT, basis: BIZ_TAX_BASIS, note: "營業稅法 §51，並得停止營業" },
   { key: "PENALTY_VOUCHER_RATE", label: "未取得憑證罰鍰比率", grp: "罰則", unit: "rate", value: PENALTY_VOUCHER_RATE, basis: BIZ_TAX_BASIS, note: "稅捐稽徵法 §44" },
+  // 規劃求解：調整方案的槓桿天花板。unit 用 "num"（純數值，不做小數/百分比換算）——
+  // 這些值在引擎裡就是以「百分點」與「年」為單位，換算成小數反而會錯。
+  { key: "PLAN_DISCOUNT", label: "保守情境折現率（%）", grp: "規劃求解", unit: "num", value: PLAN_DISCOUNT, basis: BIZ_TAX_BASIS, note: "缺口的第二個讀數，不採客戶自己的預期報酬" },
+  { key: "CAP_RATE", label: "投資報酬率假設上限（%）", grp: "規劃求解", unit: "num", value: CAP_RATE, basis: BIZ_TAX_BASIS, note: "超過即判「此路不通」，是紅綠燈的意義所在" },
+  { key: "CAP_RATE_STARTER", label: "啟程期(C) 報酬率上限（%）", grp: "規劃求解", unit: "num", value: CAP_RATE_STARTER, basis: BIZ_TAX_BASIS, note: "體質剛轉正，比一般更保守" },
+  { key: "CAP_INCOME_UP", label: "工作收入可調升上限（%）", grp: "規劃求解", unit: "num", value: CAP_INCOME_UP, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "CAP_EXPENSE_CUT", label: "生活/消費可削減上限（%）", grp: "規劃求解", unit: "num", value: CAP_EXPENSE_CUT, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "CAP_RETIRE_DELAY", label: "延後退休上限（年）", grp: "規劃求解", unit: "num", value: CAP_RETIRE_DELAY, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "CAP_RETIRE_CUT", label: "退休生活水準可調降上限（%）", grp: "規劃求解", unit: "num", value: CAP_RETIRE_CUT, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "CAP_VISION_CUT", label: "願景下修上限（%）", grp: "規劃求解", unit: "num", value: CAP_VISION_CUT, basis: BIZ_TAX_BASIS, note: "100 ＝ 一路走到每一項的「金額(最低)」" },
 ];
 
 export function defaultBizTaxRows(): BizTaxRow[] {
