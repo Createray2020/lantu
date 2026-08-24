@@ -6,8 +6,39 @@ import { eq, count } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches, clients, compCases } from "@/Shared/db/schema";
 import { allocCode } from "./codeAlloc";
+// 顯示名稱的唯一真相（純函式＋SQL 版同住一處，語意不會走鐘）。
+import { displayNameOf, DISPLAY_NAME_MAX } from "./coachName";
 
-export type Coach = typeof coaches.$inferSelect;
+/**
+ * ⚠️ **`Coach.name` 是「顯示名稱」，不是 DB 的 `coaches.name`。**
+ *
+ * `ensureCoach()` / `applyAsCoach()` 回傳前會把 `name` 換成 `displayNameOf(row)`
+ * （教練自填優先，沒填才用 Clerk 姓名），Clerk 的原名留在 `clerkName`。
+ *
+ * 為什麼要這樣偷天換日：Ray 2026/08/24 要「教練改了名字全站都換」。
+ * `coaches.name` 被 8 支查詢直接選出去、又散在頁首／工作台／分潤鏈裡，
+ * 逐處改一定會漏，而漏一處就是「官網叫雷立揚、後台叫立揚 雷」。
+ * 從回傳值就換掉，顯示層一行都不用動，也不可能漏。
+ *
+ * 要拿登入帳號的真名（後台辨識身分）請用 `clerkName`。**不要**把 `name` 寫回 DB。
+ */
+export type Coach = Omit<CoachRow, "name"> & {
+  /** 顯示名稱。永遠有值（最後退路是「教練」），所以型別上不是 nullable。 */
+  name: string;
+  /** 登入帳號的真名（Clerk）。只有 /admin 名冊在用。 */
+  clerkName: string | null;
+};
+
+/** DB 原始列（`name` 還是 Clerk 鏡像）。只在這個檔案內部流通。 */
+type CoachRow = typeof coaches.$inferSelect;
+
+/**
+ * 把 DB 列包成對外的 Coach：`name` 換成顯示名，原名移到 `clerkName`。
+ * ⚠️ 所有回傳 Coach 的路徑都必須經過這裡 —— coach.drift.test.ts 會掃。
+ */
+function withDisplayName(row: CoachRow): Coach {
+  return { ...row, clerkName: row.name, name: displayNameOf(row) };
+}
 
 function adminEmails(): string[] {
   return (process.env.LANTU_ADMIN_EMAILS || "")
@@ -30,7 +61,7 @@ function identity(user: ClerkUser) {
 
 // 白名單雙向同步：在名單內 → 保證 admin+active；不在名單內但目前是 admin → 降回 coach。
 // 從白名單移除後必須真的降回 coach，否則 admin 權限永遠撤不掉。
-async function syncAdminRole(row: Coach, isAdmin: boolean): Promise<Coach> {
+async function syncAdminRole(row: CoachRow, isAdmin: boolean): Promise<CoachRow> {
   if (isAdmin && (row.role !== "admin" || row.status !== "active")) {
     const r = await db
       .update(coaches)
@@ -78,13 +109,13 @@ export const ensureCoach = cache(async function ensureCoach(): Promise<Coach | n
     row = r[0] ?? row;
   }
 
-  return withCode(await syncAdminRole(row, isAdmin));
+  return withDisplayName(await withCode(await syncAdminRole(row, isAdmin)));
 });
 
 // 已開通卻沒有編號的教練補發一個（白名單自動建的 admin、以及回填之前就存在的舊帳號）。
 // 這不違反「ensureCoach 唯讀」——那條規矩是「不准無中生有一列 coaches」，
 // 這裡只在既有列上補一個冪等欄位，而且 code 一有值就完全不打 DB。
-async function withCode(row: Coach): Promise<Coach> {
+async function withCode(row: CoachRow): Promise<CoachRow> {
   if (row.status !== "active" || row.code) return row;
   const code = await ensureCoachCode(row.id);
   return code ? { ...row, code } : row;
@@ -112,7 +143,7 @@ export async function applyAsCoach(): Promise<Coach | null> {
 
   const row = inserted[0] ?? null;
   if (!row) return null;
-  return withCode(await syncAdminRole(row, isAdmin));
+  return withDisplayName(await withCode(await syncAdminRole(row, isAdmin)));
 }
 
 // 後台權限有兩條來源，任一成立即可，但都必須 active：
@@ -128,8 +159,20 @@ export async function isAdmin(coach: Coach | null): Promise<boolean> {
   return coach.role === "admin" || coach.orgRank === "owner";
 }
 
+/**
+ * 教練自己改對外顯示名稱。空字串＝清掉自填、回到 Clerk 姓名。
+ * ⚠️ 寫的是 `display_name`，**絕對不要寫 `name`** —— 那是 Clerk 鏡像，
+ *    下一次 ensureCoach() 就會把它蓋回去，使用者會覺得「改了又跳回來」。
+ */
+export async function saveDisplayName(id: string, raw: string): Promise<void> {
+  const v = (raw ?? "").trim().slice(0, DISPLAY_NAME_MAX);
+  await db.update(coaches).set({ displayName: v || null }).where(eq(coaches.id, id));
+}
+
 export async function listCoaches(): Promise<Coach[]> {
-  return db.select().from(coaches).orderBy(coaches.createdAt);
+  // 後台名冊也要顯示名 —— 但 /admin 會另外把 clerkName 印成小字，方便對得上登入帳號。
+  const rows = await db.select().from(coaches).orderBy(coaches.createdAt);
+  return rows.map(withDisplayName);
 }
 
 export async function setCoachStatus(id: string, status: "pending" | "active" | "suspended") {

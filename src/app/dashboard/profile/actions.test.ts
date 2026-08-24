@@ -3,10 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // 教練公開檔案的契約。這一份會直接出現在官網上，所以兩件事最重要：
 // 一是教練只能改自己的（action 根本不接 coachId），二是照片與長度上限擋得住。
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/coach", () => ({ ensureCoach: vi.fn(), isAdmin: vi.fn() }));
+vi.mock("@/lib/coach", () => ({ ensureCoach: vi.fn(), isAdmin: vi.fn(), saveDisplayName: vi.fn() }));
 vi.mock("@/lib/coachProfile", () => ({ saveProfile: vi.fn(), setPublished: vi.fn() }));
 
-import { ensureCoach, isAdmin } from "@/lib/coach";
+import { ensureCoach, isAdmin, saveDisplayName } from "@/lib/coach";
 import { saveProfile, setPublished } from "@/lib/coachProfile";
 import { saveMyProfileAction, setPublishedAction } from "./actions";
 
@@ -103,5 +103,32 @@ describe("saveMyProfileAction 的 selfHidden", () => {
     await saveMyProfileAction({ headline: "x", selfHidden: false });
     expect(asMock(saveProfile).mock.calls[0][1]).not.toHaveProperty("published");
     expect(setPublished).not.toHaveBeenCalled();
+  });
+});
+
+// ── 教練自己改顯示名稱（2026/08/24 Ray 拍板）────────────────────
+describe("saveMyProfileAction 的 displayName", () => {
+  it("寫進 coaches.display_name（不是 coach_profiles）", async () => {
+    await saveMyProfileAction({ headline: "x", displayName: "雷立揚" });
+    expect(saveDisplayName).toHaveBeenCalledWith("c1", "雷立揚");
+    expect(asMock(saveProfile).mock.calls[0][1]).not.toHaveProperty("displayName");
+  });
+
+  it("超過 20 字截斷", async () => {
+    await saveMyProfileAction({ headline: "x", displayName: "字".repeat(30) });
+    expect(asMock(saveDisplayName).mock.calls[0][1]).toHaveLength(20);
+  });
+
+  it("沒帶＝清空＝回到登入姓名（不是「不動它」）", async () => {
+    await saveMyProfileAction({ headline: "x" });
+    expect(saveDisplayName).toHaveBeenCalledWith("c1", "");
+  });
+
+  it("到期唯讀的帳號改不了名字", async () => {
+    asMock(ensureCoach).mockResolvedValue({
+      id: "c1", status: "active", licenseUntil: "2020-01-01",
+    });
+    expect((await saveMyProfileAction({ displayName: "雷立揚" })).ok).toBe(false);
+    expect(saveDisplayName).not.toHaveBeenCalled();
   });
 });

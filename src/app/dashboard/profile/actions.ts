@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import { licenseState, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { saveProfile, setPublished, type ProfileInput } from "@/lib/coachProfile";
+import { saveDisplayName } from "@/lib/coach";
+import { DISPLAY_NAME_MAX } from "@/lib/coachName";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -71,6 +73,9 @@ export async function saveMyProfileAction(input: ProfileInput): Promise<ActionRe
       // 走 setPublishedAction，教練存檔不該把自己重新上架。
       selfHidden: !!input.selfHidden,
     });
+    // 顯示名稱寫的是 coaches.display_name（不是 coach_profiles）——見 ProfileInput 的註解。
+    // 兩張表分開寫沒有交易保護，但這兩件事互相獨立，其中一件失敗不會讓資料變得不一致。
+    await saveDisplayName(me.id, (input.displayName ?? "").slice(0, DISPLAY_NAME_MAX));
     touch(me.id);
     return { ok: true };
   } catch (e) {

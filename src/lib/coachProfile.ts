@@ -5,7 +5,7 @@
 
 import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { coaches, coachProfiles } from "@/Shared/db/schema";
+import { coaches, coachProfiles, coachDisplayName } from "@/Shared/db/schema";
 import { canBePicked, publicRankLabel } from "./license";
 
 export type ProfileRow = typeof coachProfiles.$inferSelect;
@@ -54,6 +54,12 @@ export type ProfileInput = {
   areas?: string[];
   /** 教練自己選擇不要把資料放上官網。undefined＝這次存檔不動它。 */
   selfHidden?: boolean;
+  /**
+   * 對外顯示名稱。**存到 `coaches.display_name`，不是 coach_profiles** ——
+   * 名字是全站都要用的東西，而 coach_profiles 是 CASCADE、也不是每位教練都填了檔案。
+   * 留空＝沿用 Clerk 姓名。
+   */
+  displayName?: string;
 };
 
 export async function getProfile(coachId: string): Promise<ProfileRow | null> {
@@ -141,7 +147,7 @@ const PUBLIC_CONDITIONS = () => [
 export async function listPublicCoaches(): Promise<PublicCoach[]> {
   const rows = await db
     .select({
-      id: coaches.id, name: coaches.name,
+      id: coaches.id, name: coachDisplayName,
       code: coaches.code, rankCode: coaches.rankCode, p: coachProfiles,
     })
     .from(coaches)
@@ -174,7 +180,7 @@ export async function countPublicCoaches(): Promise<number> {
 export async function getPublicCoach(coachId: string): Promise<PublicCoach | null> {
   const rows = await db
     .select({
-      id: coaches.id, name: coaches.name,
+      id: coaches.id, name: coachDisplayName,
       code: coaches.code, rankCode: coaches.rankCode, p: coachProfiles,
     })
     .from(coaches)
@@ -188,7 +194,8 @@ export async function getPublicCoach(coachId: string): Promise<PublicCoach | nul
 export async function listAllProfiles() {
   return db
     .select({
-      id: coaches.id, name: coaches.name, email: coaches.email,
+      // 後台名冊刻意同時給兩個：name＝顯示名，clerkName＝登入帳號的真名（對得上是誰）。
+      id: coaches.id, name: coachDisplayName, clerkName: coaches.name, email: coaches.email,
       title: coaches.title, status: coaches.status,
       code: coaches.code, rankCode: coaches.rankCode, p: coachProfiles,
     })

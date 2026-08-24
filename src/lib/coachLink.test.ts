@@ -16,6 +16,9 @@ const h = vi.hoisted(() => {
     coachLinkRequests: { _n: "clr" },
     coachInvites: { _n: "invites" },
     clientUsers: { _n: "client_users" },
+    // 顯示名稱的 SQL 片段也從 schema 匯出（見 coachName.ts 的說明）。
+    // 假 db 只認欄位名，這裡給個佔位物件讓 select({ name: coachDisplayName }) 過得去。
+    coachDisplayName: { _col: "name" },
   };
   const store: any = { clients: [], coaches: [], clr: [], invites: [] };
   const log: any[] = [];

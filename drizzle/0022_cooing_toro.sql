@@ -1,0 +1,1 @@
+ALTER TABLE "coaches" ADD COLUMN "display_name" text;

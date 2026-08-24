@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { and, eq, desc, count } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clients, coaches, coachLinkRequests, coachInvites } from "@/Shared/db/schema";
+import { clients, coaches, coachLinkRequests, coachInvites, coachDisplayName } from "@/Shared/db/schema";
 import type { ClientUser } from "@/lib/clientUser";
 import { allocCode } from "@/lib/codeAlloc";
 import { normalizeCode } from "@/lib/codes";
@@ -13,7 +13,7 @@ export type ActiveCoach = { id: string; name: string | null; title: string | nul
 // 可供客戶選擇的教練＝已開通(active)。
 export async function listActiveCoaches(): Promise<ActiveCoach[]> {
   const rows = await db
-    .select({ id: coaches.id, name: coaches.name, title: coaches.title, orgRank: coaches.orgRank })
+    .select({ id: coaches.id, name: coachDisplayName, title: coaches.title, orgRank: coaches.orgRank })
     .from(coaches)
     .where(eq(coaches.status, "active"))
     .orderBy(coaches.createdAt);
@@ -31,7 +31,7 @@ export async function findCoachByCode(raw: string): Promise<{ id: string; name: 
   const code = normalizeCode(raw);
   if (!code) return null;
   const rows = await db
-    .select({ id: coaches.id, name: coaches.name, title: coaches.title, code: coaches.code })
+    .select({ id: coaches.id, name: coachDisplayName, title: coaches.title, code: coaches.code })
     .from(coaches)
     .where(and(eq(coaches.code, code), eq(coaches.status, "active")))
     .limit(1);
@@ -50,7 +50,7 @@ export async function getClientLinkStatus(clientUserId: string): Promise<LinkSta
   const client = cRows[0];
   if (!client) return { state: "none" };
   if (client.coachId) {
-    const co = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, client.coachId)).limit(1);
+    const co = await db.select({ name: coachDisplayName }).from(coaches).where(eq(coaches.id, client.coachId)).limit(1);
     return { state: "linked", coachName: co[0]?.name ?? null };
   }
   const pend = await db
@@ -60,7 +60,7 @@ export async function getClientLinkStatus(clientUserId: string): Promise<LinkSta
     .orderBy(desc(coachLinkRequests.createdAt))
     .limit(1);
   if (pend[0]) {
-    const co = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, pend[0].coachId)).limit(1);
+    const co = await db.select({ name: coachDisplayName }).from(coaches).where(eq(coaches.id, pend[0].coachId)).limit(1);
     return { state: "pending", coachName: co[0]?.name ?? null };
   }
   return { state: "none" };
@@ -159,7 +159,7 @@ export async function createInvite(coachId: string, note?: string): Promise<{ co
 export async function getInviteByCode(code: string): Promise<{ coachId: string; coachName: string | null; used: boolean } | null> {
   const rows = await db.select({ coachId: coachInvites.coachId, usedAt: coachInvites.usedAt }).from(coachInvites).where(eq(coachInvites.code, code)).limit(1);
   if (!rows[0]) return null;
-  const co = await db.select({ name: coaches.name }).from(coaches).where(eq(coaches.id, rows[0].coachId)).limit(1);
+  const co = await db.select({ name: coachDisplayName }).from(coaches).where(eq(coaches.id, rows[0].coachId)).limit(1);
   return { coachId: rows[0].coachId, coachName: co[0]?.name ?? null, used: !!rows[0].usedAt };
 }
 

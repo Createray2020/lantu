@@ -96,6 +96,11 @@ export default async function Admin() {
                   <tr key={c.id} className="border-t border-white/8">
                     <td className="px-3 py-2">
                       <div className="font-semibold">{c.name || "（未命名）"}</div>
+                      {/* 教練可以自己改顯示名稱，所以名冊要同時秀出登入帳號的真名，
+                          否則對帳號時分不出「雷立揚」是哪一位。相同就不重複印。 */}
+                      {c.clerkName && c.clerkName !== c.name && (
+                        <div className="text-[#6f869c] text-[11px]">登入姓名：{c.clerkName}</div>
+                      )}
                       <div className="text-[#6f869c] text-xs">{c.email}</div>
                       {/* 教練編號：核准報聘時發，之後不變。待審帳號還沒有號。 */}
                       <div className="text-[11px] font-mono tracking-wider text-[#c99a5b]">

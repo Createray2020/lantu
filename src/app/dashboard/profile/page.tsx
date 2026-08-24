@@ -29,6 +29,7 @@ export default async function ProfilePage() {
     serviceModes: p?.serviceModes ?? [],
     areas: p?.areas ?? [],
     selfHidden: p?.selfHidden ?? false,
+    displayName: me.displayName ?? "",
   };
 
   const brand = await getBrand();
@@ -76,7 +77,8 @@ export default async function ProfilePage() {
         <ProfileEditor
           initial={initial}
           specialtyOptions={params.settings.specialties ?? []}
-          coachName={me.name || me.email || "教練"}
+          coachName={me.name}
+          loginName={me.clerkName ?? me.email ?? ""}
           rankLabel={publicRankLabel(me.rankCode)}
           published={p?.published !== false}
         />

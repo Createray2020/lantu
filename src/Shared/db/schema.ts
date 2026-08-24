@@ -20,7 +20,15 @@ import {
 export const coaches = pgTable('coaches', {
   id: text('id').primaryKey(), // Clerk userId
   email: text('email'),
+  // ⚠️ name 是 **Clerk 的鏡像**：ensureCoach() 每次導頁都會用 Clerk 的 firstName+lastName
+  //    把它覆寫回去，所以任何「讓使用者改名字」的功能都不能寫這一欄（下一次導頁就被蓋掉）。
+  //    保留它是為了後台辨識身分（對得上是哪個登入帳號）。
   name: text('name'),
+  // 教練自填的**對外顯示名稱**（2026/08/24 Ray 拍板）。空白／留空＝沿用 Clerk 姓名。
+  // 全站顯示一律走 displayNameOf()（lib/coach.ts），只有 /admin 名冊會同時秀出 name 供辨識。
+  // 為什麼放 coaches 不放 coach_profiles：後者是 CASCADE 而且不是每位教練都填了公開檔案，
+  // 但「名字」是全站都要用的東西。
+  displayName: text('display_name'),
   role: text('role').default('coach').notNull(),
   status: text('status').default('pending').notNull(),
   orgRank: text('org_rank').default('member').notNull(),
@@ -79,6 +87,19 @@ export const coaches = pgTable('coaches', {
   // Postgres 的 UNIQUE 視 NULL 互異 → 待審教練（code 為 null）不受影響。
   uniqueIndex('coaches_code_uidx').on(t.code),
 ]);
+
+/**
+ * 教練顯示名稱的 SQL 版：`coalesce(nullif(display_name, ''), name)`。
+ *
+ * ⚠️ 凡是把教練姓名選出去給畫面用的查詢，一律 select 這個而不是 `coaches.name` ——
+ *    否則教練改了名字，那條路徑上的畫面會停在 Clerk 的舊名。
+ *    需要登入帳號真名的地方（只有 /admin 名冊）才另外 select `coaches.name`。
+ *
+ * 純函式版是 `lib/coachName.ts` 的 `displayNameOf()`，兩者語意必須一致。
+ * 放在 schema 這裡而不是跟純函式同住，是因為純函式那支要被 client component 引用，
+ * 不能把 drizzle／pg-core 拖進瀏覽器 bundle。
+ */
+export const coachDisplayName = sql<string | null>`coalesce(nullif(${coaches.displayName}, ''), ${coaches.name})`;
 
 // 客戶登入帳號（雙邊平台：客戶自己上官網註冊、以客戶身分登入）
 // 對應 Clerk user id；與 coaches 互斥（同一 Clerk 使用者不會同時是教練與客戶）。

@@ -3,6 +3,7 @@
 // uplineId：組織樹父節點（自參照）。可見範圍一律以「active 教練」為母體。
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/Shared/db";
+import { displayNameOf } from "./coachName";
 import { coaches } from "@/Shared/db/schema";
 
 export type OrgRank = "member" | "manager" | "owner";
@@ -14,8 +15,11 @@ export function rankOf(c: { orgRank?: string | null }): OrgRank {
 }
 
 // 全部 active 教練（組織小，一次撈進記憶體在 JS 內算樹）。
+// ⚠️ 姓名一律換成顯示名再交出去：組織樹、團隊選單、分潤鏈都吃這一支，
+//    留著 Clerk 原名會讓教練改了名字之後這幾處還是舊的。
 export async function listActiveCoaches(): Promise<CoachRow[]> {
-  return db.select().from(coaches).where(eq(coaches.status, "active")).orderBy(asc(coaches.createdAt));
+  const rows = await db.select().from(coaches).where(eq(coaches.status, "active")).orderBy(asc(coaches.createdAt));
+  return rows.map((r) => ({ ...r, name: displayNameOf(r) }));
 }
 
 // 由完整名單建「上線 → 直屬下線」對照。

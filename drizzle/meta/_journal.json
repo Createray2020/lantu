@@ -155,6 +155,13 @@
       "when": 1787565322931,
       "tag": "0021_reflective_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787568587696,
+      "tag": "0022_cooing_toro",
+      "breakpoints": true
     }
   ]
 }

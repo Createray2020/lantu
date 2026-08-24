@@ -9,6 +9,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { saveMyProfileAction } from "./actions";
+import { DISPLAY_NAME_MAX } from "@/lib/coachName";
 import PhotoCropper, { type CropSource } from "./PhotoCropper";
 
 const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1.5 text-sm text-[#eef2f7] outline-none focus:border-[#c99a5b]";
@@ -31,6 +32,8 @@ export type ProfileForm = {
   areas: string[];
   /** 教練自己選擇不要把資料放上官網（2026/08/24）。 */
   selfHidden: boolean;
+  /** 對外顯示名稱。留空＝沿用登入姓名（2026/08/24）。 */
+  displayName: string;
 };
 
 /** 讀成 dataURL 再建 Image，裁切期間都用同一個 src，不必管 objectURL 的回收時機。 */
@@ -54,11 +57,14 @@ function loadImage(file: File): Promise<CropSource> {
 }
 
 export default function ProfileEditor({
-  initial, specialtyOptions, coachName, rankLabel, published,
+  initial, specialtyOptions, coachName, loginName, rankLabel, published,
 }: {
   initial: ProfileForm;
   specialtyOptions: string[];
+  /** 目前實際會顯示的名字（自填優先）。預覽卡吃它。 */
   coachName: string;
+  /** 登入帳號的姓名（Clerk）。當作姓名欄留空時的 placeholder。 */
+  loginName: string;
   /** 對外職級。官網卡片印的就是它，預覽必須一致（所見即所得不是靠人工同步）。 */
   rankLabel: string | null;
   /** 管理員的下架狀態（教練改不了，只用來顯示提示）。 */
@@ -108,6 +114,7 @@ export default function ProfileEditor({
         prevRole: f.prevRole, credentials: f.credentials,
         serviceModes: f.serviceModes, areas: f.areas,
         selfHidden: f.selfHidden,
+        displayName: f.displayName,
       });
       setMsg(r.ok
         ? { ok: true, text: f.selfHidden ? "已儲存，你的檔案不會出現在官網" : "已儲存，官網會立即更新" }
@@ -158,6 +165,25 @@ export default function ProfileEditor({
               （你的檔案本來就已經被管理員下架，取消勾選也不會出現在官網。）
             </p>
           )}
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
+          <h2 className="text-sm font-bold border-l-[3px] border-[#c99a5b] pl-2">顯示名稱</h2>
+          <label className="block">
+            <input
+              value={f.displayName}
+              disabled={pending}
+              maxLength={DISPLAY_NAME_MAX}
+              onChange={(e) => set("displayName", e.target.value)}
+              placeholder={loginName || "你的名字"}
+              className={`${f.displayName ? INPUT : EMPTY} w-full`}
+            />
+            <span className="block text-[11px] text-[#6f869c] mt-1.5 leading-relaxed">
+              這是<b className="text-[#a9bccf]">全站</b>會顯示的名字——官網教練頁、工作台、組織表、客戶看到的都是它。
+              留空就沿用登入帳號的姓名{loginName ? `（${loginName}）` : ""}。
+              改這裡<b className="text-[#a9bccf]">不會</b>動到你的登入帳號，最多 {DISPLAY_NAME_MAX} 個字。
+            </span>
+          </label>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
@@ -293,7 +319,7 @@ export default function ProfileEditor({
       <div className="lg:sticky lg:top-4 h-fit">
         <div className="text-xs text-[#a9bccf] mb-2">客戶會看到的樣子</div>
         <CoachCard
-          name={coachName} rankLabel={rankLabel}
+          name={f.displayName.trim() || loginName || coachName} rankLabel={rankLabel}
           headline={f.headline} bio={f.bio} specialties={f.specialties}
           photoUrl={f.photoUrl}
           yearsExp={f.yearsExp === "" ? null : Number(f.yearsExp)}
