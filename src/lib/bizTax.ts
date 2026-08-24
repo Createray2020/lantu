@@ -106,3 +106,13 @@ export const CAP_RETIRE_CUT = 25;
 export const CAP_VISION_CUT = 100;
 /** 啟程期(C) 的報酬率上限，比一般更保守。 */
 export const CAP_RATE_STARTER = 6;
+
+// ── 保單健檢參數 ──
+// insure80 的健檢只有「偏低／偏高／適中」三值，但沒有公布寬容帶。
+// 實測它 11.1 萬 vs 12 萬（差 7.5%）判「適中」，所以它是有帶的；我們把它明寫成可治理的參數。
+/** 適中帶 %：|HAVE−NEED| ÷ NEED 落在此帶內視為「適中」。 */
+export const CHECKUP_BAND = 10;
+/** 理財金三角：保障型（風險管理）佔年收入 %。 */
+export const TRIANGLE_RISK = 10;
+/** 理財金三角：理財型（投資理財）佔年收入 %。 */
+export const TRIANGLE_INVEST = 30;

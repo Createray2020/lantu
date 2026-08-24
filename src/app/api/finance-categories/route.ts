@@ -5,13 +5,14 @@
 import { getCategoryPayload } from "@/lib/financeCategories";
 import { getEduCosts } from "@/lib/eduCosts";
 import { getBizTaxPayload } from "@/lib/bizTaxParams";
+import { getInsProductPayload } from "@/lib/insProducts";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [cats, edu, biz] = await Promise.all([getCategoryPayload(), getEduCosts(), getBizTaxPayload()]);
+  const [cats, edu, biz, ins] = await Promise.all([getCategoryPayload(), getEduCosts(), getBizTaxPayload(), getInsProductPayload()]);
   return Response.json(
-    { cats, edu, biz },
+    { cats, edu, biz, ins },
     { headers: { "cache-control": "public, max-age=300, stale-while-revalidate=3600" } },
   );
 }

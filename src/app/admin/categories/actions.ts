@@ -12,6 +12,7 @@ import {
 } from "@/lib/financeCategories";
 import { saveEduCost, resetEduCosts, type EduCostInput } from "@/lib/eduCosts";
 import { saveBizTaxParam, resetBizTaxParam, type BizTaxInput } from "@/lib/bizTaxParams";
+import { saveInsProduct, deleteInsProduct, importInsProductsCSV, type InsProductInput } from "@/lib/insProducts";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -29,6 +30,7 @@ const MSG: Record<string, string> = {
   "unknown-key": "不認得這個常數（只能改內建清單裡的項目）",
   "rate-must-be-decimal": "比率要填小數（20% 請填 0.2，不是 20）",
   "invalid-value": "數值要是 0 以上的數字",
+  "company-required": "保險公司不能空白",
 };
 
 function fail(e: unknown): ActionResult {
@@ -142,6 +144,41 @@ export async function resetBizTaxAction(key: string): Promise<ActionResult> {
   try {
     await guard();
     await resetBizTaxParam(key);
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ── 保險商品輕量主檔 ──
+// 這三支只動「輸入輔助用的清單」，不碰任何客戶資料。
+export async function saveInsProductAction(input: InsProductInput): Promise<ActionResult> {
+  try {
+    await guard();
+    await saveInsProduct(input);
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteInsProductAction(id: string): Promise<ActionResult> {
+  try {
+    await guard();
+    await deleteInsProduct(id);
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function importInsProductsAction(csv: string): Promise<ActionResult> {
+  try {
+    await guard();
+    await importInsProductsCSV(csv);
     refresh();
     return { ok: true };
   } catch (e) {

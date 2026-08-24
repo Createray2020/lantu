@@ -185,6 +185,36 @@ export const coachLinkRequests = pgTable('coach_link_requests', {
   uniqueIndex('clr_one_pending_per_client').on(t.clientId).where(sql`status = 'pending'`),
 ]);
 
+// 共同執案（2026/08/24 Ray 拍板）：主責教練把名下某位客戶分享給其他教練「唯讀共看」。
+//
+// ⚠️ 這張表只放寬「讀」，不放寬「寫」。教練端的租戶維度仍然是 clients.coachId，
+//    所有寫入路徑（lib/clients、lib/plans、lib/reviews、lib/revisions）一律只認 coachId＝自己；
+//    協作者能看到的東西由 lib/clientCollab.ts 的 clientAccess() 決定。
+//    要是哪天有人為了方便把這張表接進寫入條件，「唯讀協作」就當場變成「共同編輯」，
+//    而畫面上完全看不出來 —— 邊界守在資料層，見 clients.ts 的 readableClient()。
+//
+// status: pending（待對方接受）/ accepted（生效中）/ declined（婉拒）/ revoked（主責移除）
+// ⚠️ 客戶被移轉給別的教練時，這裡的協作關係**跟著客戶留著**（授權是對「這個案子」給的），
+//    新主責可以自己移除。
+export const clientCollaborators = pgTable('client_collaborators', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  // 發出邀請的主責教練（留紀錄用；客戶移轉後這裡仍是當初邀請的人）。
+  invitedBy: text('invited_by').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  status: text('status').default('pending').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  respondedAt: timestamp('responded_at', { withTimezone: true }),
+}, (t) => [
+  // 一位客戶對一位教練只會有一列：重新邀請＝把同一列改回 pending，
+  // 不是再 insert 一筆（否則婉拒過的人被重邀，清單上會同時看到兩種狀態）。
+  uniqueIndex('ccollab_client_coach_uidx').on(t.clientId, t.coachId),
+  // 協作者的「協作案件」清單與每頁的權限判定都沿這條走。
+  index('ccollab_coach_status_idx').on(t.coachId, t.status),
+  // 客戶詳情頁的協作面板。
+  index('ccollab_client_id_idx').on(t.clientId),
+]);
+
 // 年度版本（每年重製一份完整規劃；整份案件存 data jsonb）
 export const plans = pgTable('plans', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -707,6 +737,34 @@ export const financeCategories = pgTable('finance_categories', {
   // 同一類別下不允許同名細類：label 就是寫進 plan.data 的字串，重名會讓資料無法回推設定。
   uniqueIndex('finance_categories_kind_label_uq').on(t.kind, t.label),
   index('finance_categories_kind_sort_idx').on(t.kind, t.sortOrder),
+]);
+
+// 保險商品輕量主檔（平台級，只有 admin 能改；見 /admin/categories 的第四區）。
+//
+// ⚠️ 這張表刻意**只當輸入輔助**：公司／英文代號／商品名稱／險種／主附約／停現售，就這些。
+// 不存給付公式、不存費率、不存各年保障或解約金——那些是保險公司與資料商的授權資產，
+// 而且一旦存了，這張表就會變成「哪張比較划算」的比較工具，那是銷售用途，不是嵐途的定位。
+// 既有保單登錄的商品名稱是「事實登錄」（客戶已經買了什麼），跟方案配置表刻意留空的
+// 「商品名稱」是兩件事——後者指向未來的購買決定，那一欄仍然不填。
+//
+// 沒有這張表也不會壞：保單卡的公司與名稱本來就是自由文字，這裡只是把它升級成可搜尋的建議清單。
+export const insProducts = pgTable('ins_products', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  company: text('company').notNull(),        // 保險公司（顯示名，例如「國泰」）
+  code: text('code').default('').notNull(),  // 英文代號；公司層的列留空字串（UNIQUE 對 NULL 視為互異，故不用 null）
+  name: text('name').default('').notNull(),  // 商品名稱
+  kind: text('kind').default('').notNull(),  // 商品總類：終身壽險 / 定期壽險 / 意外 / 醫療 …
+  mainRider: text('main_rider').default('').notNull(), // 主約 / 附約
+  onSale: boolean('on_sale').default(true).notNull(),  // 現售 / 停售
+  bigCat: text('big_cat').default('人身').notNull(),   // 人身 / 產物
+  sortOrder: integer('sort_order').default(0).notNull(),
+  active: boolean('active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 同一家公司底下不允許同代號。code 用空字串而不是 null，否則 Postgres 把 NULL 視為互異、約束形同虛設。
+  uniqueIndex('ins_products_company_code_uq').on(t.company, t.code),
+  index('ins_products_company_idx').on(t.company, t.sortOrder),
 ]);
 
 // 各就學階段的教育費用參數（平台級，只有 admin 能改；見 /admin/edu-costs）。

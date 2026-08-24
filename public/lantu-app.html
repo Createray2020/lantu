@@ -391,6 +391,53 @@ tr.actnote td{padding-top:0;border-top:0}
 .todo li{padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;display:flex;gap:9px}
 .todo li::before{content:"▸";color:var(--amber)}
 .todo li:last-child{border-bottom:none}
+/* ── 保單檢查報告（2026/08/24）── */
+.ckhero{border-left:3px solid var(--amber2)}
+.ckdates{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:12px;color:var(--mut);margin:2px 0 12px;padding-bottom:9px;border-bottom:1px dashed var(--line)}
+.ckdates b{color:var(--tx);font-weight:700}
+.ckaway{margin-left:8px;color:var(--amber2)}
+.ckchart{overflow-x:auto;margin:4px 0 12px}
+.ckchart svg{display:block;min-width:520px}
+.ckkpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.ckkpi{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.ckkpi .l{font-size:11.5px;color:var(--mut2)}
+.ckkpi .v{font-size:24px;font-weight:800;color:var(--amber2);line-height:1.25}
+.ckkpi .v.bad{color:var(--warn)}
+.ckkpi small{display:block;font-size:11px;color:var(--mut);margin-top:2px}
+.cktbl th.ckn,.cktbl td.ckn{text-align:right}
+.cktbl .ckhv{color:var(--blue);font-size:10.5px;letter-spacing:.06em}
+.cktbl .cknd{color:var(--amber2);font-size:10.5px;letter-spacing:.06em}
+.cktbl .ckrj{color:var(--ok);font-size:10.5px;letter-spacing:.06em}
+.cktbl td.ckhave{color:var(--tx);font-variant-numeric:tabular-nums}
+.cktbl td.ckneed{color:var(--amber2);font-variant-numeric:tabular-nums}
+.cktbl td.ckdir{color:var(--ok);font-weight:700}
+.ckpill{display:inline-block;font-size:11.5px;font-weight:800;padding:1px 9px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+.ckpill.ck-low{color:var(--warn);border-color:rgba(224,138,104,.5);background:rgba(224,138,104,.12)}
+.ckpill.ck-high{color:var(--amber2);border-color:rgba(224,189,139,.5);background:rgba(224,189,139,.12)}
+.ckpill.ck-mid{color:var(--ok);border-color:rgba(143,192,163,.5);background:rgba(143,192,163,.12)}
+.ckok{font-size:12.5px;color:var(--ok);padding:6px 0}
+.ckadv{margin-top:10px;border:1px solid var(--line);border-radius:11px;background:var(--card);overflow:hidden}
+.ckadv>summary{cursor:pointer;padding:9px 13px;font-size:13px;font-weight:700;color:var(--amber2)}
+.ckadvbody{padding:2px 13px 13px}
+.cklead{font-size:13px;color:var(--tx);background:var(--card2);border-radius:9px;padding:9px 12px;margin-bottom:10px}
+.cklead b{color:var(--amber2)}.cklead em{color:var(--tx);font-style:normal;font-weight:700}
+.ckblk{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.ckblkh{font-size:12.5px;font-weight:800;color:var(--amber2);margin-bottom:4px}
+.ckblk p{margin:0 0 6px;font-size:12.5px;color:var(--mut);line-height:1.7}
+.ckcon th,.ckcon td{font-size:12px}
+.ckfold{margin:0 0 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden}
+.ckfold>summary{cursor:pointer;padding:11px 14px;font-size:14px;font-weight:700;color:var(--amber2)}
+.ckfold>summary .hint{color:var(--mut2);font-size:12px;font-weight:400;margin-left:6px}
+.ckfoldbody{padding:2px 14px 14px}
+.ckfoldbody h5{margin:10px 0 5px;font-size:13px;color:var(--amber2)}
+.lasec{margin-bottom:14px}
+.lah{font-size:13.5px;font-weight:800;color:var(--tx);margin-bottom:6px}
+.lagrp{margin:8px 0}
+.lagh{font-size:12px;font-weight:800;color:var(--amber2);margin-bottom:3px}
+.polsub{margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden}
+.polsub>summary{cursor:pointer;padding:8px 12px;font-size:12.5px;font-weight:700;color:var(--amber2)}
+.polsubbody{padding:2px 12px 12px}
+.polsubbody input,.polsubbody select{width:100%}
 </style>
 </head>
 <body>
@@ -711,6 +758,8 @@ function applyBizTax(payload){
  if(payload.basis)BIZ_TAX_BASIS=String(payload.basis);
  // 規劃求解的上限常數走同一張表（grp='規劃求解'），一起吃進來。
  try{applyPlanCaps(v)}catch(e){}
+ // 保單健檢的適中帶與理財金三角比例同理（grp='保單健檢'）。
+ try{applyCheckupParams(v)}catch(e){}
 }
 
 // ===== 企業主體 =====
@@ -1159,6 +1208,243 @@ function coverageGaps(c){
  return rows;
 }
 function totalGap(c){return sum(coverageGaps(c),function(g){return Math.max(0,g.gap)})}
+
+// ===== 保單檢查報告：HAVE vs NEED vs 狀況 vs 調整方向 =====
+// 2026/08/24 對齊 insure80 的五欄比對表（項目｜現在保單 HAVE｜現在需求 NEED｜狀況｜調整方向 READJUST）。
+// 刻意只做「比對與判定」三張表（保費／保障／$領回）——給付明細那 90+ 項屬於「呈現」，
+// 走 policyBenefitRows()／benefitsByGroup()，不進這裡的比對，也不進 coverageGaps()。
+// 為什麼不把 KINDS 從 9 擴到 90：coverageGaps() 的長度是 needs.length × KINDS.length，
+// 下游 totalGap／health 的 riskCover／advice／報告書全部吃它；而 needs 那張表也會從 15 欄變 90 欄。
+// insure80 自己的健檢也只比三項，生命資產表才是 90+ 項——兩者本來就是兩套東西。
+var CHECKUP_BAND=10;      // %：|have−need|÷need 落在此帶內視為「適中」
+var TRIANGLE_RISK=10;     // 理財金三角：保障型保費佔年收入 %
+var TRIANGLE_INVEST=30;   // 理財金三角：理財型保費佔年收入 %
+// 後台 /admin/categories「保單健檢」群組（走 bizTaxParams 同一張表）一存就覆蓋。
+function applyCheckupParams(values){
+ if(!values||typeof values!=='object')return;
+ var setters={CHECKUP_BAND:function(x){CHECKUP_BAND=x},TRIANGLE_RISK:function(x){TRIANGLE_RISK=x},TRIANGLE_INVEST:function(x){TRIANGLE_INVEST=x}};
+ Object.keys(setters).forEach(function(k){
+  var x=Number(values[k]);
+  if(isFinite(x)&&values[k]!==null&&values[k]!==undefined&&values[k]!=='')setters[k](x);
+ });
+}
+var CHECKUP_LABEL={low:'偏低',high:'偏高',mid:'適中'};
+// need 為 0 時：有保額＝偏高（買了不需要的），沒保額＝適中（沒需求也沒買，不必動）。
+function checkupState(have,need,band){
+ var b=(band==null?CHECKUP_BAND:n(band))/100;
+ have=n(have);need=n(need);
+ if(need<=0)return have>0?'high':'mid';
+ var r=(have-need)/need;
+ return r>b?'high':(r<-b?'low':'mid');
+}
+function checkupRow(item,have,need,unit,band){
+ var st=checkupState(have,need,band);
+ return {item:item,have:n(have),need:n(need),unit:unit||'元',state:st,label:CHECKUP_LABEL[st],
+  delta:st==='mid'?0:Math.abs(n(need)-n(have)),
+  dir:st==='low'?'可增加':(st==='high'?'可減少':'不須調整')};
+}
+
+// ── 保費類型：保障歸保障、理財歸理財 ──
+// 舊保單沒有 premiumType 欄位，由險種細分推；教練可在保單卡上覆寫。
+var INVEST_SUBS=['增額/儲蓄壽險','投資型壽險','年金'];
+function premiumType(p){
+ if(p&&p.premiumType)return p.premiumType;
+ return (p&&INVEST_SUBS.indexOf(p.subtype)>=0)?'理財型':'保障型';
+}
+function policyActive(p){return !!p&&p.status!=='失效'&&p.status!=='停效';}
+function annualPremiumBy(c,type){
+ return sum(c.policies,function(p){return (policyActive(p)&&premiumType(p)===type)?n(p.premium):0;});
+}
+// 1 保費：兩列。NEED 走理財金三角佔家庭年收入的比例。
+function premiumCheckup(c){
+ var inc=n((crossTable(c)||{}).incTotal);
+ var prot=annualPremiumBy(c,'保障型'),inv=annualPremiumBy(c,'理財型');
+ return {income:inc,total:prot+inv,protect:prot,invest:inv,
+  ratio:inc>0?(prot+inv)/inc:0,
+  rows:[checkupRow('保障型保費',prot,inc*TRIANGLE_RISK/100),
+        checkupRow('理財型保費',inv,inc*TRIANGLE_INVEST/100)]};
+}
+
+// 2 保障：依險種跨成員加總後套五欄。
+// ⚠️⚠️ 這裡刻意**不能**直接用 coverageGaps 的 need：
+// lifeNeed() 回的是「已經扣掉已備與流動資產之後的淨缺口」，而 have 是毛的已備。
+// 拿淨需求去對毛已備，壽險會被判成「偏高、可減少 1,123 萬」——但客戶其實還差 324 萬。
+// 五欄表一定要毛對毛，所以壽險走 grossLifeNeed()（與 coverageReadiness 同一條式子）。
+function coverageCheckupRows(c){
+ var by={},ord=[],pm=(primaryMember(c)||{}).name;
+ (c.needs||[]).forEach(function(nd){
+  var map={
+   '壽險':grossLifeNeed(c,nd),
+   '意外傷殘':n(nd.disability),
+   '住院醫療':medicalDailyNeed(nd),
+   '醫療雜費':n(nd.miscDaily),
+   '薪資補償':n(nd.incomeComp),
+   '初次罹癌':n(nd.firstCancer),
+   '癌症住院':n(nd.cancerHosp),
+   '重病給付':n(nd.critical),
+   '每月照護':n(nd.monthCare)
+  };
+  Object.keys(map).forEach(function(k){
+   var have=existingCover(c,nd.member,k);
+   if(k==='壽險'&&nd.member===pm)have+=liquidMovable(c);
+   // 調整動作的保障類保額也算「已備」——與 coverageGaps 同一套語意（見 actionCover 的註解）。
+   have+=actionCover(c,nd.member,k);
+   if(!by[k]){by[k]={need:0,have:0};ord.push(k);}
+   by[k].need+=map[k];by[k].have+=have;
+  });
+ });
+ return ord.map(function(k){
+  var o=by[k];
+  var u=(k==='住院醫療'||k==='癌症住院')?'元/日':((k==='每月照護'||k==='薪資補償')?'元/月':'元');
+  return checkupRow(k,o.have,o.need,u);
+ });
+}
+
+// ── $領回：保單可領回的五個型別 ──
+// 逐張保單自己帶 paybacks[]，因為「哪一張保單、什麼時候、領給誰」是保單的屬性，不是家庭的。
+var PAYBACK_TYPES=['$生存','$滿期','$祝壽','$年金','$投資'];
+function policyPaybacks(c){
+ var out=[];
+ (c.policies||[]).forEach(function(p,pi){
+  (p.paybacks||[]).forEach(function(b,bi){
+   out.push({pi:pi,bi:bi,policy:p.name||p.subtype||'（未命名保單）',insurer:p.insurer||'',
+    type:b.type||'$生存',receiver:b.receiver||p.insured||'',
+    ageFrom:n(b.ageFrom),ageTo:n(b.ageTo)||n(b.ageFrom),
+    freq:n(b.freq),amount:n(b.amount),note:b.note||''});
+  });
+ });
+ return out;
+}
+// 一筆領回在 [a1,a2] 這段年齡內可領到的合計。freq>0＝每 freq 年領一次。
+function paybackInSpan(b,a1,a2){
+ if(b.freq>0){var t=0;for(var a=b.ageFrom;a<=b.ageTo;a+=b.freq){if(a>=a1&&a<=a2)t+=b.amount;}return t;}
+ return (b.ageFrom>=a1&&b.ageFrom<=a2)?b.amount:0;
+}
+function paybackTotal(b){return paybackInSpan(b,-1e9,1e9);}
+function policyPaybackBetween(c,a1,a2){
+ if(!(n(a2)>=n(a1)))return 0;
+ return sum(policyPaybacks(c),function(b){return paybackInSpan(b,n(a1),n(a2));});
+}
+// 3 $領回：退休養老金一列 ＋ 每個「選定」的理財目標一列。
+function paybackCheckupRows(c){
+ var rows=[],A=n(c.profile&&c.profile.age);
+ var rt=retireNeed(c);
+ if(rt&&n(rt.total)>0){
+  var rA=n(c.profile.retireAge)||65,lA=n(c.profile.lifeExp)||85;
+  var rr=checkupRow('退休養老金',n(rt.prepared)+policyPaybackBetween(c,rA,lA),n(rt.total),'元');
+  rr.span=rA+'~'+lA+' 歲';rows.push(rr);
+ }
+ (c.goals||[]).forEach(function(g){
+  if(g.on===false)return;
+  var s=n(g.start)||A,e=n(g.end)||s;
+  var times=(n(g.freq)>0&&e>s)?Math.floor((e-s)/n(g.freq))+1:1;
+  var r=checkupRow(g.name||g.type||'（未命名目標）',n(g.prepared)+policyPaybackBetween(c,s,e),n(g.present)*Math.max(1,times),'元');
+  r.span=s+'~'+e+' 歲';rows.push(r);
+ });
+ return rows;
+}
+
+// ── 保費排程：生效日 ＋ 繳別 → 各年／各月 ──
+// effDate 在 2026/08/24 之前只是一個純字串、沒有進過任何計算，這裡開始 parse 它。
+// 民國年（三碼）自動 +1911，因為保單登錄實務上兩種寫法都有。
+function effYear(p){var m=String((p&&p.effDate)||'').match(/(\d{3,4})/);if(!m)return 0;var y=+m[1];return y<1911?y+1911:y;}
+function effMonth(p){var m=String((p&&p.effDate)||'').match(/\d{3,4}\D+(\d{1,2})/);return m?(+m[1]||0):0;}
+var PAY_MODES=['年繳','半年繳','季繳','月繳'];
+var PAY_TIMES={'年繳':1,'半年繳':2,'季繳':4,'月繳':12};
+function payTimes(mode){return PAY_TIMES[mode||'年繳']||1;}
+function premiumPerPay(p){return n(p&&p.premium)/payTimes(p&&p.payMode);}
+// 繳費月份：以生效日的月份起算，依繳別平均分佈。
+function premiumMonths(p){
+ var m0=effMonth(p);if(!m0)return [];
+ var t=payTimes(p.payMode),step=12/t,out=[];
+ for(var i=0;i<t;i++)out.push(((m0-1+step*i)%12)+1);
+ return out.sort(function(a,b){return a-b;});
+}
+// 繳費年期留空＝視為仍在繳（多數終身險登錄時不會填到期年）。
+function payingInYear(p,year){
+ if(!policyActive(p))return false;
+ var y0=effYear(p);if(!y0||year<y0)return false;
+ var yrs=n(p.payYears);
+ return yrs>0?(year<y0+yrs):true;
+}
+function premiumByYear(c,fromYear,years){
+ var out=[],N=Math.max(1,n(years)||1);
+ for(var i=0;i<N;i++){
+  var y=n(fromYear)+i,tot=0,prot=0,inv=0;
+  (c.policies||[]).forEach(function(p){
+   if(!payingInYear(p,y))return;
+   var a=n(p.premium);tot+=a;
+   if(premiumType(p)==='理財型')inv+=a;else prot+=a;
+  });
+  out.push({year:y,total:tot,protect:prot,invest:inv});
+ }
+ return out;
+}
+function premiumByMonth(c,year){
+ var out=[];for(var m=1;m<=12;m++)out.push({month:m,amount:0});
+ (c.policies||[]).forEach(function(p){
+  if(!payingInYear(p,n(year)))return;
+  var per=premiumPerPay(p);
+  premiumMonths(p).forEach(function(mm){out[mm-1].amount+=per;});
+ });
+ return out;
+}
+function premiumByPayer(c){
+ var by={},ord=[];
+ (c.policies||[]).forEach(function(p){
+  if(!policyActive(p))return;
+  var k=p.owner||p.insured||'（未指定）';
+  if(!by[k]){by[k]={payer:k,total:0,count:0};ord.push(k);}
+  by[k].total+=n(p.premium);by[k].count++;
+ });
+ return ord.map(function(k){return by[k];});
+}
+
+// ── 生命資產表：給付明細（只呈現，不比對）──
+var BENEFIT_GROUPS=['壽險','意外','住院醫療','防癌','失能長照','其他'];
+function policyBenefitRows(c,member){
+ var out=[];
+ (c.policies||[]).forEach(function(p){
+  if(member&&p.insured!==member)return;
+  if(!policyActive(p))return;
+  (p.benefits||[]).forEach(function(b){
+   out.push({group:(BENEFIT_GROUPS.indexOf(b.group)>=0?b.group:'其他'),item:b.item||'',
+    amount:n(b.amount),unit:b.unit||'元',
+    policy:p.name||p.subtype||'',insurer:p.insurer||'',insured:p.insured||''});
+  });
+ });
+ return out;
+}
+function benefitsByGroup(c,member){
+ var rows=policyBenefitRows(c,member),by={};
+ BENEFIT_GROUPS.forEach(function(g){by[g]=[];});
+ rows.forEach(function(r){by[r.group].push(r);});
+ return BENEFIT_GROUPS.map(function(g){return {group:g,rows:by[g]};}).filter(function(x){return x.rows.length>0;});
+}
+
+// ── 解約金與主約效益分析 ──
+// 解約金是唯一需要人工逐年輸入的數列（保險公司給的附表），一律記「保單年度末」的金額。
+// 保單年度：自保單生效日起的第一年為第 1 保單年度；年度末＝保單周年日的前一日。
+function policyYearAt(p,calYear){var y0=effYear(p);return y0?Math.max(0,n(calYear)-y0+1):0;}
+function surrenderAt(p,polYear){
+ var r=((p&&p.surrender)||[]).filter(function(x){return n(x.year)===n(polYear);})[0];
+ return r?n(r.amount):0;
+}
+// 主約效益分析：累計已繳保費 vs（身故給付＋可領回），用倍數說話。
+function masterAnalysis(c,calYear){
+ var Y=n(calYear);
+ return (c.policies||[]).filter(function(p){return p.policyKind!=='附約';}).map(function(p){
+  var polY=policyYearAt(p,Y);
+  var yrs=n(p.payYears);
+  var paid=polY>0?n(p.premium)*(yrs>0?Math.min(polY,yrs):polY):0;
+  var sur=surrenderAt(p,polY)||n(p.cashValue);
+  var back=sum(p.paybacks||[],function(b){return paybackTotal({freq:n(b.freq),ageFrom:n(b.ageFrom),ageTo:n(b.ageTo)||n(b.ageFrom),amount:n(b.amount)});});
+  return {name:p.name||p.subtype||'',insurer:p.insurer||'',insured:p.insured||'',
+   effDate:p.effDate||'',polYear:polY,paid:paid,death:n(p.life),surrender:sur,payback:back,
+   ratio:paid>0?(n(p.life)+back)/paid:0};
+ });
+}
+
 
 // ===== 保障準備度（以「毛需求」計算，避免與缺口反推重複扣抵） =====
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
@@ -2432,8 +2718,16 @@ function listOf(c,arr){
  if(arr==='prepared')return c.retire.prepared;
  return c[arr];
 }
+// 需求統計日：只要動到「保障需求」或「已備補充」就蓋一次戳。
+// 這是保單檢查報告頁首「距離今天 X 個月 Y 天」的資料源——沒有這個戳，
+// 那一行只是裝飾；有了它，教練一眼就知道這份需求是不是該重跑了。
+function stampNeeds(c,arr){
+ if(!c||(arr!=='needs'&&arr!=='coverages'))return;
+ var d=new Date();
+ c.needsAt=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function set(id,field,val,type){var c=activeCase();var t=id.split(':'),arr=t[0],i=t[1];
- var v=type==='num'?n(val):val;if(i==null)c[arr][field]=v;else listOf(c,arr)[i][field]=v;save();
+ var v=type==='num'?n(val):val;if(i==null)c[arr][field]=v;else listOf(c,arr)[i][field]=v;stampNeeds(c,arr);save();
  if(app.activeTab!=='data'||app.role==='client'||PLAN_ARRS[arr])render();
  syncDerived();}
 // 打字時即時更新畫面上的計算值（不整頁 render，才不會打斷游標）；存檔延後 700ms 合併，
@@ -2441,7 +2735,7 @@ function set(id,field,val,type){var c=activeCase();var t=id.split(':'),arr=t[0],
 var _liveSaveT=null;
 function liveSave(){if(_liveSaveT)clearTimeout(_liveSaveT);_liveSaveT=setTimeout(function(){_liveSaveT=null;save();},700);}
 function setLive(id,field,val,type){var c=activeCase();if(!c)return;var t=id.split(':'),arr=t[0],i=t[1];
- var v=type==='num'?n(val):val;if(i==null)c[arr][field]=v;else listOf(c,arr)[i][field]=v;
+ var v=type==='num'?n(val):val;if(i==null)c[arr][field]=v;else listOf(c,arr)[i][field]=v;stampNeeds(c,arr);
  syncDerived();liveSave();}
 function setAmtByPeriodLive(arr,idx,val){var c=activeCase();if(!c)return;var it=c[arr][idx];if(!it)return;
  var v=n(val);it.amount=(it.period==='月')?v*12:v;syncDerived();liveSave();}
@@ -2454,6 +2748,7 @@ var CALC={
  lifestyleNow:function(c){return fmt(lifestyleAnnualNow(c));},
  lifestyleCount:function(c){return String((c.travel||[]).length+(c.hobby||[]).length+(c.luxury||[]).length);},
  coverageDerived:function(c){return coverageDerivedHTML(c);},
+ checkupChart:function(c){return checkupDerivedHTML(c);},
  trackingChart:function(c){return trackingChartSVG(c);}
 };
 function syncCalcNodes(){var c=activeCase();if(!c)return;
@@ -2530,7 +2825,7 @@ function addRow(arr){var c=activeCase();if(!c)return;
  goals:function(){return {on:true,name:'',type:'其他',present:0,start:A,end:A,freq:0,growth:'通膨',imp:3,prepared:0,loanRatio:0,appreciation:0}},
  needs:function(){return {member:m0.name||'',funeral:600000,protectYears:5,estateTax:0,room:2000,selfPay:1500,nursing:1500,miscDaily:3000,incomeComp:0,disability:3000000,firstCancer:300000,cancerHosp:2000,critical:2000000,monthCare:30000,careMonths:120}},
  coverages:function(){return {member:m0.name||'',kind:'壽險',comm:0,social:0}},
- policies:function(){return {pid:polId(),insured:m0.name||'',name:'',insurer:'',bigCat:'人身',subtype:'終身壽險',policyKind:'主約',riderOf:'',owner:m0.name||'',beneficiary:'',policyNo:'',premium:0,currency:'TWD',payYears:'',paidYears:'',effDate:'',termEnd:'',status:'有效',cashValue:0,claimNote:CLAIM_TPL['終身壽險']||'',life:0,accident:0,medical:0,medMisc:0,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,pAmount:0}},
+ policies:function(){return {pid:polId(),insured:m0.name||'',insured2:'',name:'',insurer:'',bigCat:'人身',subtype:'終身壽險',policyKind:'主約',riderOf:'',owner:m0.name||'',beneficiary:'',paybackBene:'',policyNo:'',premium:0,payMode:'年繳',premiumType:'',discount:false,jobGrade:'1級',currency:'TWD',payYears:'',paidYears:'',effDate:'',termEnd:'',status:'有效',cashValue:0,claimNote:CLAIM_TPL['終身壽險']||'',life:0,accident:0,medical:0,medMisc:0,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,pAmount:0,surrender:[],benefits:[],paybacks:[]}},
  travel:function(){return {on:true,cat:'國內',sub:'認知旅遊',start:A,end:80,freq:1,amount:0,minAmount:0,imp:3}},
  hobby:function(){return {on:true,sub:'體能類',start:A,end:75,freq:1,amount:0,minAmount:0,imp:3}},
  luxury:function(){return {on:true,sub:'首飾配件',start:A,end:A,freq:1,amount:0,minAmount:0,imp:2}},
@@ -2559,8 +2854,8 @@ function addRow(arr){var c=activeCase();if(!c)return;
  if(arr==='prepared'){c.retire=c.retire||{};c.retire.prepared=c.retire.prepared||[];c.retire.prepared.push(tpl)}
  else if(PLAN_ARRS[arr]){listOf(c,arr).push(tpl)}
  else{c[arr]=c[arr]||[];c[arr].push(tpl)}
- save();render()}
-function delRow(arr,i){var c=activeCase();if(arr==='prepared'){c.retire.prepared.splice(i,1)}else if(PLAN_ARRS[arr]){listOf(c,arr).splice(i,1)}else{c[arr].splice(i,1)}save();render()}
+ stampNeeds(c,arr);save();render()}
+function delRow(arr,i){var c=activeCase();if(arr==='prepared'){c.retire.prepared.splice(i,1)}else if(PLAN_ARRS[arr]){listOf(c,arr).splice(i,1)}else{c[arr].splice(i,1)}stampNeeds(c,arr);save();render()}
 
 /* ===== render ===== */
 // 願景時間軸的 hover：十字線＋數字。一張線圖沒有 hover 等於少一半資訊。
@@ -6382,12 +6677,58 @@ var HUMAN_AMT_OPT=[['cancerHosp','癌症住院日額']];
 // 保單 id：附約要指得到自己的主約。既有保單沒有 pid，這裡補發（只補一次，存檔後固定）。
 var __polSeq=0;
 function polId(){return 'p'+Math.floor(performance.now()*1000%1e9).toString(36)+(__polSeq++).toString(36);}
-function ensurePolicy(p){if(!p.pid)p.pid=polId();if(p.bigCat==null)p.bigCat='人身';if(p.subtype==null)p.subtype=(p.bigCat==='產物'?'汽車第三人責任':'終身壽險');if(p.status==null)p.status='有效';if(p.currency==null)p.currency='TWD';if(p.policyKind==null)p.policyKind='主約';['insurer','owner','beneficiary','policyNo','payYears','paidYears','effDate','termEnd','claimNote','riderOf'].forEach(function(k){if(p[k]==null)p[k]='';});['pAmount','medMisc','incomeComp'].forEach(function(k){if(p[k]==null)p[k]=0;});return p;}
+function ensurePolicy(p){if(!p.pid)p.pid=polId();if(p.bigCat==null)p.bigCat='人身';if(p.subtype==null)p.subtype=(p.bigCat==='產物'?'汽車第三人責任':'終身壽險');if(p.status==null)p.status='有效';if(p.currency==null)p.currency='TWD';if(p.policyKind==null)p.policyKind='主約';
+ // 2026/08/24 加厚：繳別／保費類型／次被保人／職業等級／$領回受益人／折扣，以及三個子陣列。
+ // 保費類型留空＝由 premiumType() 依險種細分推，教練可在保單卡上覆寫。
+ if(p.payMode==null)p.payMode='年繳';if(p.jobGrade==null)p.jobGrade='1級';
+ // 折扣刻意存 '有'/'無' 字串而不是 boolean：sel 存進去的字串 'false' 在 JS 是 truthy，
+ // 這個坑 legacy.feedEstate 已經踩過一次（見 ofld 的 'bool' 型別註解）。
+ if(p.discount===true)p.discount='有';if(!p.discount)p.discount='無';
+ ['insurer','owner','beneficiary','policyNo','payYears','paidYears','effDate','termEnd','claimNote','riderOf','insured2','paybackBene','premiumType'].forEach(function(k){if(p[k]==null)p[k]='';});
+ ['pAmount','medMisc','incomeComp'].forEach(function(k){if(p[k]==null)p[k]=0;});
+ ['surrender','benefits','paybacks'].forEach(function(k){if(!Array.isArray(p[k]))p[k]=[];});
+ return p;}
 function ensurePolicies(c){(c.policies||[]).forEach(ensurePolicy);return c.policies||[];}
 // 切主約/附約：切回主約時清掉歸屬，免得留一個指向別人的孤兒欄位。
 function setPolicyKind(i,v){var c=activeCase();var p=(c.policies||[])[i];if(!p)return;p.policyKind=v;if(v!=='附約')p.riderOf='';save();render();}
 function setPolicyCat(i,v){var c=activeCase();var p=c.policies[i];if(!p)return;p.bigCat=v;var subs=POLICY_SUB[v]||[];if(subs.indexOf(p.subtype)<0)p.subtype=subs[0]||'';if(!p.claimNote)p.claimNote=CLAIM_TPL[p.subtype]||'';save();render();}
 function setPolicySub(i,v){var c=activeCase();var p=c.policies[i];if(!p)return;var wasTpl=(!p.claimNote||p.claimNote===(CLAIM_TPL[p.subtype]||''));p.subtype=v;if(wasTpl)p.claimNote=CLAIM_TPL[v]||'';save();render();}
+// ===== 保險商品輕量主檔（輸入輔助）=====
+// 這裡只做一件事：把「保險公司」與「商品名稱」從自由文字升級成可搜尋的建議清單。
+// 用 <input list> 而不是 <select>，因為既有保單已經有各種寫法的自由文字，
+// 強制成下拉會讓那些值當場消失；datalist 是「給建議、不擋輸入」。
+// ⚠️ 這份清單不含給付公式／費率——嵐途不做商品比價，見 src/lib/insProducts.ts 的定位註解。
+// 與 src/lib/insProducts.defaults.ts 由 insProducts.drift.test.ts 逐字對拍。
+var INS_CO_FALLBACK={
+ '人身':['三商美邦','安達','凱基','中華郵政','元大','友邦','台灣','全球','合作金庫','安聯','宏泰','法國巴黎','保誠','南山','國泰','第一金','富邦','新光','臺銀','遠雄','國外公司'],
+ '產物':['中信產險','兆豐產險','安達產物','旺旺友聯產物','明台產物','法國巴黎產物','南山產物','泰安產物','國泰產物','第一產物','富邦產物','華南產物','新光產物','新安東京產物','臺灣產物','和泰產物','國外公司(產物)']
+};
+function insCompanies(){
+ var p=window.LANTU_INSPRODUCTS;
+ if(p&&p.companies&&p.companies.length)return p.companies.map(function(x){return x.name;});
+ return INS_CO_FALLBACK['人身'].concat(INS_CO_FALLBACK['產物']);
+}
+function insProductsOf(company){
+ var p=window.LANTU_INSPRODUCTS;
+ if(!p||!p.products)return [];
+ return p.products[company]||[];
+}
+function dlHTML(id,items){
+ return '<datalist id="'+id+'">'+items.map(function(v){return '<option value="'+esc(v)+'"></option>';}).join('')+'</datalist>';
+}
+function insurerFld(bindAttr,val){
+ return '<div class="f"><label>保險公司</label><input list="dl-insurers" value="'+esc(val==null?'':val)+'" '+bindAttr+'>'+
+  dlHTML('dl-insurers',insCompanies())+'</div>';
+}
+var __prodDlSeq=0;
+function productFld(bindAttr,company,val){
+ var list=insProductsOf(company);
+ if(!list.length)return '<div class="f"><label>保單名稱</label><input value="'+esc(val==null?'':val)+'" '+bindAttr+'></div>';
+ var id='dl-prod-'+(__prodDlSeq++);
+ var opts=list.map(function(x){return (x.code?x.code+'．':'')+x.name;});
+ return '<div class="f"><label>保單名稱 <span class="hint" style="font-weight:400">'+list.length+' 個建議</span></label>'+
+  '<input list="'+id+'" value="'+esc(val==null?'':val)+'" '+bindAttr+'>'+dlHTML(id,opts)+'</div>';
+}
 function policyCard(c,p,i){
  ensurePolicy(p);
  var isProp=p.bigCat==='產物';
@@ -6403,21 +6744,29 @@ function policyCard(c,p,i){
  var catSel='<div class="f"><label>大類</label><select onchange="setPolicyCat('+i+',this.value)">'+['人身','產物'].map(function(o){return '<option '+(p.bigCat===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
  var subSel='<div class="f"><label>險種細分</label><select onchange="setPolicySub('+i+',this.value)">'+(POLICY_SUB[p.bigCat]||[]).map(function(o){return '<option '+(p.subtype===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
  var block1='<div class="subhd">保單基本</div><div class="fgrid">'+
-   fFld(sb('insurer'),'保險公司',p.insurer)+fFld(sb('name'),'保單名稱',p.name)+catSel+subSel+
+   insurerFld(sb('insurer'),p.insurer)+productFld(sb('name'),p.insurer,p.name)+catSel+subSel+
    fFld('onchange="setPolicyKind('+i+',this.value)"','主約/附約',p.policyKind,null,['主約','附約'])+
    (p.policyKind==='附約'?riderParentSel(c,p,i):'')+
    fFld(sb('status'),'保單狀態',p.status,null,POLICY_STATUS)+
-   fFld(sb('policyNo'),'保單號碼',p.policyNo)+'</div>';
+   fFld(sb('policyNo'),'保單號碼',p.policyNo)+
+   (isProp?'':fFld(sb('premiumType'),'保費類型（留空＝依險種自動判定：'+premiumType(p)+'）',p.premiumType,null,['','保障型','理財型']))+
+   (isProp?'':fFld(sb('jobGrade'),'被保人職業等級',p.jobGrade,null,['1級','2級','3級','4級','5級','6級']))+'</div>';
  // 關係人
  var block2='<div class="subhd">關係人</div><div class="fgrid">'+
-   fFld(sb('owner'),'要保人',p.owner,null,[''].concat(memOpts))+fFld(sb('insured'),'被保人',p.insured,null,memOpts)+fFld(sb('beneficiary'),'受益人',p.beneficiary)+'</div>';
+   fFld(sb('owner'),'要保人',p.owner,null,[''].concat(memOpts))+fFld(sb('insured'),'被保人',p.insured,null,memOpts)+
+   fFld(sb('insured2'),'次(從)被保人',p.insured2,null,[''].concat(memOpts))+
+   fFld(sb('beneficiary'),'身故受益人',p.beneficiary)+
+   fFld(sb('paybackBene'),'$領回受益人（留空＝要保人）',p.paybackBene)+'</div>';
  // 保費與期間
  var block3='<div class="subhd">保費與期間</div><div class="fgrid">'+
-   fFld(sb('premium','money'),'年繳保費',p.premium,'money')+fFld(sb('currency'),'幣別',p.currency,null,['TWD','USD','其他'])+
+   fFld(sb('premium','money'),'年繳保費（年繳化）',p.premium,'money')+
+   fFld(sb('payMode'),'繳別',p.payMode,null,PAY_MODES)+
+   fFld(sb('currency'),'幣別',p.currency,null,['TWD','USD','其他'])+
    fFld(sb('payYears','num'),'繳費年期',p.payYears,'num')+fFld(sb('paidYears','num'),'已繳年數',p.paidYears,'num')+
    fFld(sb('effDate'),'生效日 (YYYY/MM/DD)',p.effDate)+
    fFld(sb('termEnd'),(isProp?'到期日 (YYYY/MM)':'保障期間到期（最高續保年齡）'),p.termEnd)+
-   fFld(sb('cashValue','money'),'保單現金價值',p.cashValue,'money')+'</div>';
+   fFld(sb('cashValue','money'),'保單現金價值',p.cashValue,'money')+
+   fFld(sb('discount'),'保費折扣',p.discount?'有':'無',null,['無','有'])+'</div>';
  // 保障明細
  var block4;
  if(isProp){block4='<div class="subhd">保障保額</div><div class="fgrid">'+fFld(sb('pAmount','money'),'保額/主要限額',p.pAmount,'money')+'</div>';}
@@ -6430,7 +6779,8 @@ function policyCard(c,p,i){
    HUMAN_AMT.map(function(a){return fFld(sb(a[0],'money'),a[1],p[a[0]],'money');}).join('')+'</div>'+optHTML;}
  var claim='<div class="subhd">理賠條件</div><input class="claimin" value="'+esc(p.claimNote||'')+'" oninput="set(\'policies:'+i+'\',\'claimNote\',this.value)">';
  var riders=riderCardsHTML(c,p,i);
- return '<div class="pcard '+(isProp?'prop':'life')+(p.policyKind==='附約'?' isrider':'')+'" data-polidx="'+i+'">'+hd+'<div class="pbody">'+block1+block2+block3+block4+claim+riders+'</div></div>';
+ var subs=polSubTable(c,p,i);
+ return '<div class="pcard '+(isProp?'prop':'life')+(p.policyKind==='附約'?' isrider':'')+'" data-polidx="'+i+'">'+hd+'<div class="pbody">'+block1+block2+block3+block4+subs+claim+riders+'</div></div>';
 }
 
 // 附約要掛在哪張主約底下（同一位被保人的主約優先列出）。
@@ -6505,6 +6855,342 @@ function policiesSec(c){
  var statTbl=mems.length?'<div class="sec"><h4>人身保障統計 <span class="hint">年繳保費合計 '+fmt(totPrem)+'（其中產險 '+fmt(propPrem)+'）</span></h4><table class="rtable"><tr><th>被保人</th>'+KINDS.map(function(k){return '<th>'+k+'</th>'}).join('')+'</tr>'+stat+'</table></div>':'';
  return '<div class="ppband">現有保單 <span class="hint">逐張加厚登錄：人身／產物 · 主附約 · 關係人 · 期間狀態 · 理賠條件</span></div>'+cards+addBtn+statTbl;
 }
+
+// ===== 保單檢查報告 UI（2026/08/24）=====
+// 版面規矩沿用專案通則：首屏＝一張主圖 ＋ 3 個數字，其餘一律 <details> 收合。
+// 主圖刻意做成「以 NEED 為 100% 的達成率棒」，因為三張表的單位不同（元／元每日／元每月），
+// 直接畫金額會讓「住院醫療 9,600 元/日」看起來比「人壽 920 萬」小到不存在。
+function checkupTone(state,K){return state==='low'?K.GAP:(state==='high'?K.AMB:K.OK);}
+function checkupPill(r){
+ var cls=r.state==='low'?'ck-low':(r.state==='high'?'ck-high':'ck-mid');
+ return '<span class="ckpill '+cls+'">'+r.label+'</span>';
+}
+function checkupDirText(r){
+ if(r.state==='mid')return '不須調整';
+ return r.dir+' '+fmt(r.delta)+' '+esc(r.unit);
+}
+// 五欄比對表：項目｜現在保單 HAVE｜現在需求 NEED｜狀況｜調整方向 READJUST
+function checkupTable(rows,opts){
+ opts=opts||{};
+ if(!rows.length)return '<div class="muted" style="padding:8px">'+(opts.empty||'尚無可比對的項目。')+'</div>';
+ var spanCol=rows.some(function(r){return r.span;});
+ var head='<tr><th>項目</th>'+(spanCol?'<th>期間</th>':'')+
+  '<th class="ckn">現在保單 <span class="ckhv">HAVE</span></th>'+
+  '<th class="ckn">現在需求 <span class="cknd">NEED</span></th>'+
+  '<th>狀況</th><th>調整方向 <span class="ckrj">READJUST</span></th></tr>';
+ var body=rows.map(function(r){
+  return '<tr><td class="k">'+esc(r.item)+'</td>'+
+   (spanCol?'<td class="muted" style="font-size:11.5px">'+esc(r.span||'—')+'</td>':'')+
+   '<td class="ckn ckhave">'+(r.have>0?fmt(r.have)+' '+esc(r.unit):'—')+'</td>'+
+   '<td class="ckn ckneed">'+(r.need>0?fmt(r.need)+' '+esc(r.unit):'—')+'</td>'+
+   '<td>'+checkupPill(r)+'</td>'+
+   '<td class="'+(r.state==='mid'?'muted':'ckdir')+'">'+checkupDirText(r)+'</td></tr>';
+ }).join('');
+ return '<table class="rtable cktbl">'+head+body+'</table>';
+}
+// 主圖：每一列一條軌，NEED 在 62.5% 處畫一條目標線，HAVE 依達成率填色。
+function checkupChartSVG(c,theme){
+ var K=planChartColors(theme);
+ var rows=[].concat(premiumCheckup(c).rows,coverageCheckupRows(c),paybackCheckupRows(c))
+   .filter(function(r){return r.need>0||r.have>0;});
+ if(!rows.length)return '<div class="muted" style="padding:14px">先在「保障需求」建立需求、在「現有保單」登錄保單，這張圖就會出現。</div>';
+ var LBW=124,PR=104,W=760,rowH=26,pT=26,pB=18;
+ var H=pT+rows.length*rowH+pB;
+ var trackW=W-LBW-PR,needX=LBW+trackW*0.625;
+ var out=['<svg viewBox="0 0 '+W+' '+H+'" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="保單檢查：現在保單對現在需求">'];
+ out.push('<text x="'+LBW+'" y="14" font-size="10.5" fill="'+K.MUT+'">以「現在需求 NEED」為 100%</text>');
+ out.push('<line x1="'+needX.toFixed(1)+'" y1="18" x2="'+needX.toFixed(1)+'" y2="'+(H-pB+4)+'" stroke="'+K.ZERO+'" stroke-dasharray="3 3"/>');
+ out.push('<text x="'+(needX+4).toFixed(1)+'" y="14" font-size="10" fill="'+K.LAB+'" font-weight="700">NEED</text>');
+ rows.forEach(function(r,i){
+  var y=pT+i*rowH,bh=11,by=y+4;
+  var pct=r.need>0?r.have/r.need:(r.have>0?1.6:0);
+  var w=Math.max(0,Math.min(pct,1.6))*trackW*0.625;
+  var col=checkupTone(r.state,K);
+  out.push('<rect x="'+LBW+'" y="'+by+'" width="'+trackW.toFixed(1)+'" height="'+bh+'" rx="4" fill="'+K.TRACK+'"/>');
+  if(w>0)out.push('<rect x="'+LBW+'" y="'+by+'" width="'+w.toFixed(1)+'" height="'+bh+'" rx="4" fill="'+col+'"/>');
+  out.push('<text x="'+(LBW-8)+'" y="'+(by+9)+'" font-size="11" fill="'+K.LAB+'" text-anchor="end">'+esc(r.item)+'</text>');
+  out.push('<text x="'+(W-PR+8)+'" y="'+(by+9)+'" font-size="10.5" fill="'+col+'" font-weight="700">'+
+   (r.need>0?Math.round(pct*100)+'%':'—')+'</text>');
+ });
+ out.push('</svg>');
+ return '<div class="ckchart">'+out.join('')+'</div>';
+}
+// 調整方式：一句自動生成的調整重點 ＋ 逐險種手法 ＋ 可調整的契約明細。
+// 手法文字是「怎麼動」的知識，不是商品推薦——刻意不提任何商品名稱。
+var READJUST_HOW={
+ '壽險':{up:'可依需要增加的額度，先從現有保單著手調整，或新加保純保障型的壽險契約。預算低→多用定期型；預算高→多用終身型。調高壽險保額時不需考慮該契約可領回多少，保障歸保障、理財歸理財，才會提高保費的經濟效益。',
+        down:'先動定期壽險（降低保額、縮短保障期間），因其現金價值低、調降的損失也低；不夠再考慮終身型（降低保額、增值型改平準型、改定期型）。'},
+ '意外傷殘':{up:'直接從保單中意外險的契約著手調整，或新加保意外險契約；同時檢視被保人職業等級是否登錄正確。',
+        down:'意外險保費低、槓桿高，通常不建議調降；若確實過高，先減額而非解約。'},
+ '住院醫療':{up:'先確認實支實付的限額是否足夠，再補定額日額；兩者的角色不同，不要只加其中一邊。',
+        down:'先從定期型醫療險開始調整（降低日額或計畫別），終身型的調降損失較大。'},
+ '醫療雜費':{up:'雜費是實支實付的主戰場，優先補限額型的附約。',down:'先檢視是否多張實支實付重複，再決定要留哪一張。'},
+ '薪資補償':{up:'補失能所得型商品；重點在「按月給付」而非一次金。',down:'先減額。'},
+ '初次罹癌':{up:'一次金補的是治療與生活重整，優先於住院日額。',down:'先減額，保留一次金的核心額度。'},
+ '癌症住院':{up:'一般住院日額若已足夠，此項可不單獨加保。',down:'一般住院日額多半已涵蓋，可優先調降此項。'},
+ '重病給付':{up:'補重大傷病或重大疾病一次金；注意是「取得證明即給付」還是「符合條款定義」。',down:'先減額。'},
+ '每月照護':{up:'長照／失能扶助以「按月給付」為核心，注意給付期間與免責期。',down:'先減額，保留給付期間。'},
+ '保障型保費':{up:'先把偏低的保障項目補上，保費自然會回到理財金三角的比例。',down:'先檢視是否有重複投保、或為親屬繳費的保單可調降。'},
+ '理財型保費':{up:'從保單中理財型的部份調高，或新加保理財型契約；另可檢視為親屬繳費的保單是否有可調低的部份。',down:'理財型保費偏高時，先確認保障是否已足額——保障不足卻先做理財，順序是反的。'}
+};
+function checkupAdviceHTML(c,rows,title){
+ var bad=rows.filter(function(r){return r.state!=='mid';});
+ if(!bad.length)return '<div class="ckok">此區各項落在適中帶內，不須調整。</div>';
+ var lows=bad.filter(function(r){return r.state==='low';}).map(function(r){return r.item;});
+ var highs=bad.filter(function(r){return r.state==='high';}).map(function(r){return r.item;});
+ // 截長補短：先把偏高的調低，才有預算把偏低的調高。
+ var lead='<div class="cklead"><b>調整重點</b>　'+
+  (highs.length?'可先將 <em>'+highs.map(esc).join('、')+'</em> 的部份<b>調低</b>':'')+
+  (highs.length&&lows.length?'，再依據自己的預算將 ':(lows.length?'可依據自己的預算將 ':''))+
+  (lows.length?'<em>'+lows.map(esc).join('、')+'</em> 的部份<b>調高</b>':'')+'。</div>';
+ var blocks=bad.map(function(r){
+  var how=(READJUST_HOW[r.item]||{})[r.state==='low'?'up':'down']||'';
+  return '<div class="ckblk"><div class="ckblkh">'+esc(r.item)+' · '+(r.state==='low'?'調高':'調低')+'的方式</div>'+
+   (how?'<p>'+esc(how)+'</p>':'')+
+   checkupContractsHTML(c,r.item)+'</div>';
+ }).join('');
+ return '<details class="ckadv"><summary>'+esc(title)+'：調整方式（含可調整的契約明細）</summary><div class="ckadvbody">'+lead+blocks+'</div></details>';
+}
+// 可調整的契約明細：把「該調多少」變成「該動哪一列」。
+// 只列該險種底下實際有保額的契約，契約被保人限「保戶、配偶」（子女不分擔家庭責任）。
+function checkupContractsHTML(c,kind){
+ var f=POLICY_MAP[kind];
+ var earners=(c.members||[]).filter(function(m){return isEarnerRole(m.role);}).map(function(m){return m.name;});
+ var list;
+ if(f){
+  list=(c.policies||[]).map(function(p,i){return [p,i];}).filter(function(q){
+   return policyActive(q[0])&&n(q[0][f])>0&&(!earners.length||earners.indexOf(q[0].insured)>=0);
+  });
+ }else{
+  var want=(kind==='理財型保費')?'理財型':'保障型';
+  list=(c.policies||[]).map(function(p,i){return [p,i];}).filter(function(q){
+   return policyActive(q[0])&&premiumType(q[0])===want&&n(q[0].premium)>0;
+  });
+ }
+ if(!list.length)return '<div class="muted" style="font-size:12px;padding:4px 0">目前沒有可直接調整的契約——需要新加保。</div>';
+ var rows=list.map(function(q){
+  var p=q[0],i=q[1];
+  return '<tr><td class="k">'+esc(p.name||p.subtype||'（未命名）')+'</td>'+
+   '<td>'+esc(p.insurer||'—')+'</td><td>'+esc(p.insured||'—')+'</td>'+
+   '<td>'+esc(p.policyKind||'主約')+'</td><td>'+esc(p.effDate||'—')+'</td>'+
+   '<td class="calc">'+(f?fmt(n(p[f])):fmt(n(p.premium)))+'</td>'+
+   '<td>'+esc(premiumType(p))+'</td>'+
+   '<td><button class="tbtn" onclick="jumpPolicy('+i+')">前往編輯</button></td></tr>';
+ }).join('');
+ return '<table class="rtable ckcon"><tr><th>契約名稱</th><th>公司</th><th>被保人</th><th>主/附</th><th>生效日</th><th>'+(f?'保額':'年繳保費')+'</th><th>保費類型</th><th></th></tr>'+rows+'</table>';
+}
+// 保單運算日／需求統計日：需求資料多舊，用「距離今天」講清楚。
+function checkupDatesHTML(c){
+ var today=new Date();
+ var run=today.getFullYear()+'. '+(today.getMonth()+1)+'. '+today.getDate();
+ var raw=(c.needsAt||'').toString().slice(0,10);
+ if(!raw)return '<div class="ckdates"><span>保單運算日 <b>'+run+'</b></span>'+
+  '<span>需求統計日 <b>尚未統計</b><span class="ckaway">先到下方「保障需求」建一張</span></span></div>';
+ var d0=new Date(raw.replace(/-/g,'/'));
+ var away='';
+ if(!isNaN(d0.getTime())){
+  var days=Math.max(0,Math.floor((today-d0)/86400000));
+  // 每隔 2 年（或情況改變）就該重跑一次需求——超過就把這一行變成警示色。
+  var stale=days>=365*2;
+  away='<span class="ckaway"'+(stale?' style="color:var(--warn)"':'')+'>距離今天 '+
+   Math.floor(days/30)+' 個月 '+(days%30)+' 天'+(stale?'（建議重跑需求）':'')+'</span>';
+ }
+ return '<div class="ckdates"><span>保單運算日 <b>'+run+'</b></span><span>需求統計日 <b>'+
+  esc(raw.replace(/-/g,'. '))+'</b>'+away+'</span></div>';
+}
+function policyCheckupSec(c){
+ var pm=premiumCheckup(c);
+ var cov=coverageCheckupRows(c);
+ var pay=paybackCheckupRows(c);
+ var all=[].concat(pm.rows,cov,pay);
+ var todo=all.filter(function(r){return r.state!=='mid'&&(r.need>0||r.have>0);}).length;
+ var mtx=coverageMatrix(c),applic=0,green=0;
+ mtx.rows.forEach(function(r){r.cells.forEach(function(cl){if(cl.s!=='n'){applic++;if(cl.s==='g')green++;}});});
+ var covPct=applic?Math.round(green/applic*100):0;
+ var premPct=pm.income>0?Math.round(pm.ratio*1000)/10:0;
+ var kpi='<div class="ckkpis">'+
+  '<div class="ckkpi"><div class="l">年繳保費佔年收入</div><div class="v">'+(pm.income>0?premPct+'%':'—')+'</div><small>'+fmt(pm.total)+'　保障型 '+fmt(pm.protect)+'／理財型 '+fmt(pm.invest)+'</small></div>'+
+  '<div class="ckkpi"><div class="l">待調整項目</div><div class="v'+(todo?' bad':'')+'">'+todo+' 項</div><small>共比對 '+all.length+' 項（適中帶 ±'+CHECKUP_BAND+'%）</small></div>'+
+  '<div class="ckkpi"><div class="l">保障覆蓋率</div><div class="v">'+covPct+'%</div><small>綠格 '+green+'/'+applic+'</small></div>'+
+  '</div>';
+ var chart='<div class="sec ckhero"><h4>保單檢查報告 <span class="hint">現在的保單狀況，是否符合現在的需求</span></h4>'+
+  checkupDatesHTML(c)+'<div data-calc="checkupChart">'+checkupChartSVG(c)+'</div>'+kpi+'</div>';
+ var t1='<div class="sec"><h4>1 保費 <span class="hint">依理財金三角：保障型佔年收入 '+TRIANGLE_RISK+'%、理財型 '+TRIANGLE_INVEST+'%</span></h4>'+
+  checkupTable(pm.rows)+checkupAdviceHTML(c,pm.rows,'1 保費')+'</div>';
+ var t2='<div class="sec"><h4>2 保障 <span class="hint">需求來自「保障需求」三大塊；已備來自逐張保單與已備補充</span></h4>'+
+  checkupTable(cov,{empty:'尚未建立保障需求。到下方「保障需求」為每位需要保障的成員建一張。'})+
+  '<div class="hint">「住院醫療」之金額為定額給付＋實支實付之每日病房費。</div>'+
+  checkupAdviceHTML(c,cov,'2 保障')+'</div>';
+ var t3='<div class="sec"><h4>3 $領回 <span class="hint">理財目標所需 vs 已備＋保單可領回（$生存/$滿期/$祝壽/$年金/$投資）</span></h4>'+
+  checkupTable(pay,{empty:'尚未建立退休或理財目標。'})+
+  checkupAdviceHTML(c,pay,'3 $領回')+'</div>';
+ return chart+t1+t2+t3;
+}
+function checkupDerivedHTML(c){return checkupChartSVG(c);}
+
+// ===== 保費報表（波3）=====
+function premiumReportSec(c){
+ var Y=new Date().getFullYear();
+ var byYear=premiumByYear(c,Y,10);
+ var byMonth=premiumByMonth(c,Y);
+ var byPayer=premiumByPayer(c);
+ var det=(c.policies||[]).filter(policyActive).map(function(p,i){
+  return {p:p,i:i};
+ });
+ var detRows=det.map(function(q){
+  var p=q.p;
+  return '<tr><td class="k">'+esc(p.name||p.subtype||'（未命名）')+'</td><td>'+esc(p.insurer||'—')+'</td>'+
+   '<td>'+esc(p.insured||'—')+'</td><td>'+esc(p.owner||'—')+'</td>'+
+   '<td>'+esc(p.effDate||'—')+'</td><td>'+esc(p.payMode||'年繳')+'</td>'+
+   '<td class="calc">'+fmt(premiumPerPay(p))+'</td><td class="calc">'+fmt(n(p.premium))+'</td>'+
+   '<td>'+esc(premiumType(p))+'</td><td>'+esc(p.status||'有效')+'</td></tr>';
+ }).join('')||'<tr><td colspan="10" class="muted">尚無保單。</td></tr>';
+ var yRows=byYear.map(function(r){
+  return '<tr><td class="k">'+r.year+'</td><td class="calc">'+fmt(r.total)+'</td><td>'+fmt(r.protect)+'</td><td>'+fmt(r.invest)+'</td></tr>';
+ }).join('');
+ var mTot=sum(byMonth,function(x){return x.amount;});
+ var mRows=byMonth.map(function(r){
+  return '<tr><td class="k">'+r.month+' 月</td><td class="calc">'+fmt(r.amount)+'</td></tr>';
+ }).join('');
+ var pRows=byPayer.map(function(r){
+  return '<tr><td class="k">'+esc(r.payer)+'</td><td>'+r.count+' 張</td><td class="calc">'+fmt(r.total)+'</td></tr>';
+ }).join('')||'<tr><td colspan="3" class="muted">尚無保單。</td></tr>';
+ return '<details class="ckfold"><summary>保費報表 <span class="hint">明細 · 各月 · 各年 · 繳費人</span></summary><div class="ckfoldbody">'+
+  '<h5>保費明細</h5><div style="overflow-x:auto"><table class="rtable"><tr><th>保單</th><th>公司</th><th>被保人</th><th>要保人</th><th>生效日</th><th>繳別</th><th>每期保費</th><th>年繳化</th><th>類型</th><th>狀態</th></tr>'+detRows+'</table></div>'+
+  '<h5 style="margin-top:14px">各月保費（'+Y+' 年，依生效日月份與繳別推算）</h5><table class="rtable"><tr><th>月份</th><th>應繳</th></tr>'+mRows+'<tr><td class="k">合計</td><td class="calc">'+fmt(mTot)+'</td></tr></table>'+
+  '<div class="hint">生效日未填的保單無法推繳費月份，不會出現在這張表，但仍計入各年與明細。</div>'+
+  '<h5 style="margin-top:14px">各年保費（未來 10 年）</h5><table class="rtable"><tr><th>年度</th><th>合計</th><th>保障型</th><th>理財型</th></tr>'+yRows+'</table>'+
+  '<h5 style="margin-top:14px">繳費人</h5><table class="rtable"><tr><th>要保人</th><th>張數</th><th>年繳保費</th></tr>'+pRows+'</table>'+
+  '</div></details>';
+}
+
+// ===== $領回報表（波3）=====
+function paybackReportSec(c){
+ var list=policyPaybacks(c);
+ if(!list.length)return '<details class="ckfold"><summary>$領回報表 <span class="hint">尚未登錄任何領回</span></summary><div class="ckfoldbody"><div class="muted">在下方每張保單的「$領回」子表登錄：型別、領受人、起訖歲、金額。登錄後這裡會出現目錄／各保單／各年／領受人四張表。</div></div></details>';
+ var A=n(c.profile.age),LE=n(c.profile.lifeExp)||90;
+ var dir=list.map(function(b){
+  return '<tr><td class="k">'+esc(b.policy)+'</td><td>'+esc(b.insurer||'—')+'</td><td>'+esc(b.type)+'</td>'+
+   '<td>'+esc(b.receiver||'—')+'</td><td>'+b.ageFrom+(b.ageTo>b.ageFrom?'~'+b.ageTo:'')+' 歲</td>'+
+   '<td>'+(b.freq>0?'每 '+b.freq+' 年':'一次')+'</td><td class="calc">'+fmt(b.amount)+'</td><td class="calc">'+fmt(paybackTotal(b))+'</td></tr>';
+ }).join('');
+ var byType={},tOrd=[];
+ list.forEach(function(b){if(!byType[b.type]){byType[b.type]={t:b.type,total:0,n:0};tOrd.push(b.type);}byType[b.type].total+=paybackTotal(b);byType[b.type].n++;});
+ var tRows=tOrd.map(function(k){var o=byType[k];return '<tr><td class="k">'+esc(o.t)+'</td><td>'+o.n+' 筆</td><td class="calc">'+fmt(o.total)+'</td></tr>';}).join('');
+ var byRcv={},rOrd=[];
+ list.forEach(function(b){var k=b.receiver||'（未指定）';if(!byRcv[k]){byRcv[k]={r:k,total:0,n:0};rOrd.push(k);}byRcv[k].total+=paybackTotal(b);byRcv[k].n++;});
+ var rRows=rOrd.map(function(k){var o=byRcv[k];return '<tr><td class="k">'+esc(o.r)+'</td><td>'+o.n+' 筆</td><td class="calc">'+fmt(o.total)+'</td></tr>';}).join('');
+ var yr=[];
+ for(var a=A;a<=LE;a+=5){
+  var a2=Math.min(a+4,LE);
+  var amt=policyPaybackBetween(c,a,a2);
+  if(amt>0)yr.push('<tr><td class="k">'+a+'~'+a2+' 歲</td><td class="calc">'+fmt(amt)+'</td></tr>');
+ }
+ var yRows=yr.join('')||'<tr><td colspan="2" class="muted">此區間無領回。</td></tr>';
+ return '<details class="ckfold"><summary>$領回報表 <span class="hint">目錄 · 型別 · 各年 · 領受人（共 '+list.length+' 筆）</span></summary><div class="ckfoldbody">'+
+  '<h5>領回目錄</h5><div style="overflow-x:auto"><table class="rtable"><tr><th>保單</th><th>公司</th><th>型別</th><th>領受人</th><th>年齡</th><th>頻率</th><th>每次</th><th>合計</th></tr>'+dir+'</table></div>'+
+  '<h5 style="margin-top:14px">依型別</h5><table class="rtable"><tr><th>型別</th><th>筆數</th><th>合計</th></tr>'+tRows+'</table>'+
+  '<h5 style="margin-top:14px">各年（每 5 歲一段）</h5><table class="rtable"><tr><th>年齡區間</th><th>可領回</th></tr>'+yRows+'</table>'+
+  '<h5 style="margin-top:14px">領受人</h5><table class="rtable"><tr><th>領受人</th><th>筆數</th><th>合計</th></tr>'+rRows+'</table>'+
+  '</div></details>';
+}
+
+// ===== 生命資產表（波3）=====
+// 90+ 項的給付明細只做呈現，不進缺口比對——理由見 engine 端 CHECKUP 區塊的註解。
+function lifeAssetSec(c){
+ var mems=[...new Set((c.policies||[]).map(function(p){return p.insured;}).filter(Boolean))];
+ if(!mems.length)return '';
+ var blocks=mems.map(function(mm){
+  var gs=benefitsByGroup(c,mm);
+  if(!gs.length)return '<div class="lasec"><div class="lah">'+esc(mm)+'</div><div class="muted" style="font-size:12px">尚未登錄給付明細。到下方該成員的保單卡「給付明細」子表逐項登錄。</div></div>';
+  var body=gs.map(function(g){
+   var rows=g.rows.map(function(r){
+    return '<tr><td class="k">'+esc(r.item||'—')+'</td><td class="calc">'+fmt(r.amount)+' '+esc(r.unit)+'</td><td class="muted" style="font-size:11.5px">'+esc(r.policy||'')+'</td></tr>';
+   }).join('');
+   return '<div class="lagrp"><div class="lagh">'+esc(g.group)+'</div><table class="rtable">'+rows+'</table></div>';
+  }).join('');
+  return '<div class="lasec"><div class="lah">'+esc(mm)+' <span class="hint">'+policyBenefitRows(c,mm).length+' 項給付</span></div>'+body+'</div>';
+ }).join('');
+ return '<details class="ckfold"><summary>生命資產表 <span class="hint">逐位被保人的給付明細（呈現用，不進缺口比對）</span></summary><div class="ckfoldbody">'+blocks+'</div></details>';
+}
+
+// ===== 解約金與主約效益分析（波3/波4）=====
+function masterAnalysisSec(c){
+ var Y=new Date().getFullYear();
+ var rows=masterAnalysis(c,Y).filter(function(r){return r.polYear>0;});
+ if(!rows.length)return '';
+ var body=rows.map(function(r){
+  var pct=r.ratio>0?Math.round(r.ratio*100)+'%':'—';
+  return '<tr><td class="k">'+esc(r.name)+'</td><td>'+esc(r.insurer||'—')+'</td><td>'+esc(r.insured||'—')+'</td>'+
+   '<td>'+esc(r.effDate||'—')+'</td><td>第 '+r.polYear+' 年度</td>'+
+   '<td class="calc">'+fmt(r.paid)+'</td><td>'+fmt(r.death)+'</td><td>'+fmt(r.surrender)+'</td><td>'+fmt(r.payback)+'</td>'+
+   '<td class="ckdir">'+pct+'</td></tr>';
+ }).join('');
+ return '<details class="ckfold"><summary>主約效益分析 <span class="hint">累計已繳保費 vs 身故給付＋可領回</span></summary><div class="ckfoldbody">'+
+  '<div style="overflow-x:auto"><table class="rtable"><tr><th>主約</th><th>公司</th><th>被保人</th><th>生效日</th><th>保單年度</th><th>累計已繳</th><th>身故給付</th><th>解約金</th><th>可領回</th><th>效益</th></tr>'+body+'</table></div>'+
+  '<div class="hint">解約金取「該保單年度末」的登錄值；沒登錄逐年附表時退回保單卡上的「保單現金價值」。累計已繳保費以年繳保費 × 已過保單年度（不超過繳費年期）估算。</div>'+
+  '</div></details>';
+}
+
+// ===== 保單子表：解約金 / 給付明細 / $領回 =====
+// set() 只吃兩層（arr:i），這三個是保單底下的子陣列，需要自己的存取器。
+function polSub(c,pi,key){var p=(c.policies||[])[pi];if(!p)return [];if(!Array.isArray(p[key]))p[key]=[];return p[key];}
+function addPolSub(pi,key){
+ var c=activeCase();if(!c)return;
+ var arr=polSub(c,pi,key);
+ var A=n(c.profile.age)||40;
+ if(key==='surrender')arr.push({year:arr.length+1,amount:0});
+ else if(key==='benefits')arr.push({group:'壽險',item:'',amount:0,unit:'元'});
+ else arr.push({type:'$生存',receiver:(c.policies[pi]||{}).insured||'',ageFrom:A,ageTo:A,freq:0,amount:0,note:''});
+ save();render();
+}
+function delPolSub(pi,key,si){var c=activeCase();if(!c)return;polSub(c,pi,key).splice(si,1);save();render();}
+function setPolSub(pi,key,si,field,val,type){
+ var c=activeCase();if(!c)return;
+ var row=polSub(c,pi,key)[si];if(!row)return;
+ row[field]=(type==='num')?n(val):val;
+ save();syncDerived();
+}
+function polSubTable(c,p,pi){
+ function inp(key,si,field,val,type){
+  var bind='onchange="setPolSub('+pi+',\''+key+'\','+si+',\''+field+'\',this.value'+(type==='num'?',\'num\'':'')+')"';
+  if(type==='money')return moneyCell(bind,val);
+  return '<input '+(type==='num'?'type="number"':'')+' value="'+esc(val==null?'':val)+'" '+bind+'>';
+ }
+ function sel(key,si,field,val,opts){
+  return '<select onchange="setPolSub('+pi+',\''+key+'\','+si+',\''+field+'\',this.value)">'+
+   opts.map(function(o){return '<option '+(val===o?'selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select>';
+ }
+ var sur=(p.surrender||[]).map(function(r,si){
+  return '<tr><td>'+inp('surrender',si,'year',r.year,'num')+'</td><td>'+inp('surrender',si,'amount',r.amount,'money')+'</td>'+
+   '<td><button class="pcdel" onclick="delPolSub('+pi+',\'surrender\','+si+')">✕</button></td></tr>';
+ }).join('');
+ var ben=(p.benefits||[]).map(function(r,si){
+  return '<tr><td>'+sel('benefits',si,'group',r.group,BENEFIT_GROUPS)+'</td><td>'+inp('benefits',si,'item',r.item)+'</td>'+
+   '<td>'+inp('benefits',si,'amount',r.amount,'money')+'</td><td>'+sel('benefits',si,'unit',r.unit,['元','元/日','元/月','元/次','單位','計畫'])+'</td>'+
+   '<td><button class="pcdel" onclick="delPolSub('+pi+',\'benefits\','+si+')">✕</button></td></tr>';
+ }).join('');
+ var memOpts=[''].concat((c.members||[]).map(function(m){return m.name;}));
+ var pb=(p.paybacks||[]).map(function(r,si){
+  return '<tr><td>'+sel('paybacks',si,'type',r.type,PAYBACK_TYPES)+'</td><td>'+sel('paybacks',si,'receiver',r.receiver,memOpts)+'</td>'+
+   '<td>'+inp('paybacks',si,'ageFrom',r.ageFrom,'num')+'</td><td>'+inp('paybacks',si,'ageTo',r.ageTo,'num')+'</td>'+
+   '<td>'+inp('paybacks',si,'freq',r.freq,'num')+'</td><td>'+inp('paybacks',si,'amount',r.amount,'money')+'</td>'+
+   '<td><button class="pcdel" onclick="delPolSub('+pi+',\'paybacks\','+si+')">✕</button></td></tr>';
+ }).join('');
+ return '<details class="polsub"><summary>給付明細 · $領回 · 解約金 <span class="hint">'+
+  ((p.benefits||[]).length+' / '+(p.paybacks||[]).length+' / '+(p.surrender||[]).length)+' 筆</span></summary><div class="polsubbody">'+
+  '<div class="subhd">給付明細 <span class="hint" style="font-weight:400">生命資產表的資料源；只呈現，不進缺口比對</span></div>'+
+  '<table class="rtable"><tr><th>分組</th><th>給付項目</th><th>金額</th><th>單位</th><th></th></tr>'+ben+'</table>'+
+  '<button class="add" onclick="addPolSub('+pi+',\'benefits\')">＋ 給付項目</button>'+
+  '<div class="subhd" style="margin-top:10px">$領回 <span class="hint" style="font-weight:400">$生存／$滿期／$祝壽／$年金／$投資；頻率 0 ＝ 一次領</span></div>'+
+  '<table class="rtable"><tr><th>型別</th><th>領受人</th><th>起歲</th><th>迄歲</th><th>每幾年</th><th>每次金額</th><th></th></tr>'+pb+'</table>'+
+  '<button class="add" onclick="addPolSub('+pi+',\'paybacks\')">＋ 領回</button>'+
+  '<div class="subhd" style="margin-top:10px">解約金 <span class="hint" style="font-weight:400">保單年度末的現金價值（保險公司附表）</span></div>'+
+  '<table class="rtable"><tr><th>保單年度</th><th>年度末解約金</th><th></th></tr>'+sur+'</table>'+
+  '<button class="add" onclick="addPolSub('+pi+',\'surrender\')">＋ 年度</button>'+
+  '</div></details>';
+}
+
 // ===== 保障中心：地圖 + 產險涵蓋 + 健檢報告 =====
 function isEarnerRole(r){return r==='本人'||r==='配偶';}
 function polSum(c,member,fields){return sum(c.policies||[],function(p){return p.insured===member?fields.reduce(function(s,f){return s+n(p[f]);},0):0;});}
@@ -6532,14 +7218,17 @@ function propertyChecklist(c){
 function coverageMatrix(c){
  var members=c.members||[];
  var rd=coverageReadiness(c);
- function rdRatio(member,kind){var o=rd.filter(function(x){return x.member===member&&x.kind===kind;})[0];return o?o.ratio:null;}
+ // ⚠️ 一律過 kindNorm()：HCOLS 曾經寫改名前的「意外險」，而 coverageReadiness 產的是「意外傷殘」，
+ // 嚴格比對永遠回 null → 黃燈判斷被整段跳過，只要 accident>0 就直接綠，連帶讓 KPI 覆蓋率高估。
+ function rdRatio(member,kind){if(!kind)return null;var kk=kindNorm(kind);
+  var o=rd.filter(function(x){return x.member===member&&kindNorm(x.kind)===kk;})[0];return o?o.ratio:null;}
  var pc=propertyChecklist(c);
  function pcStatus(key){var r=pc.filter(function(x){return x.key===key;})[0];if(!r)return 'n';return r.status==='have'?'g':r.status==='miss'?'r':'y';}
  var sig=covSignals(c);
  var HCOLS=[
   {lb:'壽險',kind:'壽險',fields:['life'],app:function(m){return isEarnerRole(m.role);}},
   {lb:'醫療',kind:'住院醫療',fields:['medical'],app:function(){return true;}},
-  {lb:'意外',kind:'意外險',fields:['accident'],app:function(){return true;}},
+  {lb:'意外',kind:'意外傷殘',fields:['accident'],app:function(){return true;}},
   {lb:'癌症',kind:null,fields:['firstCancer','cancerHosp'],app:function(){return true;}},
   {lb:'重疾',kind:'重病給付',fields:['critical'],app:function(){return true;}},
   {lb:'長照/失能',kind:'每月照護',fields:['monthCare'],app:function(m){return m.role!=='子女';}},
@@ -6616,7 +7305,8 @@ function coverageHubParts(c){
  var propSec='<div class="sec"><h4>產險涵蓋清單 <span class="hint">依家庭情境 · 有沒有 · 適足 · 到期</span></h4><table class="chk"><tr><th>情境</th><th>應有產險</th><th>狀態</th><th>適足/建議</th><th>到期</th></tr>'+pcRows+'</table></div>';
  var needsTbl=needsSec(c);
  var covTbl='<div class="sec" style="margin-bottom:8px"><h4 style="color:var(--mut)">已備保障（手動補充）<span class="hint">已逐張登錄者此處通常留空；員工團險可記於此</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外傷殘,住院醫療,醫療雜費,薪資補償,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','money'],['social','已備社會','money']]);
- return {derived:kpis+mapSec+propSec+coverageCheckupHTML(c,ck,pc),needsTbl:needsTbl,covTbl:covTbl};
+ return {derived:'<details class="ckfold"><summary>全家保障地圖 · 產險涵蓋 · 五面向診斷 <span class="hint">保障覆蓋率 '+covPct+'%</span></summary><div class="ckfoldbody">'+
+  kpis+mapSec+propSec+coverageCheckupHTML(c,ck,pc)+'</div></details>',needsTbl:needsTbl,covTbl:covTbl};
 }
 // ===== 保障需求：三大塊 =====
 // 需求分析在實務上就是三個問句：走了誰接手（責任）／倒下了誰養（重病重殘）／住院誰付（醫療）。
@@ -6673,8 +7363,13 @@ function needsSec(c){
 function coverageDerivedHTML(c){return coverageHubParts(c).derived;}
 function coverageHubSec(c){
  var parts=coverageHubParts(c);
- return '<div class="ppband">保障中心 <span class="hint">全家保障地圖 · 逐張保單 · 產險涵蓋 · 健檢報告</span></div>'+
-  '<div data-calc="coverageDerived">'+parts.derived+'</div>'+policiesSec(c)+
+ // 版面順序＝結論在前、原料在後：先給保單檢查報告（一張主圖＋3 個數字＋三張比對表），
+ // 地圖／產險／生命資產表／保費與領回報表全部收合，最後才是逐張保單與需求的輸入表。
+ return '<div class="ppband">保障中心 <span class="hint">保單檢查報告 · 逐張保單 · 需求反推</span></div>'+
+  policyCheckupSec(c)+
+  '<div data-calc="coverageDerived">'+parts.derived+'</div>'+
+  lifeAssetSec(c)+premiumReportSec(c)+paybackReportSec(c)+masterAnalysisSec(c)+
+  policiesSec(c)+
   '<div class="ppband" style="margin-top:6px">保障需求 · 已備補充 <span class="hint">壽險/醫療缺口反推的輸入</span></div>'+parts.needsTbl+parts.covTbl;
 }
 function trackingSec(c){
@@ -8092,6 +8787,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
         if(d.cats)window.LANTU_CATS=d.cats;
         if(d.edu&&d.edu.length)window.LANTU_EDU_COSTS=d.edu;
         if(d.biz){window.LANTU_BIZTAX=d.biz;try{applyBizTax(d.biz)}catch(e){}}
+        if(d.ins){window.LANTU_INSPRODUCTS=d.ins;}
         try{ if(typeof render==='function')render(); }catch(e){}
       })
       .catch(function(){});

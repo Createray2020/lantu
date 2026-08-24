@@ -384,6 +384,252 @@ function coverageGaps(c){
 }
 
 function totalGap(c){return sum(coverageGaps(c),function(g){return Math.max(0,g.gap)})}
+// 保障準備度用的「毛需求」：與 lifeNeed() 同一條分子，但**不扣已備**。
+// html 端一直有這一支（coverageReadiness 用它），engine.ts 之前缺席；
+// 2026/08/24 保單檢查報告的五欄表要毛對毛，兩邊都得有。
+function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
+ return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
+  +familyAnnualParentSupport(c)*n(nd.protectYears)
+  +sum(c.liabilities,function(l){return lBal(l)})+eduTotal(c)+n(nd.funeral)+n(nd.estateTax)
+  +guaranteeFor(c,nd.member);}
+
+
+// ===== 保單檢查報告：HAVE vs NEED vs 狀況 vs 調整方向 =====
+// 2026/08/24 對齊 insure80 的五欄比對表（項目｜現在保單 HAVE｜現在需求 NEED｜狀況｜調整方向 READJUST）。
+// 刻意只做「比對與判定」三張表（保費／保障／$領回）——給付明細那 90+ 項屬於「呈現」，
+// 走 policyBenefitRows()／benefitsByGroup()，不進這裡的比對，也不進 coverageGaps()。
+// 為什麼不把 KINDS 從 9 擴到 90：coverageGaps() 的長度是 needs.length × KINDS.length，
+// 下游 totalGap／health 的 riskCover／advice／報告書全部吃它；而 needs 那張表也會從 15 欄變 90 欄。
+// insure80 自己的健檢也只比三項，生命資產表才是 90+ 項——兩者本來就是兩套東西。
+var CHECKUP_BAND=10;      // %：|have−need|÷need 落在此帶內視為「適中」
+var TRIANGLE_RISK=10;     // 理財金三角：保障型保費佔年收入 %
+var TRIANGLE_INVEST=30;   // 理財金三角：理財型保費佔年收入 %
+// 後台 /admin/categories「保單健檢」群組（走 bizTaxParams 同一張表）一存就覆蓋。
+function applyCheckupParams(values){
+ if(!values||typeof values!=='object')return;
+ var setters={CHECKUP_BAND:function(x){CHECKUP_BAND=x},TRIANGLE_RISK:function(x){TRIANGLE_RISK=x},TRIANGLE_INVEST:function(x){TRIANGLE_INVEST=x}};
+ Object.keys(setters).forEach(function(k){
+  var x=Number(values[k]);
+  if(isFinite(x)&&values[k]!==null&&values[k]!==undefined&&values[k]!=='')setters[k](x);
+ });
+}
+var CHECKUP_LABEL={low:'偏低',high:'偏高',mid:'適中'};
+// need 為 0 時：有保額＝偏高（買了不需要的），沒保額＝適中（沒需求也沒買，不必動）。
+function checkupState(have,need,band){
+ var b=(band==null?CHECKUP_BAND:n(band))/100;
+ have=n(have);need=n(need);
+ if(need<=0)return have>0?'high':'mid';
+ var r=(have-need)/need;
+ return r>b?'high':(r<-b?'low':'mid');
+}
+function checkupRow(item,have,need,unit,band){
+ var st=checkupState(have,need,band);
+ return {item:item,have:n(have),need:n(need),unit:unit||'元',state:st,label:CHECKUP_LABEL[st],
+  delta:st==='mid'?0:Math.abs(n(need)-n(have)),
+  dir:st==='low'?'可增加':(st==='high'?'可減少':'不須調整')};
+}
+
+// ── 保費類型：保障歸保障、理財歸理財 ──
+// 舊保單沒有 premiumType 欄位，由險種細分推；教練可在保單卡上覆寫。
+var INVEST_SUBS=['增額/儲蓄壽險','投資型壽險','年金'];
+function premiumType(p){
+ if(p&&p.premiumType)return p.premiumType;
+ return (p&&INVEST_SUBS.indexOf(p.subtype)>=0)?'理財型':'保障型';
+}
+function policyActive(p){return !!p&&p.status!=='失效'&&p.status!=='停效';}
+function annualPremiumBy(c,type){
+ return sum(c.policies,function(p){return (policyActive(p)&&premiumType(p)===type)?n(p.premium):0;});
+}
+// 1 保費：兩列。NEED 走理財金三角佔家庭年收入的比例。
+function premiumCheckup(c){
+ var inc=n((crossTable(c)||{}).incTotal);
+ var prot=annualPremiumBy(c,'保障型'),inv=annualPremiumBy(c,'理財型');
+ return {income:inc,total:prot+inv,protect:prot,invest:inv,
+  ratio:inc>0?(prot+inv)/inc:0,
+  rows:[checkupRow('保障型保費',prot,inc*TRIANGLE_RISK/100),
+        checkupRow('理財型保費',inv,inc*TRIANGLE_INVEST/100)]};
+}
+
+// 2 保障：依險種跨成員加總後套五欄。
+// ⚠️⚠️ 這裡刻意**不能**直接用 coverageGaps 的 need：
+// lifeNeed() 回的是「已經扣掉已備與流動資產之後的淨缺口」，而 have 是毛的已備。
+// 拿淨需求去對毛已備，壽險會被判成「偏高、可減少 1,123 萬」——但客戶其實還差 324 萬。
+// 五欄表一定要毛對毛，所以壽險走 grossLifeNeed()（與 coverageReadiness 同一條式子）。
+function coverageCheckupRows(c){
+ var by={},ord=[],pm=(primaryMember(c)||{}).name;
+ (c.needs||[]).forEach(function(nd){
+  var map={
+   '壽險':grossLifeNeed(c,nd),
+   '意外傷殘':n(nd.disability),
+   '住院醫療':medicalDailyNeed(nd),
+   '醫療雜費':n(nd.miscDaily),
+   '薪資補償':n(nd.incomeComp),
+   '初次罹癌':n(nd.firstCancer),
+   '癌症住院':n(nd.cancerHosp),
+   '重病給付':n(nd.critical),
+   '每月照護':n(nd.monthCare)
+  };
+  Object.keys(map).forEach(function(k){
+   var have=existingCover(c,nd.member,k);
+   if(k==='壽險'&&nd.member===pm)have+=liquidMovable(c);
+   // 調整動作的保障類保額也算「已備」——與 coverageGaps 同一套語意（見 actionCover 的註解）。
+   have+=actionCover(c,nd.member,k);
+   if(!by[k]){by[k]={need:0,have:0};ord.push(k);}
+   by[k].need+=map[k];by[k].have+=have;
+  });
+ });
+ return ord.map(function(k){
+  var o=by[k];
+  var u=(k==='住院醫療'||k==='癌症住院')?'元/日':((k==='每月照護'||k==='薪資補償')?'元/月':'元');
+  return checkupRow(k,o.have,o.need,u);
+ });
+}
+
+// ── $領回：保單可領回的五個型別 ──
+// 逐張保單自己帶 paybacks[]，因為「哪一張保單、什麼時候、領給誰」是保單的屬性，不是家庭的。
+var PAYBACK_TYPES=['$生存','$滿期','$祝壽','$年金','$投資'];
+function policyPaybacks(c){
+ var out=[];
+ (c.policies||[]).forEach(function(p,pi){
+  (p.paybacks||[]).forEach(function(b,bi){
+   out.push({pi:pi,bi:bi,policy:p.name||p.subtype||'（未命名保單）',insurer:p.insurer||'',
+    type:b.type||'$生存',receiver:b.receiver||p.insured||'',
+    ageFrom:n(b.ageFrom),ageTo:n(b.ageTo)||n(b.ageFrom),
+    freq:n(b.freq),amount:n(b.amount),note:b.note||''});
+  });
+ });
+ return out;
+}
+// 一筆領回在 [a1,a2] 這段年齡內可領到的合計。freq>0＝每 freq 年領一次。
+function paybackInSpan(b,a1,a2){
+ if(b.freq>0){var t=0;for(var a=b.ageFrom;a<=b.ageTo;a+=b.freq){if(a>=a1&&a<=a2)t+=b.amount;}return t;}
+ return (b.ageFrom>=a1&&b.ageFrom<=a2)?b.amount:0;
+}
+function paybackTotal(b){return paybackInSpan(b,-1e9,1e9);}
+function policyPaybackBetween(c,a1,a2){
+ if(!(n(a2)>=n(a1)))return 0;
+ return sum(policyPaybacks(c),function(b){return paybackInSpan(b,n(a1),n(a2));});
+}
+// 3 $領回：退休養老金一列 ＋ 每個「選定」的理財目標一列。
+function paybackCheckupRows(c){
+ var rows=[],A=n(c.profile&&c.profile.age);
+ var rt=retireNeed(c);
+ if(rt&&n(rt.total)>0){
+  var rA=n(c.profile.retireAge)||65,lA=n(c.profile.lifeExp)||85;
+  var rr=checkupRow('退休養老金',n(rt.prepared)+policyPaybackBetween(c,rA,lA),n(rt.total),'元');
+  rr.span=rA+'~'+lA+' 歲';rows.push(rr);
+ }
+ (c.goals||[]).forEach(function(g){
+  if(g.on===false)return;
+  var s=n(g.start)||A,e=n(g.end)||s;
+  var times=(n(g.freq)>0&&e>s)?Math.floor((e-s)/n(g.freq))+1:1;
+  var r=checkupRow(g.name||g.type||'（未命名目標）',n(g.prepared)+policyPaybackBetween(c,s,e),n(g.present)*Math.max(1,times),'元');
+  r.span=s+'~'+e+' 歲';rows.push(r);
+ });
+ return rows;
+}
+
+// ── 保費排程：生效日 ＋ 繳別 → 各年／各月 ──
+// effDate 在 2026/08/24 之前只是一個純字串、沒有進過任何計算，這裡開始 parse 它。
+// 民國年（三碼）自動 +1911，因為保單登錄實務上兩種寫法都有。
+function effYear(p){var m=String((p&&p.effDate)||'').match(/(\d{3,4})/);if(!m)return 0;var y=+m[1];return y<1911?y+1911:y;}
+function effMonth(p){var m=String((p&&p.effDate)||'').match(/\d{3,4}\D+(\d{1,2})/);return m?(+m[1]||0):0;}
+var PAY_MODES=['年繳','半年繳','季繳','月繳'];
+var PAY_TIMES={'年繳':1,'半年繳':2,'季繳':4,'月繳':12};
+function payTimes(mode){return PAY_TIMES[mode||'年繳']||1;}
+function premiumPerPay(p){return n(p&&p.premium)/payTimes(p&&p.payMode);}
+// 繳費月份：以生效日的月份起算，依繳別平均分佈。
+function premiumMonths(p){
+ var m0=effMonth(p);if(!m0)return [];
+ var t=payTimes(p.payMode),step=12/t,out=[];
+ for(var i=0;i<t;i++)out.push(((m0-1+step*i)%12)+1);
+ return out.sort(function(a,b){return a-b;});
+}
+// 繳費年期留空＝視為仍在繳（多數終身險登錄時不會填到期年）。
+function payingInYear(p,year){
+ if(!policyActive(p))return false;
+ var y0=effYear(p);if(!y0||year<y0)return false;
+ var yrs=n(p.payYears);
+ return yrs>0?(year<y0+yrs):true;
+}
+function premiumByYear(c,fromYear,years){
+ var out=[],N=Math.max(1,n(years)||1);
+ for(var i=0;i<N;i++){
+  var y=n(fromYear)+i,tot=0,prot=0,inv=0;
+  (c.policies||[]).forEach(function(p){
+   if(!payingInYear(p,y))return;
+   var a=n(p.premium);tot+=a;
+   if(premiumType(p)==='理財型')inv+=a;else prot+=a;
+  });
+  out.push({year:y,total:tot,protect:prot,invest:inv});
+ }
+ return out;
+}
+function premiumByMonth(c,year){
+ var out=[];for(var m=1;m<=12;m++)out.push({month:m,amount:0});
+ (c.policies||[]).forEach(function(p){
+  if(!payingInYear(p,n(year)))return;
+  var per=premiumPerPay(p);
+  premiumMonths(p).forEach(function(mm){out[mm-1].amount+=per;});
+ });
+ return out;
+}
+function premiumByPayer(c){
+ var by={},ord=[];
+ (c.policies||[]).forEach(function(p){
+  if(!policyActive(p))return;
+  var k=p.owner||p.insured||'（未指定）';
+  if(!by[k]){by[k]={payer:k,total:0,count:0};ord.push(k);}
+  by[k].total+=n(p.premium);by[k].count++;
+ });
+ return ord.map(function(k){return by[k];});
+}
+
+// ── 生命資產表：給付明細（只呈現，不比對）──
+var BENEFIT_GROUPS=['壽險','意外','住院醫療','防癌','失能長照','其他'];
+function policyBenefitRows(c,member){
+ var out=[];
+ (c.policies||[]).forEach(function(p){
+  if(member&&p.insured!==member)return;
+  if(!policyActive(p))return;
+  (p.benefits||[]).forEach(function(b){
+   out.push({group:(BENEFIT_GROUPS.indexOf(b.group)>=0?b.group:'其他'),item:b.item||'',
+    amount:n(b.amount),unit:b.unit||'元',
+    policy:p.name||p.subtype||'',insurer:p.insurer||'',insured:p.insured||''});
+  });
+ });
+ return out;
+}
+function benefitsByGroup(c,member){
+ var rows=policyBenefitRows(c,member),by={};
+ BENEFIT_GROUPS.forEach(function(g){by[g]=[];});
+ rows.forEach(function(r){by[r.group].push(r);});
+ return BENEFIT_GROUPS.map(function(g){return {group:g,rows:by[g]};}).filter(function(x){return x.rows.length>0;});
+}
+
+// ── 解約金與主約效益分析 ──
+// 解約金是唯一需要人工逐年輸入的數列（保險公司給的附表），一律記「保單年度末」的金額。
+// 保單年度：自保單生效日起的第一年為第 1 保單年度；年度末＝保單周年日的前一日。
+function policyYearAt(p,calYear){var y0=effYear(p);return y0?Math.max(0,n(calYear)-y0+1):0;}
+function surrenderAt(p,polYear){
+ var r=((p&&p.surrender)||[]).filter(function(x){return n(x.year)===n(polYear);})[0];
+ return r?n(r.amount):0;
+}
+// 主約效益分析：累計已繳保費 vs（身故給付＋可領回），用倍數說話。
+function masterAnalysis(c,calYear){
+ var Y=n(calYear);
+ return (c.policies||[]).filter(function(p){return p.policyKind!=='附約';}).map(function(p){
+  var polY=policyYearAt(p,Y);
+  var yrs=n(p.payYears);
+  var paid=polY>0?n(p.premium)*(yrs>0?Math.min(polY,yrs):polY):0;
+  var sur=surrenderAt(p,polY)||n(p.cashValue);
+  var back=sum(p.paybacks||[],function(b){return paybackTotal({freq:n(b.freq),ageFrom:n(b.ageFrom),ageTo:n(b.ageTo)||n(b.ageFrom),amount:n(b.amount)});});
+  return {name:p.name||p.subtype||'',insurer:p.insurer||'',insured:p.insured||'',
+   effDate:p.effDate||'',polYear:polY,paid:paid,death:n(p.life),surrender:sur,payback:back,
+   ratio:paid>0?(n(p.life)+back)/paid:0};
+ });
+}
+
 
 function propertyGaps(c){
  return (c.goals||[]).filter(function(g){return g.type==='購屋'||g.type==='置產'}).map(function(g){
@@ -1512,6 +1758,39 @@ export {
   existingCover,
   coverageGaps,
   totalGap,
+  grossLifeNeed,
+  CHECKUP_LABEL,
+  applyCheckupParams,
+  checkupState,
+  checkupRow,
+  premiumType,
+  policyActive,
+  annualPremiumBy,
+  premiumCheckup,
+  actionCover,
+  coverageCheckupRows,
+  PAYBACK_TYPES,
+  policyPaybacks,
+  paybackInSpan,
+  paybackTotal,
+  policyPaybackBetween,
+  paybackCheckupRows,
+  effYear,
+  effMonth,
+  PAY_MODES,
+  payTimes,
+  premiumPerPay,
+  premiumMonths,
+  payingInYear,
+  premiumByYear,
+  premiumByMonth,
+  premiumByPayer,
+  BENEFIT_GROUPS,
+  policyBenefitRows,
+  benefitsByGroup,
+  policyYearAt,
+  surrenderAt,
+  masterAnalysis,
   propertyGaps,
   metrics,
   ratios,
@@ -1584,7 +1863,6 @@ export {
   visionOn,
   planActionsOn,
   baseCase,
-  actionCover,
   goalFloor,
   wishFloor,
   visionRoom,

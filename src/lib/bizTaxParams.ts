@@ -14,6 +14,7 @@ import {
   CAR_RENTAL_BIZ_CAP, PENALTY_VAT_MULT, PENALTY_VOUCHER_RATE,
   PLAN_DISCOUNT, CAP_INCOME_UP, CAP_EXPENSE_CUT, CAP_RATE, CAP_RETIRE_DELAY,
   CAP_RETIRE_CUT, CAP_VISION_CUT, CAP_RATE_STARTER,
+  CHECKUP_BAND, TRIANGLE_RISK, TRIANGLE_INVEST,
 } from "./bizTax";
 
 export const BIZ_TAX_TAG = "biz-tax";
@@ -57,6 +58,10 @@ const seed: Omit<BizTaxRow, "sortOrder">[] = [
   { key: "CAP_RETIRE_DELAY", label: "延後退休上限（年）", grp: "規劃求解", unit: "num", value: CAP_RETIRE_DELAY, basis: BIZ_TAX_BASIS, note: "" },
   { key: "CAP_RETIRE_CUT", label: "退休生活水準可調降上限（%）", grp: "規劃求解", unit: "num", value: CAP_RETIRE_CUT, basis: BIZ_TAX_BASIS, note: "" },
   { key: "CAP_VISION_CUT", label: "願景下修上限（%）", grp: "規劃求解", unit: "num", value: CAP_VISION_CUT, basis: BIZ_TAX_BASIS, note: "100 ＝ 一路走到每一項的「金額(最低)」" },
+  // 保單健檢：HAVE vs NEED 的判定門檻與理財金三角比例。同樣用 "num"（純數值百分比）。
+  { key: "CHECKUP_BAND", label: "健檢「適中」寬容帶（%）", grp: "保單健檢", unit: "num", value: CHECKUP_BAND, basis: BIZ_TAX_BASIS, note: "|HAVE−NEED|÷NEED 在此帶內判「適中」；設 0 ＝ 只要不相等就判偏高/偏低" },
+  { key: "TRIANGLE_RISK", label: "理財金三角：保障型佔年收入（%）", grp: "保單健檢", unit: "num", value: TRIANGLE_RISK, basis: BIZ_TAX_BASIS, note: "保費需求的分母，6:3:1 的 1" },
+  { key: "TRIANGLE_INVEST", label: "理財金三角：理財型佔年收入（%）", grp: "保單健檢", unit: "num", value: TRIANGLE_INVEST, basis: BIZ_TAX_BASIS, note: "6:3:1 的 3" },
 ];
 
 export function defaultBizTaxRows(): BizTaxRow[] {
