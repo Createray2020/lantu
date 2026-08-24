@@ -168,7 +168,7 @@ td.calc{white-space:nowrap}
 .report .rc{background:linear-gradient(135deg,#0d2b45,#0a2138);color:#fff;padding:24px 26px;margin:-34px -38px 22px;border-radius:14px 14px 0 0;border-bottom:3px solid #c99a5b}
 .report .rc .k{color:#c99a5b;letter-spacing:.28em;font-size:11px;font-weight:700}.report .rc h1{font-size:26px;margin-top:6px;letter-spacing:.06em}
 .pill{display:inline-block;padding:2px 9px;border-radius:6px;font-size:12px;font-weight:700}
-@media print{body *{visibility:hidden}.report,.report *{visibility:visible}.report{position:absolute;left:0;top:0;box-shadow:none;max-width:100%}}
+@media print{body *{visibility:hidden}.report,.report *{visibility:visible}.report{position:absolute;left:0;top:0;box-shadow:none;max-width:100%}.report h2{break-after:avoid;page-break-after:avoid}.report table{break-inside:auto}.report tr{break-inside:avoid;page-break-inside:avoid}.report details{break-inside:avoid-page}.report details>summary{list-style:none;color:#0d2b45}}
 .hero2{background:linear-gradient(120deg,#0d2b45,#0c232b);border:1px solid var(--line);border-radius:16px;padding:22px 26px;margin-bottom:18px}
 .hero2 .k{color:var(--amber);letter-spacing:.18em;font-size:12px;font-weight:700}.hero2 h1{font-size:26px;margin:6px 0}
 @media(max-width:820px){.shell{grid-template-columns:1fr}.side{border-right:none;border-bottom:1px solid var(--line)}.big3{grid-template-columns:1fr}}
@@ -468,7 +468,7 @@ tr.actnote td{padding-top:0;border-top:0}
   <button class="tbtn" onclick="exportJSON()">匯出</button>
   <button class="tbtn" onclick="document.getElementById('imp').click()">匯入</button>
   <input type="file" id="imp" accept=".json" style="display:none" onchange="importJSON(event)">
-  <button class="tbtn amber" onclick="window.print()">列印報告</button>
+  <button class="tbtn amber" onclick="printReport()">列印報告</button>
 </div>
 <div id="app"></div>
 <script>
@@ -8129,6 +8129,17 @@ function bizToolHTML(){var T=app.tools.biz,net=n(T.monthRev)-n(T.monthCost);
    而且獨立輸出反而更有價值——這是一份可以獨立交付、甚至獨立收費的東西。
    ⚠️ 合規閘燈號只出現在這一份與顧問端，家庭版客戶報告書不顯示（Ray 2026/08/22 拍板）。 */
 function setReportDoc(v){app.reportDoc=v;render()}
+// 列印：先把報告書裡所有 <details> 打開再叫 window.print()，印完還原。
+// 收合是螢幕上的首屏紀律，不是「這段不用給客戶看」——交到客戶手上的 PDF 少一半內容是另一回事。
+// 純 CSS 打不開 details（Chrome 128 起內容藏在 ::details-content 裡），只能用 JS。
+function printReport(){
+ var ds=[].slice.call(document.querySelectorAll('.report details'));
+ var was=ds.map(function(d){return d.open;});
+ ds.forEach(function(d){d.open=true;});
+ function restore(){ds.forEach(function(d,i){d.open=was[i];});window.removeEventListener('afterprint',restore);}
+ window.addEventListener('afterprint',restore);
+ try{window.print();}finally{setTimeout(restore,1500);}
+}
 function bizReportHTML(c){
  var p=c.profile||{},co=mainCompany(c)||{},bs=ownerBalanceSheet(c),g=gateLevel(c),L=GATE_LAMP[g.lv];
  var sg=bizSignals(c),on=sg.filter(function(s){return s.st==='on'});
@@ -8610,6 +8621,429 @@ function rGapBars(gaps){var pos=gaps.filter(function(g){return g.gap>0});if(!pos
  var mx=Math.max.apply(null,pos.map(function(g){return g.gap}))||1;
  return pos.map(function(g){var w=g.gap/mx*100;return '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#33474e"><span>'+g.member+' · '+g.kind+'</span><span style="color:#b05a4a;font-weight:700">缺口 '+fmt(g.gap)+'</span></div><div style="height:8px;background:#e2e8ea;border-radius:5px"><div style="height:100%;width:'+w.toFixed(0)+'%;background:#b05a4a;border-radius:5px"></div></div></div>'}).join('');}
 
+/* ══════════════════════════════════════════════════════════════════════════
+   報告書 · 各分類的「結果」章節（2026/08/24）
+
+   Ray 的規則：有「輸入」的面向不必給客戶看，但**輸入完會產生結果的，全部要放出來**。
+   在這之前，客戶版報告書只有十四章，教練端算出來的結果有一半以上客戶看不到——
+   保單檢查五欄表（8/24 才做的）、財務三表、置產缺口、退休三段式金流、生活願望、
+   傳承規劃（legacyNeed 早就在算，報告書一行都沒用到）、職涯與婚姻、信用與海外、
+   真實追蹤、人生護照五面向，全部只活在教練的螢幕上。
+
+   每一節照 [[feedback_圖表優先]] 走：**一張圖 ＋ ≤3 個數字，明細一律 <details> 收合**。
+   把教練端的表格原封不動搬過來會得到一份沒有人讀得完的東西——那不叫「呈現結果」。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// 章節編號與目錄：章名只寫一次（<h2>§、章名</h2>），編號依實際印出來的順序自動填。
+// 為什麼不寫死：有些章是「有資料才出現」的（真實追蹤、人生護照…），
+// 寫死編號的話，目錄會列出一個翻不到的章，而且往中間插一章要手改十幾個地方。
+var CN_NUM=['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','二十一','二十二','二十三','二十四'];
+function rNumberSections(body){
+ var titles=[],k=0;
+ var html=String(body).replace(/<h2>\u00a7\u3001([^<]*)<\/h2>/g,function(m,t){
+  titles.push(t);
+  return '<h2>'+(CN_NUM[k++]||(k))+'\u3001'+t+'</h2>';
+ });
+ return {html:html,titles:titles};
+}
+function rTOC(titles){
+ if(!titles.length)return '';
+ return '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px">'+
+  '<b style="color:#0d2b45">目錄</b><ol style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
+  titles.map(function(t){return '<li>'+esc(t)+'</li>';}).join('')+'</ol></div>';
+}
+// 報告書的三個數字：一排 KPI，不要更多。超過三個就是還沒想清楚哪個最重要。
+function rBig(items){
+ return '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 12px">'+items.map(function(x){
+  return '<div style="flex:1;min-width:150px;border:1px solid #e4dccf;background:#faf7f1;border-radius:10px;padding:10px 13px">'+
+   '<div style="color:#5a6b72;font-size:11.5px">'+esc(x[0])+'</div>'+
+   '<div style="font-size:20px;font-weight:800;color:'+(x[2]||'#0d2b45')+';line-height:1.3">'+x[1]+'</div>'+
+   (x[3]?'<div style="color:#5a6b72;font-size:11px;margin-top:2px">'+x[3]+'</div>':'')+'</div>';
+ }).join('')+'</div>';
+}
+
+// 收合的明細。教練要查得到，客戶不必先讀完。
+function rFold(title,body){
+ if(!body)return '';
+ return '<details style="margin-top:10px;border:1px solid #e6e0d4;border-radius:9px;background:#fbf9f4">'+
+  '<summary style="cursor:pointer;padding:8px 12px;font-size:12.5px;font-weight:700;color:#0d2b45">'+esc(title)+'</summary>'+
+  '<div style="padding:2px 12px 12px">'+body+'</div></details>';
+}
+function rSub(t){return '<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">'+esc(t)+'</div>';}
+function rNote(t){return '<div style="color:#5a6b72;font-size:12px;margin-top:6px;line-height:1.7">'+t+'</div>';}
+function rEmpty(t){return '<p style="color:#5a6b72;font-size:12.5px">'+esc(t)+'</p>';}
+
+// 金額長條：比大小用的。rBars 只吃百分比，這一支直接吃金額並把數字寫在旁邊。
+function rAmtBars(items,unit){
+ items=(items||[]).filter(function(x){return isFinite(n(x.val));});
+ if(!items.length)return '';
+ var mx=Math.max.apply(null,items.map(function(x){return Math.abs(n(x.val));}))||1;
+ return items.map(function(x,i){
+  var v=n(x.val),w=Math.abs(v)/mx*100;
+  return '<div style="margin-bottom:7px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#33474e">'+
+   '<span>'+esc(x.label)+(x.note?' <span style="color:#5a6b72">'+esc(x.note)+'</span>':'')+'</span>'+
+   '<span style="font-weight:700;color:'+(x.color||RCOL[i%8])+'">'+fmt(v)+(unit||'')+'</span></div>'+
+   '<div style="height:9px;background:#e9edee;border-radius:5px;overflow:hidden"><div style="height:100%;width:'+w.toFixed(1)+'%;background:'+(x.color||RCOL[i%8])+'"></div></div></div>';
+ }).join('');
+}
+
+/* ── 四、財務三表與資產布局 ───────────────────────────────────────────────── */
+// 結論先講：資產是怎麼分層的（一張圓餅），以及緊急預備金夠不夠幾個月。
+// 資產負債表／現金流量表本來就是逐列資料，收進 <details>。
+function rThreeTables(c){
+ var ct=crossTable(c),m=metrics(c),lay=assetLayout(c);
+ var order=['核心','衛星','短期保留','生活用'];
+ var tot=sum(c.assets,function(a){return aVal(a)});
+ var need=n(c.params.emergencyMonths)||6;
+ var months=m.monthExp>0?m.liquid/m.monthExp:0;
+ var bal=ct.incTotal-ct.expTotal-n(ct.saveInvest);
+ var pie=tot>0?rPie(order.map(function(k){return {name:k,pct:lay[k]||0};})):rEmpty('尚未登錄資產。');
+ function row(l,v,bold,col){
+  return '<tr><td'+(bold?' style="font-weight:800"':'')+'>'+l+'</td><td style="text-align:right'+(bold?';font-weight:800':'')+(col?';color:'+col:'')+'">'+fmt(v)+'</td></tr>';
+ }
+ var bs='<table style="flex:1;min-width:240px"><tr><th colspan="2">資產負債表</th></tr>'+
+  row('自用資產',ct.aSelf)+row('可投資資產',ct.aInv)+row('資產合計',ct.aTotal,true)+
+  row('消費型負債',ct.dCons)+row('投資型負債',ct.dInv)+row('負債合計',ct.dTotal,true)+
+  row('淨值',ct.net,true,'#b07d3d')+'</table>';
+ var cf='<table style="flex:1;min-width:240px"><tr><th colspan="2">現金流量表（年）</th></tr>'+
+  row('工作收入',ct.incWork)+row('理財收入',ct.incFin)+row('其他收入',ct.incOther)+row('收入合計',ct.incTotal,true)+
+  row('生活支出',ct.expLive)+row('貸款支出',ct.expLoan)+row('撫育／孝親',ct.expSupport)+row('保險費',ct.expIns)+row('稅賦',ct.expTax)+row('娛樂＆雜費',ct.expOther)+row('支出合計',ct.expTotal,true)+
+  row('儲蓄理財投入',ct.saveInvest)+row('年度結餘',bal,true,bal>=0?'#3f7d54':'#b05a4a')+'</table>';
+ var layRows=order.map(function(k){
+  var v=lay[k]||0;
+  var items=(c.assets||[]).filter(function(a){return assetLayer(a)===k;}).map(function(a){return esc(a.name||a.type||'');}).filter(Boolean).join('、');
+  return '<tr><td>'+k+'</td><td style="text-align:right">'+fmt(v)+'</td><td style="text-align:right">'+(tot>0?(v/tot*100).toFixed(1):'0.0')+'%</td><td style="color:#5a6b72">'+(items||'—')+'</td><td style="color:#5a6b72;font-size:11.5px">'+esc(LAYER_DESC[k]||'')+'</td></tr>';
+ }).join('');
+ return rBig([
+   ['淨值',fmt(ct.net)+' 元','#b07d3d'],
+   ['可投資資產佔比',(ct.aTotal>0?Math.round(ct.aInv/ct.aTotal*100):0)+'%',null,'可投資 '+fmt(ct.aInv)],
+   ['緊急預備金',months.toFixed(1)+' 個月',months>=need?'#3f7d54':'#b05a4a','目標 '+need+' 個月'],
+  ])+
+  rSub('資產布局（核心／衛星／短期保留／生活用）')+pie+
+  rNote('核心＝長期不動用的壓艙石；衛星＝承擔風險換取成長；短期保留＝三年內要用到的錢；生活用＝自住與日常使用的資產。四層的比例決定了這份財務結構能承受多大的波動。')+
+  rFold('財務三表明細（資產負債表・現金流量表・資產布局逐層）',
+    '<div style="display:flex;gap:16px;flex-wrap:wrap">'+bs+cf+'</div>'+
+    '<div style="margin-top:12px"><table><tr><th>層級</th><th>金額</th><th>佔比</th><th>包含項目</th><th>定義</th></tr>'+layRows+'</table></div>');
+}
+
+/* ── 五、財務目標歷程 · 生活願望 ─────────────────────────────────────────── */
+// 旅遊／休閒／奢侈品：這些是「錢要花在哪裡才像自己」的答案，不是可有可無的裝飾。
+// 客戶端只給結果：現在一年花多少、一生累計多少、哪一類佔最多。
+function rLifestyle(c){
+ var a0=n(c.profile.age),hz=n(c.params.horizon)||n(c.profile.lifeExp)||85;
+ var groups=[['旅遊',c.travel],['休閒興趣',c.hobby],['奢侈品',c.luxury]];
+ var any=groups.some(function(g){return (g[1]||[]).length;});
+ if(!any)return '';
+ function annualAt(list,age){
+  return sum(list||[],function(it){
+   if(!visionOn(it))return 0;
+   return (age>=n(it.start)&&age<=n(it.end))?n(it.amount)*(n(it.freq)||1):0;
+  });
+ }
+ function lifetime(list){var t=0;for(var a=a0;a<=hz;a++)t+=annualAt(list,a);return t;}
+ var bars=groups.map(function(g,i){return {label:g[0],val:annualAt(g[1],a0),note:'一生累計 '+fmt(lifetime(g[1])),color:RCOL[(i+1)%8]};})
+   .filter(function(x){return n(x.val)>0;});
+ var nowTotal=sum(groups,function(g){return annualAt(g[1],a0);});
+ var lifeTotal=sum(groups,function(g){return lifetime(g[1]);});
+ var cnt=sum(groups,function(g){return (g[1]||[]).filter(visionOn).length;});
+ var rows=[];
+ groups.forEach(function(g){
+  (g[1]||[]).forEach(function(it){
+   rows.push('<tr><td>'+g[0]+'</td><td>'+esc(it.sub||it.cat||'')+'</td><td>'+n(it.start)+'–'+n(it.end)+' 歲</td>'+
+    '<td style="text-align:right">'+fmt(n(it.amount))+'</td><td style="text-align:right">'+(n(it.freq)||1)+' 次/年</td>'+
+    '<td>'+(visionOn(it)?'納入':'<span style="color:#8a9aa2">暫不納入</span>')+'</td></tr>');
+  });
+ });
+ return rSub('生活願望（旅遊・休閒・奢侈品）')+
+  rBig([
+   ['現在每年',fmt(nowTotal)+' 元','#b07d3d'],
+   ['一生累計（現值）',fmt(lifeTotal)+' 元'],
+   ['納入的項目',cnt+' 項'],
+  ])+
+  (bars.length?rAmtBars(bars,' 元/年'):rEmpty('目前這一段沒有落在現在這個年齡的願望項目。'))+
+  rNote('這些是週期性支出，已經整筆計入現金流投影——不是「有餘力再說」的額外項目，而是這份規劃本來就替你留下的預算。')+
+  rFold('生活願望逐項明細','<table><tr><th>分類</th><th>類型</th><th>期間</th><th>每次預算</th><th>頻率</th><th>本次規劃</th></tr>'+rows.join('')+'</table>');
+}
+
+/* ── 五、財務目標歷程 · 置產缺口 ─────────────────────────────────────────── */
+function rPropertyGap(c){
+ var ps=propertyGaps(c);
+ if(!ps.length)return '';
+ return rSub('置產缺口（購屋・置產）')+
+  rAmtBars(ps.map(function(g){return {label:g.name||'置產',val:g.gap,note:'目標價 '+fmt(g.fv)+'・可貸 '+fmt(g.loan),color:g.gap>0?'#b05a4a':'#3f7d54'};}),' 元')+
+  rNote('缺口＝目標年度的預估房價 − 可貸款金額 − 已準備。房價依「年漲幅」推到購置那一年，所以離現在越遠，需要準備的自備款越多。');
+}
+
+/* ── 六、退休與教育 · 退休三段式金流 ─────────────────────────────────────── */
+// 退休不是一個時點，是三段：還在工作、剛退休、老後。三段的收支長得完全不一樣。
+function rRetireFlow(c){
+ var proj=projection(c),ra=n(c.profile.retireAge),a0=n(c.profile.age);
+ var from=Math.max(a0,ra-3),to=Math.min(n(c.params.horizon)||85,ra+12);
+ var rows=proj.rows.filter(function(r){return r.age>=from&&r.age<=to;});
+ if(!rows.length)return '';
+ var W=740,H=200,pad=44,bw=Math.max(4,(W-pad*2)/rows.length*0.42);
+ var vals=[];rows.forEach(function(r){vals.push(r.work+r.fin,-(r.expense+r.debt+r.goal));});vals.push(0);
+ var mx=Math.max.apply(null,vals),mn=Math.min.apply(null,vals),span=(mx-mn)||1;
+ function X(i){return pad+(i+0.5)/rows.length*(W-pad*2);}
+ function Y(v){return pad+(1-(v-mn)/span)*(H-pad*2);}
+ var zeroY=Y(0);
+ var bars=rows.map(function(r,i){
+  var inc=r.work+r.fin,out=r.expense+r.debt+r.goal,x=X(i);
+  return '<rect x="'+(x-bw-1).toFixed(1)+'" y="'+Math.min(Y(inc),zeroY).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.abs(Y(inc)-zeroY).toFixed(1)+'" fill="#6f8f74" rx="1.5"/>'+
+   '<rect x="'+(x+1).toFixed(1)+'" y="'+Math.min(Y(-out),zeroY).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.abs(Y(-out)-zeroY).toFixed(1)+'" fill="#c8a08c" rx="1.5"/>';
+ }).join('');
+ var ticks=rows.map(function(r,i){return (i%2===0||r.age===ra)?'<text x="'+X(i).toFixed(0)+'" y="'+(H-8)+'" fill="#8a97a0" font-size="9.5" text-anchor="middle"'+(r.age===ra?' font-weight="800" fill="#b07d3d"':'')+'>'+r.age+'</text>':'';}).join('');
+ var raIdx=rows.map(function(r){return r.age;}).indexOf(ra);
+ var raLine=raIdx>=0?'<line x1="'+X(raIdx).toFixed(1)+'" y1="'+pad+'" x2="'+X(raIdx).toFixed(1)+'" y2="'+(H-pad)+'" stroke="#b07d3d" stroke-dasharray="4 3"/><text x="'+X(raIdx).toFixed(1)+'" y="'+(pad-6)+'" fill="#b07d3d" font-size="10" font-weight="700" text-anchor="middle">退休 '+ra+' 歲</text>':'';
+ var tbl=rows.map(function(r){
+  var out=r.expense+r.debt+r.goal;
+  return '<tr'+(r.age===ra?' style="background:#faf3e6"':'')+'><td>'+r.age+(r.age===ra?' 退休':'')+'</td><td style="text-align:right">'+fmt(r.work)+'</td><td style="text-align:right">'+fmt(r.fin)+'</td><td style="text-align:right">'+fmt(out)+'</td><td style="text-align:right;color:'+(r.bal>=0?'#3f7d54':'#b05a4a')+'">'+fmt(r.bal)+'</td></tr>';
+ }).join('');
+ return rSub('退休前後的三段式金流（'+from+'–'+to+' 歲）')+
+  '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="max-width:'+W+'px;display:block">'+rAxisY(mn,mx,pad,W,H)+
+   '<line x1="'+pad+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-pad)+'" y2="'+zeroY.toFixed(1)+'" stroke="#d9b8ac"/>'+bars+raLine+ticks+'</svg>'+
+  '<div style="font-size:12px;color:#33474e;margin-top:4px"><span style="color:#6f8f74;font-weight:700">■ 收入（工作＋理財）</span>　<span style="color:#b0836a;font-weight:700">■ 支出（生活＋負債＋目標）</span></div>'+
+  rNote('退休那一年綠色柱會忽然縮短——工作收入停掉，只剩理財收入。這張圖真正要看的是：綠柱縮短之後，橘柱有沒有跟著縮，以及中間那段差距要靠多少資產去填。')+
+  rFold('退休前後逐年金流明細','<table><tr><th>年齡</th><th>工作收入</th><th>理財收入</th><th>年支出</th><th>年度結餘</th></tr>'+tbl+'</table>');
+}
+
+/* ── 六、退休與教育 · 子女教育逐階段 ─────────────────────────────────────── */
+function rEduDetail(c){
+ var ed=(c.education||[]).filter(function(e){return n(e.annual)>0||n(e.years)>0;});
+ if(!ed.length)return '';
+ var g=n(c.params.tuitionGrowth)/100,a0=n(c.profile.age);
+ var rows=ed.map(function(e){
+  var s=n(e.startIn),yy=n(e.years),an=n(e.annual),t=0;
+  for(var k=0;k<yy;k++)t+=an*Math.pow(1+g,s+k);
+  return {child:e.child||'子女',stage:e.stage||'',school:e.schoolType||'',annual:an,years:yy,startAge:a0+s,total:t};
+ });
+ var tblRows=rows.map(function(r){
+  return '<tr><td>'+esc(r.child)+'</td><td>'+esc(r.stage)+(r.school?'（'+esc(r.school)+'）':'')+'</td><td>'+r.startAge+' 歲起 '+r.years+' 年</td>'+
+   '<td style="text-align:right">'+fmt(r.annual)+'</td><td style="text-align:right">'+fmt(r.total)+'</td></tr>';
+ }).join('');
+ return rSub('子女教育金逐階段')+
+  rAmtBars(rows.map(function(r,i){return {label:r.child+(r.stage?' · '+r.stage:''),val:r.total,note:r.startAge+' 歲起 '+r.years+' 年',color:RCOL[(i+2)%8]};}),' 元')+
+  rNote('金額是把今日學費依每年 '+(g*100).toFixed(1)+'% 的上漲率推到實際就讀那幾年之後的合計（終值）。越晚就讀的階段，同樣的學校會貴得越多。')+
+  rFold('教育金逐階段明細','<table><tr><th>子女</th><th>階段</th><th>期間</th><th>年費用(現值)</th><th>合計(終值)</th></tr>'+tblRows+'</table>');
+}
+
+/* ── 八、保單檢查報告（整章） ───────────────────────────────────────────── */
+// 五欄比對表（項目｜HAVE｜NEED｜狀況｜調整方向）的淺色版。
+// 深色版在 checkupTable()，兩邊的欄位定義一模一樣，只是換皮。
+function rCheckupTable(rows,empty){
+ if(!rows||!rows.length)return rEmpty(empty||'尚無可比對的項目。');
+ var spanCol=rows.some(function(r){return r.span;});
+ var head='<tr><th>項目</th>'+(spanCol?'<th>期間</th>':'')+'<th style="text-align:right">現在保單 HAVE</th><th style="text-align:right">現在需求 NEED</th><th>狀況</th><th>調整方向</th></tr>';
+ var body=rows.map(function(r){
+  var col=r.state==='mid'?'#3f7d54':(r.state==='low'?'#b05a4a':'#b5852f');
+  return '<tr><td>'+esc(r.item)+'</td>'+(spanCol?'<td style="color:#5a6b72;font-size:11.5px">'+esc(r.span||'—')+'</td>':'')+
+   '<td style="text-align:right">'+(r.have>0?fmt(r.have)+' '+esc(r.unit):'—')+'</td>'+
+   '<td style="text-align:right;color:#b07d3d">'+(r.need>0?fmt(r.need)+' '+esc(r.unit):'—')+'</td>'+
+   '<td style="color:'+col+';font-weight:700;white-space:nowrap">'+esc(r.label||'')+'</td>'+
+   '<td style="color:'+(r.state==='mid'?'#5a6b72':col)+'">'+esc(checkupDirText(r).replace(/<[^>]*>/g,''))+'</td></tr>';
+ }).join('');
+ return '<table>'+head+body+'</table>';
+}
+// 全家保障地圖：成員 × 險種的紅黃綠。這張是「一眼看出誰沒保到什麼」，比任何表都快。
+function rCoverageMatrix(c){
+ var mtx=coverageMatrix(c);
+ if(!mtx.rows.length)return '';
+ var MK={g:['✓','#3f7d54','#e8f1ea'],y:['△','#b5852f','#faf1de'],r:['✕','#b05a4a','#f7e7e3'],n:['—','#a9b3b6','#f4f4f2']};
+ var head='<tr><th>成員</th>'+mtx.cols.map(function(x){return '<th style="text-align:center;font-size:11.5px">'+esc(x)+'</th>';}).join('')+'</tr>';
+ var body=mtx.rows.map(function(r){
+  return '<tr><td style="white-space:nowrap">'+esc(r.name)+(r.role?' <span style="color:#5a6b72;font-size:11px">'+esc(r.role)+'</span>':'')+'</td>'+
+   r.cells.map(function(cl){var mk=MK[cl.s]||MK.n;
+    return '<td style="text-align:center;background:'+mk[2]+';color:'+mk[1]+';font-weight:800">'+mk[0]+'</td>';}).join('')+'</tr>';
+ }).join('');
+ return rSub('全家保障地圖')+'<div style="overflow-x:auto"><table style="min-width:520px">'+head+body+'</table></div>'+
+  rNote('<b style="color:#3f7d54">✓ 足額</b>　<b style="color:#b5852f">△ 不足（已備不到需求的六成）</b>　<b style="color:#b05a4a">✕ 未保</b>　<span style="color:#8a9aa2">— 不適用</span>');
+}
+function rPolicyCheckup(c){
+ var pm=premiumCheckup(c),cov=coverageCheckupRows(c),pay=paybackCheckupRows(c);
+ var all=[].concat(pm.rows,cov,pay);
+ // ⚠️ 不能只看 all.length：premiumCheckup() 永遠回兩列（保障型／理財型保費），
+ //    全新客戶因此永遠「有列」，只是每一列都是 0 對 0。要看的是有沒有任何一個數字。
+ if(!all.some(function(r){return n(r.need)>0||n(r.have)>0;}))
+  return rEmpty('尚未登錄保單與保障需求，這一章會在資料補齊後自動出現。');
+ var todo=all.filter(function(r){return r.state!=='mid'&&(r.need>0||r.have>0);}).length;
+ var mtx=coverageMatrix(c),applic=0,green=0;
+ mtx.rows.forEach(function(r){r.cells.forEach(function(cl){if(cl.s!=='n'){applic++;if(cl.s==='g')green++;}});});
+ var covPct=applic?Math.round(green/applic*100):0;
+ var premPct=pm.income>0?Math.round(pm.ratio*1000)/10:0;
+ // 保費結構
+ var Y=(new Date()).getFullYear();
+ var byYear=premiumByYear(c,Y,10);
+ var yRows=byYear.map(function(r){return '<tr><td>'+r.year+'</td><td style="text-align:right">'+fmt(r.total)+'</td><td style="text-align:right">'+fmt(r.protect)+'</td><td style="text-align:right">'+fmt(r.invest)+'</td></tr>';}).join('');
+ var premPie=(pm.protect>0||pm.invest>0)?rPie([{name:'保障型',pct:pm.protect},{name:'理財型',pct:pm.invest}]):'';
+ // $領回
+ var pb=policyPaybacks(c);
+ var pbRows=pb.map(function(b){
+  return '<tr><td>'+esc(b.policy)+'</td><td>'+esc(b.type)+'</td><td>'+esc(b.receiver)+'</td><td>'+b.ageFrom+(b.ageTo!==b.ageFrom?'–'+b.ageTo:'')+' 歲</td>'+
+   '<td style="text-align:right">'+fmt(b.amount)+'</td><td style="text-align:right">'+fmt(paybackTotal(b))+'</td></tr>';
+ }).join('');
+ var pbTotal=sum(pb,function(b){return paybackTotal(b);});
+ return rBig([
+   ['年繳保費佔年收入',(pm.income>0?premPct+'%':'—'),premPct>13?'#b05a4a':'#0d2b45','保障型 '+fmt(pm.protect)+'／理財型 '+fmt(pm.invest)],
+   ['待調整項目',todo+' 項',todo?'#b05a4a':'#3f7d54','共比對 '+all.length+' 項'],
+   ['保障覆蓋率',covPct+'%',covPct>=80?'#3f7d54':'#b5852f','綠格 '+green+'/'+applic],
+  ])+
+  '<div style="margin:4px 0 12px">'+checkupChartSVG(c,'light')+'</div>'+
+  rNote('這張圖把「現在的保單」拿去對「現在的需求」：虛線是需求 100%，長條沒碰到線就是不足，衝過頭太多就是重複投保。保障不是越多越好，是剛好對得上。')+
+  rSub('1 保費')+rCheckupTable(pm.rows)+
+  rSub('2 保障')+rCheckupTable(cov,'尚未建立保障需求。')+
+  rNote('「住院醫療」的金額為定額給付＋實支實付的每日病房費。')+
+  rSub('3 $領回')+rCheckupTable(pay,'尚未建立退休或理財目標。')+
+  rCoverageMatrix(c)+
+  rSub('保費結構')+(premPie||rEmpty('尚未登錄保費。'))+
+  rFold('未來十年的保費（依生效日與繳別推算）','<table><tr><th>年度</th><th>合計</th><th>保障型</th><th>理財型</th></tr>'+yRows+'</table>')+
+  (pb.length?rSub('保單可領回（$生存／$滿期／$祝壽／$年金／$投資）')+
+    rBig([['可領回總額',fmt(pbTotal)+' 元','#b07d3d'],['筆數',pb.length+' 筆']])+
+    rFold('領回明細','<table><tr><th>保單</th><th>型別</th><th>領受人</th><th>期間</th><th>每次</th><th>合計</th></tr>'+pbRows+'</table>')
+   :'');
+}
+
+/* ── 十一、傳承規劃 ─────────────────────────────────────────────────────── */
+// legacyNeed() 一直都在算，但報告書從來沒有印出來過——客戶看不到自己交代過的那件事。
+function rLegacy(c){
+ var lg=c.legacy||{};
+ if(lg.on===false)return rSub('傳承規劃')+rEmpty('本次規劃不處理傳承（資料仍保留，日後可隨時納入）。');
+ var need=legacyNeed(c);
+ if(!(need>0)&&!n(lg.heirs))return '';
+ var es=estateTax(c),m=metrics(c);
+ return rBig([
+   ['傳承總需求（現金）',fmt(need)+' 元','#b07d3d',n(lg.heirs)+' 位 × 每人 '+fmt(lg.perHeirCash)],
+   ['預估遺產稅',fmt(es.tax)+' 元',es.tax>0?'#b05a4a':'#3f7d54','課稅遺產淨額 '+fmt(es.base)],
+   ['目前淨值',fmt(m.net)+' 元'],
+  ])+
+  rAmtBars([
+    {label:'要留給下一代的現金',val:need,color:'#b07d3d'},
+    {label:'預估遺產稅（要先繳的）',val:es.tax,color:'#b05a4a'},
+    {label:'目前淨值',val:m.net,color:'#5a7186'},
+   ],' 元')+
+  (String(lg.perHeirNote||'').trim()?rNote('每人另外約定：'+esc(lg.perHeirNote)):'')+
+  rNote('傳承要準備的是「現金」，不是資產總額。房子與股權不能直接拿去繳稅，'+
+   (lg.feedEstate?'本次規劃已把傳承金額納入遺產稅的試算。':'本次規劃尚未把傳承金額納入遺產稅試算（可於規劃中調整）。')+
+   '遺產稅為簡化估算，實際以稽徵機關核定為準。');
+}
+
+/* ── 十三、其他規劃面向（職涯・婚姻・信用・海外） ───────────────────────── */
+function rOtherAspects(c){
+ var out=[],cr=c.credit||{},ov=c.overseas||{},ca=c.career||{},mg=c.marriage||{};
+ var score=creditScoreOf(c);
+ // 職涯
+ if(ca.plan&&ca.plan!=='無'){
+  out.push(rSub('職涯規劃')+'<table>'+
+   '<tr><td>方向</td><td>'+esc(ca.plan)+'</td></tr>'+
+   (ca.switchAge?'<tr><td>預計轉換年齡</td><td>'+esc(ca.switchAge)+' 歲</td></tr>':'')+
+   (n(ca.switchFund)?'<tr><td>轉換期需準備</td><td>'+fmt(ca.switchFund)+' 元</td></tr>':'')+
+   (ca.startupType?'<tr><td>創業型態</td><td>'+esc(ca.startupType)+'</td></tr>':'')+
+   (n(ca.startupBudget)?'<tr><td>創業預算</td><td>'+fmt(ca.startupBudget)+' 元</td></tr>':'')+
+   '</table>'+rNote('轉職與創業都會讓收入中斷一段時間，這筆準備金要與緊急預備金分開放——兩者被同一筆錢覆蓋，等於兩件事都沒準備。'));
+ }
+ // 婚姻
+ if(mg.plan==='是'){
+  out.push(rSub('婚姻規劃')+'<table>'+
+   (mg.age?'<tr><td>預計年齡</td><td>'+esc(mg.age)+' 歲</td></tr>':'')+
+   (n(mg.budget)?'<tr><td>預算（理想／最低）</td><td>'+fmt(mg.budget)+' ／ '+fmt(mg.minBudget)+' 元</td></tr>':'')+
+   '</table>');
+ }
+ // 信用
+ if(score||cr.cards||cr.payFull){
+  var band=score>=800?'極優':score>=700?'優良':score>=600?'一般':score>=400?'待改善':'需重建';
+  var col=score>=700?'#3f7d54':score>=600?'#b5852f':'#b05a4a';
+  out.push(rSub('信用現況')+
+   rBig([
+     ['聯徵信用評分',(score?score+' 分':'未填'),col,(score?band:'建議向聯徵中心申請信用報告')],
+     ['信用卡',n(cr.cards)+' 家',null,'每期全額繳清：'+esc(cr.payFull||'—')],
+     ['五年內不良紀錄',esc(cr.badRecord5yr||'—'),cr.badRecord5yr==='是'?'#b05a4a':'#3f7d54'],
+    ])+
+   rNote('信用分數直接影響房貸與信貸能拿到的利率，也是財務健康度「安全度」的其中一項加權（(分數−200)/600）。'+
+    (cr.installment==='有'?'目前有信用卡分期，分期利率通常遠高於一般貸款，建議優先清償。':'')));
+ }
+ // 海外
+ if(ov.hasAssets==='是'||ov.identity==='是'){
+  out.push(rSub('海外資產與身份')+'<table>'+
+   '<tr><td>海外資產</td><td>'+esc(ov.hasAssets||'否')+(ov.assetTypes?'（'+esc(ov.assetTypes)+'）':'')+'</td></tr>'+
+   '<tr><td>海外身份</td><td>'+esc(ov.identity||'否')+'</td></tr>'+
+   (ov.purpose?'<tr><td>用途</td><td>'+esc(ov.purpose)+'</td></tr>':'')+
+   '</table>'+rNote('有海外資產或身份時，稅務居民身份、CRS 資訊交換與遺產稅的計算方式都會不同，建議與會計師一併確認。'));
+ }
+ return out.join('');
+}
+
+/* ── 十四、缺口帳 ───────────────────────────────────────────────────────── */
+// 「總缺口」＝現值缺口 shortPV，不是把退休缺口＋保障缺口＋目標缺口相加。
+// 相加會重複計算同一筆錢，而且沒有折現，數字會大到沒有意義。
+function rGapLedger(c){
+ var g=gapPV(c),rn=retireNeed(c),m=metrics(c);
+ if(!(g>0))return rSub('缺口帳')+'<p style="color:#3f7d54;font-size:13px">依目前的收入、支出與資產推算，這份規劃在期間內<b>沒有出現現金流缺口</b>——每一年的支出都支應得過去。</p>';
+ var lifeNeedPV=Math.max(1,g+Math.max(0,m.net));
+ return rSub('缺口帳：還差多少')+
+  rBig([
+   ['現值缺口',fmt(g)+' 元','#b05a4a','折現到今天的金額'],
+   ['願景達成度',Math.round(Math.max(0,1-g/lifeNeedPV)*100)+'%'],
+   ['退休缺口',fmt(rn.gap)+' 元',rn.gap>0?'#b05a4a':'#3f7d54'],
+  ])+
+  rNote('現值缺口是把「未來每一年不夠的錢」全部折現到今天之後的一個總數。它<b>不是</b>退休缺口＋保障缺口＋目標缺口的加總——那樣會把同一筆錢算好幾次。要補的就是這一個數字，補的方式見「調整方案書」。');
+}
+
+/* ── 十五、真實追蹤與人生護照 ───────────────────────────────────────────── */
+function rTracking(c){
+ var tk=(c.tracking||[]).filter(function(t){return n(t.net)!==0||n(t.age)!==0;});
+ var pr=((c.passport||{}).result)||null;
+ if(!tk.length&&!pr)return '';
+ var out='';
+ if(tk.length){
+  var proj=projection(c),rows=proj.rows;
+  var W=740,H=210,pad=46;
+  var all=rows.map(function(r){return r.net;}).concat(tk.map(function(t){return n(t.net);})).concat([0]);
+  var mx=Math.max.apply(null,all),mn=Math.min.apply(null,all),span=(mx-mn)||1;
+  var a0=rows[0].age,aN=rows[rows.length-1].age;
+  function X(ag){return pad+(ag-a0)/((aN-a0)||1)*(W-pad*2);}
+  function Y(v){return pad+(1-(v-mn)/span)*(H-pad*2);}
+  var line=rows.map(function(r,i){return (i?'L':'M')+X(r.age).toFixed(1)+' '+Y(r.net).toFixed(1);}).join(' ');
+  var tline=tk.length>1?'<path d="'+tk.map(function(t,i){return (i?'L':'M')+X(n(t.age)).toFixed(1)+' '+Y(n(t.net)).toFixed(1);}).join(' ')+'" fill="none" stroke="#0d2b45" stroke-width="2.2"/>':'';
+  var dots=tk.map(function(t){return '<circle cx="'+X(n(t.age)).toFixed(1)+'" cy="'+Y(n(t.net)).toFixed(1)+'" r="4" fill="#0d2b45"/>';}).join('');
+  var ticks='';for(var i=0;i<rows.length;i+=5)ticks+='<text x="'+X(rows[i].age).toFixed(0)+'" y="'+(H-8)+'" fill="#8a97a0" font-size="9.5" text-anchor="middle">'+rows[i].age+'</text>';
+  var last=tk[tk.length-1];
+  var simAt=rows.filter(function(r){return r.age===n(last.age);})[0];
+  var diff=simAt?n(last.net)-simAt.net:0;
+  out+=rBig([
+    ['最近一次實際淨值',fmt(last.net)+' 元','#0d2b45',n(last.year)+' 年 · '+n(last.age)+' 歲'],
+    ['與模擬的差距',(diff>=0?'+':'')+fmt(diff)+' 元',diff>=0?'#3f7d54':'#b05a4a'],
+    ['已追蹤',tk.length+' 個年度'],
+   ])+
+   '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="max-width:'+W+'px;display:block">'+rAxisY(mn,mx,pad,W,H)+
+    '<line x1="'+pad+'" y1="'+Y(0).toFixed(1)+'" x2="'+(W-pad)+'" y2="'+Y(0).toFixed(1)+'" stroke="#d9b8ac" stroke-dasharray="4 4"/>'+
+    '<path d="'+line+'" fill="none" stroke="#7f97ac" stroke-width="2.2"/>'+tline+dots+ticks+
+    '<text x="'+(W-pad)+'" y="'+(Y(rows[rows.length-1].net)-6).toFixed(1)+'" fill="#7f97ac" font-size="10.5" font-weight="700" text-anchor="end">模擬</text>'+
+    '<text x="'+X(n(last.age)).toFixed(1)+'" y="'+(Y(n(last.net))-9).toFixed(1)+'" fill="#0d2b45" font-size="10.5" font-weight="700" text-anchor="middle">實際</text>'+
+    '</svg>'+
+   rNote('灰藍線是規劃當初的模擬走勢，深藍點是每年實際結算的淨值。兩條線貼在一起代表計畫正在被執行；持續往下偏離，就是該回頭檢視假設或執行方式的訊號。')+
+   rFold('逐年實際淨值','<table><tr><th>年度</th><th>年齡</th><th>實際淨資產</th></tr>'+
+     tk.map(function(t){return '<tr><td>'+n(t.year)+'</td><td>'+n(t.age)+' 歲</td><td style="text-align:right">'+fmt(t.net)+'</td></tr>';}).join('')+'</table>');
+ }
+ if(pr){
+  // ⚠️ 退休是「每月」、其餘四項是「一次性總額」——量綱不同，不能畫在同一個共用刻度上。
+  //    42,000 對 1,200 萬畫在一起，退休那根柱子的長度會是 0.35%，等於整根消失。
+  //    退休單獨放一個數字，四項一次性的才畫柱。
+  var lump=[
+   ['購屋','負擔得起這個價位的房子',pr.house.price],
+   ['購車','負擔得起這個價位的車',pr.car.price],
+   ['子女','每位養到 '+n(pr.support.raiseToAge)+' 歲的總花費',pr.support.perChildCost],
+   ['旅遊','可累積的旅遊基金',pr.travel.fund],
+  ].filter(function(x){return n(x[2])>0;});
+  var rm=n(pr.retire.presentMonthly);
+  if(lump.length||rm>0){
+   out+=rSub('人生護照 · 五面向能力分析')+
+    (rm>0?rBig([['退休後每月可支應',fmt(Math.round(rm))+' 元','#b07d3d','現值 · '+n(pr.retire.retireAge)+' 歲退休']]):'')+
+    (lump.length?rAmtBars(lump.map(function(x,i){return {label:x[0],val:x[2],note:x[1],color:RCOL[(i+1)%8]};}),' 元'):'')+
+    rNote('這是你當初在人生護照裡自己填的五個面向，換算成「以目前的存錢速度，各自能做到什麼程度」。它是這份完整規劃的起點，放在最後是為了對照：走了一圈之後，哪幾項已經被正式排進計畫了。');
+  }
+ }
+ return out;
+}
+
 // 一行講完「這個人在做什麼」：工作類別｜公司｜職務。
 // 空欄一律略過而不是印「—」，否則沒填公司的自由工作者會看到一串破折號。
 // 企業主的公司名稱優先取公司主檔（那才是有統編的那一家），沒有才退回自填的 jobCompany。
@@ -8640,6 +9074,7 @@ function bgReportHTML(c){
 function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGaps(c),adv=advice(c),proj=m.proj,p=c.profile,rn=retireNeed(c);
  var ct=crossTable(c),it=incomeTax(c),es=estateTax(c),al=allocInfo(c),s=scenario(c),mc=monteCarlo(c);
  var ptax=propertyTax(c),lg=legacyNeed(c),acts=actionList(c);
+ var trkHTML=rTracking(c);
  var actRep=acts.map(function(a){return '<tr><td style="text-align:center;font-weight:700;color:#c99a5b">'+a.axis+'</td><td>'+esc(a.title)+'</td><td>'+esc(a.detail)+'</td></tr>'}).join('');
  var allocRep=al.list.filter(function(x){return n(x.pct)>0}).map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+n(x.pct)+'%</td><td>'+n(x.ret)+'%</td><td>'+esc(x.benefit)+'</td></tr>'}).join('');
  var memRows=(c.members||[]).map(function(x,xi){return '<tr><td>'+esc(x.name)+'</td><td>'+x.role+'</td><td>'+n(x.age)+' 歲</td><td>'+n(x.depRatio)+'%</td><td>'+(isEarnerRole(x.role)?jobLineText(c,x,xi===primaryIdx(c)):'—')+'</td></tr>'}).join('');
@@ -8652,14 +9087,15 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  var aLiq=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0}),aFix=sum(c.assets,function(a){return a.cls==='固定'?aVal(a):0});
  var assetPie=[{name:'流動資產',pct:aLiq},{name:'固定資產',pct:aFix}];
  var hp=h.parts;
- return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>財務規劃報告書</h1></div>'+
+ var head='<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>財務規劃報告書</h1></div>'+
   (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>')+'</div>'+
-  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務階段 <b style="color:#e0bd8b">'+stageName(h.grade)+'</b>'+docCodeHTML()+'<span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>'+
+  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務階段 <b style="color:#e0bd8b">'+stageName(h.grade)+'</b>'+docCodeHTML()+'<span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>';
 
-  '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px"><b style="color:#0d2b45">目錄</b><ol style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
-   ['財務健康總覽','收支與資產結構','現況財務指標','財務目標歷程','退休與教育需求','風險保障缺口','現金流投影與機率','稅賦分析','投資風險屬性與建議配置','規劃前／後對照','規劃執行建議','執行行動清單','動態調整（PDCA）','注意事項'].map(function(t){return '<li>'+t+'</li>'}).join('')+'</ol></div>'+
-
-  '<h2>一、財務健康總覽</h2>'+
+ // 章節先組起來，編號與目錄最後才由 rNumberSections() 依「實際印出來的章」自動產生。
+ // 舊版是把「一、二、三…」寫死在字串裡、目錄再手抄一份 —— 只要有一章因為沒資料被略過
+ // （例如還沒開始追蹤的客戶沒有「真實追蹤」），目錄就會列出一個翻不到的章名，
+ // 而且往中間插一章要手改十幾個編號。章名只寫一次，編號自動接。
+ var body='<h2>§、財務健康總覽</h2>'+
   '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+rGauge('財務安全度',h.safety)+rGauge('財務自由度',h.freedom)+rGauge('願景達成度',h.vision)+'</div>'+
   '<div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:1;min-width:230px">'+rBars([{label:'收支平衡',val:hp['收支平衡']},{label:'預備金',val:hp['預備金']},{label:'信用',val:hp['信用']},{label:'負債平衡',val:hp['負債平衡']},{label:'風險保全',val:hp['風險保全'],color:'#c99a5b'}])+'</div>'+
    '<div style="min-width:172px;text-align:center"><div style="color:#5a6b72;font-size:12px">財務階段</div><div style="font-size:30px;font-weight:800;letter-spacing:.04em;margin:4px 0 2px;color:'+stageColor(h.grade,1)+'">'+stageName(h.grade)+'</div><div style="font-size:12px;color:#33474e;line-height:1.6">'+stageTask(h.grade)+'</div><div style="font-size:11px;color:#5a6b72;margin-top:4px">'+stageReason(h)+'</div></div></div>'+stageReportNote(h)+
@@ -8672,36 +9108,46 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
    '<tr><td>關注議題</td><td>'+esc(((c.intent||{}).purposes||[]).join('、')||'—')+'</td></tr><tr><td>必須達成 · 優先序</td><td>'+(orderedMustText(c)||'—')+'</td></tr><tr><td>淨資產 / 年收入 / 年支出</td><td>'+fmt(m.net)+' ／ '+fmt(m.incTotal)+' ／ '+fmt(m.expTotal)+'</td></tr></table>'+
 
   (((c.lifeGoals||[]).length)?'<div style="margin-top:12px;color:#0d2b45;font-weight:700;font-size:13px">這些目標對你的意義</div><table style="margin-top:4px"><tr><th>目標</th><th>價值觀／重要原因</th><th>對應模組</th></tr>'+(c.lifeGoals||[]).map(function(g){return '<tr><td>'+esc(g.name)+'</td><td>'+esc(g.value)+'</td><td>'+esc(g.linkModule||'')+'</td></tr>'}).join('')+'</table>':'')+
-  '<h2>二、收支與資產結構</h2>'+
+  '<h2>§、收支與資產結構</h2>'+
   '<div style="display:flex;gap:20px;flex-wrap:wrap"><div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">收入比重</div>'+rPie(incPie)+'</div>'+
    '<div style="flex:1;min-width:250px"><div style="color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">支出比重</div>'+rPie(expPie)+'</div></div>'+
   '<div style="margin-top:14px;color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">資產結構</div>'+rPie(assetPie)+
   rIncomeDetail(c)+
   '<div style="margin-top:14px;color:#0d2b45;font-weight:700;font-size:13px;margin-bottom:6px">財務十字表</div>'+rCross(ct)+
 
-  '<h2>三、現況財務指標</h2><div style="color:#5a6b72;font-size:12px;margin-bottom:6px">協會標準財務比率體檢；綠＝達標、橙＝待留意、紅＝需改善。</div><div style="color:#0d2b45;font-weight:700;font-size:13px;margin:8px 0 4px">收支流量</div>'+ratioTblR('收支流量')+'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:10px 0 4px">資產負債</div>'+ratioTblR('資產負債')+
+  '<h2>§、現況財務指標</h2><div style="color:#5a6b72;font-size:12px;margin-bottom:6px">協會標準財務比率體檢；綠＝達標、橙＝待留意、紅＝需改善。</div><div style="color:#0d2b45;font-weight:700;font-size:13px;margin:8px 0 4px">收支流量</div>'+ratioTblR('收支流量')+'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:10px 0 4px">資產負債</div>'+ratioTblR('資產負債')+
 
-  '<h2>四、財務目標歷程</h2>'+
+  '<h2>§、財務三表與資產布局</h2>'+rThreeTables(c)+
+
+  '<h2>§、財務目標歷程</h2>'+
   ((((c.intent||{}).mustHave||[]).length)?'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:0 0 4px">必須達成的人生目標（依優先序）</div><div style="color:#33474e;font-size:13px;margin-bottom:8px">'+esc(orderedMustText(c))+'</div><div style="color:#5a6b72;font-size:12px;margin-bottom:10px">未列於上表的目標，本次規劃不納入需求試算；資源不足時，將由順位在後者開始調整。</div>':'')+
   ((c.lifeGoals||[]).filter(function(g){return g.name}).length?'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:0 0 4px">人生價值環</div>'+valuesWheelSVG(c,'light'):'')+rTimeline(c)+
+  rPropertyGap(c)+rLifestyle(c)+
 
-  '<h2>五、退休與教育需求</h2>'+
+  '<h2>§、退休與教育需求</h2>'+
   '<div style="max-width:420px">'+rBars([{label:'退休總需求',val:100,color:'#7f97ac'},{label:'已準備退休金',val:rn.total?Math.min(100,rn.prepared/rn.total*100):0,color:'#6f8f74'}])+'</div>'+
   '<table style="margin-top:8px"><tr><td>退休總需求 / 已準備 / 缺口</td><td>'+fmt(rn.total)+' ／ '+fmt(rn.prepared)+' ／ <b style="color:#b05a4a">'+fmt(rn.gap)+'</b></td></tr><tr><td>子女教育金總需求(終值)</td><td><b>'+fmt(eduTotal(c))+'</b> 元</td></tr></table>'+
+  rRetireFlow(c)+rEduDetail(c)+
 
-  '<h2>六、風險保障缺口</h2><div style="color:#0d2b45;font-weight:700;font-size:13px;margin:0 0 4px">保障準備度</div>'+coverageReadinessHTML(c,'light')+rGapBars(gaps)+'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">責任遞減缺口圖</div>'+respGapCharts(c,'light')+'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">壽險需求圖（身故情境）</div>'+lifeNeedCharts(c,'light')+
+  '<h2>§、風險保障缺口</h2><div style="color:#0d2b45;font-weight:700;font-size:13px;margin:0 0 4px">保障準備度</div>'+coverageReadinessHTML(c,'light')+rGapBars(gaps)+'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">責任遞減缺口圖</div>'+respGapCharts(c,'light')+'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">壽險需求圖（身故情境）</div>'+lifeNeedCharts(c,'light')+
 
-  '<h2>七、現金流投影與機率</h2>'+
+  '<h2>§、保單檢查報告</h2><div style="color:#5a6b72;font-size:12px;margin-bottom:8px">現在的保單狀況，是否符合現在的需求（項目｜現在保單 HAVE｜現在需求 NEED｜狀況｜調整方向）。</div>'+rPolicyCheckup(c)+
+
+  '<h2>§、現金流投影與機率</h2>'+
   cashflowCharts(proj,'light',c)+
   '<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:10px 0 4px">蒙地卡羅機率區間（P10–P90，中位數橙線）</div>'+rFan(mc)+
   '<p style="color:#33474e;margin-top:6px">'+(proj.turnNeg?'可投資本金預計於 <b>'+proj.turnNeg+' 歲</b>由正轉負；':'期間內本金維持為正；')+'蒙地卡羅（'+mc.N+' 條路徑）顯示不破產機率約 <b>'+(mc.pSuccess*100).toFixed(0)+'%</b>，最終資產中位數約 '+fmt(mc.finalP50)+' 元（P10～P90：'+fmt(mc.finalP10)+'～'+fmt(mc.finalP90)+'）。</p>'+
 
-  '<h2>八、稅賦分析</h2><table><tr><td>綜合所得淨額 / 綜所稅</td><td>'+fmt(it.net)+' ／ <b>'+fmt(it.tax)+'</b>（'+(it.rate*100)+'%）</td></tr><tr><td>課稅遺產淨額 / 遺產稅</td><td>'+fmt(es.base)+' ／ <b>'+fmt(es.tax)+'</b>（'+(es.rate*100)+'%）</td></tr><tr><td>房屋稅 / 地價稅 / 牌照燃料稅(年)</td><td>'+fmt(ptax.house)+' ／ '+fmt(ptax.land)+' ／ '+fmt(ptax.car)+'（合計 '+fmt(ptax.total)+'）</td></tr></table>'+
+  '<h2>§、稅賦分析</h2><table><tr><td>綜合所得淨額 / 綜所稅</td><td>'+fmt(it.net)+' ／ <b>'+fmt(it.tax)+'</b>（'+(it.rate*100)+'%）</td></tr><tr><td>課稅遺產淨額 / 遺產稅</td><td>'+fmt(es.base)+' ／ <b>'+fmt(es.tax)+'</b>（'+(es.rate*100)+'%）</td></tr><tr><td>房屋稅 / 地價稅 / 牌照燃料稅(年)</td><td>'+fmt(ptax.house)+' ／ '+fmt(ptax.land)+' ／ '+fmt(ptax.car)+'（合計 '+fmt(ptax.total)+'）</td></tr></table>'+
 
-  '<h2>九、投資風險屬性與建議配置</h2>'+(function(){var rp=riskProfile(c);if(!rp)return '<p style="color:#5a6b72">尚未完成風險屬性測驗；建議先於「風險屬性」分頁完成 12 題 KYC 評估。</p>';var t=rp.tier;return '<p style="color:#33474e">依 KYC 測驗（'+rp.score+' / 60 分）評定為 <b style="color:'+t.color+'">'+t.name+'（'+t.en+'）</b>。'+esc(t.desc)+' 對應建議投資報酬率約 <b>'+t.rr+'%</b>、報酬波動度約 '+t.std+'%。配置方向：'+esc(t.alloc)+'</p>';})()+
+  '<h2>§、傳承規劃</h2>'+rLegacy(c)+
+
+  '<h2>§、投資風險屬性與建議配置</h2>'+(function(){var rp=riskProfile(c);if(!rp)return '<p style="color:#5a6b72">尚未完成風險屬性測驗；建議先於「風險屬性」分頁完成 12 題 KYC 評估。</p>';var t=rp.tier;return '<p style="color:#33474e">依 KYC 測驗（'+rp.score+' / 60 分）評定為 <b style="color:'+t.color+'">'+t.name+'（'+t.en+'）</b>。'+esc(t.desc)+' 對應建議投資報酬率約 <b>'+t.rr+'%</b>、報酬波動度約 '+t.std+'%。配置方向：'+esc(t.alloc)+'</p>';})()+
    (al.list.filter(function(x){return n(x.pct)>0}).length?'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">實際規劃配置</div>'+rPie(al.list)+'<table style="margin-top:10px"><tr><th>標的</th><th>比例</th><th>預期報酬</th><th>效益</th></tr>'+allocRep+'</table><p style="color:#33474e;margin-top:6px">加權預期報酬約 <b>'+al.wRet.toFixed(2)+'%</b>。</p>':'<p style="color:#5a6b72">尚未設定實際配置方案。</p>')+
 
-  '<h2>十、規劃前 / 後對照</h2><table><tr><th>指標</th><th>規劃前</th><th>規劃後</th></tr>'+
+  '<h2>§、其他規劃面向</h2>'+(rOtherAspects(c)||'<p style="color:#5a6b72">職涯、婚姻、信用與海外資產這幾項本次沒有需要特別處理的內容。</p>')+
+
+  '<h2>§、規劃前 / 後對照</h2><table><tr><th>指標</th><th>規劃前</th><th>規劃後</th></tr>'+
    '<tr><td>現值缺口</td><td>'+fmt(s.before.gap)+'</td><td>'+fmt(s.after.gap)+'</td></tr>'+
    '<tr><td>願景達成度</td><td>'+s.before.health.vision+'%</td><td>'+s.after.health.vision+'%</td></tr>'+
    '<tr><td>資產轉負年齡</td><td>'+(s.before.metrics.proj.turnNeg||'無')+'</td><td>'+(s.after.metrics.proj.turnNeg||'無')+'</td></tr>'+
@@ -8709,11 +9155,17 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
    '<tr><td>財務自由度</td><td>'+s.before.health.freedom+' 分</td><td>'+s.after.health.freedom+' 分</td></tr>'+
    '<tr><td>預估遺產稅</td><td>'+fmt(s.before.estate.tax)+'</td><td>'+fmt(s.after.estate.tax)+'</td></tr></table>'+
 
-  '<h2>十一、規劃執行建議</h2><ol style="color:#33474e;padding-left:20px">'+advRows+'</ol>'+
-  '<h2>十二、執行行動清單</h2><table><tr><th>軸線</th><th>動作</th><th>說明</th></tr>'+actRep+'</table>'+
-  '<h2>十三、動態調整（PDCA）</h2><p style="color:#33474e">計畫(Plan)→行動(Do)→確認(Check)→調整(Act)，建議每半年檢視一次。下次檢視日期：<b>'+(esc(c.nextReview)||'尚未設定')+'</b></p>'+
+  rGapLedger(c)+
+
+  (trkHTML?'<h2>§、真實追蹤與人生護照</h2>'+trkHTML:'')+
+
+  '<h2>§、規劃執行建議</h2><ol style="color:#33474e;padding-left:20px">'+advRows+'</ol>'+
+  '<h2>§、執行行動清單</h2><table><tr><th>軸線</th><th>動作</th><th>說明</th></tr>'+actRep+'</table>'+
+  '<h2>§、動態調整（PDCA）</h2><p style="color:#33474e">計畫(Plan)→行動(Do)→確認(Check)→調整(Act)，建議每半年檢視一次。下次檢視日期：<b>'+(esc(c.nextReview)||'尚未設定')+'</b></p>'+
   (c.reportNote?'<div style="margin:14px 0;padding:14px 16px;background:#f4f7f5;border:1px solid #cfe0d5;border-radius:10px"><b style="color:#0d2b45">教練總結</b><div style="color:#33474e;margin-top:6px;white-space:pre-wrap">'+esc(c.reportNote)+'</div></div>':'')+
-  '<h2>十四、注意事項</h2><p style="color:#5a6b72;font-size:12.5px">本報告依所提供資料與假設參數試算，僅供參考；稅額為簡化估算，實際以主管機關與會計師核定為準。財務規劃為動態調整過程，建議每半年檢視。</p></div>';
+  '<h2>§、注意事項</h2><p style="color:#5a6b72;font-size:12.5px">本報告依所提供資料與假設參數試算，僅供參考；稅額為簡化估算，實際以主管機關與會計師核定為準。財務規劃為動態調整過程，建議每半年檢視。</p>';
+ var R=rNumberSections(body);
+ return head+rTOC(R.titles)+R.html+'</div>';
 }
 
 function clientView(){var c=activeCase();if(!c)return '<div style="padding:60px;text-align:center;color:var(--mut)">尚無資料</div>';
