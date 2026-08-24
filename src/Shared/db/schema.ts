@@ -643,10 +643,17 @@ export const coachProfiles = pgTable('coach_profiles', {
   serviceModes: text('service_modes').array().default([]).notNull(), // 線上／實體
   areas: text('areas').array().default([]).notNull(),                // 服務地區
   published: boolean('published').default(true).notNull(),
+  // selfHidden：**教練自己**的隱藏開關（2026/08/24 Ray 拍板），跟 published 是兩條獨立的線。
+  //   published   ＝ 管理員下架，教練碰不到（saveProfile 刻意不寫它）
+  //   selfHidden  ＝ 教練自己選擇不上官網，存檔就生效，不必管理員介入
+  // ⚠️ 隱藏的只是「公開陳列」，不是「停止接客」：**教練編號照常有效**，
+  //    已經拿到編號的客戶仍然指定得到他（見 lib/coachLink.ts findCoachByCode）。
+  //    要真的停止收客戶請用 coaches.status='suspended'，那是另一條線。
+  selfHidden: boolean('self_hidden').default(false).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  // 公開列表只撈上架的；未上架的不該進入客戶視野。
-  index('coach_profiles_published_idx').on(t.published),
+  // 公開列表的過濾條件就是這兩欄（管理員沒下架、教練沒自己隱藏）。
+  index('coach_profiles_published_idx').on(t.published, t.selfHidden),
 ]);
 
 // 收支資債的「細類」字典（平台級，只有 admin 能改；見 /admin/categories）。

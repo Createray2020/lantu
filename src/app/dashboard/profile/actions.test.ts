@@ -85,3 +85,23 @@ describe("setPublishedAction", () => {
     expect(setPublished).toHaveBeenCalledWith("c2", false);
   });
 });
+
+// ── 教練自選不上官網（2026/08/24 Ray 拍板）────────────────────
+// 這裡守的是「兩個開關不能混」：selfHidden 是教練的，published 是管理員的。
+describe("saveMyProfileAction 的 selfHidden", () => {
+  it("勾了就傳 true 下去，存檔即生效", async () => {
+    await saveMyProfileAction({ headline: "x", selfHidden: true });
+    expect(asMock(saveProfile).mock.calls[0][1].selfHidden).toBe(true);
+  });
+
+  it("沒帶就是 false（預設公開）", async () => {
+    await saveMyProfileAction({ headline: "x" });
+    expect(asMock(saveProfile).mock.calls[0][1].selfHidden).toBe(false);
+  });
+
+  it("⚠️ 教練存檔永遠碰不到 published —— 被管理員下架的人不能自己翻回來", async () => {
+    await saveMyProfileAction({ headline: "x", selfHidden: false });
+    expect(asMock(saveProfile).mock.calls[0][1]).not.toHaveProperty("published");
+    expect(setPublished).not.toHaveBeenCalled();
+  });
+});

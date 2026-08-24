@@ -67,6 +67,9 @@ export async function saveMyProfileAction(input: ProfileInput): Promise<ActionRe
       credentials: clean(input.credentials, 12),
       serviceModes: clean(input.serviceModes, 4),
       areas: clean(input.areas, 10),
+      // 教練自己的隱藏開關。這裡收得下、published 收不下——後者是管理員的權力，
+      // 走 setPublishedAction，教練存檔不該把自己重新上架。
+      selfHidden: !!input.selfHidden,
     });
     touch(me.id);
     return { ok: true };

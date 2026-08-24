@@ -4,6 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import { ensureCoach } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
 import { getProfile } from "@/lib/coachProfile";
+import { publicRankLabel } from "@/lib/license";
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import ProfileEditor, { type ProfileForm } from "./ProfileEditor";
 
@@ -27,6 +28,7 @@ export default async function ProfilePage() {
     credentials: p?.credentials ?? [],
     serviceModes: p?.serviceModes ?? [],
     areas: p?.areas ?? [],
+    selfHidden: p?.selfHidden ?? false,
   };
 
   const brand = await getBrand();
@@ -75,7 +77,7 @@ export default async function ProfilePage() {
           initial={initial}
           specialtyOptions={params.settings.specialties ?? []}
           coachName={me.name || me.email || "教練"}
-          coachTitle={me.title}
+          rankLabel={publicRankLabel(me.rankCode)}
           published={p?.published !== false}
         />
       </section>

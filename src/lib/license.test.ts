@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   licenseState, addPeriod, diffDays, todayISO, clientCapOf, quotaState,
   canBePicked, RANK_CLIENT_CAPS, INTERN_MONTHS, PICK_MIN_RANK,
+  RANK_PUBLIC_LABEL, RANK_ORDER, publicRankLabel,
 } from "./license";
+import { V4_RANKS } from "./comp/preset";
 
 // 使用期限的地基語意：**沒設定期限＝不檢查**，不是「已過期」。
 // 把 null 當過期會在正式收費上線那天把全公司鎖死 —— 這條測試就是為了擋住那個改動。
@@ -170,5 +172,43 @@ describe("canBePicked", () => {
 
   it("門檻常數就是 S1", () => {
     expect(PICK_MIN_RANK).toBe("S1");
+  });
+});
+
+// ── 對外職級名稱（2026/08/24 Ray 拍板）────────────────────────
+describe("publicRankLabel", () => {
+  it("只給群組名，不帶階數 —— 客戶不需要知道是 C2 還是 C3", () => {
+    expect(publicRankLabel("C1")).toBe("認證教練");
+    expect(publicRankLabel("C3")).toBe("認證教練");
+    expect(publicRankLabel("S1")).toBe("資深教練");
+    expect(publicRankLabel("S3")).toBe("資深教練");
+    expect(publicRankLabel("CHIEF")).toBe("首席教練");
+    expect(publicRankLabel("INTERN")).toBe("實習教練");
+  });
+
+  it("未定級回 null（未定級的教練根本不會上官網）", () => {
+    expect(publicRankLabel(null)).toBeNull();
+    expect(publicRankLabel(undefined)).toBeNull();
+    expect(publicRankLabel("")).toBeNull();
+    expect(publicRankLabel("VIP")).toBeNull();
+  });
+
+  it("一律用「教練」，不准出現「顧問」", () => {
+    // 業務制度辦法原文寫「顧問」，但全系統對外統一用教練（Ray 2026/08/22 拍板、08/24 再確認）。
+    for (const label of Object.values(RANK_PUBLIC_LABEL)) {
+      expect(label, label).not.toContain("顧問");
+      expect(label, label).toContain("教練");
+    }
+  });
+
+  it("⚠️ drift：必須跟 V4_RANKS 的 groupName 逐字一致", () => {
+    // 職級表改了群組名而這裡沒跟上，官網就會印一組公司內部早就不用的名稱。
+    for (const r of V4_RANKS) {
+      expect(RANK_PUBLIC_LABEL[r.code], r.code).toBe(r.groupName);
+    }
+  });
+
+  it("八個級別一個都不能漏", () => {
+    expect(Object.keys(RANK_PUBLIC_LABEL).sort()).toEqual([...RANK_ORDER].sort());
   });
 });

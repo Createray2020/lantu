@@ -29,6 +29,8 @@ export type ProfileForm = {
   credentials: string[];
   serviceModes: string[];
   areas: string[];
+  /** 教練自己選擇不要把資料放上官網（2026/08/24）。 */
+  selfHidden: boolean;
 };
 
 /** 讀成 dataURL 再建 Image，裁切期間都用同一個 src，不必管 objectURL 的回收時機。 */
@@ -52,12 +54,14 @@ function loadImage(file: File): Promise<CropSource> {
 }
 
 export default function ProfileEditor({
-  initial, specialtyOptions, coachName, coachTitle, published,
+  initial, specialtyOptions, coachName, rankLabel, published,
 }: {
   initial: ProfileForm;
   specialtyOptions: string[];
   coachName: string;
-  coachTitle: string | null;
+  /** 對外職級。官網卡片印的就是它，預覽必須一致（所見即所得不是靠人工同步）。 */
+  rankLabel: string | null;
+  /** 管理員的下架狀態（教練改不了，只用來顯示提示）。 */
   published: boolean;
 }) {
   const router = useRouter();
@@ -103,8 +107,11 @@ export default function ProfileEditor({
         yearsExp: f.yearsExp === "" ? null : Number(f.yearsExp),
         prevRole: f.prevRole, credentials: f.credentials,
         serviceModes: f.serviceModes, areas: f.areas,
+        selfHidden: f.selfHidden,
       });
-      setMsg(r.ok ? { ok: true, text: "已儲存，官網會立即更新" } : { ok: false, text: r.error });
+      setMsg(r.ok
+        ? { ok: true, text: f.selfHidden ? "已儲存，你的檔案不會出現在官網" : "已儲存，官網會立即更新" }
+        : { ok: false, text: r.error });
       if (r.ok) router.refresh();
     });
   }
@@ -125,6 +132,33 @@ export default function ProfileEditor({
             你的檔案目前被管理員下架，不會出現在官網。內容仍可編輯。
           </div>
         )}
+
+        {/* 教練自己的隱藏開關。跟上面那條管理員下架是兩回事：
+            勾這個是自己的決定、存檔就生效；被管理員下架的話勾不勾都不會出現在官網。 */}
+        <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={f.selfHidden}
+              disabled={pending}
+              onChange={(e) => set("selfHidden", e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-[#c99a5b] shrink-0"
+            />
+            <span>
+              <span className="text-sm font-bold">不要把我的資料放上官網</span>
+              <span className="block text-[12px] text-[#a9bccf] mt-1 leading-relaxed">
+                勾選後，你不會出現在官網的教練頁，客戶也無法在那裡挑到你。
+                <b className="text-[#e0bd8b]">你的教練編號照常有效</b>——
+                已經拿到編號的客戶還是可以指定你，一樣要你按接受才會掛上。
+              </span>
+            </span>
+          </label>
+          {f.selfHidden && !published && (
+            <p className="text-[11px] text-[#e08b7a] mt-2">
+              （你的檔案本來就已經被管理員下架，取消勾選也不會出現在官網。）
+            </p>
+          )}
+        </div>
 
         <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
           <h2 className="text-sm font-bold border-l-[3px] border-[#c99a5b] pl-2">大頭照</h2>
@@ -259,7 +293,7 @@ export default function ProfileEditor({
       <div className="lg:sticky lg:top-4 h-fit">
         <div className="text-xs text-[#a9bccf] mb-2">客戶會看到的樣子</div>
         <CoachCard
-          name={coachName} title={coachTitle}
+          name={coachName} rankLabel={rankLabel}
           headline={f.headline} bio={f.bio} specialties={f.specialties}
           photoUrl={f.photoUrl}
           yearsExp={f.yearsExp === "" ? null : Number(f.yearsExp)}
@@ -290,10 +324,17 @@ function ListField({
 
 /** 教練卡片。編輯預覽與官網列表共用同一個元件，所見即所得不是靠人工同步。 */
 export function CoachCard({
-  name, title, headline, bio, specialties, photoUrl, yearsExp, prevRole,
+  name, rankLabel, headline, bio, specialties, photoUrl, yearsExp, prevRole,
   credentials, serviceModes, areas, compact = false,
 }: {
-  name: string; title: string | null; headline: string | null; bio: string | null;
+  name: string;
+  /**
+   * 對外只印制度職級（認證教練／資深教練／首席教練／實習教練）。
+   * ⚠️ 這裡刻意不是 `title`：教練自填的職稱（「執行長」那種）是對內稱謂，
+   *    Ray 2026/08/24 拍板一律不上官網。要改回顯示頭銜之前先跟他確認。
+   */
+  rankLabel: string | null;
+  headline: string | null; bio: string | null;
   specialties: string[]; photoUrl: string | null; yearsExp: number | null;
   prevRole: string | null; credentials: string[]; serviceModes: string[]; areas: string[];
   compact?: boolean;
@@ -311,7 +352,7 @@ export function CoachCard({
         )}
         <div className="min-w-0">
           <div className="font-serif text-lg text-[#eef2f7]">{name}</div>
-          {title && <div className="text-xs text-[#a7bacb]">{title}</div>}
+          {rankLabel && <div className="text-xs text-[#a7bacb]">{rankLabel}</div>}
           {headline && <p className="text-sm text-[#e0bd8b] mt-1.5 leading-snug">{headline}</p>}
           <div className="text-[11px] text-[#6f869c] mt-1 space-x-2">
             {yearsExp !== null && !Number.isNaN(yearsExp) && <span>年資 {yearsExp} 年</span>}

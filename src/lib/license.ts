@@ -41,6 +41,41 @@ export const BUILTIN_RANK_SEQ: Record<string, number> = {
   INTERN: 0, C1: 1, C2: 2, C3: 3, S1: 4, S2: 5, S3: 6, CHIEF: 7,
 };
 
+/**
+ * **對外**的職級名稱：只有群組名，不帶階數。
+ *
+ * 官網教練卡片顯示的就是這個（2026/08/24 Ray 拍板）——客戶要知道的是「這位到哪個層級」，
+ * 不是「C2 還是 C3」，更不是教練自填的職稱（「執行長」那種頭銜一律不進官網，
+ * 那是對內的稱謂，印在客戶面前只會讓人以為在賣頭銜）。
+ *
+ * ⚠️ 用詞是「教練」不是「顧問」（Ray 2026/08/22 拍板，2026/08/24 再次確認）。
+ *    業務制度辦法原文寫「顧問」，但全系統對外一律用教練。
+ * ⚠️ 這份必須跟 comp/preset.ts 的 V4_RANKS[].groupName 逐字一致，
+ *    由 license.test.ts 的 drift 測試守著——職級表改了群組名這裡沒跟上，
+ *    官網會顯示一組公司內部早就不用的名稱。
+ */
+export const RANK_PUBLIC_LABEL: Record<string, string> = {
+  INTERN: "實習教練",
+  C1: "認證教練",
+  C2: "認證教練",
+  C3: "認證教練",
+  S1: "資深教練",
+  S2: "資深教練",
+  S3: "資深教練",
+  CHIEF: "首席教練",
+};
+
+/**
+ * 官網卡片上要印的職級。
+ * 未定級回 null —— 而且未定級的教練根本不會出現在官網（見 coachProfile.listPublicCoaches），
+ * 所以這個 null 在公開頁上只是型別層的保險。
+ */
+export function publicRankLabel(rankCode: string | null | undefined): string | null {
+  if (!rankCode) return null;
+  return RANK_PUBLIC_LABEL[rankCode] ?? null;
+}
+
+/** 內部用（後台職級表、期限設定）：帶階數，分得出 C2 與 C3。 */
 export const RANK_GROUP_LABEL: Record<string, string> = {
   INTERN: "實習教練",
   C1: "認證教練 C1",

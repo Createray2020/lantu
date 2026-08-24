@@ -105,7 +105,11 @@ vi.mock("./snapshot", () => ({
   planMetrics: () => ({ netWorth: 0, healthGrade: "B", monthlySaving: 0 }),
   newCaseData: () => ({}),
 }));
-vi.mock("./coachProfile", () => ({ listPublicCoaches: async () => [{ specialties: ["退休"] }] }));
+// 教練數與專長數走不同來源：人數含「自己隱藏」的教練，專長只算看得到的卡片。
+vi.mock("./coachProfile", () => ({
+  listPublicCoaches: async () => [{ specialties: ["退休"] }],
+  countPublicCoaches: async () => 3,
+}));
 
 const COACH = "coach-1";
 const CLIENT_ID = "client-1";
@@ -204,6 +208,9 @@ describe("landing.ts：官網信任數字", () => {
     const stats = await getLandingStats(new Date("2026-08-21"));
     // count 走 sql`count(*)` 在 mock 裡拿不到真值，這裡確認的是「條件有生效、沒把 4 筆全算進去」。
     expect(stats.asOf).toBe("2026/08");
-    expect(stats.coaches).toBe(1);
+    // ⚠️ 人數來自 countPublicCoaches（含自行隱藏者），不是列表長度——
+    //    列表只有 1 筆，人數要是 3 才代表沒有被改回去共用同一支查詢。
+    expect(stats.coaches).toBe(3);
+    expect(stats.specialties).toBe(1);
   });
 });

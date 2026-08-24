@@ -6,7 +6,7 @@
 import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { plans } from "@/Shared/db/schema";
-import { listPublicCoaches } from "./coachProfile";
+import { countPublicCoaches, listPublicCoaches } from "./coachProfile";
 
 export type LandingStats = {
   coaches: number;
@@ -16,7 +16,12 @@ export type LandingStats = {
 };
 
 export async function getLandingStats(now = new Date()): Promise<LandingStats> {
-  const [coachRows, planCount] = await Promise.all([
+  // 教練數與專長數刻意取自**不同**的來源：
+  //   · 人數＝countPublicCoaches()，把「自己選擇隱藏」的教練算回來（公司規模）
+  //   · 專長＝看得到的那幾張卡（listPublicCoaches），因為專長是拿來篩選教練頁的；
+  //     首頁說有某個專長、列表卻一個人都篩不到，比數字小更傷。
+  const [coachCount, coachRows, planCount] = await Promise.all([
+    countPublicCoaches(),
     listPublicCoaches(),
     // 只算「教練做的、已經交付出去的」規劃：
     // 客戶自己的人生護照（track='client'）與建檔時自動產生的空白初版（status='draft'）
@@ -26,7 +31,7 @@ export async function getLandingStats(now = new Date()): Promise<LandingStats> {
   ]);
   const specialties = new Set(coachRows.flatMap((c) => c.specialties));
   return {
-    coaches: coachRows.length,
+    coaches: coachCount,
     plans: planCount[0]?.n ?? 0,
     specialties: specialties.size,
     asOf: `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`,

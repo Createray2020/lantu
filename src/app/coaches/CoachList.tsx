@@ -217,7 +217,7 @@ function CodeEntry({ coaches, link }: { coaches: PublicCoach[]; link: LinkState 
                     className="w-full text-left px-3 py-2 text-xs hover:bg-[#123049] flex items-center gap-2">
                     <span className="font-mono text-[#c99a5b]">{c.code}</span>
                     <span className="text-[#eef2f7]">{c.name}</span>
-                    {c.title && <span className="text-[10px] text-[#6f869c]">{c.title}</span>}
+                    {c.rankLabel && <span className="text-[10px] text-[#6f869c]">{c.rankLabel}</span>}
                   </button>
                 </li>
               ))}
