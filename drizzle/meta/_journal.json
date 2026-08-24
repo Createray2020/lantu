@@ -169,6 +169,13 @@
       "when": 1787597567426,
       "tag": "0023_brief_mindworm",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787600446756,
+      "tag": "0024_legal_nicolaos",
+      "breakpoints": true
     }
   ]
 }

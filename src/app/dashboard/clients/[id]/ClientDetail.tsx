@@ -17,6 +17,7 @@ import {
   archiveClientAction,
 } from "../../actions";
 import { StageGuideModal } from "../../StageGuide";
+import Collaborators, { type CollaboratorLite } from "./Collaborators";
 import {
   fmtMoney,
   stageColor,
@@ -49,6 +50,9 @@ export default function ClientDetail({
   reviews,
   actionItems,
   compare,
+  readOnly = false,
+  isOwner = true,
+  collaborators = [],
 }: {
   client: ClientLite;
   plans: PlanLite[];
@@ -56,6 +60,11 @@ export default function ClientDetail({
   actionItems: ItemLite[];
   compare: Compare[];
   passportPlan: PassportPlan | null;
+  /** 唯讀：使用期限到期，或我是被邀來共同執案的協作教練。所有寫入按鈕都收起來。 */
+  readOnly?: boolean;
+  /** 我是不是這位客戶的主責教練。只有主責看得到「共同執案」面板。 */
+  isOwner?: boolean;
+  collaborators?: CollaboratorLite[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"overview" | "plans" | "reviews">("overview");
@@ -97,7 +106,9 @@ export default function ClientDetail({
         <span className="text-[#a9bccf]">{client.name}</span>
       </div>
 
-      <ClientHeader client={client} onSave={(patch) => run(() => updateClientAction(client.id, patch))} onArchive={() => { if (confirm("確定封存這位客戶？")) run(() => archiveClientAction(client.id)); }} pending={pending} />
+      <ClientHeader client={client} onSave={(patch) => run(() => updateClientAction(client.id, patch))} onArchive={() => { if (confirm("確定封存這位客戶？")) run(() => archiveClientAction(client.id)); }} pending={pending} readOnly={readOnly} />
+
+      {isOwner && <Collaborators clientId={client.id} collaborators={collaborators} readOnly={readOnly} />}
 
       {err && <div className="mt-3 text-[#d9773f] text-sm">{err}</div>}
 
@@ -117,6 +128,7 @@ export default function ClientDetail({
           openItems={openItems}
           planYear={planYear}
           passportPlan={passportPlan}
+          readOnly={readOnly}
           onToggle={(id, done) => run(() => setActionItemDoneAction(client.id, id, done))}
         />
       )}
@@ -126,6 +138,7 @@ export default function ClientDetail({
           plans={plans}
           compare={compare}
           pending={pending}
+          readOnly={readOnly}
           onOpen={(id) => router.push(`/dashboard/plans/${id}/edit`)}
           onClone={(id) => run(() => clonePlanAction(id), (r) => router.push(`/dashboard/plans/${r as string}/edit`))}
           onNew={() => run(() => createPlanAction(client.id, client.name), (r) => router.push(`/dashboard/plans/${r as string}/edit`))}
@@ -142,6 +155,7 @@ export default function ClientDetail({
           plans={plans}
           planYear={planYear}
           pending={pending}
+          readOnly={readOnly}
           onAddReview={(input) => run(() => createReviewAction(client.id, input))}
           onDeleteReview={(id) => { if (confirm("刪除此諮詢紀錄？")) run(() => deleteReviewAction(client.id, id)); }}
           onAddItem={(input) => run(() => createActionItemAction(client.id, input))}
@@ -154,7 +168,7 @@ export default function ClientDetail({
 }
 
 // ── 客戶標頭（含編輯） ─────────────────────────────
-function ClientHeader({ client, onSave, onArchive, pending }: { client: ClientLite; onSave: (patch: Partial<ClientLite> & { tags?: string[]; contact?: Contact }) => void; onArchive: () => void; pending: boolean }) {
+function ClientHeader({ client, onSave, onArchive, pending, readOnly = false }: { client: ClientLite; onSave: (patch: Partial<ClientLite> & { tags?: string[]; contact?: Contact }) => void; onArchive: () => void; pending: boolean; readOnly?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(client.name);
   const [source, setSource] = useState((client.source ?? "").startsWith("其他") ? "其他" : (client.source ?? ""));
@@ -218,18 +232,20 @@ function ClientHeader({ client, onSave, onArchive, pending }: { client: ClientLi
           {client.birthDate && <span>🎂 {client.birthDate}</span>}
         </div>
       </div>
-      <div className="flex gap-2">
-        <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10"} onClick={() => setEditing(true)}>編輯</button>
-        {client.status !== "archived" && <button className={btn + " text-[#6b7d8f]"} onClick={onArchive}>封存</button>}
-      </div>
+      {!readOnly && (
+        <div className="flex gap-2">
+          <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10"} onClick={() => setEditing(true)}>編輯</button>
+          {client.status !== "archived" && <button className={btn + " text-[#6b7d8f]"} onClick={onArchive}>封存</button>}
+        </div>
+      )}
     </div>
   );
 }
 
 // ── 概況分頁 ───────────────────────────────────────
-function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, planYear, passportPlan, onToggle }: {
+function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, planYear, passportPlan, readOnly = false, onToggle }: {
   latest: PlanLite | null; latestCmp: Compare | null; planCount: number; nextAppt: string | null; passportPlan: PassportPlan | null;
-  reviews: ReviewLite[]; openItems: ItemLite[]; planYear: Map<string, number>; onToggle: (id: string, done: boolean) => void;
+  reviews: ReviewLite[]; openItems: ItemLite[]; planYear: Map<string, number>; readOnly?: boolean; onToggle: (id: string, done: boolean) => void;
 }) {
   const [showStageGuide, setShowStageGuide] = useState(false);
   return (
@@ -300,7 +316,7 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
             <div className="grid gap-2">
               {openItems.map((i) => (
                 <label key={i.id} className="flex items-start gap-2 bg-[#0c2135] border border-white/10 rounded-lg px-3 py-2 cursor-pointer">
-                  <input type="checkbox" checked={i.done} onChange={() => onToggle(i.id, !i.done)} className="mt-1" />
+                  <input type="checkbox" checked={i.done} disabled={readOnly} onChange={() => onToggle(i.id, !i.done)} className="mt-1 disabled:opacity-50" />
                   <span className="flex-1 text-sm">
                     {i.title}
                     <span className="block text-[11px] text-[#6b7d8f]">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
@@ -316,8 +332,8 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
 }
 
 // ── 年度版本分頁 ───────────────────────────────────
-function Plans({ plans, compare, pending, onOpen, onClone, onNew, onStatus, onDelete }: {
-  plans: PlanLite[]; compare: Compare[]; pending: boolean;
+function Plans({ plans, compare, pending, readOnly = false, onOpen, onClone, onNew, onStatus, onDelete }: {
+  plans: PlanLite[]; compare: Compare[]; pending: boolean; readOnly?: boolean;
   onOpen: (id: string) => void; onClone: (id: string) => void; onNew: () => void;
   onStatus: (id: string, status: string) => void; onDelete: (id: string) => void;
 }) {
@@ -340,7 +356,7 @@ function Plans({ plans, compare, pending, onOpen, onClone, onNew, onStatus, onDe
       <div className="flex items-center gap-2">
         <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f]">年度版本</h3>
         <div className="flex-1" />
-        <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"} disabled={pending} onClick={onNew}>＋ 空白版本</button>
+        {!readOnly && <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"} disabled={pending} onClick={onNew}>＋ 空白版本</button>}
       </div>
 
       <div className="grid gap-2">
@@ -353,13 +369,13 @@ function Plans({ plans, compare, pending, onOpen, onClone, onNew, onStatus, onDe
             <div className="text-[12px] font-bold w-16 text-center" style={{ color: stageColor(p.healthGrade) }}>{stageName(p.healthGrade)}</div>
             <div className="text-sm tabular-nums w-28">{fmtMoney(p.netWorth)}</div>
             <div className="text-[11px] text-[#6b7d8f] flex-1 min-w-[120px]">{p.label} · 依據 {p.basedOnDate ?? "—"} · 更新 {p.updatedAt ?? "—"}</div>
-            <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} className="bg-[#0a1a2b] border border-white/15 rounded-md text-xs px-2 py-1.5 text-[#a9bccf]">
+            <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} disabled={readOnly} className="bg-[#0a1a2b] border border-white/15 rounded-md text-xs px-2 py-1.5 text-[#a9bccf] disabled:opacity-60">
               {Object.entries(PLAN_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
             <div className="flex gap-1.5">
-              <button className={btn + " bg-[#c99a5b] text-[#08202a]"} onClick={() => onOpen(p.id)}>開啟</button>
-              <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"} disabled={pending} onClick={() => onClone(p.id)} title="以此版複製為新的一年">複製為新年度</button>
-              <button className={btn + " text-[#6b7d8f]"} onClick={() => onDelete(p.id)}>刪除</button>
+              <button className={btn + " bg-[#c99a5b] text-[#08202a]"} onClick={() => onOpen(p.id)}>{readOnly ? "檢視" : "開啟"}</button>
+              {!readOnly && <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"} disabled={pending} onClick={() => onClone(p.id)} title="以此版複製為新的一年">複製為新年度</button>}
+              {!readOnly && <button className={btn + " text-[#6b7d8f]"} onClick={() => onDelete(p.id)}>刪除</button>}
             </div>
           </div>
         ))}
@@ -397,8 +413,8 @@ function Plans({ plans, compare, pending, onOpen, onClone, onNew, onStatus, onDe
 }
 
 // ── 諮詢紀錄分頁 ───────────────────────────────────
-function Reviews({ clientId, reviews, actionItems, plans, planYear, pending, onAddReview, onDeleteReview, onAddItem, onToggleItem, onDeleteItem }: {
-  clientId: string; reviews: ReviewLite[]; actionItems: ItemLite[]; plans: PlanLite[]; planYear: Map<string, number>; pending: boolean;
+function Reviews({ clientId, reviews, actionItems, plans, planYear, pending, readOnly = false, onAddReview, onDeleteReview, onAddItem, onToggleItem, onDeleteItem }: {
+  clientId: string; reviews: ReviewLite[]; actionItems: ItemLite[]; plans: PlanLite[]; planYear: Map<string, number>; pending: boolean; readOnly?: boolean;
   onAddReview: (input: { date: string; type: string; planId: string | null; attendees: string | null; summary: string | null; nextAppt: string | null }) => void;
   onDeleteReview: (id: string) => void;
   onAddItem: (input: { title: string; owner: string | null; dueDate: string | null }) => void;
@@ -420,6 +436,10 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, pending, onA
   return (
     <div className="grid md:grid-cols-2 gap-6">
       <section className="grid gap-3">
+        {/* 唯讀（協作教練或期限到期）：新增表單整塊收起來，只留下清單。
+            留著一個按不動的表單只會讓人以為是壞掉了。 */}
+        {!readOnly && (
+        <>
         <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f]">新增諮詢</h3>
         <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
           <div className="grid grid-cols-2 gap-2">
@@ -458,14 +478,21 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, pending, onA
           >
             ＋ 新增待辦
           </button>
+        </div>
+        </>
+        )}
+
+        <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mt-2">動作項目清單</h3>
+        <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
+          {actionItems.length === 0 && <p className="text-[12px] text-[#6b7d8f]">目前沒有動作項目。</p>}
           {actionItems.map((i) => (
             <label key={i.id} className="flex items-start gap-2 border-t border-white/5 pt-2">
-              <input type="checkbox" checked={i.done} onChange={() => onToggleItem(i.id, !i.done)} className="mt-1" />
+              <input type="checkbox" checked={i.done} disabled={readOnly} onChange={() => onToggleItem(i.id, !i.done)} className="mt-1 disabled:opacity-50" />
               <span className={"flex-1 text-sm " + (i.done ? "line-through text-[#6b7d8f]" : "")}>
                 {i.title}
                 <span className="block text-[11px] text-[#6b7d8f]">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
               </span>
-              <button className="text-[#6b7d8f] text-xs" onClick={() => onDeleteItem(i.id)}>刪</button>
+              {!readOnly && <button className="text-[#6b7d8f] text-xs" onClick={() => onDeleteItem(i.id)}>刪</button>}
             </label>
           ))}
         </div>
@@ -482,7 +509,7 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, pending, onA
                   <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf]">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
                   {r.planId && planYear.get(r.planId) && <span className="text-[11px] text-[#6b7d8f]">對應 {planYear.get(r.planId)} 版</span>}
                   <div className="flex-1" />
-                  <button className="text-[#6b7d8f] text-xs" onClick={() => onDeleteReview(r.id)}>刪除</button>
+                  {!readOnly && <button className="text-[#6b7d8f] text-xs" onClick={() => onDeleteReview(r.id)}>刪除</button>}
                 </div>
                 {r.attendees && <div className="text-[12px] text-[#6b7d8f] mt-1">出席：{r.attendees}</div>}
                 {r.summary && <div className="text-[13px] text-[#a9bccf] mt-1 whitespace-pre-wrap">{r.summary}</div>}

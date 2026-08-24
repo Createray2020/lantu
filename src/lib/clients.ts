@@ -1,9 +1,10 @@
 // 客戶資料層（教練隔離）。所有查詢都以 coachId 為租戶維度。
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { actionItems, clients, plans, reviews } from "@/Shared/db/schema";
+import { actionItems, clientCollaborators, clients, coachDisplayName, coaches, plans, reviews } from "@/Shared/db/schema";
 import { newCaseData, planSnapshot } from "./snapshot";
 import { allocCode } from "./codeAlloc";
+import { COLLAB_ACCEPTED, ownedClient, readableClient } from "./clientScope";
 
 const COACH_TRACK = "coach";
 const CLIENT_TRACK = "client";
@@ -29,6 +30,9 @@ export type ClientListItem = Client & {
   nextAppt: string | null;
 };
 
+/** 共同執案（唯讀）看到的別人的客戶：多帶一個主責教練姓名，清單上要分得出來這不是自己的案子。 */
+export type SharedClientItem = ClientListItem & { ownerName: string | null };
+
 export type ClientContact = { phone?: string; email?: string; line?: string };
 export type ClientInput = {
   name: string;
@@ -49,7 +53,31 @@ function ts(d: Date | null): number {
 
 // 客戶列表：帶最新版本、上次諮詢、下次預約。
 export async function listClientsForCoach(coachId: string): Promise<ClientListItem[]> {
-  const rows = await db.select().from(clients).where(eq(clients.coachId, coachId)).orderBy(desc(clients.updatedAt));
+  const rows = await db.select().from(clients).where(ownedClient(coachId)).orderBy(desc(clients.updatedAt));
+  return decorateClients(rows);
+}
+
+/**
+ * 共同執案（唯讀）：別人邀我一起看的客戶。
+ *
+ * 刻意跟 listClientsForCoach 分兩支回、畫面上也分兩區：混在同一份清單裡，
+ * 教練會以為那是自己的案子（而所有寫入其實都會被擋），也會讓「額度 x/y」的分母說謊——
+ * 客戶數上限只算 clients.coach_id（見 lib/quota.ts），協作案件本來就不佔額度。
+ */
+export async function listSharedClientsForCoach(coachId: string): Promise<SharedClientItem[]> {
+  const rows = await db
+    .select({ client: clients, ownerName: coachDisplayName })
+    .from(clientCollaborators)
+    .innerJoin(clients, eq(clients.id, clientCollaborators.clientId))
+    .leftJoin(coaches, eq(coaches.id, clients.coachId))
+    .where(and(eq(clientCollaborators.coachId, coachId), eq(clientCollaborators.status, COLLAB_ACCEPTED)))
+    .orderBy(desc(clients.updatedAt));
+  const decorated = await decorateClients(rows.map((r) => r.client));
+  const ownerById = new Map(rows.map((r) => [r.client.id, r.ownerName]));
+  return decorated.map((c) => ({ ...c, ownerName: ownerById.get(c.id) ?? null }));
+}
+
+async function decorateClients(rows: Client[]): Promise<ClientListItem[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   // ⚠️ 明列欄位，不要 select() 整列 —— plans.data 是整份 case（約 20KB/份）。
@@ -123,11 +151,26 @@ export async function createClient(coachId: string, input: ClientInput): Promise
   return row.id;
 }
 
+/**
+ * 主責才拿得到（寫入路徑一律用這支）。
+ * ⚠️ 不要為了讓協作教練看得到就把這裡改成 readableClient() —— 每一支寫入
+ * （updateClient / createPlan / createReview…）都是靠它擋人的。要讀請用 getClientForRead()。
+ */
 export async function getClient(coachId: string, clientId: string): Promise<Client | null> {
   const [row] = await db
     .select()
     .from(clients)
-    .where(and(eq(clients.id, clientId), eq(clients.coachId, coachId)))
+    .where(and(eq(clients.id, clientId), ownedClient(coachId)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** 讀取用：主責或已接受的協作教練都拿得到。 */
+export async function getClientForRead(coachId: string, clientId: string): Promise<Client | null> {
+  const [row] = await db
+    .select()
+    .from(clients)
+    .where(and(eq(clients.id, clientId), readableClient(coachId)))
     .limit(1);
   return row ?? null;
 }
@@ -144,7 +187,8 @@ export type ClientDetail = {
 };
 
 export async function getClientDetail(coachId: string, clientId: string): Promise<ClientDetail | null> {
-  const client = await getClient(coachId, clientId);
+  // 讀取範圍：協作教練也看得到整份（唯讀）。寫入仍然只認主責。
+  const client = await getClientForRead(coachId, clientId);
   if (!client) return null;
   // 同上：客戶詳情頁只顯示各版本的中繼資料，不需要整份 data
   //（版本比較的 planMetrics 由 comparePlans 另外撈，避免同一批 jsonb 被完整拉兩次）。

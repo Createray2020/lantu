@@ -28,6 +28,10 @@ const h = vi.hoisted(() => {
     if (!c) return true;
     switch (c.__op) {
       case "and": return c.parts.every((p: any) => evalCond(p, row));
+      case "or": return c.parts.some((p: any) => evalCond(p, row));
+      // 共同執案（clientScope.readableClient 的 EXISTS 子查詢）：這支測試沒有任何協作關係，
+      // 所以一律 false —— 讀取範圍就等於「只有主責」，雙軌邊界照原樣驗。
+      case "exists": return false;
       case "eq": return get(row, c.col) === c.val;
       case "ne": return get(row, c.col) !== c.val;
       case "inArray": return c.val.includes(get(row, c.col));
@@ -90,6 +94,8 @@ const h = vi.hoisted(() => {
 
 vi.mock("drizzle-orm", () => ({
   and: (...parts: any[]) => ({ __op: "and", parts: parts.filter(Boolean) }),
+  or: (...parts: any[]) => ({ __op: "or", parts: parts.filter(Boolean) }),
+  exists: () => ({ __op: "exists" }),
   eq: (col: any, val: any) => ({ __op: "eq", col: col?.name, val }),
   ne: (col: any, val: any) => ({ __op: "ne", col: col?.name, val }),
   inArray: (col: any, val: any) => ({ __op: "inArray", col: col?.name, val }),

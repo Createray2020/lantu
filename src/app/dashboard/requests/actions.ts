@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { ensureCoach } from "@/lib/coach";
 import { licenseState, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { respondToLinkRequest, createInvite } from "@/lib/coachLink";
+import { respondToCollabInvite } from "@/lib/clientCollab";
 
 // 教練接受/婉拒客戶連結申請。接受＝把客戶掛到自己名下。
 export async function respondLinkAction(requestId: string, accept: boolean) {
@@ -26,4 +27,18 @@ export async function createInviteAction() {
   if (licenseState(coach).expired) return { ok: false as const, error: LICENSE_LOCKED_MESSAGE };
   const { code } = await createInvite(coach.id);
   return { ok: true as const, code };
+}
+
+// 教練接受／婉拒「共同執案」邀請。
+//
+// 刻意**不擋使用期限**：接受到手的只有唯讀可見權，而到期鎖定的語意是「能看不能改」——
+// 到期的教練照樣看得到自己的客戶，沒有理由連被邀來幫看都不行。
+export async function respondCollabInviteAction(inviteId: string, accept: boolean) {
+  const coach = await ensureCoach();
+  if (!coach || coach.status !== "active") return { ok: false as const, error: "未登入或帳號未開通" };
+  const r = await respondToCollabInvite(inviteId, coach.id, accept);
+  if (!r.ok) return { ok: false as const, error: r.error ?? "處理失敗" };
+  revalidatePath("/dashboard/requests");
+  revalidatePath("/dashboard/clients");
+  return { ok: true as const };
 }

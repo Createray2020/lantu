@@ -8724,15 +8724,21 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
   var READONLY=false;
   var _save=save;
   save=function(){if(READONLY)return;return _save.apply(this,arguments);};
-  function applyReadOnly(on){
+  // note：唯讀的原因由父層給（期限到期／共同執案的協作教練）。
+  // 寫死一句「使用期限已到期」的話，被邀來幫看的教練會看到一則與他無關的警告，
+  // 然後跑去找管理員延長一個根本沒到期的期限。
+  var RO_NOTE_DEFAULT='唯讀模式：使用期限已到期，這份規劃目前的修改不會被儲存。請聯繫管理員延長期限。';
+  function applyReadOnly(on,note){
     READONLY=!!on;
     var bar=document.getElementById('lantuRoBar');
+    var text=note||RO_NOTE_DEFAULT;
     if(READONLY&&!bar){
       bar=document.createElement('div');
       bar.id='lantuRoBar';
       bar.style.cssText='position:sticky;top:0;z-index:99;background:#5b1f22;color:#ffd7d8;padding:6px 12px;font-size:13px;font-weight:700';
-      bar.textContent='唯讀模式：使用期限已到期，這份規劃目前的修改不會被儲存。請聯繫管理員延長期限。';
+      bar.textContent=text;
       document.body.insertBefore(bar,document.body.firstChild);
+    }else if(READONLY&&bar){bar.textContent=text;
     }else if(!READONLY&&bar){bar.remove();}
   }
   window.addEventListener('message',function(e){
@@ -8742,7 +8748,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
     if(m.type==='lantu:uiscale'){applyScale(m.scale);return;}
     if(m.type!=='lantu:init')return;
     if(m.uiScale)applyScale(m.uiScale);
-    applyReadOnly(m.readOnly);
+    applyReadOnly(m.readOnly,m.readOnlyNote);
     /* 客戶編號（YYMM＋三碼流水號）：只用來印在三份可交付文件的表頭，不進 case 資料、不參與任何計算。
        刻意存成全域而不是塞進 c.*，因為它是 DB 的欄位、不是規劃內容——寫進 case 會被存回 plan.data，
        之後改名／改號就會有兩份真相。*/

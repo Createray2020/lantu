@@ -2,9 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import { getClientDetail } from "@/lib/clients";
 import { comparePlans } from "@/lib/plans";
+import { clientAccess } from "@/lib/clientScope";
+import { listCollaborators } from "@/lib/clientCollab";
 import DashboardHeader from "../../DashboardHeader";
 import { headerProps } from "../../headerProps";
 import ReadOnlyBanner from "../../ReadOnlyBanner";
+import CollabBanner from "./CollabBanner";
 import ClientDetail from "./ClientDetail";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +20,16 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
   // getClientDetail 已改成不撈 plans.data（只有 comparePlans 需要整份 jsonb），
   // 兩支可以並行，不必序列等待。
-  const [detail, compare] = await Promise.all([
+  // access：owner＝主責（可寫）／viewer＝被邀來共同執案（唯讀）／null＝看不到。
+  // 三支都吃「可讀範圍」，所以協作教練拿得到同一份資料；能不能改由 readOnly 決定。
+  const [detail, compare, access] = await Promise.all([
     getClientDetail(coach.id, id),
     comparePlans(coach.id, id).catch(() => []),
+    clientAccess(coach.id, id),
   ]);
-  if (!detail) notFound();
+  if (!detail || !access) notFound();
+  const isOwner = access === "owner";
+  const collaborators = isOwner ? await listCollaborators(id) : [];
 
   // 只傳前端需要的欄位（不把整份 plan.data jsonb 送到瀏覽器）。
   const client = {
@@ -73,12 +81,32 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   }));
 
   const hp = await headerProps(coach);
+  // 唯讀有兩種來源：期限到期（紅）與共同執案（藍）。兩條橫幅分開，
+  // 協作教練不該看到「請聯繫管理員延長期限」那句與他無關的話。
+  const readOnly = hp.license.expired || !isOwner;
 
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
       <DashboardHeader {...hp} />
       <ReadOnlyBanner license={hp.license} />
-      <ClientDetail client={client} plans={plans} passportPlan={passportPlan} reviews={reviews} actionItems={actionItems} compare={compare} />
+      {!isOwner && <CollabBanner />}
+      <ClientDetail
+        client={client}
+        plans={plans}
+        passportPlan={passportPlan}
+        reviews={reviews}
+        actionItems={actionItems}
+        compare={compare}
+        readOnly={readOnly}
+        isOwner={isOwner}
+        collaborators={collaborators.map((c) => ({
+          id: c.id,
+          coachName: c.coachName,
+          coachCode: c.coachCode,
+          status: c.status,
+          createdAt: c.createdAt.toISOString().slice(0, 10),
+        }))}
+      />
     </div>
   );
 }

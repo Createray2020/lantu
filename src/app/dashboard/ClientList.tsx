@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { ClientListItem } from "@/lib/clients";
+import type { ClientListItem, SharedClientItem } from "@/lib/clients";
 import type { QuotaState } from "@/lib/license";
 import { QUOTA_FULL_MESSAGE, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { createClientAction } from "./actions";
@@ -21,10 +21,13 @@ type SortKey = "updated" | "next" | "net" | "stage";
 
 export default function ClientList({
   clients,
+  shared = [],
   quota,
   readOnly = false,
 }: {
   clients: ClientListItem[];
+  /** 別人邀我共同執案的客戶（唯讀）。刻意跟自己的客戶分兩區，也不計入額度。 */
+  shared?: SharedClientItem[];
   /** 客戶數上限（依級別）。未定級或不限時 cap 為 null。 */
   quota?: QuotaState;
   /** 使用期限到期＝唯讀。 */
@@ -221,6 +224,46 @@ export default function ClientList({
             </Link>
           ))}
         </div>
+      )}
+
+      {shared.length > 0 && (
+        <section className="mt-8 pt-6 border-t border-white/10">
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="font-serif text-lg tracking-wide">共同執案</h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#3b82f6]/50 text-[#8fb8ff] bg-[#3b82f6]/10 font-bold">唯讀</span>
+            <span className="text-[#6b7d8f] text-sm">{shared.length}</span>
+          </div>
+          <p className="text-[12px] text-[#6b7d8f] mb-3">其他教練邀請你一起看的客戶。你看得到全部資料與報告書，但不能修改，也不計入你的客戶數上限。</p>
+          <div className="grid gap-2">
+            {shared.map((c) => (
+              <Link
+                key={c.id}
+                href={`/dashboard/clients/${c.id}`}
+                className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 items-center bg-[#0c2135] hover:bg-[#123049] border border-[#3b82f6]/25 rounded-lg px-3 py-3 transition"
+              >
+                <div className="col-span-2 md:col-span-1">
+                  <div className="font-bold">{c.name}</div>
+                  {c.code && <div className="font-mono text-[10px] tracking-wider text-[#6b7d8f]">{c.code}</div>}
+                </div>
+                <div className="text-[12px] text-[#a9bccf]">主責 {c.ownerName ?? "—"}</div>
+                <div className="text-sm text-[#a9bccf]">
+                  {c.latestPlan ? (
+                    <>
+                      <span className="text-[#eef2f7]">{c.latestPlan.year}</span>
+                      {c.planCount > 1 && <span className="ml-1 text-[11px] text-[#6b7d8f]">·{c.planCount}版</span>}
+                    </>
+                  ) : (
+                    <span className="text-[#6b7d8f]">—</span>
+                  )}
+                </div>
+                <div className="text-[12px] font-bold" style={{ color: stageColor(c.latestPlan?.healthGrade) }}>
+                  {c.latestPlan ? stageName(c.latestPlan.healthGrade) : "—"}
+                </div>
+                <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(c.latestPlan?.netWorth ?? null)}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {guideFor !== false && <StageGuideModal current={guideFor} onClose={() => setGuideFor(false)} />}

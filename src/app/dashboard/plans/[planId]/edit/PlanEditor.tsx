@@ -7,6 +7,14 @@ import { savePlanDataAction } from "../../../actions";
 import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
 import { LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 
+// 唯讀有兩種來源，提示文字必須分開：協作教練沒有「期限」問題，
+// 給他看「請聯繫管理員延長期限」只會讓他去找錯的人。
+const RO_NOTE = {
+  license: LICENSE_LOCKED_MESSAGE,
+  collab: "共同執案（唯讀）：這份報告書由主責教練維護，你的修改不會被儲存。",
+} as const;
+const RO_BADGE = { license: "唯讀", collab: "協作唯讀" } as const;
+
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 
 // v12 App（/lantu-app.html?embed=1）以 iframe 載入。
@@ -20,6 +28,7 @@ export default function PlanEditor({
   data,
   uiScale = 100,
   readOnly = false,
+  readOnlyReason = "license",
   clientCode = null,
 }: {
   planId: string;
@@ -29,6 +38,8 @@ export default function PlanEditor({
   data: unknown;
   uiScale?: number;
   readOnly?: boolean;
+  /** 唯讀的原因：license＝使用期限到期；collab＝我是被邀來共同執案的協作教練。 */
+  readOnlyReason?: "license" | "collab";
   /** 客戶編號：報告書／方案書／診斷書的表頭要印它。 */
   clientCode?: string | null;
 }) {
@@ -51,7 +62,7 @@ export default function PlanEditor({
 
     function postInit() {
       iframeRef.current?.contentWindow?.postMessage(
-        { type: "lantu:init", data, uiScale: currentScale(), readOnly, clientCode: clientCode ?? null },
+        { type: "lantu:init", data, uiScale: currentScale(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null },
         window.location.origin,
       );
     }
@@ -84,7 +95,7 @@ export default function PlanEditor({
       window.removeEventListener("message", onMessage);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [planId, data, uiScale, readOnly, clientCode]);
+  }, [planId, data, uiScale, readOnly, readOnlyReason, clientCode]);
 
   const statusText: Record<SaveState, string> = {
     idle: "",
@@ -107,10 +118,15 @@ export default function PlanEditor({
         <span className="text-sm font-bold">{year} 年度版本{label ? ` · ${label}` : ""}</span>
         {readOnly && (
           <span
-            className="text-[11px] font-bold px-2 py-0.5 rounded border border-[#e5484d]/60 text-[#ff9d9f] bg-[#e5484d]/10"
-            title={LICENSE_LOCKED_MESSAGE}
+            className={
+              "text-[11px] font-bold px-2 py-0.5 rounded border " +
+              (readOnlyReason === "collab"
+                ? "border-[#3b82f6]/60 text-[#8fb8ff] bg-[#3b82f6]/10"
+                : "border-[#e5484d]/60 text-[#ff9d9f] bg-[#e5484d]/10")
+            }
+            title={RO_NOTE[readOnlyReason]}
           >
-            唯讀
+            {RO_BADGE[readOnlyReason]}
           </span>
         )}
         <div className="flex-1" />
@@ -126,7 +142,7 @@ export default function PlanEditor({
         className="flex-1 w-full border-0"
         onLoad={() =>
           iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly, clientCode: clientCode ?? null },
+            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null },
             window.location.origin,
           )
         }

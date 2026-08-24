@@ -9,6 +9,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
 import { newCaseData, planMetrics, planSnapshot, type PlanMetrics } from "./snapshot";
+import { ownedClient, readableClient } from "./clientScope";
 
 export type Plan = typeof plans.$inferSelect;
 
@@ -22,7 +23,19 @@ async function ownedPlan(coachId: string, planId: string): Promise<Plan | null> 
     .select({ plan: plans })
     .from(plans)
     .innerJoin(clients, eq(plans.clientId, clients.id))
-    .where(and(eq(plans.id, planId), eq(clients.coachId, coachId), eq(plans.track, COACH_TRACK)))
+    .where(and(eq(plans.id, planId), ownedClient(coachId), eq(plans.track, COACH_TRACK)))
+    .limit(1);
+  return row?.plan ?? null;
+}
+
+// 讀取版（含 data）：主責 **或** 已接受的協作教練。只給「開報告書來看」與版本紀錄用，
+// 任何寫入請走 ownedPlan/ownedPlanLite —— 它們認的是主責，不是可見範圍。
+async function readablePlan(coachId: string, planId: string): Promise<Plan | null> {
+  const [row] = await db
+    .select({ plan: plans })
+    .from(plans)
+    .innerJoin(clients, eq(plans.clientId, clients.id))
+    .where(and(eq(plans.id, planId), readableClient(coachId), eq(plans.track, COACH_TRACK)))
     .limit(1);
   return row?.plan ?? null;
 }
@@ -36,7 +49,7 @@ async function ownedPlanLite(coachId: string, planId: string): Promise<PlanLite 
     .select({ id: plans.id, clientId: plans.clientId, year: plans.year, label: plans.label, status: plans.status, track: plans.track })
     .from(plans)
     .innerJoin(clients, eq(plans.clientId, clients.id))
-    .where(and(eq(plans.id, planId), eq(clients.coachId, coachId), eq(plans.track, COACH_TRACK)))
+    .where(and(eq(plans.id, planId), ownedClient(coachId), eq(plans.track, COACH_TRACK)))
     .limit(1);
   return row ?? null;
 }
@@ -45,13 +58,28 @@ async function ownedClientId(coachId: string, clientId: string): Promise<boolean
   const [row] = await db
     .select({ id: clients.id })
     .from(clients)
-    .where(and(eq(clients.id, clientId), eq(clients.coachId, coachId)))
+    .where(and(eq(clients.id, clientId), ownedClient(coachId)))
     .limit(1);
   return !!row;
 }
 
+async function readableClientId(coachId: string, clientId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: clients.id })
+    .from(clients)
+    .where(and(eq(clients.id, clientId), readableClient(coachId)))
+    .limit(1);
+  return !!row;
+}
+
+/** 主責才拿得到。⚠️ 寫入路徑（回復版本等）一律用這支，不要換成 getPlanForRead()。 */
 export async function getPlan(coachId: string, planId: string): Promise<Plan | null> {
   return ownedPlan(coachId, planId);
+}
+
+/** 讀取用：協作教練也拿得到（畫面端必須連帶把 readOnly 打開）。 */
+export async function getPlanForRead(coachId: string, planId: string): Promise<Plan | null> {
+  return readablePlan(coachId, planId);
 }
 
 // 存回 iframe 編輯的整份案件，同時用引擎重算快照。
@@ -154,7 +182,8 @@ export type PlanComparison = {
 
 // 版本比較：用引擎從各版 data 算跨年對照。
 export async function comparePlans(coachId: string, clientId: string): Promise<PlanComparison[]> {
-  if (!(await ownedClientId(coachId, clientId))) throw new Error("forbidden");
+  // 純讀（跨年對照圖），協作教練也看得到。
+  if (!(await readableClientId(coachId, clientId))) throw new Error("forbidden");
   // 只比教練那一軌。客戶的護照份是同一年的另一筆，混進來會變成兩欄一樣的年份，
   // 而且它只有五面向推估、沒有完整現況，跨年趨勢會直接失真。
   const rows = await db
