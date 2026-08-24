@@ -3498,25 +3498,45 @@ function leverSummary(set){
 }
 
 /** 首屏：三個數字 ＋ 主圖 ＋ 拉桿 ＋ 四張變化卡。圖與拉桿必須貼在一起，拉了要當場看到線動。 */
-function gapHeroHTML(c,led,gate){
+function gapHeroHTML(c,ledBase,gate){
  var d=planDraft(c),hasDraft=Object.keys(d).length>0;
+ // ⚠️ 上面那三個大數字**一定要跟著拉桿走**。
+ // 2026/08/23 Ray 實測回報「拉桿動了、上面的數據沒有任何改變」——原因就是這裡吃的是
+ // 現況的 gapLedger。教練盯著看的就是「現值缺口」那個數字，它不動就等於整頁沒反應。
+ // 現在：有拉桿就顯示調整後的數字，並把調整前的用刪除線放在上面當參照。
+ var led=hasDraft?gapLedger(applyLevers(c,d)):ledBase;
  var ok=led.total<=0.5;
+ function was(bef,aft,fmtFn){
+  if(!hasDraft)return '';
+  var b=fmtFn(bef),a=fmtFn(aft);
+  if(b===a)return '';
+  return '<div class="hint" style="display:block;text-decoration:line-through;margin-bottom:-2px">'+b+'</div>';
+ }
+ var money=function(v){return fmt(v)},pct1=function(v){return v+'%'};
  var big='<div class="big3">'+
-  '<div class="b"><div class="l">現值缺口<span class="hint"> 假設報酬 '+(+led.rate.toFixed(2))+'%</span></div>'+
+  '<div class="b"><div class="l">現值缺口<span class="hint"> 假設報酬 '+(+led.rate.toFixed(2))+'%'+(hasDraft?' · 調整後':'')+'</span></div>'+
+   was(ledBase.total,led.total,money)+
    '<div class="v" style="color:'+(ok?'var(--ok)':'var(--warn)')+'">'+fmt(led.total)+'</div>'+
    '<div class="hint" style="display:block">'+(ok?'一生現金流不會轉負':'今天要多放進去的金額')+'</div></div>'+
   '<div class="b"><div class="l">保守情境<span class="hint"> 折現率 '+led.conservativeRate+'%</span></div>'+
+   was(ledBase.conservative,led.conservative,money)+
    '<div class="v" style="color:'+(led.conservative<=0.5?'var(--ok)':'var(--warn)')+'">'+fmt(led.conservative)+'</div>'+
    '<div class="hint" style="display:block">'+(led.conservative>led.total*1.5?'⚠ 高度依賴報酬率假設':'與左邊接近，假設風險低')+'</div></div>'+
   '<div class="b"><div class="l">願景達成度</div>'+
+   was(ledBase.visionRate,led.visionRate,pct1)+
    '<div class="v" style="color:'+(led.visionRate>=60?'var(--ok)':'var(--warn)')+'">'+led.visionRate+'%</div>'+
    '<div class="hint" style="display:block">填得平就是 100%</div></div></div>';
+
+ var draftBadge=hasDraft
+  ? '<div class="hint" style="display:block;margin-top:8px;color:var(--amber2)">下面這些數字已套用：<b>'+esc(leverSummary(d))+'</b>　'+
+    '<a href="javascript:void 0" onclick="clearDraft()" style="color:var(--mut)">歸零看回現況</a></div>'
+  : '';
 
  var warn='';
  if(led.rateOverCap)warn+='<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 報酬率假設 '+(+led.rate.toFixed(2))+'% 已超過規劃上限 '+CAP_RATE+'%，缺口會被這個假設壓低，請以「保守情境」為準。</div>';
  else if(!ok&&led.conservative>led.total*3)warn+='<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 兩個讀數差 '+(led.conservative/led.total).toFixed(1)+' 倍：這份規劃的成敗幾乎完全押在報酬率假設上，務必與客戶說明。</div>';
 
- var how=ok?'<span style="color:var(--ok)">✅ 依目前假設不會轉負。仍請確認下方「缺口組成與即時缺口」裡的保障與預備金。</span>'
+ var how=ok?'<span style="color:var(--ok)">✅ '+(hasDraft?'這組調整之後':'依目前假設')+'不會轉負。仍請確認下方「缺口組成與即時缺口」裡的保障與預備金。</span>'
   :(led.years<=1?'<b style="color:var(--warn)">現金流最快在 '+led.negAge+' 歲轉負，缺口沒有攤提空間，必須立即處理。</b>'
    :'補平的方式：'+led.years+' 年內（到 '+(n(c.profile.age)+led.years)+' 歲）每年存入 <b style="color:var(--amber2)">'+fmt(led.annual)+'</b> 元，以 '+(+led.rate.toFixed(2))+'% 複利累積。');
 
@@ -3531,7 +3551,7 @@ function gapHeroHTML(c,led,gate){
   :'<div class="hint" style="display:block;margin-top:7px">尚未採用任何正式方案——報告書仍以「未調整」呈現。</div>';
 
  return '<div class="sec"><h4>缺口 <span class="hint">曲線掉到零線以下的那塊紅色，折現回今天就是缺口</span></h4>'+
-  big+warn+
+  big+draftBadge+warn+
   '<div style="margin:12px 0 4px">'+gapChartSVG(c,d,'dark','gap')+'</div>'+
   '<div style="margin-top:8px">'+how+'</div>'+
   '<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">'+
@@ -3569,10 +3589,15 @@ function soloHTML(c,solo,noAct){
   ? '<div class="hint" style="display:block;margin-bottom:10px">目前階段 <b>'+stageName(gate.grade)+'</b>：'+esc(stageTask(gate.grade))+'。'+
     (gate.block.rate?'<span style="color:var(--warn)">「提高報酬」已鎖住</span>':'報酬率上限已收緊為 '+gate.rateCap+'%')+'</div>'
   : '';
+ // ⚠️ 這一區塊刻意以「未調整的現況」為基準，不跟拉桿走——它回答的是診斷題
+ //（每一根單獨能做到什麼），跟著拉桿跑的話拉完就全綠，反而看不出體質。
+ var baseNote=Object.keys(planDraft(c)).length
+  ? '<div class="hint" style="display:block;margin-bottom:8px;color:var(--mut2)">以下以<b>未調整的現況</b>為基準，不受上面拉桿影響——它回答的是「每一根單獨能做到什麼」。</div>'
+  : '';
  var verdict=allRed
   ? '<div class="hint" style="display:block;margin-top:8px;color:var(--warn)"><b>六根全紅——單靠任何一根都補不平。</b>請看下方「調願景型」處方，那是系統認為唯一走得通的方向。</div>'
   : '<div class="hint" style="display:block;margin-top:8px">每一條都是「其他都不動、只動這一根」的反解。條子衝出軌道＝拉到規劃上限仍補不平。</div>';
- return '<div class="sec"><h4>該解什麼 <span class="hint">六根槓桿各自反解</span></h4>'+gateNote+
+ return '<div class="sec"><h4>該解什麼 <span class="hint">六根槓桿各自反解</span></h4>'+baseNote+gateNote+
   leverBarsHTML(c,solo,'dark',!noAct)+verdict+'</div>';
 }
 

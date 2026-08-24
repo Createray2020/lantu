@@ -243,3 +243,82 @@ describe("配置表的按鈕真的接得上（不是繞過按鈕直接呼叫函�
     });
   });
 });
+
+/**
+ * 2026/08/23 Ray 實測回報：「拉桿動了之後，上面的數據沒有任何改變。」
+ * 接線其實是好的（draft 有寫入、金線有出現），錯在**三個大數字吃的是現況的 gapLedger**。
+ * 教練盯著看的就是「現值缺口」那個數字，它不動就等於整頁沒反應。
+ *
+ * ⚠️ 這一組一律**透過畫面上真正的 <input type="range"> 派發 change 事件**，
+ * 不呼叫 setLever()——上一次就是繞過元件才漏掉 bug 的。
+ */
+describe("拉桿要能當場改變上面的數字（用真的拉桿，不呼叫函式）", () => {
+  const bigs = () =>
+    [...w.document.querySelectorAll(".big3 .b")].slice(0, 3)
+      .map((e: Element) => (e.querySelector(".v")?.textContent || "").trim());
+
+  const pull = (idx: number, val: string) => {
+    const ranges = w.document.querySelectorAll('input[type=range]');
+    const r = ranges[idx] as HTMLInputElement;
+    expect(r, "第 " + idx + " 根拉桿要存在").toBeTruthy();
+    r.value = val;
+    r.dispatchEvent(new w.Event("change", { bubbles: true }));
+  };
+
+  it("拉「減少支出」之後，現值缺口／保守情境／願景達成度三個都要變", () => {
+    w.clearDraft();
+    w.app.dataTab = "plan"; w.render();
+    const before = bigs();
+    expect(before[0]).not.toBe("0");          // 範例個案本來就有缺口
+    pull(1, "15");                            // 0=增加收入 1=減少支出
+    expect(w.n(cur().plan.draft.expense)).toBe(15);
+    const after = bigs();
+    expect(after[0], "現值缺口要跟著變").not.toBe(before[0]);
+    expect(after[2], "願景達成度要跟著變").not.toBe(before[2]);
+  });
+
+  it("有拉桿時會標示「調整後」，並把調整前的數字用刪除線留著當參照", () => {
+    const h = pane();
+    expect(h).toContain("調整後");
+    expect(h).toContain("line-through");
+    expect(h).toContain("下面這些數字已套用");
+  });
+
+  it("歸零之後三個數字回到現況", () => {
+    const withDraft = bigs();
+    w.clearDraft();
+    const back = bigs();
+    expect(back[0]).not.toBe(withDraft[0]);
+    expect(back[0]).toBe(w.fmt(w.gapPV(cur())));
+  });
+
+  it("「該解什麼」刻意不跟拉桿走（它是診斷，不是結果），而且畫面上要講明白", () => {
+    w.clearDraft(); w.render();
+    // 有草稿時會多一行說明（baseNote），那行本來就只在有拉桿時出現——
+    // 要比的是「反解出來的六根條子有沒有變」，所以先把那行剝掉。
+    const strip = (s: string) =>
+      s.replace(/<div class="hint"[^>]*>以下以[\s\S]*?<\/div>/, "");
+    const soloBefore = strip(w.soloHTML(cur(), w.soloSolve(cur()), true));
+    pull(1, "15");
+    const soloAfter = strip(w.soloHTML(cur(), w.soloSolve(cur()), true));
+    expect(soloAfter).toBe(soloBefore);        // 反解基準不變
+    expect(pane()).toContain("未調整的現況");    // 但畫面上有說
+    w.clearDraft();
+  });
+
+  it("六根拉桿都能透過真實事件寫進 draft", () => {
+    w.clearDraft(); w.app.dataTab = "plan"; w.render();
+    const ranges = w.document.querySelectorAll('input[type=range]');
+    expect(ranges.length).toBe(w.LEVERS.length);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    w.LEVERS.forEach((L: any, i: number) => {
+      const r = w.document.querySelectorAll('input[type=range]')[i] as HTMLInputElement;
+      if (r.disabled) return;                  // 階段閘門鎖住的那根跳過
+      const mid = (Number(r.min) + Number(r.max)) / 2;
+      r.value = String(mid);
+      r.dispatchEvent(new w.Event("change", { bubbles: true }));
+      expect(w.n(cur().plan.draft[L.id]), L.name + " 沒寫進 draft").toBeCloseTo(mid, 6);
+    });
+    w.clearDraft();
+  });
+});
