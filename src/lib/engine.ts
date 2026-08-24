@@ -99,7 +99,7 @@ function sampleCase(){return {
   {name:'定期定額 ETF',subCat:'定期定額ETF/基金',period:'月',amount:120000},
   {name:'儲蓄險保費',subCat:'儲蓄保險保費',period:'年',amount:60000}
  ],
- legacy:{heirs:2,perHeirCash:20000000,perHeirNote:'每人一間房',feedEstate:true},
+ legacy:{on:true,heirs:2,perHeirCash:20000000,perHeirNote:'每人一間房',feedEstate:true},
  nextReview:'2025-06-01',
  career:{plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:2},
  marriage:{plan:'否',age:'',budget:'',minBudget:'',importance:0},
@@ -121,7 +121,7 @@ function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['in
  // profile.credit 是信用評分的舊欄位（與 credit.score 雙寫）。sampleCase 帶 700 分，
  // 這裡若不一併清掉，新客戶會憑空拿到示範資料的評分並白送約 12.5 分財務安全度。
  c.profile.credit='';
- c.intent=defaultIntent();c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};
+ c.intent=defaultIntent();c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={on:true,heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};
  // 與 lantu-app.html 的 newCase() 對齊：少了這幾個欄位，新客戶進 iframe 後價值輪與報告備註會是 undefined。
  c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';
  return c}
@@ -210,7 +210,15 @@ function assetPassive(c){return sum(c.assets,function(a){return (a.income!=null&
 
 function liquidMovable(c){return sum(c.assets,function(a){return (a.cls==='流動'&&a.movable)?aVal(a):0})}
 
-function lifestyleFactor(c,age,factor){var s=0;[c.travel,c.hobby,c.luxury].forEach(function(arr){(arr||[]).forEach(function(it){if(age>=n(it.start)&&age<=n(it.end))s+=n(it.amount)*(n(it.freq)||1)*factor})});return s;}
+// ---------- 願景選定閘 ----------
+// 財務規劃的第一步是「先選定要執行哪些願景」，沒選的完全不進計算：
+// 不進一生需求、不上時間軸、也不會被壓縮槓桿動到。
+// ⚠️⚠️ 一定要用 `on!==false` 判斷，不可以寫成 `!!x.on`：
+//     舊資料完全沒有 on 欄位（undefined），必須視為「已選定」，
+//     否則既有客戶的願景會在改版當下全部消失、缺口一夜歸零。
+function visionOn(x){return !x||x.on!==false}
+
+function lifestyleFactor(c,age,factor){var s=0;[c.travel,c.hobby,c.luxury].forEach(function(arr){(arr||[]).forEach(function(it){if(!visionOn(it))return;if(age>=n(it.start)&&age<=n(it.end))s+=n(it.amount)*(n(it.freq)||1)*factor})});return s;}
 
 function lifestyleAnnualNow(c){return lifestyleFactor(c,n(c.profile.age),1);}
 
@@ -481,7 +489,7 @@ function projection(c,lump,rateOverride){
   var w=retiredWeight(c,age);
   var expense=workPhaseExpense(c,age,inflF,w);
   var debt=sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;var el=(age-sa)*12;return (age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0});
-  var goalOut=sum(c.goals,function(gg){if(age<n(gg.start)||age>n(gg.end))return 0;
+  var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(age<n(gg.start)||age>n(gg.end))return 0;
     var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;
     var gr=gg.growth==='通膨'?infl:(gg.growth==='薪資'?n(c.params.salaryGrowth)/100:(gg.type==='購屋'?n(gg.appreciation)/100:0));
     return n(gg.present)*Math.pow(1+gr,t);});
@@ -579,8 +587,8 @@ function goalFloor(g){var v=n(g.minPresent);if(v>0)return Math.min(v,n(g.present
 function wishFloor(w){var v=n(w.minAmount);if(v>0)return Math.min(v,n(w.amount));return n(w.imp)>=5?n(w.amount):0}
 // 願景還有多少可壓縮空間（現值口徑的粗估，只用來判斷「這根槓桿有沒有得動」）。
 function visionRoom(c){
- var s=sum(c.goals,function(g){return Math.max(0,n(g.present)-goalFloor(g))});
- [c.travel,c.hobby,c.luxury].forEach(function(arr){s+=sum(arr,function(w){return Math.max(0,n(w.amount)-wishFloor(w))*(n(w.freq)||1)})});
+ var s=sum(c.goals,function(g){return visionOn(g)?Math.max(0,n(g.present)-goalFloor(g)):0});
+ [c.travel,c.hobby,c.luxury].forEach(function(arr){s+=sum(arr,function(w){return visionOn(w)?Math.max(0,n(w.amount)-wishFloor(w))*(n(w.freq)||1):0})});
  return s;
 }
 
@@ -652,8 +660,8 @@ function applyLevers(c,set){
  }
  var vx=n(set.vision)/100;
  if(vx>0){
-  (a.goals||[]).forEach(function(g){var f=goalFloor(g);g.present=n(g.present)-vx*Math.max(0,n(g.present)-f)});
-  [a.travel,a.hobby,a.luxury].forEach(function(arr){(arr||[]).forEach(function(w){var f=wishFloor(w);w.amount=n(w.amount)-vx*Math.max(0,n(w.amount)-f)})});
+  (a.goals||[]).forEach(function(g){if(!visionOn(g))return;var f=goalFloor(g);g.present=n(g.present)-vx*Math.max(0,n(g.present)-f)});
+  [a.travel,a.hobby,a.luxury].forEach(function(arr){(arr||[]).forEach(function(w){if(!visionOn(w))return;var f=wishFloor(w);w.amount=n(w.amount)-vx*Math.max(0,n(w.amount)-f)})});
  }
  return a;
 }
@@ -913,11 +921,13 @@ function visionChanges(c,x){
  var vx=n(x)/100,out=[];
  if(vx<=0)return out;
  (c.goals||[]).forEach(function(g){
+  if(!visionOn(g))return;
   var f=goalFloor(g),from=n(g.present),to=from-vx*Math.max(0,from-f);
   if(from-to>0.5)out.push({kind:'目標',name:(g.name||g.type||'目標'),from:from,to:to,floor:f,unit:'元'});
  });
  [['旅遊',c.travel],['休閒',c.hobby],['奢侈品',c.luxury]].forEach(function(pair){
   (pair[1]||[]).forEach(function(w){
+   if(!visionOn(w))return;
    var f=wishFloor(w),from=n(w.amount),to=from-vx*Math.max(0,from-f);
    if(from-to>0.5)out.push({kind:pair[0],name:(w.sub||w.cat||pair[0]),from:from,to:to,floor:f,unit:'元/次'});
   });
@@ -1018,7 +1028,7 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
    var wMC=retiredWeight(c,age);
    var expense=workPhaseExpense(c,age,cumI,wMC);
    var debt=sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;var el=(age-sa)*12;return (age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0});
-   var goalOut=sum(c.goals,function(gg){if(age<n(gg.start)||age>n(gg.end))return 0;var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;var gr=gg.growth==='通膨'?cumI:1;return n(gg.present)*gr});
+   var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(age<n(gg.start)||age>n(gg.end))return 0;var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;var gr=gg.growth==='通膨'?cumI:1;return n(gg.present)*gr});
    var eduY=edu[age]||0;
    var lifeY=lifestyleFactor(c,age,cumI);
    var retireDraw=retireAnnual(c,age,cumI)*wMC;
@@ -1264,7 +1274,9 @@ function estimateSocialPension(c){
 /** @deprecated 舊名，改用 estimateSocialPension（保留 export 契約相容） */
 function estimateLaborPension(c){return estimateSocialPension(c);}
 
-function legacyNeed(c){var lg=c.legacy||{};return n(lg.heirs)*n(lg.perHeirCash)}
+// 傳承是願景的一部分、不獨立計算，但客戶可以勾選不處理（lg.on===false）。
+// 目標金額沿用既有的「繼承人數 × 每人現金傳承」，不需要新欄位。
+function legacyNeed(c){var lg=c.legacy||{};if(lg.on===false)return 0;return n(lg.heirs)*n(lg.perHeirCash)}
 
 function allocInfo(c){var al=(c.plan&&c.plan.allocations)||[];
  var totalPct=sum(al,function(a){return n(a.pct)});
@@ -1448,6 +1460,7 @@ export {
   visionRate,
   visionRateOf,
   gapLedger,
+  visionOn,
   goalFloor,
   wishFloor,
   visionRoom,

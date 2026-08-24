@@ -139,11 +139,15 @@ describe("缺口組成與變化卡", () => {
 });
 
 describe("版面：首屏必須是圖，不是報表", () => {
-  it("收合區塊維持三塊，不會有人偷偷把明細塞回首屏", () => {
+  it("明細一律收合，不會有人偷偷把它們塞回首屏", () => {
     w.app.dataTab = "plan"; w.render();
     const h = pane();
     const folds = (h.match(/<details>/g) || []).length;   // foldSec 產生的都不帶 open
-    expect(folds).toBe(3);                                 // 缺口組成／方案比較／其他參數
+    // 缺口組成／調整動作清單(v2)／方案比較／其他參數
+    // ⚠️ 這個數字只有在「新增的是收合區塊」時才可以往上加。
+    //    任何把明細塞進首屏（不帶 <details>）的改動都不該動這一行，見 feedback_圖表優先。
+    expect(folds).toBe(4);
+    expect(h).toContain("調整動作清單");
   });
 
   it("展開的區塊依序是：缺口(含拉桿) → 該解什麼 → 三個處方 → 配置與對帳", () => {

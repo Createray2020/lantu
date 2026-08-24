@@ -241,6 +241,21 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(HTML).toContain("function wishFloor(w){var v=n(w.minAmount);if(v>0)return Math.min(v,n(w.amount));return n(w.imp)>=5?n(w.amount):0}");
   });
 
+  it("願景選定閘 visionOn()：兩邊公式一致，且六個攔截點都接上了", () => {
+    // ⚠️ 這條公式是「既有客戶數字一位不動」的保證：舊資料沒有 on 欄位（undefined），
+    //    必須視為已選定。寫成 !!x.on 會讓所有既有客戶的願景一夜消失。
+    const F = "function visionOn(x){return !x||x.on!==false}";
+    expect(HTML).toContain(F);
+    expect(E.visionOn.toString().replace(/\s+/g, "")).toContain("x.on!==false");
+
+    // 六個攔截點（html 端逐一釘住，engine 端由下面的數字斷言守）
+    expect(HTML).toContain("(arr||[]).forEach(function(it){if(!visionOn(it))return;if(age>=n(it.start)");
+    expect(HTML).toContain("sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(age<n(gg.start)");
+    expect(HTML).toContain("return visionOn(g)?Math.max(0,n(g.present)-goalFloor(g)):0");
+    expect(HTML).toContain("(a.goals||[]).forEach(function(g){if(!visionOn(g))return;var f=goalFloor(g)");
+    expect(HTML).toContain("function legacyNeed(c){var lg=c.legacy||{};if(lg.on===false)return 0;");
+  });
+
   it("求解上限常數：兩邊的預設值一致，且都吃得到後台覆蓋", () => {
     expect(HTML).toContain("var CAP_RATE=8;");
     expect(HTML).toContain("var PLAN_DISCOUNT=2.5;");
