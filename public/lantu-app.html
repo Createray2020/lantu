@@ -4616,7 +4616,7 @@ function actionFlowHTML(c){
   if(a.tool&&a.tool!=='—')w.push('工具：'+a.tool);
   if(n(a.payMonthly))w.push('每月投入 '+fmt(a.payMonthly));
   if(n(a.payLump))w.push('單筆 '+fmt(a.payLump));
-  if(n(a.getMonthly))w.push('每月增加現金流 '+fmt(a.getMonthly));
+  if(n(a.getMonthly))w.push(a.cat==='expense'?'每月省下 '+fmt(a.getMonthly):a.cat==='income'?'每月增加收入 '+fmt(a.getMonthly):'每月領取 '+fmt(a.getMonthly));
   if(n(a.getLump))w.push('取得資金 '+fmt(a.getLump));
   if(n(a.growth))w.push('增值 '+a.growth+'%');
   if(n(a.cover))w.push('保額 '+fmt(a.cover)+'（'+esc(a.coverKind||'')+'）');
@@ -7530,122 +7530,256 @@ function cashHealthToolHTML(){var T=app.tools.cashh;
    報告書回答「你現在怎麼樣」，方案書回答「所以要做什麼」——
    後者是教練真正要跟客戶逐條對過去的東西，混在一起會被前面 20 頁淹掉。
    ⚠️ 內容全部來自 planActions()／gapLedger()／soloSolve()，不在這裡重算任何數字。 */
+/* ============================================================
+   調整方案書 v2 的列印版元件
+   ------------------------------------------------------------
+   方案書回答「所以要做什麼」，客戶版報告書回答「你現在怎麼樣」——
+   兩份文件的分工不變（Ray 2026/08/23 拍板、08/24 再次確認）。
+   v2 之後方案書的主角從「六根槓桿的比例」換成「一條一條具體動作」。
+   ⚠️ 這裡的元件一律是**靜態列印版**（淺色、無互動），不要混用畫面版。
+   ============================================================ */
+var RP={ok:'#3f7d54',bad:'#b05a4a',amb:'#c99a5b',mut:'#5a6b72',line:'#dfe6e8'};
+
+function rpTable(head,rows,empty){
+ if(!rows)return '<p style="font-size:13px;color:'+RP.mut+'">'+(empty||'（無資料）')+'</p>';
+ return '<table><tr>'+head+'</tr>'+rows+'</table>';
+}
+
+/* 一、願景清單：選了哪些、做不做得到 */
+function planVisionReportHTML(c){
+ var pa=projection(c),okMap={};
+ pa.events.forEach(function(e){okMap[e.name]=e.ok});
+ var rows='',offNames=[],hasFlow=false;
+ // 判定欄有三種：✓／✕（單一時點的事件）與「已計入現金流」（週期性的生活願望）。
+ // ⚠️ 週期性支出沒有單一時點的成敗，逐年攤在曲線上——顯示「—」會被誤讀成漏算。
+ function push(name,when,amt,on,flow){
+  if(!on){offNames.push(name);return}
+  var st=okMap[name],mark;
+  if(flow){mark='<span style="color:'+RP.mut+'">已計入現金流</span>';hasFlow=true;}
+  else mark='<span style="font-weight:700;color:'+(st===false?RP.bad:RP.ok)+'">'+(st===false?'✕ 做不到':'✓ 做得到')+'</span>';
+  rows+='<tr><td>'+esc(name)+'</td><td>'+when+'</td><td style="text-align:right">'+(amt?fmt(amt):'—')+'</td>'+
+   '<td style="text-align:center">'+mark+'</td></tr>';
+ }
+ (c.goals||[]).forEach(function(g){push((g.name||g.type||'目標'),n(g.start)+' 歲',n(g.present),visionOn(g))});
+ [['travel','旅遊'],['hobby','休閒'],['luxury','奢侈品']].forEach(function(pr){
+  (c[pr[0]]||[]).forEach(function(w){
+   var nm=[w.cat,w.sub].filter(Boolean).join('·')||pr[1];
+   push(nm+'（'+pr[1]+'）',n(w.start)+'–'+n(w.end)+' 歲，每年 '+(n(w.freq)||1)+' 次',n(w.amount),visionOn(w),true);
+  });
+ });
+ var rAge=n(c.profile.retireAge)||65;
+ push('退休生活',rAge+' 歲起',0,true);
+ var lg=c.legacy||{},lgNeed=legacyNeed(c);
+ if(lgNeed>0||n(lg.heirs)>0)push('傳承',' 期末',lgNeed,lg.on!==false);
+
+ return rpTable('<th>願景</th><th>時點</th><th style="text-align:right">金額</th><th style="text-align:center">目前判定</th>',rows,'尚未設定任何願景。')+
+  (hasFlow?'<p style="font-size:12px;color:'+RP.mut+';margin-top:6px">旅遊、休閒、奢侈品是<b>週期性</b>的支出，逐年攤在現金流裡，沒有單一時點的成敗——做不做得到已經反映在上面那條曲線上。</p>':'')+
+  (offNames.length?'<p style="font-size:12px;color:'+RP.mut+';margin-top:6px">本次<b>不納入</b>規劃：'+esc(offNames.join('、'))+'。這是共同決定不做的，不是做不到——資料仍然保留，未來想恢復隨時可以。</p>':'')+
+  '<p style="font-size:12px;color:'+RP.mut+';margin-top:6px">「做不到」的意思是：做完那件事之後，可投資資產會掉到零以下——也就是得靠借錢才辦得到。選定的願景按<b>時間先到先支付</b>，所以早期的花掉了，晚期的就會落空。</p>';
+}
+
+/* 二、調整動作清單 */
+function planActionsReportHTML(c){
+ var acts=planActionsOn(c);
+ if(!acts.length)return '<p style="font-size:14px;color:'+RP.bad+'">尚未排定任何調整動作。請在「調整方案」分頁的動作清單新增，這一章才會有內容。</p>';
+ var srcName={surplus:'月結餘',cash:'現金水位','new':'新增／自生'};
+ var rows=acts.map(function(a){
+  var eff=[];
+  if(n(a.payMonthly))eff.push('每月投入 '+fmt(a.payMonthly));
+  if(n(a.payLump))eff.push('單筆 '+fmt(a.payLump));
+  if(n(a.getMonthly))eff.push(
+   a.cat==='expense'?'每月省下 '+fmt(a.getMonthly)
+   :a.cat==='income'?'每月增加收入 '+fmt(a.getMonthly)
+   :'每月領取 '+fmt(a.getMonthly));
+  if(n(a.getLump))eff.push('取得資金 '+fmt(a.getLump));
+  if(n(a.divYear))eff.push('年配息 '+fmt(a.divYear)+'（'+(a.divMode==='payout'?'提領':'再投入')+'）');
+  if(n(a.growth))eff.push('增值 '+a.growth+'%');
+  if(n(a.cover))eff.push('保額 '+fmt(a.cover)+'（'+esc(a.coverKind||'')+(a.member?'／'+esc(a.member):'')+'）');
+  var yr=(n(a.payFrom)||n(a.getFrom))
+   ? (n(a.payFrom)||n(a.getFrom))+((n(a.payTo)||n(a.getTo))?'–'+(n(a.payTo)||n(a.getTo)):'')+' 歲'
+   : '—';
+  var src=srcName[a.src];
+  if(!src&&String(a.src||'').indexOf('act:')===0){
+   var from=acts.filter(function(x){return 'act:'+x.id===a.src})[0];
+   src=from?('來自「'+((from.name||'').trim()||actCat(from.cat).n)+'」'):'—';
+  }
+  var ref='';
+  if(a.ref){var r=refRow(c,a.ref);if(r)ref='<div style="color:'+RP.mut+';font-size:12px">↳ '+esc(r.name||r.subCat||r.type||'')+'</div>'}
+  return '<tr><td style="white-space:nowrap;font-weight:700;color:'+RP.amb+'">'+esc(actCat(a.cat).n)+'</td>'+
+   '<td>'+esc((a.name||'').trim()||'（未命名）')+ref+
+   (a.note?'<div style="color:'+RP.mut+';font-size:12px;margin-top:2px">'+esc(a.note)+'</div>':'')+'</td>'+
+   '<td>'+esc(a.tool||'—')+'</td><td style="white-space:nowrap">'+yr+'</td>'+
+   '<td>'+esc(eff.join('　·　'))+'</td><td style="white-space:nowrap;color:'+RP.mut+'">'+esc(src||'—')+'</td></tr>';
+ }).join('');
+ return rpTable('<th>類別</th><th>項目</th><th>使用工具</th><th>年期</th><th>達到的效果</th><th>資金來源</th>',rows)+
+  '<p style="font-size:12px;color:'+RP.mut+';margin-top:6px">這裡登錄的是<b>工具與效果</b>，不是特定商品。每一筆的錢用它自己的增值率單獨累積，不套用全域的報酬率假設。'+
+  '「資金來源」是用來確認這些動作彼此不會搶同一筆錢。</p>';
+}
+
+/* 三、資金勾稽 */
+function planLedgerReportHTML(c){
+ var L=actionLedger(c);
+ function r(l,v,col){return '<tr><td>'+l+'</td><td style="text-align:right'+(col?';color:'+col:'')+'">'+fmt(v)+'</td></tr>'}
+ var t1='<table><tr><th>每月資金</th><th style="text-align:right">金額</th></tr>'+
+  r('現況月結餘',L.base)+r('＋ 新增工作收入',L.addInc,RP.ok)+r('＋ 刪減支出',L.cutExp,RP.ok)+
+  r('− 新增投入',L.newInv,RP.bad)+r('− 新增保費',L.prem,RP.bad)+
+  '<tr><td style="font-weight:800">剩餘結餘</td><td style="text-align:right;font-weight:800;color:'+(L.monthBad?RP.bad:RP.ok)+'">'+fmt(L.left)+'</td></tr></table>';
+ var t2='<table><tr><th>單筆資金</th><th style="text-align:right">金額</th></tr>'+
+  r('可動用現金',L.cash)+r('＋ 變現／貸款取得',L.lumpGot,RP.ok)+r('− 單筆投入',L.lumpNeed,RP.bad)+
+  '<tr><td style="font-weight:800">剩餘現金</td><td style="text-align:right;font-weight:800;color:'+(L.cashBad?RP.bad:RP.ok)+'">'+fmt(L.cashLeft)+'</td></tr>'+
+  '<tr><td style="color:'+RP.mut+'">緊急預備金門檻</td><td style="text-align:right;color:'+RP.mut+'">'+fmt(L.emReq)+'</td></tr></table>';
+ var al='';
+ if(L.monthBad)al+='<p style="font-size:13px;color:'+RP.bad+';margin-top:8px">⚠ 每月資金超支 '+fmt(-L.left)+' 元。這一組動作在現有的收支結構下<b>排不出錢</b>，必須調整投入金額或重新安排資金來源。</p>';
+ if(L.cashBad)al+='<p style="font-size:13px;color:'+RP.bad+';margin-top:8px">⚠ 執行後現金水位低於緊急預備金門檻 '+fmt(L.emReq-L.cashLeft)+' 元。突發事件會被迫贖回投資部位。</p>';
+ if(!al)al='<p style="font-size:13px;color:'+RP.ok+';margin-top:8px">✓ 這一組動作的資金排得出來，而且執行後仍保有緊急預備金。</p>';
+ return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+t1+t2+'</div>'+al;
+}
+
+/* 四、執行時序 */
+function planFlowReportHTML(c){
+ var A=n(c.profile.age)||40;
+ var acts=planActionsOn(c).slice().sort(function(x,y){return (n(x.startY)||99)-(n(y.startY)||99)});
+ if(!acts.length)return '<p style="font-size:14px">目前沒有待執行的動作。</p>';
+ var group={},order=[];
+ acts.forEach(function(a){
+  var sy=n(a.startY)||n(a.payFrom)||n(a.getFrom)||A;
+  var key=sy<=A+1?'現在起':(sy+' 歲（'+Math.max(0,sy-A)+' 年後）');
+  if(!group[key]){group[key]=[];order.push(key)}
+  group[key].push(a);
+ });
+ return order.map(function(k){
+  return '<h3 style="margin-top:14px;color:'+RP.amb+'">'+esc(k)+'</h3><ul style="padding-left:2px;font-size:14px;line-height:1.85">'+
+   group[k].map(function(a){
+    var w=[];
+    if(a.tool&&a.tool!=='—')w.push(a.tool);
+    if(n(a.payMonthly))w.push('每月 '+fmt(a.payMonthly));
+    if(n(a.payLump))w.push('單筆 '+fmt(a.payLump));
+    if(n(a.getMonthly))w.push(a.cat==='expense'?'每月省下 '+fmt(a.getMonthly):'每月 +'+fmt(a.getMonthly));
+    if(n(a.cover))w.push('保額 '+fmt(a.cover));
+    return '<li style="list-style:none;margin-bottom:7px"><span style="display:inline-block;width:13px;height:13px;border:1.5px solid #0d2b45;border-radius:3px;margin-right:8px;vertical-align:-2px"></span>'+
+     '<b>'+esc(actCat(a.cat).n)+'｜'+esc((a.name||'').trim()||'（未命名）')+'</b>'+
+     (w.length?' — '+esc(w.join('　·　')):'')+'</li>'}).join('')+'</ul>';
+ }).join('');
+}
+
+/* 五、如果還要更多：三個替代方案 */
+function planCutReportHTML(c){
+ var gate=leverGate(c),pa=projection(c);
+ if(pa.shortPV<=0.5)return '<p style="font-size:14px;color:'+RP.ok+'">這一組動作已經把缺口補平，不需要再調整願景本身。</p>';
+ var CUTS=[{k:'retire',n:'延後退休'},{k:'retireLevel',n:'降低退休水準'},{k:'vision',n:'壓縮願景'}];
+ var rows=CUTS.map(function(Cc){
+  var r=solveLever(c,Cc.k,{},gate),txt,col=RP.amb;
+  if(r.blocked){txt='此階段建議先不動';col=RP.mut}
+  else if(!r.needed){txt='不需要動';col=RP.ok}
+  else if(!r.feasible){txt='拉到上限仍補不平';col=RP.bad}
+  else txt=leverLabel(Cc.k,r.x);
+  return '<tr><td style="white-space:nowrap;font-weight:700">'+Cc.n+'</td><td style="color:'+col+';font-weight:700">'+esc(txt)+'</td>'+
+   '<td style="color:'+RP.mut+';font-size:12px">'+(r.blocked&&gate.reason[Cc.k]?esc(gate.reason[Cc.k]):'')+'</td></tr>';
+ }).join('');
+ return rpTable('<th>做法</th><th>要調到多少</th><th>備註</th>',rows)+
+  '<p style="font-size:12px;color:'+RP.mut+';margin-top:6px">這三條是<b>互相替代</b>的選項，不是要一起做——每一條都是「其他都不動、只動這一項」的答案。'+
+  '在目前已排的動作之上計算。</p>';
+}
 function planReportHTML(c){
+ // ── 調整方案書 v2（2026/08/24 整份重寫）──
+ // v1 的主角是「六根槓桿的比例」，v2 換成「一條一條具體動作」。
+ // 敘事順序照客戶當場聽得懂的邏輯走：
+ //   差多少 → 選了哪些願景 → 缺口怎麼形成 → 決定做哪些事 → 做得到嗎 → 還要更多的話 → 什麼時候做
+ // ⚠️ 方案書回答「所以要做什麼」；客戶版報告書回答「你現在怎麼樣」。分工不變。
  var p=c.profile||{};
- var pa=planActions(c),led=pa.ledger,solo=soloSolve(c),rxs=prescriptions(c);
- var rec=allocReconcile(c,planLevers(c)),ap=rec.alloc;
- var invRows=ap.rows.map(function(x){var r=x.row;
-  return '<tr><td>'+esc(r.name||'（未指定）')+'</td><td>'+esc(r.src||'新增投入')+'</td>'+
-   '<td style="text-align:right">'+fmt(r.principal)+'</td><td style="text-align:right">'+fmt(r.yearly)+'</td>'+
-   '<td style="text-align:right">'+(n(r.yearly)>0?x.years+' 年':'—')+'</td><td style="text-align:right">'+(+n(r.ret))+'%</td>'+
-   '<td style="text-align:right;font-weight:700">'+(x.pv>0?fmt(x.pv):'—')+'</td></tr>'}).join('');
- var proRows=allocProtect(c).map(function(r){
-  return '<tr><td>'+esc(r.gapKey||'（未指定）')+'</td><td>'+esc(r.name||'（未指定）')+'</td>'+
-   '<td style="text-align:right">'+fmt(r.cover)+'</td><td style="text-align:right">'+fmt(r.premium)+'</td>'+
-   '<td>'+esc(r.terms||'')+'</td></tr>'}).join('');
- var s=scenario(c),lv=pa.levers,adopted=Object.keys(lv).length>0;
- var col=function(ok){return ok?'#3f7d54':'#b05a4a'};
- var hb=s.before.health,ha=s.after.health;
+ var pb=projection(baseCase(c)),pa=projection(c);
+ var led=gapLedger(c);
+ var s=scenario(c),hb=s.before.health,ha=s.after.health;
+ var imp=pb.shortPV>0.5?Math.max(0,Math.round((1-pa.shortPV/pb.shortPV)*100)):100;
+ var okCnt=0,tot=0;pa.events.forEach(function(e){tot++;if(e.ok)okCnt++});
+ var hasAct=pa.hasActions;
+ var col=function(ok){return ok?RP.ok:RP.bad};
+ var urg=pa.urgAge,near=(pa.shortPV>0.5&&urg!=null&&(urg-n(p.age))<=10);
 
  var nowRows=led.now.map(function(x){
-  return '<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+fmt(x.amount)+'</td><td style="color:#5a6b72">'+esc(x.kind)+'</td></tr>'}).join('');
+  return '<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+fmt(x.amount)+'</td><td style="color:'+RP.mut+'">'+esc(x.kind)+'</td></tr>'}).join('');
 
- var actRows=pa.actions.map(function(a){
-  return '<tr><td style="text-align:center;font-weight:700;color:#c99a5b;white-space:nowrap">'+esc(a.axis)+'</td>'+
-   '<td style="white-space:nowrap">'+esc(a.title)+'</td><td>'+esc(a.detail)+
-   (a.note?'<div style="color:#5a6b72;font-size:12px;margin-top:2px">'+esc(a.note)+'</div>':'')+'</td></tr>'}).join('');
-
- var vcRows=pa.visionChanges.map(function(v){
+ var vcRows=visionChanges(c,n(planLevers(c).vision)).map(function(v){
   return '<tr><td>'+esc(v.kind)+'</td><td>'+esc(v.name)+'</td><td style="text-align:right">'+fmt(v.from)+'</td>'+
-   '<td style="text-align:right;font-weight:700">'+fmt(v.to)+'</td><td style="text-align:right;color:#5a6b72">'+fmt(v.floor)+'</td></tr>'}).join('');
+   '<td style="text-align:right;font-weight:700">'+fmt(v.to)+'</td><td style="text-align:right;color:'+RP.mut+'">'+fmt(v.floor)+'</td></tr>'}).join('');
 
- var rxRows=rxs.map(function(r){
-  var det=(r.steps||[]).filter(function(x){return x.needed&&r.levers[x.id]!==undefined}).map(function(x){
-   return esc(x.name)+' '+leverLabel(x.id,r.levers[x.id])}).join('、')||'不需要調整';
-  return '<tr><td style="white-space:nowrap;font-weight:700">'+esc(r.name)+'</td><td>'+det+'</td>'+
-   '<td style="color:'+col(r.ok)+';font-weight:700;white-space:nowrap">'+(r.ok?'可以填平':'仍差 '+fmt(r.gap))+'</td></tr>'}).join('');
-
- var chk=pa.actions.map(function(a){
-  return '<li style="margin-bottom:7px;list-style:none"><span style="display:inline-block;width:13px;height:13px;border:1.5px solid #0d2b45;border-radius:3px;margin-right:8px;vertical-align:-2px"></span>'+
-   '<b>'+esc(a.title)+'</b> — '+esc(a.detail)+'</li>'}).join('');
+ var ff=pa.firstFail;
+ var verdict = !ff
+  ? '<b style="color:'+RP.ok+'">選定的願景全部做得到。</b>'
+  : (ff.kind==='legacy'
+     ? '基本的人生目標都做得到了，<b style="color:'+RP.bad+'">卡在「傳承」</b>——期末資產 '+cfAxis((pa.rows[pa.rows.length-1]||{}).total)+'，目標 '+cfAxis(ff.amount)+'。'
+     : '照這一組動作走，做得到 <b>'+ff.age+' 歲以前</b>的所有事；第一個做不到的是 <b style="color:'+RP.bad+'">'+ff.age+' 歲的「'+esc(ff.name)+'」</b>。');
 
  return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>調整方案書</h1></div>'+
   (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
   '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+'　現年 '+n(p.age)+' 歲　目前階段：'+stageName(hb.grade)+docCodeHTML()+'</div></div>'+
 
   '<h2>一、你和你想要的未來，差多少</h2>'+
-  '<p style="font-size:14px;line-height:1.9">這份方案書只回答兩件事：<b>缺口是多少</b>，以及<b>用什麼方式補</b>。'+
-  '缺口不是把退休、保障、目標的數字加起來——那是三個不同時點、不同性質的東西。'+
-  '這裡的「現值缺口」指的是：<b>為了讓你一生的可投資資產永遠不落到負數，今天必須額外準備的一筆錢。</b></p>'+
-  '<div style="margin:14px 0 4px">'+gapChartSVG(c,lv,'light')+'</div>'+
-  '<table><tr><td>現值缺口（以預期報酬 '+(+led.rate.toFixed(2))+'% 計）</td><td style="text-align:right;font-weight:800;color:'+col(led.total<=0.5)+'">'+fmt(led.total)+' 元</td></tr>'+
-  '<tr><td>保守情境（折現率 '+led.conservativeRate+'%）</td><td style="text-align:right;font-weight:700">'+fmt(led.conservative)+' 元</td></tr>'+
-  '<tr><td>願景達成度</td><td style="text-align:right;font-weight:700">'+led.visionRate+'%</td></tr>'+
-  (led.total>0.5?'<tr><td>補平方式</td><td style="text-align:right">'+(led.years<=1
-    ? '現金流最快 '+led.negAge+' 歲轉負，必須立即處理'
-    : led.years+' 年內每年存入 '+fmt(led.annual)+' 元')+'</td></tr>':'')+
+  '<p style="font-size:14px;line-height:1.9">財務規劃要回答的是：<b>你這一生想做的事，錢夠不夠支撐。</b>'+
+  '缺口幾乎一定存在——把基本的目標做到之後，還有傳承，還有更想追求的事。'+
+  '所以這份方案書要看的不是「補平了沒」，而是<b>比原本改善了多少</b>，然後每年再調整一次。</p>'+
+  '<div style="margin:14px 0 6px">'+visionTimelineSVG(c,'light','rp')+'</div>'+
+  '<table><tr><td>一生願景需要的資金（折現到今天）</td><td style="text-align:right;font-weight:700">'+fmt(pa.needPV)+' 元</td></tr>'+
+  '<tr><td>現況的缺口</td><td style="text-align:right;font-weight:700">'+fmt(pb.shortPV)+' 元</td></tr>'+
+  (hasAct?'<tr><td>套用本次方案之後</td><td style="text-align:right;font-weight:800;color:'+col(pa.shortPV<=0.5)+'">'+
+    (pa.shortPV<=0.5?'已補平':fmt(pa.shortPV)+' 元')+'（改善 '+imp+'%）</td></tr>':'')+
+  '<tr><td>選定的願景做得到幾件</td><td style="text-align:right;font-weight:700">'+okCnt+' / '+tot+' 件</td></tr>'+
   '</table>'+
+  '<p style="font-size:14px;line-height:1.9;margin-top:10px">'+verdict+'</p>'+
+  (pa.shortPV>0.5
+   ? '<p style="font-size:13px;color:'+(near?RP.bad:RP.amb)+';margin-top:6px">'+
+     (near?'⚠ 缺口在 '+urg+' 歲就會出現（十年內），沒有攤提的空間，必須立即處理。'
+          :'缺口出現在 '+urg+' 歲（十年以後）。時點不急，屬於每年動態調整的範圍——只要比原本更優化就是有效的。')+'</p>'
+   : '')+
   (led.conservative>led.total*3&&led.total>0.5
-   ? '<p style="font-size:13px;color:#b05a4a;margin-top:8px">⚠ 兩個數字差了 '+(led.conservative/led.total).toFixed(1)+' 倍。這代表這份規劃的成敗高度取決於投資報酬率是否真的達到假設值。報酬率是假設，不是承諾。</p>'
+   ? '<p style="font-size:13px;color:'+RP.bad+';margin-top:8px">⚠ 用保守折現率（'+led.conservativeRate+'%）重算，缺口是 '+fmt(led.conservative)+' 元，'+
+     '與上方差了 '+(led.conservative/led.total).toFixed(1)+' 倍。這代表這份規劃的成敗高度取決於投資報酬率是否真的達到假設值。報酬率是假設，不是承諾。</p>'
    : '')+
 
-  (led.flow.length?'<h2>二、缺口是怎麼形成的</h2>'+
-   '<div style="margin-top:10px">'+gapBarsHTML(led,'light')+'</div>'+
-   '<p style="font-size:12px;color:#5a6b72;margin-top:8px">依「第一個不足年（'+led.negAge+' 歲）之後」的折現支出組成歸因，各條相加等於現值缺口 '+fmt(led.total)+' 元。</p>'
-   :'<h2>二、缺口是怎麼形成的</h2><p style="font-size:14px">依目前的假設，一生的可投資資產不會轉為負數，沒有現金流缺口。以下的「另需準備」仍請一併確認。</p>')+
+  '<h2>二、這一輪要完成哪些願景</h2>'+
+  '<p style="font-size:14px;line-height:1.9">財務規劃的第一步不是算錢，是<b>先決定要做哪些事</b>。以下是這一輪共同選定的清單。</p>'+
+  planVisionReportHTML(c)+
 
+  '<h2>三、缺口是怎麼形成的</h2>'+
+  (led.flow.length
+   ? '<div style="margin-top:10px">'+gapBarsHTML(led,'light')+'</div>'+
+     '<p style="font-size:12px;color:'+RP.mut+';margin-top:8px">依「第一個不足年（'+led.negAge+' 歲）之後」的折現支出組成歸因，各條相加等於現值缺口 '+fmt(led.total)+' 元。'+
+     '缺口不是把退休、保障、目標的數字加起來——那是三個不同時點、不同性質的東西。</p>'
+   : '<p style="font-size:14px">依目前的假設，一生的可投資資產不會轉為負數，沒有現金流缺口。以下的「另需準備」仍請一併確認。</p>')+
   (led.now.length?'<h3 style="margin-top:14px">另需準備（不併入上方缺口）</h3>'+
    '<table><tr><th>項目</th><th style="text-align:right">金額</th><th>性質</th></tr>'+nowRows+'</table>'+
-   '<p style="font-size:12px;color:#5a6b72">保障缺口是「事件發生才要的錢」、緊急預備金是「隨時要能動用的錢」，和一生現金流的時點與性質都不同，因此分開列示。</p>':'')+
+   '<p style="font-size:12px;color:'+RP.mut+'">保障缺口是「事件發生才要的錢」、緊急預備金是「隨時要能動用的錢」，和一生現金流的時點與性質都不同，因此分開列示。</p>':'')+
 
-  '<h2>三、有哪些補法（每一條都是「其他都不動、只動這一項」）</h2>'+
-  '<div style="margin-top:10px">'+leverBarsHTML(c,solo,'light',false)+'</div>'+
-  '<p style="font-size:12px;color:#5a6b72">標示「拉到上限仍差」＝這條路單獨走不通。上限是規劃的合理性界線，不是不能努力，而是不應該把計畫建立在超出常態的假設上。</p>'+
+  '<h2>四、我們決定做哪些事</h2>'+
+  '<p style="font-size:14px;line-height:1.9">補缺口只有兩個方向：<b>增加收入</b>（工作收入的提升，以及理財效率的提升）與<b>減少支出</b>。'+
+  '下面每一條都是具體到「用什麼工具、做多久、產生什麼效果」的動作，不是百分比。</p>'+
+  planActionsReportHTML(c)+
 
-  '<h2>四、三種組合方式</h2>'+
-  '<table><tr><th>方案</th><th>內容</th><th>結果</th></tr>'+rxRows+'</table>'+
+  '<h2>五、這些動作做得到嗎</h2>'+
+  '<p style="font-size:14px;line-height:1.9">動作排得再好，前提是<b>錢排得出來</b>。這一章把每月與單筆兩條資金線攤開對帳。</p>'+
+  planLedgerReportHTML(c)+
 
-  '<h2>五、本次採用的方案</h2>'+
-  (adopted
-   ? '<p style="font-size:14px;line-height:1.9">採用：<b>'+esc(leverSummary(lv))+'</b></p>'+
-     '<div style="margin:10px 0 12px">'+deltaCardsHTML(c,lv,'light')+'</div>'+
-     '<p style="font-size:12px;color:#5a6b72">上方第一章的圖已經畫出調整前後兩條線；金色那條就是採用本方案之後的走勢。</p>'+
-     '<table style="margin-top:10px"><tr><th>其他指標</th><th style="text-align:right">調整前</th><th style="text-align:right">調整後</th></tr>'+
-     '<tr><td>退休年齡</td><td style="text-align:right">'+n(c.profile.retireAge)+' 歲</td><td style="text-align:right;font-weight:700">'+n(s.afterCase.profile.retireAge)+' 歲</td></tr>'+
-     '<tr><td>退休缺口</td><td style="text-align:right">'+fmt(s.before.retire.gap)+'</td><td style="text-align:right;font-weight:700">'+fmt(s.after.retire.gap)+'</td></tr>'+
-     '<tr><td>財務自由度</td><td style="text-align:right">'+hb.freedom+'%</td><td style="text-align:right;font-weight:700">'+ha.freedom+'%</td></tr></table>'
-   : '<p style="font-size:14px;color:#b05a4a">尚未採用任何方案。請在「調整方案」分頁拉出一組組合後按「採用為正式方案」，這一章才會有內容。</p>')+
-
+  '<h2>六、如果還想做到更多</h2>'+
+  '<p style="font-size:14px;line-height:1.9">前面是「把水加進來」。如果加到極限仍然不夠，另一個方向是<b>把目標本身調整一下</b>。</p>'+
+  planCutReportHTML(c)+
   (vcRows?'<h3 style="margin-top:14px">願景的具體調整</h3>'+
    '<table><tr><th>類別</th><th>項目</th><th style="text-align:right">原本</th><th style="text-align:right">調整後</th><th style="text-align:right">可接受的最低</th></tr>'+vcRows+'</table>'+
-   '<p style="font-size:12px;color:#5a6b72">「可接受的最低」是先前一起填下的金額。調整不是放棄，是把資源讓給更重要的事。</p>':'')+
+   '<p style="font-size:12px;color:'+RP.mut+'">「可接受的最低」是先前一起填下的金額。調整不是放棄，是把資源讓給更重要的事。</p>':'')+
 
-  '<h2>六、要放什麼進去</h2>'+
-  '<div style="margin-top:10px">'+allocBarHTML(rec,'light')+'</div>'+
-  (invRows
-   ? '<h3 style="margin-top:14px">投資型配置</h3>'+
-     '<table><tr><th>標的</th><th>資金來源</th><th style="text-align:right">本金</th><th style="text-align:right">每年投入</th><th style="text-align:right">年數</th><th style="text-align:right">預期報酬</th><th style="text-align:right">現值貢獻</th></tr>'+invRows+'</table>'+
-     '<p style="font-size:12px;color:#5a6b72">「現值貢獻」只算<b>新增投入</b>的錢——既有資產轉入是換個地方放，不會憑空多出一筆。年投入以該列自己的預期報酬率折現。</p>'
+  '<h2>七、什麼時候做什麼</h2>'+
+  planFlowReportHTML(c)+
+  '<p style="font-size:13px;margin-top:12px">下次檢視日期：<b>'+esc(c.nextReview||'（未設定）')+'</b>。'+
+  '財務規劃不是一次到位，而是<b>每年檢視、逐年調整</b>。實際執行狀況請在「真實追蹤」逐年登錄，屆時可以直接比對這條規劃線與實際淨資產的落差。</p>'+
+
+  (String(c.planNote||'').trim()
+   ? '<h2>八、教練的話</h2><p style="font-size:14px;line-height:1.95;white-space:pre-wrap">'+esc(c.planNote)+'</p>'
    : '')+
-  (proRows
-   ? '<h3 style="margin-top:14px">保障型配置</h3>'+
-     '<table><tr><th>對應缺口</th><th>險種 / 結構</th><th style="text-align:right">保額</th><th style="text-align:right">年繳保費</th><th>條件內容</th></tr>'+proRows+'</table>'
-   : '')+
-  '<h3 style="margin-top:14px">保障對帳</h3>'+
-  '<div style="margin-top:8px">'+protectMatchHTML(rec,'light')+'</div>'+
-  (rec.alloc.premium>0?'<p style="font-size:12px;color:#b05a4a;margin-top:8px">年繳保費合計 '+fmt(rec.alloc.premium)+' 元是實際支出，會影響現金流，請一併登錄到收支表的保險科目。</p>':'')+
-  '<p style="font-size:12px;color:#5a6b72;margin-top:8px">本表登錄的是<b>結構與條件</b>，不是特定商品。商品的選擇與適配請由客戶與各該領域的專業人士確認。</p>'+
 
-  '<h2>七、執行清單</h2>'+
-  (chk?'<ul style="padding-left:2px;font-size:14px;line-height:1.8">'+chk+'</ul>':'<p style="font-size:14px">目前沒有待辦事項。</p>')+
-  '<table style="margin-top:10px"><tr><th>面向</th><th>做什麼</th><th>做到什麼程度</th></tr>'+actRows+'</table>'+
-  '<p style="font-size:13px;margin-top:10px">下次檢視日期：<b>'+esc(c.nextReview||'（未設定）')+'</b>。'+
-  '實際執行狀況請在「真實追蹤」逐年登錄，屆時可直接比對這條規劃線與實際淨資產的落差。</p>'+
-
-  '<p style="font-size:12px;color:#5a6b72;margin-top:22px;border-top:1px solid #dfe6e8;padding-top:10px">'+
+  '<p style="font-size:12px;color:'+RP.mut+';margin-top:22px;border-top:1px solid '+RP.line+';padding-top:10px">'+
   '本方案書為依據所提供資料所做的結構試算，其中的報酬率、通膨率與薪資成長率均為<b>假設值</b>，並非對未來績效的保證。'+
+  '每一筆調整動作登錄的是<b>工具與效果</b>，不是特定商品；商品的選擇與適配請由您與各該領域的專業人士確認。'+
   '嵐途為一般顧問公司，不從事投資顧問或保險招攬業務，本文件不構成任何金融商品的推介或投資建議。'+
-  '個人稅務、法律與商品選擇請與您的會計師、律師及各該領域專業人士確認。</p>'+
+  '個人稅務與法律事項請與您的會計師、律師確認。</p>'+
   '</div>';
 }
 
