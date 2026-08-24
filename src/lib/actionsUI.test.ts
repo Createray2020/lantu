@@ -5,9 +5,10 @@ import { JSDOM } from "jsdom";
 /**
  * 調整動作清單 c.actions[]（區塊 1B，2026/08/24）。
  *
- * 本階段只做資料層與輸入介面，**完全不進任何試算**——所以這支測試最重要的一條是
- * 「不管填了多少動作，既有的缺口與健康度一位不動」。動作要進 projection() 的
- * 分離池是區塊 2 的事，屆時這條斷言會被改寫成「有動作才會變」。
+ * 動作經由 projection() 的**分離池**進試算：被動作指定的錢用該動作自己的 growth 滾，
+ * 全域 rate 只管沒被指定的剩餘資產。最重要的一條斷言是
+ * 「**沒有任何動作時，數字與改版前一位不差**」——分離池的實作必須在 acts 為空時
+ * 完全退化成改版前的算式。
  *
  * 另外釘住三件容易走鐘的事：
  *   ① 一致性規則：所有流出走 pay*、所有流入走 get*
@@ -150,26 +151,73 @@ describe("啟用開關", () => {
   });
 });
 
-describe("⚠️ 區塊 1B 不進試算：填再多動作，既有數字一位不動", () => {
-  it("缺口／需求現值／健康度等級都與沒有動作時相同", () => {
+describe("動作真的進試算（分離池）", () => {
+  it("沒有任何動作時，數字與改版前一位不差", () => {
     const c = fresh();
     const gap0 = w.gapPV(c);
-    const need0 = w.projection(c).needPV;
-    const grade0 = w.health(c).grade;
+    w.addRow("actions");
+    w.toggleAction(0); // 停用
+    expect(w.gapPV(w.app.cases[0])).toBeCloseTo(gap0, 6);
+  });
 
-    ["income", "expense", "regular", "lump", "liquidate", "loan", "insure"].forEach((k) => {
+  it("加一筆定期定額，缺口下降；停用後回到原值", () => {
+    const c = fresh();
+    const gap0 = w.gapPV(c);
+    const a = addOf("regular");
+    a.payMonthly = 30000;
+    a.growth = 6;
+    w.render();
+    const after = w.gapPV(w.app.cases[0]);
+    expect(after).toBeLessThan(gap0);
+    w.toggleAction(0);
+    expect(w.gapPV(w.app.cases[0])).toBeCloseTo(gap0, 6);
+  });
+
+  it("增加工作收入與刪減支出都讓缺口下降", () => {
+    ["income", "expense"].forEach((k) => {
+      const c = fresh();
+      const gap0 = w.gapPV(c);
       const a = addOf(k);
-      a.payMonthly = 30000;
-      a.getMonthly = 30000;
-      a.payLump = 3000000;
-      a.getLump = 3000000;
-      a.growth = 8;
-      a.cover = 10000000;
+      a.getMonthly = 20000;
+      w.render();
+      expect(w.gapPV(w.app.cases[0])).toBeLessThan(gap0);
     });
+  });
 
-    const after = w.app.cases[0];
-    expect(w.gapPV(after)).toBeCloseTo(gap0, 6);
-    expect(w.projection(after).needPV).toBeCloseTo(need0, 6);
-    expect(w.health(after).grade).toBe(grade0);
+  it("分離池用動作自己的報酬率：growth 越高、缺口越小", () => {
+    function gapAt(g: number) {
+      fresh();
+      const a = addOf("regular");
+      a.payMonthly = 30000;
+      a.growth = g;
+      return w.gapPV(w.app.cases[0]);
+    }
+    expect(gapAt(8)).toBeLessThan(gapAt(2));
+  });
+
+  it("買保障是支出：缺口變大（保額的價值走保障缺口，不走現金流）", () => {
+    const c = fresh();
+    const gap0 = w.gapPV(c);
+    const a = addOf("insure");
+    a.payMonthly = 8000;
+    a.cover = 10000000;
+    w.render();
+    expect(w.gapPV(w.app.cases[0])).toBeGreaterThan(gap0);
+  });
+
+  it("願景事件會被標記可否負擔，並找得出第一個做不到的", () => {
+    const c = fresh();
+    const p = w.projection(c);
+    expect(Array.isArray(p.events)).toBe(true);
+    expect(p.events.length).toBeGreaterThan(0);
+    p.events.forEach((e: { age: number; ok: boolean; name: string }) => {
+      expect(typeof e.ok).toBe("boolean");
+      expect(typeof e.name).toBe("string");
+    });
+    // 事件依年齡排序，firstFail 是第一個 ok=false 的
+    const ages = p.events.map((e: { age: number }) => e.age);
+    expect(ages.slice().sort((x: number, y: number) => x - y)).toEqual(ages);
+    const firstBad = p.events.filter((e: { ok: boolean }) => !e.ok)[0] || null;
+    expect(p.firstFail).toEqual(firstBad);
   });
 });

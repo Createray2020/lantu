@@ -225,7 +225,9 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
 
   it("現值缺口的封閉解：兩邊是同一條公式", () => {
     // shortPV = max over t ( −raw_t ÷ (1+r)^(t+1) )
-    expect(HTML).toContain("if(raw<0){if(negAge===null)negAge=age;var need_=-raw/df;if(need_>shortPV){shortPV=need_;shortAge=age;}}");
+    // ⚠️ 2026/08/24 起缺口看的是「主池＋分離池」的合計（rawTot），不是只看主池。
+    expect(HTML).toContain("var rawTot=raw+potSum;");
+    expect(HTML).toContain("if(rawTot<0){if(negAge===null)negAge=age;var need_=-rawTot/df;if(need_>shortPV){shortPV=need_;shortAge=age;}}");
     expect(HTML).toContain("raw=raw*(1+ret)+bal;");
   });
 

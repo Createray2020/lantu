@@ -478,6 +478,14 @@ function projection(c,lump,rateOverride){
  //   shortPV = max over t ( −raw_t ÷ (1+r)^(t+1) )。實際路徑永遠比它好看，所以這是保守上界。
  var raw=invest,shortPV=0,shortAge=null,negAge=null,needPV=0;
  var pvOut={base:0,debt:0,goal:0,edu:0,life:0,retire:0},pvLate={base:0,debt:0,goal:0,edu:0,life:0,retire:0};
+
+ // ---------- 調整動作：分離池 ----------
+ // 被動作指定的錢用「該動作自己的 growth」滾，全域 ret 只管沒被指定的剩餘資產。
+ // ⚠️⚠️ acts 為空時 pots 全空、actIn/actOut/actPay 全 0，下面每一行都退化成改版前的算式
+ //     ——「沒有動作時既有客戶數字一位不動」靠這個等價性，有測試守著，不要破壞它。
+ var acts=planActionsOn(c), pots={};
+ acts.forEach(function(x){pots[x.id]=0});
+ var evts=[], legacyTarget=legacyNeed(c);
  for(var age=a0;age<=aEnd;age++){
   var t=age-a0;
   var workIncome=sum(c.incomes,function(i){return (i.type==='工作'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
@@ -496,22 +504,105 @@ function projection(c,lump,rateOverride){
   var edu=eduByYear[age]||0;
   var life=lifestyleFactor(c,age,Math.pow(1+infl,t));
   var retireDraw=retireAnnual(c,age,inflF)*w;
-  var bal=income-expense-debt-goalOut-edu-life-retireDraw;
+
+  // ---- 調整動作 ----
+  // 一致性規則：所有流出走 pay*、所有流入走 get*。
+  // 保費與貸款月付是「支出」不是投資，所以走 actOut 不進池子。
+  var actIn=0,actOut=0,actPay=0;
+  acts.forEach(function(x){
+   var pf=n(x.payFrom),pt=n(x.payTo)||aEnd,gf=n(x.getFrom),gt=n(x.getTo)||aEnd;
+   if(x.cat==='insure'||x.cat==='loan'){
+    if(n(x.payMonthly)&&age>=pf&&age<=pt)actOut+=n(x.payMonthly)*12;
+    if(n(x.getLump)&&age===pf)actIn+=n(x.getLump);          // 貸款撥款
+    return;                                                  // 這兩類沒有自己的資金池
+   }
+   if(x.cat==='income'||x.cat==='expense'){
+    if(n(x.getMonthly)&&age>=gf&&age<=gt)actIn+=n(x.getMonthly)*12;
+    return;                                                  // 加薪／省下的錢直接進主池
+   }
+   if(x.cat==='liquidate'){
+    if(n(x.getLump)&&age===pf)actIn+=n(x.getLump);           // 淨變現金額
+    return;
+   }
+   // regular／lump：真的有一個自己的資金池
+   var k=x.id;pots[k]=(pots[k]||0)*(1+n(x.growth)/100);
+   if(n(x.payMonthly)&&age>=pf&&age<=pt){var mv=n(x.payMonthly)*12;pots[k]+=mv;actPay+=mv;}
+   if(n(x.payLump)&&age===pf){pots[k]+=n(x.payLump);actPay+=n(x.payLump);}
+   if(n(x.divYear)&&age>=pf){if(x.divMode==='payout')actIn+=n(x.divYear);else pots[k]+=n(x.divYear);}
+   if(n(x.getMonthly)&&age>=gf&&age<=gt){var tk=Math.min(pots[k],n(x.getMonthly)*12);pots[k]-=tk;actIn+=tk;}
+   if(n(x.getLump)&&age===gt){var tl=Math.min(pots[k],n(x.getLump));pots[k]-=tl;actIn+=tl;}
+  });
+  var potSum=0;for(var _pk in pots){if(pots.hasOwnProperty(_pk))potSum+=pots[_pk];}
+
+  var bal=income-expense-debt-goalOut-edu-life-retireDraw+actIn-actOut-actPay;
   invest=(invest>0?invest*(1+ret):invest)+bal;
   raw=raw*(1+ret)+bal;
   var df=Math.pow(1+ret,t+1);
-  if(raw<0){if(negAge===null)negAge=age;var need_=-raw/df;if(need_>shortPV){shortPV=need_;shortAge=age;}}
+  // ⚠️ 缺口一定要看「主池＋分離池」的合計：只看主池，等於分離池裡的錢不存在。
+  var rawTot=raw+potSum;
+  if(rawTot<0){if(negAge===null)negAge=age;var need_=-rawTot/df;if(need_>shortPV){shortPV=need_;shortAge=age;}}
   // 折現後的支出組成：pvOut 供「一生需求現值」，pvLate 只累計第一個不足年之後的，供缺口歸因。
   var comp={base:expense,debt:debt,goal:goalOut,edu:edu,life:life,retire:retireDraw};
   for(var ck in comp){if(!comp.hasOwnProperty(ck))continue;var cv=comp[ck]/df;pvOut[ck]+=cv;needPV+=cv;if(negAge!==null)pvLate[ck]+=cv;}
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
-  if(turnNeg===null&&invest<0)turnNeg=age;
+  var totalInv=invest+potSum;
+  if(turnNeg===null&&totalInv<0)turnNeg=age;
   var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)});
-  var netEst=invest+fixedAssets-remDebt;
-  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,net:netEst});
+  var netEst=totalInv+fixedAssets-remDebt;
+
+  // 願景事件的可負擔性標記。
+  // ⚠️ 刻意**不改變現金流**（維持「照付、餘額可以轉負」的既有語意，否則所有既有客戶
+  //    的數字都會變）。✕ 的意思是「做完這件事之後總資產掉到零以下」＝要靠借錢才做得到。
+  //    這正是 Ray 說的「按時間先到先付」的直接後果：早期的先花掉，晚期的就做不到了。
+  (c.goals||[]).forEach(function(gg){
+   if(!visionOn(gg))return;
+   if(age!==n(gg.start))return;
+   evts.push({kind:'goal',age:age,name:(gg.name||gg.type||'目標'),amount:n(gg.present),ok:totalInv>=0});
+  });
+
+  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst});
  }
+ // 子女教育是連續好幾年的支出，不是單一事件——逐年插旗會在圖上排出六支「子女教育」，
+ // 把整張時間軸擠爆。合併成一個區段：起於第一個繳費年，全程不轉負才算做得到。
+ var eduAges=Object.keys(eduByYear).map(Number).filter(function(a){return eduByYear[a]>0}).sort(function(x,y){return x-y});
+ if(eduAges.length){
+  var eFrom=eduAges[0],eTo=eduAges[eduAges.length-1],eSum=0;
+  eduAges.forEach(function(a){eSum+=eduByYear[a]});
+  var eBad=rows.some(function(r){return r.age>=eFrom&&r.age<=eTo&&r.total<0});
+  evts.push({kind:'edu',age:eFrom,span:eTo,name:'子女教育',amount:eSum,ok:!eBad});
+ }
+
+ // 退休生活：不是單一事件，判定是「退休後到預估壽命，資產全程不轉負」。
+ var rAge=n(c.profile.retireAge)||65;
+ if(rAge<=aEnd){
+  var badRetire=rows.some(function(r){return r.age>=rAge&&r.total<0});
+  evts.push({kind:'retire',age:rAge,name:'退休生活',amount:0,span:aEnd,ok:!badRetire});
+ }
+ // 傳承是願景的一部分（客戶可勾選不處理），判定用期末總資產。
+ var lastRow=rows[rows.length-1]||{total:0};
+ // ⚠️ 傳承只做「旗子標記」，**刻意不進 shortPV**。
+ //    legacyNeed 動輒幾千萬（sampleCase 就是 4,000 萬），一旦併進缺口會讓所有既有客戶
+ //    的數字一夜暴增。傳承要不要進一生需求是區塊 4 的題目，要先有客戶勾選的動線。
+ if(legacyTarget>0){
+  evts.push({kind:'legacy',age:aEnd,name:'傳承',amount:legacyTarget,ok:lastRow.total>=legacyTarget});
+ }
+ evts.sort(function(x,y){return x.age-y.age});
+ var firstFail=null;for(var _e=0;_e<evts.length;_e++){if(!evts[_e].ok){firstFail=evts[_e];break;}}
+
  return {rows:rows,turnNeg:turnNeg,totalOutflow:totalOut,
-  shortPV:shortPV,shortAge:shortAge,negAge:negAge,needPV:needPV,pvOut:pvOut,pvLate:pvLate,rate:ret*100};
+  shortPV:shortPV,shortAge:shortAge,negAge:negAge,needPV:needPV,pvOut:pvOut,pvLate:pvLate,rate:ret*100,
+  events:evts,firstFail:firstFail,urgAge:(negAge!=null?negAge:shortAge),hasActions:acts.length>0};
+}
+
+// 啟用中的調整動作。id 缺失的補一個，免得分離池的 key 互相蓋掉。
+function planActionsOn(c){
+ var out=[],seq=0;
+ ((c||{}).actions||[]).forEach(function(x){
+  if(!x||x.on===false)return;
+  if(!x.id)x.id='_a'+(seq++);
+  out.push(x);
+ });
+ return out;
 }
 
 // ===== 調整方案：缺口求解器 =====
@@ -1461,6 +1552,7 @@ export {
   visionRateOf,
   gapLedger,
   visionOn,
+  planActionsOn,
   goalFloor,
   wishFloor,
   visionRoom,

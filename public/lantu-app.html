@@ -210,6 +210,65 @@ input.amtin{text-align:right;font-variant-numeric:tabular-nums;letter-spacing:.0
 .dh:active{cursor:grabbing}
 tr.dragging{opacity:.45}
 tr.dragover td{box-shadow:inset 0 2px 0 var(--amber2)}
+/* ===== 調整方案 v2 ===== */
+:root{--gap2:#ef6f6f}
+.v2big .b .v{font-family:var(--serif);font-size:24px;font-weight:800;line-height:1.25;letter-spacing:-.01em}
+.v2big .b.hero{border-left:3px solid var(--amber)}
+.vtwrap svg{display:block}
+.vttip{position:absolute;pointer-events:none;background:#04121e;border:1px solid var(--line);border-radius:8px;
+ padding:7px 10px;font-size:11.5px;line-height:1.65;opacity:0;transition:opacity .1s;white-space:nowrap;
+ box-shadow:0 6px 20px rgba(0,0,0,.5);z-index:9}
+.vtlg{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin-top:4px}
+.vtlg i{width:14px;height:3px;border-radius:2px;display:inline-block;vertical-align:middle;margin-right:5px}
+.v2verdict{background:var(--card);border-left:3px solid var(--gap2);border-radius:8px;padding:10px 13px;margin-top:11px;font-size:13.5px}
+.v2verdict.good{border-left-color:var(--ok)}
+.v2chips{display:flex;gap:7px;flex-wrap:wrap}
+.v2chip{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);
+ border-radius:999px;padding:6px 13px 6px 10px;cursor:pointer;font-size:12.5px;user-select:none;transition:.13s;color:var(--mut)}
+.v2chip:hover{border-color:var(--amber2)}
+.v2chip .dot{width:9px;height:9px;border-radius:50%;background:var(--mut2);flex:none;transition:.13s}
+.v2chip.on{background:rgba(201,154,91,.16);border-color:var(--amber);color:var(--tx);font-weight:600}
+.v2chip.on .dot{background:var(--amber2)}
+.v2chip .amt{font-size:11px;color:var(--mut2);font-variant-numeric:tabular-nums}
+.v2chip.on .amt{color:var(--amber2)}
+.quotaGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+@media(max-width:820px){.quotaGrid,.ledgrid{grid-template-columns:1fr!important}}
+.qcol{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 13px}
+.qcol.add{border-top:3px solid var(--ok)}.qcol.cut{border-top:3px solid var(--teal)}
+.qcol>b{font-size:13px;color:var(--amber2);display:block;margin-bottom:2px}
+.qcol .sub{font-size:11.5px;color:var(--mut2);margin-bottom:10px}
+.qrow{padding:8px 0;border-top:1px solid var(--line)}.qrow:first-of-type{border-top:0}
+.qhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px}
+.qnums{font-size:11.5px;color:var(--mut2);font-variant-numeric:tabular-nums;margin-top:2px}
+.qnums .done{color:var(--ok)}.qnums .left{color:var(--warn)}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.09);margin-top:5px;overflow:hidden;display:flex}
+.bar i{display:block;height:100%;border-radius:3px}
+.led{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.led.bad{border-left:3px solid var(--gap2)}.led.okk{border-left:3px solid var(--ok)}
+.ledrow{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:12.5px}
+.ledrow.tot{border-top:1px solid var(--line);margin-top:5px;padding-top:8px;font-weight:800}
+.ledrow span:last-child{font-variant-numeric:tabular-nums}
+.v2alert{border-radius:8px;padding:9px 12px;font-size:12.5px;margin-top:10px;display:flex;gap:8px;align-items:flex-start}
+.v2alert.red{background:rgba(239,111,111,.13);border:1px solid rgba(239,111,111,.4);color:#ffc9c9}
+.v2alert.amb{background:rgba(201,154,91,.13);border:1px solid rgba(201,154,91,.4);color:var(--amber2)}
+.vlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:9px}
+.vitem{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;display:flex;gap:10px;align-items:center}
+.vitem.off{opacity:.45}
+.vitem .vt{flex:1;min-width:0}
+.vitem .vn{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.vitem .vm{font-size:11.5px;color:var(--mut2);font-variant-numeric:tabular-nums}
+.mk{font-size:11px;font-weight:800;padding:1px 5px;border-radius:4px;white-space:nowrap}
+.mk.y{background:rgba(143,192,163,.2);color:var(--ok)}
+.mk.n{background:rgba(239,111,111,.18);color:#ff9f9f}
+.v2flow{position:relative;padding-left:22px}
+.v2flow::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.v2flow .fitem{position:relative;padding:0 0 14px}
+.v2flow .fitem::before{content:'';position:absolute;left:-19px;top:6px;width:9px;height:9px;border-radius:50%;
+ background:var(--amber);box-shadow:0 0 0 3px var(--bg)}
+.v2flow .fw{font-size:11.5px;color:var(--amber2);font-weight:800;letter-spacing:.04em}
+.v2flow .fn{font-size:13px;font-weight:700}
+.v2flow .fd{font-size:12px;color:var(--mut)}
+
 /* 調整動作清單（v2） */
 .actstbl table{min-width:1300px}
 .actstbl th{white-space:nowrap}
@@ -1397,6 +1456,14 @@ function projection(c,lump,rateOverride){
  //   shortPV = max over t ( −raw_t ÷ (1+r)^(t+1) )。實際路徑永遠比它好看，所以這是保守上界。
  var raw=invest,shortPV=0,shortAge=null,negAge=null,needPV=0;
  var pvOut={base:0,debt:0,goal:0,edu:0,life:0,retire:0},pvLate={base:0,debt:0,goal:0,edu:0,life:0,retire:0};
+
+ // ---------- 調整動作：分離池 ----------
+ // 被動作指定的錢用「該動作自己的 growth」滾，全域 ret 只管沒被指定的剩餘資產。
+ // ⚠️⚠️ acts 為空時 pots 全空、actIn/actOut/actPay 全 0，下面每一行都退化成改版前的算式
+ //     ——「沒有動作時既有客戶數字一位不動」靠這個等價性，有測試守著，不要破壞它。
+ var acts=planActionsOn(c), pots={};
+ acts.forEach(function(x){pots[x.id]=0});
+ var evts=[], legacyTarget=legacyNeed(c);
  for(var age=a0;age<=aEnd;age++){
   var t=age-a0;
   var workIncome=sum(c.incomes,function(i){return (i.type==='工作'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
@@ -1415,26 +1482,108 @@ function projection(c,lump,rateOverride){
   var edu=eduByYear[age]||0;
   var life=lifestyleFactor(c,age,Math.pow(1+infl,t));
   var retireDraw=retireAnnual(c,age,inflF)*w;
-  var bal=income-expense-debt-goalOut-edu-life-retireDraw;
+
+  // ---- 調整動作 ----
+  // 一致性規則：所有流出走 pay*、所有流入走 get*。
+  // 保費與貸款月付是「支出」不是投資，所以走 actOut 不進池子。
+  var actIn=0,actOut=0,actPay=0;
+  acts.forEach(function(x){
+   var pf=n(x.payFrom),pt=n(x.payTo)||aEnd,gf=n(x.getFrom),gt=n(x.getTo)||aEnd;
+   if(x.cat==='insure'||x.cat==='loan'){
+    if(n(x.payMonthly)&&age>=pf&&age<=pt)actOut+=n(x.payMonthly)*12;
+    if(n(x.getLump)&&age===pf)actIn+=n(x.getLump);          // 貸款撥款
+    return;                                                  // 這兩類沒有自己的資金池
+   }
+   if(x.cat==='income'||x.cat==='expense'){
+    if(n(x.getMonthly)&&age>=gf&&age<=gt)actIn+=n(x.getMonthly)*12;
+    return;                                                  // 加薪／省下的錢直接進主池
+   }
+   if(x.cat==='liquidate'){
+    if(n(x.getLump)&&age===pf)actIn+=n(x.getLump);           // 淨變現金額
+    return;
+   }
+   // regular／lump：真的有一個自己的資金池
+   var k=x.id;pots[k]=(pots[k]||0)*(1+n(x.growth)/100);
+   if(n(x.payMonthly)&&age>=pf&&age<=pt){var mv=n(x.payMonthly)*12;pots[k]+=mv;actPay+=mv;}
+   if(n(x.payLump)&&age===pf){pots[k]+=n(x.payLump);actPay+=n(x.payLump);}
+   if(n(x.divYear)&&age>=pf){if(x.divMode==='payout')actIn+=n(x.divYear);else pots[k]+=n(x.divYear);}
+   if(n(x.getMonthly)&&age>=gf&&age<=gt){var tk=Math.min(pots[k],n(x.getMonthly)*12);pots[k]-=tk;actIn+=tk;}
+   if(n(x.getLump)&&age===gt){var tl=Math.min(pots[k],n(x.getLump));pots[k]-=tl;actIn+=tl;}
+  });
+  var potSum=0;for(var _pk in pots){if(pots.hasOwnProperty(_pk))potSum+=pots[_pk];}
+
+  var bal=income-expense-debt-goalOut-edu-life-retireDraw+actIn-actOut-actPay;
   invest=(invest>0?invest*(1+ret):invest)+bal;
   raw=raw*(1+ret)+bal;
   var df=Math.pow(1+ret,t+1);
-  if(raw<0){if(negAge===null)negAge=age;var need_=-raw/df;if(need_>shortPV){shortPV=need_;shortAge=age;}}
+  // ⚠️ 缺口一定要看「主池＋分離池」的合計：只看主池，等於分離池裡的錢不存在。
+  var rawTot=raw+potSum;
+  if(rawTot<0){if(negAge===null)negAge=age;var need_=-rawTot/df;if(need_>shortPV){shortPV=need_;shortAge=age;}}
   // 折現後的支出組成：pvOut 供「一生需求現值」，pvLate 只累計第一個不足年之後的，供缺口歸因。
   var comp={base:expense,debt:debt,goal:goalOut,edu:edu,life:life,retire:retireDraw};
   for(var ck in comp){if(!comp.hasOwnProperty(ck))continue;var cv=comp[ck]/df;pvOut[ck]+=cv;needPV+=cv;if(negAge!==null)pvLate[ck]+=cv;}
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
-  if(turnNeg===null&&invest<0)turnNeg=age;
+  var totalInv=invest+potSum;
+  if(turnNeg===null&&totalInv<0)turnNeg=age;
   var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)});
-  var netEst=invest+fixedAssets-remDebt;
+  var netEst=totalInv+fixedAssets-remDebt;
   var planOut=goalOut+edu+life;
+
+  // 願景事件的可負擔性標記。
+  // ⚠️ 刻意**不改變現金流**（維持「照付、餘額可以轉負」的既有語意，否則所有既有客戶
+  //    的數字都會變）。✕ 的意思是「做完這件事之後總資產掉到零以下」＝要靠借錢才做得到。
+  //    這正是 Ray 說的「按時間先到先付」的直接後果：早期的先花掉，晚期的就做不到了。
+  (c.goals||[]).forEach(function(gg){
+   if(!visionOn(gg))return;
+   if(age!==n(gg.start))return;
+   evts.push({kind:'goal',age:age,name:(gg.name||gg.type||'目標'),amount:n(gg.present),ok:totalInv>=0});
+  });
   planBal=(planBal>0?planBal*(1+planRet):planBal)+planYr;
   var planDraw=Math.max(0,Math.min(planBal,planOut));
   planBal-=planDraw; if(planBal<0)planBal=0; var freeCap=Math.max(0,invest); if(planBal>freeCap)planBal=freeCap;
-  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,net:netEst,planBal:planBal,planDraw:planDraw,planOut:planOut});
+  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst,planBal:planBal,planDraw:planDraw,planOut:planOut});
  }
+ // 子女教育是連續好幾年的支出，不是單一事件——逐年插旗會在圖上排出六支「子女教育」，
+ // 把整張時間軸擠爆。合併成一個區段：起於第一個繳費年，全程不轉負才算做得到。
+ var eduAges=Object.keys(eduByYear).map(Number).filter(function(a){return eduByYear[a]>0}).sort(function(x,y){return x-y});
+ if(eduAges.length){
+  var eFrom=eduAges[0],eTo=eduAges[eduAges.length-1],eSum=0;
+  eduAges.forEach(function(a){eSum+=eduByYear[a]});
+  var eBad=rows.some(function(r){return r.age>=eFrom&&r.age<=eTo&&r.total<0});
+  evts.push({kind:'edu',age:eFrom,span:eTo,name:'子女教育',amount:eSum,ok:!eBad});
+ }
+
+ // 退休生活：不是單一事件，判定是「退休後到預估壽命，資產全程不轉負」。
+ var rAge=n(c.profile.retireAge)||65;
+ if(rAge<=aEnd){
+  var badRetire=rows.some(function(r){return r.age>=rAge&&r.total<0});
+  evts.push({kind:'retire',age:rAge,name:'退休生活',amount:0,span:aEnd,ok:!badRetire});
+ }
+ // 傳承是願景的一部分（客戶可勾選不處理），判定用期末總資產。
+ var lastRow=rows[rows.length-1]||{total:0};
+ // ⚠️ 傳承只做「旗子標記」，**刻意不進 shortPV**。
+ //    legacyNeed 動輒幾千萬（sampleCase 就是 4,000 萬），一旦併進缺口會讓所有既有客戶
+ //    的數字一夜暴增。傳承要不要進一生需求是區塊 4 的題目，要先有客戶勾選的動線。
+ if(legacyTarget>0){
+  evts.push({kind:'legacy',age:aEnd,name:'傳承',amount:legacyTarget,ok:lastRow.total>=legacyTarget});
+ }
+ evts.sort(function(x,y){return x.age-y.age});
+ var firstFail=null;for(var _e=0;_e<evts.length;_e++){if(!evts[_e].ok){firstFail=evts[_e];break;}}
+
  return {rows:rows,turnNeg:turnNeg,totalOutflow:totalOut,
-  shortPV:shortPV,shortAge:shortAge,negAge:negAge,needPV:needPV,pvOut:pvOut,pvLate:pvLate,rate:ret*100};
+  shortPV:shortPV,shortAge:shortAge,negAge:negAge,needPV:needPV,pvOut:pvOut,pvLate:pvLate,rate:ret*100,
+  events:evts,firstFail:firstFail,urgAge:(negAge!=null?negAge:shortAge),hasActions:acts.length>0};
+}
+
+// 啟用中的調整動作。id 缺失的補一個，免得分離池的 key 互相蓋掉。
+function planActionsOn(c){
+ var out=[],seq=0;
+ ((c||{}).actions||[]).forEach(function(x){
+  if(!x||x.on===false)return;
+  if(!x.id)x.id='_a'+(seq++);
+  out.push(x);
+ });
+ return out;
 }
 // ===== 調整方案：缺口求解器 =====
 //
@@ -2357,9 +2506,30 @@ function addRow(arr){var c=activeCase();if(!c)return;
 function delRow(arr,i){var c=activeCase();if(arr==='prepared'){c.retire.prepared.splice(i,1)}else if(PLAN_ARRS[arr]){listOf(c,arr).splice(i,1)}else{c[arr].splice(i,1)}save();render()}
 
 /* ===== render ===== */
+// 願景時間軸的 hover：十字線＋數字。一張線圖沒有 hover 等於少一半資訊。
+function bindVT(){
+ document.querySelectorAll('.vtwrap').forEach(function(box){
+  var svg=box.querySelector('svg'),tip=box.querySelector('.vttip'),cross=box.querySelector('.vtcross');
+  if(!svg||!tip)return;
+  svg.querySelectorAll('.vthv rect').forEach(function(r){
+   r.addEventListener('mouseenter',function(){
+    var x=+r.getAttribute('data-x'),age=r.getAttribute('data-age'),
+        b=+r.getAttribute('data-b'),a=+r.getAttribute('data-a');
+    if(cross){cross.setAttribute('x1',x);cross.setAttribute('x2',x);cross.setAttribute('opacity','.55')}
+    tip.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b><br>'+
+     (b===a?'資產 '+cfAxis(a):'<span style="color:#8ea3b5">現況</span> '+cfAxis(b)+'<br><span style="color:#f0c34e">調整後</span> '+cfAxis(a));
+    var bw=box.getBoundingClientRect(),sc=bw.width/980;
+    tip.style.opacity=1;
+    tip.style.left=Math.min(bw.width-150,Math.max(0,x*sc-70))+'px';
+    tip.style.top='30px';
+   });
+  });
+  svg.addEventListener('mouseleave',function(){tip.style.opacity=0;if(cross)cross.setAttribute('opacity','0')});
+ });
+}
 function render(){document.querySelectorAll('#roleSw button').forEach(function(b){b.classList.toggle('on',b.dataset.r===app.role)});
  var ac=activeCase();if(ac)normalizeIntent(ac);
- document.getElementById('app').innerHTML=app.role==='coach'?coachView():clientView();bindTabs();bindPrioDrag();bindAnalysis()}
+ document.getElementById('app').innerHTML=app.role==='coach'?coachView():clientView();bindTabs();bindPrioDrag();bindAnalysis();bindVT()}
 function bindTabs(){document.querySelectorAll('[data-tab]').forEach(function(b){b.onclick=function(){app.activeTab=b.dataset.tab;render()}});
  document.querySelectorAll('[data-dtab]').forEach(function(b){b.onclick=function(){app.dataTab=b.dataset.dtab;render()}})}
 // 必達優先序：HTML5 拖曳（觸控裝置改用列上的 ◀ ▶）
@@ -3534,6 +3704,98 @@ function leverSummary(set){
 }
 
 /** 首屏：三個數字 ＋ 主圖 ＋ 拉桿 ＋ 四張變化卡。圖與拉桿必須貼在一起，拉了要當場看到線動。 */
+/* ============================================================
+   願景時間軸主圖（調整方案 v2 首屏）
+   ------------------------------------------------------------
+   取代 gapChartSVG 成為 /plan 的首屏主圖。它要一眼回答三件事：
+     ① 現況 vs 套用動作後的差距（灰虛線 / 金實線）
+     ② 每一件選定的願景做不做得到（旗子）
+     ③ 缺口出現在哪一年、急不急（十年分界）
+
+   ⚠️ 旗子一定要同時有 ✓／✕ 符號：綠 #8fc0a3 與紅 #ef6f6f 在紅綠色盲下
+      ΔE 只有 7.8（落在「必須加輔助編碼」的區間），光靠顏色分不出來。
+
+   ⚠️ Y 軸下限一定要裁切：現況線常常掉到 −4,000 萬，照實際範圍畫會把
+      「調整後」那條線壓成貼著頂端的一條平線——整張圖就沒重點了。
+      被裁掉的部分在圖上用文字註明，不是默默切掉。
+   ============================================================ */
+function visionTimelineSVG(c,theme,idKey){
+ var K=planChartColors(theme);
+ var pb=projection(baseCase(c)), pa=projection(c);
+ var W=980,H=348,L=58,R=18,T=66,B=34,pw=W-L-R,ph=H-T-B;
+ var mx=0,realMn=0;
+ pb.rows.concat(pa.rows).forEach(function(r){var v=r.total;realMn=Math.min(realMn,v);mx=Math.max(mx,v)});
+ mx*=1.12; if(mx<=0)mx=1;
+ var mn=Math.max(realMn*1.12,-mx*0.55),clipped=realMn<mn-0.5;
+ var a0=n(c.profile.age)||40,aEnd=n(c.params.horizon)||85,span=Math.max(1,aEnd-a0);
+ var X=function(a){return L+(a-a0)/span*pw};
+ var Y=function(v){return T+ph-(Math.max(mn,Math.min(mx,v))-mn)/(mx-mn)*ph};
+ var uid=(idKey||'vt');
+
+ var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="願景歷程資產曲線" style="width:100%;height:auto;overflow:visible">';
+ niceTicks(mn,mx,5).forEach(function(v){var y=Y(v);
+  s+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+'" stroke="'+(Math.abs(v)<1?K.ZERO:K.GRID)+'" stroke-width="'+(Math.abs(v)<1?1.4:1)+'"/>'+
+   '<text x="'+(L-8)+'" y="'+(y+4).toFixed(1)+'" fill="'+K.TICK+'" font-size="10.5" text-anchor="end">'+cfAxis(v)+'</text>'});
+ for(var ax=a0;ax<=aEnd;ax+=5)
+  s+='<text x="'+X(ax).toFixed(1)+'" y="'+(H-11)+'" fill="'+K.TICK+'" font-size="10.5" text-anchor="middle">'+ax+'</text>';
+
+ var x10=X(a0+10);
+ if(x10<W-R)s+='<line x1="'+x10.toFixed(1)+'" y1="'+T+'" x2="'+x10.toFixed(1)+'" y2="'+(T+ph)+'" stroke="'+K.MUT+'" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>'+
+  '<text x="'+(x10+5).toFixed(1)+'" y="'+(T+13)+'" fill="'+K.MUT+'" font-size="10">10 年</text>';
+
+ var neg=pa.rows.filter(function(r){return r.total<0});
+ if(neg.length){
+  var d='M'+X(neg[0].age).toFixed(1)+' '+Y(0).toFixed(1);
+  neg.forEach(function(r){d+=' L'+X(r.age).toFixed(1)+' '+Y(r.total).toFixed(1)});
+  d+=' L'+X(neg[neg.length-1].age).toFixed(1)+' '+Y(0).toFixed(1)+' Z';
+  s+='<path d="'+d+'" fill="'+K.GAP+'" fill-opacity="'+(K.dark?0.22:0.16)+'"/>';
+ }
+ function line(rows,col,wd,dash){
+  return '<path d="'+rows.map(function(r,i){return (i?'L':'M')+X(r.age).toFixed(1)+' '+Y(r.total).toFixed(1)}).join(' ')+
+   '" fill="none" stroke="'+col+'" stroke-width="'+wd+'" stroke-linejoin="round"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>'}
+ var same=!pa.hasActions;
+ if(!same)s+=line(pb.rows,K.BASE,2,'5 4');
+ s+=line(pa.rows,same?K.BASE:K.AFT,2.4);
+
+ if(clipped)s+='<text x="'+(W-R)+'" y="'+(T+ph-6)+'" fill="'+K.GAP+'" font-size="10.5" font-weight="700" text-anchor="end">↓ 現況續跌至 '+cfAxis(realMn)+'（超出圖框）</text>';
+
+ // 旗子：太近就交錯高度，避免標籤疊字
+ var lastX=-99,hi=false;
+ pa.events.forEach(function(ev){
+  if(ev.kind==='legacy')return;                       // 傳承在期末，畫在圖上會擠掉座標
+  var x=X(Math.max(a0,Math.min(aEnd,ev.age)));
+  var row=pa.rows[Math.max(0,Math.min(pa.rows.length-1,ev.age-a0))]||pa.rows[0];
+  hi=(x-lastX<64)?!hi:false; lastX=x;
+  var ty=hi?T-32:T-10, sy=hi?T-44:T-22;
+  var col=ev.ok?K.OK:'#ff9f9f', lc=ev.ok?K.OK:K.GAP;
+  s+='<line x1="'+x.toFixed(1)+'" y1="'+(ty+4)+'" x2="'+x.toFixed(1)+'" y2="'+Y(row.total).toFixed(1)+'" stroke="'+lc+'" stroke-width="1" stroke-opacity=".4"/>'+
+   '<circle cx="'+x.toFixed(1)+'" cy="'+Y(row.total).toFixed(1)+'" r="3.6" fill="'+lc+'" stroke="'+(K.dark?'#081a2b':'#fff')+'" stroke-width="2"/>'+
+   '<text x="'+x.toFixed(1)+'" y="'+ty+'" fill="'+col+'" font-size="12" font-weight="800" text-anchor="middle">'+(ev.ok?'✓':'✕')+'</text>'+
+   '<text x="'+x.toFixed(1)+'" y="'+sy+'" fill="'+col+'" font-size="9.5" text-anchor="middle" opacity=".95">'+esc(String(ev.name).slice(0,6))+'</text>';
+ });
+
+ // hover：十字線＋數字（一張線圖沒有 hover 等於少一半資訊）
+ s+='<g class="vthv">';
+ pa.rows.forEach(function(r,i){
+  var bw=pw/span;
+  s+='<rect x="'+(X(r.age)-bw/2).toFixed(1)+'" y="'+T+'" width="'+bw.toFixed(1)+'" height="'+ph+'" fill="transparent" '+
+   'data-vt="'+uid+'" data-i="'+i+'" data-x="'+X(r.age).toFixed(1)+'" '+
+   'data-age="'+r.age+'" data-b="'+Math.round(pb.rows[i]?pb.rows[i].total:0)+'" data-a="'+Math.round(r.total)+'"/>'});
+ s+='</g><line class="vtcross" x1="0" y1="'+T+'" x2="0" y2="'+(T+ph)+'" stroke="'+K.AMB+'" stroke-width="1" opacity="0"/>';
+ s+='</svg>';
+
+ var lg='<div class="vtlg">'+
+  (same?'':'<span><i style="border-top:2px dashed '+K.BASE+'"></i>現況</span>')+
+  '<span><i style="background:'+(same?K.BASE:K.AFT)+'"></i>'+(same?'現況':'套用動作後')+'</span>'+
+  '<span><i style="background:'+K.GAP+';opacity:.5;height:9px;border-radius:2px"></i>缺口（資產轉負那一段）</span>'+
+  '<span style="color:'+K.OK+'">✓ 願景做得到</span><span style="color:#ff9f9f">✕ 做不到</span></div>';
+ return '<div class="vtwrap" style="position:relative">'+s+'<div class="vttip"></div></div>'+lg;
+}
+
+// 「現況」＝把所有調整動作拿掉的同一個個案。用來畫灰線與算改善度。
+function baseCase(c){
+ var b=JSON.parse(JSON.stringify(c)); b.actions=[]; return b;
+}
 function gapHeroHTML(c,ledBase,gate){
  var d=planDraft(c),hasDraft=Object.keys(d).length>0;
  // ⚠️ 上面那三個大數字**一定要跟著拉桿走**。
@@ -3976,7 +4238,7 @@ function actionsHTML(c){
    '⚠️ 刪減支出與資產變現<b>必須指到明細的某一列</b>：具體刪什麼、賣什麼是要跟客戶討論的，不能只寫一個金額。<br>'+
    '⚠️ 每個動作都要宣告<b>資金來源</b>。「刪減支出 2 萬」＋「定期定額投入 2 萬」是同一筆錢，靠這一欄才串得起來。<br>'+
    '「工具」純文字、不進計算；「增值%」是<b>這筆錢自己的報酬率</b>，不是全域假設。<br>'+
-   '<b style="color:var(--amber2)">本階段只存資料，還沒有進任何試算</b>——先把欄位填順手，接引擎是下一步。</div>';
+   '<b style="color:var(--amber2)">改任何一格，上面的圖與旗子當場重算</b>——動作的錢走「分離池」，用它自己的增值%滾，不吃全域報酬率假設。</div>';
 }
 function addActionOfPicked(){
  var el=document.getElementById('newActCat');
@@ -3986,20 +4248,272 @@ function addActionOfPicked(){
  if(list.length){var a=list[list.length-1];a.cat=k;a.ref='';actFillSpan(c,a);save();render();}
 }
 
+/* ============================================================
+   調整方案 v2 首屏：主圖 ＋ 三個數字 ＋ 判語 ＋ 動作開關
+   ------------------------------------------------------------
+   ⚠️ 主數字刻意是「改善了多少」而不是「補平了沒」。
+      Ray：「財務規劃不是一次就確保終身沒問題，而是每年動態調整……
+      特別是十年後的部分，有些許缺口都是正常的……只要能比原本更優化就可以。」
+      一片紅字的缺口讀起來像失敗，但那其實是常態。
+   ============================================================ */
+function planImprove(c){
+ var pb=projection(baseCase(c)),pa=projection(c);
+ var imp=pb.shortPV>0.5?Math.max(0,Math.round((1-pa.shortPV/pb.shortPV)*100)):100;
+ var okCnt=0,tot=0;
+ pa.events.forEach(function(e){tot++;if(e.ok)okCnt++});
+ var near=0,far=0,urg=pa.urgAge;
+ if(pa.shortPV>0.5){if(urg!=null&&(urg-n(c.profile.age))<=10)near=pa.shortPV;else far=pa.shortPV;}
+ return {pb:pb,pa:pa,imp:imp,okCnt:okCnt,total:tot,near:near,far:far,urg:urg};
+}
+
+function planHeroV2(c){
+ var R=planImprove(c),pb=R.pb,pa=R.pa;
+ var ok=pa.shortPV<=0.5;
+ var col=ok?'var(--ok)':(R.imp>=50?'var(--amber2)':'var(--warn)');
+ var big='<div class="big3 v2big">'+
+  '<div class="b"><div class="l">一生願景需要的資金</div>'+
+   '<div class="v">'+cfAxis(pa.needPV)+'</div>'+
+   '<div class="hint" style="display:block">折現到今天的總需求</div></div>'+
+  '<div class="b hero"><div class="l">缺口改善</div>'+
+   '<div class="v" style="color:'+col+'">'+
+    (pb.shortPV<=0.5?'無缺口':cfAxis(pb.shortPV)+' <span style="opacity:.6">→</span> '+(pa.shortPV<=0.5?'<span style="color:var(--ok)">已補平</span>':cfAxis(pa.shortPV)))+'</div>'+
+   '<div class="hint" style="display:block">'+(pb.shortPV<=0.5?'現況即可支撐':(pa.hasActions?'改善 '+R.imp+'%':'尚未排任何動作'))+'</div></div>'+
+  '<div class="b"><div class="l">願景達成</div>'+
+   '<div class="v" style="color:'+(R.okCnt===R.total?'var(--ok)':'var(--amber2)')+'">'+R.okCnt+' / '+R.total+' 件</div>'+
+   '<div class="hint" style="display:block">選定的願景中做得到幾件</div></div></div>';
+
+ var ff=pa.firstFail,vd;
+ if(!ff){
+  vd='<div class="v2verdict good">✅ <b>選定的願景全部做得到。</b>仍請確認下方的資金勾稽與保障缺口。</div>';
+ }else{
+  var after=pa.events.filter(function(e){return e.age>ff.age&&!e.ok}).length;
+  var body= ff.kind==='legacy'
+   ? '基本人生目標都做得到了，<b style="color:#ff9f9f">卡在「傳承」</b> — 期末資產 '+cfAxis((pa.rows[pa.rows.length-1]||{}).total)+'，目標 '+cfAxis(ff.amount)+'。'
+   : '照這組動作走，你做得到 <b>'+ff.age+' 歲以前</b>的所有事；第一個做不到的是 <b style="color:#ff9f9f">'+ff.age+' 歲的「'+esc(ff.name)+'」</b>'+(after?'，之後還有 <b>'+after+'</b> 件會落空。':'。');
+  vd='<div class="v2verdict">'+body;
+  if(R.near>0.5)vd+='<div style="margin-top:6px;color:#ff9f9f">🔴 <b>缺口在 '+R.urg+' 歲就出現（十年內）'+cfAxis(R.near)+'</b>：沒有攤提空間，必須立即處理。</div>';
+  if(R.far>0.5)vd+='<div style="margin-top:6px;color:var(--amber2)">🟡 <b>缺口出現在 '+R.urg+' 歲（十年以後）'+cfAxis(R.far)+'</b>：'+
+   (R.total-R.okCnt>1?'時點不急，但目前有 <b>'+(R.total-R.okCnt)+' 件</b>願景落空 — 先把它們補回來，再談逐年微調。'
+                     :'屬動態調整區，逐年檢視即可，比原本更優化就算有效。')+'</div>';
+  vd+='</div>';
+ }
+
+ var acts=c.actions||[];
+ var chips=acts.length
+  ? acts.map(function(a,i){
+     var amt=(a.cat==='income'||a.cat==='expense')?'+'+fmt(a.getMonthly)+'/月'
+      :n(a.payMonthly)?'−'+fmt(a.payMonthly)+'/月'
+      :n(a.payLump)?fmt(a.payLump)+' 單筆'
+      :n(a.getLump)?'+'+fmt(a.getLump):'';
+     return '<span class="v2chip'+(a.on===false?'':' on')+'" onclick="toggleAction('+i+')">'+
+      '<span class="dot"></span>'+esc((a.name||'').trim()||actCat(a.cat).n)+
+      (amt?'<span class="amt">'+amt+'</span>':'')+'</span>'}).join('')
+  : '<span class="hint">還沒有任何動作。到下面的「調整動作清單」新增一筆，這裡就會出現開關。</span>';
+
+ return '<div class="sec"><h4>願景歷程 <span class="hint">灰線＝現況、金線＝套用動作後。旗子 ✓ 做得到、✕ 做不到</span></h4>'+
+  big+
+  '<div style="margin:12px 0 2px">'+visionTimelineSVG(c,'dark','plan')+'</div>'+
+  vd+
+  '<div style="border-top:1px solid var(--line);margin-top:13px;padding-top:11px">'+
+   '<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:8px;flex-wrap:wrap">'+
+    '<b style="color:var(--amber2);font-size:13px">開開看</b>'+
+    '<span class="hint">點一下就切換，上面的線與旗子當場改變</span></div>'+
+   '<div class="v2chips">'+chips+'</div></div></div>';
+}
+
+/* ---------- 缺口配額對帳 ----------
+   ⚠️ 兩區的數學關係不同，不能長得一樣：
+      補缺口三條線是**加總**（共用一個總配額，堆疊起來填）；
+      改缺口三根是**替代**（各自回答「單獨動這根要調到多少」），刻意不相加。 */
+function quotaAddOf(c){
+ var pb=projection(baseCase(c));
+ if(pb.shortPV<=0.5)return {need:0};
+ var r=pb.rate/100,yrs=Math.max(1,(n(c.profile.retireAge)||65)-(n(c.profile.age)||40)),af=0;
+ for(var i=0;i<yrs;i++)af+=Math.pow(1+r,-(i+1));
+ return {need:pb.shortPV/af/12};
+}
+function laneDoneOf(c){
+ var out={A:0,B:0,C:0},rAge=n(c.profile.retireAge)||65,a0=n(c.profile.age)||40;
+ (c.actions||[]).forEach(function(a){
+  if(a.on===false)return;
+  var lane=actCat(a.cat).lane;
+  if(a.cat==='income'||a.cat==='expense')out[lane]+=n(a.getMonthly);
+  else if(a.cat==='regular'||a.cat==='insure'||a.cat==='loan')out[lane]+=n(a.payMonthly);
+  else{var yy=Math.max(1,rAge-(n(a.payFrom)||a0));out[lane]+=(n(a.payLump)||n(a.getLump))/yy/12;}
+ });
+ return out;
+}
+function quotaV2HTML(c){
+ var q=quotaAddOf(c),need=q.need||0,done=laneDoneOf(c);
+ var pa=projection(c);
+ var LANES=[
+  {k:'A',n:'工作收入提升',s:'每月薪資增加',col:'var(--ok)'},
+  {k:'B',n:'理財效率提升',s:'月定額＋單筆＋不動產變現',col:'var(--amber)'},
+  {k:'C',n:'支出刪減',s:'逐項討論，不用 % 抓',col:'var(--teal)'}];
+ var got=LANES.reduce(function(t,L){return t+(done[L.k]||0)},0),left=Math.max(0,need-got);
+ var stack=LANES.map(function(L){var wpc=need>0?Math.min(100,(done[L.k]||0)/need*100):0;
+  return wpc>0?'<i style="width:'+wpc.toFixed(1)+'%;background:'+L.col+';margin-right:2px"></i>':''}).join('');
+
+ var addHTML='<div class="qrow" style="padding-top:0"><div class="qhead">'+
+  '<b style="font-size:14px">總配額 '+fmt(need)+' ／月</b><span class="hint">到 '+(n(c.profile.retireAge)||65)+' 歲為止</span></div>'+
+  '<div class="qnums">已排 <b class="done">'+fmt(got)+'</b>'+(left>0?'　·　還差 <b class="left">'+fmt(left)+'</b>':'　·　<b class="done">已達參考量體</b>')+'</div>'+
+  '<div class="bar" style="height:9px">'+stack+'</div>'+
+  ((left<=0&&pa.shortPV>0.5)?'<div class="qnums" style="margin-top:7px;color:var(--warn);line-height:1.6">⚠ 量體已達，但實際試算仍有缺口 <b>'+cfAxis(pa.shortPV)+'</b>。'+
+    '<span class="hint">配額是把現值缺口平均攤到退休前的<b>估算量體</b>；實際動作有各自的年期與複利，兩邊本來就不會相等 — <b>判準以上面那張圖為準</b>。</span></div>':'')+
+  '</div>'+
+  LANES.map(function(L){var v=done[L.k]||0;
+   return '<div class="qrow"><div class="qhead">'+
+    '<b><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+L.col+';margin-right:6px"></span>'+L.n+'</b>'+
+    '<b style="'+(v>0?'color:var(--ok)':'color:var(--mut2);font-weight:400;font-size:11.5px')+'">'+(v>0?fmt(v)+' ／月':'尚未排入')+'</b></div>'+
+    '<div class="qnums"><span class="hint">'+L.s+'</span></div></div>'}).join('');
+
+ var gate=leverGate(c),cutHTML;
+ if(pa.shortPV<=0.5){
+  cutHTML='<div class="qrow" style="padding-top:0"><b style="color:var(--ok)">目前這組動作已經補平，不需要動願景。</b>'+
+   '<div class="qnums"><span class="hint">桶子不用變小 — 這是最好的結果。</span></div></div>';
+ }else{
+  var CUTS=[{k:'retire',n:'延後退休',s:'工作期延長、退休期縮短'},
+            {k:'retireLevel',n:'降低退休水準',s:'退休期支出調降'},
+            {k:'vision',n:'壓縮願景',s:'往「可接受的最低」壓'}];
+  cutHTML='<div class="qrow" style="padding-top:0"><span class="hint">以下三選一 — <b style="color:var(--amber2)">它們是替代方案，不能相加</b>。數字＝在目前已排的動作之上，單獨動這一根要調到多少。</span></div>'+
+   CUTS.map(function(Cc){
+    var r=solveLever(c,Cc.k,{},gate),txt,cl='var(--amber2)';
+    if(r.blocked){txt='此階段鎖住';cl='var(--mut2)';}
+    else if(!r.needed){txt='不需要動';cl='var(--ok)';}
+    else if(!r.feasible){txt='拉到上限仍補不平';cl='var(--warn)';}
+    else txt=leverLabel(Cc.k,r.x);
+    return '<div class="qrow"><div class="qhead"><b>'+Cc.n+'</b><b style="color:'+cl+'">'+esc(txt)+'</b></div>'+
+     '<div class="qnums"><span class="hint">'+Cc.s+(r.blocked&&gate.reason[Cc.k]?'　'+esc(gate.reason[Cc.k]):'')+'</span></div></div>'}).join('');
+ }
+
+ return '<div class="quotaGrid">'+
+  '<div class="qcol add"><b>補缺口</b><div class="sub">把水加進來 — 收入與支出兩個模型</div>'+addHTML+'</div>'+
+  '<div class="qcol cut"><b>改缺口</b><div class="sub">把桶子變小 — 調整願景本身</div>'+cutHTML+'</div></div>'+
+  '<div class="hint" style="margin-top:10px;line-height:1.8">'+
+   '<b>補缺口</b>三條線是<b>加總</b>關係，共用一個總配額 — 那是把現值缺口攤到退休前的<b>參考量體</b>，給教練一個「大概要生出多少」的錨，不是精確等式。<br>'+
+   '<b>改缺口</b>三根是<b>替代</b>關係，各自回答「單獨動這一根要調到多少」，<b>刻意不相加</b>。<br>'+
+   'v1 的求解器程式碼全部留著，只是從「產出方案」降級成「產出配額」 — 真正決定缺口的是動作清單。</div>';
+}
+
+/* ---------- 資金勾稽 ----------
+   ⚠️「未來缺口沒補平」與「當下每月排不出錢」是兩件事，畫面上一定要分開兩格。
+      前者是 Ray 說的動態調整區（琥珀）；後者是這個月就執行不了（紅字）。
+      混成一條會讓教練把執行不了的方案交出去。依 Ray 拍板：軟提示、不擋採用。 */
+function actionLedger(c){
+ var m=metrics(c);
+ // ⚠️ metrics() 沒有 monthInc，月結餘要用 save（＝年收入−年支出）÷12。
+ //    c.savings[]（儲蓄理財投入）不進總支出，所以 save 已經是「可自由運用的結餘」。
+ var base=n(m.save)/12;
+ var addInc=0,cutExp=0,newInv=0,prem=0,lumpNeed=0,lumpGot=0;
+ (c.actions||[]).forEach(function(a){
+  if(a.on===false)return;
+  if(a.cat==='income')addInc+=n(a.getMonthly);
+  else if(a.cat==='expense')cutExp+=n(a.getMonthly);
+  else if(a.cat==='regular')newInv+=n(a.payMonthly);
+  else if(a.cat==='insure')prem+=n(a.payMonthly);
+  else if(a.cat==='loan'){newInv+=n(a.payMonthly);lumpGot+=n(a.getLump);}
+  else if(a.cat==='lump')lumpNeed+=n(a.payLump);
+  else if(a.cat==='liquidate')lumpGot+=n(a.getLump);
+ });
+ var left=base+addInc+cutExp-newInv-prem;
+ var emReq=(n(m.monthExp)||0)*(n(c.params.emergencyMonths)||6);
+ var cash=n(m.cash),cashLeft=cash+lumpGot-lumpNeed;
+ return {base:base,addInc:addInc,cutExp:cutExp,newInv:newInv,prem:prem,left:left,
+  cash:cash,lumpGot:lumpGot,lumpNeed:lumpNeed,cashLeft:cashLeft,emReq:emReq,
+  monthBad:left<0,cashBad:cashLeft<emReq};
+}
+function ledgerV2HTML(c){
+ var L=actionLedger(c),pa=projection(c);
+ function row(l,v,col){return '<div class="ledrow"><span>'+l+'</span><span'+(col?' style="color:'+col+'"':'')+'>'+fmt(v)+'</span></div>'}
+ var g='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" class="ledgrid">'+
+  '<div class="led '+(L.monthBad?'bad':'okk')+'"><b style="font-size:13px;color:var(--amber2)">每月資金</b>'+
+   row('現況月結餘',L.base)+row('＋ 新增工作收入',L.addInc,'var(--ok)')+row('＋ 刪減支出',L.cutExp,'var(--ok)')+
+   row('− 新增投入',L.newInv,'var(--warn)')+row('− 新增保費',L.prem,'var(--warn)')+
+   '<div class="ledrow tot"><span>剩餘結餘</span><span style="color:'+(L.monthBad?'var(--gap2)':'var(--ok)')+'">'+fmt(L.left)+'</span></div></div>'+
+  '<div class="led '+(L.cashBad?'bad':'okk')+'"><b style="font-size:13px;color:var(--amber2)">單筆資金（現金水位）</b>'+
+   row('可動用現金',L.cash)+row('＋ 變現／貸款取得',L.lumpGot,'var(--ok)')+row('− 單筆投入',L.lumpNeed,'var(--warn)')+
+   '<div class="ledrow tot"><span>剩餘現金</span><span style="color:'+(L.cashBad?'var(--gap2)':'var(--ok)')+'">'+fmt(L.cashLeft)+'</span></div>'+
+   '<div class="ledrow"><span class="hint">緊急預備金門檻（'+(n(c.params.emergencyMonths)||6)+' 個月支出）</span><span class="hint">'+fmt(L.emReq)+'</span></div></div></div>';
+ var al='';
+ if(L.monthBad)al+='<div class="v2alert red">🔴<div><b>每月資金超支 '+fmt(-L.left)+' 元。</b>這不是動態調整能解決的 — 這張表<b>這個月就執行不了</b>，動作要重排或改資金來源。</div></div>';
+ if(L.cashBad)al+='<div class="v2alert red">🔴<div><b>現金水位低於緊急預備金 '+fmt(L.emReq-L.cashLeft)+' 元。</b>單筆投入排太多，突發事件會被迫贖回。</div></div>';
+ if(!L.monthBad&&!L.cashBad)al='<div class="v2alert amb">🟡<div>資金排得出來。'+(pa.shortPV>0.5?'剩下的缺口逐年檢視即可 — <b>比原本更優化就算有效</b>。':'而且缺口已經補平。')+'</div></div>';
+ return g+al+'<div class="hint" style="margin-top:10px;line-height:1.8">依拍板為<b>軟提示、不擋採用</b>。但「未來缺口沒補平」與「當下每月排不出錢」是兩件事，畫面上分開兩格 — 混成一條會讓教練把這個月就執行不了的方案交出去。<br>⚠️「刪減支出 2 萬」＋「定期定額投入 2 萬」是<b>同一筆錢</b>，靠動作的「資金來源」欄才串得起來。</div>';
+}
+
+/* ---------- 動作流程（定案後輸出到調整方案書） ---------- */
+function actionFlowHTML(c){
+ var A=n(c.profile.age)||40;
+ var acts=(c.actions||[]).filter(function(a){return a.on!==false}).slice()
+  .sort(function(x,y){return (n(x.startY)||99)-(n(y.startY)||99)});
+ if(!acts.length)return '<div class="muted">還沒有啟用任何動作。</div>';
+ return '<div class="v2flow">'+acts.map(function(a){
+  var sy=n(a.startY)||n(a.payFrom)||n(a.getFrom)||A;
+  var when=sy<=A+1?'現在起':(sy+' 歲（'+Math.max(0,sy-A)+' 年後）');
+  var w=[];
+  if(a.tool&&a.tool!=='—')w.push('工具：'+a.tool);
+  if(n(a.payMonthly))w.push('每月投入 '+fmt(a.payMonthly));
+  if(n(a.payLump))w.push('單筆 '+fmt(a.payLump));
+  if(n(a.getMonthly))w.push('每月增加現金流 '+fmt(a.getMonthly));
+  if(n(a.getLump))w.push('取得資金 '+fmt(a.getLump));
+  if(n(a.growth))w.push('增值 '+a.growth+'%');
+  if(n(a.cover))w.push('保額 '+fmt(a.cover)+'（'+esc(a.coverKind||'')+'）');
+  if(n(a.payFrom)&&n(a.payTo))w.push('年期 '+a.payFrom+'–'+a.payTo+' 歲');
+  return '<div class="fitem"><div class="fw">'+when+'</div>'+
+   '<div class="fn">'+esc(actCat(a.cat).n)+'｜'+esc((a.name||'').trim()||'（未命名）')+'</div>'+
+   '<div class="fd">'+esc(w.join('　·　'))+'</div>'+
+   (a.note?'<div class="fd" style="color:var(--mut2)">'+esc(a.note)+'</div>':'')+'</div>'}).join('')+'</div>';
+}
 function planSec(c){
  var p=c.plan||{};
  var led=gapLedger(c),solo=soloSolve(c),gate=solo.gate,rxs=prescriptions(c);
  // 金額欄一律走 moneyCell（千分位），與 406c5ec 的全站標準化一致。
  var f='<div class="f"><label>資產移轉海外金額(降遺產稅基)</label>'+moneyCell('onchange="setPlan(\'movableToOverseas\',this.value,\'num\')"',p.movableToOverseas)+'</div>'+
   '<div class="f"><label>下次檢視日期</label><input type="date" value="'+esc(c.nextReview)+'" onchange="setCase(\'nextReview\',this.value)"></div>';
- return gapHeroHTML(c,led,gate)+
-  soloHTML(c,solo)+
-  rxCardsHTML(c,rxs)+
-  allocSecHTML(c)+
+ // ── 版面（v2，2026/08/24）──
+ // 首屏只有「一張圖＋三個數字＋判語＋動作開關」，其餘一律收合。
+ // ⚠️ v1 的拉桿／三個處方／該解什麼／方案比較全部保留，只是收進 <details>——
+ //    它們仍然是有用的診斷，但不該再佔首屏；首屏要回答的是「做得到嗎、改善多少」。
+ return planHeroV2(c)+
+  foldSec('缺口配額對帳','這條線大概要生出多少錢 vs 動作實際排了多少',quotaV2HTML(c),true)+
+  foldSec('調整動作清單','補缺口的手段，一條一條具體動作 — 改任何一格，上面的圖與旗子當場重算',actionsHTML(c),true)+
+  foldSec('資金勾稽','客戶到底有沒有錢做這些動作',ledgerV2HTML(c))+
+  foldSec('動作流程','定案後輸出到調整方案書的執行時序',actionFlowHTML(c))+
+  foldSec('願景選定','先決定要執行哪些願景，選定的當中按時間先到先付',visionPickHTML(c))+
+  foldSec('拉桿與處方（v1 診斷）','六根槓桿的反解、該解什麼、三個處方 — 保留作為量體參考',
+    soloHTML(c,solo)+rxCardsHTML(c,rxs)+gapHeroHTML(c,led,gate))+
   foldSec('缺口組成與即時缺口','缺口是哪些支出造成的，另有保障與預備金要補',gapDetailHTML(c,led))+
-  foldSec('調整動作清單','v2：把補缺口的手段記成一條一條具體動作（本階段只存資料，尚未進試算）',actionsHTML(c))+
+  foldSec('建議資產配置','投資型與保障型的配置與對帳',allocSecHTML(c))+
   foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c))+
   foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>');
+}
+
+/* 願景選定：把四張表的 on 旗標集中成一排卡片，教練在方案頁就能勾。
+   ⚠️ 選定閘（要不要做）跟壓縮槓桿（做多少）是兩層，順序不能顛倒。 */
+function visionPickHTML(c){
+ var A=n(c.profile.age)||40,items=[];
+ (c.goals||[]).forEach(function(g,i){items.push({arr:'goals',i:i,x:g,name:(g.name||g.type||'目標'),
+  meta:n(g.start)+' 歲　'+fmt(g.present)})});
+ [['travel','旅遊'],['hobby','休閒'],['luxury','奢侈品']].forEach(function(pr){
+  (c[pr[0]]||[]).forEach(function(w,i){items.push({arr:pr[0],i:i,x:w,name:(w.sub||w.cat||pr[1]),
+   meta:n(w.start)+'–'+n(w.end)+' 歲　每次 '+fmt(w.amount)})});
+ });
+ var pa=projection(c),okMap={};
+ pa.events.forEach(function(e){okMap[e.name]=e.ok});
+ var cards=items.map(function(it){
+  var on=it.x.on!==false,mk=on&&okMap[it.name]!=null?'<span class="mk '+(okMap[it.name]?'y':'n')+'">'+(okMap[it.name]?'✓ 做得到':'✕ 做不到')+'</span>':'';
+  return '<div class="vitem'+(on?'':' off')+'">'+
+   '<input type="checkbox" '+(on?'checked':'')+' onchange="set(\''+it.arr+':'+it.i+'\',\'on\',this.checked,\'bool\');render()" style="width:17px;height:17px;accent-color:var(--amber);flex:none">'+
+   '<div class="vt"><div class="vn">'+esc(it.name)+' '+mk+'</div><div class="vm">'+it.meta+'</div></div></div>'}).join('');
+ var lg=c.legacy||{},lgOn=lg.on!==false,lgNeed=n(lg.heirs)*n(lg.perHeirCash);
+ var lgCard='<div class="vitem'+(lgOn?'':' off')+'">'+
+  '<input type="checkbox" '+(lgOn?'checked':'')+' onchange="setObj(\'legacy\',\'on\',this.checked);render()" style="width:17px;height:17px;accent-color:var(--amber);flex:none">'+
+  '<div class="vt"><div class="vn">傳承 '+(lgOn&&okMap['傳承']!=null?'<span class="mk '+(okMap['傳承']?'y':'n')+'">'+(okMap['傳承']?'✓ 做得到':'✕ 做不到')+'</span>':'')+'</div>'+
+  '<div class="vm">期末目標　'+fmt(lgNeed)+'（'+n(lg.heirs)+' 位繼承人）</div></div></div>';
+ return '<div class="vlist">'+(cards||'')+lgCard+'</div>'+
+  '<div class="hint" style="margin-top:10px;line-height:1.8">沒選的不進「一生願景需要的資金」、也不上時間軸。<br>'+
+  '⚠️ 選定閘（要不要做）與願景壓縮槓桿（做多少）是兩層，順序不能顛倒。<br>'+
+  '⚠️ 傳承是願景的一部分、不獨立計算，但客戶可以勾選不處理 — 金額沿用「繼承人數 × 每人現金傳承」。</div>';
 }
 
 function pieSVG(list){list=(list||[]).filter(function(x){return n(x.pct)>0});if(!list.length)return '<div class="muted">尚未設定配置</div>';

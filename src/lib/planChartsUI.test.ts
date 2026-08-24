@@ -138,58 +138,73 @@ describe("缺口組成與變化卡", () => {
   });
 });
 
-describe("版面：首屏必須是圖，不是報表", () => {
-  it("明細一律收合，不會有人偷偷把它們塞回首屏", () => {
+describe("版面（v2）：首屏必須是圖，不是報表", () => {
+  it("首屏只有主圖＋三個數字＋判語＋動作開關，其餘一律收合", () => {
     w.app.dataTab = "plan"; w.render();
     const h = pane();
-    const folds = (h.match(/<details>/g) || []).length;   // foldSec 產生的都不帶 open
-    // 缺口組成／調整動作清單(v2)／方案比較／其他參數
-    // ⚠️ 這個數字只有在「新增的是收合區塊」時才可以往上加。
-    //    任何把明細塞進首屏（不帶 <details>）的改動都不該動這一行，見 feedback_圖表優先。
-    expect(folds).toBe(4);
-    expect(h).toContain("調整動作清單");
+    const firstFold = h.indexOf("<details");
+    expect(firstFold).toBeGreaterThan(0);
+    const head = h.slice(0, firstFold);
+    // 首屏該有的
+    expect(head).toContain("願景歷程");
+    expect(head).toContain("一生願景需要的資金");
+    expect(head).toContain("缺口改善");
+    expect(head).toContain("願景達成");
+    expect(head).toContain("開開看");
+    expect(head).toContain("<svg");
+    // ⚠️ 首屏不該有的：任何表格、任何拉桿。
+    //    v1 的拉桿／處方／該解什麼全部保留，但收進 <details>——見 feedback_圖表優先。
+    expect(head).not.toContain("<table");
+    expect(head).not.toContain('type="range"');
   });
 
-  it("展開的區塊依序是：缺口(含拉桿) → 該解什麼 → 三個處方 → 配置與對帳", () => {
+  it("v1 的診斷區塊沒有被刪掉，只是收進收合區", () => {
     const h = pane();
-    const order = ["曲線掉到零線以下", "該解什麼", "三個處方", "配置與對帳"];
-    let prev = -1;
+    const firstFold = h.indexOf("<details");
+    ["該解什麼", "三個處方", "曲線掉到零線以下", "配置與對帳", "方案比較"].forEach((t) => {
+      const i = h.indexOf(t);
+      expect(i, t + " 不該消失").toBeGreaterThan(0);
+      expect(i, t + " 應該在收合區裡").toBeGreaterThan(firstFold);
+    });
+    expect(h.indexOf('type="range"')).toBeGreaterThan(firstFold);
+  });
+
+  it("收合區塊的順序照定案企劃：配額 → 動作清單 → 勾稽 → 流程 → 願景選定 → v1 診斷", () => {
+    const h = pane();
+    // 用各區塊 hint 的獨特字串，避免撞到首屏文案裡出現的同名詞
+    const order = [
+      "這條線大概要生出多少錢",
+      "補缺口的手段，一條一條具體動作",
+      "客戶到底有沒有錢做這些動作",
+      "定案後輸出到調整方案書",
+      "先決定要執行哪些願景",
+      "六根槓桿的反解",
+    ];
+    let prev = h.indexOf("<details");
     order.forEach((t) => {
       const i = h.indexOf(t);
-      expect(i).toBeGreaterThan(prev);
+      expect(i, t).toBeGreaterThan(prev);
       prev = i;
     });
-    // 四塊都要在第一個收合區之前
-    expect(prev).toBeLessThan(h.indexOf("<details>"));
   });
 
-  it("首屏就有主圖與拉桿，兩者在同一個區塊裡（拉了要當場看到線動）", () => {
+  it("主圖的旗子一定同時有符號與顏色（綠紅在色盲下 ΔE 僅 7.8）", () => {
     const h = pane();
-    const heroStart = h.indexOf("曲線掉到零線以下");
-    const slider = h.indexOf('type="range"');
-    const firstFold = h.indexOf("<details>");
-    expect(heroStart).toBeGreaterThanOrEqual(0);
-    expect(slider).toBeGreaterThan(heroStart);
-    expect(slider).toBeLessThan(firstFold);                // 拉桿在第一個收合區塊之前
+    expect(/[✓✕]/.test(h)).toBe(true);
+    expect(h).toContain("✓ 願景做得到");
+    expect(h).toContain("✕ 做不到");
   });
 
-  it("拉桿改值會寫進 plan.draft，且主圖跟著多一條線", () => {
-    w.setLever("expense", 12);
-    expect(w.n(cur().plan.draft.expense)).toBe(12);
-    expect(pane()).toContain(">調整後</text>");
-    w.clearDraft();
-    expect(pane()).not.toContain(">調整後</text>");
+  it("動作 chips 緊貼主圖下方（點了要當場看到線動）", () => {
+    const h = pane();
+    const svg = h.indexOf("<svg");
+    const chips = h.indexOf("v2chips");
+    const firstFold = h.indexOf("<details");
+    expect(chips).toBeGreaterThan(svg);
+    expect(chips).toBeLessThan(firstFold);
   });
 });
 
-/**
- * 2026/08/23 踩過的 bug：兩張配置表傳給 tableSec 的陣列鍵是 'plan.invest'，
- * 但 set/addRow/delRow 的對照表 PLAN_ARRS 用的是 'planInvest' —— 對不起來，
- * 「＋ 新增」按下去完全沒反應，改欄位還會丟例外。
- *
- * 當時的測試直接呼叫 addRow('planInvest')，等於**繞過了按鈕本身**，所以測試全綠、功能全壞。
- * 這一組改成「從畫面上把 onclick 的字串挖出來執行」，才真的驗到那條線有沒有接上。
- */
 describe("配置表的按鈕真的接得上（不是繞過按鈕直接呼叫函式）", () => {
   const secOf = (title: string) => {
     const h = [...w.document.querySelectorAll("h4")].find((e: Element) => (e.textContent || "").includes(title));
@@ -257,9 +272,18 @@ describe("配置表的按鈕真的接得上（不是繞過按鈕直接呼叫函�
  * 不呼叫 setLever()——上一次就是繞過元件才漏掉 bug 的。
  */
 describe("拉桿要能當場改變上面的數字（用真的拉桿，不呼叫函式）", () => {
+  // ⚠️ v2 之後首屏第一組 .big3 是「一生需求／缺口改善／願景達成」，
+  //    拉桿連動的是 v1 gapHeroHTML 那一組（現值缺口／保守情境／願景達成度），
+  //    它現在住在「拉桿與處方（v1 診斷）」收合區裡 → 要跳過首屏那一組。
   const bigs = () =>
-    [...w.document.querySelectorAll(".big3 .b")].slice(0, 3)
-      .map((e: Element) => (e.querySelector(".v")?.textContent || "").trim());
+    [...w.document.querySelectorAll(".big3")]
+      .filter((g: Element) => !g.classList.contains("v2big"))[0]
+      ?.querySelectorAll(".b")
+      ? [...([...w.document.querySelectorAll(".big3")]
+          .filter((g: Element) => !g.classList.contains("v2big"))[0]
+          .querySelectorAll(".b"))].slice(0, 3)
+          .map((e: Element) => (e.querySelector(".v")?.textContent || "").trim())
+      : [];
 
   const pull = (idx: number, val: string) => {
     const ranges = w.document.querySelectorAll('input[type=range]');
