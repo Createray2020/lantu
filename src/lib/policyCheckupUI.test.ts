@@ -169,3 +169,45 @@ describe("⚠️ 折扣欄位不能存成字串 'false'", () => {
     expect(w.ensurePolicy({ discount: "有" }).discount).toBe("有");
   });
 });
+
+/**
+ * 2026/08/24 Ray 回報「保單健檢報告字體過大、內容整個跑出破圖」。
+ *
+ * 真因不是字級設定，是 SVG 被容器等比拉大：主圖的 viewBox 寬 900，
+ * 但 CSS 給 width:100%，在 1440 螢幕上容器有 1090px → 整張圖（含寫死的 12px 標籤）
+ * 被放大 1.2～1.8 倍，圖上的字比周圍 UI 大一半，版面也跟著撐開。
+ *
+ * 這組測試把「只准縮小、不准放大」釘住：CSS 的 max-width 必須等於 viewBox 的寬，
+ * 而且兩個值改一邊就要改另一邊。
+ */
+describe("主圖只准縮小、不准放大（字被等比拉大的防線）", () => {
+  const CSS_MAX = 900; // .ckchart svg{max-width:…}
+
+  it("CSS 有把主圖的 max-width 鎖住，而且與 viewBox 的寬相同", () => {
+    const html = readFileSync(new URL("../../public/lantu-app.html", import.meta.url), "utf8");
+    expect(html).toContain(`.ckchart svg{display:block;min-width:620px;max-width:${CSS_MAX}px;margin:0 auto}`);
+
+    const svg = w.document.querySelector(".ckchart svg");
+    expect(svg).toBeTruthy();
+    const vbW = Number(svg.getAttribute("viewBox").split(/\s+/)[2]);
+    expect(vbW).toBe(CSS_MAX);
+  });
+
+  it("圖上的字級落在 10～13（與周圍 UI 同一個量級，不能靠放大來讀）", () => {
+    const svg = w.document.querySelector(".ckchart svg");
+    const sizes = [...svg.querySelectorAll("text")].map((t: Element) => Number(t.getAttribute("font-size")));
+    expect(sizes.length).toBeGreaterThan(0);
+    sizes.forEach((s: number) => {
+      expect(s).toBeGreaterThanOrEqual(10);
+      expect(s).toBeLessThanOrEqual(13);
+    });
+  });
+
+  it("五欄表與契約明細都包在可橫向捲動的殼裡（窄螢幕不擠成三行）", () => {
+    const h = pane();
+    expect(h).toContain('<div class="cktblwrap"><table class="rtable cktbl">');
+    const html = readFileSync(new URL("../../public/lantu-app.html", import.meta.url), "utf8");
+    expect(html).toContain(".cktblwrap{overflow-x:auto;max-width:900px;margin:0 auto}");
+    expect(html).toContain('<div class="ckconwrap"><table class="rtable ckcon">');
+  });
+});

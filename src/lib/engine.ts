@@ -123,7 +123,7 @@ function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['in
  c.profile.credit='';
  c.intent=defaultIntent();c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={on:true,heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};
  // 與 lantu-app.html 的 newCase() 對齊：少了這幾個欄位，新客戶進 iframe 後價值輪與報告備註會是 undefined。
- c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';
+ c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.profile.jobCompany='';c.profile.jobTitle='';c.profile.jobNote='';c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';
  return c}
 
 // 「本人」成員；找不到就退回第一位。壽險缺口的流動資產抵充、勞保勞退概算都以他為準。
@@ -319,18 +319,14 @@ function retireNeed(c){
 function guaranteeFor(c,member){var pm=(primaryMember(c)||{}).name;
  return sum(c.guarantees,function(g){return ((g.owner||pm)===member)?n(g.balance):0})}
 
+// ⚠️⚠️ 這一支回的是「淨缺口」，不是「需求」。
+// 毛需求在 grossLifeNeed()，這裡再扣掉已備壽險與家庭可變現流動資產。
+// 絕對不可以把它拿去當 coverageGaps() / coverageCheckupRows() 的 need——
+// 那兩支自己還會再扣一次已備，已備被扣兩次，壽險缺口會整個消失
+// （2026/08/24 實測示範案：需求被報成 324 萬、已備 1,448 萬，缺口 −1,123 萬＝「無缺口」，
+//  但同一份資料的保障準備度是 82%、五欄表說還差 324 萬）。
 function lifeNeed(c,nd){
- var famLiving=familyAnnualLiving(c);
- // 負債一律走 lBal()（有乘匯率）。直接用 n(l.balance) 會讓外幣房貸在「缺口」與「準備度」兩頁差一個匯率。
- // 企業主的個人連帶保證也是責任的一部分——一般人算壽險需求只算「房貸＋生活費＋教育金」，
- // 漏掉保證金額會讓額度嚴重不足（實務上這一項往往讓需求倍增）。
- var need=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
-   + familyAnnualParentSupport(c)*n(nd.protectYears)
-   + sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax)
-   + guaranteeFor(c,nd.member);
- var existing=existingCover(c,nd.member,'壽險');
- var liquid=liquidMovable(c);
- return Math.max(0,need - existing - liquid);
+ return Math.max(0,grossLifeNeed(c,nd) - existingCover(c,nd.member,'壽險') - liquidMovable(c));
 }
 
 function medicalDailyNeed(nd){return n(nd.room)+n(nd.selfPay)+n(nd.nursing)}
@@ -355,11 +351,14 @@ function actionCover(c,member,kind){
   return (((a.member||'').trim()||pm)===member)?n(a.cover):0;
  });
 }
+// 綜合保障缺口＝毛需求 − 毛已備。
+// ⚠️ 壽險走 grossLifeNeed()，與 coverageReadiness()／coverageCheckupRows() 同一條分子；
+//    三處的「需求」必須是同一個數字，coverageGap.test.ts 釘住。
 function coverageGaps(c){
  var rows=[];
  (c.needs||[]).forEach(function(nd){
   var map={
-   '壽險':lifeNeed(c,nd),
+   '壽險':grossLifeNeed(c,nd),
    '意外傷殘':n(nd.disability),
    '住院醫療':medicalDailyNeed(nd),
    '醫療雜費':n(nd.miscDaily),

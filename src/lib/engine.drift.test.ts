@@ -80,7 +80,8 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   // 2026/08/22 企業主模組：連帶保證進 lifeNeed()，兩份實作必須同時改。
   // 這一項會經由 totalGap() 影響 health() → plans.health_grade，漂移的代價很直接。
   it("lifeNeed()：本人簽的個人連帶保證要加進壽險需求", () => {
-    expect(HTML).toContain("+ guaranteeFor(c,nd.member)");
+    // 2026/08/24 起這條分子的唯一真相是 grossLifeNeed()；lifeNeed() 只在它外面扣已備。
+    expect(HTML).toContain("+guaranteeFor(c,nd.member);}");
     expect(HTML).toContain("function guaranteeFor(c,member){var pm=(primaryMember(c)||{}).name;");
 
     const c = E.sampleCase();
@@ -276,8 +277,8 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   });
 
   it("負債一律換匯（lBal），不可直接讀 l.balance", () => {
-    // 兩邊的 lifeNeed 都要用 lBal，否則外幣房貸在「缺口」與「準備度」兩頁會差一個匯率
-    expect(HTML).toContain("+ sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c)");
+    // 兩邊的 grossLifeNeed 都要用 lBal，否則外幣房貸在「缺口」與「準備度」兩頁會差一個匯率
+    expect(HTML).toContain("+sum(c.liabilities,function(l){return lBal(l)})+eduTotal(c)");
 
     const c = E.sampleCase();
     c.liabilities = [{ name: "美金房貸", currency: "美金", fxRate: 32, balance: 100000, rate: 2, pay: 500, months: 240, startAge: 38 }];

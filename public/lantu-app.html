@@ -396,12 +396,19 @@ tr.actnote td{padding-top:0;border-top:0}
 .ckdates{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:12px;color:var(--mut);margin:2px 0 12px;padding-bottom:9px;border-bottom:1px dashed var(--line)}
 .ckdates b{color:var(--tx);font-weight:700}
 .ckaway{margin-left:8px;color:var(--amber2)}
+/* ⚠️ 圖只准縮小、不准放大。SVG 裡的字級是寫死的使用者單位，一旦容器比 viewBox 寬，
+   整張圖（含 11px 的標籤）就被等比拉大——1440 螢幕是 1.43 倍、27 吋到 1.8 倍，
+   圖上的字會比周圍 UI 大一半，整塊版面也跟著撐開（2026/08/24 Ray 回報的「字太大、跑版」）。
+   max-width 鎖在 CK_CHART_W，寬螢幕置中；窄螢幕才等比縮，縮小不礙眼。 */
 .ckchart{overflow-x:auto;margin:4px 0 12px}
-.ckchart svg{display:block;min-width:520px}
+.ckchart svg{display:block;min-width:620px;max-width:900px;margin:0 auto}
+/* 五欄表在窄螢幕橫向捲動，不要把字擠成兩三行；寬螢幕與主圖切齊，不要被拉成一片空欄 */
+.cktblwrap{overflow-x:auto;max-width:900px;margin:0 auto}
+.cktblwrap>.cktbl{min-width:640px}
 .ckkpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .ckkpi{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
 .ckkpi .l{font-size:11.5px;color:var(--mut2)}
-.ckkpi .v{font-size:24px;font-weight:800;color:var(--amber2);line-height:1.25}
+.ckkpi .v{font-size:20px;font-weight:800;color:var(--amber2);line-height:1.3}
 .ckkpi .v.bad{color:var(--warn)}
 .ckkpi small{display:block;font-size:11px;color:var(--mut);margin-top:2px}
 .cktbl th.ckn,.cktbl td.ckn{text-align:right}
@@ -425,6 +432,8 @@ tr.actnote td{padding-top:0;border-top:0}
 .ckblkh{font-size:12.5px;font-weight:800;color:var(--amber2);margin-bottom:4px}
 .ckblk p{margin:0 0 6px;font-size:12.5px;color:var(--mut);line-height:1.7}
 .ckcon th,.ckcon td{font-size:12px}
+.ckconwrap{overflow-x:auto}
+.ckconwrap>.ckcon{min-width:620px}
 .ckfold{margin:0 0 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden}
 .ckfold>summary{cursor:pointer;padding:11px 14px;font-size:14px;font-weight:700;color:var(--amber2)}
 .ckfold>summary .hint{color:var(--mut2);font-size:12px;font-weight:400;margin-left:6px}
@@ -657,7 +666,7 @@ function sampleCase(){return {
  ]}
 };}
 function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['actions','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
- c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={on:true,heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
+ c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={on:true,heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.profile.jobCompany='';c.profile.jobTitle='';c.profile.jobNote='';c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
 
 // ===== 工作類別 / 投保級距 =====
 // 2026(115年) 勞工保險投保薪資分級表：實際月薪 → 對應月投保薪資（第1級 29,500；天花板第11級 45,800，115.01.01 生效）。
@@ -805,13 +814,21 @@ function guaranteeTotal(c){return sum(c.guarantees,function(g){return n(g.balanc
 // 企業主還要加上他簽下的保證金額——這往往讓需求額度倍增。
 function guaranteeFor(c,member){var pm=(primaryMember(c)||{}).name;
  return sum(c.guarantees,function(g){return ((g.owner||pm)===member)?n(g.balance):0})}
-function ensureJobFields(c){if(!c.profile)c.profile={};if(!c.profile.jobType)c.profile.jobType='一般就業者';if(c.profile.jobTypeOther==null)c.profile.jobTypeOther='';if(c.profile.birth==null)c.profile.birth='';if(c.profile.monthlySalary==null)c.profile.monthlySalary='';if(!c.company)c.company=defaultCompany();return c;}
+// 工作三欄（2026/08/24）：公司名稱／職務／工作摘要。
+// 純文字、不進任何計算，但它們是「這個人到底在做什麼」的答案——
+// 只有『一般就業者』四個字，教練隔三個月回來看根本想不起這位客戶是誰。
+// jobCompany 刻意允許留空（自由工作者、待業、不方便寫的都不必硬填）。
+// ⚠️ 與 c.company（企業主的公司主檔）是兩件事：那是有統編、有股權與財報的法人，
+//    這裡只是「他上班的地方叫什麼名字」。企業主兩邊都會有，不要合併。
+var JOB_TEXT_FIELDS=[['jobCompany','公司名稱','可留空'],['jobTitle','職務','具體在做什麼，例：產線品保工程師']];
+function ensureJobText(o){if(!o)return o;if(o.jobCompany==null)o.jobCompany='';if(o.jobTitle==null)o.jobTitle='';if(o.jobNote==null)o.jobNote='';return o;}
+function ensureJobFields(c){if(!c.profile)c.profile={};if(!c.profile.jobType)c.profile.jobType='一般就業者';if(c.profile.jobTypeOther==null)c.profile.jobTypeOther='';if(c.profile.birth==null)c.profile.birth='';if(c.profile.monthlySalary==null)c.profile.monthlySalary='';if(!c.company)c.company=defaultCompany();ensureJobText(c.profile);return c;}
 function primaryMember(c){return (c.members||[]).filter(function(m){return m.role==='本人'})[0]||(c.members||[])[0];}
 // 就業者/業務：以月薪帶入「本人」成員的投保類型與月投保薪資（企業主投保自行維持）。
 function applyInsFromSalary(c){if(c.profile.jobType==='企業主')return;var pm=primaryMember(c);if(!pm)return;pm.insType=jobInsType(c.profile.jobType);
  pm.insSalary=isNoEmployerJob(c.profile.jobType)?NP_INSURED_MONTHLY:laborInsSalary(c.profile.monthlySalary);}
 // 配偶／其他賺薪成員：工作類別與月薪存在成員物件上（本人維持存 c.profile/c.company）
-function ensureMemberJob(m){if(!m)return m;if(m.jobType==null)m.jobType='一般就業者';if(m.jobTypeOther==null)m.jobTypeOther='';if(m.monthlySalary==null)m.monthlySalary='';if(!m.company)m.company=defaultCompany();return m;}
+function ensureMemberJob(m){if(!m)return m;if(m.jobType==null)m.jobType='一般就業者';if(m.jobTypeOther==null)m.jobTypeOther='';if(m.monthlySalary==null)m.monthlySalary='';if(!m.company)m.company=defaultCompany();ensureJobText(m);return m;}
 function applyInsFromSalaryMember(m){if(!m||m.jobType==='企業主')return;m.insType=jobInsType(m.jobType);
  m.insSalary=isNoEmployerJob(m.jobType)?NP_INSURED_MONTHLY:laborInsSalary(m.monthlySalary);}
 
@@ -1150,15 +1167,14 @@ function retireNeed(c){
 }
 
 // 壽險/醫療 需求反推 (per member in needs)
+// ⚠️⚠️ 這一支回的是「淨缺口」，不是「需求」。
+// 毛需求在 grossLifeNeed()，這裡再扣掉已備壽險與家庭可變現流動資產。
+// 絕對不可以把它拿去當 coverageGaps() / coverageCheckupRows() 的 need——
+// 那兩支自己還會再扣一次已備，已備被扣兩次，壽險缺口會整個消失
+// （2026/08/24 實測示範案：需求被報成 324 萬、已備 1,448 萬，缺口 −1,123 萬＝「無缺口」，
+//  但同一份資料的保障準備度是 82%、五欄表說還差 324 萬）。
 function lifeNeed(c,nd){
- var famLiving=familyAnnualLiving(c);
- var need=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
-   + familyAnnualParentSupport(c)*n(nd.protectYears)
-   + sum(c.liabilities,function(l){return lBal(l)}) + eduTotal(c) + n(nd.funeral) + n(nd.estateTax)
-   + guaranteeFor(c,nd.member);
- var existing=existingCover(c,nd.member,'壽險');
- var liquid=liquidMovable(c);
- return Math.max(0,need - existing - liquid);
+ return Math.max(0,grossLifeNeed(c,nd) - existingCover(c,nd.member,'壽險') - liquidMovable(c));
 }
 function medicalDailyNeed(nd){return n(nd.room)+n(nd.selfPay)+n(nd.nursing)}
 function memberDep(c,name){var m=(c.members||[]).find(function(x){return x.name===name});return m?n(m.depRatio):100}
@@ -1169,7 +1185,6 @@ function existingCover(c,member,kind){
  return fromCov+fromPol;
 }
 
-// 綜合保障缺口: 需求(反推 or 直接) - 已有
 // 調整動作提供的保額。⚠️ 只算啟用中的，而且要同時對到「成員」與「險種」。
 // 動作沒指定成員時算在主要成員身上（教練最常排的就是本人的家庭責任保障）。
 function actionCover(c,member,kind){
@@ -1180,11 +1195,14 @@ function actionCover(c,member,kind){
   return (((a.member||'').trim()||pm)===member)?n(a.cover):0;
  });
 }
+// 綜合保障缺口＝毛需求 − 毛已備。
+// ⚠️ 壽險走 grossLifeNeed()，與 coverageReadiness()／coverageCheckupRows() 同一條分子；
+//    三處的「需求」必須是同一個數字，coverageGap.test.ts 釘住。
 function coverageGaps(c){
  var rows=[];
  (c.needs||[]).forEach(function(nd){
   var map={
-   '壽險':lifeNeed(c,nd),
+   '壽險':grossLifeNeed(c,nd),
    '意外傷殘':n(nd.disability),
    '住院醫療':medicalDailyNeed(nd),
    '醫療雜費':n(nd.miscDaily),
@@ -2792,6 +2810,10 @@ function setMemberRole(i,v){var c=activeCase();var m=c.members[i];if(!m)return;m
 function setBirth(v){var c=activeCase();ensureJobFields(c);c.profile.birth=v;var a=ageFromBirth(v);if(a!=null)c.profile.age=a;save();render();}
 function setMemberBirth(i,v){var c=activeCase();var m=c.members[i];if(!m)return;m.birth=v;var a=ageFromBirth(v);if(a!=null)m.age=a;save();render();}
 function setJobTypeOther(v){var c=activeCase();ensureJobFields(c);c.profile.jobTypeOther=v;save();if(app.role==='client')render();}
+// 工作三欄的存檔：跟 setJobTypeOther 一樣不整頁 render——這些是自由輸入欄，
+// 每敲一個字就重繪會把游標踢掉（v12 的欄位是整頁重畫出來的）。
+function setJobText(k,v){var c=activeCase();ensureJobFields(c);c.profile[k]=v;save();if(app.role==='client')render();}
+function setMemberJobText(i,k,v){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m[k]=v;save();if(app.role==='client')render();}
 function setMemberJobTypeOther(i,v){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m.jobTypeOther=v;save();if(app.role==='client')render();}
 // 月投保薪資：下拉選級距（選「其他」則沿用目前數值，改由旁邊的手填框輸入）
 function setInsGrade(i,v){var c=activeCase();var m=c.members[i];if(!m)return;if(v==='__other')return;m.insSalary=n(v);save();render();}
@@ -3197,8 +3219,15 @@ function personCard(c,m,idx,isPrimary){
   }
   var otherAttr=isPrimary?'oninput="setJobTypeOther(this.value)"':'oninput="setMemberJobTypeOther('+idx+',this.value)"';
   var jtOther=isPrimary?(p.jobTypeOther||''):(m.jobTypeOther||'');
+  // 公司名稱／職務：跟著工作類別一起填，不要拆到別的分頁去（教練問這三題是同一口氣問完的）。
+  var src=isPrimary?p:m;
+  var jobText=JOB_TEXT_FIELDS.map(function(f){
+   var at=isPrimary?('oninput="setJobText(\''+f[0]+'\',this.value)"')
+                   :('oninput="setMemberJobText('+idx+',\''+f[0]+'\',this.value)"');
+   return '<div class="f"><label>'+f[1]+'</label><input value="'+esc(src[f[0]]||'')+'" '+at+' placeholder="'+esc(f[2])+'"></div>';
+  }).join('');
   var jobSel='<div class="f"><label>工作類別</label><select '+jobSelAttr+'>'+JOB_TYPES.map(function(o){return '<option '+(jt===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select></div>'+
-   ((jt==='其他')?'<div class="f"><label>工作類別（自行填寫）</label><input value="'+esc(jtOther)+'" '+otherAttr+' placeholder="例：自由接案、退休、進修中"></div>':'');
+   ((jt==='其他')?'<div class="f"><label>工作類別（自行填寫）</label><input value="'+esc(jtOther)+'" '+otherAttr+' placeholder="例：自由接案、退休、進修中"></div>':'')+jobText;
   var noEmp=isNoEmployerJob(jt);
   var salField=(jt==='企業主'||noEmp)?'':'<div class="f"><label>月薪(投保計算用)</label>'+moneyCell(salAttr,sal)+'</div>';
   var insField=insSalaryField(m,idx)+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES);
@@ -3208,7 +3237,12 @@ function personCard(c,m,idx,isPrimary){
   var hint=(jt==='企業主')?'<div class="hint" style="margin-top:6px">企業主投保多自行維持，月投保薪資請於上方手填。</div>'
     :noEmp?'<div class="hint" style="margin-top:6px">'+esc(jt)+'沒有雇主，預設以<b>國民年金</b>投保（月投保金額 '+fmt(NP_INSURED_MONTHLY)+' 元，'+NP_YEAR+' 年起），不計勞退提繳。'+(jt==='投資者'?' 投資／理財所得請於「收支資債」以<b>理財收入</b>登錄，不列為薪資。':'')+'</div>'
     :'<div class="hint" style="margin-top:6px">依 '+LABOR_YEAR_TXT+' 勞保投保薪資分級表自動帶入（級距天花板 45,800，可下拉改選或手填）。'+(jt==='業務工作者'?' 業務工作者收入常浮動、多以職業工會投保。':'')+'</div>';
-  workBlock='<div class="subhd">工作與投保</div><div class="fgrid">'+jobSel+salField+insField+'</div>'+hint+insGradeBox(m)+coHTML
+  // 工作摘要：職務內容之外「之後會陸續補上的紀錄」（升遷、轉調、接了什麼案子、老闆說了什麼）。
+  // 刻意給一塊夠大的空白而不是一行 input——這一欄會愈寫愈長。
+  var noteAt=isPrimary?'oninput="setJobText(\'jobNote\',this.value)"':'oninput="setMemberJobText('+idx+',\'jobNote\',this.value)"';
+  var jobNote='<div class="bgf" style="margin-top:8px"><label>工作摘要・補充紀錄</label>'+
+   '<textarea rows="3" placeholder="工作內容、產業與規模、班別與加班狀況、收入結構（底薪/獎金/分紅）、近期異動…往後有新的就往下加" '+noteAt+'>'+esc(src.jobNote||'')+'</textarea></div>';
+  workBlock='<div class="subhd">工作與投保</div><div class="fgrid">'+jobSel+salField+insField+'</div>'+jobNote+hint+insGradeBox(m)+coHTML
    +seniorityBlock(m,idx,LABOR_LIKE_INS.indexOf(m.insType||'勞保')>=0);
  }else{
   workBlock='<div class="subhd">投保</div><div class="fgrid">'+fFld(mb('insType'),'投保類型',m.insType,null,MEMBER_INS_TYPES)+insSalaryField(m,idx)+'</div>'+insGradeBox(m)
@@ -6886,15 +6920,18 @@ function checkupTable(rows,opts){
    '<td>'+checkupPill(r)+'</td>'+
    '<td class="'+(r.state==='mid'?'muted':'ckdir')+'">'+checkupDirText(r)+'</td></tr>';
  }).join('');
- return '<table class="rtable cktbl">'+head+body+'</table>';
+ return '<div class="cktblwrap"><table class="rtable cktbl">'+head+body+'</table></div>';
 }
 // 主圖：每一列一條軌，NEED 在 62.5% 處畫一條目標線，HAVE 依達成率填色。
+// ⚠️ W 必須與 CSS 的 .ckchart svg{max-width} 同一個值：SVG 的字級是使用者單位，
+//    容器一旦比 viewBox 寬，字就跟著等比放大（見 .ckchart 的註解）。改一邊要改兩邊，
+//    policyCheckupUI.test.ts 釘住。
 function checkupChartSVG(c,theme){
  var K=planChartColors(theme);
  var rows=[].concat(premiumCheckup(c).rows,coverageCheckupRows(c),paybackCheckupRows(c))
    .filter(function(r){return r.need>0||r.have>0;});
  if(!rows.length)return '<div class="muted" style="padding:14px">先在「保障需求」建立需求、在「現有保單」登錄保單，這張圖就會出現。</div>';
- var LBW=124,PR=104,W=760,rowH=26,pT=26,pB=18;
+ var LBW=136,PR=104,W=900,rowH=26,pT=26,pB=18;
  var H=pT+rows.length*rowH+pB;
  var trackW=W-LBW-PR,needX=LBW+trackW*0.625;
  var out=['<svg viewBox="0 0 '+W+' '+H+'" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="保單檢查：現在保單對現在需求">'];
@@ -6908,8 +6945,8 @@ function checkupChartSVG(c,theme){
   var col=checkupTone(r.state,K);
   out.push('<rect x="'+LBW+'" y="'+by+'" width="'+trackW.toFixed(1)+'" height="'+bh+'" rx="4" fill="'+K.TRACK+'"/>');
   if(w>0)out.push('<rect x="'+LBW+'" y="'+by+'" width="'+w.toFixed(1)+'" height="'+bh+'" rx="4" fill="'+col+'"/>');
-  out.push('<text x="'+(LBW-8)+'" y="'+(by+9)+'" font-size="11" fill="'+K.LAB+'" text-anchor="end">'+esc(r.item)+'</text>');
-  out.push('<text x="'+(W-PR+8)+'" y="'+(by+9)+'" font-size="10.5" fill="'+col+'" font-weight="700">'+
+  out.push('<text x="'+(LBW-8)+'" y="'+(by+9)+'" font-size="12" fill="'+K.LAB+'" text-anchor="end">'+esc(r.item)+'</text>');
+  out.push('<text x="'+(W-PR+8)+'" y="'+(by+9)+'" font-size="11.5" fill="'+col+'" font-weight="700">'+
    (r.need>0?Math.round(pct*100)+'%':'—')+'</text>');
  });
  out.push('</svg>');
@@ -6977,7 +7014,7 @@ function checkupContractsHTML(c,kind){
    '<td>'+esc(premiumType(p))+'</td>'+
    '<td><button class="tbtn" onclick="jumpPolicy('+i+')">前往編輯</button></td></tr>';
  }).join('');
- return '<table class="rtable ckcon"><tr><th>契約名稱</th><th>公司</th><th>被保人</th><th>主/附</th><th>生效日</th><th>'+(f?'保額':'年繳保費')+'</th><th>保費類型</th><th></th></tr>'+rows+'</table>';
+ return '<div class="ckconwrap"><table class="rtable ckcon"><tr><th>契約名稱</th><th>公司</th><th>被保人</th><th>主/附</th><th>生效日</th><th>'+(f?'保額':'年繳保費')+'</th><th>保費類型</th><th></th></tr>'+rows+'</table></div>';
 }
 // 保單運算日／需求統計日：需求資料多舊，用「距離今天」講清楚。
 function checkupDatesHTML(c){
@@ -7558,7 +7595,7 @@ function analysisModules(c){
   {k:'coverage',t:'保障準備度',hint:'各險種「已備 ÷ 毛需求」；100% 即足額',
    html:function(){return '<div id="an-gap">'+coverageReadinessHTML(c)+lifeNeedDetailHTML(c)+'</div>'}},
 
-  {k:'gap',t:'保障缺口（需求已反推計算）',
+  {k:'gap',t:'保障缺口（毛需求 − 已備）',hint:'需求與上方「保障準備度」是同一個數字；已備含逐張保單、已備補充、方案動作，本人壽險再加家庭可變現資產',
    html:function(){
     var gt=gaps().map(function(g){return '<tr><td class="k">'+g.member+'</td><td>'+g.kind+'</td><td>'+fmt(g.need)+'</td><td>'+fmt(g.have)+'</td><td class="'+(g.gap>0?'bad':'good')+'">'+fmt(g.gap)+'</td></tr>'}).join('');
     return '<table class="rtable"><tr><th>被保人</th><th>險種</th><th>需求</th><th>已備</th><th>缺口</th></tr>'+(gt||'<tr><td colspan=5 class=muted>請於「保障需求」分頁新增</td></tr>')+'</table>';
@@ -8573,6 +8610,17 @@ function rGapBars(gaps){var pos=gaps.filter(function(g){return g.gap>0});if(!pos
  var mx=Math.max.apply(null,pos.map(function(g){return g.gap}))||1;
  return pos.map(function(g){var w=g.gap/mx*100;return '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#33474e"><span>'+g.member+' · '+g.kind+'</span><span style="color:#b05a4a;font-weight:700">缺口 '+fmt(g.gap)+'</span></div><div style="height:8px;background:#e2e8ea;border-radius:5px"><div style="height:100%;width:'+w.toFixed(0)+'%;background:#b05a4a;border-radius:5px"></div></div></div>'}).join('');}
 
+// 一行講完「這個人在做什麼」：工作類別｜公司｜職務。
+// 空欄一律略過而不是印「—」，否則沒填公司的自由工作者會看到一串破折號。
+// 企業主的公司名稱優先取公司主檔（那才是有統編的那一家），沒有才退回自填的 jobCompany。
+function jobLineText(c,m,isPrimary){
+ var src=isPrimary?(c.profile||{}):(m||{});
+ var jt=src.jobType||'一般就業者';
+ if(jt==='其他'&&String(src.jobTypeOther||'').trim())jt=src.jobTypeOther;
+ var co=String(src.jobCompany||'').trim();
+ if(jt==='企業主'&&!co)co=String((mainCompany(c)||{}).name||'').trim();
+ return [jt,co,String(src.jobTitle||'').trim()].filter(Boolean).map(esc).join('　｜　');
+}
 // 報告書的客戶側寫：把成員卡填的背景補充攤出來。
 // 數字說得出「他有多少」，說不出「他為什麼會這樣決定」——那段在這裡。
 function bgReportHTML(c){
@@ -8594,7 +8642,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  var ptax=propertyTax(c),lg=legacyNeed(c),acts=actionList(c);
  var actRep=acts.map(function(a){return '<tr><td style="text-align:center;font-weight:700;color:#c99a5b">'+a.axis+'</td><td>'+esc(a.title)+'</td><td>'+esc(a.detail)+'</td></tr>'}).join('');
  var allocRep=al.list.filter(function(x){return n(x.pct)>0}).map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+n(x.pct)+'%</td><td>'+n(x.ret)+'%</td><td>'+esc(x.benefit)+'</td></tr>'}).join('');
- var memRows=(c.members||[]).map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+x.role+'</td><td>'+n(x.age)+' 歲</td><td>'+n(x.depRatio)+'%</td></tr>'}).join('');
+ var memRows=(c.members||[]).map(function(x,xi){return '<tr><td>'+esc(x.name)+'</td><td>'+x.role+'</td><td>'+n(x.age)+' 歲</td><td>'+n(x.depRatio)+'%</td><td>'+(isEarnerRole(x.role)?jobLineText(c,x,xi===primaryIdx(c)):'—')+'</td></tr>'}).join('');
  var rColorR=function(s){return s==='good'?'#3f7d54':s==='warn'?'#b5852f':s==='bad'?'#b05a4a':'#777'};
  var ratioTblR=function(gn){var keys=Object.keys(r).filter(function(k){return r[k].group===gn});return '<table><tr><th>指標</th><th>現況</th><th>理想值</th></tr>'+keys.map(function(k){var x=r[k];return '<tr><td>'+k+'</td><td style="color:'+rColorR(x.status)+';font-weight:700">'+x.v+'</td><td style="color:#5a6b72">'+x.ideal+'</td></tr>'}).join('')+'</table>'};
  var advRows=adv.map(function(a){return '<li style="margin-bottom:4px"><b>'+a[0]+'</b>：'+a[1]+'</li>'}).join('');
@@ -8615,10 +8663,11 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+rGauge('財務安全度',h.safety)+rGauge('財務自由度',h.freedom)+rGauge('願景達成度',h.vision)+'</div>'+
   '<div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:1;min-width:230px">'+rBars([{label:'收支平衡',val:hp['收支平衡']},{label:'預備金',val:hp['預備金']},{label:'信用',val:hp['信用']},{label:'負債平衡',val:hp['負債平衡']},{label:'風險保全',val:hp['風險保全'],color:'#c99a5b'}])+'</div>'+
    '<div style="min-width:172px;text-align:center"><div style="color:#5a6b72;font-size:12px">財務階段</div><div style="font-size:30px;font-weight:800;letter-spacing:.04em;margin:4px 0 2px;color:'+stageColor(h.grade,1)+'">'+stageName(h.grade)+'</div><div style="font-size:12px;color:#33474e;line-height:1.6">'+stageTask(h.grade)+'</div><div style="font-size:11px;color:#5a6b72;margin-top:4px">'+stageReason(h)+'</div></div></div>'+stageReportNote(h)+
-  '<table style="margin-top:12px"><tr><th>成員</th><th>稱謂</th><th>年齡</th><th>家計負擔</th></tr>'+(memRows||'<tr><td colspan=4>—</td></tr>')+'</table>'+bgReportHTML(c)+
+  '<table style="margin-top:12px"><tr><th>成員</th><th>稱謂</th><th>年齡</th><th>家計負擔</th><th>工作</th></tr>'+(memRows||'<tr><td colspan=5>—</td></tr>')+'</table>'+bgReportHTML(c)+
   '<div style="margin-top:12px;color:#0d2b45;font-weight:700;font-size:13px">家族族譜</div>'+familyTreeSVG(c,'light')+
   '<table style="margin-top:8px">'+
-   '<tr><td>工作類別</td><td>'+esc(p.jobType||'一般就業者')+((p.jobType==='企業主'&&(c.company||{}).name)?'（'+esc(c.company.name)+'）':'')+'</td></tr>'+
+   '<tr><td>工作</td><td>'+jobLineText(c,null,true)+'</td></tr>'+
+   (String((p.jobNote||'')).trim()?'<tr><td>工作摘要</td><td style="white-space:pre-wrap;line-height:1.7">'+esc(p.jobNote)+'</td></tr>':'')+
    ((p.jobType==='企業主')?'<tr><td>公司概況</td><td>'+esc((c.company||{}).industry||'—')+' ｜ 持股 '+n((c.company||{}).sharePct)+'% ｜ 年營收 '+fmt((c.company||{}).annualRevenue)+' ｜ 年淨利 '+fmt((c.company||{}).netProfit)+((c.company||{}).ownerLoan?' ｜ 負責人往來 '+fmt(c.company.ownerLoan):'')+'</td></tr>':'')+
    '<tr><td>關注議題</td><td>'+esc(((c.intent||{}).purposes||[]).join('、')||'—')+'</td></tr><tr><td>必須達成 · 優先序</td><td>'+(orderedMustText(c)||'—')+'</td></tr><tr><td>淨資產 / 年收入 / 年支出</td><td>'+fmt(m.net)+' ／ '+fmt(m.incTotal)+' ／ '+fmt(m.expTotal)+'</td></tr></table>'+
 

@@ -139,18 +139,27 @@ describe("2 保障：把需求依險種跨成員加總後套五欄", () => {
    * lifeNeed() 回的是「已扣掉已備與流動資產」的淨缺口；coverageGaps 的 have 卻是毛的已備。
    * 若五欄表直接用 coverageGaps 的 need，示範客戶的壽險會被判成
    * 「HAVE 1,448 萬 / NEED 324 萬 → 偏高，可減少 1,123 萬」——但他其實還差 324 萬。
-   * 毛對毛才對得起來：NEED 走 grossLifeNeed，而「可增加」的金額要正好等於原本的淨缺口。
+   * 毛對毛才對得起來：NEED 走 grossLifeNeed，而「可增加」的金額要正好等於淨缺口。
+   *
+   * 2026/08/24 續：coverageGaps() 原本踩的是同一個坑（need 吃 lifeNeed 的淨缺口、
+   * 已備卻又扣第二次），已一併改吃 grossLifeNeed。所以現在五欄表與缺口表
+   * **need 相同、have 相同、缺口相同**——三處一致由 coverageGap.test.ts 守著。
    */
   it("壽險一定是毛需求對毛已備，不能拿淨缺口去比", () => {
     const c = Eng.sampleCase();
     const life = Eng.coverageCheckupRows(c).find((r: { item: string }) => r.item === "壽險");
     const gapRow = Eng.coverageGaps(c).find((r: { kind: string }) => r.kind === "壽險");
+    const nd = c.needs[0];
 
     expect(life.state).toBe("low");                       // 示範客戶壽險是不足，不是過剩
     expect(life.need).toBeGreaterThan(life.have);
-    // NEED（毛） − HAVE（毛） 必須等於原本 lifeNeed() 算出來的淨缺口
-    expect(life.need - life.have).toBeCloseTo(gapRow.need, 6);
-    expect(life.delta).toBeCloseTo(gapRow.need, 6);
+    // 五欄表與缺口表講同一組毛數字
+    expect(life.need).toBeCloseTo(gapRow.need, 6);
+    expect(life.have).toBeCloseTo(gapRow.have, 6);
+    // NEED（毛） − HAVE（毛） 必須等於 lifeNeed() 算出來的淨缺口
+    expect(life.need - life.have).toBeCloseTo(Eng.lifeNeed(c, nd), 6);
+    expect(life.delta).toBeCloseTo(Eng.lifeNeed(c, nd), 6);
+    expect(life.delta).toBeCloseTo(gapRow.gap, 6);
     expect(life.dir).toBe("可增加");
   });
 
