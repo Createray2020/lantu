@@ -57,6 +57,20 @@ export default async function ProfilePage() {
           </p>
         </div>
 
+        {/* 教練編號：客戶要「指定你」就是輸入這一組。C 階教練在官網卡片上不給直接點，
+            這組號是他們唯一的進場方式，所以放在檔案頁最顯眼的地方讓教練隨手抄得到。 */}
+        <div className="mb-5 rounded-xl border border-[#c99a5b]/30 bg-[#c99a5b]/10 px-4 py-3">
+          <div className="text-xs text-[#a9bccf]">我的教練編號</div>
+          <div className="font-mono text-2xl tracking-[0.14em] text-[#e0bd8b] mt-0.5">
+            {me.code ?? "—"}
+          </div>
+          <p className="text-[12px] text-[#a9bccf] mt-1 leading-relaxed">
+            把這組編號給客戶，他到{" "}
+            <Link href="/coaches" className="underline underline-offset-4 hover:text-white">官網教練頁</Link>{" "}
+            輸入就能直接把連結申請送給你（一樣要你按接受才會掛上）。
+          </p>
+        </div>
+
         <ProfileEditor
           initial={initial}
           specialtyOptions={params.settings.specialties ?? []}

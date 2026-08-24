@@ -68,6 +68,8 @@ vi.mock("drizzle-orm", () => ({ eq: () => ({}), count: () => ({}) }));
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 vi.mock("@clerk/nextjs/server", () => ({ currentUser: h.currentUser }));
+// 配號走 DB（code_counters）——這裡的假 schema 沒有那張表，且發號規則另有 codes.test.ts 守著。
+vi.mock("./codeAlloc", () => ({ allocCode: async (kind: string) => (kind === "coach" ? "FC2608001" : "2608001") }));
 
 import { ensureCoach, applyAsCoach, transferClients, removeCoach, isAdmin } from "./coach";
 

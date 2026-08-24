@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { actionItems, clients, plans, reviews } from "@/Shared/db/schema";
 import { newCaseData, planSnapshot } from "./snapshot";
+import { allocCode } from "./codeAlloc";
 
 const COACH_TRACK = "coach";
 const CLIENT_TRACK = "client";
@@ -101,6 +102,8 @@ export async function createClient(coachId: string, input: ClientInput): Promise
       contact: input.contact ?? {},
       birthDate: input.birthDate ?? null,
       status: input.status ?? "active",
+      // 客戶編號在「建立那一刻」發，之後不再變動（規則見 lib/codes.ts）。
+      code: await allocCode("client"),
     })
     .returning({ id: clients.id });
 

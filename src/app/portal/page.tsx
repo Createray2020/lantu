@@ -87,6 +87,11 @@ export default async function Portal() {
             <div className="text-center mb-8">
               <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-2">MY LIFE PASSPORT</div>
               <h1 className="font-serif text-3xl mb-2">{name}，你的人生護照</h1>
+              {setup.code && (
+                <div className="font-mono text-[11px] tracking-[0.2em] text-[#6f869c] mb-2" title="你的客戶編號">
+                  客戶編號 {setup.code}
+                </div>
+              )}
               <p className="text-[#a7bacb] text-sm">依你目前的存錢規劃，每月應存合計</p>
               <div className="font-serif text-4xl text-[#e0bd8b] mt-2">{r.totalMonthlyWan.toFixed(1)} 萬</div>
             </div>

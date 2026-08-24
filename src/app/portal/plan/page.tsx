@@ -11,5 +11,5 @@ export default async function ClientPlanPage() {
   if (!user) redirect("/client/sign-in");
   const plan = await getClientPlanCase(user.id);
   if (!plan) redirect("/portal/passport");
-  return <ClientPlanFrame data={plan.data} />;
+  return <ClientPlanFrame data={plan.data} clientCode={plan.code} />;
 }

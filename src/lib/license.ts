@@ -52,6 +52,33 @@ export const RANK_GROUP_LABEL: Record<string, string> = {
   CHIEF: "首席教練",
 };
 
+// ── 派案資格（2026/08/24 Ray 拍板）─────────────────────────────
+// C 階（實習／C1–C3）不派案：官網教練頁**照常呈現**他們，但卡片上不給「選擇這位教練」，
+// 自動建議清單也不出現他們。客戶只要拿到完整教練編號，仍然可以指定 C 階教練
+// （C 階自己開發來的客戶要進得來，只是不吃系統派案）。
+export const PICK_MIN_RANK = "S1";
+
+export const PICK_BLOCKED_MESSAGE =
+  "這位教練不開放在教練頁直接指定，請向他索取教練編號後於下方輸入。";
+
+/**
+ * 這位教練能不能在官網被「直接點選 / 自動建議」。
+ *
+ * ⚠️ 這裡的 null 語意跟 licenseUntil **刻意相反**：未定級＝不可被指定（Ray 2026/08/24 拍板）。
+ *    理由是這條閘的預設值方向不同——期限沒設是「還沒開始收費」，職級沒設是「還沒被認可到能收派案」。
+ *    後果是後台職級表沒填的教練在官網一律只能靠編號指定，這是預期行為，不是 bug。
+ */
+export function canBePicked(
+  rankCode: string | null | undefined,
+  rankSeq?: Record<string, number | null | undefined>,
+): boolean {
+  if (!rankCode) return false;
+  const min = rankSeq?.[PICK_MIN_RANK] ?? BUILTIN_RANK_SEQ[PICK_MIN_RANK];
+  const seq = rankSeq?.[rankCode] ?? BUILTIN_RANK_SEQ[rankCode];
+  if (seq == null || min == null) return false;
+  return seq >= min;
+}
+
 export type LicenseUnit = "month" | "year";
 
 export type LicenseInput = {

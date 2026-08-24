@@ -63,6 +63,8 @@ const h = vi.hoisted(() => {
 vi.mock("drizzle-orm", () => ({ and: () => ({}), eq: () => ({}), desc: () => ({}), count: () => ({}) }));
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
+// 配號走 DB（code_counters）——這裡的假 schema 沒有那張表，且發號規則另有 codes.test.ts 守著。
+vi.mock("@/lib/codeAlloc", () => ({ allocCode: async (kind: string) => (kind === "coach" ? "FC2608001" : "2608001") }));
 
 import { redeemInvite } from "./coachLink";
 

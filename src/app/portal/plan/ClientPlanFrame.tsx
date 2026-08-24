@@ -16,7 +16,7 @@ function readScale() {
   }
 }
 
-export default function ClientPlanFrame({ data }: { data: unknown }) {
+export default function ClientPlanFrame({ data, clientCode }: { data: unknown; clientCode?: string | null }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function ClientPlanFrame({ data }: { data: unknown }) {
     // 用 "*" 廣播的是含姓名/統編/保單號/資產負債的完整財務資料，而且下面還有 350ms×8 次重試。
     function post() {
       iframeRef.current?.contentWindow?.postMessage(
-        { type: "lantu:init", data, uiScale: readScale() },
+        { type: "lantu:init", data, uiScale: readScale(), clientCode: clientCode ?? null },
         window.location.origin,
       );
     }
@@ -44,7 +44,7 @@ export default function ClientPlanFrame({ data }: { data: unknown }) {
       window.removeEventListener("message", onMsg);
       clearInterval(iv);
     };
-  }, [data]);
+  }, [data, clientCode]);
 
   return (
     <div className="fixed inset-0 flex flex-col bg-[#081a2b]">
@@ -63,7 +63,7 @@ export default function ClientPlanFrame({ data }: { data: unknown }) {
         className="flex-1 w-full border-0"
         onLoad={() =>
           iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:init", data, uiScale: readScale() },
+            { type: "lantu:init", data, uiScale: readScale(), clientCode: clientCode ?? null },
             window.location.origin,
           )
         }

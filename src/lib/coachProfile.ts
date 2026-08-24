@@ -6,12 +6,22 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches, coachProfiles } from "@/Shared/db/schema";
+import { canBePicked } from "./license";
 
 export type ProfileRow = typeof coachProfiles.$inferSelect;
 
-/** 對外送出的教練卡片。刻意不含 email／電話／制度職級。 */
+/**
+ * 對外送出的教練卡片。刻意不含 email／電話／**制度職級**。
+ *
+ * pickable 是職級的衍生結論而不是職級本身：客戶只需要知道「這位能不能直接點」，
+ * 不需要（也不該）知道對方是 C2 還是 S1。把 rankCode 送到瀏覽器等於把內部職級公開。
+ */
 export type PublicCoach = {
   id: string;
+  /** 教練編號（FC+YYMM+三碼）。未核准前為 null，但公開列表本來就只收 active。 */
+  code: string | null;
+  /** 能不能在官網被直接點選／出現在自動建議：S1 以上才可以（見 lib/license.ts canBePicked）。 */
+  pickable: boolean;
   name: string;
   title: string | null;
   headline: string | null;
@@ -75,10 +85,13 @@ export async function setPublished(coachId: string, published: boolean) {
 }
 
 function toPublic(row: {
-  id: string; name: string | null; title: string | null; p: ProfileRow | null;
+  id: string; name: string | null; title: string | null;
+  code?: string | null; rankCode?: string | null; p: ProfileRow | null;
 }): PublicCoach {
   return {
     id: row.id,
+    code: row.code ?? null,
+    pickable: canBePicked(row.rankCode),
     name: row.name || "教練",
     title: row.title,
     headline: row.p?.headline ?? null,
@@ -102,7 +115,8 @@ function toPublic(row: {
 export async function listPublicCoaches(): Promise<PublicCoach[]> {
   const rows = await db
     .select({
-      id: coaches.id, name: coaches.name, title: coaches.title, p: coachProfiles,
+      id: coaches.id, name: coaches.name, title: coaches.title,
+      code: coaches.code, rankCode: coaches.rankCode, p: coachProfiles,
     })
     .from(coaches)
     .innerJoin(coachProfiles, eq(coaches.id, coachProfiles.coachId))
@@ -113,7 +127,10 @@ export async function listPublicCoaches(): Promise<PublicCoach[]> {
 
 export async function getPublicCoach(coachId: string): Promise<PublicCoach | null> {
   const rows = await db
-    .select({ id: coaches.id, name: coaches.name, title: coaches.title, p: coachProfiles })
+    .select({
+      id: coaches.id, name: coaches.name, title: coaches.title,
+      code: coaches.code, rankCode: coaches.rankCode, p: coachProfiles,
+    })
     .from(coaches)
     .innerJoin(coachProfiles, eq(coaches.id, coachProfiles.coachId))
     .where(and(
@@ -130,7 +147,8 @@ export async function listAllProfiles() {
   return db
     .select({
       id: coaches.id, name: coaches.name, email: coaches.email,
-      title: coaches.title, status: coaches.status, p: coachProfiles,
+      title: coaches.title, status: coaches.status,
+      code: coaches.code, rankCode: coaches.rankCode, p: coachProfiles,
     })
     .from(coaches)
     .leftJoin(coachProfiles, eq(coaches.id, coachProfiles.coachId))

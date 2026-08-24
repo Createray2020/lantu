@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   licenseState, addPeriod, diffDays, todayISO, clientCapOf, quotaState,
-  RANK_CLIENT_CAPS, INTERN_MONTHS,
+  canBePicked, RANK_CLIENT_CAPS, INTERN_MONTHS, PICK_MIN_RANK,
 } from "./license";
 
 // 使用期限的地基語意：**沒設定期限＝不檢查**，不是「已過期」。
@@ -131,5 +131,44 @@ describe("quotaState", () => {
 
   it("超額（降級後可能發生）不會出現負的剩餘數", () => {
     expect(quotaState(20, 25)).toEqual({ cap: 20, used: 25, left: 0, full: true });
+  });
+});
+
+// ── 派案資格（2026/08/24 Ray 拍板）──────────────────────────────
+// ⚠️ 這條閘的 null 語意跟 licenseUntil **刻意相反**：未定級＝不可被指定。
+//    期限沒設是「還沒開始收費」，職級沒設是「還沒被認可到能收派案」。
+describe("canBePicked", () => {
+  it("S1 以上可以被直接指定／出現在自動建議", () => {
+    expect(canBePicked("S1")).toBe(true);
+    expect(canBePicked("S2")).toBe(true);
+    expect(canBePicked("S3")).toBe(true);
+    expect(canBePicked("CHIEF")).toBe(true);
+  });
+
+  it("實習與 C1–C3 不派案（首頁照常呈現，但只能靠輸入編號指定）", () => {
+    expect(canBePicked("INTERN")).toBe(false);
+    expect(canBePicked("C1")).toBe(false);
+    expect(canBePicked("C2")).toBe(false);
+    expect(canBePicked("C3")).toBe(false);
+  });
+
+  it("未定級（null／空字串）＝不可被指定", () => {
+    expect(canBePicked(null)).toBe(false);
+    expect(canBePicked(undefined)).toBe(false);
+    expect(canBePicked("")).toBe(false);
+  });
+
+  it("認不得的職級代號一律當不可指定，不要猜", () => {
+    expect(canBePicked("VIP")).toBe(false);
+  });
+
+  it("後台自訂職級表的 seq 會蓋掉內建順序", () => {
+    // 公司把 C3 的 seq 調到 S1 之上 → C3 就吃得到派案
+    expect(canBePicked("C3", { C3: 9, S1: 4 })).toBe(true);
+    expect(canBePicked("S1", { C3: 9, S1: 4 })).toBe(true);
+  });
+
+  it("門檻常數就是 S1", () => {
+    expect(PICK_MIN_RANK).toBe("S1");
   });
 });

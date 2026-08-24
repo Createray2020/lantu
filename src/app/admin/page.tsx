@@ -97,6 +97,10 @@ export default async function Admin() {
                     <td className="px-3 py-2">
                       <div className="font-semibold">{c.name || "（未命名）"}</div>
                       <div className="text-[#6f869c] text-xs">{c.email}</div>
+                      {/* 教練編號：核准報聘時發，之後不變。待審帳號還沒有號。 */}
+                      <div className="text-[11px] font-mono tracking-wider text-[#c99a5b]">
+                        {c.code ?? "—"}
+                      </div>
                     </td>
                     <td className="px-3 py-2">
                       <span className={admin ? "text-[#e0bd8b] font-bold" : "text-[#a9bccf]"}>

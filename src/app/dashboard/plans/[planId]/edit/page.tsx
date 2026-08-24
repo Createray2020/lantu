@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import { getPlan } from "@/lib/plans";
+import { getClient } from "@/lib/clients";
 import { licenseState } from "@/lib/license";
 import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
 import PlanEditor from "./PlanEditor";
@@ -16,6 +17,8 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
 
   const plan = await getPlan(coach.id, planId);
   if (!plan) notFound();
+  // 客戶編號：三份可交付文件的表頭要印它，隨 lantu:init 一起送進 iframe。
+  const client = await getClient(coach.id, plan.clientId);
 
   return (
     <PlanEditor
@@ -26,6 +29,7 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
       data={plan.data}
       uiScale={coach.uiScale ?? DEFAULT_UI_SCALE}
       readOnly={licenseState(coach).expired}
+      clientCode={client?.code ?? null}
     />
   );
 }

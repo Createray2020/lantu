@@ -6447,7 +6447,7 @@ function bizReportHTML(c){
  ].map(function(x){return '<tr><td><b>'+x[0]+'</b></td><td style="white-space:nowrap">'+x[1]+'</td><td>'+x[2]+'</td></tr>'}).join('');
  return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 企業主財務規劃</div><h1>企業主財務診斷書</h1></div>'+
   (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
-  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+(co.name?' · '+esc(co.name):'')+'</div></div>'+
+  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+(co.name?' · '+esc(co.name):'')+docCodeHTML()+'</div></div>'+
 
   '<h2>一、核心命題</h2>'+
   '<p style="font-size:14px;line-height:1.9">企業主的財務規劃，本質是<b>「把一個高度集中、不流動、與人身高度綁定的資產，逐步轉換成分散、流動、與人身脫鉤的資產」</b>的過程。'+
@@ -6602,7 +6602,7 @@ function planReportHTML(c){
 
  return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>調整方案書</h1></div>'+
   (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
-  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+'　現年 '+n(p.age)+' 歲　目前階段：'+stageName(hb.grade)+'</div></div>'+
+  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+'　現年 '+n(p.age)+' 歲　目前階段：'+stageName(hb.grade)+docCodeHTML()+'</div></div>'+
 
   '<h2>一、你和你想要的未來，差多少</h2>'+
   '<p style="font-size:14px;line-height:1.9">這份方案書只回答兩件事：<b>缺口是多少</b>，以及<b>用什麼方式補</b>。'+
@@ -6678,6 +6678,12 @@ function planReportHTML(c){
   '嵐途為一般顧問公司，不從事投資顧問或保險招攬業務，本文件不構成任何金融商品的推介或投資建議。'+
   '個人稅務、法律與商品選擇請與您的會計師、律師及各該領域專業人士確認。</p>'+
   '</div>';
+}
+
+/* 三份文件表頭共用：有編號才印，沒有就整段不出現（教練本機開的示範案例沒有編號）。 */
+function docCodeHTML(){
+  var code=window.LANTU_CLIENT_CODE;
+  return code?'<span style="color:#5a6b72;margin-left:10px;font-size:11px;letter-spacing:.1em">客戶編號 '+esc(code)+'</span>':'';
 }
 
 function reportPane(c){
@@ -6802,7 +6808,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  var hp=h.parts;
  return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>財務規劃報告書</h1></div>'+
   (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>')+'</div>'+
-  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務階段 <b style="color:#e0bd8b">'+stageName(h.grade)+'</b><span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>'+
+  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務階段 <b style="color:#e0bd8b">'+stageName(h.grade)+'</b>'+docCodeHTML()+'<span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>'+
 
   '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px"><b style="color:#0d2b45">目錄</b><ol style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
    ['財務健康總覽','收支與資產結構','現況財務指標','財務目標歷程','退休與教育需求','風險保障缺口','現金流投影與機率','稅賦分析','投資風險屬性與建議配置','規劃前／後對照','規劃執行建議','執行行動清單','動態調整（PDCA）','注意事項'].map(function(t){return '<li>'+t+'</li>'}).join('')+'</ol></div>'+
@@ -6939,6 +6945,10 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
     if(m.type!=='lantu:init')return;
     if(m.uiScale)applyScale(m.uiScale);
     applyReadOnly(m.readOnly);
+    /* 客戶編號（YYMM＋三碼流水號）：只用來印在三份可交付文件的表頭，不進 case 資料、不參與任何計算。
+       刻意存成全域而不是塞進 c.*，因為它是 DB 的欄位、不是規劃內容——寫進 case 會被存回 plan.data，
+       之後改名／改號就會有兩份真相。*/
+    window.LANTU_CLIENT_CODE=m.clientCode||null;
     var c=migrateCase(m.data||{});
     app.cases=[c];app.activeId=c.id;app.role=CLIENT?'client':'coach';app.activeTab=CLIENT?'analysis':'data';
     inited=true;render();

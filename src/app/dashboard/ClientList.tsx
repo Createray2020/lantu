@@ -50,7 +50,8 @@ export default function ClientList({
       if (status !== "all" && c.status !== status) return false;
       if (tag !== "all" && !(c.tags ?? []).includes(tag)) return false;
       if (q.trim()) {
-        const hay = (c.name + " " + (c.tags ?? []).join(" ") + " " + (c.source ?? "")).toLowerCase();
+        // 客戶編號一起丟進比對字串：教練對帳／查詢時直接貼編號就能定位。
+        const hay = (c.name + " " + (c.code ?? "") + " " + (c.tags ?? []).join(" ") + " " + (c.source ?? "")).toLowerCase();
         if (!hay.includes(q.trim().toLowerCase())) return false;
       }
       return true;
@@ -111,7 +112,7 @@ export default function ClientList({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="搜尋姓名／標籤／來源"
+          placeholder="搜尋姓名／編號／標籤／來源"
           className={sel + " flex-1 min-w-[180px]"}
         />
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={sel}>
@@ -168,6 +169,9 @@ export default function ClientList({
             >
               <div className="col-span-2 md:col-span-1">
                 <div className="font-bold">{c.name}</div>
+                {c.code && (
+                  <div className="font-mono text-[10px] tracking-wider text-[#6b7d8f]">{c.code}</div>
+                )}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(c.tags ?? []).map((t) => (
                     <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] border border-white/10">{t}</span>

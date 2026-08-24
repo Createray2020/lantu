@@ -5,6 +5,8 @@ import { and, eq, desc, count } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, coaches, coachLinkRequests, coachInvites } from "@/Shared/db/schema";
 import type { ClientUser } from "@/lib/clientUser";
+import { allocCode } from "@/lib/codeAlloc";
+import { normalizeCode } from "@/lib/codes";
 
 export type ActiveCoach = { id: string; name: string | null; title: string | null; orgRank: string };
 
@@ -16,6 +18,25 @@ export async function listActiveCoaches(): Promise<ActiveCoach[]> {
     .where(eq(coaches.status, "active"))
     .orderBy(coaches.createdAt);
   return rows;
+}
+
+/**
+ * 用教練編號找教練（客戶在官網「輸入編號指定」時走這條）。
+ *
+ * 刻意**不要求**對方有公開檔案、也不看職級：
+ * C 階教練不吃系統派案（官網卡片不給點、自動建議也不出現），但他自己開發來的客戶
+ * 拿著編號一定要進得來——編號就是為了這件事才發的。唯一的底線仍是「帳號已開通」。
+ */
+export async function findCoachByCode(raw: string): Promise<{ id: string; name: string | null; title: string | null; code: string } | null> {
+  const code = normalizeCode(raw);
+  if (!code) return null;
+  const rows = await db
+    .select({ id: coaches.id, name: coaches.name, title: coaches.title, code: coaches.code })
+    .from(coaches)
+    .where(and(eq(coaches.code, code), eq(coaches.status, "active")))
+    .limit(1);
+  const r = rows[0];
+  return r?.code ? { id: r.id, name: r.name, title: r.title, code: r.code } : null;
 }
 
 export type LinkStatus =
@@ -163,7 +184,7 @@ export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok
   if (!client) {
     const ins = await db
       .insert(clients)
-      .values({ coachId: null, clientUserId: user.id, name: user.name || "我的規劃", source: "教練邀請", status: "active" })
+      .values({ coachId: null, clientUserId: user.id, name: user.name || "我的規劃", source: "教練邀請", status: "active", code: await allocCode("client") })
       .returning();
     client = ins[0];
     if (!client) return { ok: false, error: "建立客戶資料失敗，請稍後再試" };

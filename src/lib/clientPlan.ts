@@ -11,6 +11,7 @@ import { normalizeIntent, DEFAULT_TARGET, type Intent } from "@/lib/intent";
 import { planSnapshot } from "@/lib/snapshot";
 import { logRevision } from "@/lib/revisions";
 import type { ClientUser } from "@/lib/clientUser";
+import { allocCode } from "@/lib/codeAlloc";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const num = (v: unknown): number => {
@@ -143,7 +144,7 @@ export async function savePassport(
   if (existing[0]) {
     clientId = existing[0].id;
   } else {
-    const ins = await db.insert(clients).values({ coachId: null, clientUserId: user.id, name, source: "自助", status: "active" }).returning({ id: clients.id });
+    const ins = await db.insert(clients).values({ coachId: null, clientUserId: user.id, name, source: "自助", status: "active", code: await allocCode("client") }).returning({ id: clients.id });
     clientId = ins[0].id;
   }
 
@@ -176,13 +177,13 @@ export type ClientBasics = {
   name: string; birth: string; gender: string; phone: string; email: string; marital: string; dependents: number;
 };
 
-export async function getClientSetup(clientUserId: string): Promise<{ basics: ClientBasics | null; cross: CrossInputs | null; intent: Intent | null }> {
+export async function getClientSetup(clientUserId: string): Promise<{ basics: ClientBasics | null; cross: CrossInputs | null; intent: Intent | null; code: string | null }> {
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];
-  if (!client) return { basics: null, cross: null, intent: null };
+  if (!client) return { basics: null, cross: null, intent: null, code: null };
   const own = await ownPlanRow(client.id);
   const data = own?.data as any;
-  return { basics: data?.setup?.basics ?? null, cross: data?.setup?.cross ?? null, intent: data?.intent ?? null };
+  return { basics: data?.setup?.basics ?? null, cross: data?.setup?.cross ?? null, intent: data?.intent ?? null, code: client.code ?? null };
 }
 
 // 存基本資料＋十字表：更新 clients 本體與 plan.data（收支資債彙總進 case，供引擎與教練接手用）。
@@ -229,14 +230,14 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
 // 刻意仍取「最新一份」（跨兩軌）——掛了教練之後，客戶在「我的財務藍圖」看到的就是教練做的年度版，
 // 這是對的：客戶要看的是最新的規劃，不是自己當初的護照骨架。
 // 「客戶能改哪些 section」是另一件事（見 客戶可編頁面清單），與這裡取哪一份無關。
-export async function getClientPlanCase(clientUserId: string): Promise<{ planId: string; data: unknown } | null> {
+export async function getClientPlanCase(clientUserId: string): Promise<{ planId: string; data: unknown; code: string | null } | null> {
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];
   if (!client) return null;
   const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
   const plan = pRows[0];
   if (!plan) return null;
-  return { planId: plan.id, data: plan.data };
+  return { planId: plan.id, data: plan.data, code: client.code ?? null };
 }
 
 /**

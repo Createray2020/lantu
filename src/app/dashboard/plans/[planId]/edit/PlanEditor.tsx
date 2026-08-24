@@ -20,6 +20,7 @@ export default function PlanEditor({
   data,
   uiScale = 100,
   readOnly = false,
+  clientCode = null,
 }: {
   planId: string;
   clientId: string;
@@ -28,6 +29,8 @@ export default function PlanEditor({
   data: unknown;
   uiScale?: number;
   readOnly?: boolean;
+  /** 客戶編號：報告書／方案書／診斷書的表頭要印它。 */
+  clientCode?: string | null;
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -48,7 +51,7 @@ export default function PlanEditor({
 
     function postInit() {
       iframeRef.current?.contentWindow?.postMessage(
-        { type: "lantu:init", data, uiScale: currentScale(), readOnly },
+        { type: "lantu:init", data, uiScale: currentScale(), readOnly, clientCode: clientCode ?? null },
         window.location.origin,
       );
     }
@@ -81,7 +84,7 @@ export default function PlanEditor({
       window.removeEventListener("message", onMessage);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [planId, data, uiScale, readOnly]);
+  }, [planId, data, uiScale, readOnly, clientCode]);
 
   const statusText: Record<SaveState, string> = {
     idle: "",
@@ -123,7 +126,7 @@ export default function PlanEditor({
         className="flex-1 w-full border-0"
         onLoad={() =>
           iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly },
+            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly, clientCode: clientCode ?? null },
             window.location.origin,
           )
         }

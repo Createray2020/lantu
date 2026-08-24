@@ -60,6 +60,13 @@ export const coaches = pgTable('coaches', {
 
   // 介面縮放百分比（老花友善）：100 / 115 / 130。
   uiScale: integer('ui_scale').default(100).notNull(),
+
+  // ── 教練編號（2026/08/24 Ray 拍板）──────────────────────────
+  // 格式：FC + 西元年後兩碼 + 月 + 三碼流水號（FC2609002 ＝ 2026/09 第二位報聘的教練）。
+  // 發號時機＝「核准報聘」那一刻（status 第一次轉 active）；待審申請不佔號。
+  // ⚠️ 一旦發出永不變更，也不因停權／再核准而重發 —— 客戶手上、對帳單上、名片上的號都是它。
+  //    也絕對不要拿 approvedAt 當發號依據：setCoachStatus 停權時會把它清成 null。
+  code: text('code'),
 }, (t) => [
   // 自參照 FK：刪除教練時的 ON DELETE SET NULL 需要它，否則每次刪除都要全表掃。
   index('coaches_upline_id_idx').on(t.uplineId),
@@ -67,6 +74,10 @@ export const coaches = pgTable('coaches', {
   index('coaches_status_idx').on(t.status),
   // 推薦人也是自參照 FK（代管移轉與同業招募業績歸屬都要沿它查）。
   index('coaches_sponsor_id_idx').on(t.sponsorId),
+  // 客戶輸入編號指定教練時的查詢路徑，同時也是「同一個號不可能發兩次」的最後一道保險：
+  // 配號本身已由 code_counters 的單語句 upsert 保證原子性，這條是防手動改資料改出重號。
+  // Postgres 的 UNIQUE 視 NULL 互異 → 待審教練（code 為 null）不受影響。
+  uniqueIndex('coaches_code_uidx').on(t.code),
 ]);
 
 // 客戶登入帳號（雙邊平台：客戶自己上官網註冊、以客戶身分登入）
@@ -100,6 +111,9 @@ export const clients = pgTable('clients', {
   lifeStage: text('life_stage'),   // 單身/新婚/育兒/退休前/退休
   status: text('status').default('active').notNull(), // active/pending/archived
   birthDate: date('birth_date'),
+  // 客戶編號（2026/08/24 Ray 拍板）：西元年後兩碼 + 月 + 三碼流水號，不加身分前綴
+  // （2610005 ＝ 2026/10 第五位客戶）。以「建立月」計，發出後不變。
+  code: text('code'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
@@ -108,6 +122,25 @@ export const clients = pgTable('clients', {
   // 客戶端 /portal 每個頁面/動作都用它反查，且程式全篇假設 1:1（七處 limit(1)）。
   // Postgres 的 UNIQUE 允許多個 NULL，所以教練建立的客戶（clientUserId=null）不受影響。
   uniqueIndex('clients_client_user_id_uidx').on(t.clientUserId),
+  // 客戶編號：教練端用它搜尋、報告書印它。唯一性同 coaches_code_uidx 的理由。
+  uniqueIndex('clients_code_uidx').on(t.code),
+]);
+
+// 編號流水號計數器（教練編號 / 客戶編號共用一張表，用 kind 分流）。
+//
+// ⚠️ 為什麼需要這張表而不是「查 max(code) + 1」：
+//    neon-http 驅動不支援互動式交易（db.transaction() 直接丟錯），兩個人同一秒送出
+//    就會讀到同一個 max、算出同一個號。這裡改成單一語句的
+//    `insert … on conflict do update set last_seq = last_seq + 1 returning`，
+//    由 Postgres 的列鎖保證同月不可能發出兩個一樣的號。
+// kind: coach（教練，前綴 FC）/ client（客戶，無前綴）
+// ym: 西元年後兩碼＋月（YYMM，台北時區）
+export const codeCounters = pgTable('code_counters', {
+  kind: text('kind').notNull(),
+  ym: text('ym').notNull(),
+  lastSeq: integer('last_seq').default(0).notNull(),
+}, (t) => [
+  uniqueIndex('code_counters_pk').on(t.kind, t.ym),
 ]);
 
 // 客戶↔教練 連結申請（雙向確認）：客戶端「選擇教練」送出 → 教練端「接受」才把 clients.coachId 設上。

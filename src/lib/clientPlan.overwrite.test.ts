@@ -35,6 +35,8 @@ vi.mock("@/Shared/db", () => {
   };
 });
 vi.mock("./revisions", () => ({ logRevision: async () => { state.writes.push("revision"); } }));
+// 配號走 DB（code_counters）——這裡的假 schema 沒有那張表，且發號規則另有 codes.test.ts 守著。
+vi.mock("@/lib/codeAlloc", () => ({ allocCode: async (kind: string) => (kind === "coach" ? "FC2608001" : "2608001") }));
 
 const { savePassport } = await import("./clientPlan");
 const { emptyPassport } = await import("./passport");

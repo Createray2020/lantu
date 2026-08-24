@@ -5,6 +5,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { eq, count } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches, clients, compCases } from "@/Shared/db/schema";
+import { allocCode } from "./codeAlloc";
 
 export type Coach = typeof coaches.$inferSelect;
 
@@ -77,8 +78,17 @@ export const ensureCoach = cache(async function ensureCoach(): Promise<Coach | n
     row = r[0] ?? row;
   }
 
-  return syncAdminRole(row, isAdmin);
+  return withCode(await syncAdminRole(row, isAdmin));
 });
+
+// 已開通卻沒有編號的教練補發一個（白名單自動建的 admin、以及回填之前就存在的舊帳號）。
+// 這不違反「ensureCoach 唯讀」——那條規矩是「不准無中生有一列 coaches」，
+// 這裡只在既有列上補一個冪等欄位，而且 code 一有值就完全不打 DB。
+async function withCode(row: Coach): Promise<Coach> {
+  if (row.status !== "active" || row.code) return row;
+  const code = await ensureCoachCode(row.id);
+  return code ? { ...row, code } : row;
+}
 
 // 明確申請成為教練：建立 status=pending 的 coaches 列（待後台核准）。
 // 已經有列就原樣回傳，不覆寫 status —— 停權者不能靠再申請一次把自己救回 pending。
@@ -102,7 +112,7 @@ export async function applyAsCoach(): Promise<Coach | null> {
 
   const row = inserted[0] ?? null;
   if (!row) return null;
-  return syncAdminRole(row, isAdmin);
+  return withCode(await syncAdminRole(row, isAdmin));
 }
 
 // 後台權限有兩條來源，任一成立即可，但都必須 active：
@@ -127,6 +137,23 @@ export async function setCoachStatus(id: string, status: "pending" | "active" | 
     .update(coaches)
     .set({ status, approvedAt: status === "active" ? new Date() : null })
     .where(eq(coaches.id, id));
+  if (status === "active") await ensureCoachCode(id);
+}
+
+/**
+ * 「核准報聘」那一刻發教練編號（FC + YYMM + 三碼流水號）。
+ *
+ * ⚠️ 只在 code 還是 null 時發：停權後再核准、或後台連按兩次「核准」，都必須拿回同一個號。
+ *    先讀再寫在這裡是安全的——重複配號最多浪費一個流水號，而 coaches_code_uidx
+ *    會擋掉真正的重號；相對地「每次核准都重發」會讓已經印在名片上的號失效。
+ */
+export async function ensureCoachCode(id: string): Promise<string | null> {
+  const rows = await db.select({ code: coaches.code }).from(coaches).where(eq(coaches.id, id)).limit(1);
+  if (!rows[0]) return null;
+  if (rows[0].code) return rows[0].code;
+  const code = await allocCode("coach");
+  await db.update(coaches).set({ code }).where(eq(coaches.id, id));
+  return code;
 }
 
 // 設定組織職級與上線（後台維護組織樹）。
