@@ -345,6 +345,16 @@ function existingCover(c,member,kind){
  return fromCov+fromPol;
 }
 
+// 調整動作提供的保額。⚠️ 只算啟用中的，而且要同時對到「成員」與「險種」。
+// 動作沒指定成員時算在主要成員身上（教練最常排的就是本人的家庭責任保障）。
+function actionCover(c,member,kind){
+ var pm=(primaryMember(c)||{}).name;
+ return sum(planActionsOn(c),function(a){
+  if(a.cat!=='insure')return 0;
+  if((a.coverKind||'壽險')!==kind)return 0;
+  return (((a.member||'').trim()||pm)===member)?n(a.cover):0;
+ });
+}
 function coverageGaps(c){
  var rows=[];
  (c.needs||[]).forEach(function(nd){
@@ -363,6 +373,10 @@ function coverageGaps(c){
    var need=map[k],ex=existingCover(c,nd.member,k);
    // 已備來源擴充：本人的壽險一次性需求，可由家庭流動資產支應（與 lantu-app.html:453 一致）。
    if(k==='壽險'&&nd.member===(primaryMember(c)||{}).name)ex+=liquidMovable(c);
+   // 調整動作裡的保障類：保額算進「已備」。
+   // ⚠️ 不接這一條的話，買保險在試算上永遠只是「保費讓缺口變大」，
+   //    教練排了保障動作卻看到情況更糟——那是錯的訊號。
+   ex+=actionCover(c,nd.member,k);
    rows.push({member:nd.member,kind:k,need:need,have:ex,gap:need-ex});
   });
  });
@@ -1375,16 +1389,32 @@ function allocInfo(c){var al=(c.plan&&c.plan.allocations)||[];
  return {list:al,totalPct:totalPct,wRet:wRet};
 }
 
+// 「現況」＝把所有調整動作拿掉的同一份個案。用來畫灰線、算改善度、做前後對照。
+// ⚠️ 深拷貝，不要就地清空——呼叫端拿到的 c 還要繼續用。
+function baseCase(c){
+ var b=JSON.parse(JSON.stringify(c||{}));
+ b.actions=[];
+ return b;
+}
+
 function scenario(c){
  // 2026/08/23 起「規劃後」＝套用 c.plan.levers 的完整槓桿組合（六根），
  // 不再只有延後退休一根。舊欄位 plan.retireDelay 由 planLevers() 相容進來。
+ //
+ // 2026/08/24（v2）：調整動作上線後，「規劃前」不再等於 c —— c 本身已經含 actions。
+ // ⚠️ 有動作時 before 必須用 baseCase(c)（把 actions 清空的同一份個案），
+ //    否則前後對照兩邊都含動作，差額永遠是 0，整張對照表失去意義。
+ // 動作與 v1 的 levers 可以並存：levers 仍然套用在「含動作」的個案上。
+ var hasAct=planActionsOn(c).length>0;
+ var baseC=hasAct?baseCase(c):c;
  var after=applyLevers(c,planLevers(c));
- var before={metrics:metrics(c),retire:retireNeed(c),health:health(c),estate:estateTax(c),incomeTax:incomeTax(c),gap:gapPV(c)};
+ var before={metrics:metrics(baseC),retire:retireNeed(baseC),health:health(baseC),estate:estateTax(baseC),incomeTax:incomeTax(baseC),gap:gapPV(baseC)};
  var mAfter=metrics(after);
  var netAfter=mAfter.net-n((c.plan||{}).movableToOverseas); // 資產移轉降低境內帳面淨值(遺產稅基)
  var after2={metrics:mAfter,retire:retireNeed(after),health:health(after),estate:estateTax(after,netAfter),incomeTax:incomeTax(after),gap:mAfter.proj.shortPV};
  // afterCase＝套用方案後的完整個案（延後退休已推到每位賺薪成員），供測試與明細追溯。
- return {before:before,after:after2,afterCase:after};
+ // baseCase＝規劃前的那一份（有動作時是清空 actions 的版本）。
+ return {before:before,after:after2,afterCase:after,baseCase:baseC,hasActions:hasAct};
 }
 
 function crossTable(c){var m=metrics(c);
@@ -1553,6 +1583,8 @@ export {
   gapLedger,
   visionOn,
   planActionsOn,
+  baseCase,
+  actionCover,
   goalFloor,
   wishFloor,
   visionRoom,

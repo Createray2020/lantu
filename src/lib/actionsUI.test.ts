@@ -221,3 +221,184 @@ describe("動作真的進試算（分離池）", () => {
     expect(p.firstFail).toEqual(firstBad);
   });
 });
+
+describe("資料源收斂：報告書／生涯模擬／前後對照都看得到動作", () => {
+  it("scenario 的『規劃前』會把動作拿掉，前後對照才有差額", () => {
+    fresh();
+    const a = addOf("regular");
+    a.payMonthly = 30000;
+    a.growth = 6;
+    const s = w.scenario(w.app.cases[0]);
+    expect(s.hasActions).toBe(true);
+    // ⚠️ 這條是重點：before 不可以等於含動作的 c，否則差額永遠是 0
+    expect(s.before.gap).toBeGreaterThan(s.after.gap);
+    expect(s.baseCase.actions.length).toBe(0);
+  });
+
+  it("沒有動作時 scenario 的行為與改版前一致", () => {
+    const c = fresh();
+    const s = w.scenario(c);
+    expect(s.hasActions).toBe(false);
+    expect(s.before.gap).toBeCloseTo(w.gapPV(c), 6);
+  });
+
+  it("baseCase 是深拷貝，不會就地清掉呼叫端的 actions", () => {
+    fresh();
+    addOf("regular");
+    const b = w.baseCase(w.app.cases[0]);
+    expect(b.actions.length).toBe(0);
+    expect(w.app.cases[0].actions.length).toBe(1);
+  });
+
+  it("保障動作的保額會計入『已備』，缺口跟著變小", () => {
+    const c = fresh();
+    const who = c.members[0].name;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = (cc: any, kind: string) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      w.coverageGaps(cc).filter((r: any) => r.member === who && r.kind === kind)[0];
+
+    // 挑一個目前確實有缺口的險種來測（sampleCase 的壽險會被流動資產抵掉）
+
+    const kinds: string[] = w.KINDS.filter((k: string) => (row(c, k)?.gap || 0) > 0);
+    expect(kinds.length, "sampleCase 至少要有一個險種有缺口").toBeGreaterThan(0);
+    const kind = kinds[0];
+    const b = row(c, kind);
+
+    const a = addOf("insure");
+    a.cover = Math.round(b.gap / 2);
+    a.coverKind = kind;
+    a.member = who;
+    const af = row(w.app.cases[0], kind);
+
+    expect(af.have).toBeCloseTo(b.have + a.cover, 6);
+    expect(af.gap).toBeCloseTo(b.gap - a.cover, 6);
+  });
+
+  it("停用的保障動作不算保額", () => {
+    const c = fresh();
+    const a = addOf("insure");
+    a.cover = 5000000;
+    a.coverKind = "壽險";
+    a.member = c.members[0].name;
+    const on = w.actionCover(w.app.cases[0], c.members[0].name, "壽險");
+    expect(on).toBe(5000000);
+    w.toggleAction(0);
+    expect(w.actionCover(w.app.cases[0], c.members[0].name, "壽險")).toBe(0);
+  });
+});
+
+describe("當下脈絡：不用跳頁就填得對", () => {
+  it("可用資源條有四格：月結餘／現金水位／保障缺口／負債比", () => {
+    fresh();
+    addOf("regular");
+    w.render();
+    const h = pane();
+    ["月結餘 可再投入", "現金水位 可動用", "保障缺口 未補", "負債比"].forEach((t) => {
+      expect(h).toContain(t);
+    });
+  });
+
+  it("刪減支出那列顯示該項目前金額與刪減後剩多少", () => {
+    fresh();
+    const a = addOf("expense");
+    a.ref = "expenses:0";
+    a.getMonthly = 3000;
+    w.render();
+    const h = pane();
+    expect(h).toContain("此項目前每月");
+    expect(h).toContain("刪減後每月剩");
+  });
+
+  it("刪減額超過該項金額時會擋", () => {
+    fresh();
+    const a = addOf("expense");
+    a.ref = "expenses:0";
+    a.getMonthly = 99999999;
+    w.render();
+    expect(pane()).toContain("刪減額超過該項金額");
+  });
+
+  it("定期定額那列列出客戶原有的儲蓄理財投入（避免重複填）", () => {
+    const c = fresh();
+    c.savings = [{ name: "定期定額 ETF", amount: 120000, period: "年" }];
+    addOf("regular");
+    w.render();
+    const h = pane();
+    expect(h).toContain("客戶原有的儲蓄理財投入");
+    expect(h).toContain("只填<b>增加的部分</b>");
+  });
+
+  it("保障那列顯示該成員該險種還缺多少", () => {
+    const c = fresh();
+    const a = addOf("insure");
+    a.coverKind = "壽險";
+    a.member = c.members[0].name;
+    w.render();
+    expect(pane()).toMatch(/的「壽險」(還缺|已無缺口)/);
+  });
+
+  it("停用的動作不顯示脈絡（畫面不吵）", () => {
+    fresh();
+    addOf("expense");
+    w.toggleAction(0);
+    expect(pane()).not.toContain("此項目前每月");
+  });
+});
+
+describe("連動：十字表與投資配置", () => {
+  it("十字表疊加動作，但四張原始表一個字都沒被改", () => {
+    const c = fresh();
+    const expBefore = JSON.stringify(c.expenses);
+    const a = addOf("expense");
+    a.ref = "expenses:0";
+    a.getMonthly = 5000;
+    const x = w.crossTable(w.app.cases[0]);
+    const after = w.crossTableAfter(w.app.cases[0]);
+    expect(after).toBeTruthy();
+    expect(after.expLive).toBeLessThan(x.expLive);
+    expect(after.monthBal).toBeGreaterThan(x.monthBal);
+    // ⚠️ 這條是重點：原始資料不可以被動到
+    expect(JSON.stringify(w.app.cases[0].expenses)).toBe(expBefore);
+  });
+
+  it("沒有動作時 crossTableAfter 回 null（不顯示第二個數字）", () => {
+    const c = fresh();
+    expect(w.crossTableAfter(c)).toBe(null);
+  });
+
+  it("加薪讓十字表的工作收入變大", () => {
+    const c = fresh();
+    const x = w.crossTable(c);
+    const a = addOf("income");
+    a.getMonthly = 10000;
+    const after = w.crossTableAfter(w.app.cases[0]);
+    expect(after.incWork).toBeCloseTo(x.incWork + 120000, 6);
+  });
+
+  it("定期定額與單筆投入自動併進投資配置", () => {
+    const c = fresh();
+    const ownBefore = w.allocInvestOwn(c).length;
+    const a = addOf("regular");
+    a.payMonthly = 20000;
+    a.growth = 6;
+    a.name = "全球 ETF 月扣";
+    const all = w.allocInvest(w.app.cases[0]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = all.filter((r: any) => r.fromAction)[0];
+    expect(row).toBeTruthy();
+    expect(row.yearly).toBe(240000);
+    expect(row.ret).toBe(6);
+    // 手填那張表不受影響
+    expect(w.allocInvestOwn(w.app.cases[0]).length).toBe(ownBefore);
+  });
+
+  it("停用的動作不進配置", () => {
+    fresh();
+    const a = addOf("regular");
+    a.payMonthly = 20000;
+    w.toggleAction(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(w.allocInvest(w.app.cases[0]).filter((r: any) => r.fromAction).length).toBe(0);
+  });
+});

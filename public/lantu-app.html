@@ -269,6 +269,20 @@ tr.dragover td{box-shadow:inset 0 2px 0 var(--amber2)}
 .v2flow .fn{font-size:13px;font-weight:700}
 .v2flow .fd{font-size:12px;color:var(--mut)}
 
+.xafter{color:var(--amber2);font-weight:700}
+
+/* 動作清單的當下脈絡 */
+.actctxbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:9px;margin-bottom:11px}
+.actctx{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+.actctx.bad{border-left:3px solid var(--gap2)}
+.actctx .l{font-size:11px;color:var(--mut);letter-spacing:.04em;font-weight:700}
+.actctx .v{font-family:var(--serif);font-size:19px;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums}
+.actctx.bad .v{color:var(--gap2)}
+.actctx .s{font-size:11px;color:var(--mut2);font-variant-numeric:tabular-nums;margin-top:1px}
+.actrowctx{font-size:11.5px;line-height:1.75;margin-bottom:3px}
+.actrowctx .ctxok{color:var(--ok)}
+.actrowctx .ctxwarn{color:var(--warn);font-weight:700}
+
 /* 調整動作清單（v2） */
 .actstbl table{min-width:1300px}
 .actstbl th{white-space:nowrap}
@@ -1107,6 +1121,16 @@ function existingCover(c,member,kind){
 }
 
 // 綜合保障缺口: 需求(反推 or 直接) - 已有
+// 調整動作提供的保額。⚠️ 只算啟用中的，而且要同時對到「成員」與「險種」。
+// 動作沒指定成員時算在主要成員身上（教練最常排的就是本人的家庭責任保障）。
+function actionCover(c,member,kind){
+ var pm=(primaryMember(c)||{}).name;
+ return sum(planActionsOn(c),function(a){
+  if(a.cat!=='insure')return 0;
+  if((a.coverKind||'壽險')!==kind)return 0;
+  return (((a.member||'').trim()||pm)===member)?n(a.cover):0;
+ });
+}
 function coverageGaps(c){
  var rows=[];
  (c.needs||[]).forEach(function(nd){
@@ -1125,6 +1149,10 @@ function coverageGaps(c){
    var need=map[k],ex=existingCover(c,nd.member,k);
    // 已備來源擴充：本人的壽險一次性需求，可由家庭流動資產支應
    if(k==='壽險'&&nd.member===(primaryMember(c)||{}).name)ex+=liquidMovable(c);
+   // 調整動作裡的保障類：保額算進「已備」。
+   // ⚠️ 不接這一條的話，買保險在試算上永遠只是「保費讓缺口變大」，
+   //    教練排了保障動作卻看到情況更糟——那是錯的訊號。
+   ex+=actionCover(c,nd.member,k);
    rows.push({member:nd.member,kind:k,need:need,have:ex,gap:need-ex});
   });
  });
@@ -1879,7 +1907,28 @@ function applyPlanCaps(values){
 
 var ALLOC_SRC=['新增投入','既有轉入'];
 
-function allocInvest(c){return ((c.plan||{}).invest)||[]}
+// 投資型配置＝手填的 c.plan.invest ＋ **調整動作裡的定期定額／單筆投入**。
+// 那兩類本來就是投資，理論上就該出現在配置圓餅與加權報酬裡；
+// 「建議資產配置」本身是規劃不是現況，所以這裡合併沒有語意衝突
+//（跟十字表不一樣——十字表是現況，動作只能疊加顯示、不能寫進去）。
+// ⚠️ 動作帶來的列標 `fromAction:true`，畫面上不可編輯，要改請回動作清單。
+function allocInvest(c){
+ var own=((c.plan||{}).invest)||[];
+ var A=n((c||{}).profile&&c.profile.age)||40,R=n((c||{}).profile&&c.profile.retireAge)||65;
+ var fromAct=planActionsOn(c).filter(function(a){return a.cat==='regular'||a.cat==='lump'}).map(function(a){
+  var from=n(a.payFrom)||A,to=n(a.payTo)||R;
+  return {name:((a.name||'').trim()||actCat(a.cat).n),
+   kind:(a.tool||'').trim()||'—',
+   principal:n(a.payLump),
+   yearly:n(a.payMonthly)*12,
+   years:Math.max(1,to-from+(a.cat==='lump'?1:0)),
+   ret:n(a.growth),
+   src:'新增投入',
+   fromAction:true,actionId:a.id};
+ });
+ return own.concat(fromAct);
+}
+function allocInvestOwn(c){return ((c.plan||{}).invest)||[]}
 function allocProtect(c){return ((c.plan||{}).protect)||[]}
 
 /** 這一列的投入年數：留空＝從現在到退休。 */
@@ -2340,13 +2389,21 @@ function allocInfo(c){var al=(c.plan&&c.plan.allocations)||[];
 function scenario(c){
  // 2026/08/23 起「規劃後」＝套用 c.plan.levers 的完整槓桿組合（六根），
  // 不再只有延後退休一根。舊欄位 plan.retireDelay 由 planLevers() 相容進來。
+ //
+ // 2026/08/24（v2）：調整動作上線後，「規劃前」不再等於 c —— c 本身已經含 actions。
+ // ⚠️ 有動作時 before 必須用 baseCase(c)（把 actions 清空的同一份個案），
+ //    否則前後對照兩邊都含動作，差額永遠是 0，整張對照表失去意義。
+ // 動作與 v1 的 levers 可以並存：levers 仍然套用在「含動作」的個案上。
+ var hasAct=planActionsOn(c).length>0;
+ var baseC=hasAct?baseCase(c):c;
  var after=applyLevers(c,planLevers(c));
- var before={metrics:metrics(c),retire:retireNeed(c),health:health(c),estate:estateTax(c),incomeTax:incomeTax(c),gap:gapPV(c)};
+ var before={metrics:metrics(baseC),retire:retireNeed(baseC),health:health(baseC),estate:estateTax(baseC),incomeTax:incomeTax(baseC),gap:gapPV(baseC)};
  var mAfter=metrics(after);
  var netAfter=mAfter.net-n((c.plan||{}).movableToOverseas); // 資產移轉降低境內帳面淨值(遺產稅基)
  var after2={metrics:mAfter,retire:retireNeed(after),health:health(after),estate:estateTax(after,netAfter),incomeTax:incomeTax(after),gap:mAfter.proj.shortPV};
  // afterCase＝套用方案後的完整個案（延後退休已推到每位賺薪成員），供測試與明細追溯。
- return {before:before,after:after2,afterCase:after};
+ // baseCase＝規劃前的那一份（有動作時是清空 actions 的版本）。
+ return {before:before,after:after2,afterCase:after,baseCase:baseC,hasActions:hasAct};
 }
 /* ===== 財務十字表 ===== */
 function crossTable(c){var m=metrics(c);
@@ -2464,7 +2521,7 @@ function addRow(arr){var c=activeCase();if(!c)return;
  actions:function(){return {id:actId(),on:true,cat:'regular',name:'',tool:'',ref:'',
    payFrom:A+1,payTo:n(c.profile.retireAge)||65,payMonthly:0,payLump:0,
    getFrom:'',getTo:'',getMonthly:0,getLump:0,divYear:0,divMode:'reinvest',
-   growth:0,cover:0,coverKind:'壽險',src:'surplus',startY:A+1,note:''}},
+   growth:0,cover:0,coverKind:'壽險',member:'',src:'surplus',startY:A+1,note:''}},
  savings:function(){return {name:'',cat:'儲蓄理財',subCat:'',period:'月',amount:0,start:A,end:65}},
  retireExpenses:function(){return {name:'',cat:'生活',subCat:'',period:'年',amount:0,infl:true,startAge:'',endAge:''}},
  assets:function(){return {name:'',owner:m0.name||'',mainCat:'可投資資產',type:'現金',cls:'流動',region:'台灣',currency:'台幣',fxRate:1,cost:0,value:0,ret:0,income:0,movable:true}},
@@ -4007,7 +4064,16 @@ function allocSecHTML(c){
  var ap=rec.alloc;
  // 保障配置的「對應缺口」下拉，選項就是這個個案實際算出來的即時缺口
  var gapOpts='（未指定）'+(rec.led.now.length?','+rec.led.now.map(function(x){return x.name}).join(','):'');
- var invTbl=tableSec('投資型配置','planInvest',allocInvest(c),[
+ var fromAct=allocInvest(c).filter(function(r){return r.fromAction});
+ var actRows=fromAct.length
+  ? '<div class="sec"><h4>來自調整動作的投資 <span class="hint">定期定額與單筆投入會自動併進配置與加權報酬，要改請回「調整動作清單」</span></h4>'+
+    '<div class="tw"><table><tr><th>項目</th><th>工具</th><th class="num">單筆</th><th class="num">年投入</th><th class="num">年數</th><th class="num">預期報酬%</th></tr>'+
+    fromAct.map(function(r){return '<tr><td>'+esc(r.name)+'</td><td><span class="hint">'+esc(r.kind)+'</span></td>'+
+     '<td class="num">'+(r.principal?fmt(r.principal):'—')+'</td><td class="num">'+(r.yearly?fmt(r.yearly):'—')+'</td>'+
+     '<td class="num">'+r.years+'</td><td class="num">'+(r.ret||0)+'%</td></tr>'}).join('')+
+    '</table></div></div>'
+  : '';
+ var invTbl=actRows+tableSec('投資型配置（手填）','planInvest',allocInvestOwn(c),[
    ['name','標的（可留空）','text'],
    ['src','資金來源','sel:'+ALLOC_SRC.join(',')],
    ['principal','本金','money'],
@@ -4161,7 +4227,8 @@ function actMoney(i,k,v){
 }
 var ACT_DASH='<span class="hint">—</span>';
 
-function actionRowHTML(a,i){
+function actionRowHTML(a,i,c){
+ c=c||activeCase();
  var cat=actCat(a.cat), off=(a.on===false);
  var catSel='<select onchange="setActionCat('+i+',this.value)">'+ACT_CATS.map(function(x){
   return '<option value="'+x.k+'" '+(a.cat===x.k?'selected':'')+'>'+x.n+'</option>'}).join('')+'</select>';
@@ -4186,8 +4253,11 @@ function actionRowHTML(a,i){
     '<option value="payout" '+(a.divMode==='payout'?'selected':'')+'>提領</option></select>'
   : ACT_DASH;
  var coverCell = actHas(a,'cover')
-  ? actMoney(i,'cover',a.cover)+'<select style="margin-top:4px" onchange="setAction('+i+',\'coverKind\',this.value)">'+
-    KINDS.map(function(k){return '<option '+(a.coverKind===k?'selected':'')+'>'+k+'</option>'}).join('')+'</select>'
+  ? actMoney(i,'cover',a.cover)+
+    '<select style="margin-top:4px" onchange="setAction('+i+',\'coverKind\',this.value)">'+
+    KINDS.map(function(k){return '<option '+(a.coverKind===k?'selected':'')+'>'+k+'</option>'}).join('')+'</select>'+
+    '<select style="margin-top:4px" onchange="setAction('+i+',\'member\',this.value)">'+
+    (c.members||[]).map(function(mm){return '<option '+((a.member||'')===mm.name?'selected':'')+'>'+esc(mm.name)+'</option>'}).join('')+'</select>'
   : ACT_DASH;
 
  var r1='<tr class="actrow'+(off?' off':'')+'">'+
@@ -4209,19 +4279,110 @@ function actionRowHTML(a,i){
  var warn='';
  if(cat.ref&&!a.ref) warn='<span style="color:var(--warn)">⚠ 尚未指到明細的某一列——具體刪減／變現哪一項是要跟客戶討論的，不能自由填。</span> ';
  if(a.cat==='liquidate') warn+='<span class="hint">變現金額請填<b>淨額</b>：租金收入消失、貸款提前清償、交易稅費都要先扣掉。</span> ';
- var r2='<tr class="actnote'+(off?' off':'')+'"><td></td><td colspan="12">'+warn+
+ var ctx=off?'':actRowCtx(c,a,i);
+ var r2='<tr class="actnote'+(off?' off':'')+'"><td></td><td colspan="12">'+ctx+warn+
   '<input value="'+esc(a.note||'')+'" placeholder="備註（例如：扣款來源＝月結餘、先生轉職年薪由 120 萬提升至 138 萬）" '+
   'oninput="setLive(\'actions:'+i+'\',\'note\',this.value)" onchange="set(\'actions:'+i+'\',\'note\',this.value)" '+
   'style="width:100%;background:transparent;border:0;border-bottom:1px dashed var(--line);border-radius:0;padding:3px 2px;font-size:12px;color:var(--mut)"></td></tr>';
  return r1+r2;
 }
 
+/* ============================================================
+   動作清單的「當下脈絡」
+   ------------------------------------------------------------
+   Ray：「我要新增定期定額，可是不知道它現在的十字表，是不是就得點進去？
+   像這些基本資料應該都要在當下就能看得到。」
+
+   兩層：
+     ① 表格上方一條固定的「可用資源條」——月結餘／現金水位／保障缺口／負債比
+     ② 每一列依類別顯示只有那一類才需要的數字（刪減支出看該項刪完剩多少、
+        定期定額看月結餘還夠不夠、單筆看現金水位、保障看該險種缺口）
+   目的只有一個：**教練不用跳頁就填得對**。
+   ============================================================ */
+function actionCtx(c){
+ var m=metrics(c),L=actionLedger(c);
+ var cov=coverageGaps(c),covGap=0;
+ cov.forEach(function(r){if(r.gap>0)covGap+=r.gap});
+ var debtRatio=m.assetTotal?m.debtTotal/m.assetTotal:0;
+ return {m:m,led:L,covGap:covGap,debtRatio:debtRatio,
+  emReq:m.monthExp*(n(c.params.emergencyMonths)||6)};
+}
+function actionCtxBar(c){
+ var X=actionCtx(c),L=X.led;
+ function cell(lab,val,sub,bad){
+  return '<div class="actctx'+(bad?' bad':'')+'"><div class="l">'+lab+'</div>'+
+   '<div class="v">'+val+'</div><div class="s">'+sub+'</div></div>'}
+ return '<div class="actctxbar">'+
+  cell('月結餘 可再投入',fmt(L.left),'現況 '+fmt(L.base)+'，已排 '+fmt(L.newInv+L.prem),L.monthBad)+
+  cell('現金水位 可動用',fmt(L.cashLeft),'預備金門檻 '+fmt(X.emReq),L.cashBad)+
+  cell('保障缺口 未補',cfAxis(X.covGap),X.covGap>0?'保障類動作的保額會扣這裡':'已無缺口',X.covGap>0)+
+  cell('負債比',(X.debtRatio*100).toFixed(0)+'%','負債 '+cfAxis(X.m.debtTotal)+' / 資產 '+cfAxis(X.m.assetTotal),X.debtRatio>0.6)+
+  '</div>';
+}
+
+// 每一列的行內脈絡：只講這一類才需要知道的數字。
+function actRowCtx(c,a,i){
+ var X=actionCtx(c),L=X.led,out=[];
+ function ok(t){out.push('<span class="ctxok">'+t+'</span>')}
+ function warn(t){out.push('<span class="ctxwarn">⚠ '+t+'</span>')}
+ function mut(t){out.push('<span class="hint">'+t+'</span>')}
+
+ if(a.cat==='expense'){
+  var e=refRow(c,a.ref);
+  if(e){var now=n(e.amount)/12,cut=n(a.getMonthly),left=now-cut;
+   mut('此項目前每月 '+fmt(now));
+   if(cut>0){ if(left<0)warn('刪減額超過該項金額，最多只能省 '+fmt(now));
+              else ok('刪減後每月剩 '+fmt(left)); } }
+ }
+ else if(a.cat==='income'){
+  var w=sum(c.incomes,function(x){return x.type==='工作'?n(x.amount):0})/12;
+  mut('目前工作收入每月 '+fmt(w));
+  if(n(a.getMonthly)>0)ok('提升後 '+fmt(w+n(a.getMonthly))+'（+'+(w?Math.round(n(a.getMonthly)/w*100):0)+'%）');
+ }
+ else if(a.cat==='regular'||a.cat==='insure'){
+  mut('現況月結餘 '+fmt(L.base)+'，這組動作排完剩 '+fmt(L.left));
+  if(L.monthBad)warn('每月已超支 '+fmt(-L.left)+'，這一筆扣不出來');
+  if(a.cat==='regular'){
+   var sv=(c.savings||[]).filter(function(x){return n(x.amount)>0});
+   if(sv.length)mut('客戶原有的儲蓄理財投入：'+sv.slice(0,3).map(function(x){
+     return esc((x.name||x.subCat||'未命名'))+' '+fmt(n(x.amount)/12)+'/月'}).join('、')+
+     (sv.length>3?' 等 '+sv.length+' 筆':'')+'　←　這裡只填<b>增加的部分</b>');
+  }
+  if(a.cat==='insure'){
+   var kd=a.coverKind||'壽險',pm=(primaryMember(c)||{}).name,who=(a.member||'').trim()||pm;
+   var g=0;coverageGaps(c).forEach(function(r){if(r.member===who&&r.kind===kd)g=r.gap});
+   if(g>0)warn(who+' 的「'+kd+'」還缺 '+cfAxis(g)+'（此動作的保額已計入）');
+   else ok(who+' 的「'+kd+'」已無缺口');
+  }
+ }
+ else if(a.cat==='lump'){
+  mut('可動用現金 '+fmt(L.cash)+'，這組動作排完剩 '+fmt(L.cashLeft));
+  if(L.cashBad)warn('低於緊急預備金門檻 '+fmt(X.emReq));
+ }
+ else if(a.cat==='liquidate'){
+  var as=refRow(c,a.ref);
+  if(as){mut('此資產帳面 '+fmt(aVal(as)));
+   var rent=sum(c.incomes,function(x){return (x.type==='理財'&&/租/.test(x.name||''))?n(x.amount):0});
+   if(rent>0)warn('注意：目前有租金收入 '+fmt(rent)+'/年，賣掉之後會消失');}
+ }
+ else if(a.cat==='loan'){
+  mut('目前負債 '+cfAxis(X.m.debtTotal)+'，負債比 '+(X.debtRatio*100).toFixed(0)+'%');
+  if(X.debtRatio>0.6)warn('負債比已偏高');
+ }
+ return out.length?'<div class="actrowctx">'+out.join('　')+'</div>':'';
+}
+// 'expenses:3' / 'assets:1' → 對應的那一列
+function refRow(c,ref){
+ if(!ref)return null;
+ var t=String(ref).split(':'),arr=c[t[0]];
+ return (Array.isArray(arr)?arr[+t[1]]:null)||null;
+}
 function actionsHTML(c){
  c.actions=c.actions||[];
  var head='<tr><th style="width:34px">啟用</th><th>類別</th><th>項目名稱</th><th>工具／指向明細</th>'+
   '<th>年期(歲)</th><th>每月投入／單筆</th><th>給付／增額</th><th>年配息</th><th>增值%</th>'+
   '<th>保額</th><th>資金來源</th><th>執行時點</th><th></th></tr>';
- var rows=c.actions.map(actionRowHTML).join('');
+ var rows=c.actions.map(function(a,i){return actionRowHTML(a,i,c)}).join('');
  if(!rows) rows='<tr><td colspan="13" class="muted" style="padding:14px">尚無動作。從右下角選一個類別，點「＋ 新增動作」。</td></tr>';
 
  var onCnt=c.actions.filter(function(a){return a.on!==false}).length;
@@ -4232,6 +4393,7 @@ function actionsHTML(c){
    '<span class="hint">'+onCnt+' / '+c.actions.length+' 項啟用中</span>'+
    '<span style="flex:1"></span>'+pick+
    '<button class="tbtn amber" onclick="addActionOfPicked()">＋ 新增動作</button></div>'+
+  actionCtxBar(c)+
   '<div class="tw actstbl"><table>'+head+rows+'</table></div>'+
   '<div class="hint" style="margin-top:10px;line-height:1.85">'+
    '⚠️ 動作記的是「<b>相對現況的差額</b>」不是絕對值。客戶原本就有的定期定額寫在收支表的「儲蓄理財投入」，這裡只記<b>增加的部分</b>——重複填會讓缺口憑空消失。<br>'+
@@ -4524,15 +4686,62 @@ function pieSVG(list){list=(list||[]).filter(function(x){return n(x.pct)>0});if(
  var leg=list.map(function(x,i){return '<div style="display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:4px"><span style="width:11px;height:11px;border-radius:3px;background:'+cols[i%cols.length]+'"></span>'+esc(x.name)+' <b style="color:var(--tx)">'+n(x.pct)+'%</b> <span class="muted">'+esc(x.benefit)+'</span></div>'}).join('');
  return '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center"><svg width="180" height="180" viewBox="0 0 180 180">'+segs+'<circle cx="90" cy="90" r="42" fill="var(--card)"/></svg><div style="flex:1;min-width:200px">'+leg+'</div></div>';
 }
-function crossTableHTML(x){
- function cell(t,rows,tot){return '<div style="background:#0a1a20;border:1px solid var(--line);border-radius:10px;padding:12px"><div style="color:var(--amber2);font-weight:700;margin-bottom:6px">'+t+'</div>'+rows+'<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:5px;font-weight:800">合計 '+fmt(tot)+'</div></div>'}
- function r(l,v){return '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut)"><span>'+l+'</span><span style="color:var(--tx)">'+fmt(v)+'</span></div>'}
- return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
-  cell('收入',r('工作',x.incWork)+r('理財',x.incFin)+r('其他',x.incOther),x.incTotal)+
-  cell('支出',r('生活',x.expLive)+r('稅賦',x.expTax)+r('保險',x.expIns)+r('其他+負債',x.expOther),x.expTotal)+
-  cell('資產',r('自用',x.aSelf)+r('可投資',x.aInv),x.aTotal)+
-  cell('負債',r('消費型',x.dCons)+r('投資型',x.dInv),x.dTotal)+
-  '</div><div style="text-align:center;margin-top:10px;color:var(--mut)">保險居中 ｜ 單月結餘 <b style="color:'+(x.monthBal>=0?'var(--ok)':'var(--warn)')+'">'+fmt(x.monthBal)+'</b> ｜ 淨資產 <b style="color:var(--amber2)">'+fmt(x.net)+'</b></div>';
+/* ============================================================
+   十字表的「套用動作後」
+   ------------------------------------------------------------
+   Ray：「新增一個動作，現在的十字表就直接改變。」
+
+   ⚠️⚠️ 做法是**顯示層疊加**，絕對不是把動作寫進 c.expenses／c.assets。
+      那四張表是客戶「現在」的事實；一旦被動作覆寫，baseCase() 就回不去，
+      v2 的「改善了多少」永遠算不出來（灰線＝金線，改善度恆為 0）。
+   分析頁的十字表不是輸入介面，所以直接並列「現況 → 調整後」；
+   真正的輸入介面（收支資債分頁）維持純現況，教練填資料時不會搞混。
+   ============================================================ */
+function crossTableAfter(c){
+ var x=crossTable(c),acts=planActionsOn(c);
+ if(!acts.length)return null;
+ var addWork=0,cutLive=0,addSave=0,addIns=0,addLoanPay=0,lumpBorrow=0,liquidated=0;
+ acts.forEach(function(a){
+  if(a.cat==='income')addWork+=n(a.getMonthly)*12;
+  else if(a.cat==='expense')cutLive+=n(a.getMonthly)*12;
+  else if(a.cat==='regular')addSave+=n(a.payMonthly)*12;
+  else if(a.cat==='insure')addIns+=n(a.payMonthly)*12;
+  else if(a.cat==='loan'){addLoanPay+=n(a.payMonthly)*12;lumpBorrow+=n(a.getLump);}
+  else if(a.cat==='liquidate')liquidated+=n(a.getLump);
+  // lump（單筆投入）＝流動資產內部搬家，十字表的四個總數不變，故不處理
+ });
+ var y={};for(var k in x){if(x.hasOwnProperty(k))y[k]=x[k];}
+ y.incWork=x.incWork+addWork;
+ y.incTotal=x.incTotal+addWork;
+ y.expLive=Math.max(0,x.expLive-cutLive);
+ y.expIns=x.expIns+addIns;
+ y.expLoan=x.expLoan+addLoanPay;
+ y.expTotal=Math.max(0,x.expTotal-cutLive+addIns+addLoanPay);
+ y.saveInvest=x.saveInvest+addSave;
+ // 變現＝固定資產換成可投資（總額以淨變現金額計）；貸款＝可投資與負債同增
+ y.aSelf=Math.max(0,x.aSelf-liquidated);
+ y.aInv=x.aInv+liquidated+lumpBorrow;
+ y.aTotal=x.aTotal+lumpBorrow;
+ y.dInv=x.dInv+lumpBorrow;
+ y.dTotal=x.dTotal+lumpBorrow;
+ y.net=y.aTotal-y.dTotal;
+ y.monthBal=(y.incTotal-y.expTotal)/12;
+ return y;
+}
+function crossTableHTML(x,after){
+ // after＝crossTableAfter() 的結果；有動作時每一格並列「現況 → 調整後」。
+ function d(a,b){return (after&&Math.abs(a-b)>0.5)?' <span class="xafter">→ '+fmt(b)+'</span>':''}
+ function cell(t,rows,tot,tot2){return '<div style="background:#0a1a20;border:1px solid var(--line);border-radius:10px;padding:12px"><div style="color:var(--amber2);font-weight:700;margin-bottom:6px">'+t+'</div>'+rows+'<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:5px;font-weight:800">合計 '+fmt(tot)+d(tot,tot2)+'</div></div>'}
+ function r(l,v,v2){return '<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);gap:8px"><span>'+l+'</span><span style="color:var(--tx);white-space:nowrap">'+fmt(v)+d(v,v2)+'</span></div>'}
+ var a=after||x;
+ return (after?'<div class="hint" style="margin-bottom:9px">灰色是現況，<span class="xafter">→ 金色</span>是套用調整動作之後。'+
+   '⚠️ 動作<b>沒有</b>寫進收支資債四表——那是客戶現在的事實，這裡只是疊加顯示。</div>':'')+
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
+  cell('收入',r('工作',x.incWork,a.incWork)+r('理財',x.incFin,a.incFin)+r('其他',x.incOther,a.incOther),x.incTotal,a.incTotal)+
+  cell('支出',r('生活',x.expLive,a.expLive)+r('稅賦',x.expTax,a.expTax)+r('保險',x.expIns,a.expIns)+r('其他+負債',x.expOther,a.expOther),x.expTotal,a.expTotal)+
+  cell('資產',r('自用',x.aSelf,a.aSelf)+r('可投資',x.aInv,a.aInv),x.aTotal,a.aTotal)+
+  cell('負債',r('消費型',x.dCons,a.dCons)+r('投資型',x.dInv,a.dInv),x.dTotal,a.dTotal)+
+  '</div><div style="text-align:center;margin-top:10px;color:var(--mut)">保險居中 ｜ 單月結餘 <b style="color:'+(x.monthBal>=0?'var(--ok)':'var(--warn)')+'">'+fmt(x.monthBal)+'</b>'+d(x.monthBal,a.monthBal)+' ｜ 淨資產 <b style="color:var(--amber2)">'+fmt(x.net)+'</b>'+d(x.net,a.net)+'</div>';
 }
 function timelineHTML(c,theme){var A=n(c.profile.age);var evs=[];
  (c.goals||[]).forEach(function(g){if(!visionOn(g))return;evs.push({age:n(g.start),label:g.name})});
@@ -6474,7 +6683,12 @@ function trackingSec(c){
 }
 function trackingChartSVG(c){var proj=projection(c),rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
  // 採用了正式方案就多疊一條「方案後」的線——教練要看的是實際落在「沒調整」還是「調整後」哪一條上。
- var lvT=planLevers(c),afterRows=Object.keys(lvT).length?projection(applyLevers(c,lvT)).rows:null;
+ // ⚠️ 2026/08/24：c 本身已經含調整動作，所以「沒調整」那條要畫 baseCase(c)，
+ //    「調整後」才是 c＋levers。有動作或有 levers 任一個，就值得畫兩條。
+ var lvT=planLevers(c),hasAct=planActionsOn(c).length>0;
+ var twoLines=hasAct||Object.keys(lvT).length>0;
+ if(hasAct){proj=projection(baseCase(c));rows=proj.rows;}
+ var afterRows=twoLines?projection(applyLevers(c,lvT)).rows:null;
  var W=760,H=220,pad=40;var tk=(c.tracking||[]).filter(function(t){return n(t.net)!==0||n(t.age)!==0});
  var all=rows.map(function(r){return r.net}).concat(afterRows?afterRows.map(function(r){return r.net}):[]).concat(tk.map(function(t){return n(t.net)})).concat([0]);
  var mx=Math.max.apply(null,all),mn=Math.min.apply(null,all),span=(mx-mn)||1;
@@ -6667,7 +6881,7 @@ function analysisModules(c){
     return '<table class="rtable"><tr><th>項目</th><th>需求終值</th><th>可貸款</th><th>缺口</th></tr>'+pt+'</table>';
    }},
 
-  {k:'cross',t:'財務十字表',html:function(){return crossTableHTML(ct())}},
+  {k:'cross',t:'財務十字表',html:function(){return crossTableHTML(ct(),crossTableAfter(c))}},
 
   {k:'timeline',t:'財務目標歷程',html:function(){return timelineSVG(c)}},
 
