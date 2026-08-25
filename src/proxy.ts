@@ -1,5 +1,4 @@
 // Next.js 16：Middleware 更名為 Proxy。Clerk 授權入口。
-import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 // 公開路由：首頁與登入/註冊；其餘一律需登入。
@@ -49,18 +48,24 @@ export default clerkMiddleware(async (auth, req) => {
 
   // 未登入的頁面請求 → 導去 /login 並帶回原本要去的位置。
   //
-  // 為什麼不用 auth.protect()：它對未登入者是「改寫成 404」，使用者看到的是一片
-  // 找不到頁面，完全看不出「你只是登出了」。2026/08/22 一次部署把 session 洗掉，
+  // 為什麼要改掉預設行為：`auth.protect()` 對未登入者是「改寫成 404」，使用者看到的
+  // 是一片找不到頁面，完全看不出「你只是登出了」。2026/08/22 一次部署把 session 洗掉，
   // 整個後台就變成 404 —— 系統其實好好的，但從畫面上完全判斷不出來。
-  // （這站的 Clerk 還在用開發金鑰 pk_test，session 靠 dev-browser handshake 維持，
-  //   重新部署或瀏覽器擋第三方 cookie 都可能把它弄掉，所以這條路徑不是罕見情況。）
-  const { userId } = await auth();
-  if (!userId) {
-    const url = new URL('/login', req.url);
+  //
+  // ⚠️⚠️ 但這件事**一定要交給 auth.protect 的 unauthenticatedUrl，不可以自己
+  //      `auth()` 拿不到 userId 就 NextResponse.redirect**（2026/08/25 這樣寫過，
+  //      新註冊的教練當場卡進無限迴圈）：
+  //      這站的 Clerk 是開發金鑰 pk_test，session 要先跑一趟 **dev-browser handshake**
+  //      才建立得起來。handshake 還沒跑的請求，middleware 看到的是
+  //      `x-clerk-auth-reason: dev-browser-missing` ＋ `x-clerk-auth-status: signed-out`；
+  //      自己把人導走的話 handshake 永遠不會發生，而瀏覽器端的 Clerk 認為已經登入、
+  //      又把人送回受保護頁 → 導去 /login → 再送回來 → 無限迴圈。
+  //      `auth.protect()` 內部會先完成 handshake，只有真的未登入才吃 unauthenticatedUrl。
+  const back = req.nextUrl.pathname + req.nextUrl.search;
+  await auth.protect({
     // /login 只接受站內路徑（它自己也會再驗一次 startsWith('/')）。
-    url.searchParams.set('redirect_url', req.nextUrl.pathname + req.nextUrl.search);
-    return NextResponse.redirect(url);
-  }
+    unauthenticatedUrl: new URL(`/login?redirect_url=${encodeURIComponent(back)}`, req.url).toString(),
+  });
 });
 
 export const config = {
