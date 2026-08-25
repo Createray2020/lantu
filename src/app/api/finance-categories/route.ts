@@ -6,13 +6,19 @@ import { getCategoryPayload } from "@/lib/financeCategories";
 import { getEduCosts } from "@/lib/eduCosts";
 import { getBizTaxPayload } from "@/lib/bizTaxParams";
 import { getInsProductPayload } from "@/lib/insProducts";
+import { getAnDefaultPayload } from "@/lib/anDefaults";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [cats, edu, biz, ins] = await Promise.all([getCategoryPayload(), getEduCosts(), getBizTaxPayload(), getInsProductPayload()]);
+  // an＝分析頁模組的全平台預設順序（後台 /admin/analysis 維護）。
+  // 搭這班車而不是另開一支 API：iframe 本來就在載入時抓這一包、抓到再 render()，
+  // 多開一支等於多一次往返，還要多維護一條公開路由。
+  const [cats, edu, biz, ins, an] = await Promise.all([
+    getCategoryPayload(), getEduCosts(), getBizTaxPayload(), getInsProductPayload(), getAnDefaultPayload(),
+  ]);
   return Response.json(
-    { cats, edu, biz, ins },
+    { cats, edu, biz, ins, an },
     { headers: { "cache-control": "public, max-age=300, stale-while-revalidate=3600" } },
   );
 }

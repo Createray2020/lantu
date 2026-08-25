@@ -7616,18 +7616,40 @@ function threeTablesHTML(ct){
 // 版本比較的 diff 會被排版偏好洗版，客戶端也會莫名其妙跟著教練的排序跑。
 // ══════════════════════════════════════════════════════════════════════════
 
-function anPrefKey(c){return 'lantu.an.'+((c&&c.id)||'default');}
+// ⚠️ key 在 2026/08/25 換版（lantu.an. → lantu.an2.）。
+// 理由：後台預設上線之前，每位教練每位客戶都已經存過一份「完整」偏好（舊的 anPatch
+// 會把三個維度一起寫回去），而「存過就不覆蓋」是刻意的語意 —— 不換版的話，
+// 後台設什麼都不會生效。換版＝上線那一天所有人一次性回到後台預設，之後才開始各自記憶。
+function anPrefKey(c){return 'lantu.an2.'+((c&&c.id)||'default');}
 
+// 後台（/admin/analysis）定的全平台預設，經 /api/finance-categories 的 an 送進來。
+// 拿不到（還沒回來、離線、API 壞了）就回落空陣列，等於照模組表本身的順序——畫面不會壞。
+function anDefault(){
+ var d=window.LANTU_AN_DEFAULT;
+ if(!d||typeof d!=='object')return {order:[],hidden:[]};
+ return {order:Array.isArray(d.order)?d.order:[],hidden:Array.isArray(d.hidden)?d.hidden:[]};
+}
+
+// 這台電腦、這位客戶存過的偏好原文；沒存過回 null。
+// 「沒存過」跟「存了空的」是兩件事：前者要吃後台預設，
+// 後者是教練自己把預設隱藏的那幾個都叫回來了，不能被預設蓋回去。
+function anStored(c){
+ try{var raw=localStorage.getItem(anPrefKey(c));var p=raw?JSON.parse(raw):null;return (p&&typeof p==='object')?p:null;}catch(e){return null;}
+}
+
+// 三層：後台預設 → 教練在這位客戶調過的 → 當下畫面。逐維度各自判斷有沒有被調過。
 function anPref(c){
- try{
-  var raw=localStorage.getItem(anPrefKey(c));
-  var p=raw?JSON.parse(raw):null;
-  if(!p||typeof p!=='object')p={};
-  return {order:Array.isArray(p.order)?p.order:[],hidden:Array.isArray(p.hidden)?p.hidden:[],open:Array.isArray(p.open)?p.open:[]};
- }catch(e){return {order:[],hidden:[],open:[]};}
+ var raw=anStored(c)||{},d=anDefault();
+ return {
+  order:(Array.isArray(raw.order)&&raw.order.length)?raw.order:d.order,
+  hidden:Array.isArray(raw.hidden)?raw.hidden:d.hidden,
+  open:Array.isArray(raw.open)?raw.open:[]
+ };
 }
 function anSave(c,p){try{localStorage.setItem(anPrefKey(c),JSON.stringify(p));}catch(e){}}
-function anPatch(k,v){var c=activeCase();var p=anPref(c);p[k]=v;anSave(c,p);}
+// ⚠️ 只寫被動到的那一維（原本是把整份正規化過的偏好寫回去）：
+// 否則「只點過展開」會順手把 hidden 寫成 []，看起來就像教練明確取消了後台的預設隱藏。
+function anPatch(k,v){var c=activeCase();var raw=anStored(c)||{};raw[k]=v;anSave(c,raw);}
 
 // 每個模組的 html() 只在展開時才被呼叫，所以這些昂貴計算全部做成 memo。
 // 不 memo 的話，展開三張都要看 proj 的卡就會把投影算三遍。
@@ -7788,11 +7810,11 @@ function anBarHTML(mods,hidden){
    '<i onclick="anToggleHide(\''+x.k+'\')" title="'+(hidden[x.k]?'顯示':'隱藏')+'">'+(hidden[x.k]?'＋':'−')+'</i></span>';
  }).join('');
  return '<div class="sec anbar"><div class="anbarhead">'+
-  '<b>分析模組</b><span class="hint">拖曳排序 · 標題可跳轉 · −／＋ 隱藏或顯示。順序與展開狀態只記在這台電腦，逐客戶各自記憶。</span>'+
+  '<b>分析模組</b><span class="hint">拖曳排序 · 標題可跳轉 · −／＋ 隱藏或顯示。起手順序來自後台預設；你自己調過的只記在這台電腦、逐客戶各自記憶。</span>'+
   '<span style="flex:1"></span>'+
   '<button class="tbtn" onclick="anExpandAll(true)">全部展開</button>'+
   '<button class="tbtn" onclick="anExpandAll(false)">全部收合</button>'+
-  '<button class="tbtn" onclick="anResetPref()">恢復預設</button>'+
+  '<button class="tbtn" onclick="anResetPref()" title="清掉這位客戶的個人排序，回到後台設定的預設順序與顯示狀態">恢復預設</button>'+
   '</div><div class="anchips" id="anChips">'+chips+'</div></div>';
 }
 
@@ -7834,9 +7856,11 @@ function anToggleHide(k){
  var h=(p.hidden||[]).slice();
  var i=h.indexOf(k);
  if(i>=0)h.splice(i,1);else h.push(k);
- p.hidden=h;anSave(c,p);render();
+ anPatch('hidden',h);render();
 }
 
+// 恢復預設＝把這位客戶的個人偏好整個拿掉，回到後台定的預設（不是程式寫死的那一份）。
+// 後台之後又改了預設，也是靠這個鈕才吃得到新的——後台不會回頭覆蓋教練已經調過的客戶。
 function anResetPref(){
  var c=activeCase();
  try{localStorage.removeItem(anPrefKey(c));}catch(e){}
@@ -9376,6 +9400,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
 (function(){
   window.LANTU_CATS=window.LANTU_CATS||null;
   window.LANTU_EDU_COSTS=window.LANTU_EDU_COSTS||null;
+  window.LANTU_AN_DEFAULT=window.LANTU_AN_DEFAULT||null;
   try{
     fetch('/api/finance-categories',{cache:'no-store'})
       .then(function(r){return r&&r.ok?r.json():null;})
@@ -9385,6 +9410,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
         if(d.edu&&d.edu.length)window.LANTU_EDU_COSTS=d.edu;
         if(d.biz){window.LANTU_BIZTAX=d.biz;try{applyBizTax(d.biz)}catch(e){}}
         if(d.ins){window.LANTU_INSPRODUCTS=d.ins;}
+        if(d.an){window.LANTU_AN_DEFAULT=d.an;}
         try{ if(typeof render==='function')render(); }catch(e){}
       })
       .catch(function(){});

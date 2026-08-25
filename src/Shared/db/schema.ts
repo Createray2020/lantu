@@ -920,3 +920,20 @@ export const consultSessions = pgTable('consult_sessions', {
   // 註記會同時歸屬兩場，摘要範圍就永遠對不起來。
   uniqueIndex('consult_sessions_one_open_per_client').on(t.clientId).where(sql`ended_at is null`),
 ]);
+
+// 客戶分析頁模組的「全平台預設順序」（2026/08/25）。
+//
+// 教練自己在分析頁拖出來的順序存 localStorage（逐客戶、逐台電腦），那是他個人的視角；
+// 這張表是另一層：後台定一份，所有教練打開任何客戶時的**起手順序**就是它。
+// 兩層的關係刻意是「後台管起手、教練管當下」——後台改了不會回頭覆蓋教練已經調過的客戶，
+// 教練按「恢復預設」才會重新吃這一份。
+//
+// key 對應 src/lib/analysisModules.ts 的 AN_MODULES（也就是 lantu-app.html 的模組鍵）。
+// ⚠️ 合併語意與 biz_tax_params 同一套：DB 有的覆蓋、沒有的接在後面，
+//    所以之後新增模組不會從畫面上消失，後台誤刪一列也只是那個模組回到隊尾。
+export const anModuleDefaults = pgTable('an_module_defaults', {
+  key: text('key').primaryKey(),
+  sortOrder: integer('sort_order').notNull(),
+  hidden: boolean('hidden').default(false).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

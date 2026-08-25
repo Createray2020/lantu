@@ -183,6 +183,13 @@
       "when": 1787694233531,
       "tag": "0025_romantic_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787696293218,
+      "tag": "0026_lyrical_spiral",
+      "breakpoints": true
     }
   ]
 }

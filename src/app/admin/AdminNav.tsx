@@ -33,6 +33,7 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
     title: "系統設定",
     items: [
       { href: "/admin/categories", label: "類別與參數" },
+      { href: "/admin/analysis", label: "分析模組" },
       { href: "/admin/brand", label: "品牌設定" },
     ],
   },
