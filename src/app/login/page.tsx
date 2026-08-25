@@ -76,6 +76,8 @@ export default async function LoginPage({
             <p className="text-[13px] text-[#6f869c]">
               想加入嵐途教練團隊？
               <Link href="/join" className="text-[#a7bacb] hover:text-white underline underline-offset-4">看看這裡</Link>
+              <span className="mx-1.5">·</span>
+              <Link href="/apply" className="text-[#a7bacb] hover:text-white underline underline-offset-4">直接申請</Link>
             </p>
           </div>
         </div>

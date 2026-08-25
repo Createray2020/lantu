@@ -20,6 +20,9 @@ const isPublicRoute = createRouteMatcher([
   // 按「開始規劃」才導去註冊。這是企業主客群的入場門，地位等同人生護照。
   '/bizcheck',
   '/join', // 招募頁：對外公開，訪客要看得到
+  // 教練申請的對外短網址：只做「已登入→申請頁／未登入→教練註冊」的分岔。
+  // 不公開的話，未登入者會先被導去 /login，而那裡的註冊連結是客戶註冊——新教練會辦錯身分。
+  '/apply',
   '/login', // 登入身分選擇頁（官網只有一顆登入，教練/客戶在這裡分流）
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀

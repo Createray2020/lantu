@@ -161,6 +161,17 @@ export default function JoinPage() {
             用 LINE 預約 1 對 1 說明
           </a>
           <div className="mt-3 text-[12px] text-[#6f869c]">LINE 官方帳號 {LINE_ID}</div>
+
+          {/* 已經談過、或直接就想申請的人，之前只能等我們私訊給網址。
+              LINE 預約仍是主 CTA，這顆是次要動作。/apply 會自己分岔到註冊或申請頁。 */}
+          <div className="mt-8 pt-6 border-t border-white/10">
+            <p className="text-[#a7bacb] text-sm mb-3">已經談過了，或想直接提出申請？</p>
+            <Link href="/apply"
+                  className="inline-block text-sm font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg">
+              直接送出教練申請 →
+            </Link>
+            <div className="mt-2 text-[12px] text-[#6f869c]">送出後由嵐途審核（含費用確認），開通才進得了系統。</div>
+          </div>
         </div>
       </section>
 

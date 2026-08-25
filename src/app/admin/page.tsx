@@ -42,6 +42,8 @@ export default async function Admin() {
   // 而「載入 V4 辦法數值」只在職級表完全空白時才帶入 —— 只讀 DB 的話實習教練永遠選不到。
   const rankCodes = [...RANK_ORDER, ...Object.keys(caps).filter((c) => !RANK_ORDER.includes(c as never))];
   // 接手候選人只列已開通的教練，且不能是自己。
+  // 申請表單填的推薦人存的是 id，名冊要印得出名字。listCoaches() 本來就 select *，不必多查一次。
+  const nameById = new Map(coaches.map((c) => [c.id, c.name || c.email || c.id]));
   const activePeers = coaches
     .filter((c) => c.status === "active")
     .map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
@@ -106,6 +108,12 @@ export default async function Admin() {
                       <div className="text-[11px] font-mono tracking-wider text-[#c99a5b]">
                         {c.code ?? "—"}
                       </div>
+                      {/* 申請表單填的手機／現職（存在 note）與推薦人。核准前就是靠這幾行判斷，
+                          印在這裡才不用為了看一行字點進別的頁。 */}
+                      {c.note && <div className="text-[#8fa8bd] text-[11px] mt-1 whitespace-pre-wrap">{c.note}</div>}
+                      {c.sponsorId && (
+                        <div className="text-[#6f869c] text-[11px]">推薦人：{nameById.get(c.sponsorId) ?? c.sponsorId}</div>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <span className={admin ? "text-[#e0bd8b] font-bold" : "text-[#a9bccf]"}>

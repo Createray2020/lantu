@@ -11,19 +11,38 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  */
 
 const h = vi.hoisted(() => {
-  const T = { coaches: { _n: "coaches" }, clients: { _n: "clients" }, compCases: { _n: "comp_cases" } };
+  // 假 schema 需要欄位物件：applyAsCoach 會用 where(eq(coaches.code, …)) 找推薦人、
+  // 再用 where(eq(coaches.id, …)) 找自己那一列——兩次都打 coaches，不讓 where 真的過濾的話
+  // 「推薦人」會抓到自己。
+  const T = {
+    coaches: {
+      _n: "coaches",
+      id: { name: "id" }, code: { name: "code" }, email: { name: "email" },
+      name: { name: "name" }, displayName: { name: "display_name" }, status: { name: "status" },
+    },
+    clients: { _n: "clients" },
+    compCases: { _n: "comp_cases" },
+  };
   // rows＝coaches 查詢結果；counts＝clients/comp_cases 的 count() 結果；moved＝transferClients 影響列
   const state: any = {
     rows: [] as any[], inserts: [] as any[], updates: [] as any[], deletes: [] as string[],
     counts: { clients: 0, comp_cases: 0 }, moved: [] as any[],
   };
+  const camel = (col: string) => col.replace(/_([a-z])/g, (_m: string, ch: string) => ch.toUpperCase());
+  const match = (cond: any, row: any) => {
+    if (!cond?.col) return true; // 認不得的條件就不過濾（其他測試沿用舊行為）
+    const v = row[cond.col] !== undefined ? row[cond.col] : row[camel(cond.col)];
+    return v === cond.val;
+  };
   const db = {
     select: () => ({
       from: (t: any) => {
         const table = t?._n ?? "coaches";
-        const rows = () => (table === "coaches" ? state.rows : [{ n: state.counts[table] ?? 0 }]);
+        let cond: any = null;
+        const rows = () =>
+          table === "coaches" ? state.rows.filter((r: any) => match(cond, r)) : [{ n: state.counts[table] ?? 0 }];
         const c: any = {
-          where: () => c,
+          where: (x: any) => { cond = x; return c; },
           groupBy: () => Promise.resolve(rows()),
           limit: () => Promise.resolve(rows()),
           then: (res: any, rej: any) => Promise.resolve(rows()).then(res, rej),
@@ -64,7 +83,7 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("react", async (orig) => ({ ...(await orig<any>()), cache: (f: any) => f }));
-vi.mock("drizzle-orm", () => ({ eq: () => ({}), count: () => ({}) }));
+vi.mock("drizzle-orm", () => ({ eq: (col: any, val: any) => ({ col: col?.name, val }), count: () => ({}) }));
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 vi.mock("@clerk/nextjs/server", () => ({ currentUser: h.currentUser }));
@@ -146,6 +165,47 @@ describe("applyAsCoach：唯一會建立教練列的入口", () => {
     expect(c?.status).toBe("pending");
     expect(c?.role).toBe("coach");
     expect(h.state.inserts).toHaveLength(1);
+  });
+
+  it("四欄申請資料各自落到正確欄位", async () => {
+    // 推薦人是另一位教練（有編號）。⚠️ 自己那一列還不存在。
+    h.state.rows = [{ id: "coach_s", code: "FC2608012", email: "s@example.com", name: "資深教練", displayName: null, status: "active" }];
+    signedInAs("newcoach@example.com");
+    await applyAsCoach({ name: "王小明", phone: "0912-345-678", currentJob: "壽險業務三年", sponsorCode: " fc2608012 " });
+    const v = h.state.inserts[0];
+    // 姓名寫 display_name。⚠️ 寫 name 的話，下一次導頁 ensureCoach 就用 Clerk 姓名蓋回去。
+    expect(v.displayName).toBe("王小明");
+    expect(v.name).toBe("小明 王"); // Clerk 鏡像原樣
+    expect(v.note).toContain("手機：0912-345-678");
+    expect(v.note).toContain("現職：壽險業務三年");
+    expect(v.note).toContain("FC2608012");
+    expect(v.sponsorId).toBe("coach_s");
+  });
+
+  it("推薦人編號查無 → 不擋送出，只在備註留線索", async () => {
+    signedInAs("newcoach@example.com");
+    const c = await applyAsCoach({ name: "王小明", phone: "0912", sponsorCode: "FC9999999" });
+    expect(c?.status).toBe("pending");
+    expect(h.state.inserts[0].sponsorId).toBeUndefined();
+    expect(h.state.inserts[0].note).toContain("查無此編號");
+  });
+
+  it("沒填任何欄位時不寫那三個欄位（保留原本的空白申請）", async () => {
+    signedInAs("newcoach@example.com");
+    await applyAsCoach();
+    const v = h.state.inserts[0];
+    expect(v.displayName).toBeUndefined();
+    expect(v.note).toBeUndefined();
+    expect(v.sponsorId).toBeUndefined();
+  });
+
+  it("已核准的教練誤觸申請頁，不會洗掉他的顯示名稱與備註", async () => {
+    h.state.rows = [{ id: "user_1", email: "x@example.com", name: "小明 王", displayName: "阿明教練", note: "月費已收", status: "active" }];
+    signedInAs("x@example.com");
+    await applyAsCoach({ name: "亂填", phone: "0900", currentJob: "亂填" });
+    const v = h.state.inserts[0];
+    expect(v.displayName).toBeUndefined();
+    expect(v.note).toBeUndefined();
   });
 
   it("已存在的列不覆寫 status（停權者不能靠再申請一次救回 pending）", async () => {

@@ -6,6 +6,7 @@ import { eq, count } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches, clients, compCases } from "@/Shared/db/schema";
 import { allocCode } from "./codeAlloc";
+import { normalizeCode } from "./codes";
 // 顯示名稱的唯一真相（純函式＋SQL 版同住一處，語意不會走鐘）。
 import { displayNameOf, DISPLAY_NAME_MAX } from "./coachName";
 
@@ -121,12 +122,79 @@ async function withCode(row: CoachRow): Promise<CoachRow> {
   return code ? { ...row, code } : row;
 }
 
+/**
+ * 申請表單填的四樣東西（2026/08/25）。
+ *
+ * 為什麼不是「多開四個欄位」：
+ * · 姓名 → `display_name`。**絕對不能寫 `name`** —— 那欄是 Clerk 鏡像，
+ *   `ensureCoach()` 下一次導頁就用 Clerk 的 firstName+lastName 蓋回去（見檔頭那段）。
+ * · 手機＋現職 → `note`（後台備註欄）。`title` 是「制度職稱」會被印到內部畫面上，
+ *   拿它裝「現職：OO人壽業務」等於讓申請人的舊頭銜變成嵐途的頭銜。
+ * · 推薦人編號 → 解成 `sponsor_id`（既有的推薦人欄位，同業招募的業績歸屬就吃它）。
+ */
+export type CoachApplication = {
+  name?: string | null;
+  phone?: string | null;
+  currentJob?: string | null;
+  sponsorCode?: string | null;
+};
+
+const APPLY_FIELD_MAX = 60;
+const clip = (v: string | null | undefined, max = APPLY_FIELD_MAX) => (v ?? "").trim().slice(0, max);
+
+/** 把申請資料組成後台看得懂的一行。查無推薦人編號也照樣留字串（是線索，不是錯誤）。 */
+function applyNote(input: CoachApplication, sponsorName: string | null): string {
+  const parts = [
+    clip(input.phone) ? `手機：${clip(input.phone)}` : "",
+    clip(input.currentJob) ? `現職：${clip(input.currentJob)}` : "",
+    clip(input.sponsorCode)
+      ? `推薦人：${normalizeCode(clip(input.sponsorCode))}${sponsorName ? `（${sponsorName}）` : "（查無此編號）"}`
+      : "",
+  ].filter(Boolean);
+  return parts.length ? `申請資料｜${parts.join("｜")}` : "";
+}
+
 // 明確申請成為教練：建立 status=pending 的 coaches 列（待後台核准）。
 // 已經有列就原樣回傳，不覆寫 status —— 停權者不能靠再申請一次把自己救回 pending。
-export async function applyAsCoach(): Promise<Coach | null> {
+//
+// ⚠️ 申請表單那四欄**只在「這一列還是待審」時才寫**：已核准的教練誤觸申請頁
+//    （或按了瀏覽器上一頁重送），不能把他自己設定過的顯示名稱與後台備註洗掉。
+export async function applyAsCoach(input: CoachApplication = {}): Promise<Coach | null> {
   const user = await currentUser();
   if (!user) return null;
   const { email, name, isAdmin } = identity(user);
+
+  // 推薦人：用教練編號解人。查無不擋送出（可能只是打錯或對方還沒發號），留在 note 給後台判斷。
+  let sponsorId: string | null = null;
+  let sponsorName: string | null = null;
+  const rawSponsor = normalizeCode(clip(input.sponsorCode, 20));
+  if (rawSponsor) {
+    const found = await db
+      .select({ id: coaches.id, name: coaches.name, displayName: coaches.displayName, email: coaches.email })
+      .from(coaches)
+      .where(eq(coaches.code, rawSponsor))
+      .limit(1);
+    if (found[0]) {
+      sponsorId = found[0].id;
+      sponsorName = displayNameOf(found[0]);
+    }
+  }
+
+  const selfName = clip(input.name, DISPLAY_NAME_MAX);
+  const note = applyNote(input, sponsorName);
+
+  const existing = await db.select().from(coaches).where(eq(coaches.id, user.id)).limit(1);
+  const fresh = !existing[0];
+  const stillPending = existing[0]?.status === "pending";
+
+  const applyFields =
+    fresh || stillPending
+      ? {
+          ...(selfName ? { displayName: selfName } : {}),
+          ...(note ? { note } : {}),
+          ...(sponsorId ? { sponsorId } : {}),
+        }
+      : {};
 
   const inserted = await db
     .insert(coaches)
@@ -137,8 +205,9 @@ export async function applyAsCoach(): Promise<Coach | null> {
       role: isAdmin ? "admin" : "coach",
       status: isAdmin ? "active" : "pending",
       approvedAt: isAdmin ? new Date() : null,
+      ...applyFields,
     })
-    .onConflictDoUpdate({ target: coaches.id, set: { email, name } })
+    .onConflictDoUpdate({ target: coaches.id, set: { email, name, ...applyFields } })
     .returning();
 
   const row = inserted[0] ?? null;
