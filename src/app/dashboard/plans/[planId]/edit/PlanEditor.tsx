@@ -3,7 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { savePlanDataAction } from "../../../actions";
+import {
+  savePlanDataAction,
+  addNoteAction,
+  deleteNoteAction,
+  listNotesAction,
+  startSessionAction,
+  endSessionAction,
+  openSessionAction,
+  listSessionsAction,
+  restoreToSessionAction,
+} from "../../../actions";
+import type { NoteRow, NoteInput } from "@/lib/notes";
+import type { SessionRow, EndInput } from "@/lib/consultSession";
 import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
 import { LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 
@@ -16,6 +28,23 @@ const RO_NOTE = {
 const RO_BADGE = { license: "唯讀", collab: "協作唯讀" } as const;
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
+
+/**
+ * 註記的權限，跟「資料能不能改」是兩件事：
+ *   owner  主責教練 —— 全部可寫、可勾客戶可見
+ *   viewer 共同執案的協作教練 —— 資料一個字都不能改，但**可以寫註記**（會標上名字、
+ *          不可勾客戶可見）。一個字都留不下的協作，等於只能口頭講完就散了。
+ *   none   使用期限到期 —— 這是帳號層的鎖，連註記都不給寫。
+ */
+type NoteAccess = "owner" | "viewer" | "none";
+
+/** iframe → 父層的註記／諮詢訊息。 */
+type NoteMsg =
+  | { type: "lantu:note"; op: "add"; input: NoteInput }
+  | { type: "lantu:note"; op: "del"; noteId: string }
+  | { type: "lantu:session"; op: "start"; adoptLoose: boolean }
+  | { type: "lantu:session"; op: "end"; sessionId: string; input: EndInput }
+  | { type: "lantu:session"; op: "restore"; sessionId: string };
 
 // v12 App（/lantu-app.html?embed=1）以 iframe 載入。
 // 握手：iframe onLoad / 'lantu:ready' → 父層 postMessage 'lantu:init' 灌入 data；
@@ -49,6 +78,13 @@ export default function PlanEditor({
   const latest = useRef<unknown>(null);
   const [state, setState] = useState<SaveState>("idle");
 
+  // 註記與諮詢場次不住在 plans.data 裡（它們掛在客戶身上，年度重製時要延續），
+  // 所以走自己的通道：父層持有狀態，變動後整批 push 進 iframe。
+  const notesRef = useRef<NoteRow[]>([]);
+  const sessionRef = useRef<SessionRow | null>(null);
+  const pastRef = useRef<SessionRow[]>([]);
+  const noteAccess: NoteAccess = readOnly ? (readOnlyReason === "collab" ? "viewer" : "none") : "owner";
+
   useEffect(() => {
     // 規劃器是 px 版面，父層的 rem 縮放對它無效 —— 一併把字級與唯讀狀態送進去。
     // 以 localStorage 為準：使用者剛在頂欄按過字級，帳號欄位還沒重新讀進來。
@@ -62,9 +98,81 @@ export default function PlanEditor({
 
     function postInit() {
       iframeRef.current?.contentWindow?.postMessage(
-        { type: "lantu:init", data, uiScale: currentScale(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null },
+        {
+          type: "lantu:init",
+          data,
+          uiScale: currentScale(),
+          readOnly,
+          readOnlyNote: RO_NOTE[readOnlyReason],
+          clientCode: clientCode ?? null,
+          notes: notesRef.current,
+          session: sessionRef.current,
+          past: pastRef.current,
+          noteAccess,
+        },
         window.location.origin,
       );
+    }
+
+    /** 註記或場次變動後，把最新的整批推進 iframe（它不自己查 DB）。 */
+    function pushNotes() {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "lantu:notes", notes: notesRef.current, session: sessionRef.current, past: pastRef.current, noteAccess },
+        window.location.origin,
+      );
+    }
+
+    async function reload() {
+      try {
+        const [ns, sess, all] = await Promise.all([
+          listNotesAction(clientId),
+          openSessionAction(clientId),
+          listSessionsAction(clientId),
+        ]);
+        notesRef.current = ns;
+        sessionRef.current = sess;
+        // 「回到上次諮詢開始時」要的是最近一場**已結束**的；還開著的那場是「回到開場狀態」。
+        pastRef.current = all.filter((x) => !!x.endedAt);
+        pushNotes();
+      } catch {
+        /* 讀不到就維持現況：註記讀失敗不該讓整個規劃器停擺 */
+      }
+    }
+
+    // 進場先把註記載進來（iframe 可能已經 ready，所以載完再 push 一次）
+    void reload();
+
+    async function onNoteMsg(msg: NoteMsg) {
+      if (noteAccess === "none") return;
+      try {
+        if (msg.type === "lantu:note" && msg.op === "add") {
+          const r = await addNoteAction(clientId, { ...msg.input, sessionId: sessionRef.current?.id ?? null });
+          if (r.ok) {
+            notesRef.current = [...notesRef.current, r.note];
+            pushNotes();
+          }
+        } else if (msg.type === "lantu:note" && msg.op === "del") {
+          const ok = await deleteNoteAction(clientId, msg.noteId);
+          if (ok) {
+            notesRef.current = notesRef.current.filter((x) => x.id !== msg.noteId);
+            pushNotes();
+          }
+        } else if (msg.type === "lantu:session" && msg.op === "start") {
+          const r = await startSessionAction(clientId, planId, msg.adoptLoose);
+          if (r.ok) await reload();
+        } else if (msg.type === "lantu:session" && msg.op === "end") {
+          const r = await endSessionAction(clientId, msg.sessionId, msg.input);
+          if (r.ok) {
+            await reload();
+            router.refresh();
+          }
+        } else if (msg.type === "lantu:session" && msg.op === "restore") {
+          const r = await restoreToSessionAction(clientId, msg.sessionId);
+          if (r.ok) router.refresh(); // 還原改的是 plans.data，整頁重載才拿得到新資料
+        }
+      } catch {
+        /* server action 失敗不影響規劃器本體 */
+      }
     }
 
     function onMessage(e: MessageEvent) {
@@ -74,6 +182,8 @@ export default function PlanEditor({
 
       if (msg.type === "lantu:ready") {
         postInit();
+      } else if (msg.type === "lantu:note" || msg.type === "lantu:session") {
+        void onNoteMsg(msg as unknown as NoteMsg);
       } else if (msg.type === "lantu:save") {
         if (readOnly) return; // 到期唯讀：不寫回（server action 也會擋，這裡只是不要一直跳「儲存失敗」）
         latest.current = msg.data;
@@ -95,7 +205,7 @@ export default function PlanEditor({
       window.removeEventListener("message", onMessage);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [planId, data, uiScale, readOnly, readOnlyReason, clientCode]);
+  }, [planId, clientId, data, uiScale, readOnly, readOnlyReason, clientCode, noteAccess, router]);
 
   const statusText: Record<SaveState, string> = {
     idle: "",

@@ -59,3 +59,30 @@ export async function clientAccess(coachId: string, clientId: string): Promise<C
   if (!row) return null;
   return row.coachId === coachId ? "owner" : "viewer";
 }
+
+/**
+ * 註記寫入範圍：主責 **或** 已接受邀請的協作教練。
+ *
+ * ⚠️⚠️ 這是第三把尺，也是唯一一條「讀得到就寫得進去」的例外，開它是有代價的。
+ *
+ * 為什麼要開：共同執案的用途就是找資深教練來看一個案子，而他能給的東西是「意見」。
+ * 一個字都不能留的協作，等於只能口頭講完就散了。所以協作教練可以寫註記——
+ * 但只能寫註記，資料本身仍然一個字都改不動。
+ *
+ * 開它的三道配套，缺一不可（少任何一道，唯讀協作就從「能留意見」變成「能影響客戶」）：
+ *
+ *   1. 這支函式**只准出現在 `src/lib/notes.ts`**。任何其他寫入路徑用到它，
+ *      唯讀協作就會擴散成可寫，而畫面上完全看不出來。
+ *      → `clientScope.drift.test.ts` 逐檔掃原始碼守著。
+ *
+ *   2. 協作教練寫的列，`authorAccess='viewer'`，而 `visible` 由**資料層強制**寫成 false
+ *      （不是靠 UI 把 checkbox 變灰）。他的意見留給主責教練看，不會流到客戶面前。
+ *
+ *   3. 他只能改／刪**自己寫的那一列**（`authorId = me`），不能動主責寫的。
+ *
+ * 除了註記以外的任何東西（clients / plans / reviews / actionItems / revisions 的寫入），
+ * 一律只能用 ownedClient()。
+ */
+export function annotatableClient(coachId: string): SQL {
+  return readableClient(coachId);
+}

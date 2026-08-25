@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/comp-recompute",
       "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/close-sessions",
+      "schedule": "0 18 * * *"
     }
   ]
 }

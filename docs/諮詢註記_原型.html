@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>嵐途 · 區塊註記＋一場諮詢 · 完整原型</title>
+<style>
+:root{--bg:#081a2b;--panel:#0d2b45;--card:#12334f;--card2:#17406a;--line:rgba(255,255,255,.11);
+ --tx:#eef2f7;--mut:#a7bacb;--mut2:#6f869c;--amber:#c99a5b;--amber2:#e0bd8b;--teal:#a9bccf;
+ --ok:#8fc0a3;--warn:#e08a68;--gap2:#ef6f6f;--gold:#f0c34e;--r:12px;
+ --serif:"Noto Serif TC","Songti TC","PingFang TC",serif;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.7 "PingFang TC","Noto Sans TC",system-ui,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 90px}
+h1{font-family:var(--serif);font-size:21px;margin:0 0 4px}
+.sub{color:var(--mut2);font-size:12.5px;margin-bottom:16px}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:16px}
+.sec h4{font-size:15px;margin:0 0 12px;color:var(--amber2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hint{color:var(--mut2);font-size:12px;font-weight:400}
+.muted{color:var(--mut);font-size:12.5px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--mut2);font-weight:600;font-size:11.5px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.gap{color:var(--gap2);font-weight:800}
+.ok{color:var(--ok)}
+button{font-family:inherit;cursor:pointer}
+.btn{background:var(--card);border:1px solid var(--line);color:var(--teal);border-radius:8px;padding:5px 12px;font-size:12.5px;font-weight:700}
+.btn:hover{background:var(--card2)}
+.btn.pri{background:var(--amber);border-color:var(--amber);color:#0b1f33}
+.btn.pri:hover{background:var(--amber2)}
+.btn.sm{padding:3px 9px;font-size:11.5px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── 頂列：角色 + 諮詢狀態 ── */
+.topbar{position:sticky;top:0;z-index:40;background:linear-gradient(180deg,#0f3350,#0d2b45);
+ border-bottom:1px solid var(--line);padding:8px 20px}
+.topbar .in{max-width:1080px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.roleSw{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
+.roleSw button{background:transparent;border:none;color:var(--mut2);padding:5px 11px;font-size:11.5px;font-weight:700}
+.roleSw button.on{background:var(--card2);color:var(--amber2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(143,192,163,.18);flex:none}
+.dot.off{background:var(--mut2);box-shadow:none}
+.topbar b{font-size:12.5px;color:var(--amber2)}
+.topbar .sp{flex:1}
+
+/* ── 註記帶 ── */
+.notewrap{border-top:1px dashed var(--line);margin:14px -18px -16px;padding:10px 18px 12px;
+ background:rgba(255,255,255,.014);border-radius:0 0 var(--r) var(--r)}
+.notewrap.alert{background:rgba(239,111,111,.07);border-top:1px solid rgba(239,111,111,.35)}
+.notehead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut2);cursor:pointer;user-select:none;flex-wrap:wrap}
+.notehead .pen{color:var(--amber2)}
+.notehead .cnt{color:var(--amber2);font-weight:700}
+.notehead .need{color:var(--gap2);font-weight:800}
+.notehead .sp{flex:1}
+.noteopen{margin-top:10px}
+.noteopen.hide{display:none}
+.tags{display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap}
+.tag{background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:999px;padding:2px 11px;font-size:11.5px;font-weight:700}
+.tag.on{border-color:var(--amber);color:var(--amber2);background:rgba(201,154,91,.12)}
+.prefill{font-size:12px;color:var(--mut2);background:rgba(255,255,255,.03);border-left:2px solid var(--amber);
+ padding:6px 10px;border-radius:0 6px 6px 0;margin-bottom:7px;line-height:1.6}
+.prefill i{color:var(--amber2);font-style:normal;font-weight:700}
+textarea{width:100%;background:var(--card);border:1px solid var(--line);color:var(--tx);border-radius:8px;
+ padding:8px 10px;font:13px/1.6 inherit;resize:vertical;min-height:52px}
+textarea:focus{outline:none;border-color:var(--amber)}
+.noterow{display:flex;align-items:center;gap:10px;margin-top:7px;flex-wrap:wrap}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);cursor:pointer}
+.chk input{accent-color:var(--amber)}
+.chk.lock{opacity:.42;cursor:not-allowed}
+.notelist{margin-top:11px;display:flex;flex-direction:column;gap:6px}
+.noteitem{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;background:rgba(255,255,255,.028);
+ border-radius:7px;padding:7px 10px;line-height:1.55}
+.noteitem.other{border-left:2px solid var(--teal)}
+.noteitem.cli{border-left:2px solid var(--gold)}
+.pill{flex:none;font-size:10.5px;font-weight:800;border-radius:4px;padding:1px 6px;margin-top:2px}
+.pill.basis{background:rgba(169,188,207,.2);color:#c3d3e2}
+.pill.decision{background:rgba(201,154,91,.24);color:var(--amber2)}
+.pill.todo{background:rgba(224,138,104,.2);color:var(--warn)}
+.eye{flex:none;font-size:11px;margin-top:2px}
+.eye.on{color:var(--ok)} .eye.off{color:var(--mut2);opacity:.45}
+.by{color:var(--mut2);font-size:11px}
+.by.cli{color:var(--gold)}
+
+/* ── 彈窗 ── */
+.mask{position:fixed;inset:0;background:rgba(4,14,24,.74);display:none;align-items:center;justify-content:center;z-index:90;padding:20px}
+.mask.on{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:660px;width:100%;
+ max-height:86vh;overflow:auto;padding:20px 22px}
+.modal h3{font-family:var(--serif);font-size:17px;margin:0 0 4px;color:var(--amber2)}
+.pickrow{display:flex;align-items:flex-start;gap:10px;padding:9px 11px;border-radius:8px;
+ background:rgba(255,255,255,.03);margin-bottom:7px;font-size:13px;line-height:1.55;cursor:pointer}
+.pickrow input{margin-top:4px;accent-color:var(--amber);flex:none}
+.pickrow .src{color:var(--mut2);font-size:11px;display:block;margin-top:2px}
+.warnbox{background:rgba(224,138,104,.1);border:1px solid rgba(224,138,104,.32);border-radius:8px;
+ padding:9px 12px;font-size:12px;color:var(--mut);line-height:1.65;margin:12px 0}
+.warnbox b{color:var(--warn)}
+
+/* ── KPI / 摘要 ── */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+@media(max-width:720px){.kpis{grid-template-columns:1fr}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:13px 15px}
+.kpi .l{font-size:11.5px;color:var(--mut2);margin-bottom:5px}
+.kpi .v{font-family:var(--serif);font-size:23px;font-weight:800;line-height:1.2}
+.kpi .d{font-size:11.5px;color:var(--mut2);margin-top:3px}
+.sumgrp{margin-bottom:15px}
+.sumgrp>h5{font-size:13px;color:var(--amber2);margin:0 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sumitem{font-size:13px;line-height:1.6;padding:7px 0 7px 14px;border-left:2px solid var(--line);margin-bottom:5px}
+.sumitem .src{color:var(--mut2);font-size:11px}
+details.fold{margin-top:6px}
+details.fold>summary{cursor:pointer;color:var(--amber2);font-weight:700;font-size:12.5px;list-style:none}
+
+/* 主圖：SVG 只准縮小不准放大 */
+svg.chart{display:block;width:100%;max-width:640px;height:auto;margin:0 auto 6px}
+
+.tabs{display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap}
+.dtab{background:var(--card);border:1px solid var(--line);color:var(--mut);border-radius:8px;padding:6px 13px;font-size:12.5px;font-weight:700}
+.dtab.on{background:var(--card2);color:var(--amber2);border-color:var(--amber)}
+.pg{display:none}.pg.on{display:block}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#123a5c;border:1px solid var(--amber);
+ color:var(--amber2);padding:9px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:120;
+ opacity:0;pointer-events:none;transition:opacity .2s;max-width:88vw;text-align:center}
+.toast.on{opacity:1}
+.note-note{background:rgba(201,154,91,.09);border:1px solid rgba(201,154,91,.3);border-radius:9px;
+ padding:11px 14px;font-size:12.5px;line-height:1.7;color:var(--mut);margin-bottom:16px}
+.note-note b{color:var(--amber2)}
+pre.copy{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px 14px;
+ font:12px/1.75 ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;margin:0}
+
+/* 報告書（紙感） */
+.paper{background:#fdfbf7;color:#2a2a2a;border:1px solid #e6ddd0;border-radius:var(--r);padding:22px 24px;margin-bottom:16px}
+.paper .ch{font-family:var(--serif);font-size:16px;font-weight:800;color:#8a6a3c;margin:0 0 9px;
+ border-bottom:1px solid #eadfd0;padding-bottom:6px}
+.paper p{font-size:13px;line-height:1.85;margin:0 0 8px}
+.rpnote{border-left:3px solid #c99a5b;background:#f7f1e6;padding:8px 12px;border-radius:0 7px 7px 0;
+ font-size:12.5px;line-height:1.7;margin:8px 0 0}
+.rpnote b{color:#8a6a3c}
+.paper .foot{font-size:11.5px;color:#9b8f7e;margin-top:12px;border-top:1px solid #eadfd0;padding-top:8px}
+
+/* 掛點總覽 */
+.mapgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:9px}
+.mapcard{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+.mapcard .t{font-size:12.5px;color:var(--amber2);font-weight:700}
+.mapcard .k{font-size:11px;color:var(--mut2);font-family:ui-monospace,Menlo,monospace;margin-top:2px}
+.mapcard .lv{font-size:10.5px;color:var(--teal);margin-top:3px}
+
+.restore{background:rgba(143,192,163,.09);border:1px solid rgba(143,192,163,.32);border-radius:9px;
+ padding:11px 14px;font-size:12.5px;line-height:1.7;color:var(--mut);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.restore b{color:var(--ok)}
+.tl{display:flex;flex-direction:column;gap:0;margin-top:4px}
+.tlrow{display:flex;gap:11px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.tlrow:last-child{border-bottom:none}
+.tlrow .tm{color:var(--mut2);font-size:11.5px;flex:none;width:96px;font-variant-numeric:tabular-nums}
+.tlrow .bd{flex:1;line-height:1.55}
+.tlrow .bd b{color:var(--amber2)}
+</style>
+</head>
+<body>
+
+<!-- ══ 頂列 ══ -->
+<div class="topbar">
+ <div class="in">
+  <div class="roleSw" id="roleSw">
+   <button data-r="owner" class="on" onclick="setRole('owner')">主責教練</button>
+   <button data-r="viewer" onclick="setRole('viewer')">唯讀協作</button>
+   <button data-r="client" onclick="setRole('client')">客戶端</button>
+  </div>
+  <span class="dot off" id="sdot"></span>
+  <b id="stitle">不在諮詢中</b>
+  <span class="hint" id="ssub">註記照樣可寫，歸「日常維護」</span>
+  <span class="sp"></span>
+  <button class="btn pri" id="sbtn" onclick="toggleSess()">開始諮詢</button>
+ </div>
+</div>
+
+<div class="wrap">
+<h1>區塊註記 ＋ 一場諮詢 ＋ 摘要匯出</h1>
+<div class="sub">完整可點原型 · 涵蓋波 1–5 · 2026/08/25 · 對版面與欄位用</div>
+
+<div class="note-note">
+<b>怎麼玩：</b>左上角切<b>三種身分</b>看同一頁的差別（唯讀協作教練能寫但不能勾客戶可見；客戶端只看得到勾了可見的）。
+分頁 ① 是註記帶本體，② 是一場諮詢的完整動線含還原點，③ 摘要，④ 報告書，⑤ 22 個掛點在哪。
+</div>
+
+<div class="tabs">
+ <button class="dtab on" data-pg="p1" onclick="go('p1')">① 註記帶</button>
+ <button class="dtab" data-pg="p2" onclick="go('p2')">② 一場諮詢</button>
+ <button class="dtab" data-pg="p3" onclick="go('p3')">③ 摘要與匯出</button>
+ <button class="dtab" data-pg="p4" onclick="go('p4')">④ 客戶報告書</button>
+ <button class="dtab" data-pg="p5" onclick="go('p5')">⑤ 掛點總覽</button>
+</div>
+
+<!-- ══════════ ① 註記帶 ══════════ -->
+<div class="pg on" id="p1">
+ <div id="roleTip" class="note-note" style="display:none"></div>
+
+ <!-- 異常態示範 -->
+ <div class="sec" data-blk="coverage.five">
+  <h4>保障需求比對（五欄表）<span class="hint">HAVE / NEED / 狀況 / 調整方向</span></h4>
+  <table>
+   <tr><th>項目</th><th class="num">已備</th><th class="num">需求</th><th>狀況</th><th>方向</th></tr>
+   <tr><td>壽險</td><td class="num">8,000,000</td><td class="num">11,240,000</td><td class="gap">還差 3,240,000</td><td>補足</td></tr>
+   <tr><td>意外傷殘</td><td class="num">3,000,000</td><td class="num">3,000,000</td><td class="ok">已足額</td><td>維持</td></tr>
+   <tr><td>住院醫療</td><td class="num">2,000/日</td><td class="num">3,000/日</td><td class="gap">還差 1,000/日</td><td>補足</td></tr>
+   <tr><td>重病給付</td><td class="num">1,000,000</td><td class="num">2,500,000</td><td class="gap">還差 1,500,000</td><td>補足</td></tr>
+  </table>
+  <div class="notewrap" data-note="coverage.five"></div>
+ </div>
+
+ <!-- 一般態 -->
+ <div class="sec" data-blk="retire.flow">
+  <h4>退休三段式金流<span class="hint">工作期 / 退休期</span></h4>
+  <table>
+   <tr><th>期間</th><th class="num">年支出</th><th class="num">年收入</th><th>結餘</th></tr>
+   <tr><td>工作期（現在–65 歲）</td><td class="num">960,000</td><td class="num">1,440,000</td><td class="ok">+480,000</td></tr>
+   <tr><td>退休期（65–85 歲）</td><td class="num">720,000</td><td class="num">432,000</td><td class="gap">−288,000</td></tr>
+  </table>
+  <div class="muted" style="margin-top:9px">退休金流缺口現值 <b class="gap">4,860,000</b>，於 <b>71 歲</b>首次轉負。</div>
+  <div class="notewrap" data-note="retire.flow"></div>
+ </div>
+
+ <!-- 逐列 → 列級 -->
+ <div class="sec" data-blk="coverage.policies">
+  <h4>現有保單<span class="hint">逐列資料，每一列自己也能註記（就地展開，不跳頁）</span></h4>
+  <table id="polTbl">
+   <tr><th>保單</th><th>被保人</th><th class="num">保額</th><th class="num">年保費</th><th style="width:78px"></th></tr>
+  </table>
+  <div class="notewrap" data-note="coverage.policies"></div>
+ </div>
+
+ <!-- 客戶端才有的區塊 -->
+ <div class="sec" data-blk="fin.income" data-cli="1">
+  <h4>收入<span class="hint">客戶端也能在這裡註記（會標成「客戶填的」）</span></h4>
+  <table>
+   <tr><th>項目</th><th>類型</th><th class="num">月額</th></tr>
+   <tr><td>本薪</td><td>薪資所得</td><td class="num">95,000</td></tr>
+   <tr><td>年終＋績效</td><td>薪資所得</td><td class="num">25,000</td></tr>
+   <tr><td>租金</td><td>租賃所得</td><td class="num">18,000</td></tr>
+  </table>
+  <div class="notewrap" data-note="fin.income"></div>
+ </div>
+</div>
+
+<!-- ══════════ ② 一場諮詢 ══════════ -->
+<div class="pg" id="p2">
+ <div class="sec">
+  <h4>這一場的狀態</h4>
+  <div id="sessBody"></div>
+ </div>
+
+ <div class="sec">
+  <h4>還原點<span class="hint">這是「防誤刪」唯一被順便解掉的部分</span></h4>
+  <div class="restore">
+   <span style="font-size:20px">⏱</span>
+   <div style="flex:1;min-width:220px">
+    現有的版本還原功能藏在版本紀錄頁、而且叫「第 37 版」，諮詢當下沒人想得起來。<br>
+    開始諮詢時釘住一版之後，它就有了講得出口的名字：<b>「回到上次諮詢開始時的狀態」</b>。
+   </div>
+   <button class="btn" onclick="toast('已回到 2026/05/12 諮詢開始時的狀態（示意）')">回到上次諮詢開始時</button>
+  </div>
+  <div style="margin-top:12px">
+   <div class="hint" style="margin-bottom:4px">客戶的諮詢時間軸（每一場都是一個還原點）</div>
+   <div class="tl">
+    <div class="tlrow"><span class="tm">2026/08/25</span><span class="bd"><b>年度檢視</b> · 進行中 · 已記 <span id="tlCnt">0</span> 則</span></div>
+    <div class="tlrow"><span class="tm">2026/05/12</span><span class="bd"><b>季檢視</b> · 4 則註記 · 缺口 512→486 萬</span></div>
+    <div class="tlrow"><span class="tm">2026/02/03</span><span class="bd"><b>年度重製</b> · 9 則註記 · 缺口 605→512 萬</span></div>
+    <div class="tlrow"><span class="tm">2025/11/20</span><span class="bd"><b>初談</b> · 12 則註記</span></div>
+   </div>
+  </div>
+ </div>
+
+ <div class="sec">
+  <h4>忘記按「結束」怎麼辦<span class="hint">這件事一定會發生</span></h4>
+  <table>
+   <tr><th>情境</th><th>系統怎麼收</th><th>後果</th></tr>
+   <tr><td>開了新的一場</td><td>自動封掉上一場（superseded）</td><td class="ok">摘要照樣產得出來</td></tr>
+   <tr><td>整天沒按結束</td><td>隔天 cron 自動封場（auto）</td><td class="ok">只是沒被人工整理過</td></tr>
+   <tr><td>諮詢中</td><td>狀態列常駐提醒「現在寫的會進紀錄」</td><td class="ok">順便是合規提示</td></tr>
+  </table>
+  <div class="muted" style="margin-top:9px">原則：<b style="color:var(--amber2)">忘記按結束絕不能造成資料損失。</b></div>
+ </div>
+</div>
+
+<!-- ══════════ ③ 摘要 ══════════ -->
+<div class="pg" id="p3">
+ <div class="kpis">
+  <div class="kpi"><div class="l">這次動了</div><div class="v" id="k1">—</div><div class="d">個區塊</div></div>
+  <div class="kpi"><div class="l">產生待辦</div><div class="v" id="k2">—</div><div class="d">項，已進追蹤</div></div>
+  <div class="kpi"><div class="l">總缺口</div><div class="v"><span class="gap">486</span> <span style="font-size:15px;color:var(--mut2)">→</span> <span class="ok">324</span></div><div class="d">萬元 · 改善 162 萬</div></div>
+ </div>
+
+ <div class="sec">
+  <h4>缺口改善<span class="hint">首屏一張圖＋三個數字，其餘收合</span></h4>
+  <svg class="chart" viewBox="0 0 640 150" role="img" aria-label="缺口從 486 萬改善到 324 萬">
+   <text x="0" y="14" fill="#6f869c" font-size="11">單位：萬元</text>
+   <line x1="70" y1="128" x2="640" y2="128" stroke="rgba(255,255,255,.14)"/>
+   <rect x="96" y="42" width="150" height="86" rx="4" fill="#ef6f6f" opacity=".78"/>
+   <text x="171" y="34" fill="#ef6f6f" font-size="15" font-weight="800" text-anchor="middle">486</text>
+   <text x="171" y="145" fill="#a7bacb" font-size="11.5" text-anchor="middle">諮詢前</text>
+   <rect x="330" y="71" width="150" height="57" rx="4" fill="#8fc0a3" opacity=".82"/>
+   <text x="405" y="63" fill="#8fc0a3" font-size="15" font-weight="800" text-anchor="middle">324</text>
+   <text x="405" y="145" fill="#a7bacb" font-size="11.5" text-anchor="middle">這次調整後</text>
+   <line x1="255" y1="60" x2="320" y2="60" stroke="#c99a5b" stroke-width="1.5" stroke-dasharray="4 3"/>
+   <text x="530" y="66" fill="#e0bd8b" font-size="12.5" font-weight="700">改善 162 萬</text>
+   <text x="0" y="132" fill="#6f869c" font-size="11">0</text>
+  </svg>
+ </div>
+
+ <div class="sec">
+  <h4>2026/08/25 諮詢摘要<span class="hint">14:32–15:48 · 年度檢視 · 出席：王大明、王太太</span></h4>
+  <div class="sumgrp"><h5>◆ 決定 <span class="hint">勾了客戶可見的會印進報告書</span></h5><div id="sumD"></div></div>
+  <div class="sumgrp"><h5>◆ 依據</h5><div id="sumJ"></div></div>
+  <div class="sumgrp"><h5>◆ 待辦 <span class="hint">直接進 action_items 追蹤</span></h5><div id="sumT"></div></div>
+
+  <details class="fold">
+   <summary>這次的數字變動明細（點開）</summary>
+   <table style="margin-top:8px">
+    <tr><th>區塊</th><th>欄位</th><th class="num">改前</th><th class="num">改後</th></tr>
+    <tr><td>保障需求</td><td>壽險 已備</td><td class="num">6,500,000</td><td class="num">8,000,000</td></tr>
+    <tr><td>退休</td><td>退休年齡</td><td class="num">65</td><td class="num">67</td></tr>
+    <tr><td>收支</td><td>每月儲蓄</td><td class="num">18,000</td><td class="num">25,000</td></tr>
+   </table>
+  </details>
+
+  <div class="noterow" style="margin-top:16px">
+   <button class="btn pri" onclick="toast('已存進客戶的諮詢時間軸（reviews）')">存成諮詢紀錄</button>
+   <button class="btn" onclick="toast('PDF 已匯出（走既有 printReport）')">匯出 PDF</button>
+   <button class="btn" onclick="showCopy()">複製摘要（貼 LINE）</button>
+   <span class="hint">複製出來只含勾了「客戶可見」的</span>
+  </div>
+ </div>
+
+ <div class="sec" id="copybox" style="display:none">
+  <h4>複製出來的純文字<span class="hint">使用率會最高的一顆</span></h4>
+  <pre class="copy" id="copytxt"></pre>
+ </div>
+</div>
+
+<!-- ══════════ ④ 報告書 ══════════ -->
+<div class="pg" id="p4">
+ <div class="note-note">
+  <b>規則：</b>註記<b>貼在對應章節下面</b>，不集中成一章。只有勾了「客戶可見」的才出現，且統一標示為「顧問註記」，
+  與系統計算結果視覺上分開。章號仍由既有的 <code>rNumberSections()</code> 自動產生。
+ </div>
+
+ <div class="paper">
+  <div class="ch">§6、保障需求與缺口</div>
+  <p>依家庭責任、負債餘額與子女教育金推算，壽險需求為 <b>1,124 萬元</b>，目前已備 <b>800 萬元</b>，尚有
+     <b style="color:#c0392b">324 萬元</b>缺口。住院醫療日額需求 3,000 元，目前已備 2,000 元。</p>
+  <div id="rp_coverage"></div>
+ </div>
+
+ <div class="paper">
+  <div class="ch">§8、退休生活規劃</div>
+  <p>以退休年齡 67 歲、預估壽命 85 歲試算，退休期年支出 72 萬元、年收入 43.2 萬元，
+     年度短差 28.8 萬元，缺口現值 <b style="color:#c0392b">486 萬元</b>，於 71 歲首次轉負。</p>
+  <div id="rp_retire"></div>
+ </div>
+
+ <div class="paper">
+  <div class="ch">§19、本次諮詢紀要</div>
+  <p>2026 年 8 月 25 日年度檢視，出席：王大明、王太太。本次調整後總缺口由 486 萬元降至 324 萬元，
+     改善 162 萬元。後續追蹤事項如下。</p>
+  <div id="rp_summary"></div>
+  <div class="foot">※ 本文件所載報酬率為假設，非承諾。嵐途為一般顧問公司，不提供投資顧問或保險招攬服務。</div>
+ </div>
+</div>
+
+<!-- ══════════ ⑤ 掛點總覽 ══════════ -->
+<div class="pg" id="p5">
+ <div class="note-note">
+  全站有 <b>115 個</b> <code>class="sec"</code>。若照字面「每個段落都掛」，會做出 115 個永遠空著的框。
+  以下是手挑的 <b>22 個區塊級掛點</b> ＋ <b>3 處列級</b>。
+ </div>
+ <div class="sec">
+  <h4>區塊級掛點（22）</h4>
+  <div class="mapgrid" id="mapg"></div>
+ </div>
+ <div class="sec">
+  <h4>列級掛點（3 處）<span class="hint">就地展開在同一個區塊底部</span></h4>
+  <div class="mapgrid">
+   <div class="mapcard"><div class="t">每一張保單</div><div class="k">policy:&lt;polId&gt;</div><div class="lv">為什麼這樣設保額</div></div>
+   <div class="mapcard"><div class="t">收支資債每一列</div><div class="k">fin.&lt;kind&gt;:&lt;idx&gt;</div><div class="lv">這筆的來源與性質</div></div>
+   <div class="mapcard"><div class="t">每位家庭成員</div><div class="k">member:&lt;mid&gt;</div><div class="lv">背景與特殊狀況</div></div>
+  </div>
+ </div>
+</div>
+
+</div>
+
+<!-- ══ 結束諮詢：批次勾選 ══ -->
+<div class="mask" id="pickmask">
+ <div class="modal">
+  <h3>這一場的決定，哪幾則要給客戶看？</h3>
+  <div class="hint" style="margin-bottom:14px">預設全不勾。勾選的動作放在這裡，不放在寫入的當下——你現在正好在整理等下要跟客戶講什麼。</div>
+  <div id="picklist"></div>
+  <div class="warnbox">⚠️ 勾選的內容會印進帶公司抬頭的客戶文件。<b>不得含商品推薦或投資建議</b>。</div>
+  <div class="noterow" style="justify-content:flex-end">
+   <button class="btn" onclick="closePick()">取消</button>
+   <button class="btn pri" onclick="finishSess()">產生摘要</button>
+  </div>
+ </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════ 狀態 ══════════ */
+var role = 'owner';            // owner / viewer / client
+var sess = null;
+var notes = [];
+var seq = 1;
+
+var BLOCKS = {
+ 'coverage.five':     {name:'保障需求比對', pre:'壽險已備 800 萬、需求 1,124 萬，<i>還差 324 萬</i>；住院醫療日額還差 1,000 元。', alert:true, cli:false},
+ 'retire.flow':       {name:'退休三段式金流', pre:'退休金流缺口現值 <i>486 萬</i>，於 <i>71 歲</i>首次轉負。', alert:false, cli:false},
+ 'coverage.policies': {name:'現有保單', pre:'共登錄 <i>3 張</i>保單，年保費合計 <i>74,600 元</i>，占年收入 5.2%。', alert:false, cli:false},
+ 'fin.income':        {name:'收入', pre:'年收入合計 <i>1,656,000 元</i>，其中租賃所得占 13%。', alert:false, cli:true},
+ 'policy:p1':         {name:'保單 · ○○終身壽險', pre:'保額 <i>500 萬</i>、年保費 62,000 元，繳費至 65 歲。', alert:false, cli:false},
+ 'policy:p2':         {name:'保單 · ○○醫療附約', pre:'日額 <i>2,000 元</i>，掛在終身壽險主約下。', alert:false, cli:false},
+ 'policy:p3':         {name:'保單 · △△意外險', pre:'保額 <i>300 萬</i>，一年期產險，需逐年續保。', alert:false, cli:false}
+};
+var POLS = [['p1','○○人壽 終身壽險','王大明','5,000,000','62,000'],
+            ['p2','○○人壽 醫療附約','王大明','2,000/日','8,400'],
+            ['p3','△△產險 意外險','王大明','3,000,000','4,200']];
+
+var KINDS = [['basis','依據','這個數字從哪來'],['decision','決定','談完決定怎麼做'],['todo','待辦','下次要處理的']];
+var KN = {basis:'依據', decision:'決定', todo:'待辦'};
+var draft = {};
+
+var MAP = [
+ ['家庭','家庭成員與參數','family.people'],['收支資債','收入','fin.income'],['收支資債','支出','fin.expense'],
+ ['收支資債','資產','fin.asset'],['收支資債','負債','fin.liability'],['收支資債','儲蓄理財投入','fin.saving'],
+ ['退休','三段式金流','retire.flow'],['退休','退休支出明細','retire.expenses'],['教育','子女教育金','edu.main'],
+ ['目標','目標／置產／願望','goals.list'],['保障','五欄比對表','coverage.five'],['保障','保障需求推算','coverage.need'],
+ ['保障','現有保單','coverage.policies'],['稅賦','所得稅／遺產稅','tax.main'],['意圖','關注議題與人生目標','intent.main'],
+ ['方案','動作清單','plan.actions'],['方案','缺口與槓桿','plan.gap'],['傳承','傳承安排','legacy.main'],
+ ['風險','風險屬性','risk.main'],['信用','聯徵評分','credit.main'],['企業','公私勾稽','biz.linkage'],['企業','退場傳承','biz.exit']
+];
+
+/* ══════════ 權限 ══════════ */
+function canWrite(key){
+ if(role==='client') return !!BLOCKS[key].cli;      // 客戶只能寫他填得到的區塊
+ return true;                                       // 主責與唯讀協作都能寫
+}
+function canSee(n){
+ if(role==='client') return n.visible;              // 客戶只看得到勾了可見的
+ return true;
+}
+function canToggleVisible(){ return role==='owner'; } // 只有主責能勾客戶可見
+function meName(){ return role==='viewer' ? '林教練 · 唯讀協作' : role==='client' ? '王大明 · 客戶' : null; }
+function meAccess(){ return role; }
+
+/* ══════════ 註記帶 ══════════ */
+function noteHTML(key){
+ var b = BLOCKS[key];
+ var mine = notes.filter(function(n){return n.block===key && canSee(n)});
+ var d = draft[key] || (draft[key]={kind:'decision', visible:false, open:false});
+ var writable = canWrite(key);
+
+ var list = mine.map(function(n){
+   var cls = n.access==='client' ? ' cli' : (n.access==='viewer' ? ' other' : '');
+   return '<div class="noteitem'+cls+'"><span class="pill '+n.kind+'">'+KN[n.kind]+'</span>'+
+     '<span style="flex:1">'+esc(n.text)+
+       (n.by?' <span class="by'+(n.access==='client'?' cli':'')+'">· '+esc(n.by)+'</span>':'')+'</span>'+
+     (role==='client'?'':'<span class="eye '+(n.visible?'on':'off')+'" title="'+(n.visible?'客戶可見':'僅對內')+'">'+(n.visible?'👁':'🔒')+'</span>')+
+     '</div>';
+ }).join('');
+
+ // 頭部（收起時的一行）
+ var headRight = mine.length
+   ? '<span class="cnt">已記 '+mine.length+' 則</span>'
+   : (b.alert && role!=='client'
+      ? '<span class="need">缺口偏大，建議記一句</span>'
+      : '<span style="color:var(--mut2)">'+strip(b.pre).slice(0,24)+'…</span>');
+
+ if(!writable && !mine.length) return '';  // 客戶在不能寫的區塊：整條不出現
+
+ var body = '';
+ if(writable){
+   var tags = KINDS.map(function(k){
+     return '<button class="tag'+(d.kind===k[0]?' on':'')+'" onclick="setKind(\''+key+'\',\''+k[0]+'\')" title="'+k[2]+'">'+k[1]+'</button>';
+   }).join('');
+   var vis = canToggleVisible()
+     ? '<label class="chk"><input type="checkbox" id="vi_'+key+'" '+(d.visible?'checked':'')+'> 客戶可見<span class="hint">（預設關）</span></label>'
+     : '<label class="chk lock" title="'+(role==='viewer'?'唯讀協作教練寫的註記不會流到客戶端':'客戶寫的註記不會印進報告書')+'"><input type="checkbox" disabled> 客戶可見<span class="hint">（'+(role==='viewer'?'協作教練不可勾':'客戶不可勾')+'）</span></label>';
+   body = '<div class="tags">'+tags+'</div>'+
+     '<div class="prefill">💬 '+b.pre+'</div>'+
+     '<textarea id="ta_'+key+'" placeholder="'+(role==='client'?'補充說明…例如「租金是我父親的房子，他只收半價」':'接著寫…例如「客戶決定分兩年補足，今年先補 150 萬」')+'"></textarea>'+
+     '<div class="noterow">'+vis+'<span style="flex:1"></span>'+
+       '<button class="btn pri" onclick="addNote(\''+key+'\')">記下</button></div>';
+ }
+
+ return '<div class="notehead" onclick="toggleNote(\''+key+'\')">'+
+   '<span class="pen">✎</span><span>註記</span>'+headRight+
+   '<span class="sp"></span><span style="color:var(--mut2)">'+(d.open?'收起 ▴':'展開 ▾')+'</span></div>'+
+   '<div class="noteopen'+(d.open?'':' hide')+'">'+ body +
+     (list?'<div class="notelist">'+list+'</div>':'') +'</div>';
+}
+
+function paint(){
+ // 保單列
+ var t = document.getElementById('polTbl');
+ if(t){
+   t.innerHTML = '<tr><th>保單</th><th>被保人</th><th class="num">保額</th><th class="num">年保費</th><th style="width:78px"></th></tr>'
+    + POLS.map(function(p){
+      var cnt = notes.filter(function(n){return n.block==='policy:'+p[0] && canSee(n)}).length;
+      return '<tr><td>'+p[1]+'</td><td>'+p[2]+'</td><td class="num">'+p[3]+'</td><td class="num">'+p[4]+'</td>'+
+        '<td><button class="btn sm" onclick="openRow(\'policy:'+p[0]+'\')">✎'+(cnt?' '+cnt:'')+'</button></td></tr>';
+    }).join('');
+ }
+ document.querySelectorAll('[data-note]').forEach(function(el){
+   var k = el.dataset.note, html = noteHTML(k);
+   el.innerHTML = html;
+   el.style.display = html ? '' : 'none';
+   el.className = 'notewrap' + ((BLOCKS[k].alert && role!=='client' && !notes.filter(function(n){return n.block===k}).length) ? ' alert' : '');
+ });
+ // 客戶端隱藏他看不到的區塊
+ document.querySelectorAll('.sec[data-blk]').forEach(function(s){
+   s.style.display = (role==='client' && !BLOCKS[s.dataset.blk].cli
+     && !notes.filter(function(n){return n.block===s.dataset.blk && n.visible}).length) ? 'none' : '';
+ });
+ renderSummary(); paintSess(); paintRole();
+}
+function toggleNote(key){ draft[key]=draft[key]||{kind:'decision',visible:false,open:false}; draft[key].open=!draft[key].open; paint(); }
+function setKind(key,k){ draft[key].kind=k; paint(); }
+function openRow(key){
+ var host = document.querySelector('[data-note^="policy:"], [data-note="coverage.policies"]');
+ draft[key] = draft[key] || {kind:'basis',visible:false,open:true};
+ draft[key].open = true;
+ host.dataset.note = key; paint();
+ setTimeout(function(){var e=document.getElementById('ta_'+key); if(e)e.focus()},40);
+ toast('列級註記就地展開：'+BLOCKS[key].name);
+}
+function addNote(key){
+ var ta=document.getElementById('ta_'+key); if(!ta)return;
+ var txt=(ta.value||'').trim(); if(!txt){toast('先寫點什麼');return}
+ var visEl=document.getElementById('vi_'+key);
+ var vis = canToggleVisible() && visEl && visEl.checked;   // 資料層強制：非主責一律 false
+ notes.push({id:seq++, block:key, kind:draft[key].kind, text:txt, visible:!!vis,
+             by:meName(), access:meAccess(), sessId: sess?sess.id:null});
+ ta.value=''; if(visEl)visEl.checked=false; draft[key].visible=false;
+ paint();
+ toast(sess ? '已記入這一場諮詢' : '已記入「日常維護」');
+}
+
+/* ══════════ 一場諮詢 ══════════ */
+function toggleSess(){
+ if(role!=='owner'){ toast('只有主責教練能開始／結束一場諮詢'); return; }
+ if(!sess){
+   var loose = notes.filter(function(n){return !n.sessId}).length;
+   sess = {id:'s'+seq++, start:'14:32'};
+   if(loose && confirm('上次諮詢後你記了 '+loose+' 則，要帶進這一場當議程嗎？')){
+     notes.forEach(function(n){ if(!n.sessId) n.sessId=sess.id; });
+   }
+   paint(); toast('已釘住目前的規劃版本，這就是還原點');
+ } else {
+   var d = notes.filter(function(n){return n.sessId===sess.id && n.kind==='decision'});
+   if(!d.length){ finishSess(); return; }
+   document.getElementById('picklist').innerHTML = d.map(function(n){
+     var lock = n.access!=='owner';
+     return '<label class="pickrow"'+(lock?' style="opacity:.5"':'')+'><input type="checkbox" data-nid="'+n.id+'" '+(n.visible?'checked':'')+(lock?' disabled':'')+'>'+
+       '<span>'+esc(n.text)+'<span class="src">來自：'+BLOCKS[n.block].name+(lock?'　🔒 '+esc(n.by)+' 寫的，不可對客戶公開':'')+'</span></span></label>';
+   }).join('');
+   document.getElementById('pickmask').classList.add('on');
+ }
+}
+function closePick(){ document.getElementById('pickmask').classList.remove('on'); }
+function finishSess(){
+ document.querySelectorAll('#picklist input').forEach(function(cb){
+   if(cb.disabled) return;
+   var n = notes.filter(function(x){return x.id==cb.dataset.nid})[0];
+   if(n) n.visible = cb.checked;
+ });
+ closePick(); sess=null; paint(); go('p3'); toast('摘要已產生，待辦已進追蹤');
+}
+function paintSess(){
+ var on=!!sess, cnt = sess ? notes.filter(function(n){return n.sessId===sess.id}).length : 0;
+ document.getElementById('sdot').className='dot'+(on?'':' off');
+ document.getElementById('stitle').textContent = on?'諮詢進行中':'不在諮詢中';
+ document.getElementById('ssub').innerHTML = on
+   ? '14:32 開始 · 已記 <b>'+cnt+'</b> 則 · 忘了按結束也沒關係'
+   : '註記照樣可寫，歸「日常維護」';
+ var b=document.getElementById('sbtn');
+ b.textContent = on?'結束並產摘要':'開始諮詢';
+ b.disabled = (role!=='owner');
+ var tc=document.getElementById('tlCnt'); if(tc)tc.textContent=cnt;
+ var sb=document.getElementById('sessBody');
+ if(sb) sb.innerHTML = on
+  ? '<div class="restore"><span class="dot"></span><div style="flex:1;min-width:200px">'+
+    '<b>諮詢進行中</b>　14:32 開始 · 已記 '+cnt+' 則<br>'+
+    '<span class="hint">期間所有註記自動歸屬這一場；開場時已釘住一版當還原點。</span></div>'+
+    '<button class="btn pri" onclick="toggleSess()">結束並產摘要</button></div>'
+  : '<div class="muted">目前不在諮詢中。這時候寫的註記會歸到「<b style="color:var(--amber2)">日常維護</b>」——'+
+    '例如你諮詢前一天自己先看資料、想到要問的問題。<br>下次按「開始諮詢」時，系統會問要不要把它們帶進來當議程。</div>'+
+    '<div class="noterow"><button class="btn pri" onclick="toggleSess()"'+(role!=='owner'?' disabled':'')+'>開始諮詢</button>'+
+    '<span class="hint">'+(role!=='owner'?'只有主責教練能開場':'會釘住目前的規劃版本')+'</span></div>';
+}
+
+/* ══════════ 摘要 / 報告書 ══════════ */
+function renderSummary(){
+ var g={decision:[],basis:[],todo:[]};
+ notes.forEach(function(n){ g[n.kind].push(n) });
+ function fill(id,arr){
+   var el=document.getElementById(id); if(!el)return;
+   el.innerHTML = arr.length ? arr.map(function(n){
+     return '<div class="sumitem">'+esc(n.text)+'<span class="src"> · '+BLOCKS[n.block].name+
+       (n.by?' · '+esc(n.by):'')+(n.visible?' · 👁 客戶可見':'')+'</span></div>';
+   }).join('') : '<div class="muted">—</div>';
+ }
+ fill('sumD',g.decision); fill('sumJ',g.basis); fill('sumT',g.todo);
+ var blk={}; notes.forEach(function(n){blk[n.block]=1});
+ var k1=document.getElementById('k1'),k2=document.getElementById('k2');
+ if(k1)k1.textContent=Object.keys(blk).length||'—';
+ if(k2)k2.textContent=g.todo.length||'—';
+
+ // 報告書：貼在對應章節
+ rp('rp_coverage', ['coverage.five','coverage.policies','policy:p1','policy:p2','policy:p3']);
+ rp('rp_retire',   ['retire.flow']);
+ var el=document.getElementById('rp_summary');
+ if(el){
+   var t=notes.filter(function(n){return n.kind==='todo'});
+   el.innerHTML = t.length
+     ? '<ol style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.85">'+
+       t.map(function(n){return '<li>'+esc(n.text)+'</li>'}).join('')+'</ol>'
+     : '<p style="color:#a89b88;font-size:12.5px">（本次無追蹤事項）</p>';
+ }
+}
+function rp(id, keys){
+ var el=document.getElementById(id); if(!el)return;
+ var v=notes.filter(function(n){return n.visible && keys.indexOf(n.block)>=0});
+ el.innerHTML = v.length ? v.map(function(n){
+   return '<div class="rpnote"><b>顧問註記　</b>'+esc(n.text)+'</div>';
+ }).join('') : '<div style="color:#a89b88;font-size:12px;margin-top:6px">（本章沒有勾選為客戶可見的註記）</div>';
+}
+function showCopy(){
+ var vis=notes.filter(function(n){return n.visible});
+ var t='【2026/08/25 諮詢摘要】王大明\n出席：王大明、王太太\n\n本次總缺口 486 萬 → 324 萬，改善 162 萬。\n\n';
+ var d=vis.filter(function(n){return n.kind==='decision'});
+ var w=notes.filter(function(n){return n.kind==='todo'});
+ if(d.length) t+='◆ 這次的決定\n'+d.map(function(n,i){return (i+1)+'. '+n.text}).join('\n')+'\n\n';
+ if(w.length) t+='◆ 接下來要做的\n'+w.map(function(n,i){return (i+1)+'. '+n.text}).join('\n')+'\n\n';
+ t+='下次約談：2026/11/20';
+ document.getElementById('copytxt').textContent=t;
+ var b=document.getElementById('copybox'); b.style.display='block'; b.scrollIntoView({behavior:'smooth'});
+}
+
+/* ══════════ 角色 ══════════ */
+function setRole(r){
+ role=r;
+ document.querySelectorAll('#roleSw button').forEach(function(b){b.classList.toggle('on',b.dataset.r===r)});
+ paint(); go('p1');
+ toast(r==='owner'?'主責教練：全部可寫、可勾客戶可見'
+      :r==='viewer'?'唯讀協作教練：可寫註記、標明作者，但不能勾客戶可見'
+      :'客戶端：只看得到勾了可見的，只能在自己填得到的區塊寫');
+}
+function paintRole(){
+ var el=document.getElementById('roleTip'); if(!el)return;
+ var m={
+  owner:'',
+  viewer:'<b>唯讀協作教練視角。</b>你能讀全部、也能寫註記（會標上你的名字），但資料一個字都不能改，'+
+         '而且<b>「客戶可見」是鎖住的</b>——協作教練的意見不會流到客戶面前。這是本案唯一要在 <code>clientScope.ts</code> 開第三把尺的地方。',
+  client:'<b>客戶端視角。</b>只看得到教練勾了「客戶可見」的註記；只有<b>收入</b>這類他自己填得到的區塊才有註記框，'+
+         '寫的東西會標成「客戶填的」，而且永遠不能勾可見。上面的區塊消失了就是這個規則在作用。'
+ };
+ el.innerHTML=m[role]; el.style.display = m[role]?'':'none';
+}
+
+/* ══════════ 雜項 ══════════ */
+function go(pg){
+ document.querySelectorAll('.pg').forEach(function(e){e.classList.toggle('on',e.id===pg)});
+ document.querySelectorAll('.dtab').forEach(function(b){b.classList.toggle('on',b.dataset.pg===pg)});
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+var tmr;
+function toast(m){var t=document.getElementById('toast');t.innerHTML=m;t.classList.add('on');
+ clearTimeout(tmr);tmr=setTimeout(function(){t.classList.remove('on')},2300)}
+function strip(s){return s.replace(/<[^>]+>/g,'')}
+function esc(s){return String(s).replace(/[&<>]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[m]})}
+
+/* 掛點總覽 */
+document.getElementById('mapg').innerHTML = MAP.map(function(m){
+ return '<div class="mapcard"><div class="t">'+m[0]+' · '+m[1]+'</div><div class="k">'+m[2]+'</div></div>';
+}).join('');
+
+/* 預塞幾則，讓各頁一開始就看得到形狀 */
+notes.push({id:seq++,block:'coverage.five',kind:'decision',text:'壽險缺口分兩年補足，今年先補 150 萬，明年視獎金再補。',visible:true,by:null,access:'owner',sessId:null});
+notes.push({id:seq++,block:'retire.flow',kind:'basis',text:'客戶說公司 65 歲一定要退，但太太希望他做到 67。以 67 重算。',visible:false,by:null,access:'owner',sessId:null});
+notes.push({id:seq++,block:'coverage.five',kind:'todo',text:'請客戶提供公司團保保單影本，確認實際額度。',visible:false,by:null,access:'owner',sessId:null});
+notes.push({id:seq++,block:'retire.flow',kind:'basis',text:'退休年齡改 67 我覺得偏樂觀，建議也做 65 的版本對照。',visible:false,by:'林教練 · 唯讀協作',access:'viewer',sessId:null});
+notes.push({id:seq++,block:'fin.income',kind:'basis',text:'租金那筆是我父親的房子，他只收半價，之後可能會調整。',visible:false,by:'王大明 · 客戶',access:'client',sessId:null});
+notes.push({id:seq++,block:'policy:p3',kind:'basis',text:'意外險是一年期產險，續保時要重新核保，職業變更要通知。',visible:false,by:null,access:'owner',sessId:null});
+
+paint();
+</script>
+</body>
+</html>

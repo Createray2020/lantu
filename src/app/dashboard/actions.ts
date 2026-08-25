@@ -6,7 +6,9 @@ import { requireWritableCoach, requireClientQuota } from "@/lib/guard";
 import * as Clients from "@/lib/clients";
 import * as Plans from "@/lib/plans";
 import * as Reviews from "@/lib/reviews";
-import { logRevision } from "@/lib/revisions";
+import { logRevision, restoreRevision } from "@/lib/revisions";
+import * as Notes from "@/lib/notes";
+import * as Session from "@/lib/consultSession";
 
 // 這裡是教練端「所有寫入」的唯一身分入口 —— 期限到期的唯讀鎖定就掛在 requireWritableCoach()，
 // 不要繞過它直接取教練身分，否則那條路徑會變成到期後仍可寫的破口。
@@ -131,4 +133,96 @@ export async function deleteActionItemAction(clientId: string, itemId: string): 
   await Reviews.deleteActionItem(cid, itemId);
   revalidatePath(`/dashboard/clients/${clientId}`);
   revalidatePath("/dashboard/overview");
+}
+
+// ── 區塊註記 ＋ 一場諮詢 ────────────────────────────────
+// ⚠️ 這一段刻意只呼叫 lib/notes 與 lib/consultSession，不自己組查詢條件。
+//    「唯讀協作教練可以寫註記」那條例外只住在 lib/notes.ts，
+//    clientScope.drift.test.ts 會掃這支檔案確認它沒有漏出來。
+export type NoteResult = { ok: true; note: Notes.NoteRow } | { ok: false; error: string };
+
+export async function addNoteAction(clientId: string, input: Notes.NoteInput): Promise<NoteResult> {
+  const me = await requireWritableCoach();
+  const cid = me.id;
+  const r = await Notes.addNote(cid, clientId, input, me.name ?? null);
+  if (r.ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return r;
+}
+
+export async function deleteNoteAction(clientId: string, noteId: string): Promise<boolean> {
+  const cid = await coachId();
+  const ok = await Notes.deleteNote(cid, clientId, noteId);
+  if (ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return ok;
+}
+
+export async function setNoteVisibleAction(clientId: string, noteId: string, visible: boolean): Promise<boolean> {
+  const cid = await coachId();
+  return Notes.setNoteVisible(cid, clientId, noteId, visible);
+}
+
+export async function listNotesAction(clientId: string): Promise<Notes.NoteRow[]> {
+  const cid = await coachId();
+  return Notes.listNotes(cid, clientId);
+}
+
+export type StartSessionResult =
+  | { ok: true; session: Session.SessionRow; adopted: number }
+  | { ok: false; error: string };
+
+export async function startSessionAction(
+  clientId: string,
+  planId: string | null,
+  adoptLoose: boolean,
+): Promise<StartSessionResult> {
+  const cid = await coachId();
+  const r = await Session.startSession(cid, clientId, planId, adoptLoose);
+  if (r.ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return r;
+}
+
+export type EndSessionResult =
+  | { ok: true; reviewId: string; todos: number }
+  | { ok: false; error: string };
+
+export async function endSessionAction(clientId: string, sessionId: string, input: Session.EndInput): Promise<EndSessionResult> {
+  const cid = await coachId();
+  const r = await Session.endSession(cid, sessionId, input);
+  if (!r.ok) return r;
+  revalidatePath(`/dashboard/clients/${clientId}`);
+  return { ok: true, reviewId: r.reviewId, todos: r.todos };
+}
+
+export async function openSessionAction(clientId: string): Promise<Session.SessionRow | null> {
+  await coachId();
+  return Session.openSession(clientId);
+}
+
+export async function listSessionsAction(clientId: string): Promise<Session.SessionRow[]> {
+  await coachId();
+  return Session.listSessions(clientId);
+}
+
+export type RestoreResult = { ok: true; planId: string } | { ok: false; error: string };
+
+/**
+ * 回到某一場諮詢開始時的狀態。
+ *
+ * ⚠️ 只還原「規劃資料」，**不動註記**——按下還原就把這一場談出來的東西一起抹掉，
+ *    是誰都不想要的結果，而且那些正是解釋「為什麼要還原」的東西。
+ *    還原本身也記一版（restoreRevision 內建），所以中間的編輯不會變成回不去的孤兒。
+ */
+export async function restoreToSessionAction(clientId: string, sessionId: string): Promise<RestoreResult> {
+  const cid = await coachId();
+  const sessions = await Session.listSessions(clientId, 200);
+  const s = sessions.find((x) => x.id === sessionId);
+  if (!s) return { ok: false, error: "找不到這一場諮詢" };
+  if (!s.planId || !s.revisionId) return { ok: false, error: "這一場沒有可還原的版本快照" };
+  const me = await requireWritableCoach();
+  const owned = await Plans.getPlan(cid, s.planId);
+  if (!owned) return { ok: false, error: "沒有這份規劃的權限" };
+  const r = await restoreRevision(s.planId, s.revisionId, { type: "coach", id: cid, name: me.name ?? null });
+  if (!r.ok) return { ok: false, error: r.error };
+  revalidatePath(`/dashboard/clients/${clientId}`);
+  return { ok: true, planId: s.planId };
 }

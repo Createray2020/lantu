@@ -855,3 +855,68 @@ export const learnProgress = pgTable('learn_progress', {
   uniqueIndex('learn_progress_coach_lesson_uidx').on(t.coachId, t.lessonId),
   index('learn_progress_coach_course_idx').on(t.coachId, t.courseId),
 ]);
+
+/* ══════════════════════════════════════════════════════════════════════
+   區塊註記 ＋ 一場諮詢
+   ══════════════════════════════════════════════════════════════════════ */
+
+// 區塊註記：「這個數字為什麼是這樣」的說明。
+//
+// ⚠️ 主鍵刻意掛在 **客戶** 身上，不掛年度版本。
+//    「這位客戶的房貸在他媽媽名下，不計入負債」明年一樣成立——綁在 plan 上
+//    就得每年重打一次，而年度重製（複製去年成今年）是這套系統最常走的動線。
+//
+// visible 的 default 是 false 而且是**資料庫層**的預設：註記會被印進帶公司抬頭的
+// 客戶文件，嵐途是一般顧問公司、不得從事保險招攬或投資顧問，所以「不小心印出去」
+// 的成本遠高於「忘記勾」。authorAccess 不是 'owner' 的列一律不得為 true，
+// 由 lib/notes.ts 在寫入時強制覆寫（不是靠 UI 擋）。
+export const clientNotes = pgTable('client_notes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  // null ＝ 日常維護（沒開諮詢時寫的）。場次被刪不該連帶刪掉註記，所以是 set null。
+  sessionId: uuid('session_id').references((): AnyPgColumn => consultSessions.id, { onDelete: 'set null' }),
+  blockKey: text('block_key').notNull(),               // 'coverage.five' / 'policy:<pid>' …
+  kind: text('kind').default('basis').notNull(),       // basis 依據 / decision 決定 / todo 待辦
+  body: text('body').notNull(),
+  visible: boolean('visible').default(false).notNull(),
+  authorType: text('author_type').default('coach').notNull(),   // coach / client
+  authorId: text('author_id'),
+  authorName: text('author_name'),
+  // owner 主責 / viewer 唯讀協作教練 / client 客戶本人。viewer 與 client 永遠 visible=false。
+  authorAccess: text('author_access').default('owner').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('client_notes_client_block_idx').on(t.clientId, t.blockKey),
+  index('client_notes_session_idx').on(t.sessionId),
+  index('client_notes_client_created_idx').on(t.clientId, t.createdAt.desc()),
+]);
+
+// 一場諮詢：把「這次談了什麼」變成諮詢過程的副產品，而不是事後回想補寫的作業。
+//
+// revisionId 是開場那一刻釘住的版本快照 —— 現有的還原功能叫「第 37 版」，
+// 諮詢當下沒有人想得起來去點它；有了場次它才有講得出口的名字：
+// 「回到上次諮詢開始時的狀態」。
+//
+// metricsBefore / metricsAfter 存的是 shortPV 等指標，摘要靠它算出「這次改善多少」——
+// 評判標準是「比原本更優化」而不是「補平」。
+export const consultSessions = pgTable('consult_sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  planId: uuid('plan_id').references(() => plans.id, { onDelete: 'set null' }),
+  revisionId: uuid('revision_id').references(() => planRevisions.id, { onDelete: 'set null' }),
+  startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  // manual 手動結束 / superseded 開了新的一場 / auto 隔天自動封場。
+  // ⚠️ 忘記按結束是必然會發生的，而且絕不能造成資料損失——最多只是摘要沒被人工整理過。
+  closeReason: text('close_reason'),
+  reviewId: uuid('review_id').references(() => reviews.id, { onDelete: 'set null' }),
+  metricsBefore: jsonb('metrics_before'),
+  metricsAfter: jsonb('metrics_after'),
+}, (t) => [
+  index('consult_sessions_client_started_idx').on(t.clientId, t.startedAt.desc()),
+  // 一位客戶同時只能有一場未結束的諮詢。少了這條，忘記按結束又開新的一場，
+  // 註記會同時歸屬兩場，摘要範圍就永遠對不起來。
+  uniqueIndex('consult_sessions_one_open_per_client').on(t.clientId).where(sql`ended_at is null`),
+]);

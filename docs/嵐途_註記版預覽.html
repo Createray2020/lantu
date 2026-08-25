@@ -9392,9 +9392,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
 })();
 </script>
 
-<!-- ══ 區塊註記 ＋ 一場諮詢 ＋ 摘要匯出（2026/08/25）══
-     零侵入：不改任何既有 Sec 函式，wrap render() 之後依區塊標題掛載。
-     embed 模式走 DB（client_notes／consult_sessions），直接開這個檔走 localStorage。 -->
+<!-- ══ 區塊註記 ＋ 一場諮詢（新增）══ -->
 <script>
 /* ══════════════════════════════════════════════════════════════
    嵐途 · 區塊註記 ＋ 一場諮詢 ＋ 摘要匯出
@@ -9462,63 +9460,22 @@ var KINDS = [['basis','依據','這個數字從哪來'],['decision','決定','�
 /* 客戶端可寫的區塊（客戶只填得到事實層） */
 var CLIENT_WRITABLE = {'fin.income':1,'fin.expense':1,'fin.asset':1,'fin.liability':1,'family.people':1,'goals.list':1};
 
-var LN_REMOTE_STATE;
 var LN = window.LN = {
  draft:{},           // key -> {kind, visible, open, text}
- role: IS_CLIENT_VIEW ? 'client' : 'owner',   // owner / viewer / client（remote 時由父層的 noteAccess 決定）
+ role:'owner',       // owner / viewer / client（預覽用；正式版由伺服器決定）
  mountedKeys:[]
 };
 
-/* ───────── 資料存取 ─────────
-   兩種模式，形狀一樣、來源不同：
-     remote（embed，掛在 /dashboard 外殼底下）＝ 註記住在 DB 的 client_notes／consult_sessions，
-        父層灌進來、寫入走 postMessage。⚠️ 絕對不能塞進 case——那會被 save() 寫回 plans.data，
-        變成「同一則註記有兩份真相」，而且年度重製時不會延續。
-     local（直接開這個檔）＝ 存在 case 裡，走 localStorage。示範與離線用。 */
-var REMOTE = /[?&]embed=1/.test(location.search);
-var IS_CLIENT_VIEW = /[?&]role=client/.test(location.search);
-LN_REMOTE_STATE = { notes: [], session: null, access: 'owner' };
-
+/* ───────── 資料存取 ───────── */
 function C(){ return (typeof activeCase==='function') ? activeCase() : null; }
-function allNotes(){
- if(REMOTE) return LN_REMOTE_STATE.notes;
- var c=C(); if(!c)return []; if(!c.notes)c.notes=[]; return c.notes;
-}
-function sess(){
- if(REMOTE) return LN_REMOTE_STATE.session;
- var c=C(); return c ? (c.sess||null) : null;
-}
-
-/* DB 的欄位名 ↔ 這支檔案內部用的欄位名。
-   刻意做成一層對映而不是整份改名：本機模式與 remote 模式共用同一套畫面程式，
-   只有這兩支函式知道 DB 長什麼樣。 */
-function fromRow(r){
- return {
-  id:r.id, block:r.blockKey, kind:r.kind, text:r.body, visible:!!r.visible,
-  by:r.authorName||null, access:r.authorAccess||'owner',
-  sessId:r.sessionId||null, at:fmtAt(r.createdAt)
- };
-}
-function toInput(n){ return { blockKey:n.block, kind:n.kind, body:n.text, visible:!!n.visible }; }
-function fmtAt(v){
- try{ var d=new Date(v); return p2(d.getMonth()+1)+'/'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes()); }
- catch(e){ return ''; }
-}
-function toParentLN(msg){
- try{
-  var origin=(function(){ try{ var r=document.referrer; if(r) return new URL(r).origin; }catch(e){} return location.origin; })();
-  parent.postMessage(msg, origin);
- }catch(e){}
-}
+function allNotes(){ var c=C(); if(!c)return []; if(!c.notes)c.notes=[]; return c.notes; }
+function sess(){ var c=C(); return c ? (c.sess||null) : null; }
 function nid(){ return 'n'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36); }
 function persist(){ try{ if(typeof save==='function') save(); }catch(e){} }
 
 function meName(){ return LN.role==='viewer' ? '林教練 · 唯讀協作' : LN.role==='client' ? '客戶本人' : null; }
-function canWrite(key){
- if(REMOTE && LN_REMOTE_STATE.access==='none') return false;   // 使用期限到期＝連註記都不給寫
- return LN.role==='client' ? !!CLIENT_WRITABLE[key] : true;
-}
-function canVisible(){ return LN.role==='owner' && !(REMOTE && LN_REMOTE_STATE.access!=='owner'); }
+function canWrite(key){ return LN.role==='client' ? !!CLIENT_WRITABLE[key] : true; }
+function canVisible(){ return LN.role==='owner'; }
 function canSee(n){ return LN.role==='client' ? !!n.visible : true; }
 
 /* ───────── 系統預填句（吃真實引擎數字） ───────── */
@@ -9544,12 +9501,6 @@ function snapMetrics(c){
 }
 LN.restore=function(sessId){
  var c=C(); if(!c) return;
- if(REMOTE){
-  if(!confirm('把資料回到那一場諮詢開始時的狀態？\n（註記會保留；還原本身也會記一版，中間的編輯回得去）')) return;
-  toParentLN({ type:'lantu:session', op:'restore', sessionId:sessId });
-  flash('還原中…');
-  return;
- }
  var s = (c.sess&&c.sess.id===sessId) ? c.sess : (c.sessions||[]).filter(function(x){return x.id===sessId})[0];
  if(!s||!s.snap){ flash('這一場沒有可還原的快照'); return; }
  if(!confirm('把資料回到 '+(s.date||'')+' '+(s.start||'')+' 諮詢開始時的狀態？\n（這一場記下的註記會保留）')) return;
@@ -9962,20 +9913,13 @@ function mountSessBar(){
   '<span class="lnsp"></span>'+
   (s?'<button class="lnbtn" onclick="LN.restore(\''+s.id+'\')" title="把資料回到這一場開始時；註記保留">回到開場狀態</button>'+
       '<button class="lnbtn" onclick="LN.summary()">看摘要</button>':
-     (lastSessionId()?'<button class="lnbtn" onclick="LN.restore(\''+lastSessionId()+'\')">回到上次諮詢開始時</button>':''))+
+     ((C()&&(C().sessions||[]).length)?'<button class="lnbtn" onclick="LN.restore(\''+C().sessions[0].id+'\')">回到上次諮詢開始時</button>':''))+
   '<button class="lnbtn pri" onclick="LN.session()"'+(LN.role!=='owner'?' disabled':'')+'>'+(s?'結束並產摘要':'開始諮詢')+'</button>'+
   '</div>';
 }
 
-/* 最近一場已結束的諮詢＝「上次」。remote 由父層灌 LN_REMOTE_STATE.past。 */
-function lastSessionId(){
- if(REMOTE) return (LN_REMOTE_STATE.past&&LN_REMOTE_STATE.past[0]&&LN_REMOTE_STATE.past[0].id)||null;
- var c=C(); return (c&&c.sessions&&c.sessions[0]&&c.sessions[0].id)||null;
-}
-
 /* ───────── 對外 API ───────── */
 LN.toggle=function(k){ d(k).open=!d(k).open; redraw(); };
-LN.open=function(k){ if(!d(k).open){ d(k).open=true; redraw(); } };   // 冪等：連按不會反而收起來
 LN.kind=function(k,v){ d(k).kind=v; redraw(); };
 LN.vis=function(k,v){ d(k).visible=v; };
 LN.typing=function(k,v){ d(k).text=v; };
@@ -9985,26 +9929,15 @@ LN.add=function(k){
  var st=d(k), txt=(st.text||'').trim();
  if(!txt){ flash('先寫點什麼'); return; }
  var s=sess();
- var draftNote={ block:k, kind:st.kind, text:txt, visible: canVisible() && !!st.visible };
- if(REMOTE){
-  // 樂觀更新：先畫出來，父層存完會用 lantu:notes 把真的那一列推回來覆蓋。
-  toParentLN({ type:'lantu:note', op:'add', input: toInput(draftNote) });
-  LN_REMOTE_STATE.notes = LN_REMOTE_STATE.notes.concat([{
-   id:'tmp_'+nid(), block:k, kind:st.kind, text:txt,
-   visible:draftNote.visible, by:meName(), access:LN.role, sessId:s?s.id:null, at:stamp(), pending:true
-  }]);
- }else{
-  allNotes().push({
-   id:nid(), block:k, kind:st.kind, text:txt,
-   visible: draftNote.visible,                 // 非主責一律 false（資料層強制）
-   by: meName(), access: LN.role,
-   sessId: s?s.id:null,
-   at: stamp()
-  });
-  persist();
- }
+ allNotes().push({
+  id:nid(), block:k, kind:st.kind, text:txt,
+  visible: canVisible() && !!st.visible,       // 非主責一律 false（資料層強制）
+  by: meName(), access: LN.role,
+  sessId: s?s.id:null,
+  at: stamp()
+ });
  st.text=''; st.visible=false;
- redraw();
+ persist(); redraw();
  flash(s?'已記入這一場諮詢':'已記入「日常維護」');
 };
 LN.del=function(id){
@@ -10012,30 +9945,19 @@ LN.del=function(id){
  for(var j=0;j<arr.length;j++) if(arr[j].id===id) i=j;
  if(i<0) return;
  if(!confirm('刪除這則註記？')) return;
- if(REMOTE){
-  toParentLN({ type:'lantu:note', op:'del', noteId:id });
-  LN_REMOTE_STATE.notes = LN_REMOTE_STATE.notes.filter(function(x){return x.id!==id});
- }else{
-  arr.splice(i,1); persist();
- }
- redraw();
+ arr.splice(i,1); persist(); redraw();
 };
 
 LN.session=function(){
  if(LN.role!=='owner'){ flash('只有主責教練能開始／結束諮詢'); return; }
- if(REMOTE && LN_REMOTE_STATE.access!=='owner'){ flash('只有主責教練能開始／結束諮詢'); return; }
  var c=C(); if(!c) return;
- if(!sess()){
+ if(!c.sess){
   var loose=allNotes().filter(function(x){return !x.sessId});
-  var adopt = loose.length ? confirm('上次諮詢後你記了 '+loose.length+' 則，要帶進這一場當議程嗎？') : false;
-  if(REMOTE){
-   toParentLN({ type:'lantu:session', op:'start', adoptLoose:adopt });
-   flash('正在開場…已釘住目前的規劃版本');
-   return;
-  }
   c.sess={ id:'s'+Date.now().toString(36), start:hhmm(), date:today(),
            before: snapMetrics(c), snap: snapCase(c) };
-  if(adopt) loose.forEach(function(x){ x.sessId=c.sess.id; });
+  if(loose.length && confirm('上次諮詢後你記了 '+loose.length+' 則，要帶進這一場當議程嗎？')){
+   loose.forEach(function(x){ x.sessId=c.sess.id; });
+  }
   persist(); redraw(); flash('已釘住目前的規劃版本，這就是還原點');
  }else{
   openPick();
@@ -10073,20 +9995,8 @@ LN.finish=function(){
 };
 function finish(){
  var c=C(); if(!c) return;
- var s=sess(); if(!s) return;
- if(REMOTE){
-  // 批次勾選的結果一起送出去；伺服器端定案可見性 → 產 review → 產 action_items。
-  var ids=[];
-  var mask=document.getElementById('lnMask');
-  if(mask) [].slice.call(mask.querySelectorAll('.lnpick input')).forEach(function(cb){
-   if(!cb.disabled && cb.checked) ids.push(cb.dataset.nid);
-  });
-  toParentLN({ type:'lantu:session', op:'end', sessionId:s.id, input:{ visibleNoteIds:ids } });
-  LN.closeMask();
-  flash('摘要產生中…待辦會進追蹤');
-  return;
- }
  if(!c.sessions) c.sessions=[];
+ var s=c.sess;
  s.end=hhmm();
  s.after=snapMetrics(c);
  s.notes=allNotes().filter(function(x){return x.sessId===s.id}).length;
@@ -10191,7 +10101,6 @@ function flash(msg){
  clearTimeout(_ft); _ft=setTimeout(function(){ t.classList.remove('on'); },2200);
 }
 LN.flash=flash;
-LN.prefillOf=prefillOf;   // 測試用：逐一掃每個掛點的預填句是不是空的
 function p2(x){ return (x<10?'0':'')+x; }
 function hhmm(){ var d2=new Date(); return p2(d2.getHours())+':'+p2(d2.getMinutes()); }
 function today(){ var d2=new Date(); return d2.getFullYear()+'/'+p2(d2.getMonth()+1)+'/'+p2(d2.getDate()); }
@@ -10304,38 +10213,10 @@ body{padding-bottom:52px}
  .lnmodal{max-height:none;border:none}}
 `;
 
-/* ───────── 接收父層（embed 模式）─────────
-   父層是唯一的資料來源：它查 DB、它寫 DB，這裡只負責畫。
-   只認 parent 且比對 origin —— 少了這道，任何網站把這份檔案 iframe 進去就能塞假註記。 */
-function listenParent(){
- if(!REMOTE) return;
- var ORIGIN=(function(){ try{ var r=document.referrer; if(r) return new URL(r).origin; }catch(e){} return location.origin; })();
- window.addEventListener('message', function(e){
-  if(e.source!==parent) return;
-  if(e.origin && ORIGIN && e.origin!==ORIGIN) return;
-  var m=e.data; if(!m || (m.type!=='lantu:init' && m.type!=='lantu:notes')) return;
-  if(Array.isArray(m.notes)) LN_REMOTE_STATE.notes = m.notes.map(fromRow);
-  if(m.session!==undefined){
-   LN_REMOTE_STATE.session = m.session ? {
-    id:m.session.id, start:fmtAt(m.session.startedAt), date:(m.session.startedAt||'').toString().slice(0,10),
-    before:m.session.metricsBefore||null
-   } : null;
-  }
-  if(Array.isArray(m.past)) LN_REMOTE_STATE.past = m.past;
-  if(m.noteAccess) {
-   LN_REMOTE_STATE.access = m.noteAccess;
-   // 協作教練看到的是同一個畫面，差別在「客戶可見」鎖住、註記標名字。
-   LN.role = m.noteAccess==='client' ? 'client' : (m.noteAccess==='viewer' ? 'viewer' : 'owner');
-  }
-  try{ if(typeof render==='function') render(); else mount(); }catch(err){}
- });
-}
-
 /* ───────── 啟動 ───────── */
 function boot(){
  var st=document.createElement('style'); st.id='lnCSS'; st.textContent=CSS;
  document.head.appendChild(st);
- listenParent();
 
  // wrap render：零侵入
  if(typeof window.render==='function'){
@@ -10349,6 +10230,44 @@ else boot();
 
 })();
 
+</script>
+
+<script>
+/* ───── 預覽副本專用（正式版不含這段）───── */
+(function(){
+ function boot(){
+  try{
+   if(!window.app) return setTimeout(boot,60);
+   if(!app.cases || !app.cases.length){
+     app.cases=[migrateCase(sampleCase())];
+     app.activeId=app.cases[0].id;
+     try{save()}catch(e){}
+   }
+   if(!app.activeId) app.activeId=app.cases[0].id;
+   // 頂欄插角色切換（預覽用）
+   var sw=document.getElementById('roleSw');
+   if(sw && !document.getElementById('lnRoleSw')){
+     var d=document.createElement('div'); d.id='lnRoleSw';
+     d.style.cssText='display:inline-flex;margin-left:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;vertical-align:middle';
+     d.innerHTML=['owner','viewer','client'].map(function(r,i){
+       var t={owner:'主責',viewer:'唯讀協作',client:'客戶端'}[r];
+       return '<button data-lnr="'+r+'" style="background:'+(i===0?'var(--card2)':'transparent')+';border:none;color:'+(i===0?'var(--amber2)':'var(--mut2)')+';padding:4px 10px;font:700 11.5px inherit;cursor:pointer">'+t+'</button>';
+     }).join('');
+     sw.parentNode.insertBefore(d,sw.nextSibling);
+     d.querySelectorAll('[data-lnr]').forEach(function(b){
+       b.onclick=function(){
+         d.querySelectorAll('[data-lnr]').forEach(function(x){x.style.background='transparent';x.style.color='var(--mut2)'});
+         b.style.background='var(--card2)'; b.style.color='var(--amber2)';
+         LN.setRole(b.dataset.lnr);
+       };
+     });
+   }
+   if(typeof render==='function') render();
+  }catch(e){ console.error('[preview]',e); }
+ }
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,80)});
+ else setTimeout(boot,80);
+})();
 </script>
 </body>
 </html>

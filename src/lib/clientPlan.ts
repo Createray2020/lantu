@@ -230,14 +230,14 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
 // 刻意仍取「最新一份」（跨兩軌）——掛了教練之後，客戶在「我的財務藍圖」看到的就是教練做的年度版，
 // 這是對的：客戶要看的是最新的規劃，不是自己當初的護照骨架。
 // 「客戶能改哪些 section」是另一件事（見 客戶可編頁面清單），與這裡取哪一份無關。
-export async function getClientPlanCase(clientUserId: string): Promise<{ planId: string; data: unknown; code: string | null } | null> {
+export async function getClientPlanCase(clientUserId: string): Promise<{ planId: string; clientId: string; data: unknown; code: string | null } | null> {
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];
   if (!client) return null;
   const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
   const plan = pRows[0];
   if (!plan) return null;
-  return { planId: plan.id, data: plan.data, code: client.code ?? null };
+  return { planId: plan.id, clientId: client.id, data: plan.data, code: client.code ?? null };
 }
 
 /**

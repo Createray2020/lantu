@@ -176,6 +176,13 @@
       "when": 1787600446756,
       "tag": "0024_legal_nicolaos",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787694233531,
+      "tag": "0025_romantic_paibok",
+      "breakpoints": true
     }
   ]
 }

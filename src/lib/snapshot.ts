@@ -92,3 +92,26 @@ export function planMetrics(data: unknown): PlanMetrics {
     return { ...EMPTY_METRICS };
   }
 }
+
+/**
+ * 一場諮詢的前後指標。摘要靠它算出「這次改善了多少」。
+ *
+ * ⚠️ 用 shortPV（現值缺口）當主指標，不是把各項缺口相加——
+ *    「總缺口」的唯一定義是 projection() 的 shortPV，相加是錯的。
+ *    shortPV 住在 metrics().proj 底下，不在 metrics() 頂層。
+ */
+export type SessionMetrics = { shortPV: number | null; net: number | null; gap: number | null };
+
+export function sessionMetrics(data: unknown): SessionMetrics {
+  if (!looksLikeCase(data)) return { shortPV: null, net: null, gap: null };
+  try {
+    const m = (metrics(data) ?? {}) as Record<string, unknown>;
+    const proj = (m.proj ?? {}) as Record<string, unknown>;
+    let gap: number | null = null;
+    try { gap = Math.round(num(totalGap(data))); } catch { gap = null; }
+    return { shortPV: Math.round(num(proj.shortPV)), net: Math.round(num(m.net)), gap };
+  } catch (e) {
+    console.error("[sessionMetrics] 無法計算", e);
+    return { shortPV: null, net: null, gap: null };
+  }
+}

@@ -77,3 +77,44 @@ describe("讀取路徑確實放寬了（不然這個功能等於沒做）", () =
     expect(R("src/app/dashboard/plans/[planId]/edit/page.tsx")).toMatch(/readOnly=\{[^}]*isOwner/);
   });
 });
+
+/**
+ * 第三把尺 annotatableClient() 的圍欄。
+ *
+ * 它是全庫唯一「讀得到就寫得進去」的例外，只為了讓唯讀協作教練能留意見。
+ * 一旦它出現在註記以外的寫入路徑，「唯讀協作」就會擴散成「共同編輯」，
+ * 而且畫面上完全看不出來——跟當初 readableClient 的坑一模一樣。
+ */
+describe("annotatableClient() 只准住在 lib/notes.ts", () => {
+  const ALLOWED = ["src/lib/clientScope.ts", "src/lib/notes.ts"];
+  const SCAN = [
+    "src/lib/clients.ts",
+    "src/lib/plans.ts",
+    "src/lib/reviews.ts",
+    "src/lib/revisions.ts",
+    "src/lib/consultSession.ts",
+    "src/app/dashboard/actions.ts",
+  ];
+
+  it.each(SCAN)("%s 不引用 annotatableClient", (file) => {
+    expect(ALLOWED.includes(file)).toBe(false);
+    expect(
+      /annotatableClient/.test(R(file)),
+      `${file} 用到了 annotatableClient()——唯讀協作教練會因此改得動這條路徑`,
+    ).toBe(false);
+  });
+
+  it("lib/notes.ts 的可見性由資料層強制，不是靠呼叫端傳進來", () => {
+    const src = R("src/lib/notes.ts");
+    // addNote 必須用 access 決定 visible，不能直接吃 input.visible
+    expect(/visible:\s*access === "owner" \? !!input\.visible : false/.test(src)).toBe(true);
+    // 客戶寫的永遠 false
+    expect(/authorAccess: "client"/.test(src)).toBe(true);
+  });
+
+  it("開始／結束諮詢一律只認主責（不可用讀範圍或註記範圍）", () => {
+    const src = R("src/lib/consultSession.ts");
+    expect(/ownedClient/.test(src)).toBe(true);
+    expect(READ_SCOPE.test(src)).toBe(false);
+  });
+});
