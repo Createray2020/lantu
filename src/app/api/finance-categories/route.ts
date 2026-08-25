@@ -1,7 +1,11 @@
 // 收支資債細類 + 教育費用參數 + 企業稅務法規常數：iframe app（public/lantu-app.html）載入時抓一次。
 // 公開（見 proxy.ts）：類別名稱、學費參數與稅率都不是客戶資料，且 app 在登入前的客戶端也會用到。
-// 三份都有 unstable_cache（tag: finance-categories / edu-costs / biz-tax），後台一存就即時生效，
-// 所以這裡可以放心給瀏覽器短快取。
+// 每一份都有 unstable_cache（tag: finance-categories / edu-costs / biz-tax / ins-products / an-defaults），
+// 後台一存伺服器端就即時生效，所以這裡可以放心給短快取。
+// ⚠️ 但 max-age 是**邊緣快取**（Vercel CDN 會照這個數字 HIT，updateTag 打不到它）——
+//    2026/08/25 實測：後台存完，這支 API 仍會回舊值直到 age 超過 max-age。
+//    原本是 300 秒，對「後台改完想馬上看到」太久；降成 60 秒。
+//    降這個數字幾乎不花成本：回源時 unstable_cache 還在，根本不會多打 DB。
 import { getCategoryPayload } from "@/lib/financeCategories";
 import { getEduCosts } from "@/lib/eduCosts";
 import { getBizTaxPayload } from "@/lib/bizTaxParams";
@@ -19,6 +23,6 @@ export async function GET() {
   ]);
   return Response.json(
     { cats, edu, biz, ins, an },
-    { headers: { "cache-control": "public, max-age=300, stale-while-revalidate=3600" } },
+    { headers: { "cache-control": "public, max-age=60, stale-while-revalidate=3600" } },
   );
 }

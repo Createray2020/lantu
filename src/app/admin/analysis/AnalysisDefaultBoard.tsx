@@ -47,7 +47,7 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
   const save = () =>
     run(
       () => saveAnDefaultsAction(list.map((r) => r.k), list.filter((r) => r.hidden).map((r) => r.k)),
-      "已存檔，所有教練重新整理後即生效",
+      "已存檔。教練端最慢一分鐘內重新整理就會看到（那支設定 API 有一分鐘的邊緣快取）",
       () => setDirty(false),
     );
 
