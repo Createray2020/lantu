@@ -1,0 +1,917 @@
+<title>insure80 保單健檢拆解</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  color-scheme: light;
+  --ground:#f5f8f8; --surface:#ffffff; --surface-2:#eef3f3;
+  --ink:#10171a; --ink-2:#46545a; --muted:#7b8a90;
+  --rule:#dce4e5; --rule-soft:#e9eeee;
+  --accent:#0e5257; --accent-2:#12787f; --accent-wash:#dcecec;
+  --s1:#2a78d6; --s2:#eb6834;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --shadow:0 1px 2px rgba(16,23,26,.05), 0 8px 24px -16px rgba(16,23,26,.35);
+  --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans:"Noto Sans TC", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif:"Noto Serif TC", Georgia, serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --ground:#0e1315; --surface:#151b1d; --surface-2:#1b2325;
+    --ink:#edf2f2; --ink-2:#a9b6ba; --muted:#7f8d92;
+    --rule:#26302f; --rule-soft:#1e2729;
+    --accent:#4fb3ba; --accent-2:#67c8ce; --accent-wash:#16302f;
+    --s1:#3987e5; --s2:#d95926;
+    --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --ground:#0e1315; --surface:#151b1d; --surface-2:#1b2325;
+  --ink:#edf2f2; --ink-2:#a9b6ba; --muted:#7f8d92;
+  --rule:#26302f; --rule-soft:#1e2729;
+  --accent:#4fb3ba; --accent-2:#67c8ce; --accent-wash:#16302f;
+  --s1:#3987e5; --s2:#d95926;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--sans); font-size:16px; line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:0 24px 96px;}
+.col{max-width:74ch;}
+
+h1,h2,h3,h4{font-family:var(--serif); font-weight:700; text-wrap:balance; line-height:1.35; margin:0;}
+p{margin:0;}
+a{color:var(--accent-2); text-underline-offset:3px;}
+a:focus-visible, summary:focus-visible{outline:2px solid var(--accent-2); outline-offset:3px; border-radius:4px;}
+
+/* ── masthead ─────────────────────────────── */
+.mast{border-bottom:1px solid var(--rule); background:var(--surface); }
+.mast .wrap{padding-top:34px; padding-bottom:34px; display:flex; flex-direction:column; gap:18px;}
+.kicker{font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); display:flex; flex-wrap:wrap; gap:14px; align-items:center;}
+.kicker .dot{width:4px;height:4px;border-radius:50%;background:var(--accent-2);}
+h1{font-size:clamp(30px,4.6vw,46px); letter-spacing:-.01em;}
+.dek{font-size:17px; color:var(--ink-2); max-width:62ch;}
+
+/* ── hero figure ──────────────────────────── */
+.hero{padding:40px 0 8px;}
+.figure{
+  background:var(--surface); border:1px solid var(--rule); border-radius:14px;
+  box-shadow:var(--shadow); padding:26px 22px 20px; overflow-x:auto;
+}
+.figure svg{display:block; min-width:640px; width:100%; height:auto;}
+.figcap{font-size:13.5px; color:var(--muted); margin-top:14px; padding-top:12px; border-top:1px solid var(--rule-soft);}
+
+.stats{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:18px;}
+.stat{background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:16px 18px;}
+.stat .n{font-family:var(--serif); font-size:34px; font-weight:700; line-height:1.1; color:var(--accent-2); font-variant-numeric:tabular-nums;}
+.stat .l{font-size:13px; color:var(--ink-2); margin-top:4px;}
+@media (max-width:640px){ .stats{grid-template-columns:1fr;} }
+
+/* ── sections ─────────────────────────────── */
+section{padding-top:64px;}
+.eyebrow{font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent-2); margin-bottom:10px;}
+h2{font-size:clamp(23px,3vw,30px); margin-bottom:6px;}
+h3{font-size:19px; margin:34px 0 8px;}
+h4{font-size:15.5px; font-family:var(--sans); font-weight:700; margin:22px 0 6px; color:var(--ink);}
+section > .col > p + p{margin-top:14px;}
+.lede{color:var(--ink-2); font-size:16.5px; margin-bottom:20px;}
+
+hr.sep{border:0; border-top:1px solid var(--rule); margin:0;}
+
+/* ── tables ───────────────────────────────── */
+.tablewrap{overflow-x:auto; border:1px solid var(--rule); border-radius:12px; background:var(--surface); margin:16px 0;}
+table{border-collapse:collapse; width:100%; font-size:14px; min-width:520px;}
+th,td{text-align:left; padding:10px 14px; border-bottom:1px solid var(--rule-soft); vertical-align:top;}
+thead th{background:var(--surface-2); font-weight:700; font-size:12.5px; letter-spacing:.03em; color:var(--ink-2); white-space:nowrap;}
+tbody tr:last-child td{border-bottom:0;}
+td.num, th.num{text-align:right; font-variant-numeric:tabular-nums; font-family:var(--mono); white-space:nowrap;}
+code, .code{font-family:var(--mono); font-size:.88em; background:var(--surface-2); padding:1px 5px; border-radius:4px; color:var(--ink);}
+
+/* ── chips / pills ────────────────────────── */
+.pill{display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; padding:2px 9px; border-radius:999px; white-space:nowrap; border:1px solid transparent;}
+.pill.low{color:var(--crit); border-color:color-mix(in srgb, var(--crit) 40%, transparent); background:color-mix(in srgb, var(--crit) 10%, transparent);}
+.pill.high{color:var(--serious); border-color:color-mix(in srgb, var(--serious) 45%, transparent); background:color-mix(in srgb, var(--serious) 12%, transparent);}
+.pill.ok{color:var(--good); border-color:color-mix(in srgb, var(--good) 40%, transparent); background:color-mix(in srgb, var(--good) 10%, transparent);}
+.req{color:var(--crit); font-weight:700;}
+
+/* ── details ──────────────────────────────── */
+details{border:1px solid var(--rule); border-radius:12px; background:var(--surface); margin:14px 0; overflow:hidden;}
+details > summary{
+  cursor:pointer; padding:13px 18px; font-weight:700; font-size:14.5px; list-style:none;
+  display:flex; align-items:center; gap:10px; color:var(--ink);
+}
+details > summary::-webkit-details-marker{display:none;}
+details > summary::before{
+  content:"＋"; font-family:var(--mono); font-size:13px; color:var(--accent-2); flex:none;
+}
+details[open] > summary::before{content:"−";}
+details[open] > summary{border-bottom:1px solid var(--rule-soft);}
+.dbody{padding:4px 18px 18px;}
+.dbody .tablewrap{border:0; border-radius:0; background:transparent; margin:8px 0;}
+.dbody table{min-width:480px;}
+.dbody p{font-size:14.5px; color:var(--ink-2); margin-top:12px;}
+summary .cnt{margin-left:auto; font-family:var(--mono); font-size:11.5px; color:var(--muted); font-weight:400;}
+
+/* ── callouts ─────────────────────────────── */
+.note{
+  border-left:3px solid var(--accent-2); background:var(--accent-wash);
+  padding:14px 18px; border-radius:0 10px 10px 0; font-size:14.5px; margin:18px 0; color:var(--ink);
+}
+.note b{color:var(--accent-2);}
+.formula{
+  font-family:var(--mono); font-size:13.5px; background:var(--surface-2);
+  border:1px solid var(--rule); border-radius:10px; padding:14px 16px; margin:14px 0;
+  overflow-x:auto; white-space:pre; line-height:1.8; color:var(--ink);
+}
+
+ul.tight{margin:12px 0; padding-left:20px;}
+ul.tight li{margin:5px 0;}
+ul.tight li::marker{color:var(--accent-2);}
+
+/* ── chart ────────────────────────────────── */
+.legend{display:flex; gap:18px; font-size:13px; color:var(--ink-2); margin-bottom:14px; flex-wrap:wrap;}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:-1px;}
+
+/* ── module grid ──────────────────────────── */
+.mods{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; margin:18px 0;}
+.mod{background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:12px 14px;}
+.mod .no{font-family:var(--mono); font-size:11px; color:var(--accent-2); font-weight:600;}
+.mod .nm{font-weight:700; font-size:14.5px; margin-top:2px;}
+.mod .ds{font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.6;}
+
+.footer{margin-top:72px; padding-top:24px; border-top:1px solid var(--rule); font-size:13px; color:var(--muted);}
+.footer p + p{margin-top:8px;}
+@media (prefers-reduced-motion: no-preference){
+  details[open] .dbody{animation:fade .18s ease-out;}
+  @keyframes fade{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
+}
+</style>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="kicker">
+      <span>系統拆解報告</span><span class="dot"></span>
+      <span>insure80 · 奇韋系統 since 1999</span><span class="dot"></span>
+      <span>2026.08.24</span>
+    </div>
+    <h1>insure80 保單健檢系統拆解</h1>
+    <p class="dek">實際登入帳號逐頁爬取，聚焦兩件事：<strong>保單怎麼被記錄</strong>，以及<strong>健檢報告長什麼樣</strong>。以下所有欄位、選項、公式與版面，都是站上實際跑出來的結果。</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ══ HERO ══ -->
+<div class="hero">
+  <div class="figure">
+    <svg viewBox="0 0 940 300" role="img" aria-label="insure80 健檢引擎：NEED 減 HAVE 得出狀況與調整方向">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="Noto Sans TC, system-ui, sans-serif">
+
+        <!-- NEED -->
+        <rect x="18" y="52" width="196" height="120" rx="12" fill="var(--surface-2)" stroke="var(--rule)"/>
+        <text x="36" y="80" font-size="12" font-family="JetBrains Mono, monospace" fill="var(--s2)" letter-spacing="1.5">NEED</text>
+        <text x="36" y="106" font-size="17" font-weight="700" fill="var(--ink)">2 保險理財需求</text>
+        <text x="36" y="130" font-size="12.5" fill="var(--ink-2)">年收入 → 理財金三角</text>
+        <text x="36" y="150" font-size="12.5" fill="var(--ink-2)">人生責任 → 保額</text>
+
+        <!-- HAVE -->
+        <rect x="18" y="196" width="196" height="86" rx="12" fill="var(--surface-2)" stroke="var(--rule)"/>
+        <text x="36" y="222" font-size="12" font-family="JetBrains Mono, monospace" fill="var(--s1)" letter-spacing="1.5">HAVE</text>
+        <text x="36" y="246" font-size="17" font-weight="700" fill="var(--ink)">4–8 現有保單</text>
+        <text x="36" y="268" font-size="12.5" fill="var(--ink-2)">保費・保障・$領回・解約金</text>
+
+        <!-- arrows into engine -->
+        <g stroke="var(--muted)" fill="none" stroke-width="1.6" color="var(--muted)">
+          <path d="M214 112 H 292" marker-end="url(#ar)"/>
+          <path d="M214 239 H 292" marker-end="url(#ar)"/>
+        </g>
+
+        <!-- ENGINE -->
+        <rect x="300" y="52" width="230" height="230" rx="14" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.8"/>
+        <text x="415" y="86" font-size="12" text-anchor="middle" font-family="JetBrains Mono, monospace" fill="var(--accent-2)" letter-spacing="1.5">9 保單檢查報告</text>
+        <text x="415" y="128" font-size="20" text-anchor="middle" font-weight="700" fill="var(--ink)">逐項比對</text>
+        <text x="415" y="163" font-size="15" text-anchor="middle" font-family="JetBrains Mono, monospace" fill="var(--ink-2)">NEED − HAVE</text>
+        <line x1="330" y1="184" x2="500" y2="184" stroke="var(--rule)"/>
+        <text x="415" y="209" font-size="13" text-anchor="middle" fill="var(--crit)" font-weight="700">偏低 → 可增加</text>
+        <text x="415" y="234" font-size="13" text-anchor="middle" fill="var(--serious)" font-weight="700">偏高 → 可減少</text>
+        <text x="415" y="259" font-size="13" text-anchor="middle" fill="var(--good)" font-weight="700">適中 → 不須調整</text>
+
+        <g stroke="var(--muted)" fill="none" stroke-width="1.6" color="var(--muted)">
+          <path d="M530 167 H 606" marker-end="url(#ar)"/>
+        </g>
+
+        <!-- READJUST -->
+        <rect x="614" y="52" width="308" height="230" rx="12" fill="var(--surface-2)" stroke="var(--rule)"/>
+        <text x="636" y="80" font-size="12" font-family="JetBrains Mono, monospace" fill="var(--accent-2)" letter-spacing="1.5">READJUST</text>
+        <text x="636" y="106" font-size="17" font-weight="700" fill="var(--ink)">調整重點與方式</text>
+        <text x="636" y="134" font-size="12.5" fill="var(--ink-2)">① 先評估 1 保費（總預算）</text>
+        <text x="636" y="158" font-size="12.5" fill="var(--ink-2)">② 截長補短：先調低偏高者</text>
+        <text x="636" y="182" font-size="12.5" fill="var(--ink-2)">③ 再依預算調高偏低者</text>
+        <text x="636" y="212" font-size="12.5" fill="var(--ink-2)">④ 附「可調整的契約明細」</text>
+        <text x="636" y="236" font-size="12.5" fill="var(--ink-2)">　 逐張列出可動的主/附約</text>
+        <text x="636" y="266" font-size="12" fill="var(--muted)">每 2 年 · 或情況改變 · 或保單異動 → 重跑</text>
+
+        <!-- loop back -->
+        <g stroke="var(--accent-2)" fill="none" stroke-width="1.4" stroke-dasharray="4 4" color="var(--accent-2)">
+          <path d="M768 282 V 296 H 116 V 172" marker-end="url(#ar)"/>
+        </g>
+      </g>
+    </svg>
+    <p class="figcap">健檢引擎的全貌。整套系統只做一件事：把「需求」與「現有保單」化成同一組可比對的數字，指出偏高偏低，再給出可執行的調整清單——然後每兩年重跑一次。</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">10</div><div class="l">人身險模組（產險另 4 個），構成固定的作業動線</div></div>
+    <div class="stat"><div class="n">4</div><div class="l">層保單資料模型：保單 → 主約 → 附約 → 逐年給付</div></div>
+    <div class="stat"><div class="n">3</div><div class="l">健檢構面：保費、保障、$領回，共 6 個檢查項目</div></div>
+  </div>
+</div>
+
+<!-- ══ 1 系統全貌 ══ -->
+<section id="overview">
+  <div class="col">
+    <div class="eyebrow">01 — 系統全貌</div>
+    <h2>編號即動線</h2>
+    <p class="lede">左側選單不是分類，是一條有順序的作業流程。1 建人、2 統計需求、3 建保單，其餘 4–8 全是同一份保單資料的不同切面，9 是收斂，10 是後續維護。</p>
+  </div>
+
+  <div class="mods">
+    <div class="mod"><div class="no">01</div><div class="nm">保單人員</div><div class="ds">客戶／配偶／子女／親屬／其他人員</div></div>
+    <div class="mod"><div class="no">02</div><div class="nm">保險理財需求</div><div class="ds">NEED：保費 · 保障 · $領回</div></div>
+    <div class="mod"><div class="no">03</div><div class="nm">新增 修改</div><div class="ds">建立／修改保單（唯一寫入點）</div></div>
+    <div class="mod"><div class="no">04</div><div class="nm">保單</div><div class="ds">目錄／主附約內容／自訂／給付／主約效益／關係人／分佈</div></div>
+    <div class="mod"><div class="no">05</div><div class="nm">保費</div><div class="ds">明細／月／各月／各年／繳費人</div></div>
+    <div class="mod"><div class="no">06</div><div class="nm">保障</div><div class="ds">個人生命資產表／家庭／彙總／各年</div></div>
+    <div class="mod"><div class="no">07</div><div class="nm">$領回</div><div class="ds">目錄／各保單／各月／各年／領受人</div></div>
+    <div class="mod"><div class="no">08</div><div class="nm">解約金</div><div class="ds">逐保單年度末現金價值（手動輸入）</div></div>
+    <div class="mod"><div class="no">09</div><div class="nm">保單檢查報告</div><div class="ds">HAVE vs NEED 的收斂點</div></div>
+    <div class="mod"><div class="no">10</div><div class="nm">變更 理賠</div><div class="ds">11 類變更事項／9 類理賠項目</div></div>
+  </div>
+
+  <div class="col">
+    <div class="note">
+      <b>關鍵設計：</b>單一資料錄入點。整套系統只有「3 新增 修改」會寫入保單資料，4 到 9 全部是同一份資料的<strong>唯讀衍生視圖</strong>。這也是為什麼 9 的報告能即時反映任何保單異動。
+    </div>
+  </div>
+
+  <details>
+    <summary>全站路由對照表<span class="cnt">45 條</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>區塊</th><th>路徑</th><th>頁面</th></tr></thead>
+        <tbody>
+          <tr><td>商品</td><td><code>/Dictionary/InsSearch</code></td><td>人身險查詢比較（商品字典）</td></tr>
+          <tr><td>商品</td><td><code>/Dictionary/InsCompareComb</code></td><td>比較組合</td></tr>
+          <tr><td>商品</td><td><code>/Dictionary/CPSearch</code></td><td>CP 值排行</td></tr>
+          <tr><td>商品</td><td><code>/Dictionary/InsSearch?PGM=OnSale</code></td><td>現售比較</td></tr>
+          <tr><td>商品</td><td><code>/Dictionary/IPDDicSearch</code></td><td>產險公司目錄</td></tr>
+          <tr><td>客戶</td><td><code>/Search/ · /All · /Insurance · /Content</code></td><td>依條件／全部／依保單／依內容</td></tr>
+          <tr><td>客戶</td><td><code>/Ins01/Add · /Copy · /RecycleBin</code></td><td>新增客戶／複製組合／刪除的資料</td></tr>
+          <tr><td>人身 1</td><td><code>/Ins01?cusno={GUID}</code></td><td>保單人員</td></tr>
+          <tr><td>人身 2</td><td><code>/Ins02/Step · /step1 · /step2 · /step3</code></td><td>需求四步精靈</td></tr>
+          <tr><td>人身 3</td><td><code>/Ins03/Add01 · /Query · /view?warrantyNo={GUID}</code></td><td>建立／清單／編輯保單</td></tr>
+          <tr><td>人身 4</td><td><code>/Ins04/InsList · InsContent · InsExcel?custmiz=0|1 · MasterAnalysis · Relaction · PolicyAnalysis</code></td><td>保單七視圖</td></tr>
+          <tr><td>人身 5</td><td><code>/Ins05/Details · Month · EachMonth · EachYear · Payer</code></td><td>保費五視圖</td></tr>
+          <tr><td>人身 6</td><td><code>/Ins06/Summary · FamailyExcel · Person · Famaily · FamailyEachYear</code></td><td>保障五視圖</td></tr>
+          <tr><td>人身 7</td><td><code>/Ins07/index · RebackIns · RebackMonth · RebackYear · Receiver</code></td><td>$領回五視圖</td></tr>
+          <tr><td>人身 8</td><td><code>/Ins08/index</code></td><td>解約金</td></tr>
+          <tr><td>人身 9</td><td><code>/Ins09/index</code></td><td>保單檢查報告</td></tr>
+          <tr><td>人身 10</td><td><code>/Ins10/index · /Compensate</code></td><td>變更／理賠</td></tr>
+          <tr><td>產險</td><td><code>/Ipd02/Add · AddCenter?type=101 · /Ipd02/Index · /Ipd03/Index · /Ipd04/Index · PremiumDetails</code></td><td>產險四模組</td></tr>
+          <tr><td>投資型</td><td><code>/InsuranceInvest/Customer · CustomerResult · Account · Detail · InvestGainLoss · InvestFundIndex · FundFavorites</code></td><td>投資標的管理</td></tr>
+          <tr><td>跨客戶</td><td><code>/Payment/Index · /IpdInsurance · /PayBack/Index</code></td><td>全帳號保費／領回月曆</td></tr>
+          <tr><td>提醒</td><td><code>/Remind/Birthday · Expire · CustomerLoginInfo</code></td><td>生日／產險到期／客戶登入</td></tr>
+          <tr><td>列印</td><td><code>/Print · /Print/CoverPrintMaster · /AddrPrint/AddrPrint01</code></td><td>報表目錄／封面／地址名條</td></tr>
+        </tbody>
+      </table></div>
+      <p>客戶主鍵是 32 碼 GUID（<code>cusno</code>），保單主鍵同樣是 GUID（<code>warrantyNo</code>）。投資型走 <code>?parm={JSON}</code>、商品字典走 <code>?Search={JSON}</code>，把查詢條件整包序列化進 query string。技術棧為 ASP.NET MVC 伺服器渲染 ＋ Vue 3 / Element Plus 元件。</p>
+    </div>
+  </details>
+</section>
+
+<hr class="sep" style="margin-top:56px">
+
+<!-- ══ 2 保單紀錄模型 ══ -->
+<section id="policy-model">
+  <div class="col">
+    <div class="eyebrow">02 — 核心</div>
+    <h2>保單紀錄模型</h2>
+    <p class="lede">四層結構：<strong>一張保單</strong>掛<strong>一個主契約</strong>與 <strong>N 個附加契約</strong>，每一條契約再向商品字典要出<strong>逐年給付</strong>。所有下游報表都是這棵樹的投影。</p>
+  </div>
+
+  <div class="figure">
+    <svg viewBox="0 0 940 336" role="img" aria-label="保單資料模型四層結構">
+      <g font-family="Noto Sans TC, system-ui, sans-serif">
+        <!-- L1 -->
+        <rect x="16" y="16" width="908" height="86" rx="12" fill="var(--surface-2)" stroke="var(--accent-2)" stroke-width="1.6"/>
+        <text x="34" y="42" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--accent-2)" letter-spacing="1.4">LAYER 1 — 保單 POLICY</text>
+        <text x="34" y="68" font-size="13" fill="var(--ink)">要保人 ・ 被保人 ・ 次(從)被保人 ・ 繳費人 ・ 保單生效日 ・ 被保人職業 1–6 級 ・ 保費繳別 ・ 保單號碼 ・ 保費折扣</text>
+        <text x="34" y="90" font-size="13" fill="var(--ink)">保單狀況 ・ $領回受益人 ・ 身故受益人 ・ 保費合計 ・ 更新時間</text>
+
+        <!-- L2 -->
+        <rect x="16" y="118" width="446" height="80" rx="12" fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="34" y="144" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--s1)" letter-spacing="1.4">LAYER 2 — 主契約 ×1</text>
+        <text x="34" y="169" font-size="13" fill="var(--ink)">保險公司 ・ 英文代號 ・ 契約名稱</text>
+        <text x="34" y="189" font-size="13" fill="var(--ink)">繳費年期 ・ 保障年期 ・ 保額 ・ 保費 ・ 解約金</text>
+
+        <!-- L3 -->
+        <rect x="478" y="118" width="446" height="80" rx="12" fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="496" y="144" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--s2)" letter-spacing="1.4">LAYER 3 — 附加契約 ×N</text>
+        <text x="496" y="169" font-size="13" fill="var(--ink)">被保人 ・ 職業等級 ・ <tspan font-weight="700">獨立生效日</tspan> ・ 英文代號</text>
+        <text x="496" y="189" font-size="13" fill="var(--ink)">契約名稱 ・ 繳費年期 ・ 保障年期 ・ 保額 ・ 保費</text>
+
+        <g stroke="var(--rule)" fill="none" stroke-width="1.4">
+          <path d="M239 102 V118"/><path d="M701 102 V118"/>
+        </g>
+
+        <!-- L4 -->
+        <rect x="16" y="214" width="908" height="106" rx="12" fill="var(--surface-2)" stroke="var(--rule)"/>
+        <text x="34" y="240" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--muted)" letter-spacing="1.4">LAYER 4 — 逐年給付（由商品字典展開，非人工輸入）</text>
+        <text x="34" y="266" font-size="13" fill="var(--ink)">保單年度末 → 一般身故(壽險) ・ 意外身故 ・ 癌症身故 ・ 重疾特傷 ・ 重大傷病 ・ 各項醫療日額與限額 ・ $領回 ・ 解約金</text>
+        <text x="34" y="292" font-size="12.5" fill="var(--ink-2)">→ 匯總成「6 保障 生命資產表」的 90＋ 個給付項目，以及「9 報告」裡的 HAVE 數字</text>
+        <text x="34" y="312" font-size="12" fill="var(--muted)">※ 解約金是唯一需人工逐年輸入的欄位</text>
+        <g stroke="var(--rule)" fill="none" stroke-width="1.4">
+          <path d="M239 198 V214"/><path d="M701 198 V214"/>
+        </g>
+      </g>
+    </svg>
+    <p class="figcap">附約可以有自己的生效日，這是整個保費統計邏輯的分水嶺——見下方「兩套對齊規則」。</p>
+  </div>
+
+  <div class="col">
+    <h3>建立新保單：四步精靈</h3>
+    <p>路徑 <code>/Ins03/Add01</code>，分頁為 <strong>1 基本資料 → 2 主契約 → 3 附加契約 → 4 其他資料</strong>。系統在進入時就先配好保單編號。</p>
+  </div>
+
+  <details open>
+    <summary>Layer 1 · 基本資料欄位<span class="cnt">9 欄</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>欄位</th><th>必填</th><th>型別 / 選項</th><th>備註</th></tr></thead>
+        <tbody>
+          <tr><td>要保人</td><td class="req">●</td><td>下拉：保單人員名單</td><td>來源＝模組 1 建立的人員</td></tr>
+          <tr><td>被保人</td><td class="req">●</td><td>下拉：保單人員名單</td><td></td></tr>
+          <tr><td>次(從)被保人</td><td>—</td><td>下拉</td><td>雙被保人商品用</td></tr>
+          <tr><td>繳費人</td><td class="req">●</td><td>下拉（可為「其他人員」）</td><td>模組 1 另有 8 個「其他人員」名稱欄位專供此用</td></tr>
+          <tr><td>保單生效日</td><td class="req">●</td><td>日期，預設今日</td><td>顯示為「民國．西元」雙軌</td></tr>
+          <tr><td>被保人職業</td><td>—</td><td>1 級／2 級／3 級／4 級／5 級／6 級</td><td>影響意外險費率</td></tr>
+          <tr><td>保費繳別</td><td class="req">●</td><td>年繳／半年繳／季繳／月繳</td><td>頁面明示「躉繳＝年繳」</td></tr>
+          <tr><td>保單號碼</td><td>—</td><td>文字</td><td>非必填，亦可只填代號</td></tr>
+          <tr><td>保費折扣</td><td>—</td><td>勾選「有」</td><td></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>Layer 2/3 · 契約列欄位<span class="cnt">主約 8 欄 / 附約 10 欄</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>欄位</th><th>主契約</th><th>附加契約</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td>保險公司</td><td>●</td><td>繼承</td><td>38 家（人身 20／產物 16／國外 2）</td></tr>
+          <tr><td>英文代號</td><td>●</td><td>●</td><td>商品字典主鍵，如 <code>LEGOAE</code>／<code>EPAA</code>／<code>MAJIXA</code></td></tr>
+          <tr><td>契約名稱</td><td>●</td><td>●</td><td>由代號帶出</td></tr>
+          <tr><td>被保人</td><td>繼承</td><td>●</td><td>附約可掛不同被保人</td></tr>
+          <tr><td>職業等級</td><td>繼承</td><td>●</td><td></td></tr>
+          <tr><td>生效日</td><td>＝保單生效日</td><td>●獨立</td><td><strong>附約可與主約不同日</strong></td></tr>
+          <tr><td>繳費年期</td><td>●</td><td>●</td><td>年數（20年）或到齡（80歲）</td></tr>
+          <tr><td>保障年期</td><td>●</td><td>●</td><td>年數或到齡（100歲）</td></tr>
+          <tr><td>保額</td><td>●</td><td>●</td><td>單位多型：元／萬元／單位／計畫／日額／「附加」</td></tr>
+          <tr><td>保費</td><td>●</td><td>●</td><td></td></tr>
+          <tr><td>保費類型</td><td>●</td><td>●</td><td>保障型／理財型 —— <strong>健檢 1 保費的分母就靠這欄</strong></td></tr>
+          <tr><td>解約金</td><td>可展開</td><td>可展開</td><td>逐保單年度末人工輸入</td></tr>
+        </tbody>
+      </table></div>
+      <p>「保額」欄位是多型的，這點值得注意：終身壽險用「萬元」、防癌險用「單位」、醫療險用「計畫」或「日額元」、豁免保費用「附加」。系統靠商品字典知道每個代號該用哪種單位。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>實例：一張保單長什麼樣<span class="cnt">凱基 · 1主約3附約</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>主/附</th><th>代號</th><th>契約名稱</th><th>繳費</th><th>保障</th><th class="num">保額</th><th class="num">保費</th><th>類型</th></tr></thead>
+        <tbody>
+          <tr><td>主</td><td><code>LEGOAE</code></td><td>安心樂高終身保險</td><td>20年</td><td>100歲</td><td class="num">100 元</td><td class="num">1,207</td><td>保障</td></tr>
+          <tr><td>附</td><td><code>EPAA</code></td><td>人身意外傷害保險附約</td><td>80歲</td><td>80歲</td><td class="num">50 萬</td><td class="num">405</td><td>保障</td></tr>
+          <tr><td>附</td><td><code>MAJIXA</code></td><td>好活力一年期防癌健康保險附約</td><td>85歲</td><td>85歲</td><td class="num">100 萬</td><td class="num">3,240</td><td>保障</td></tr>
+        </tbody>
+      </table></div>
+      <p>保單層彙總：要保人／被保人／繳費人＝同一人，保單狀況「正常」，繳別年繳，保費合計 4,852 元，$領回受益人未指定則為要保人，$祝壽受益人已指定。</p>
+    </div>
+  </details>
+
+  <div class="col">
+    <h3>兩套「生效日對齊」規則</h3>
+    <p>因為附約可以有獨立生效日，同一批資料在不同報表要用不同的統計方式。系統把這件事寫成明文規則：</p>
+  </div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>報表</th><th>對齊方式</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td><strong>5 保費</strong>（各年／各月統計）</td><td>附約生效日 <strong>對齊</strong> 主約生效日</td><td>以「一份保單」為單位加總，才貼近實際繳費行為</td></tr>
+      <tr><td><strong>4 保單 › 主附約內容</strong></td><td>附約生效日 <strong>不對齊</strong> 主約</td><td>此表類似「保單面頁」，每條契約都是獨立紀錄，差異必須呈現</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="col">
+    <div class="note">
+      <b>保單年度定義（8 解約金採用）：</b>自保單生效日起算一年為第 1 保單年度；「保單周年日」＝隔年同一日期，「保單年度末」＝周年日前一日。解約金一律記錄<strong>保單年度末</strong>的金額。
+    </div>
+
+    <h3>客戶（保單人員）模型</h3>
+    <p>模組 1 是家庭型結構，五種角色：<strong>客戶 · 配偶 · 子女[] · 親屬[]（含關係）· 其他人員（8 個名稱位）</strong>。統計對象只算「保戶、配偶、子女」，親屬不計入家庭保障需求。</p>
+  </div>
+
+  <details>
+    <summary>客戶欄位清單<span class="cnt">19 欄</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>群組</th><th>欄位</th></tr></thead>
+        <tbody>
+          <tr><td>身分</td><td>暱稱<span class="req">*</span>（中英文）、性別<span class="req">*</span>（與保費有關）、血型、生日<span class="req">*</span>（有關保險年齡）</td></tr>
+          <tr><td>線上查詢</td><td>客戶帳號（建議用行動電話，或 4–15 字元數字／小寫英文；<strong>不可用身分證字號或 Email</strong>；首次登入密碼＝西元出生年月日 8 碼）</td></tr>
+          <tr><td>聯絡</td><td>行動（有帳號則必填，供忘記密碼用）、E Mail（可寄報表）、其他電話、傳真、通訊地址（城市／區）、備註</td></tr>
+          <tr><td>職業</td><td>任職公司、公司職稱、公司電話＋分機、公司傳真、公司地址（城市／區）</td></tr>
+          <tr><td>分類</td><td>客戶等級、客戶關係、客戶群組（可自訂新增）</td></tr>
+        </tbody>
+      </table></div>
+      <p>配偶／子女／親屬共用大部分欄位，但沒有「客戶帳號」——線上查詢只開給主客戶。子女的生日提示改成「有生日才有保險年齡」。</p>
+    </div>
+  </details>
+</section>
+
+<hr class="sep" style="margin-top:56px">
+
+<!-- ══ 3 NEED ══ -->
+<section id="need">
+  <div class="col">
+    <div class="eyebrow">03 — NEED</div>
+    <h2>需求怎麼被算出來</h2>
+    <p class="lede">模組 2 是一個三步精靈，且<strong>必須跑完才會產生健檢報告</strong>——沒有 NEED 就沒有比對基準，第 9 頁只會跳出「請先輸入保險理財需求」。輸入極少，幾乎全靠公式推導。</p>
+  </div>
+
+  <h3 class="col">Step 1 · 保費預算</h3>
+  <div class="col"><p>唯一輸入是<strong>年收入</strong>，依據可選「理財金三角」或「自行輸入」。</p></div>
+  <div class="formula">理財金三角（年收入 6 : 3 : 1）
+  60%  一般生活花費
+  30%  投資理財   →  理財型保費需求  =  年收入 × 30%
+  10%  風險管理   →  保障型保費需求  =  年收入 × 10%
+
+實例：年收入 120 萬  →  保障型 12 萬/年 ・ 理財型 36 萬/年</div>
+
+  <h3 class="col">Step 2 · 保障需求</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>項目</th><th>輸入</th><th>計算</th></tr></thead>
+    <tbody>
+      <tr><td>5 年淨生活費</td><td>每月 X 萬元</td><td class="num">X × 60</td></tr>
+      <tr><td>無附加壽險之房貸</td><td>尚未償還總額</td><td class="num">直接計入</td></tr>
+      <tr><td>5 年親屬扶養金</td><td>每月 Y 萬元</td><td class="num">Y × 60</td></tr>
+      <tr><td>其他貸款或負債（可多筆）</td><td>債務類別＋金額</td><td class="num">加總</td></tr>
+      <tr><td>子女生活教育費</td><td>有子女時出現</td><td class="num">依內建參考表</td></tr>
+      <tr><td>住院醫療需求</td><td>每日 Z 元</td><td class="num">直接計入</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="formula">人壽保障需求 = 5年淨生活費 + 房貸 + 5年親屬扶養金 + 其他負債 + 子女費用
+意外保障需求 = 人壽保障需求 × 2
+住院醫療需求 = 每日病房費（元/日）
+
+實例：300 + 500 + 120 = 920 萬  →  意外 1,840 萬 ・ 醫療 3,000 元/日</div>
+
+  <div class="col">
+    <div class="note">
+      <b>家庭分攤規則：</b>人壽保額按「個人年收入 ÷ 家庭年收入」的百分比分配到各賺薪成員。<strong>子女因無經濟收入、對家人無財務責任，不分擔家庭基本保障</strong>，也不列入 2 保障的調整清單。
+    </div>
+  </div>
+
+  <details>
+    <summary>內建參考表 · 子女生活教育費（更新日 2026.5.19）<span class="cnt">6 階段</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>項目</th><th>嬰兒 1–3</th><th>幼稚園 4–6</th><th>國小 7–12</th><th>國中 13–15</th><th>高中 16–18</th><th>大學 19–22</th><th class="num">合計</th></tr></thead>
+        <tbody>
+          <tr><td>生活費<br><span style="color:var(--muted);font-size:12px">食衣住行</span></td><td>41,000/月<br>147.6萬</td><td>15,000/月<br>54萬</td><td>18,000/月<br>129.6萬</td><td>18,000/月<br>64.8萬</td><td>20,000/月<br>72萬</td><td>25,000/月<br>120萬</td><td class="num">588 萬</td></tr>
+          <tr><td>學雜費</td><td>—</td><td>私立<br>95,000/學期<br>57萬</td><td>私立/雙語<br>120,000/學期<br>144萬</td><td>私立/雙語<br>110,000/學期<br>66萬</td><td>私立/補助<br>13,000/學期<br>7.8萬</td><td>私立/補助<br>15,000/學期<br>12萬</td><td class="num">286.8 萬</td></tr>
+          <tr><td>教育輔助費</td><td>—</td><td>才藝課<br>5,000/月<br>18萬</td><td>安親班<br>7,500/月<br>54萬</td><td>補習班<br>5,000/月<br>18萬</td><td>補習班<br>5,000/月<br>18萬</td><td>—</td><td class="num">108 萬</td></tr>
+        </tbody>
+      </table></div>
+      <p>三項合計約 <strong>982.8 萬／每名子女（0–22 歲）</strong>。這是系統自帶並定期更新的參數表，使用者可覆寫。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>債務類別選項<span class="cnt">7 類</span></summary>
+    <div class="dbody">
+      <p style="margin-top:8px">信用卡循環 ・ 現金卡貸款 ・ 汽車貸款 ・ 銀行貸款 ・ 就學貸款 ・ 會錢（已標）・ 其他貸款</p>
+    </div>
+  </details>
+
+  <h3 class="col">Step 3 · $領回（理財目標）</h3>
+  <div class="col"><p>兩種目標型別：<strong>退休養老金</strong>與<strong>其他目標</strong>。全部走 W − H（Want 減 Have）的缺口模型，且「年度不可重疊」。</p></div>
+
+  <div class="formula">現在值：退休生活開支 每月 M 萬  →  年支出 = M × 12
+未來值：年支出 × (1 + CPI)^準備年數        CPI 預設 1.7%
+Want  ：未來值年支出 × 退休生活年數
+Have  ：可請領（勞工/國民/公職退休金） + 已準備退休金
+缺口  ：$ = Want − Have
+
+實例：40 歲，65 歲退休，活到 85 歲，每月 3 萬
+  36 萬/年 → 25 年通膨 → 54.8 萬/年
+  54.8 × 20 年 = 1,096 萬 (Want)
+  已準備 200 萬 (Have)
+  → 退休養老金缺口 896 萬，預計 2026–2051 完成</div>
+
+  <div class="col">
+    <p style="margin-top:14px">人生階段由年齡自動判定並顯示對應文案，例如 31 歲單身＝「單身貴族」、40 歲單身＝「中年單身」，健檢報告首頁的「現階段規劃重點」直接沿用這段文字。</p>
+  </div>
+</section>
+
+<hr class="sep" style="margin-top:56px">
+
+<!-- ══ 4 健檢報告 ══ -->
+<section id="report">
+  <div class="col">
+    <div class="eyebrow">04 — 核心</div>
+    <h2>健檢報告的格式</h2>
+    <p class="lede">整份報告是<strong>三張同構的表</strong>，每張表只有五欄，欄名固定：項目 · 現在保單 HAVE · 現在需求 NEED · 狀況 · 調整方向 READJUST。這是整個系統最值得抄的地方——格式極簡，但資訊密度極高。</p>
+  </div>
+
+  <div class="figure">
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>現在保單 HAVE</span>
+      <span><i style="background:var(--s2)"></i>現在需求 NEED</span>
+      <span style="color:var(--muted)">實例：40 歲單身，年收入 120 萬，8 張保單</span>
+    </div>
+    <svg viewBox="0 0 946 300" role="img" aria-label="健檢實例：三個保障項目的 HAVE 與 NEED 對比長條圖">
+      <g font-family="Noto Sans TC, system-ui, sans-serif">
+        <!-- gridlines -->
+        <g stroke="var(--rule-soft)" stroke-width="1">
+          <line x1="190" y1="30" x2="190" y2="256"/>
+          <line x1="330" y1="30" x2="330" y2="256"/>
+          <line x1="470" y1="30" x2="470" y2="256"/>
+          <line x1="610" y1="30" x2="610" y2="256"/>
+          <line x1="750" y1="30" x2="750" y2="256"/>
+        </g>
+        <line x1="190" y1="256" x2="890" y2="256" stroke="var(--rule)" stroke-width="1.5"/>
+        <g font-size="11" font-family="JetBrains Mono, monospace" fill="var(--muted)" text-anchor="middle">
+          <text x="190" y="276">0</text><text x="330" y="276">400</text><text x="470" y="276">800</text>
+          <text x="610" y="276">1200</text><text x="750" y="276">1600</text><text x="890" y="276">2000</text>
+        </g>
+        <text x="540" y="294" font-size="11" fill="var(--muted)" text-anchor="middle">萬元（住院醫療險以元/日換算比例呈現）</text>
+
+        <!-- row 1 人壽 -->
+        <text x="176" y="52" font-size="13.5" text-anchor="end" fill="var(--ink)" font-weight="700">人壽險保額</text>
+        <rect x="190" y="38" width="142" height="15" rx="4" fill="var(--s1)"/>
+        <rect x="190" y="56" width="322" height="15" rx="4" fill="var(--s2)"/>
+        <text x="340" y="50" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--ink-2)">406.4</text>
+        <text x="520" y="68" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--ink-2)">920</text>
+
+        <!-- row 2 意外 -->
+        <text x="176" y="122" font-size="13.5" text-anchor="end" fill="var(--ink)" font-weight="700">意外險保額</text>
+        <rect x="190" y="108" width="52" height="15" rx="4" fill="var(--s1)"/>
+        <rect x="190" y="126" width="644" height="15" rx="4" fill="var(--s2)"/>
+        <text x="250" y="120" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--ink-2)">150</text>
+        <text x="842" y="138" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--ink-2)">1,840</text>
+
+        <!-- row 3 醫療 -->
+        <text x="176" y="192" font-size="13.5" text-anchor="end" fill="var(--ink)" font-weight="700">住院醫療險</text>
+        <rect x="190" y="178" width="336" height="15" rx="4" fill="var(--s1)"/>
+        <rect x="190" y="196" width="105" height="15" rx="4" fill="var(--s2)"/>
+        <text x="534" y="190" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--ink-2)">9,600 元/日</text>
+        <text x="303" y="208" font-size="11.5" font-family="JetBrains Mono, monospace" fill="var(--ink-2)">3,000 元/日</text>
+
+        <!-- verdicts -->
+        <g font-size="12" font-weight="700">
+          <text x="176" y="70" text-anchor="end" fill="var(--crit)">偏低</text>
+          <text x="176" y="140" text-anchor="end" fill="var(--crit)">偏低</text>
+          <text x="176" y="210" text-anchor="end" fill="var(--serious)">偏高</text>
+        </g>
+      </g>
+    </svg>
+    <p class="figcap">同一位客戶，醫療險買太多、壽險與意外險嚴重不足——這正是報告要客戶一眼看到的事。系統接著給的建議是「先把住院醫療險調低，再依預算把人壽、意外調高」，也就是它反覆強調的<strong>截長補短</strong>。</p>
+  </div>
+
+  <h3 class="col">報告的三張表</h3>
+
+  <h4 class="col">1 保費</h4>
+  <div class="tablewrap"><table>
+    <thead><tr><th>項目</th><th class="num">現在保單 HAVE</th><th class="num">現在需求 NEED</th><th>狀況</th><th>調整方向 READJUST</th></tr></thead>
+    <tbody>
+      <tr><td>保障型保費</td><td class="num">11.1 萬元</td><td class="num">12 萬元</td><td><span class="pill ok">適中</span></td><td>不須調整</td></tr>
+      <tr><td>理財型保費</td><td class="num">—</td><td class="num">36 萬元</td><td><span class="pill low">偏低</span></td><td>可增加 36 萬元</td></tr>
+    </tbody>
+  </table></div>
+  <div class="col"><p style="font-size:14.5px;color:var(--ink-2)">表頭另附：<code>2026 年 保費合計 110,573 元　佔年收入 9.21%　其中保障型 110,573 元／理財型 0 元</code>，並標示是否「符合理財金三角」。統計範圍限定<strong>被保人＝保戶/配偶/子女，繳費人＝保戶/配偶</strong>。</p></div>
+
+  <h4 class="col">2 保障</h4>
+  <div class="tablewrap"><table>
+    <thead><tr><th>項目</th><th class="num">HAVE</th><th class="num">NEED</th><th>狀況</th><th>READJUST</th></tr></thead>
+    <tbody>
+      <tr><td>人壽險保額</td><td class="num">406.4 萬元</td><td class="num">920 萬元</td><td><span class="pill low">偏低</span></td><td>可增加 513.6 萬元</td></tr>
+      <tr><td>意外險保額</td><td class="num">150 萬元</td><td class="num">1,840 萬元</td><td><span class="pill low">偏低</span></td><td>可增加 1,690 萬元</td></tr>
+      <tr><td>住院醫療險</td><td class="num">9,600 元/日</td><td class="num">3,000 元/日</td><td><span class="pill high">偏高</span></td><td>可減少 6,600 元/日</td></tr>
+    </tbody>
+  </table></div>
+  <div class="col"><p style="font-size:14.5px;color:var(--ink-2)">註記寫死在報表底：住院醫療險之金額為「<strong>定額給付 ＋ 實支實付</strong>」之每日病房費，實支實付取最高者。</p></div>
+
+  <h4 class="col">3 $領回</h4>
+  <div class="tablewrap"><table>
+    <thead><tr><th>項目</th><th>期間</th><th class="num">HAVE</th><th class="num">NEED</th><th>狀況</th><th>READJUST</th></tr></thead>
+    <tbody>
+      <tr><td>退休養老金</td><td>2026 ~ 2051</td><td class="num">—</td><td class="num">896 萬元</td><td><span class="pill low">偏低</span></td><td>可增加 896 萬元</td></tr>
+    </tbody>
+  </table></div>
+  <div class="col"><p style="font-size:14.5px;color:var(--ink-2)">HAVE 的「$領回金額」統計至有 $領回保單之被保人 <strong>90 歲</strong>止。每個理財目標一列，期間不可重疊。</p></div>
+
+  <div class="col">
+    <h3>「調整方式」彈窗：報告真正的價值</h3>
+    <p>每張表旁邊都有一顆標了 <code>Ai</code> 的「調整方式」按鈕，點開是一份四段式的處方：</p>
+    <ul class="tight">
+      <li><strong>重述比對表</strong>——同樣五欄，讓客戶再確認一次</li>
+      <li><strong>保單調整重點</strong>——一句自動生成的話：「可先將 <em>某人</em> 之 <em>住院醫療險</em> 的部份<strong>調低</strong>，再依據自己的預算將 <em>某人</em> 之 <em>人壽險保額、意外險保額</em> 的部份<strong>調高</strong>」</li>
+      <li><strong>逐項調整方式</strong>——每個偏差項目給出具體手法（見下表）</li>
+      <li><strong>可調整的契約明細</strong>——逐張列出該險種底下所有可動的主約/附約（公司、繳別、要保人、保單狀況、被保人、生效日、契約名稱、繳費年期、保額、保費、保費類型），限定被保人為「保戶、配偶」</li>
+    </ul>
+  </div>
+
+  <details open>
+    <summary>系統內建的調整話術<span class="cnt">逐險種</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>險種 · 方向</th><th>建議手法</th></tr></thead>
+        <tbody>
+          <tr><td><strong>人壽險 · 調高</strong></td><td>先從現有保單著手，或新加保純保障型壽險。<br>預算低 → 多用定期型；預算高 → 多用終身型。<br>提醒：調高壽險保額時<strong>不需考慮該契約可領回多少 $</strong>，保障歸保障、理財歸理財，才能提高保費的經濟效益。</td></tr>
+          <tr><td><strong>人壽險 · 調低</strong></td><td>先動定期壽險（降低保額、縮短保障期間），因其現金價值低、損失小；不夠再動終身型（降低保額、增值型改平準型、改定期型）。</td></tr>
+          <tr><td><strong>意外險 · 調高</strong></td><td>直接從保單中意外險契約著手，或新加保意外險契約。</td></tr>
+          <tr><td><strong>住院醫療險 · 調低</strong></td><td>先從定期型醫療險契約開始調整。</td></tr>
+          <tr><td><strong>理財型保費 · 調高</strong></td><td>先從保單中理財型壽險部份調高，或新加保理財型壽險契約。<br>另提醒：檢視為親屬繳費的保單，看是否有可調低的部份。</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>報告頁的固定框架文字<span class="cnt">方法論</span></summary>
+    <div class="dbody">
+      <p style="margin-top:10px"><strong>功能說明：</strong>「保單檢查報告」和「健康檢查報告」原理一樣——健康檢查幫我們了解「現在身體狀況」是否符合「健康標準」，保單檢查幫我們了解「現在保單狀況」是否符合「現在需求」。</p>
+      <p><strong>觸發時機：</strong>經濟／子女年齡／人生階段情況改變時、或每隔 2 年、或現有保單改變 → 重跑 NEED → 核對 HAVE → 檢視報告 → READJUST。</p>
+      <p><strong>調整要領三步驟：</strong>① 先從「1 保費」開始評估（保險就是錢，先定總預算）② 掌握「截長補短」原則——先把偏高的調低，才有預算把偏低的調高 ③ 依據各項「調整方式」的契約明細動手。</p>
+      <p><strong>頁首雙日期：</strong><code>保單運算日</code>（今天）與 <code>需求統計日</code>（NEED 上次更新日），並顯示兩者「距離今天 X 個月 Y 天」——這是提醒業務員需求資料是否過期的機制。</p>
+    </div>
+  </details>
+</section>
+
+<hr class="sep" style="margin-top:56px">
+
+<!-- ══ 5 保障體系 ══ -->
+<section id="coverage">
+  <div class="col">
+    <div class="eyebrow">05 — HAVE 的來源</div>
+    <h2>生命資產表與商品字典</h2>
+    <p class="lede">報告裡 HAVE 那一欄的數字，不是人工填的，而是從商品字典逐年展開、再依給付分類加總出來的。這是整套系統最重的資產。</p>
+  </div>
+
+  <div class="col">
+    <h3>商品字典（模組：商品 › 人身險）</h3>
+    <p>每個商品有一組主鍵 <code>英文代號</code>（如 <code>LEGOAA</code>），欄位為：保險公司 · 狀況（停售／現售）· 商品名稱 · 保險種類 · 主附約 · 繳費年期 · 保障期間。詳情頁提供性別／年齡／保額試算，並分六個分頁：</p>
+    <ul class="tight">
+      <li><strong>給付明細</strong>——依 壽險／意外／醫療（定額給付・實支實付）／防癌／失能／$領回 分組，每項是一條給付公式或金額</li>
+      <li><strong>各年保障</strong>——逐保單年度：一般身故(壽險) · 意外身故 · 癌症身故 · 重疾特傷 · 重大傷病</li>
+      <li><strong>各年 $領回</strong>・<strong>各年保費</strong>・<strong>條款</strong>・<strong>費率</strong></li>
+    </ul>
+    <div class="formula">給付公式範例（凱基 LEGOAA 安心樂高終身保險）
+身故保險金 = 已繳年繳化保險費總和 × 1.06 倍 − 累計已領保險金
+             15 歲內改以「已繳保險費總和」× 年複利 2.25%
+             另加計當年度未到期保費
+$祝壽金   = 達 100 歲，已繳年繳化保險費總和 × 1.06 倍 − 累積已領保險金
+定額給付   病房費每日 100 元，一次住院最高給付 365 天</div>
+
+    <h3>6 保障 · 生命資產表</h3>
+    <p>把一位被保人身上所有契約的給付項目攤平成一張表，實測有 <strong>90＋ 個給付項目</strong>，分五大區塊。這張表同時是列印給客戶的主力報表之一。</p>
+  </div>
+
+  <details>
+    <summary>生命資產表的給付項目分類<span class="cnt">5 區塊 90＋ 項</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>區塊</th><th>給付項目（實測樣本）</th></tr></thead>
+        <tbody>
+          <tr><td><strong>壽險</strong></td><td>身故 ・ 壽險終身保障（指定歲數時）・ 生命末期最高 ・ 完全失能 ・ 1(2)–(6) 11 級失能 ・ 完全失能扶助（年給付／月給付）・ 2–6 級失能扶助月給付 ・ 復健補償一次給付 ・ 重大疾病特定傷病最高 ・ 重大疾病手術看護</td></tr>
+          <tr><td><strong>意外</strong></td><td>意外身故 ・ 意外身故（含壽險）・ 意外失能 ・ 特定意外失能 ・ 意外住院日額 ・ 骨折醫療 ・ 關節脫臼手術 ・ 重大燒燙傷 ・ 意外傷害失能裝置/附屬品</td></tr>
+          <tr><td><strong>住院醫療<br>· 定額給付</strong></td><td>住院病房日額 ・ 長期住院另給付 ・ 加護/隔離病房另給付 ・ 燒燙/灼傷病房另給付 ・ 住院手術每次 ・ 門診手術每次 ・ 住院前後門診 ・ 出院/居家療養</td></tr>
+          <tr><td><strong>住院醫療<br>· 實支實付</strong></td><td>病房費限額 ・ 加護病房費限額 ・ 燒燙傷病房限額 ・ 住院手術費限額 ・ 門診手術費限額 ・ 腫瘤治療門診限額 ・ 住院醫療費用/雜費限額 ・ 門診特定醫療限額 ・ 住院前後門診限額 ・ 補充保險金限額 ・ 轉換定額型病房費</td></tr>
+          <tr><td><strong>防癌</strong></td><td>癌症身故 ・ 癌症身故（含壽險）・ 初次罹患原位癌/低侵襲性/侵襲性/特定癌症 ・ 癌症住院日額 ・ 癌症長期住院 ・ 一般/特定手術住院醫療 ・ 各級癌症門診手術 ・ 各級癌症手術 ・ 住/出院前後門診 ・ 放射醫療/質子治療 ・ 化學治療 ・ 骨髓/幹細胞移植 ・ 住/出院療養 ・ 義乳重建 ・ 義肢裝設 ・ 義齒裝設</td></tr>
+        </tbody>
+      </table></div>
+      <p>報表另有「婦女 孕婦」區塊（在列印目錄中可見）。同一張表有三個模式：<strong>有給付項目</strong>（只顯示實際有保障的）、<strong>鎖定</strong>、<strong>自訂版本</strong>（依需求自選要呈現的項目）。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>商品字典的分類主檔<span class="cnt">保險公司 38 · 商品總類 17</span></summary>
+    <div class="dbody">
+      <h4 style="margin-top:14px">保險公司</h4>
+      <p style="margin-top:6px"><strong>人身險（20）</strong>三商美邦 ・ 安達 ・ 凱基 ・ 中華郵政 ・ 元大 ・ 友邦 ・ 台灣 ・ 全球 ・ 合作金庫 ・ 安聯 ・ 宏泰 ・ 法國巴黎 ・ 保誠 ・ 南山 ・ 國泰 ・ 第一金 ・ 富邦 ・ 新光 ・ 臺銀 ・ 遠雄</p>
+      <p><strong>產物險（16）</strong>中信產險 ・ 兆豐產險 ・ 安達產物 ・ 旺旺友聯產物 ・ 明台產物 ・ 法國巴黎產物 ・ 南山產物 ・ 泰安產物 ・ 國泰產物 ・ 第一產物 ・ 富邦產物 ・ 華南產物 ・ 新光產物 ・ 新安東京產物 ・ 臺灣產物 ・ 和泰產物</p>
+      <p><strong>其他（2）</strong>國外公司 ・ 國外公司(產物)</p>
+      <h4 style="margin-top:20px">商品總類（17）</h4>
+      <p style="margin-top:6px">終身壽險 ・ 定期壽險 ・ 意外 ・ 醫療 ・ 防癌 ・ 重大疾病 ・ 特定傷病 ・ 年金 ・ 外幣 ・ 投資型 ・ 失能 ・ 婦嬰 ・ 長期照顧 ・ 豁免保費 ・ 萬能 ・ 專案商品 ・ 公司團險</p>
+      <h4 style="margin-top:20px">其他維度</h4>
+      <p style="margin-top:6px">主附約：主約／附約　｜　銷售狀況：停售／現售</p>
+    </div>
+  </details>
+</section>
+
+<hr class="sep" style="margin-top:56px">
+
+<!-- ══ 6 其他模組 ══ -->
+<section id="others">
+  <div class="col">
+    <div class="eyebrow">06 — 周邊</div>
+    <h2>其餘模組的資料切面</h2>
+    <p class="lede">同一份保單資料，被切成七種保單視圖、五種保費視圖、五種保障視圖、五種領回視圖。每一種都是一張可列印的報表。</p>
+  </div>
+
+  <details>
+    <summary>4 保單 · 七種視圖<span class="cnt">各自的欄位</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>視圖</th><th>欄位</th></tr></thead>
+        <tbody>
+          <tr><td>查詢目錄</td><td>編號 · 保險公司 · 被保人 · 保單號碼 · 保單生效日 · 主契約名稱</td></tr>
+          <tr><td>主附約內容</td><td>保單層（公司/繳別/要保人/保單狀況/保單號碼/保費/繳費人/身故受益人）＋ 契約層（被保人/生效日/主附/契約名稱/繳費年期/保額/保費/保費類型）</td></tr>
+          <tr><td>單張有自訂</td><td>依 壽險・意外・住院醫療（定期/終身）・防癌・婦女孕婦 分險種輸出</td></tr>
+          <tr><td>單張有給付</td><td>同上，但只列有給付的項目</td></tr>
+          <tr><td>主約效益分析</td><td>累計保費 vs 一般身故(壽險)／共 $領回／解約金 → <strong>效益 %</strong>（實測 106%～18,552%）</td></tr>
+          <tr><td>保單關係人</td><td>要保人 · 被保人 · 保險公司 · 保單生效日 · 保單號碼 · 年繳保費 · 身故受益人 · $領回受益人</td></tr>
+          <tr><td>保單分佈</td><td>被保人 × 保險公司 的交叉統計（張數）</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>5 保費 / 6 保障 / 7 $領回 / 8 解約金<span class="cnt">切面與規則</span></summary>
+    <div class="dbody">
+      <div class="tablewrap"><table>
+        <thead><tr><th>模組</th><th>視圖</th><th>重點</th></tr></thead>
+        <tbody>
+          <tr><td>5 保費</td><td>保費明細 / 月 / 各月 / 各年 / 繳費人</td><td>台幣保單與外幣保單分開列示；表尾給「保費合計・佔年收入 %・保障型/理財型金額」與「符合理財金三角」判定</td></tr>
+          <tr><td>6 保障</td><td>個人（生命資產表）/ 家庭 / 個人彙總 / 家庭彙總 / 家庭各年</td><td>可切「有給付項目」與「自訂版本」；家庭版依 壽險/意外/住院醫療/防癌/婦女孕婦 分冊</td></tr>
+          <tr><td>7 $領回</td><td>領回目錄 / 各保單 / 各月 / 各年 / 領受人</td><td>領回型別：<strong>$生存 · $滿期 · $祝壽 · $年金 · $投資</strong>；每筆記錄領受人、時間、方式、金額與計算式</td></tr>
+          <tr><td>8 解約金</td><td>各保單解約金</td><td><strong>唯一需人工輸入</strong>的數列，逐保單年度末；在「3 新增 修改」的解約金頁輸入</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>10 變更 · 理賠<span class="cnt">11 + 9 類</span></summary>
+    <div class="dbody">
+      <h4 style="margin-top:14px">變更項目（11）</h4>
+      <p style="margin-top:6px">基本資料：地址 電話 職業 ・ 要保人 ・ 受益人：身故 $領回 ・ 繳費管道 ・ 繳別：年 半年 季 月 ・ 險種轉換 或 保額變更 ・ 附加契約內容 ・ 繳費年期 ・ 繳清 展期 自動墊繳保費 ・ 契約恢復效力 ・ 投資型保單內容</p>
+      <h4 style="margin-top:20px">理賠項目（9）</h4>
+      <p style="margin-top:6px">住院醫療 ・ 意外醫療 ・ 癌症醫療 ・ 重疾特傷/重大傷病 ・ 一般失能/長照 ・ 意外失能 ・ 一般身故 ・ 意外身故 ・ 癌症身故</p>
+      <p>兩者都是以「被保人 ＋ 項目」為查詢維度的異動紀錄簿，與保單主檔分離。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>產險模組<span class="cnt">4 類標的</span></summary>
+    <div class="dbody">
+      <p style="margin-top:10px">產險是獨立的四模組動線（1 保單人員 · 2 新增修改 · 3 保單 · 4 保費），<strong>不進健檢報告</strong>。建立時先選標的類型：<strong>汽車（type=101）・機車 ・ 房屋 ・ 其他</strong>，再走三步精靈：1 基本資料 → 2 投保內容 → 3 其他資料。</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>汽車 · 基本資料</th><th>必填</th></tr></thead>
+        <tbody>
+          <tr><td>要保人 / 被保人（車主）/ 繳費人 / 保險公司 / 車牌號碼</td><td class="req">●</td></tr>
+          <tr><td>車輛廠牌 / 車輛種類 / 製造年份 / 原始發照日 / 引擎·車身號碼 / 排氣量(CC·HP) / 噸數 / 乘客人數 / 車型·代號</td><td>—</td></tr>
+        </tbody>
+      </table></div>
+      <p>提醒模組另有「產險專案到期」，是產險唯一與健檢動線相連的地方。</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>投資型保單管理<span class="cnt">6 分頁</span></summary>
+    <div class="dbody">
+      <p style="margin-top:10px">分頁：帳戶目錄 · 投保內容 · <strong>投資標的</strong> · 各年投資金額 · 投資績效 · 停利停損設定。</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>層級</th><th>欄位</th></tr></thead>
+        <tbody>
+          <tr><td>帳戶目錄</td><td>編號 · 公司 · 主契約 · 標的現值 · 累計投資金額 · 損益金額 · 績效 %（外幣依匯率日換算台幣合計）</td></tr>
+          <tr><td>投資標的</td><td>投資標的（基金名）· 標的幣別 · 投資金額 · 平均淨值 · 持有單位數 · 交易內容（逐筆申贖）</td></tr>
+        </tbody>
+      </table></div>
+      <p>系統明示：投資金額<strong>未扣除風險保費成本與各種手續費</strong>，因此績效是近似值。另有跨客戶的「停利停損」提醒清單與「基金資訊／我的最愛基金」。</p>
+    </div>
+  </details>
+</section>
+
+<hr class="sep" style="margin-top:56px">
+
+<!-- ══ 7 報表體系 ══ -->
+<section id="print">
+  <div class="col">
+    <div class="eyebrow">07 — 交付</div>
+    <h2>五份報表就是一次面談</h2>
+    <p class="lede">系統把「該印哪幾張、按什麼順序裝訂、每張的作用是什麼」寫死在「裝訂說明」裡。這是把軟體變成銷售流程的關鍵一步——值得直接借鑑。</p>
+  </div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th style="width:60px">順序</th><th>報表</th><th>原由（系統原文）</th></tr></thead>
+    <tbody>
+      <tr><td class="num">0</td><td><strong>封面</strong></td><td>讓客戶感受到被尊重，這是一份專業服務。</td></tr>
+      <tr><td class="num">1</td><td><strong>2 保險理財需求</strong></td><td>讓客戶再一次了解和確定：他個人或家庭「現在的保險理財需求」。</td></tr>
+      <tr><td class="num">2</td><td><strong>5 保費 › 保費明細</strong></td><td>讓客戶知道目前所繳付的年度保費一共多少，其中多少符合／不符合理財金三角，保障型與理財型各佔多少。</td></tr>
+      <tr><td class="num">3</td><td><strong>6 保障 › 家庭 EXCEL</strong></td><td>讓客戶知道家庭每一個人現在身上投保的保障彙總內容：是什麼、給付有多少。</td></tr>
+      <tr><td class="num">4</td><td><strong>7 $領回 › 領回目錄</strong></td><td>讓客戶知道現有保單中有哪些可領回 $生存／$滿期／$祝壽／$年金／$投資，包括領回的時間、方式、金額。</td></tr>
+      <tr><td class="num">5</td><td><strong>9 保單檢查報告</strong></td><td>讓客戶了解現在保單狀況是否符合現在的保險理財需求，以及哪些檢查項目偏高或偏低。</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="col">
+    <div class="note">
+      其他報表一律不印，改請客戶「線上查詢」——系統為每位客戶配一組帳號（建議用手機號碼、初始密碼為西元生日 8 碼），並在「提醒 › 客戶線上查詢」追蹤誰登入過。<b>把厚報表變成薄面談＋線上自助</b>，是這套系統很清楚的取捨。
+    </div>
+  </div>
+</section>
+
+<hr class="sep" style="margin-top:56px">
+
+<!-- ══ 8 takeaways ══ -->
+<section id="takeaways">
+  <div class="col">
+    <div class="eyebrow">08 — 給嵐途的筆記</div>
+    <h2>可以直接搬的、以及刻意不搬的</h2>
+  </div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th style="width:90px">建議</th><th>做法</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="pill ok">值得搬</span></td>
+        <td><strong>五欄比對表</strong>：項目 · HAVE · NEED · 狀況 · 調整方向</td>
+        <td>一眼看懂、不需解讀。嵐途 /plan 的「動作清單」可以在每個動作前面掛這五欄當標題列。</td>
+      </tr>
+      <tr>
+        <td><span class="pill ok">值得搬</span></td>
+        <td><strong>雙日期 ＋ 距今天數</strong>（保單運算日 / 需求統計日）</td>
+        <td>用最低成本讓使用者看見「資料多舊」，比任何提醒功能都有效。</td>
+      </tr>
+      <tr>
+        <td><span class="pill ok">值得搬</span></td>
+        <td><strong>「可調整的契約明細」</strong>——建議下方直接列出可動的那幾筆</td>
+        <td>把「該調多少」變成「該動哪一列」。這正是 v2 動作清單缺的最後一哩。</td>
+      </tr>
+      <tr>
+        <td><span class="pill ok">值得搬</span></td>
+        <td><strong>裝訂順序表</strong>：每份報表寫明「原由」</td>
+        <td>把工具變成流程。嵐途的三份交付文件也可以配一張「什麼時候印哪份、為什麼」。</td>
+      </tr>
+      <tr>
+        <td><span class="pill high">要小心</span></td>
+        <td>「意外保障 ＝ 人壽 × 2」這類<strong>硬編係數</strong></td>
+        <td>算得快，但沒有推導依據，客戶一問就答不出來。嵐途的 negAge 分段與現值缺口在這點上是強項。</td>
+      </tr>
+      <tr>
+        <td><span class="pill high">要小心</span></td>
+        <td>健檢<strong>只看單一時點</strong>，不看逐年現金流</td>
+        <td>它的 NEED 是一個靜態總額，HAVE 是今日保額。嵐途的 projection 逐年路徑本來就比這強，不要為了對齊而退化。</td>
+      </tr>
+      <tr>
+        <td><span class="pill low">不要搬</span></td>
+        <td><strong>密集表格為主的版面</strong></td>
+        <td>整份報告沒有一張圖。90＋ 項的生命資產表對客戶是壓力不是資訊。首屏一張圖 ＋ ≤3 個數字仍然是對的。</td>
+      </tr>
+      <tr>
+        <td><span class="pill low">不要搬</span></td>
+        <td><strong>解約金人工逐年輸入</strong></td>
+        <td>資料維護成本極高，而且一旦沒填，主約效益分析與 $領回統計就整欄空白——實測帳號正是如此。</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="footer">
+  <p><strong>資料來源</strong>　本報告全部內容取自 <code>www.insure80.com</code> 已登入帳號的實際頁面（2026.08.24–25 爬取），包含 45 條路由、三步需求精靈、四步保單精靈、商品字典詳情頁與保單檢查報告全文。系統由奇韋系統股份有限公司營運，Since 1999。</p>
+  <p><strong>樣本說明</strong>　健檢實例使用帳號內既有的練習客戶（40 歲單身、8 張保單），需求數字（年收入 120 萬、每月淨生活費 5 萬、房貸 500 萬、扶養 2 萬、醫療 3,000 元/日、退休 65 歲活到 85 歲每月 3 萬、已準備 200 萬）為測試輸入，僅用於觸發報告版面。報告中未包含任何真實客戶的個人資料。<br><strong>待處理：</strong>該筆測試需求資料目前仍留在練習客戶帳上（<code>2 保險理財需求</code> 頁右上角「刪除」可清除，自動點擊未生效）。</p>
+</div>
+
+</div>

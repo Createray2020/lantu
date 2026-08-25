@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>調整方案 v2 原型｜嵐途財務規劃系統</title>
+<style>
+:root{--bg:#081a2b;--panel:#0d2b45;--card:#12334f;--card2:#17406a;--line:rgba(255,255,255,.11);
+ --tx:#eef2f7;--mut:#a7bacb;--mut2:#6f869c;--amber:#c99a5b;--amber2:#e0bd8b;--teal:#a9bccf;
+ --ok:#8fc0a3;--warn:#e08a68;--gap:#ef6f6f;--aft:#f0c34e;--base:#8ea3b5;--r:12px;
+ --serif:"Noto Serif TC","Songti TC",Georgia,serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);
+ font-family:"Noto Sans TC","PingFang TC","Helvetica Neue",system-ui,sans-serif;
+ font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:18px 16px 80px}
+.top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.top .en{font-size:9.5px;letter-spacing:.34em;color:var(--amber2);font-weight:600}
+h1{font-family:var(--serif);font-size:21px;margin:0;font-weight:800;letter-spacing:.02em}
+.proto{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;color:#08202a;
+ background:var(--amber);border-radius:6px;padding:2px 8px}
+.who{color:var(--mut);font-size:12.5px;margin-bottom:16px}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 17px;margin-bottom:13px}
+.sec h4{font-family:var(--serif);font-size:15.5px;margin:0 0 12px;color:var(--amber2);
+ display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;font-weight:800}
+.hint{font-size:11.5px;color:var(--mut2);font-weight:400;letter-spacing:0}
+.muted{color:var(--mut);font-size:12.5px}
+
+/* 首屏三數字 */
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:14px}
+.b{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.b .l{font-size:11.5px;color:var(--mut);letter-spacing:.05em;font-weight:700}
+.b .v{font-family:var(--serif);font-size:25px;font-weight:800;line-height:1.25;margin-top:3px;
+ letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.b .s{font-size:11.5px;color:var(--mut2);display:block;margin-top:2px}
+.b.hero{border-left:3px solid var(--amber)}
+
+/* 圖 */
+.chart{margin:6px 0 2px;position:relative}
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+#tip{position:absolute;pointer-events:none;background:#04121e;border:1px solid var(--line);
+ border-radius:8px;padding:7px 10px;font-size:11.5px;line-height:1.65;opacity:0;transition:opacity .1s;
+ box-shadow:0 6px 20px rgba(0,0,0,.5);white-space:nowrap;z-index:9;font-variant-numeric:tabular-nums}
+.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin-top:4px}
+.lg i{width:14px;height:3px;border-radius:2px;display:inline-block;vertical-align:middle;margin-right:5px}
+.verdict{background:var(--card);border-left:3px solid var(--gap);border-radius:8px;
+ padding:10px 13px;margin-top:11px;font-size:13.5px}
+.verdict.good{border-left-color:var(--ok)}
+
+/* 動作 chips（緊貼主圖下方） */
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.chip{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);
+ border-radius:999px;padding:6px 13px 6px 10px;cursor:pointer;font-size:12.5px;user-select:none;
+ transition:.13s;color:var(--mut)}
+.chip:hover{border-color:var(--amber2)}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:var(--mut2);flex:none;transition:.13s}
+.chip.on{background:rgba(201,154,91,.16);border-color:var(--amber);color:var(--tx);font-weight:600}
+.chip.on .dot{background:var(--amber2)}
+.chip .amt{font-size:11px;color:var(--mut2);font-variant-numeric:tabular-nums}
+.chip.on .amt{color:var(--amber2)}
+
+/* details */
+details{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:11px}
+details>summary{cursor:pointer;list-style:none;padding:13px 17px;font-family:var(--serif);
+ font-size:14.5px;font-weight:800;color:var(--amber2);display:flex;align-items:center;gap:9px}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:'▸';font-size:12px;transition:transform .15s;color:var(--amber2)}
+details[open]>summary::before{transform:rotate(90deg)}
+details>summary .tag{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--mut);letter-spacing:0}
+.dbody{padding:2px 17px 17px}
+
+/* 配額 */
+.quotaGrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+@media(max-width:720px){.quotaGrid{grid-template-columns:1fr}}
+.qcol{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 13px}
+.qcol.add{border-top:3px solid var(--ok)}
+.qcol.cut{border-top:3px solid var(--teal)}
+.qcol>b{font-size:13px;color:var(--amber2);display:block;margin-bottom:2px}
+.qcol .sub{font-size:11.5px;color:var(--mut2);margin-bottom:10px}
+.qrow{padding:8px 0;border-top:1px solid var(--line)}
+.qrow:first-of-type{border-top:0}
+.qhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px}
+.qhead b{font-weight:700}
+.qnums{font-size:11.5px;color:var(--mut2);font-variant-numeric:tabular-nums;margin-top:2px}
+.qnums .done{color:var(--ok)}
+.qnums .left{color:var(--warn)}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.09);margin-top:5px;overflow:hidden;display:flex}
+.bar i{display:block;height:100%;border-radius:3px}
+
+/* 手機：先給圖，數字往後排（首屏一張圖優先） */
+@media(max-width:640px){
+ #hero{display:flex;flex-direction:column}
+ #hero>h4{order:1}
+ #hero>.chart{order:2}
+ #hero>.lg{order:3}
+ #hero>#big{order:4;margin:14px 0 0}
+ #hero>#verdict{order:5}
+ #hero>div:last-child{order:6}
+ .b .v{font-size:21px}
+ .big{grid-template-columns:1fr 1fr}
+ .b:first-child{grid-column:1/-1}
+}
+
+/* 表 */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{color:var(--mut);font-weight:700;font-size:11.5px;letter-spacing:.03em;white-space:nowrap}
+td .hint{white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.off td{opacity:.42}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scroll table{min-width:760px}
+.cat{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap}
+.cat.income{background:rgba(143,192,163,.2);color:var(--ok)}
+.cat.expense{background:rgba(224,138,104,.18);color:var(--warn)}
+.cat.regular,.cat.lump{background:rgba(201,154,91,.2);color:var(--amber2)}
+.cat.liquidate,.cat.loan{background:rgba(169,188,207,.18);color:var(--teal)}
+.cat.insure{background:rgba(183,198,176,.18);color:#c3d3bb}
+input[type=text],input[type=number],select{background:#0a2136;border:1px solid var(--line);color:var(--tx);
+ border-radius:7px;padding:5px 8px;font-size:12.5px;font-family:inherit;width:100%;
+ font-variant-numeric:tabular-nums}
+input:focus,select:focus{outline:none;border-color:var(--amber2)}
+input.w{width:88px;text-align:right}
+input.yr{width:56px;text-align:right}
+.sw{position:relative;display:inline-block;width:34px;height:19px;flex:none;cursor:pointer;vertical-align:middle}
+.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw i{position:absolute;inset:0;background:rgba(255,255,255,.14);border-radius:19px;transition:.15s}
+.sw i::before{content:'';position:absolute;width:14px;height:14px;left:2.5px;top:2.5px;border-radius:50%;
+ background:var(--mut);transition:.15s}
+.sw input:checked+i{background:var(--amber)}
+.sw input:checked+i::before{transform:translateX(15px);background:#08202a}
+.btn{background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:8px;
+ padding:6px 13px;font-size:12.5px;cursor:pointer;font-family:inherit;transition:.13s}
+.btn:hover{border-color:var(--amber2)}
+.btn.amber{background:var(--amber);color:#08202a;border-color:var(--amber);font-weight:700}
+.btn.sm{padding:3px 9px;font-size:11.5px}
+.btn.x{padding:3px 8px;color:var(--mut2);background:transparent}
+.btn.x:hover{color:var(--gap);border-color:var(--gap)}
+
+/* 勾稽 */
+.led{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.led.bad{border-left:3px solid var(--gap)}
+.led.okk{border-left:3px solid var(--ok)}
+.ledrow{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:12.5px}
+.ledrow.tot{border-top:1px solid var(--line);margin-top:5px;padding-top:8px;font-weight:800}
+.ledrow span:last-child{font-variant-numeric:tabular-nums}
+.alert{border-radius:8px;padding:9px 12px;font-size:12.5px;margin-top:10px;display:flex;gap:8px;align-items:flex-start}
+.alert.red{background:rgba(239,111,111,.13);border:1px solid rgba(239,111,111,.4);color:#ffc9c9}
+.alert.amb{background:rgba(201,154,91,.13);border:1px solid rgba(201,154,91,.4);color:var(--amber2)}
+.alert b{white-space:nowrap}
+
+/* 願景清單 */
+.vlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:9px}
+.vitem{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;
+ display:flex;gap:10px;align-items:center}
+.vitem.off{opacity:.45}
+.vitem .vt{flex:1;min-width:0}
+.vitem .vn{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+.vitem .vm{font-size:11.5px;color:var(--mut2);font-variant-numeric:tabular-nums}
+.mk{font-size:11px;font-weight:800;padding:1px 5px;border-radius:4px;white-space:nowrap}
+.vitem .vn{flex-wrap:wrap}
+.mk.y{background:rgba(143,192,163,.2);color:var(--ok)}
+.mk.n{background:rgba(239,111,111,.18);color:#ff9f9f}
+
+/* 動作流程 */
+.flow{position:relative;padding-left:22px}
+.flow::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.fitem{position:relative;padding:0 0 14px}
+.fitem::before{content:'';position:absolute;left:-19px;top:6px;width:9px;height:9px;border-radius:50%;
+ background:var(--amber);box-shadow:0 0 0 3px var(--bg)}
+.fitem .fw{font-size:11.5px;color:var(--amber2);font-weight:800;letter-spacing:.04em}
+.fitem .fn{font-size:13px;font-weight:700}
+.fitem .fd{font-size:12px;color:var(--mut)}
+.note{font-size:11.5px;color:var(--mut2);margin-top:9px;line-height:1.7}
+.kbd{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#0a2136;border:1px solid var(--line);
+ border-radius:4px;padding:1px 5px;color:var(--amber2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div><div class="en">LAN TU</div><h1>調整方案</h1></div>
+  <span class="proto">v2 版面原型</span>
+</div>
+<div class="who" id="who"></div>
+
+<!-- ======== 第一層：主圖 + 三數字 ======== -->
+<div class="sec" id="hero">
+  <h4>願景歷程 <span class="hint">灰線＝現況、金線＝套用動作後。旗子 ✓ 做得到、✕ 做不到</span></h4>
+  <div class="big" id="big"></div>
+  <div class="chart"><div id="svgbox"></div><div id="tip"></div></div>
+  <div class="lg">
+    <span><i style="background:transparent;border-top:2px dashed var(--base);height:0"></i>現況</span>
+    <span><i style="background:var(--aft)"></i>套用動作後</span>
+    <span><i style="background:var(--gap);opacity:.5;height:9px;width:14px;border-radius:2px"></i>缺口（資產轉負那一段）</span>
+    <span style="color:var(--ok)">✓ 願景做得到</span>
+    <span style="color:#ff9f9f">✕ 做不到</span>
+  </div>
+  <div id="verdict"></div>
+  <div style="border-top:1px solid var(--line);margin-top:13px;padding-top:11px">
+    <div style="display:flex;align-items:baseline;gap:9px;margin-bottom:8px;flex-wrap:wrap">
+      <b style="color:var(--amber2);font-size:13px">開開看</b>
+      <span class="hint">點一下就切換，上面的線與旗子當場改變</span>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+</div>
+
+<!-- ======== 第二層：配額對帳 ======== -->
+<details open>
+  <summary>缺口配額對帳 <span class="tag" id="quotaTag"></span></summary>
+  <div class="dbody">
+    <div class="quotaGrid">
+      <div class="qcol add">
+        <b>補缺口</b><div class="sub">把水加進來 — 收入與支出兩個模型</div>
+        <div id="qAdd"></div>
+      </div>
+      <div class="qcol cut">
+        <b>改缺口</b><div class="sub">把桶子變小 — 調整願景本身</div>
+        <div id="qCut"></div>
+      </div>
+    </div>
+    <div class="note">
+      <b>補缺口</b>三條線是<b>加總</b>關係，共用一個總配額 — 那是把現值缺口攤到退休前的<b>參考量體</b>，
+      給教練一個「大概要生出多少」的錨，不是精確等式。<br>
+      <b>改缺口</b>三根是<b>替代</b>關係，各自回答「單獨動這一根要調到多少」，<b>刻意不相加</b>。<br>
+      v1 的求解器程式碼全部留著，只是從「產出方案」降級成「產出配額」 — 真正決定缺口的是動作清單。
+    </div>
+  </div>
+</details>
+
+<!-- ======== 第三層：動作清單 ======== -->
+<details open>
+  <summary>調整動作清單 <span class="tag" id="actTag"></span></summary>
+  <div class="dbody">
+    <div class="scroll"><table id="actTbl"></table></div>
+    <div style="margin-top:11px;display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+      <select id="newCat" style="width:auto;min-width:150px"></select>
+      <button class="btn" onclick="addAction()">＋ 新增動作</button>
+      <span class="hint">工具欄位純文字、不進計算；增值速度是<b>這筆錢自己的報酬率</b>（分離池）</span>
+    </div>
+    <div class="note">
+      ⚠️ 動作記的是「<b>相對現況的差額</b>」不是絕對值。客戶原本就有的定期定額寫在收支表裡，這裡只記<b>增加的部分</b>，否則會重複計算。<br>
+      ⚠️ 刪減支出與資產變現<b>必須指到明細的某一列</b>（原型用下拉呈現），不能自由填 — 具體刪什麼是要跟客戶討論的。
+    </div>
+  </div>
+</details>
+
+<!-- ======== 資金勾稽 ======== -->
+<details>
+  <summary>資金勾稽 <span class="tag" id="ledTag"></span></summary>
+  <div class="dbody">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="ledGrid"></div>
+    <div id="ledAlert"></div>
+    <div class="note">依拍板為<b>軟提示、不擋採用</b>。但「未來缺口沒補平」與「當下每月排不出錢」是兩件事，畫面上分開兩格 —
+    混成一條會讓教練把這個月就執行不了的方案交出去。</div>
+  </div>
+</details>
+
+<!-- ======== 願景清單 ======== -->
+<details>
+  <summary>願景選定 <span class="tag" id="visTag"></span></summary>
+  <div class="dbody">
+    <div class="vlist" id="vlist"></div>
+    <div class="note">
+      先選定要執行哪些願景，選定的當中<b>按時間先到的先支付</b>。沒選的不進「一生願景需要的資金」、也不上時間軸。<br>
+      ⚠️ 選定閘（要不要做）與願景壓縮槓桿（做多少）是兩層，順序不能顛倒。<br>
+      ⚠️ 傳承是願景的一部分、不獨立計算，但客戶可以勾選不處理。
+    </div>
+  </div>
+</details>
+
+<!-- ======== 動作流程 ======== -->
+<details>
+  <summary>動作流程 <span class="tag">定案後輸出到調整方案書</span></summary>
+  <div class="dbody">
+    <div class="flow" id="flow"></div>
+  </div>
+</details>
+
+<div class="note" style="text-align:center;padding-top:8px">
+  這是版面與邏輯原型，數字取自一組虛構的示範客戶，未接真實引擎。<br>
+  確認過版面與欄位之後，再依定案企劃的區塊 1→6 改真實程式。
+</div>
+
+</div>
+
+<script>
+/* ============================================================
+   示範客戶（虛構）
+   ============================================================ */
+var C={
+ name:'陳先生',age:45,spouseAge:43,endAge:90,retireAge:65,
+ salaryM:140000,        // 家庭月薪資
+ rentM:8000,            // 老家出租月租
+ expM:128000,           // 工作期家庭月支出（含房貸月付 38000）
+ mortgageM:38000, mortgageEnd:62,
+ retireExpM:99000,      // 退休期家庭月支出（含醫療準備）
+ cash:900000, invest:1000000,
+ rate:5,                // 全域報酬率假設 %
+ emergencyMonths:6
+};
+
+/* 支出明細（刪減支出動作要指到這裡的某一列） */
+var EXPENSES=[
+ {id:'e1',name:'房貸月付',m:38000},
+ {id:'e2',name:'家庭生活費',m:40000},
+ {id:'e3',name:'子女教育與才藝',m:18000},
+ {id:'e4',name:'孝親費',m:15000},
+ {id:'e5',name:'第二台車（貸款＋養車）',m:9000},
+ {id:'e6',name:'保險費',m:8000}
+];
+/* 資產明細（資產變現動作要指到這裡的某一列） */
+var ASSETS=[
+ {id:'a1',name:'自住房（台中）',v:12800000,liq:false},
+ {id:'a2',name:'老家（出租中）',v:4800000,liq:true},
+ {id:'a3',name:'投資部位',v:1500000,liq:true},
+ {id:'a4',name:'現金與定存',v:800000,liq:true}
+];
+
+/* 願景（選定閘 on；按時間先到先付） */
+var VISIONS=[
+ {id:'v1',age:47,name:'換車',amt:1000000,on:true},
+ {id:'v2',age:50,name:'老大大學四年',amt:1600000,on:true,years:4},
+ {id:'v3',age:53,name:'老二大學四年',amt:1600000,on:true,years:4},
+ {id:'v4',age:55,name:'夫妻環遊世界',amt:800000,on:true},
+ {id:'v5',age:58,name:'子女成家支援',amt:1000000,on:true},
+ {id:'v6',age:65,name:'退休生活',amt:0,on:true,span:true,toAge:90},
+ {id:'v7',age:70,name:'二度長途旅遊',amt:600000,on:true},
+ {id:'v8',age:90,name:'傳承：留給子女',amt:12000000,on:true,legacy:true}
+];
+
+/* 動作類別 */
+var CATS={
+ income:  {n:'增加工作收入',lane:'A'},
+ expense: {n:'刪減支出',    lane:'C'},
+ regular: {n:'定期定額',    lane:'B'},
+ lump:    {n:'單筆投入',    lane:'B'},
+ liquidate:{n:'資產變現',   lane:'B'},
+ loan:    {n:'貸款取得資金',lane:'B'},
+ insure:  {n:'購買保障',    lane:'B'}
+};
+
+/* 預設動作清單（示範） */
+var ACTIONS=[
+ {id:'x1',on:true,cat:'income',name:'轉職／爭取加薪',tool:'職涯規劃',
+  getFrom:46,getTo:65,getMonthly:15000,growth:0,src:'new',startY:46,
+  note:'先生轉職，年薪由 120 萬提升至 138 萬'},
+ {id:'x2',on:true,cat:'expense',name:'處理掉第二台車',tool:'—',ref:'e5',
+  getFrom:46,getTo:90,getMonthly:9000,growth:0,src:'new',startY:46,
+  note:'賣車後改共乘與大眾運輸'},
+ {id:'x3',on:true,cat:'regular',name:'全球股票型 ETF 月扣',tool:'VT／00646 定期定額',
+  payFrom:46,payTo:65,payMonthly:20000,growth:6,src:'surplus',startY:46,
+  note:'扣款來源＝月結餘'},
+ {id:'x4',on:false,cat:'liquidate',name:'賣掉老家',tool:'—',ref:'a2',
+  payFrom:52,getLump:4300000,growth:0,src:'new',startY:52,
+  note:'淨變現金額已扣交易稅費與仲介；租金收入同步消失'},
+ {id:'x5',on:false,cat:'lump',name:'變現資金一次投入',tool:'全球平衡型組合',
+  payFrom:52,payLump:4000000,growth:5.5,src:'act:x4',startY:52,
+  note:'資金來源指向「賣掉老家」那一列'},
+ {id:'x6',on:false,cat:'insure',name:'補足家庭責任保障',tool:'定期壽險 20 年期',
+  payFrom:46,payTo:65,payMonthly:4200,cover:8000000,coverKind:'壽險',growth:0,src:'surplus',startY:46,
+  note:'保額進保障缺口，不然買保險在試算上永遠只是變貴'},
+ {id:'x7',on:false,cat:'regular',name:'退休帳戶加碼',tool:'目標日期基金',
+  payFrom:52,payTo:65,payMonthly:25000,growth:5.5,src:'surplus',startY:52,
+  note:'房貸壓力減輕後再加碼'}
+];
+
+/* ============================================================
+   工具
+   ============================================================ */
+function n(v){v=+v;return isFinite(v)?v:0}
+function fmt(v){if(v==null||!isFinite(v))return '—';
+ var s=Math.round(Math.abs(v)).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
+ return (v<0?'-':'')+s}
+function wan(v){if(v==null||!isFinite(v))return '—';
+ var w=v/10000;return (Math.abs(w)>=1000?Math.round(w):Math.round(w*10)/10).toLocaleString('en-US')+' 萬'}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+
+/* ============================================================
+   簡化試算引擎
+   主池：一般資產，走全域報酬率
+   分離池：每個動作自己的 pot，走該動作的 growth（Ray 拍板的「分離池」）
+   ============================================================ */
+function activeVisions(){
+ return VISIONS.filter(function(v){return v.on}).slice().sort(function(a,b){return a.age-b.age});
+}
+function actsOn(useActions){
+ return useActions?ACTIONS.filter(function(a){return a.on}):[];
+}
+
+function project(useActions,ov){
+ ov=ov||{};
+ var acts=actsOn(useActions), r=C.rate/100;
+ var RET=C.retireAge+n(ov.retireDelay);          // 延後退休
+ var REXP=C.retireExpM*(1-n(ov.retireCut));      // 降低退休水準
+ var VCUT=n(ov.visionCut);                       // 壓縮願景
+ var main=C.cash+C.invest;          // 主池（允許轉負，負了照樣計息 → 現值缺口的來源）
+ var pots={}; acts.forEach(function(a){pots[a.id]=0});
+ var rows=[], shortPV=0, shortAge=null, negAge=null, needPV=0;
+ var vis=activeVisions(), done={}, firstFail=null;
+ var soldRent=acts.some(function(a){return a.cat==='liquidate'&&a.ref==='a2'});
+
+ for(var age=C.age; age<=C.endAge; age++){
+  var t=age-C.age, df=Math.pow(1+r,t+1);
+
+  /* --- 年度現金流 --- */
+  var inc=0, exp=0;
+  if(age<RET) inc+=C.salaryM*12;
+  /* 租金：賣掉老家之後就沒有了（連帶效應，教練要知道） */
+  var sellAge=null; acts.forEach(function(a){if(a.cat==='liquidate'&&a.ref==='a2')sellAge=a.payFrom});
+  if(!(sellAge!==null&&age>=sellAge)) inc+=C.rentM*12;
+
+  exp += (age<RET?C.expM:REXP)*12;
+  if(age<RET && age>C.mortgageEnd) exp -= C.mortgageM*12;   // 房貸繳完
+
+  /* --- 動作：流入（增加收入／刪減支出／給付） --- */
+  var invested=0, lumpIn=0;
+  acts.forEach(function(a){
+   if(a.getMonthly && age>=n(a.getFrom) && age<=n(a.getTo||C.endAge)){
+    if(a.cat==='income'||a.cat==='expense') inc+=a.getMonthly*12;   // 進主池現金流
+   }
+   if(a.getLump && age===n(a.payFrom||a.getFrom)) lumpIn+=a.getLump; // 變現／貸款取得
+   if(a.cat==='insure' && a.payMonthly && age>=n(a.payFrom) && age<=n(a.payTo||C.endAge))
+    exp+=a.payMonthly*12;                                           // 保費是支出，不是投資
+  });
+
+  /* --- 動作：分離池投入與滾動 --- */
+  acts.forEach(function(a){
+   if(a.cat==='insure') return;
+   var g=1+n(a.growth)/100;
+   pots[a.id]=pots[a.id]*g;
+   if(a.payMonthly && age>=n(a.payFrom) && age<=n(a.payTo||C.endAge) && a.cat!=='loan'){
+    pots[a.id]+=a.payMonthly*12; invested+=a.payMonthly*12;
+   }
+   if(a.payLump && age===n(a.payFrom)){ pots[a.id]+=a.payLump; invested+=a.payLump; }
+   if(a.divYear && age>=n(a.payFrom)){
+    if(a.divMode==='payout') inc+=a.divYear; else pots[a.id]+=a.divYear;
+   }
+   /* 貸款月付＝流出 */
+   if(a.cat==='loan' && a.payMonthly && age>=n(a.payFrom) && age<=n(a.payTo||C.endAge))
+    exp+=a.payMonthly*12;
+  });
+
+  var net=inc-exp+lumpIn-invested;
+
+  /* --- 願景事件：先到先付，付不出來就標✕ --- */
+  var potSum=0; Object.keys(pots).forEach(function(k){potSum+=pots[k]});
+
+  /* --- 願景事件：先到先付；付不出來就標✕，錢不會被花掉 --- */
+  var flags=[];
+  vis.forEach(function(v){
+   if(v.legacy||v.span) return;                 // 傳承看期末、退休生活看區間，都不在這裡扣款
+   var span=v.years||1, per=v.amt*(1-VCUT)/span;
+   if(age>=v.age && age<v.age+span){
+    /* 可動用＝主池＋分離池（真的不夠時會贖回投資，這是實務） */
+    if(main+net+potSum>=per){ net-=per; if(age===v.age+span-1&&done[v.id]!==false) done[v.id]=true; }
+    else { done[v.id]=false; }
+   }
+   if(age===v.age) flags.push(v);
+  });
+
+  main = main*(1+r) + net;                       // 負了照樣計息 → 現值缺口的封閉解
+
+  /* 總資產＝主池＋分離池。缺口一定要看合計，只看主池等於分離池的錢不存在 */
+  var total=main+potSum;
+  if(total<0){ if(negAge===null)negAge=age;
+   var need=-total/df; if(need>shortPV){shortPV=need;shortAge=age} }
+
+  /* 一生願景需求現值 */
+  needPV += exp/df;
+  vis.forEach(function(v){ if(!v.legacy && !v.span && age===v.age) needPV += v.amt*(1-VCUT)/df });
+
+  rows.push({age:age,total:total,main:main,pot:potSum,flags:flags});
+ }
+
+ var last=rows[rows.length-1];
+
+ /* 退休生活：不逐年扣款（已在支出裡），判定＝該區間資產全程不轉負 */
+ vis.forEach(function(v){
+  if(!v.span) return;
+  var bad=rows.some(function(x){return x.age>=RET && x.age<=(v.toAge||C.endAge) && x.total<0});
+  done[v.id]=!bad;
+ });
+
+ /* 傳承：選定才進需求，判定用期末總資產 */
+ var legacy=vis.filter(function(v){return v.legacy})[0];
+ if(legacy){
+  var lt=legacy.amt*(1-VCUT);
+  needPV += lt/Math.pow(1+r,C.endAge-C.age+1);
+  done[legacy.id]= last.total>=lt;
+  if(!done[legacy.id]){
+   var extra=(lt-Math.max(0,last.total))/Math.pow(1+r,C.endAge-C.age+1);
+   if(extra>shortPV){shortPV=extra;shortAge=C.endAge}
+  }
+ }
+
+ /* 第一個做不到的：按時間先後（先到先付的直接後果） */
+ vis.forEach(function(v){ if(done[v.id]===false && !firstFail) firstFail=v });
+
+ /* 近／遠兩段缺口 */
+ /* 急迫度看「第一次轉負是哪一年」（何時開始出事），
+    不是看 shortAge（缺口現值最大的那一年）—— 後者常常落在期末，會低估急迫性。 */
+ var near=0,far=0, urgAge=(negAge!=null?negAge:shortAge);
+ if(shortPV>0){ if((urgAge-C.age)<=10) near=shortPV; else far=shortPV; }
+
+ return {rows:rows,shortPV:shortPV,shortAge:shortAge,negAge:negAge,needPV:needPV,
+  done:done,firstFail:firstFail,near:near,far:far,urgAge:urgAge,visions:vis,pots:pots};
+}
+
+/* ---- 補缺口配額：一個總額，三條線一起填（加總關係） ----
+   把現值缺口攤成「從今天到退休、每月要額外生出多少現金」。 */
+function quotaAdd(){
+ var base=project(false); if(base.shortPV<=0.5) return {need:0,pv:0};
+ var r=C.rate/100, yrs=Math.max(1,C.retireAge-C.age), af=0;
+ for(var i=0;i<yrs;i++) af+=Math.pow(1+r,-(i+1));
+ return {need:base.shortPV/af/12, pv:base.shortPV};
+}
+
+/* ---- 改缺口配額：三根各自是「替代方案」，不能相加 ----
+   單獨用這一根、其他都不動，要調到多少才補得平。掃描到上限為止。 */
+function quotaCut(){
+ var withActs=true;                                   // 以「已排的動作」為基準往上加
+ function gapAt(ov){ return project(withActs,ov).shortPV }
+ if(gapAt({})<=0.5) return {retire:{done:true},retireLevel:{done:true},vision:{done:true}};
+ function scan(key,max,step,fmtf){
+  for(var v=step; v<=max+1e-9; v+=step){
+   var ov={}; ov[key]=v;
+   if(gapAt(ov)<=0.5) return {x:v,label:fmtf(v),ok:true};
+  }
+  return {x:max,label:fmtf(max),ok:false};
+ }
+ return {
+  retire:      scan('retireDelay',10,1,function(v){return '延後 '+v+' 年（'+(C.retireAge+v)+' 歲退休）'}),
+  retireLevel: scan('retireCut',.5,.02,function(v){return '調降 '+Math.round(v*100)+'%（每月 '+fmt(C.retireExpM*(1-v))+'）'}),
+  vision:      scan('visionCut',.9,.05,function(v){return '壓縮 '+Math.round(v*100)+'%'})
+ };
+}
+
+/* ---- 已排：動作清單裡歸到各條線的貢獻（每月等值） ---- */
+function laneDone(){
+ var out={A:0,B:0,C:0,D:0,E:0,F:0};
+ ACTIONS.forEach(function(a){
+  if(!a.on) return;
+  var lane=CATS[a.cat].lane;
+  if(a.cat==='income'||a.cat==='expense') out[lane]+=n(a.getMonthly);
+  else if(a.cat==='regular') out[lane]+=n(a.payMonthly);
+  else if(a.cat==='lump'||a.cat==='liquidate'||a.cat==='loan'){
+   var yrs=Math.max(1,C.retireAge-n(a.payFrom||C.age));
+   out[lane]+=(n(a.payLump)||n(a.getLump))/yrs/12;
+  }
+ });
+ return out;
+}
+
+/* ---- 資金勾稽 ---- */
+function ledger(){
+ var surplusBase=(C.salaryM+C.rentM)-C.expM;
+ var addIncome=0, cutExpense=0, newInvest=0, premium=0, lumpNeed=0, lumpGot=0;
+ ACTIONS.forEach(function(a){
+  if(!a.on) return;
+  if(a.cat==='income') addIncome+=n(a.getMonthly);
+  if(a.cat==='expense') cutExpense+=n(a.getMonthly);
+  if(a.cat==='regular') newInvest+=n(a.payMonthly);
+  if(a.cat==='insure') premium+=n(a.payMonthly);
+  if(a.cat==='loan') newInvest+=n(a.payMonthly);
+  if(a.cat==='lump') lumpNeed+=n(a.payLump);
+  if(a.cat==='liquidate'||a.cat==='loan') lumpGot+=n(a.getLump);
+ });
+ var left=surplusBase+addIncome+cutExpense-newInvest-premium;
+ var emReq=C.expM*C.emergencyMonths;
+ var cashLeft=C.cash+lumpGot-lumpNeed;
+ return {surplusBase:surplusBase,addIncome:addIncome,cutExpense:cutExpense,
+  newInvest:newInvest,premium:premium,left:left,
+  cash:C.cash,lumpGot:lumpGot,lumpNeed:lumpNeed,cashLeft:cashLeft,emReq:emReq,
+  monthBad:left<0, cashBad:cashLeft<emReq};
+}
+
+/* ============================================================
+   主圖
+   ============================================================ */
+function chart(){
+ var pb=project(false), pa=project(true);
+ var W=980,H=340,L=58,R=18,T=58,B=34, pw=W-L-R, ph=H-T-B;
+ var mx=0,realMn=0;
+ pb.rows.concat(pa.rows).forEach(function(x){realMn=Math.min(realMn,x.total);mx=Math.max(mx,x.total)});
+ mx*=1.12;
+ /* ⚠️ 現況線常常掉到 −4,000 萬，直接照實際範圍畫會把「調整後」壓成一條平線。
+    下限裁到正值的 0.55 倍，被裁掉的部分在圖上註明，不要為了誠實而讓圖沒重點。 */
+ var mn=Math.max(realMn*1.12,-mx*.55), clipped=realMn<mn;
+ var X=function(a){return L+(a-C.age)/(C.endAge-C.age)*pw};
+ var Y=function(v){return T+ph-(Math.max(mn,Math.min(mx,v))-mn)/(mx-mn)*ph};
+
+ /* 刻度 */
+ function ticks(a,b,k){var sp=b-a,raw=sp/(k||4),mag=Math.pow(10,Math.floor(Math.log(raw)/Math.LN10)),
+  nm=raw/mag,st=(nm<=1?1:nm<=2?2:nm<=2.5?2.5:nm<=5?5:10)*mag,o=[],v=Math.ceil(a/st-1e-9)*st;
+  for(;v<=b+st*1e-6;v+=st)o.push(Math.abs(v)<st*1e-6?0:v);
+  if(o.indexOf(0)<0&&a<0&&b>0)o.push(0);return o}
+
+ var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="願景歷程資產曲線">';
+ /* 網格 */
+ ticks(mn,mx,5).forEach(function(v){var y=Y(v);
+  s+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+'" stroke="'+
+   (v===0?'rgba(255,255,255,.30)':'rgba(255,255,255,.07)')+'" stroke-width="'+(v===0?1.4:1)+'"/>'+
+   '<text x="'+(L-8)+'" y="'+(y+4).toFixed(1)+'" fill="#71858c" font-size="10.5" text-anchor="end">'+wan(v)+'</text>'});
+ for(var a=C.age;a<=C.endAge;a+=5){
+  s+='<text x="'+X(a).toFixed(1)+'" y="'+(H-11)+'" fill="#71858c" font-size="10.5" text-anchor="middle">'+a+'</text>'}
+
+ /* 10 年分界 */
+ var x10=X(C.age+10);
+ s+='<line x1="'+x10.toFixed(1)+'" y1="'+T+'" x2="'+x10.toFixed(1)+'" y2="'+(T+ph)+'" stroke="var(--mut2)" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>'+
+  '<text x="'+(x10+5).toFixed(1)+'" y="'+(T+13)+'" fill="#6f869c" font-size="10">10 年</text>';
+
+ /* 缺口填色（套用後的線低於零） */
+ var neg=[];pa.rows.forEach(function(x){if(x.total<0)neg.push(x)});
+ if(neg.length){
+  var d='M'+X(neg[0].age).toFixed(1)+' '+Y(0).toFixed(1);
+  neg.forEach(function(x){d+=' L'+X(x.age).toFixed(1)+' '+Y(x.total).toFixed(1)});
+  d+=' L'+X(neg[neg.length-1].age).toFixed(1)+' '+Y(0).toFixed(1)+' Z';
+  s+='<path d="'+d+'" fill="var(--gap)" fill-opacity=".22"/>';
+ }
+ function line(rows,col,w,dash){
+  var d=rows.map(function(x,i){return (i?'L':'M')+X(x.age).toFixed(1)+' '+Y(x.total).toFixed(1)}).join(' ');
+  return '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+w+'" stroke-linejoin="round"'+
+   (dash?' stroke-dasharray="'+dash+'"':'')+'/>'}
+ s+=line(pb.rows,'var(--base)',2,'5 4');
+ s+=line(pa.rows,'var(--aft)',2.4);
+
+ /* 被裁掉的部分要講清楚，不然「灰線貼著底跑」會被讀成「打平」 */
+ if(clipped){
+  s+='<text x="'+(W-R)+'" y="'+(T+ph-6)+'" fill="var(--gap)" font-size="10.5" font-weight="700" text-anchor="end">'+
+   '↓ 現況續跌至 '+wan(realMn)+'（超出圖框）</text>';
+ }
+
+ /* 願景旗（依「套用後」判定；✓／✕ 符號＋顏色雙編碼 —
+    綠紅在紅綠色盲下 ΔE 僅 7.8，不能只靠顏色） */
+ var lastX=-99, hi=false;
+ pa.visions.slice().sort(function(a,b){return a.age-b.age}).forEach(function(v){
+  if(v.legacy) return;
+  var ok=pa.done[v.id]!==false;
+  var x=X(v.age), row=pa.rows[v.age-C.age]||pa.rows[0];
+  hi = (x-lastX<64) ? !hi : false; lastX=x;          // 太近就交錯高度，避免標籤疊字
+  var ty=hi?T-32:T-10, sy=hi?T-44:T-22;
+  var col=ok?'var(--ok)':'#ff9f9f', line2=ok?'var(--ok)':'var(--gap)';
+  s+='<line x1="'+x.toFixed(1)+'" y1="'+(ty+4)+'" x2="'+x.toFixed(1)+'" y2="'+Y(row.total).toFixed(1)+'" stroke="'+
+    line2+'" stroke-width="1" stroke-opacity=".4"/>';
+  s+='<circle cx="'+x.toFixed(1)+'" cy="'+Y(row.total).toFixed(1)+'" r="3.6" fill="'+
+    line2+'" stroke="var(--bg)" stroke-width="2"/>';
+  s+='<text x="'+x.toFixed(1)+'" y="'+ty+'" fill="'+col+
+    '" font-size="12" font-weight="800" text-anchor="middle">'+(ok?'✓':'✕')+'</text>';
+  s+='<text x="'+x.toFixed(1)+'" y="'+sy+'" fill="'+col+
+    '" font-size="9.5" text-anchor="middle" opacity=".95">'+esc(v.name)+'</text>';
+ });
+
+ /* hover 層 */
+ s+='<g id="hv">';
+ pa.rows.forEach(function(x,i){
+  s+='<rect x="'+(X(x.age)-pw/(C.endAge-C.age)/2).toFixed(1)+'" y="'+T+'" width="'+
+   (pw/(C.endAge-C.age)).toFixed(1)+'" height="'+ph+'" fill="transparent" data-i="'+i+'"/>'});
+ s+='</g><line id="cross" x1="0" y1="'+T+'" x2="0" y2="'+(T+ph)+'" stroke="var(--amber2)" stroke-width="1" opacity="0"/>';
+ s+='</svg>';
+ return {svg:s,pb:pb,pa:pa,X:X,Y:Y,W:W,H:H};
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+var CH=null;
+function render(){
+ document.getElementById('who').innerHTML=
+  esc(C.name)+'，'+C.age+' 歲｜配偶 '+C.spouseAge+' 歲｜子女 12 歲、9 歲｜'+
+  '家庭月收入 '+fmt(C.salaryM+C.rentM)+'、月支出 '+fmt(C.expM)+
+  '｜退休 '+C.retireAge+' 歲｜報酬率假設 '+C.rate+'%';
+
+ CH=chart();
+ var pb=CH.pb, pa=CH.pa;
+ document.getElementById('svgbox').innerHTML=CH.svg;
+ bindHover();
+
+ /* --- 三數字 --- */
+ var imp=pb.shortPV>0.5?Math.max(0,Math.round((1-pa.shortPV/pb.shortPV)*100)):100;
+ var okCnt=0,total=0;
+ pa.visions.forEach(function(v){total++;if(pa.done[v.id]!==false)okCnt++});
+ var col=pa.shortPV<=0.5?'var(--ok)':(imp>=50?'var(--amber2)':'var(--warn)');
+ document.getElementById('big').innerHTML=
+  '<div class="b"><div class="l">一生願景需要的資金</div>'+
+   '<div class="v" style="color:var(--tx)">'+wan(pa.needPV)+'</div>'+
+   '<span class="s">折現到今天的總需求（含選定的傳承）</span></div>'+
+  '<div class="b hero"><div class="l">缺口改善</div>'+
+   '<div class="v" style="color:'+col+'">'+(pb.shortPV<=0.5?'無缺口':wan(pb.shortPV)+' → '+wan(pa.shortPV))+'</div>'+
+   '<span class="s">'+(pb.shortPV<=0.5?'現況即可支撐':'改善 '+imp+'%')+'</span></div>'+
+  '<div class="b"><div class="l">願景達成</div>'+
+   '<div class="v" style="color:'+(okCnt===total?'var(--ok)':'var(--amber2)')+'">'+okCnt+' / '+total+' 件</div>'+
+   '<span class="s">選定的願景中做得到幾件</span></div>';
+
+ /* --- 判語 --- */
+ var vd=document.getElementById('verdict');
+ if(!pa.firstFail){
+  vd.className='verdict good';
+  vd.innerHTML='✅ <b>選定的願景全部做得到。</b>仍請確認下方資金勾稽，以及十年後的動態調整區。';
+ }else{
+  var ff=pa.firstFail, after=pa.visions.filter(function(v){return v.age>ff.age&&pa.done[v.id]===false}).length;
+  vd.className='verdict';
+  vd.innerHTML= ff.legacy
+   ? '基本人生目標都做得到了，<b style="color:#ff9f9f">卡在「'+esc(ff.name)+'」</b> — '+
+     '期末資產 '+wan((pa.rows[pa.rows.length-1]||{}).total)+'，目標 '+wan(ff.amt)+'。'
+   : '照這組動作走，你做得到 <b>'+ff.age+' 歲以前</b>的所有事；'+
+     '第一個做不到的是 <b style="color:#ff9f9f">'+ff.age+' 歲的「'+esc(ff.name)+'」</b>'+
+     (after?'，之後還有 <b>'+after+'</b> 件會落空。':'。');
+  if(pa.near>0.5) vd.innerHTML+='<div style="margin-top:6px;color:#ff9f9f">🔴 <b>缺口在 '+pa.urgAge+' 歲就出現（十年內）'+wan(pa.near)+'</b>：沒有攤提空間，必須立即處理。</div>';
+  if(pa.far>0.5){
+   var miss=pa.visions.filter(function(v){return pa.done[v.id]===false}).length;
+   vd.innerHTML+='<div style="margin-top:6px;color:var(--amber2)">🟡 <b>缺口出現在 '+pa.urgAge+' 歲（十年以後）'+wan(pa.far)+'</b>：'+
+    (miss>1
+     ? '時點不急，但目前有 <b>'+miss+' 件</b>願景落空 — 先把它們補回來，再談逐年微調。'
+     : '屬動態調整區，逐年檢視即可，比原本更優化就算有效。')+'</div>';
+  }
+ }
+
+ /* --- chips --- */
+ document.getElementById('chips').innerHTML=ACTIONS.map(function(a){
+  var amt=a.cat==='income'||a.cat==='expense'?'+'+fmt(a.getMonthly)+'/月'
+   :a.payMonthly?'−'+fmt(a.payMonthly)+'/月'
+   :a.payLump?fmt(a.payLump)+' 單筆'
+   :a.getLump?'+'+fmt(a.getLump):'';
+  return '<span class="chip'+(a.on?' on':'')+'" onclick="toggle(\''+a.id+'\')">'+
+   '<span class="dot"></span>'+esc(a.name)+'<span class="amt">'+amt+'</span></span>'}).join('');
+
+ renderQuota(pb,pa); renderTable(); renderLedger(); renderVisions(pa); renderFlow();
+}
+
+function renderQuota(pb,pa){
+ var q=quotaAdd(), done=laneDone(), cut=quotaCut();
+ var need=q.need||0;
+ var LANES=[
+  {k:'A',n:'工作收入提升',s:'每月薪資增加',col:'var(--ok)'},
+  {k:'B',n:'理財效率提升',s:'月定額＋單筆＋不動產變現',col:'var(--amber)'},
+  {k:'C',n:'支出刪減',s:'逐項討論，不用 % 抓',col:'var(--teal)'}
+ ];
+ var got=LANES.reduce(function(s,L){return s+(done[L.k]||0)},0);
+ var left=Math.max(0,need-got);
+
+ /* 補缺口＝一個總配額，三條線一起填（堆疊，可加總） */
+ var stack=LANES.map(function(L){
+  var w=need>0?Math.min(100,(done[L.k]||0)/need*100):0;
+  return w>0?'<i style="width:'+w.toFixed(1)+'%;background:'+L.col+';margin-right:2px"></i>':''}).join('');
+ document.getElementById('qAdd').innerHTML=
+  '<div class="qrow" style="padding-top:0">'+
+   '<div class="qhead"><b style="font-size:14px">總配額 '+fmt(need)+' ／月</b>'+
+   '<span class="hint">到 '+C.retireAge+' 歲為止</span></div>'+
+   '<div class="qnums">已排 <b class="done">'+fmt(got)+'</b>'+
+    (left>0?'　·　還差 <b class="left">'+fmt(left)+'</b>':'　·　<b class="done">已達參考量體</b>')+'</div>'+
+   '<div class="bar" style="height:9px">'+stack+'</div>'+
+   (left<=0&&pa.shortPV>0.5
+    ? '<div class="qnums" style="margin-top:7px;color:var(--warn);line-height:1.6">'+
+      '⚠ 量體已達，但實際試算仍有缺口 <b>'+wan(pa.shortPV)+'</b>。'+
+      '<span class="hint">配額是把現值缺口平均攤到退休前的<b>估算量體</b>；'+
+      '實際動作有各自的年期與複利，兩邊本來就不會相等 — <b>判準以上面那張圖為準</b>。</span></div>'
+    : '')+'</div>'+
+  LANES.map(function(L){
+   var v=done[L.k]||0;
+   return '<div class="qrow"><div class="qhead">'+
+    '<b><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+L.col+
+    ';margin-right:6px"></span>'+L.n+'</b>'+
+    '<b style="'+(v>0?'color:var(--ok)':'color:var(--mut2);font-weight:400;font-size:11.5px')+'">'+
+    (v>0?fmt(v)+' ／月':'尚未排入')+'</b></div>'+
+    '<div class="qnums"><span class="hint">'+L.s+'</span></div></div>'}).join('');
+
+ /* 改缺口＝三個互相替代的選項，刻意不相加 */
+ var CUTS=[
+  {k:'retire',n:'延後退休',s:'工作期延長、退休期縮短'},
+  {k:'retireLevel',n:'降低退休水準',s:'退休期支出調降'},
+  {k:'vision',n:'壓縮願景',s:'往「可接受的最低」壓'}
+ ];
+ document.getElementById('qCut').innerHTML=
+  (cut.retire&&cut.retire.done
+   ? '<div class="qrow" style="padding-top:0"><b style="color:var(--ok)">目前這組動作已經補平，不需要動願景。</b>'+
+     '<div class="qnums"><span class="hint">桶子不用變小 — 這是最好的結果。</span></div></div>'
+   : '<div class="qrow" style="padding-top:0"><span class="hint">以下三選一 — <b style="color:var(--amber2)">它們是替代方案，不能相加</b>。'+
+     '數字＝在目前已排的動作之上，單獨動這一根要調到多少。</span></div>'+
+     CUTS.map(function(Cc){
+      var rr=cut[Cc.k]||{};
+      return '<div class="qrow"><div class="qhead"><b>'+Cc.n+'</b>'+
+       '<b style="color:'+(rr.ok?'var(--amber2)':'var(--warn)')+'">'+
+       (rr.ok?esc(rr.label):'拉到上限仍補不平')+'</b></div>'+
+       '<div class="qnums"><span class="hint">'+Cc.s+'</span></div></div>'}).join(''));
+
+ document.getElementById('quotaTag').textContent=
+  pb.shortPV<=0.5?'現況無缺口':'總配額 每月 '+fmt(need)+' 元　·　已排 '+fmt(got);
+}
+
+function yrsLabel(a){
+ var f=a.payFrom||a.getFrom, t=a.payTo||a.getTo;
+ if(!f) return '—';
+ return t?(f+'–'+t):(f+' 歲一次');
+}
+function renderTable(){
+ var head='<tr><th style="width:36px"></th><th>類別</th><th>項目名稱</th><th>工具／指向</th>'+
+  '<th class="num">投入期</th><th class="num">每月投入</th><th class="num">單筆</th>'+
+  '<th class="num">給付／增額</th><th class="num">增值%</th><th>資金來源</th><th class="num">保額</th><th></th></tr>';
+ var body=ACTIONS.map(function(a){
+  var refName='';
+  if(a.ref){var m=EXPENSES.concat(ASSETS).filter(function(x){return x.id===a.ref})[0];refName=m?m.name:''}
+  var srcMap={surplus:'月結餘',cash:'現金水位','new':'新增／自生'};
+  var srcTxt=srcMap[a.src];
+  if(!srcTxt){
+   if(String(a.src||'').indexOf('act:')===0){
+    var from=ACTIONS.filter(function(x){return 'act:'+x.id===a.src})[0];
+    srcTxt=from?('↳ '+from.name):'（來源已刪除）';
+   } else srcTxt='—';
+  }
+  var get=a.getMonthly?fmt(a.getMonthly)+'/月':(a.getLump?fmt(a.getLump)+' 一次':'—');
+  return '<tr class="'+(a.on?'':'off')+'">'+
+   '<td><label class="sw"><input type="checkbox" '+(a.on?'checked':'')+' onchange="toggle(\''+a.id+'\')"><i></i></label></td>'+
+   '<td><span class="cat '+a.cat+'">'+CATS[a.cat].n+'</span></td>'+
+   '<td><input type="text" value="'+esc(a.name)+'" onchange="setf(\''+a.id+'\',\'name\',this.value)"></td>'+
+   '<td>'+(refName?'<span class="hint">↳ '+esc(refName)+'</span>':'<span class="hint">'+esc(a.tool||'—')+'</span>')+'</td>'+
+   '<td class="num"><span class="hint">'+yrsLabel(a)+'</span></td>'+
+   '<td class="num"><input class="w" type="text" value="'+(a.payMonthly?fmt(a.payMonthly):'')+'" placeholder="—" onchange="setf(\''+a.id+'\',\'payMonthly\',this.value)"></td>'+
+   '<td class="num"><span class="hint">'+(a.payLump?fmt(a.payLump):'—')+'</span></td>'+
+   '<td class="num"><input class="w" type="text" value="'+(a.getMonthly?fmt(a.getMonthly):(a.getLump?fmt(a.getLump):''))+'" placeholder="—" onchange="setf(\''+a.id+'\',\''+(a.getLump&&!a.getMonthly?'getLump':'getMonthly')+'\',this.value)"></td>'+
+   '<td class="num"><input class="w" style="width:56px" type="text" value="'+(a.growth||'')+'" placeholder="—" onchange="setf(\''+a.id+'\',\'growth\',this.value)"></td>'+
+   '<td><span class="hint">'+esc(srcTxt)+'</span></td>'+
+   '<td class="num"><span class="hint">'+(a.cover?fmt(a.cover):'—')+'</span></td>'+
+   '<td><button class="btn x sm" onclick="delAction(\''+a.id+'\')">✕</button></td></tr>'+
+   (a.note?'<tr class="'+(a.on?'':'off')+'"><td></td><td colspan="11" style="padding-top:0;border-bottom:1px solid var(--line)">'+
+    '<span class="hint">'+esc(a.note)+'</span></td></tr>':'')}).join('');
+ document.getElementById('actTbl').innerHTML=head+body;
+ var onCnt=ACTIONS.filter(function(a){return a.on}).length;
+ document.getElementById('actTag').textContent=onCnt+' / '+ACTIONS.length+' 項啟用中';
+ var sel=document.getElementById('newCat');
+ if(!sel.options.length) sel.innerHTML=Object.keys(CATS).map(function(k){
+  return '<option value="'+k+'">'+CATS[k].n+'</option>'}).join('');
+}
+
+function renderLedger(){
+ var L=ledger();
+ document.getElementById('ledGrid').innerHTML=
+  '<div class="led '+(L.monthBad?'bad':'okk')+'">'+
+   '<b style="font-size:13px;color:var(--amber2)">每月資金</b>'+
+   '<div class="ledrow"><span>現況月結餘</span><span>'+fmt(L.surplusBase)+'</span></div>'+
+   '<div class="ledrow"><span>＋ 新增工作收入</span><span style="color:var(--ok)">'+fmt(L.addIncome)+'</span></div>'+
+   '<div class="ledrow"><span>＋ 刪減支出</span><span style="color:var(--ok)">'+fmt(L.cutExpense)+'</span></div>'+
+   '<div class="ledrow"><span>− 新增投入</span><span style="color:var(--warn)">'+fmt(L.newInvest)+'</span></div>'+
+   '<div class="ledrow"><span>− 新增保費</span><span style="color:var(--warn)">'+fmt(L.premium)+'</span></div>'+
+   '<div class="ledrow tot"><span>剩餘結餘</span><span style="color:'+(L.monthBad?'var(--gap)':'var(--ok)')+'">'+fmt(L.left)+'</span></div>'+
+  '</div>'+
+  '<div class="led '+(L.cashBad?'bad':'okk')+'">'+
+   '<b style="font-size:13px;color:var(--amber2)">單筆資金（現金水位）</b>'+
+   '<div class="ledrow"><span>現金與定存</span><span>'+fmt(L.cash)+'</span></div>'+
+   '<div class="ledrow"><span>＋ 變現／貸款取得</span><span style="color:var(--ok)">'+fmt(L.lumpGot)+'</span></div>'+
+   '<div class="ledrow"><span>− 單筆投入</span><span style="color:var(--warn)">'+fmt(L.lumpNeed)+'</span></div>'+
+   '<div class="ledrow tot"><span>剩餘現金</span><span style="color:'+(L.cashBad?'var(--gap)':'var(--ok)')+'">'+fmt(L.cashLeft)+'</span></div>'+
+   '<div class="ledrow"><span class="hint">緊急預備金門檻（'+C.emergencyMonths+' 個月支出）</span><span class="hint">'+fmt(L.emReq)+'</span></div>'+
+  '</div>';
+ var al='';
+ if(L.monthBad) al+='<div class="alert red">🔴<div><b>每月資金超支 '+fmt(-L.left)+' 元。</b>'+
+  '這不是動態調整能解決的 — 這張表<b>這個月就執行不了</b>，動作要重排或改資金來源。</div></div>';
+ if(L.cashBad) al+='<div class="alert red">🔴<div><b>現金水位低於緊急預備金 '+fmt(L.emReq-L.cashLeft)+' 元。</b>'+
+  '單筆投入排太多，突發事件會被迫贖回。</div></div>';
+ if(!L.monthBad&&!L.cashBad) al='<div class="alert amb">🟡<div>資金排得出來。剩下的缺口屬於<b>十年後的動態調整區</b>，逐年檢視即可 — 比原本更優化就算有效。</div></div>';
+ document.getElementById('ledAlert').innerHTML=al;
+ document.getElementById('ledTag').textContent=(L.monthBad||L.cashBad)?'⚠ 有排不出來的資金':'資金排得出來';
+}
+
+function renderVisions(pa){
+ document.getElementById('vlist').innerHTML=VISIONS.map(function(v){
+  var ok=v.on&&pa.done[v.id]!==false;
+  return '<div class="vitem'+(v.on?'':' off')+'">'+
+   '<label class="sw"><input type="checkbox" '+(v.on?'checked':'')+' onchange="toggleVision(\''+v.id+'\')"><i></i></label>'+
+   '<div class="vt"><div class="vn">'+esc(v.name)+
+    (v.on?' <span class="mk '+(ok?'y':'n')+'">'+(ok?'✓ 做得到':'✕ 做不到')+'</span>':'')+
+'</div>'+
+   '<div class="vm">'+(v.legacy?'期末目標':(v.span?v.age+'–'+(v.toAge||C.endAge)+' 歲':v.age+' 歲'))+'　'+
+    (v.span?'月支出 '+fmt(C.retireExpM):fmt(v.amt))+
+    (v.years?'（分 '+v.years+' 年）':'')+'</div></div></div>'}).join('');
+ var on=VISIONS.filter(function(v){return v.on}).length;
+ document.getElementById('visTag').textContent=on+' / '+VISIONS.length+' 項納入規劃';
+}
+
+function renderFlow(){
+ var acts=ACTIONS.filter(function(a){return a.on}).slice()
+  .sort(function(a,b){return (a.startY||99)-(b.startY||99)});
+ if(!acts.length){document.getElementById('flow').innerHTML='<div class="muted">還沒有啟用任何動作。</div>';return}
+ document.getElementById('flow').innerHTML=acts.map(function(a){
+  var when=a.startY<=C.age+1?'現在起':(a.startY+' 歲（'+(a.startY-C.age)+' 年後）');
+  var what=[];
+  if(a.tool&&a.tool!=='—') what.push('工具：'+a.tool);
+  if(a.payMonthly) what.push('每月投入 '+fmt(a.payMonthly));
+  if(a.payLump) what.push('單筆 '+fmt(a.payLump));
+  if(a.getMonthly) what.push('每月增加現金流 '+fmt(a.getMonthly));
+  if(a.getLump) what.push('取得資金 '+fmt(a.getLump));
+  if(a.growth) what.push('增值 '+a.growth+'%');
+  if(a.cover) what.push('保額 '+fmt(a.cover));
+  if(a.payFrom&&a.payTo) what.push('年期 '+a.payFrom+'–'+a.payTo+' 歲');
+  return '<div class="fitem"><div class="fw">'+when+'</div>'+
+   '<div class="fn">'+esc(CATS[a.cat].n)+'｜'+esc(a.name)+'</div>'+
+   '<div class="fd">'+esc(what.join('　·　'))+'</div></div>'}).join('');
+}
+
+/* ---- hover ---- */
+function bindHover(){
+ var svg=document.querySelector('#svgbox svg'); if(!svg) return;
+ var tip=document.getElementById('tip'), cross=svg.querySelector('#cross'),
+  box=document.getElementById('svgbox');
+ svg.querySelectorAll('#hv rect').forEach(function(r){
+  r.addEventListener('mouseenter',function(){
+   var i=+r.getAttribute('data-i'), b=CH.pb.rows[i], a=CH.pa.rows[i];
+   var x=CH.X(a.age);
+   cross.setAttribute('x1',x);cross.setAttribute('x2',x);cross.setAttribute('opacity','.55');
+   var evs=CH.pa.visions.filter(function(v){return v.age===a.age&&!v.legacy});
+   tip.innerHTML='<b style="color:var(--amber2)">'+a.age+' 歲</b><br>'+
+    '<span style="color:var(--base)">現況</span> '+wan(b.total)+'<br>'+
+    '<span style="color:var(--aft)">調整後</span> '+wan(a.total)+
+    (evs.length?'<br><span style="color:'+(CH.pa.done[evs[0].id]!==false?'var(--ok)':'#ff9f9f')+'">'+
+     (CH.pa.done[evs[0].id]!==false?'✓':'✕')+' '+esc(evs[0].name)+' '+wan(evs[0].amt)+'</span>':'');
+   var rect=box.getBoundingClientRect(), sc=rect.width/CH.W;
+   tip.style.opacity=1;
+   tip.style.left=Math.min(rect.width-160,Math.max(0,x*sc-70))+'px';
+   tip.style.top=(28)+'px';
+  });
+ });
+ svg.addEventListener('mouseleave',function(){
+  tip.style.opacity=0; if(cross)cross.setAttribute('opacity','0')});
+}
+
+/* ---- 互動 ---- */
+function toggle(id){var a=ACTIONS.filter(function(x){return x.id===id})[0];if(a){a.on=!a.on;render()}}
+function toggleVision(id){var v=VISIONS.filter(function(x){return x.id===id})[0];if(v){v.on=!v.on;render()}}
+function setf(id,k,v){var a=ACTIONS.filter(function(x){return x.id===id})[0];if(!a)return;
+ a[k]=(k==='name'||k==='tool'||k==='note')?v:n(String(v).replace(/,/g,''));render()}
+function delAction(id){ACTIONS=ACTIONS.filter(function(x){return x.id!==id});render()}
+var seq=8;
+function addAction(){
+ var cat=document.getElementById('newCat').value;
+ var a={id:'x'+(seq++),on:true,cat:cat,name:'新動作',tool:'',src:'surplus',startY:C.age+1,growth:0};
+ if(cat==='income'||cat==='expense'){a.getFrom=C.age+1;a.getTo=C.retireAge;a.getMonthly=5000;a.src='new'}
+ else if(cat==='regular'){a.payFrom=C.age+1;a.payTo=C.retireAge;a.payMonthly=10000;a.growth=5}
+ else if(cat==='lump'){a.payFrom=C.age+1;a.payLump=500000;a.growth=5;a.src='cash'}
+ else if(cat==='liquidate'){a.payFrom=C.age+2;a.getLump=1000000;a.src='new'}
+ else if(cat==='loan'){a.payFrom=C.age+1;a.payTo=C.age+21;a.payMonthly=15000;a.getLump=3000000;a.src='new'}
+ else if(cat==='insure'){a.payFrom=C.age+1;a.payTo=C.retireAge;a.payMonthly=3000;a.cover=3000000;a.coverKind='壽險'}
+ ACTIONS.push(a);render();
+}
+
+render();
+</script>
+</body>
+</html>
