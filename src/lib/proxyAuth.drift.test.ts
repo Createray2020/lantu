@@ -35,7 +35,8 @@ describe("proxy 的未登入處理", () => {
     expect(CODE).toContain("isApiRoute");
   });
 
-  it("教練申請的公開入口還在（未登入要進得了 /apply → /sign-up）", () => {
-    expect(CODE).toMatch(/'\/apply'/);
+  it("教練申請入口還在，且未登入的落點是 /sign-up", () => {
+    expect(CODE).toContain("isApplyEntry");
+    expect(CODE).toMatch(/unauthenticatedUrl:\s*new URL\('\/sign-up'/);
   });
 });

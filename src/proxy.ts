@@ -20,9 +20,6 @@ const isPublicRoute = createRouteMatcher([
   // 按「開始規劃」才導去註冊。這是企業主客群的入場門，地位等同人生護照。
   '/bizcheck',
   '/join', // 招募頁：對外公開，訪客要看得到
-  // 教練申請的對外短網址：只做「已登入→申請頁／未登入→教練註冊」的分岔。
-  // 不公開的話，未登入者會先被導去 /login，而那裡的註冊連結是客戶註冊——新教練會辦錯身分。
-  '/apply',
   '/login', // 登入身分選擇頁（官網只有一顆登入，教練/客戶在這裡分流）
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀
@@ -38,11 +35,26 @@ const isPublicRoute = createRouteMatcher([
 // 比乾脆的 401/404 更難查。頁面才導向。
 const isApiRoute = createRouteMatcher(['/api(.*)', '/trpc(.*)']);
 
+// 教練申請的對外短網址。**刻意不是公開路由**：
+// 公開路由 clerkMiddleware 直接 return、不跑 dev-browser handshake，
+// 於是頁面裡的 auth() 對「其實已登入」的人也拿不到 userId，就把他判成沒帳號、
+// 送去 Clerk 的「Create your account」——已經有帳號的人在那裡永遠繞不出來
+// （2026/08/25 錄影實錄：已登入的客戶帳號按「直接送出教練申請」後被丟去註冊頁）。
+// 交給 auth.protect 就對了：它先完成 handshake，真的沒登入才吃 unauthenticatedUrl。
+const isApplyEntry = createRouteMatcher(['/apply']);
+
 export default clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return;
 
   if (isApiRoute(req)) {
     await auth.protect();
+    return;
+  }
+
+  // 申請入口：沒帳號的人要去教練註冊（不是 /login——那裡的註冊連結是**客戶**註冊，
+  // 新教練會辦錯身分）；已登入的人由 /apply 自己導去 /dashboard/apply。
+  if (isApplyEntry(req)) {
+    await auth.protect({ unauthenticatedUrl: new URL('/sign-up', req.url).toString() });
     return;
   }
 

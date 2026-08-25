@@ -29,10 +29,17 @@ describe("申請入口的每一段都要接得上", () => {
     expect(src).toContain("/sign-up");
   });
 
-  it("⚠️ /apply 必須是公開路由", () => {
-    // 不公開的話未登入者會先被丟去 /login，而那裡的註冊連結是**客戶**註冊：
-    // 新教練會辦成客戶帳號，然後永遠找不到申請頁。
-    expect(R("src/proxy.ts")).toMatch(/'\/apply'/);
+  it("⚠️ /apply 由 auth.protect 守，且未登入時導去教練註冊", () => {
+    const proxy = R("src/proxy.ts");
+    // 兩件事都要成立，少一件就會出事：
+    //  · 不能是公開路由 —— 公開路由不跑 dev-browser handshake（本站是 pk_test 開發金鑰），
+    //    auth() 會對「其實已登入」的人回 null，把有帳號的人送去註冊新帳號、永遠繞不出來。
+    //  · 未登入的落點必須是 /sign-up（教練註冊），不是 /login —— 那裡的註冊連結是客戶註冊，
+    //    新教練會辦錯身分。
+    expect(proxy).toContain("isApplyEntry");
+    expect(proxy).toMatch(/unauthenticatedUrl:\s*new URL\('\/sign-up'/);
+    const publicBlock = proxy.slice(proxy.indexOf("isPublicRoute"), proxy.indexOf("isApiRoute"));
+    expect(publicBlock, "/apply 不可以列在公開路由裡").not.toMatch(/'\/apply'/);
   });
 
   it("教練註冊完要落在申請頁，不是直接進教練端", () => {
