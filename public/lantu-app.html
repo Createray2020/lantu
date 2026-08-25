@@ -2832,7 +2832,10 @@ function addRow(arr){var c=activeCase();if(!c)return;
  var m0=(c.members||[])[0]||{};
  var kid=(c.members||[]).filter(function(m){return m.role==='子女'})[0]||{};
  var TPL={
- members:function(){return {name:'',role:'子女',gender:'男',age:0,worked:0,insStart:'',pensionStart:'',pensionYears:0,pensionBalance:0,insType:'健保眷屬',insSalary:0,depRatio:0,expRatio:0,indepAge:26}},
+ // ⚠️ 角色與年齡都留空，不預設「子女 0 歲」：舊版一按「＋ 新增家庭成員」就長出
+ //    一位 0 歲子女，教育金分頁當場自動生出幼兒園到大學的整套需求（m.eduAuto 對新案子預設開），
+ //    使用者根本還沒開始填。空角色不進任何自動計算，選了角色才開始算。
+ members:function(){return {name:'',role:'',gender:'男',age:'',worked:0,insStart:'',pensionStart:'',pensionYears:0,pensionBalance:0,insType:'健保眷屬',insSalary:0,depRatio:0,expRatio:0,indepAge:26}},
  incomes:function(){return {name:'',owner:m0.name||'',type:'工作',subType:'薪資',period:'年',amount:0,growth:0,start:A,end:65}},
  expenses:function(){return {name:'',cat:'生活',period:'年',amount:0,infl:true,start:A,end:85,cut:0}},
  actions:function(){return {id:actId(),on:true,cat:'regular',name:'',tool:'',ref:'',
@@ -3156,7 +3159,7 @@ function familyTreeSVG(c,theme){
  });
  var cards=ms.map(function(m,i){
   var q=pos[m.mid];if(!q)return '';
-  var isSelf=(i===pi),role=isSelf?'本人':(m.role||'其他');
+  var isSelf=(i===pi),role=isSelf?'本人':(m.role||'未指定');
   var nm=memberLabel(c,m,i);
   var jt=isSelf?((c.profile||{}).jobType||''):(m.jobType||'');
   if(jt==='其他'){var jo=isSelf?((c.profile||{}).jobTypeOther||''):(m.jobTypeOther||'');if(jo)jt=jo;}
@@ -3176,7 +3179,7 @@ function familyTreeSec(c){
 }
 function personCard(c,m,idx,isPrimary){
  var p=c.profile;
- var role=isPrimary?'本人':(m.role||'其他');
+ var role=isPrimary?'本人':(m.role||'');
  var isEarner=(role==='本人'||role==='配偶');
  if(isPrimary)ensureJobFields(c);else if(isEarner)ensureMemberJob(m);
  var jt=isEarner?(isPrimary?p.jobType:m.jobType):'';
@@ -3184,9 +3187,12 @@ function personCard(c,m,idx,isPrimary){
  var av=esc(dispName.slice(0,1));
  var cls=isPrimary?'self':(role==='配偶'?'spouse':'other');
  var jobtag=isEarner?'<span class="jobtag">'+esc(jt||'一般就業者')+'</span>'
-   :((role==='子女'&&m.indepAge!==''&&m.indepAge!=null)?'<span class="jobtag dep">獨立歲 '+esc(m.indepAge)+'</span>':'<span class="jobtag mut">'+esc(role)+'</span>');
+   :((role==='子女'&&m.indepAge!==''&&m.indepAge!=null)?'<span class="jobtag dep">獨立歲 '+esc(m.indepAge)+'</span>':'<span class="jobtag mut">'+esc(role||'未指定角色')+'</span>');
  var roleSel=isPrimary?'<span class="role">本人</span>'
-   :'<select class="rolesel" onchange="setMemberRole('+idx+',this.value)">'+['配偶','父','母','子女','長輩','其他'].map(function(o){return '<option '+(role===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select>';
+   // 未指定角色時多一個佔位選項：使用者必須主動選，才不會沿用上一個人的角色靜靜算進去。
+   :'<select class="rolesel" onchange="setMemberRole('+idx+',this.value)">'+
+     (role?'':'<option value="" selected>請選擇角色</option>')+
+     ['配偶','父','母','子女','長輩','其他'].map(function(o){return '<option '+(role===o?'selected':'')+'>'+o+'</option>'}).join('')+'</select>';
  var delBtn=isPrimary?'':'<button class="pcdel" title="刪除成員" onclick="delRow(\'members\','+idx+')">✕</button>';
  var hd='<div class="phd"><span class="av">'+av+'</span><div class="pident"><div class="who">'+esc(dispName)+'</div><div class="rolewrap">'+roleSel+'</div></div>'+jobtag+delBtn+'</div>';
  // 身分
@@ -3647,6 +3653,12 @@ function eduChildren(c){
  return (c.members||[]).map(function(m,i){return {m:m,i:i}}).filter(function(x){return (x.m.role||'')==='子女'});
 }
 function eduChildAge(m){var a=m.birth?ageFromBirth(m.birth):null;return n(a!=null&&a!==''?a:m.age);}
+// 「年齡還沒填」與「0 歲」必須分得出來：新增成員的 age 是空字串，
+// 而 n('')===0 —— 不分的話，剛加進來還沒填資料的孩子會立刻長出幼兒園到大學的整套需求。
+function eduAgeKnown(m){
+ if(m.birth)return true;
+ return m.age!==''&&m.age!=null&&m.age!==undefined&&!isNaN(Number(m.age));
+}
 // 依孩子的年齡與期望學歷，把 c.education 裡屬於這個孩子的自動列對齊；
 // 手動改過的金額（lock）與手動加的列（auto!==true）一律保留。
 // 舊資料保護：既有客戶的 education 是顧問一列一列填的。
@@ -3671,7 +3683,11 @@ function disableEduAuto(mi){
 }
 function syncEduChild(c,m){
  c.education=c.education||[];
- if(!m.eduAuto)return c;
+ // 沒開自動、或年齡還不知道 → 這位子女不該有任何自動列（先前生成的也要收掉）。
+ if(!m.eduAuto||!eduAgeKnown(m)){
+  c.education=c.education.filter(function(e){return !(e.mid===m.mid&&e.auto===true)});
+  return c;
+ }
  var top=m.eduTop||'大學',age=eduChildAge(m);
  var want=eduRemainingStages(age,top,m.eduPayTo);
  var wantKey={};want.forEach(function(w){wantKey[w.stage]=w});
@@ -3697,7 +3713,31 @@ function syncEduChild(c,m){
  });
  return c;
 }
-function syncEduAll(c){eduAutoDefaults(c);eduChildren(c).forEach(function(x){syncEduChild(c,x.m)});return c;}
+function syncEduAll(c){
+ eduAutoDefaults(c);
+ var kids=eduChildren(c);
+ // ⚠️ 孤兒自動列：成員被刪掉、或角色從「子女」改成別的之後，syncEduChild 再也走不到他，
+ //    c.education 裡那些 auto:true 的列就永遠留著 —— 畫面上沒有任何子女，教育金需求卻還在，
+ //    而且找不到來源。這一條就是那個 bug 的修法。
+ //    ⚠️ 只清 auto:true。手動列（auto!==true）是顧問自己填的舊資料，一列都不能碰。
+ var live={};
+ kids.forEach(function(x){if(x.m.mid)live[x.m.mid]=1});
+ var before=(c.education||[]).length;
+ c.education=(c.education||[]).filter(function(e){return e.auto!==true||live[e.mid]});
+ if(c.education.length!==before&&typeof save==='function')setTimeout(save,0); // 清掉的要落地，但不要在 render 中途存檔
+ kids.forEach(function(x){syncEduChild(c,x.m)});
+ return c;
+}
+// 教育金分頁就地新增子女：不用先切回「家庭」分頁再切回來。
+// 角色寫死子女、年齡留空（填了才會開始推算學段）。
+function addEduChild(){
+ var c=activeCase();if(!c)return;
+ addRow('members');
+ var ms=c.members||[],m=ms[ms.length-1];
+ if(m){m.role='子女';m.eduAuto=true;m.indepAge=m.indepAge||26;}
+ ensureMemberIds(c);save();render();
+ setTimeout(function(){var el=document.querySelector('[data-educhild="'+(m&&m.mid||'')+'"] input');if(el)el.focus();},0);
+}
 // 手動列（沒有 mid 的舊資料）也要有 annual；舊資料 annual 本來就有，不動。
 function eduIdxOf(c,mid,stage){
  var l=c.education||[];
@@ -3736,14 +3776,33 @@ function eduNum(mid,stage,field,v){
  // 學雜費／補習才藝／撫養費都是金額 → moneyCell（bindMoney 會補 amtRaw，值進 setEduAmt 前是純數字）。
  return moneyCell('oninput="setEduAmt(\''+esc(mid)+'\',\''+esc(stage)+'\',\''+field+'\',this.value,1)" onchange="setEduAmt(\''+esc(mid)+'\',\''+esc(stage)+'\',\''+field+'\',this.value)"',v);
 }
+// 教育金卡片上的年齡：填完要當場看到學段長出來，所以走 render()（不像姓名那種自由輸入欄）。
+function setEduChildAge(mi,v){
+ var c=activeCase();if(!c)return;var m=(c.members||[])[mi];if(!m)return;
+ m.age=(v===''||v==null)?'':n(v);
+ save();render();
+}
 function eduChildCard(c,m,mi){
- var age=eduChildAge(m),cur=eduStageOfAge(age);
+ var known=eduAgeKnown(m);
+ var age=eduChildAge(m),cur=known?eduStageOfAge(age):null;
+ // 身分三欄就放在卡片上：這一頁本來要人先切回「家庭」分頁才改得到名字與年齡。
+ var idBlock='<div class="fgrid" data-educhild="'+esc(m.mid||'')+'">'+
+   fFld('oninput="set(\'members:'+mi+'\',\'name\',this.value)"','姓名',m.name)+
+   birthField(m.birth,'onchange="setMemberBirth('+mi+',this.value)"')+
+   ageField(m.age,m.birth,'onchange="setEduChildAge('+mi+',this.value)"','目前年齡')+
+  '</div>';
+ if(!known){
+  return '<div class="sec"><h4>'+esc(memberLabel(c,m,-1)||'子女')+' <span class="hint">尚未填年齡</span></h4>'+
+   idBlock+
+   '<div class="hint" style="margin-top:6px">填上<b>出生日期或年齡</b>之後，這裡會自動推算他目前的就學階段、還要供給幾年，並帶入官方公告的各階段學雜費。'+
+   '<br>在那之前不會產生任何教育金需求 —— 免得剛加進來還沒填的孩子先算出一整套學費。</div></div>';
+ }
  var rows=(c.education||[]).filter(function(e){return e.mid===m.mid&&e.auto===true});
  var top=m.eduTop||'大學';
  var locked=rows.some(function(e){return e.lock&&(e.lock.tuition||e.lock.extra||e.lock.care)});
  var nowTxt=cur?('目前就讀 <b>'+esc(cur.stage)+'</b>（'+esc(cur.stage)+'還剩 '+cur.remainYears+' 年）')
   :(age<eduStageDefs()[0].startAge?'尚未入學（<b>'+(eduStageDefs()[0].startAge-Math.floor(age))+'</b> 年後上'+esc(eduStageDefs()[0].stage)+'）':'已完成學業');
- var head='<h4>'+esc(memberLabel(c,m,-1)||'子女')+' <span class="hint">'+Math.floor(age)+' 歲 · '+nowTxt+'</span></h4>';
+ var head='<h4>'+esc(memberLabel(c,m,-1)||'子女')+' <span class="hint">'+Math.floor(age)+' 歲 · '+nowTxt+'</span></h4>'+idBlock;
  var opts='<div class="fgrid">'+
   '<div class="f"><label>期望最高學歷</label><select onchange="setEduOpt('+mi+',\'eduTop\',this.value)">'+
    eduStageDefs().filter(function(s){return ['高中職','大學','研究所','博士班'].indexOf(s.stage)>=0}).map(function(s){
@@ -3791,12 +3850,16 @@ function eduSec(c){
  var kids=eduChildren(c);
  var manual=(c.education||[]).filter(function(e){return e.auto!==true});
  var cards=kids.map(function(x){return eduChildCard(c,x.m,x.i)}).join('');
- var empty=kids.length?'':'<div class="sec"><div class="hint">「家庭」分頁還沒有角色為<b>子女</b>的成員。加了子女並填上生日或年齡之後，這裡會自動推算他目前的就學階段、剩餘年數，並帶入官方公告的各階段學雜費。</div></div>';
+ // 沒有子女時不要只丟一句「請去家庭分頁加人」——這一頁就是在規劃子女教育，
+ // 要人先切走再切回來是最不直觀的一段。就地加、就地填。
+ var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addEduChild()">＋ 新增子女</button>'+
+  '<div class="hint" style="margin-top:6px">會在「家庭」分頁同步建立一位角色為子女的成員；完整的投保、獨立歲等欄位在那裡補。</div></div>';
+ var empty=kids.length?'':'<div class="sec"><div class="hint">還沒有角色為<b>子女</b>的成員。按下方「＋ 新增子女」就地加一位，填上出生日期或年齡之後，這裡會自動推算他目前的就學階段、剩餘年數，並帶入官方公告的各階段學雜費。</div></div>';
  var manualTbl=manual.length
   ?tableSec('手動列（舊資料／未出生子女）','education',c.education,[['child','子女','text'],['stage','階段','sel:'+eduStageDefs().map(function(s){return s.stage}).join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','money'],['years','供給年數','num'],['startIn','幾年後開始','num']],'自動產生的列請在上方各子女卡片調整；這張表保留手動／舊資料列。')
   :'';
  return '<div class="sec"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
-  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+empty+cards+manualTbl;
+  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+empty+cards+addBtn+manualTbl;
 }
 function taxSec(c){var t=c.taxParams||{},it=incomeTax(c),es=estateTax(c);
  var f='<div class="f"><label>婚姻</label><select onchange="setTax(\'married\',this.value===\'true\',\'bool\')"><option value="false" '+(!t.married?'selected':'')+'>單身</option><option value="true" '+(t.married?'selected':'')+'>有偶</option></select></div>'+
@@ -5488,7 +5551,7 @@ function intentSec(c){var it=c.intent||{};
    ?'<div class="sec" data-goalanchor="職涯規劃"><h4>職涯 / 創業規劃 '+mustBadge(c,'職涯規劃')+'</h4><div class="fgrid">'+ofld('career','plan','是否轉換或創業','sel:無,考慮轉職,考慮創業')+ofld('career','switchAge','預計幾歲轉換','num')+ofld('career','switchFund','轉換預備資金','money')+ofld('career','startupType','創業類別')+ofld('career','startupBudget','創業預算','money')+ofld('career','importance','重要度（5最高）','imp')+'</div></div>'
    :foldedGoal(c,'職涯規劃',(c.career||{}).plan&&c.career.plan!=='無'?'（先前已填「'+esc(c.career.plan)+'」，資料保留、仍列入模擬）':''))+
   (targetOn(c,'婚姻規劃')
-   ?'<div class="sec" data-goalanchor="婚姻規劃"><h4>婚姻規劃 '+mustBadge(c,'婚姻規劃')+'</h4><div class="fgrid">'+ofld('marriage','plan','是否結婚','sel:否,是')+ofld('marriage','age','理想結婚年齡','num')+ofld('marriage','budget','婚禮預算(理想)','num')+ofld('marriage','minBudget','婚禮預算(最低)','num')+ofld('marriage','importance','重要度（5最高）','imp')+'</div><div class="hint" style="margin-top:8px">旅遊/休閒/奢侈品/傳承 於「目標/置產」分頁以對應類型新增，並可填理想與最低雙檔。</div></div>'
+   ?'<div class="sec" data-goalanchor="婚姻規劃"><h4>婚姻規劃 '+mustBadge(c,'婚姻規劃')+'</h4><div class="fgrid">'+ofld('marriage','plan','是否結婚','sel:否,是')+ofld('marriage','age','理想結婚年齡','num')+ofld('marriage','budget','婚禮預算(理想)','money')+ofld('marriage','minBudget','婚禮預算(最低)','money')+ofld('marriage','importance','重要度（5最高）','imp')+'</div><div class="hint" style="margin-top:8px">旅遊/休閒/奢侈品/傳承 於「目標/置產」分頁以對應類型新增，並可填理想與最低雙檔。</div></div>'
    :foldedGoal(c,'婚姻規劃',(c.marriage||{}).plan==='是'?'（先前已填婚姻規劃，資料保留、仍列入模擬）':''))+
   '<div class="sec"><h4>理財模式評估 <span class="hint">記帳、儲蓄與投資經驗，判讀理財習慣</span></h4><div class="fgrid">'+ofld('moneyStyle','bookkeep','記帳經驗','sel:無,曾記帳但中斷,持續記帳中')+ofld('moneyStyle','budgeting','收支管理','sel:未管理,有記錄無計劃,有計劃管理')+ofld('moneyStyle','emergency','緊急預備金','sel:尚未準備,已準備')+ofld('moneyStyle','emergencyAmt','預備金金額','money')+'</div>'+
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">儲蓄經驗（可複選）</div>'+chips('savingExp',SAVING_EXP,it.savingExp)+'</div>'+
