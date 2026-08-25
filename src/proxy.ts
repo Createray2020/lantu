@@ -1,4 +1,5 @@
 // Next.js 16：Middleware 更名為 Proxy。Clerk 授權入口。
+import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 // 公開路由：首頁與登入/註冊；其餘一律需登入。
@@ -34,9 +35,31 @@ const isPublicRoute = createRouteMatcher([
   '/api/cron(.*)',
 ]);
 
+// API 路由不導向：把一個 fetch 導去 HTML 登入頁，呼叫端只會拿到看不懂的 200，
+// 比乾脆的 401/404 更難查。頁面才導向。
+const isApiRoute = createRouteMatcher(['/api(.*)', '/trpc(.*)']);
+
 export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
+  if (isPublicRoute(req)) return;
+
+  if (isApiRoute(req)) {
     await auth.protect();
+    return;
+  }
+
+  // 未登入的頁面請求 → 導去 /login 並帶回原本要去的位置。
+  //
+  // 為什麼不用 auth.protect()：它對未登入者是「改寫成 404」，使用者看到的是一片
+  // 找不到頁面，完全看不出「你只是登出了」。2026/08/22 一次部署把 session 洗掉，
+  // 整個後台就變成 404 —— 系統其實好好的，但從畫面上完全判斷不出來。
+  // （這站的 Clerk 還在用開發金鑰 pk_test，session 靠 dev-browser handshake 維持，
+  //   重新部署或瀏覽器擋第三方 cookie 都可能把它弄掉，所以這條路徑不是罕見情況。）
+  const { userId } = await auth();
+  if (!userId) {
+    const url = new URL('/login', req.url);
+    // /login 只接受站內路徑（它自己也會再驗一次 startsWith('/')）。
+    url.searchParams.set('redirect_url', req.nextUrl.pathname + req.nextUrl.search);
+    return NextResponse.redirect(url);
   }
 });
 
