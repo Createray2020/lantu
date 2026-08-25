@@ -6922,6 +6922,30 @@ function checkupTable(rows,opts){
  }).join('');
  return '<div class="cktblwrap"><table class="rtable cktbl">'+head+body+'</table></div>';
 }
+// SVG 沒有自動換行，也沒有 text-overflow：字太長就直接畫到 viewBox 外面被裁掉。
+// 2026/08/25 Ray 回報主圖左側標籤被切成「平面車位・屋齡5-10年）」「低標準 中古車 180 萬）」——
+// 目標名稱是教練自己打的，長度不受控，光靠加寬左欄永遠會有更長的一個。
+// 估寬：CJK／全形標點約等於字級，半形字母數字約 0.55 倍（在 12px 下實測夠準）。
+function svgTextW(str,fs){
+ var w=0;str=String(str||'');
+ for(var i=0;i<str.length;i++){
+  var ch=str.charCodeAt(i);
+  w+=(ch>0x2e80)?fs:fs*0.55;   // 0x2E80 以上＝中日韓與全形標點
+ }
+ return w;
+}
+// 截到放得下為止，尾巴補刪節號。回傳 {text, full, cut}
+function svgFitText(str,maxW,fs){
+ str=String(str||'');
+ if(svgTextW(str,fs)<=maxW)return {text:str,full:str,cut:false};
+ var ell=svgTextW('…',fs),out='',w=0;
+ for(var i=0;i<str.length;i++){
+  var cw=svgTextW(str.charAt(i),fs);
+  if(w+cw+ell>maxW)break;
+  out+=str.charAt(i);w+=cw;
+ }
+ return {text:out+'…',full:str,cut:true};
+}
 // 主圖：每一列一條軌，NEED 在 62.5% 處畫一條目標線，HAVE 依達成率填色。
 // ⚠️ W 必須與 CSS 的 .ckchart svg{max-width} 同一個值：SVG 的字級是使用者單位，
 //    容器一旦比 viewBox 寬，字就跟著等比放大（見 .ckchart 的註解）。改一邊要改兩邊，
@@ -6931,7 +6955,8 @@ function checkupChartSVG(c,theme){
  var rows=[].concat(premiumCheckup(c).rows,coverageCheckupRows(c),paybackCheckupRows(c))
    .filter(function(r){return r.need>0||r.have>0;});
  if(!rows.length)return '<div class="muted" style="padding:14px">先在「保障需求」建立需求、在「現有保單」登錄保單，這張圖就會出現。</div>';
- var LBW=136,PR=104,W=900,rowH=26,pT=26,pB=18;
+ // LBW＝左側標籤欄寬。加寬只是治標（名稱長度不受控），真正的防線是下面的 svgFitText()。
+ var LBW=210,PR=104,W=900,rowH=26,pT=26,pB=18,LBFS=12,LBMAX=LBW-10;
  var H=pT+rows.length*rowH+pB;
  var trackW=W-LBW-PR,needX=LBW+trackW*0.625;
  var out=['<svg viewBox="0 0 '+W+' '+H+'" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="保單檢查：現在保單對現在需求">'];
@@ -6945,7 +6970,9 @@ function checkupChartSVG(c,theme){
   var col=checkupTone(r.state,K);
   out.push('<rect x="'+LBW+'" y="'+by+'" width="'+trackW.toFixed(1)+'" height="'+bh+'" rx="4" fill="'+K.TRACK+'"/>');
   if(w>0)out.push('<rect x="'+LBW+'" y="'+by+'" width="'+w.toFixed(1)+'" height="'+bh+'" rx="4" fill="'+col+'"/>');
-  out.push('<text x="'+(LBW-8)+'" y="'+(by+9)+'" font-size="12" fill="'+K.LAB+'" text-anchor="end">'+esc(r.item)+'</text>');
+  var lb=svgFitText(r.item,LBMAX,LBFS);
+  out.push('<text x="'+(LBW-8)+'" y="'+(by+9)+'" font-size="'+LBFS+'" fill="'+K.LAB+'" text-anchor="end">'+
+   (lb.cut?'<title>'+esc(lb.full)+'</title>':'')+esc(lb.text)+'</text>');
   out.push('<text x="'+(W-PR+8)+'" y="'+(by+9)+'" font-size="11.5" fill="'+col+'" font-weight="700">'+
    (r.need>0?Math.round(pct*100)+'%':'—')+'</text>');
  });

@@ -211,3 +211,54 @@ describe("主圖只准縮小、不准放大（字被等比拉大的防線）", (
     expect(html).toContain('<div class="ckconwrap"><table class="rtable ckcon">');
   });
 });
+
+/**
+ * 2026/08/25 Ray 再回報：主圖左側的標籤被切成「平面車位・屋齡5-10年）」。
+ *
+ * SVG 沒有自動換行也沒有 text-overflow，字太長就直接畫到 viewBox 外面被裁掉。
+ * 而目標名稱是教練自己打的、長度不受控——光靠加寬左欄，永遠會有更長的下一個。
+ * 正解是估寬後截斷並補刪節號，全名放進 <title>。
+ */
+describe("主圖左側標籤不可以被裁掉", () => {
+  const LBW = 210, LBFS = 12, LBMAX = LBW - 10;
+
+  it("估寬函式：CJK 約等於字級，半形約 0.55 倍", () => {
+    expect(w.svgTextW("壽險", 12)).toBeCloseTo(24, 6);
+    expect(w.svgTextW("abcd", 12)).toBeCloseTo(12 * 0.55 * 4, 6);
+    expect(w.svgTextW("", 12)).toBe(0);
+  });
+
+  it("放得下就原樣輸出，放不下才截斷並補刪節號、保留全名", () => {
+    const short = w.svgFitText("壽險", LBMAX, LBFS);
+    expect(short).toMatchObject({ text: "壽險", cut: false });
+
+    const long = w.svgFitText("換屋（三房＋平面車位・屋齡5-10年）", LBMAX, LBFS);
+    expect(long.cut).toBe(true);
+    expect(long.text.endsWith("…")).toBe(true);
+    expect(long.full).toBe("換屋（三房＋平面車位・屋齡5-10年）");
+    expect(w.svgTextW(long.text, LBFS)).toBeLessThanOrEqual(LBMAX);
+  });
+
+  it("超長的目標名稱不會把圖撐破，而且截斷後仍看得到全名", () => {
+    const c = cur();
+    c.goals = (c.goals || []).concat([
+      { on: true, name: "換屋（三房＋平面車位・屋齡5-10年）", type: "購屋", present: 22_000_000, minPresent: 18_000_000, start: 52, end: 52, freq: 0, growth: "固定", appreciation: 2, loanRatio: 70, imp: 4, prepared: 0 },
+    ]);
+    w.render();
+    const svg = w.document.querySelector(".ckchart svg");
+    const labels = [...svg.querySelectorAll("text")].filter((t: Element) => t.getAttribute("text-anchor") === "end");
+    expect(labels.length).toBeGreaterThan(0);
+    // ⚠️ textContent 會把 <title> 的全名也串進來 —— 畫出來的只有直接的文字節點。
+    const shown = (t: Element) =>
+      [...t.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join("");
+    labels.forEach((t: Element) => {
+      // 每一個標籤的實際寬度都要放得進左欄（x=LBW-8，靠右對齊 → 左緣不能小於 0）
+      expect(w.svgTextW(shown(t), LBFS)).toBeLessThanOrEqual(LBMAX + 0.5);
+    });
+    // 被截掉的那一列要有 <title> 帶全名
+    const cut = labels.filter((t: Element) => shown(t).endsWith("…"));
+    expect(cut.length).toBeGreaterThan(0);
+    cut.forEach((t: Element) => expect(t.querySelector("title")).toBeTruthy());
+    expect(svg.innerHTML).toContain("換屋（三房＋平面車位・屋齡5-10年）");
+  });
+});
