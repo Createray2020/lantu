@@ -10528,12 +10528,8 @@ function goalJourneyTable(c,theme){
 }
 
 /* ── 報告書：獨立一頁的路徑圖 ───────────────────────────────────────────────
-   三件事讓它不平面：
-   ① 路面是「沿法線外擴的多邊形」，寬度用 (1-u)^1.7 收窄＝真正的透視衰減，不是線性。
-   ② 中線的白虛線是逐段自己畫的多邊形，愈遠愈短愈細——這才是眼睛判斷遠近的主要線索。
-   ③ 路面下方壓一層同形狀、往下位移的暗色＝路基厚度；加上由近到遠的霧化漸層。
-   幾何刻意不對稱：每一列的左右端點、彎幅、迴轉外擴、節點落點都各自不同（固定亂數表，
-   不用 Math.random，才不會每次 render 都跳動、測試也才釘得住）。
+   路不是一條線，是一條「有寬度的路面」：先把蜿蜒的中心線取樣成折線，再沿法線
+   左右外擴成多邊形填色。寬度由下往上收窄＝透視，遠方的路本來就比較細。
    起點在畫面底部（現在），一路往上走到最上面的願景。
    ───────────────────────────────────────────────────────────────────────── */
 function jnQuad(p0,cp,p1,t){var u=1-t;return {x:u*u*p0.x+2*u*t*cp.x+t*t*p1.x,y:u*u*p0.y+2*u*t*cp.y+t*t*p1.y};}
@@ -10541,15 +10537,6 @@ function jnCubic(p0,c1,c2,p1,t){
  var u=1-t,a=u*u*u,b=3*u*u*t,c=3*u*t*t,d=t*t*t;
  return {x:a*p0.x+b*c1.x+c*c2.x+d*p1.x, y:a*p0.y+b*c1.y+c*c2.y+d*p1.y};
 }
-/* 固定的「不規則」表：讓每一列長得不一樣，但每次 render 都一樣。 */
-var JN_JIT=[
- {l: 0, r: 0,  bow: 34, bulge: 74, t0:0.24, t1:0.74},
- {l:26, r:14,  bow:-22, bulge: 92, t0:0.30, t1:0.79},
- {l:10, r:38,  bow: 40, bulge: 88, t0:0.21, t1:0.69},
- {l:34, r: 6,  bow:-30, bulge: 88, t0:0.28, t1:0.77},
- {l: 4, r:28,  bow: 26, bulge: 80, t0:0.25, t1:0.71},
- {l:22, r:18,  bow:-38, bulge: 72, t0:0.32, t1:0.76}
-];
 /* CJK 換行：中文算 1、半形算 0.55。優先在「・」切段，避免把 36,569,833 這種數字攔腰斷掉。 */
 function jnW(s){var w=0;for(var i=0;i<s.length;i++)w+=(s.charCodeAt(i)<128?0.55:1);return w;}
 function jnWrap(s,per,maxLines){
@@ -10570,13 +10557,10 @@ function jnWrap(s,per,maxLines){
  if(lines.length>maxLines){lines=lines.slice(0,maxLines);lines[maxLines-1]=lines[maxLines-1].slice(0,-1)+'…';}
  return lines;
 }
-/* halo＝跟頁面同色的描邊：文字疊到路面上時仍然讀得到（paint-order 讓描邊畫在字下面）。 */
-function jnText(x,y,lines,col,size,weight,lh,halo){
+function jnText(x,y,lines,col,size,weight,lh){
  return lines.map(function(l,i){
-  return '<text x="'+x.toFixed(1)+'" y="'+(y+i*lh).toFixed(1)+'" fill="'+col+'" font-size="'+size.toFixed(1)+'" '+
-   (weight?'font-weight="'+weight+'" ':'')+
-   (halo?'paint-order="stroke" stroke="'+halo+'" stroke-width="3.4" stroke-linejoin="round" ':'')+
-   'text-anchor="middle">'+esc(l)+'</text>';
+  return '<text x="'+x.toFixed(1)+'" y="'+(y+i*lh).toFixed(1)+'" fill="'+col+'" font-size="'+size+'" '+
+   (weight?'font-weight="'+weight+'" ':'')+'text-anchor="middle">'+esc(l)+'</text>';
  }).join('');
 }
 function jnLegend(items,light,sub){
@@ -10586,201 +10570,112 @@ function jnLegend(items,light,sub){
    return '<span style="display:inline-flex;align-items:center;gap:6px"><svg width="11" height="11"><circle cx="5.5" cy="5.5" r="4.4" fill="none" stroke="'+gc+'" stroke-width="2"/></svg>'+esc(g.t)+'</span>';}).join('')+
   '</div>';
 }
-function jnPolyD(pts){return pts.map(function(p,i){return (i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1);}).join('');}
-/* 每個取樣點的單位法線；路面、路肩、虛線全部共用同一組。 */
-function jnNormals(pts){
- var out=[];
+/* 折線 → d 字串 */
+function jnPolyD(pts){
+ return pts.map(function(p,i){return (i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1);}).join('');
+}
+/* 沿法線外擴：回傳 {left:[],right:[]} */
+function jnOffset(pts,widthAt){
+ var L=[],R=[];
  for(var i=0;i<pts.length;i++){
   var a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
   var tx=b.x-a.x, ty=b.y-a.y, len=Math.sqrt(tx*tx+ty*ty)||1;
-  out.push({x:-ty/len, y:tx/len});
+  var nx=-ty/len, ny=tx/len, w=widthAt(i/(pts.length-1))/2;
+  L.push({x:pts[i].x+nx*w, y:pts[i].y+ny*w});
+  R.push({x:pts[i].x-nx*w, y:pts[i].y-ny*w});
  }
- return out;
-}
-function jnBand(pts,nrm,from,to,hArr,dyArr){
- var L=[],R=[];
- for(var i=from;i<=to;i++){
-  var h=hArr[i], oy=dyArr?dyArr[i]:0;
-  L.push({x:pts[i].x+nrm[i].x*h, y:pts[i].y+nrm[i].y*h+oy});
-  R.push({x:pts[i].x-nrm[i].x*h, y:pts[i].y-nrm[i].y*h+oy});
- }
- return jnPolyD(L)+jnPolyD(R.reverse()).replace('M','L')+'Z';
-}
-/* 外擴後會不會自己打結，看的是「半寬有沒有超過當地轉彎半徑」。
-   用三點外接圓求半徑，超過就把半寬壓下來——U 形彎的蝴蝶結就是這樣長出來的。 */
-function jnCurveR(pts,i){
- var a=pts[Math.max(0,i-3)], b=pts[i], c=pts[Math.min(pts.length-1,i+3)];
- var ab=Math.hypot(b.x-a.x,b.y-a.y), bc=Math.hypot(c.x-b.x,c.y-b.y), ca=Math.hypot(a.x-c.x,a.y-c.y);
- var ar=Math.abs((b.x-a.x)*(c.y-a.y)-(c.x-a.x)*(b.y-a.y))/2;
- if(ar<1e-6)return 1e9;
- return (ab*bc*ca)/(4*ar);
-}
-/* 參考圖的立體感不是「打光」，是「緞帶在空間裡轉」：直線段寬、彎道段窄。
-   所以半寬＝深度基準 ×（彎得愈急愈窄），再加硬箝制保證不自交。
-   兩端另外收尖，路才不會是被切斷的方塊。 */
-function jnHalfArr(pts,fn,cap){
- var out=[],last=pts.length-1;
- for(var i=0;i<=last;i++){
-  var h=fn(i/last);
-  if(cap){
-   var R=jnCurveR(pts,i);
-   h*=Math.min(1,0.42+0.58*Math.min(1,R/150));   // 彎道收窄
-   h=Math.min(h,0.60*R);                          // 保證不自交
-  }
-  out.push(h);
- }
- if(cap){                                          // 兩端收尖
-  var tip=Math.round(last*0.035)||6;
-  for(var e=0;e<=tip;e++){
-   var f=0.30+0.70*(e/tip);
-   out[e]*=f; out[last-e]*=f;
-  }
- }
- // 抹平箝制造成的階梯，路緣才不會有折角
- for(var p2=0;p2<8;p2++){
-  var cp2=out.slice();
-  for(var j=1;j<last;j++)out[j]=(cp2[j-1]+cp2[j]*2+cp2[j+1])/4;
- }
- return out;
-}
-/* 中線虛白線：逐段自己畫，愈遠愈短、愈細。 */
-function jnDashes(pts,nrm,dashAt,gapAt,hArr){
- var out=[],mode=1,rem=dashAt(0),start=0;
- for(var i=0;i<pts.length-1;i++){
-  var u=i/(pts.length-1);
-  var dx=pts[i+1].x-pts[i].x, dy=pts[i+1].y-pts[i].y;
-  rem-=Math.sqrt(dx*dx+dy*dy);
-  if(rem<=0){
-   if(mode&&i>start)out.push(jnBand(pts,nrm,start,i,hArr));
-   mode=1-mode; start=i+1; rem=(mode?dashAt(u):gapAt(u));
-  }
- }
- if(mode&&pts.length-1>start)out.push(jnBand(pts,nrm,start,pts.length-1,hArr));
- return out;
+ return {left:L,right:R};
 }
 
-function goalJourneyPathSVG(c,theme,style){
- var ribbon=(style==='ribbon');
+function goalJourneyPathSVG(c,theme){
  var items=journeyItems(c), light=(theme!=='dark');
  if(!items.length)return '<div style="color:'+(light?'#5a6b72':'var(--mut)')+'">尚無已選定的目標。</div>';
  var col=light
-  ?{near:'#2f3b41',far:'#8d979b',base:'#1b2429',kerb:'#e8dcc6',dash:'#fbf3df',ring:'#ffffff',title:'#0d2b45',sub:'#5a6b72',flag:'#1e6b6b',flagT:'#ffffff',mark:'#0d2b45',hint:'#8a7a63',bg:'#fdfbf6'}
-  :{near:'#141d22',far:'#4a585e',base:'#070d10',kerb:'#3c4a50',dash:'#e6cfa6',ring:'#12222a',title:'#e9f0f2',sub:'#9db2b9',flag:'#2e8b8b',flagT:'#04181b',mark:'#c99a5b',hint:'#9db2b9',bg:'#0a1a20'};
+  ?{road:'#3a464c',kerb:'#263035',dash:'#f6e7c4',ring:'#ffffff',title:'#0d2b45',sub:'#5a6b72',flag:'#1e6b6b',flagT:'#ffffff',mark:'#0d2b45',hint:'#8a7a63'}
+  :{road:'#1b262b',kerb:'#0a1216',dash:'#e0bd8b',ring:'#12222a',title:'#e9f0f2',sub:'#9db2b9',flag:'#2e8b8b',flagT:'#04181b',mark:'#c99a5b',hint:'#9db2b9'};
  var A=n((c.profile||{}).age)||0;
- var W=760, MX=74, ROWH=186, PER=2, MAX_ROWS=6;
+ var W=760, MX=86, ROWH=182, PER=2, MAX_ROWS=6;
  var chunk=PER*MAX_ROWS, np=Math.max(1,Math.ceil(items.length/chunk));
  var per=Math.ceil(items.length/np); if(per%PER)per++;
  var pages=[]; for(var s0=0;s0<items.length;s0+=per)pages.push(items.slice(s0,s0+per));
 
  return pages.map(function(list,pi){
   var rows=Math.ceil(list.length/PER);
-  var TOPPAD=88, BOT=130;
+  var TOPPAD=84, BOT=126;
   var H=(rows-1)*ROWH+TOPPAD+BOT;
-  var bottomY=H-BOT, topY=bottomY-(rows-1)*ROWH, spanY=(bottomY-topY)||1;
-  var uid2='j'+pi;
+  var bottomY=H-BOT, xL=MX, xR=W-MX, bulge=64, bow=30;
 
-  /* ① 中心線（由下往上）：先擺控制點，再用 Catmull-Rom 一次串成整條樣條。
-        重點是「一條」——逐段各畫各的會在接縫處切線不連續，外擴時就冒出尖角。 */
-  var wps=[], markA=[], markB=[];
+  /* ① 中心線：由下往上，逐列一段二次貝茲（左右交錯彎），列與列之間用 U 形迴轉接起來。
+        全部取樣成折線，之後才好外擴成路面。 */
+  var pts=[], nodePos=[];
   for(var r=0;r<rows;r++){
-   var J=JN_JIT[r%JN_JIT.length], y=bottomY-r*ROWH, ltr=(r%2===0);
-   var xa=MX+J.l, xb=W-MX-J.r, sX=ltr?xa:xb, eX=ltr?xb:xa;
-   markA.push(wps.length); wps.push({x:sX,y:y});
-   wps.push({x:(sX+eX)/2+(ltr?-26:26), y:y+J.bow*0.6});
-   markB.push(wps.length); wps.push({x:eX,y:y});
-   if(r<rows-1)wps.push({x:eX+(ltr?J.bulge:-J.bulge), y:y-ROWH/2});
-  }
-  var pts=[], wpAt=[];
-  (function(){
-   function P(i){return wps[Math.max(0,Math.min(wps.length-1,i))];}
-   for(var i=0;i<wps.length-1;i++){
-    var p0=P(i-1), p1=P(i), p2=P(i+1), p3=P(i+2);
-    var c1={x:p1.x+(p2.x-p0.x)/6, y:p1.y+(p2.y-p0.y)/6};
-    var c2={x:p2.x-(p3.x-p1.x)/6, y:p2.y-(p3.y-p1.y)/6};
-    if(i===0){wpAt[0]=0; pts.push(p1);}
-    for(var k=1;k<=34;k++)pts.push(jnCubic(p1,c1,c2,p2,k/34));
-    wpAt[i+1]=pts.length-1;
-   }
-  })();
-  var nodePos=[];
-  for(var r2=0;r2<rows;r2++){
-   var J2=JN_JIT[r2%JN_JIT.length], iA=wpAt[markA[r2]], iB=wpAt[markB[r2]];
+   var y=bottomY-r*ROWH, ltr=(r%2===0);
+   var p0={x:ltr?xL:xR,y:y}, p1={x:ltr?xR:xL,y:y};
+   var cp={x:W/2, y:y+(ltr?bow:-bow)};              // 一列往下彎、一列往上彎＝自然的波浪
+   for(var k=0;k<=30;k++){var t=k/30; if(r&&k===0)continue; pts.push(jnQuad(p0,cp,p1,t));}
    for(var m=0;m<PER;m++){
-    var idx=r2*PER+m; if(idx>=list.length)break;
-    var t=(m===0?J2.t0:J2.t1), q=pts[Math.round(iA+(iB-iA)*t)];
+    var idx=r*PER+m; if(idx>=list.length)break;
+    var tt=(m===0?0.26:0.76), q=jnQuad(p0,cp,p1,tt);
     nodePos.push({it:list[idx], x:q.x, y:q.y});
    }
+   if(r<rows-1){
+    var out=p1.x+(ltr?bulge:-bulge), y2=y-ROWH;
+    var c1={x:out,y:y-ROWH*0.16}, c2={x:out,y:y2+ROWH*0.16}, e={x:p1.x,y:y2};
+    for(var k2=1;k2<=26;k2++)pts.push(jnCubic(p1,c1,c2,e,k2/26));
+   }
   }
-  var nrm=jnNormals(pts);
+  /* ② 路面：寬度由下（近）往上（遠）收窄 */
+  var wBot=38, wTop=17;
+  function widthAt(u){return wBot+(wTop-wBot)*u;}
+  var off=jnOffset(pts,widthAt);
+  var roadD=jnPolyD(off.left)+jnPolyD(off.right.slice().reverse()).replace('M','L')+'Z';
 
-  /* ② 透視：寬度、路基厚度、虛線長寬全部跟著 u 走（u=0 近、u=1 遠） */
-  var wNear=56, wFar=13;
-  function halfW(u){return (wFar+(wNear-wFar)*Math.pow(1-u,1.7))/2;}
-  function dashHalf(u){return Math.max(0.7,(1.2+3.4*Math.pow(1-u,1.7)))/2;}
-  function dashLen(u){return 8+26*Math.pow(1-u,1.6);}
-  function gapLen(u){return 7+21*Math.pow(1-u,1.6);}
-  var last=pts.length-1;
-  var hArr=jnHalfArr(pts,halfW,true);
-  var dhArr=hArr.map(function(h,i){var u=i/last;return Math.min(dashHalf(u), h*0.16);});
-  var roadD=jnBand(pts,nrm,0,last,hArr);
-  var kerbL=[],kerbR=[];
-  for(var i2=0;i2<=last;i2++){var h2=hArr[i2];
-   kerbL.push({x:pts[i2].x+nrm[i2].x*h2,y:pts[i2].y+nrm[i2].y*h2});
-   kerbR.push({x:pts[i2].x-nrm[i2].x*h2,y:pts[i2].y-nrm[i2].y*h2});}
-  var dashes=jnDashes(pts,nrm,dashLen,gapLen,dhArr).map(function(d){
-   return '<path d="'+d+'" fill="url(#'+uid2+'dash)"/>';}).join('');
-
-  /* ③ 節點：近大遠小，字級也跟著（但收斂，遠端仍讀得到） */
+  /* ③ 節點與插旗 */
   var nodes=nodePos.map(function(np2){
    var it=np2.it, g=JN_GROUPS[it.grp], gc=light?g.light:g.dark, px=np2.x, py=np2.y;
-   var u=(bottomY-py)/spanY, sc=1-0.26*u;                    // 1.00 → 0.74
-   var R2=31*sc, fs=14*(1-0.14*u), fs2=12*(1-0.12*u);
-   var ft=it.age+' 歲', fw=(jnW(ft)*11+16)*sc, fh=20*sc, pole=(52+R2*0.1)*sc;
+   var ft=it.age+' 歲', fw=jnW(ft)*11+18;
    var titleLines=jnWrap(it.title,17,2);
-   var ty=py+R2+22;
    return '<g>'+
-    '<path d="M'+(px-R2-10).toFixed(1)+' '+(py+8*sc).toFixed(1)+'V'+(py-pole).toFixed(1)+'" stroke="'+col.flag+'" stroke-width="'+(2.4*sc).toFixed(1)+'" stroke-linecap="round"/>'+
-    '<path d="M'+(px-R2-10).toFixed(1)+' '+(py-pole).toFixed(1)+'h'+fw.toFixed(1)+'v'+fh.toFixed(1)+'h-'+fw.toFixed(1)+'z" fill="'+col.flag+'"/>'+
-    '<text x="'+(px-R2-10+fw/2).toFixed(1)+'" y="'+(py-pole+fh*0.72).toFixed(1)+'" fill="'+col.flagT+'" font-size="'+(12*sc).toFixed(1)+'" font-weight="800" text-anchor="middle">'+esc(ft)+'</text>'+
-    '<ellipse cx="'+px.toFixed(1)+'" cy="'+(py+R2*0.82).toFixed(1)+'" rx="'+(R2*0.86).toFixed(1)+'" ry="'+(R2*0.24).toFixed(1)+'" fill="rgba(0,0,0,.20)"/>'+
-    '<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="'+R2.toFixed(1)+'" fill="'+col.ring+'" stroke="'+gc+'" stroke-width="'+(2.4*sc).toFixed(1)+'"/>'+
-    '<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="'+(R2+4.5*sc).toFixed(1)+'" fill="none" stroke="'+gc+'" stroke-width="1" opacity=".3"/>'+
-    '<g transform="translate('+(px-12*sc*1.35).toFixed(1)+' '+(py-12*sc*1.35).toFixed(1)+') scale('+(sc*1.35).toFixed(3)+')" fill="none" stroke="'+gc+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+jnIconSVG(it.icon,gc)+'</g>'+
-    jnText(px,ty,titleLines,col.title,fs,'800',fs+3.5,col.bg)+
-    jnText(px,ty+titleLines.length*(fs+3.5),jnWrap(it.year+'　'+(it.brief||it.detail||''),23,2),col.sub,fs2,'',fs2+3,col.bg)+
+    /* 里程碑旗：插在節點左側，比照參考圖 */
+    '<path d="M'+(px-40).toFixed(1)+' '+(py+8).toFixed(1)+'V'+(py-52).toFixed(1)+'" stroke="'+col.flag+'" stroke-width="2.4" stroke-linecap="round"/>'+
+    '<path d="M'+(px-40).toFixed(1)+' '+(py-52).toFixed(1)+'h'+fw.toFixed(1)+'v20h-'+fw.toFixed(1)+'z" fill="'+col.flag+'"/>'+
+    '<text x="'+(px-40+fw/2).toFixed(1)+'" y="'+(py-37.6).toFixed(1)+'" fill="'+col.flagT+'" font-size="12" font-weight="800" text-anchor="middle">'+esc(ft)+'</text>'+
+    /* 節點 */
+    '<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="30" fill="'+col.ring+'" stroke="'+gc+'" stroke-width="2.4"/>'+
+    '<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="34.5" fill="none" stroke="'+gc+'" stroke-width="1" opacity=".3"/>'+
+    '<g transform="translate('+(px-16).toFixed(1)+' '+(py-16).toFixed(1)+') scale(1.33)" fill="none" stroke="'+gc+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+jnIconSVG(it.icon,gc)+'</g>'+
+    /* 文字 */
+    jnText(px,py+54,titleLines,col.title,13.5,'800',17)+
+    jnText(px,py+54+titleLines.length*17,jnWrap(it.year+'　'+(it.brief||it.detail||''),23,2),col.sub,11.5,'',15)+
     '</g>';
   }).join('');
 
-  /* ④ 起點（最下）與終點（最上） */
-  var sx=pts[0].x, sy=pts[0].y, ex=pts[last].x, ey=pts[last].y;
+  /* ④ 起點（畫面最下）與終點（畫面最上） */
+  var sx=xL, sy=bottomY, ex=pts[pts.length-1].x, ey=pts[pts.length-1].y;
   var start=(pi===0)
-   ? '<g><g transform="translate('+(sx-56)+' '+(sy-6)+')" stroke="'+col.mark+'" stroke-width="2.8" stroke-linecap="round" fill="none">'+
-      '<circle cx="10" cy="-32" r="5" fill="'+col.mark+'" stroke="none"/>'+
-      '<path d="M10 -26v12M10 -22.5l-6.5-4.5M10 -22.5l6.5 3.5M10 -14l-5.5 13M10 -14l6 12"/></g>'+
-     '<text x="'+(sx-48)+'" y="'+(sy+26)+'" fill="'+col.mark+'" font-size="12" font-weight="800" text-anchor="middle" letter-spacing=".18em">START</text>'+
-     '<text x="'+(sx-48)+'" y="'+(sy+42)+'" fill="'+col.sub+'" font-size="11" text-anchor="middle">現在 '+A+' 歲</text>'+
-     '<path d="M'+(sx-26)+' '+(sy+2)+'h15" stroke="'+col.mark+'" stroke-width="2.2" stroke-linecap="round" marker-end="url(#'+uid2+'arw)"/></g>'
-   : '<text x="'+sx.toFixed(1)+'" y="'+(sy+46).toFixed(1)+'" fill="'+col.hint+'" font-size="11" text-anchor="middle">（續前頁）</text>';
+   ? '<g>'+
+     /* 走路的人 */
+     '<g transform="translate('+(sx-52)+' '+(sy-8)+')" stroke="'+col.mark+'" stroke-width="2.6" stroke-linecap="round" fill="none">'+
+      '<circle cx="10" cy="-30" r="4.6" fill="'+col.mark+'" stroke="none"/>'+
+      '<path d="M10 -24v11M10 -21l-6-4M10 -21l6 3M10 -13l-5 12M10 -13l5.5 11"/></g>'+
+     '<text x="'+(sx-46)+'" y="'+(sy+22)+'" fill="'+col.mark+'" font-size="12" font-weight="800" text-anchor="middle" letter-spacing=".18em">START</text>'+
+     '<text x="'+(sx-46)+'" y="'+(sy+38)+'" fill="'+col.sub+'" font-size="11" text-anchor="middle">現在 '+A+' 歲</text>'+
+     '<path d="M'+(sx-24)+' '+(sy+2)+'h16" stroke="'+col.mark+'" stroke-width="2" stroke-linecap="round" marker-end="url(#jnArrow'+pi+')"/>'+
+     '</g>'
+   : '<text x="'+sx+'" y="'+(sy+44)+'" fill="'+col.hint+'" font-size="11" text-anchor="middle">（續前頁）</text>';
   var end=(pi===pages.length-1)
-   ? '<g><path d="M'+ex.toFixed(1)+' '+(ey+5).toFixed(1)+'V'+(ey-44).toFixed(1)+'" stroke="'+col.mark+'" stroke-width="2.4" stroke-linecap="round"/>'+
-     '<path d="M'+ex.toFixed(1)+' '+(ey-43).toFixed(1)+'h27l-6 7.6 6 7.6H'+ex.toFixed(1)+'z" fill="'+col.mark+'"/>'+
-     '<text x="'+(ex+14).toFixed(1)+'" y="'+(ey-53).toFixed(1)+'" fill="'+col.mark+'" font-size="12" font-weight="800" text-anchor="middle">願景達成</text></g>'
-   : '<text x="'+ex.toFixed(1)+'" y="'+(ey-28).toFixed(1)+'" fill="'+col.hint+'" font-size="11" text-anchor="middle">（接下頁）</text>';
+   ? '<g><path d="M'+ex.toFixed(1)+' '+(ey+6).toFixed(1)+'V'+(ey-46).toFixed(1)+'" stroke="'+col.mark+'" stroke-width="2.6" stroke-linecap="round"/>'+
+     '<path d="M'+ex.toFixed(1)+' '+(ey-45).toFixed(1)+'h30l-6.5 8.5 6.5 8.5H'+ex.toFixed(1)+'z" fill="'+col.mark+'"/>'+
+     '<text x="'+(ex+16).toFixed(1)+'" y="'+(ey-56).toFixed(1)+'" fill="'+col.mark+'" font-size="12" font-weight="800" text-anchor="middle">願景達成</text></g>'
+   : '<text x="'+ex.toFixed(1)+'" y="'+(ey-30).toFixed(1)+'" fill="'+col.hint+'" font-size="11" text-anchor="middle">（接下頁）</text>';
 
   return '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="max-width:'+W+'px;display:block;margin:0 auto'+(pi?';page-break-before:always':'')+'">'+
-   '<defs>'+
-    '<linearGradient id="'+uid2+'road" x1="0" y1="'+bottomY+'" x2="0" y2="'+(topY-40)+'" gradientUnits="userSpaceOnUse">'+
-     '<stop offset="0" stop-color="'+col.near+'"/><stop offset="1" stop-color="'+col.far+'"/></linearGradient>'+
-    '<linearGradient id="'+uid2+'dash" x1="0" y1="'+bottomY+'" x2="0" y2="'+(topY-40)+'" gradientUnits="userSpaceOnUse">'+
-     '<stop offset="0" stop-color="'+col.dash+'"/><stop offset="1" stop-color="'+col.dash+'" stop-opacity=".55"/></linearGradient>'+
-    '<marker id="'+uid2+'arw" markerWidth="7" markerHeight="7" refX="5" refY="3.2" orient="auto"><path d="M0 0.4 6.4 3.2 0 6" fill="'+col.mark+'"/></marker>'+
-   '</defs>'+
-   (ribbon
-     ? '<path d="'+roadD+'" fill="'+col.near+'"/>'
-     : '<path d="'+roadD+'" fill="url(#'+uid2+'road)"/>'+
-       '<path d="'+jnPolyD(kerbL)+'" fill="none" stroke="'+col.kerb+'" stroke-width="1.4" opacity=".55"/>'+
-       '<path d="'+jnPolyD(kerbR)+'" fill="none" stroke="'+col.kerb+'" stroke-width="1.4" opacity=".55"/>'+
-       dashes)+
+   '<defs><marker id="jnArrow'+pi+'" markerWidth="7" markerHeight="7" refX="5" refY="3.2" orient="auto"><path d="M0 0.4 6.4 3.2 0 6" fill="'+col.mark+'"/></marker></defs>'+
+   '<path d="'+roadD+'" fill="rgba(0,0,0,.10)" transform="translate(0 5)"/>'+
+   '<path d="'+roadD+'" fill="'+col.road+'"/>'+
+   '<path d="'+jnPolyD(off.left)+'" fill="none" stroke="'+col.kerb+'" stroke-width="1.6"/>'+
+   '<path d="'+jnPolyD(off.right)+'" fill="none" stroke="'+col.kerb+'" stroke-width="1.6"/>'+
+   '<path d="'+jnPolyD(pts)+'" fill="none" stroke="'+col.dash+'" stroke-width="2.4" stroke-dasharray="14 13" stroke-linecap="round" opacity=".9"/>'+
    start+end+nodes+'</svg>';
  }).join('')+jnLegend(items,light,col.sub);
 }
@@ -10810,8 +10705,7 @@ window.addEventListener('load',function(){
  window.PROTO_CASE=c;
 
  var an=goalJourneyTable(c,'dark');
- var rpA=goalJourneyPathSVG(c,'light','ribbon');
- var rpB=goalJourneyPathSVG(c,'light','road');
+ var rp=goalJourneyPathSVG(c,'light');
  var tb=goalJourneyTable(c,'light');
 
  document.body.innerHTML=
@@ -10829,9 +10723,7 @@ window.addEventListener('load',function(){
    '<div class="report" style="max-width:820px">'+
      '<h2>五、財務目標歷程</h2>'+
      '<div style="color:#5a6b72;font-size:12.5px;margin:-4px 0 14px">從現在 '+n(c.profile.age)+' 歲出發，這是這份規劃要陪你走完的路。每一個停靠點都是你自己選定的目標——路徑上的順序，就是資源投入的順序。</div>'+
-     '<div style="text-align:center;font-size:12px;color:#8a7a63;letter-spacing:.1em;margin:0 0 6px">版本 A · 緞帶（貼近你給的圖）</div>'+rpA+
-     '<div style="border-top:1px dashed #e0d8c8;margin:26px 0 14px"></div>'+
-     '<div style="text-align:center;font-size:12px;color:#8a7a63;letter-spacing:.1em;margin:0 0 6px">版本 B · 馬路（同樣的幾何，加中線與路肩）</div>'+rpB+
+     rp+
      '<div style="border-top:1px dashed #e0d8c8;margin:18px 0 12px"></div>'+
      '<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:0 0 6px">目標一覽</div>'+
      tb+
