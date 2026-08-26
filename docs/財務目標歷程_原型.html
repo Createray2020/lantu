@@ -10615,12 +10615,26 @@ function jnCurveR(pts,i){
  if(ar<1e-6)return 1e9;
  return (ab*bc*ca)/(4*ar);
 }
+/* 參考圖的立體感不是「打光」，是「緞帶在空間裡轉」：直線段寬、彎道段窄。
+   所以半寬＝深度基準 ×（彎得愈急愈窄），再加硬箝制保證不自交。
+   兩端另外收尖，路才不會是被切斷的方塊。 */
 function jnHalfArr(pts,fn,cap){
  var out=[],last=pts.length-1;
  for(var i=0;i<=last;i++){
   var h=fn(i/last);
-  if(cap)h=Math.min(h,0.62*jnCurveR(pts,i));
+  if(cap){
+   var R=jnCurveR(pts,i);
+   h*=Math.min(1,0.42+0.58*Math.min(1,R/150));   // 彎道收窄
+   h=Math.min(h,0.60*R);                          // 保證不自交
+  }
   out.push(h);
+ }
+ if(cap){                                          // 兩端收尖
+  var tip=Math.round(last*0.035)||6;
+  for(var e=0;e<=tip;e++){
+   var f=0.30+0.70*(e/tip);
+   out[e]*=f; out[last-e]*=f;
+  }
  }
  // 抹平箝制造成的階梯，路緣才不會有折角
  for(var p2=0;p2<8;p2++){
@@ -10645,7 +10659,8 @@ function jnDashes(pts,nrm,dashAt,gapAt,hArr){
  return out;
 }
 
-function goalJourneyPathSVG(c,theme){
+function goalJourneyPathSVG(c,theme,style){
+ var ribbon=(style==='ribbon');
  var items=journeyItems(c), light=(theme!=='dark');
  if(!items.length)return '<div style="color:'+(light?'#5a6b72':'var(--mut)')+'">尚無已選定的目標。</div>';
  var col=light
@@ -10701,16 +10716,13 @@ function goalJourneyPathSVG(c,theme){
   /* ② 透視：寬度、路基厚度、虛線長寬全部跟著 u 走（u=0 近、u=1 遠） */
   var wNear=56, wFar=13;
   function halfW(u){return (wFar+(wNear-wFar)*Math.pow(1-u,1.7))/2;}
-  function baseDy(u){return 3+9*Math.pow(1-u,1.7);}          // 路基厚度：近厚遠薄
   function dashHalf(u){return Math.max(0.7,(1.2+3.4*Math.pow(1-u,1.7)))/2;}
   function dashLen(u){return 8+26*Math.pow(1-u,1.6);}
   function gapLen(u){return 7+21*Math.pow(1-u,1.6);}
   var last=pts.length-1;
   var hArr=jnHalfArr(pts,halfW,true);
-  var dArr=jnHalfArr(pts,baseDy,false);
   var dhArr=hArr.map(function(h,i){var u=i/last;return Math.min(dashHalf(u), h*0.16);});
   var roadD=jnBand(pts,nrm,0,last,hArr);
-  var baseD=jnBand(pts,nrm,0,last,hArr,dArr);
   var kerbL=[],kerbR=[];
   for(var i2=0;i2<=last;i2++){var h2=hArr[i2];
    kerbL.push({x:pts[i2].x+nrm[i2].x*h2,y:pts[i2].y+nrm[i2].y*h2});
@@ -10763,11 +10775,13 @@ function goalJourneyPathSVG(c,theme){
      '<stop offset="0" stop-color="'+col.dash+'"/><stop offset="1" stop-color="'+col.dash+'" stop-opacity=".55"/></linearGradient>'+
     '<marker id="'+uid2+'arw" markerWidth="7" markerHeight="7" refX="5" refY="3.2" orient="auto"><path d="M0 0.4 6.4 3.2 0 6" fill="'+col.mark+'"/></marker>'+
    '</defs>'+
-   '<path d="'+baseD+'" fill="'+col.base+'"/>'+
-   '<path d="'+roadD+'" fill="url(#'+uid2+'road)"/>'+
-   '<path d="'+jnPolyD(kerbL)+'" fill="none" stroke="'+col.kerb+'" stroke-width="1.4" opacity=".55"/>'+
-   '<path d="'+jnPolyD(kerbR)+'" fill="none" stroke="'+col.kerb+'" stroke-width="1.4" opacity=".55"/>'+
-   dashes+start+end+nodes+'</svg>';
+   (ribbon
+     ? '<path d="'+roadD+'" fill="'+col.near+'"/>'
+     : '<path d="'+roadD+'" fill="url(#'+uid2+'road)"/>'+
+       '<path d="'+jnPolyD(kerbL)+'" fill="none" stroke="'+col.kerb+'" stroke-width="1.4" opacity=".55"/>'+
+       '<path d="'+jnPolyD(kerbR)+'" fill="none" stroke="'+col.kerb+'" stroke-width="1.4" opacity=".55"/>'+
+       dashes)+
+   start+end+nodes+'</svg>';
  }).join('')+jnLegend(items,light,col.sub);
 }
 
@@ -10796,7 +10810,8 @@ window.addEventListener('load',function(){
  window.PROTO_CASE=c;
 
  var an=goalJourneyTable(c,'dark');
- var rp=goalJourneyPathSVG(c,'light');
+ var rpA=goalJourneyPathSVG(c,'light','ribbon');
+ var rpB=goalJourneyPathSVG(c,'light','road');
  var tb=goalJourneyTable(c,'light');
 
  document.body.innerHTML=
@@ -10814,7 +10829,9 @@ window.addEventListener('load',function(){
    '<div class="report" style="max-width:820px">'+
      '<h2>五、財務目標歷程</h2>'+
      '<div style="color:#5a6b72;font-size:12.5px;margin:-4px 0 14px">從現在 '+n(c.profile.age)+' 歲出發，這是這份規劃要陪你走完的路。每一個停靠點都是你自己選定的目標——路徑上的順序，就是資源投入的順序。</div>'+
-     rp+
+     '<div style="text-align:center;font-size:12px;color:#8a7a63;letter-spacing:.1em;margin:0 0 6px">版本 A · 緞帶（貼近你給的圖）</div>'+rpA+
+     '<div style="border-top:1px dashed #e0d8c8;margin:26px 0 14px"></div>'+
+     '<div style="text-align:center;font-size:12px;color:#8a7a63;letter-spacing:.1em;margin:0 0 6px">版本 B · 馬路（同樣的幾何，加中線與路肩）</div>'+rpB+
      '<div style="border-top:1px dashed #e0d8c8;margin:18px 0 12px"></div>'+
      '<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:0 0 6px">目標一覽</div>'+
      tb+
