@@ -63,7 +63,10 @@ export function remainingStages(
   const list = byAge(stages);
   const topIdx = list.findIndex((s) => s.stage === topLevel);
   const cut = topIdx >= 0 ? topIdx : list.length - 1;
-  const a = Math.max(0, Number.isFinite(age) ? Math.floor(age) : 0);
+  // ⚠️ 年齡允許為**負**——未出生子女走的就是負歲數（-3 ＝ 預計 3 年後出生）。
+  // 舊版這裡是 Math.max(0, ...)，填 -3 會被夾成 0，幼兒園變成「3 年後開始」（正解 6 年後），
+  // 整條學段時間軸提前三年而且不會報錯。夾擠拿掉之後，下面的 from / startIn 自然就對了。
+  const a = Number.isFinite(age) ? Math.floor(age) : 0;
   const cap = Number.isFinite(payToAge) ? Number(payToAge) : 0;
   const out: StageRow[] = [];
   for (let i = 0; i <= cut; i++) {

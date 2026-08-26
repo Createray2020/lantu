@@ -109,6 +109,32 @@ describe("stageOfAge / remainingStages：由年齡推學段", () => {
     expect(rows[0]).toMatchObject({ stage: "幼兒園", startIn: 3, remainYears: 3 });
   });
 
+  // ⚠️ 未出生子女走的就是負歲數（-3 ＝ 預計 3 年後出生）。
+  // 舊版 remainingStages 內有 Math.max(0, age)，-3 被夾成 0 →
+  // 幼兒園算成「3 年後開始」（正解 6 年後），整條時間軸提前三年而且不噴錯。
+  it("未出生子女（-3 歲）：整條學段時間軸往後推三年，年數不變", () => {
+    const rows = remainingStages(-3, "大學");
+    expect(rows.map((r) => r.stage)).toEqual(["幼兒園", "國小", "國中", "高中職", "大學"]);
+    expect(rows[0]).toMatchObject({ stage: "幼兒園", startIn: 6, remainYears: 3, current: false });
+    expect(rows[4]).toMatchObject({ stage: "大學", startIn: 21, remainYears: 4 });
+    // 與 0 歲相比：每一段都晚三年開始，但供給年數一模一樣
+    const born = remainingStages(0, "大學");
+    rows.forEach((r, i) => {
+      expect(r.startIn, r.stage).toBe(born[i].startIn + 3);
+      expect(r.remainYears, r.stage).toBe(born[i].remainYears);
+    });
+  });
+
+  it("未出生子女沒有「正在讀」的學段", () => {
+    expect(stageOfAge(-3)).toBeNull();
+    expect(remainingStages(-3, "大學").every((r) => !r.current)).toBe(true);
+  });
+
+  it("「支付學雜費至幾歲」對未出生子女一樣有效", () => {
+    const rows = remainingStages(-3, "大學", 15);
+    expect(rows.map((r) => r.stage)).toEqual(["幼兒園", "國小", "國中"]);
+  });
+
   it("期望學歷不在清單裡（後台改過學段名稱）時，一路供給到最後一段而不是整份消失", () => {
     const rows = remainingStages(7, "不存在的學歷");
     expect(rows.length).toBeGreaterThan(0);
@@ -141,7 +167,8 @@ describe("推學段規則雙實作對拍：eduPlan.ts ↔ lantu-app.html", () =>
     await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
   });
 
-  const AGES = [0, 2, 3, 5, 6, 7, 11, 12, 14, 15, 17, 18, 21, 22, 23, 24, 27, 30];
+  // 負歲數＝未出生子女，兩邊也必須一致（這是 2026/08/26 新增的合法輸入）
+  const AGES = [-10, -5, -3, -1, 0, 2, 3, 5, 6, 7, 11, 12, 14, 15, 17, 18, 21, 22, 23, 24, 27, 30];
   const TOPS = ["高中職", "大學", "研究所", "博士班"];
   const PAY_TO = [0, 15, 20, 22, 26];
 

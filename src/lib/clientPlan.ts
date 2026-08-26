@@ -4,7 +4,7 @@ import { and, eq, asc, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
 import { newCase } from "@/lib/engine";
-import { computePassport, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
+import { computePassport, BASE_YEAR, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
 import { normalizeIntent, DEFAULT_TARGET, type Intent } from "@/lib/intent";
 // 客戶端寫 plan.data 時也必須重算快照。舊版只 set({data})，教練列表上的階段/淨值會一直停在
 // 客戶「上次由教練存檔」時的舊值（實測正式庫有一筆淨值差 500 萬）。
@@ -64,16 +64,45 @@ export function buildCase(p: PassportInputs, name: string): any {
   c.intent = normalizeIntent({ purposes: [], targets: passportTargets, mustHave: passportTargets });
 
   c.education = [];
+  c.birthPlan = [];
   if (r.support.perChildCost > 0 && num(p.support.monthly) > 0) {
-    // education[].annual 是「今日現值的年費用」——引擎（eduTotal / projection）會自己再套學費上漲率。
-    // 舊版填的是 perChildCost/年數，而 perChildCost 已經是逐年複利加總過的結果，
-    // 等於把學費成長算了兩次，投影裡的教育支出被放大約 1.66 倍。
-    c.education.push({
-      child: "子女", stage: "教育", schoolType: "",
-      annual: Math.round(num(p.support.annualCost)),
-      years: num(p.support.raiseToAge),
-      startIn: Math.max(0, num(p.support.birthYear) - num(p.support.startYear)),
-    });
+    // ⚠️ 人生護照的「扶養」面向本來就有一根**預計出生年份**的滑桿（可拉到 30 年後），
+    //    但舊版把它壓成一列 education 就結束了——教練端因此拿不到一位「子女」成員，
+    //    自動學段推算、官方學雜費、子女的其他準備基金、0–2 歲育兒費全部吃不到。
+    //    客戶明明說了「我 6 年後想生」，那句話到教練手上只剩一個 startIn 數字。
+    //
+    //    出生年還在未來 → 建一位「尚未出生」的子女成員 ＋ 一列生育規劃，
+    //    教練端一打開就有整套推算；已經出生（或今年）→ 維持原本那一列 education。
+    //
+    //    ⚠️ 這裡的「幾年後」用 BASE_YEAR 當現在，不是 startYear（月存入起始年，可能是十年前）。
+    //       房／車／旅遊那三面向沿用舊的 startYear 慣例，動它們會讓既有客戶的規劃數字整批位移，
+    //       不在這次範圍內。
+    const bornIn = Math.round(num(p.support.birthYear)) - BASE_YEAR;
+    if (bornIn > 0) {
+      const bid = `pb${Math.round(num(p.support.birthYear))}`;
+      c.members = c.members || [];
+      c.members.push({
+        name: "第1胎", role: "子女", gender: "男", age: "",
+        unborn: true, bornAt: age + bornIn, birthBid: bid,
+        worked: 0, insType: "健保眷屬", insSalary: 0,
+        nhiCat: "眷屬(依附投保)", nhiSalary: 0, nhiDeps: 0,
+        depRatio: 0, expRatio: 0, indepAge: 26,
+        // 客戶自己填的「扶養到幾歲」＝支付學雜費至幾歲；年費用交給官方學費參數表推算
+        // （護照那根滑桿是很粗的估計，教練端有逐學段的公告值）。
+        eduAuto: true, eduPayTo: num(p.support.raiseToAge) || 0,
+      });
+      c.birthPlan.push({ bid, atAge: age + bornIn, delivery: "自然產", care: "月子中心", careMonths: 1 });
+    } else {
+      // education[].annual 是「今日現值的年費用」——引擎（eduTotal / projection）會自己再套學費上漲率。
+      // 舊版填的是 perChildCost/年數，而 perChildCost 已經是逐年複利加總過的結果，
+      // 等於把學費成長算了兩次，投影裡的教育支出被放大約 1.66 倍。
+      c.education.push({
+        child: "子女", stage: "教育", schoolType: "",
+        annual: Math.round(num(p.support.annualCost)),
+        years: num(p.support.raiseToAge),
+        startIn: 0,
+      });
+    }
   }
 
   c.passport = { inputs: p, result: r, savedAt: new Date().toISOString() };

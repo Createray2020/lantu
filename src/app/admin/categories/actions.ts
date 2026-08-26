@@ -11,6 +11,7 @@ import {
   type CatInput,
 } from "@/lib/financeCategories";
 import { saveEduCost, resetEduCosts, type EduCostInput } from "@/lib/eduCosts";
+import { saveBirthCost, resetBirthCost, type BirthCostInput } from "@/lib/birthCosts";
 import { saveBizTaxParam, resetBizTaxParam, type BizTaxInput } from "@/lib/bizTaxParams";
 import { saveInsProduct, deleteInsProduct, importInsProductsCSV, type InsProductInput } from "@/lib/insProducts";
 
@@ -27,6 +28,7 @@ const MSG: Record<string, string> = {
   "not-found": "找不到這筆類別",
   "empty-stage": "學段名稱不能空白",
   "invalid-years": "年數要介於 1~12",
+  "invalid-amount": "金額要是 0 以上的整數",
   "unknown-key": "不認得這個常數（只能改內建清單裡的項目）",
   "rate-must-be-decimal": "比率要填小數（20% 請填 0.2，不是 20）",
   "invalid-value": "數值要是 0 以上的數字",
@@ -122,6 +124,28 @@ export async function resetEduCostsAction(): Promise<ActionResult> {
   try {
     await guard();
     await resetEduCosts();
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function saveBirthCostAction(input: BirthCostInput): Promise<ActionResult> {
+  try {
+    await guard();
+    await saveBirthCost(input);
+    refresh();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function resetBirthCostAction(key: string): Promise<ActionResult> {
+  try {
+    await guard();
+    await resetBirthCost(key);
     refresh();
     return { ok: true };
   } catch (e) {

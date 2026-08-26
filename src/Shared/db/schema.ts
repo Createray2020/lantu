@@ -784,6 +784,26 @@ export const eduCostParams = pgTable('edu_cost_params', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// 生育費用參數（平台級，只有 admin 能改；見 /admin/categories 的「生育費用」分頁）。
+//
+// 為什麼另開一張而不是塞進 edu_cost_params：那張表的主鍵是「學段」，
+// 每一列都必須有起始年齡與年數；生育費用是一組彼此無關的單價（一次性／每月／每年），
+// 硬塞進去等於要給「月子中心」編一個假的學段起始年齡。
+//
+// 合併語意同 biz_tax_params：程式端的 birthCosts.defaults.ts 是骨幹，
+// DB 有的那幾列覆蓋上去；誤刪一列只會回到內建值，不會讓前端拿到 undefined。
+export const birthCostParams = pgTable('birth_cost_params', {
+  key: text('key').primaryKey(),              // 對應 birthCosts.defaults.ts 的 key，例如 POSTPARTUM_CENTER_MONTH
+  label: text('label').notNull(),             // 後台顯示名稱
+  grp: text('grp').default('孕產').notNull(), // 分組：孕產 / 月子 / 育兒
+  unit: text('unit').default('次').notNull(), // 次＝一次性 / 月＝每月 / 年＝每年
+  amount: integer('amount').default(0).notNull(),  // 今日現值（元）
+  basis: text('basis'),                       // 資料基準日，例如 2026-08
+  note: text('note'),                         // 資料來源註記（後台顯示，避免數字來歷不明）
+  sortOrder: integer('sort_order').default(0).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // 企業／稅務法規常數（平台級，只有 admin 能改；見 /admin/categories 的第三區）。
 //
 // 為什麼這一塊要進 DB 而個人稅制不用：它改得比個人稅制勤，而且「改了沒更新」比「沒寫」更危險

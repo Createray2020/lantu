@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildCase } from "./clientPlan";
-import { emptyPassport, computePassport } from "./passport";
+import { emptyPassport, computePassport, BASE_YEAR } from "./passport";
 import * as EngineExports from "./engine";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,20 +40,54 @@ describe("buildCase：passport → case 的量綱", () => {
     expect(c.travel[0].start).toBe(c.profile.age + yearsOut);
   });
 
+  // ⚠️ 2026/08/26 起：出生年還在未來 → 不再壓成一列 education，
+  //    而是建一位「尚未出生」的子女成員（教練端自動推學段、帶官方學雜費）＋一列生育規劃。
+  it("預計出生年在未來 → 產生未出生子女成員與生育規劃，education 留空", () => {
+    expect(p.support.birthYear).toBeGreaterThan(BASE_YEAR);
+    expect(c.education).toHaveLength(0);
+
+    const kid = c.members.find((m: { unborn?: boolean }) => m.unborn);
+    expect(kid, "應該要有一位尚未出生的子女成員").toBeTruthy();
+    expect(kid.role).toBe("子女");
+    expect(kid.age).toBe("");                       // 未出生成員不寫年齡（更不寫負數）
+    expect(kid.eduAuto).toBe(true);
+    expect(kid.eduPayTo).toBe(p.support.raiseToAge);
+    // 幾年後出生用 BASE_YEAR 當現在，不是月存入起始年
+    expect(kid.bornAt).toBe(c.profile.age + (p.support.birthYear - BASE_YEAR));
+
+    expect(c.birthPlan).toHaveLength(1);
+    expect(c.birthPlan[0].atAge).toBe(kid.bornAt);
+    // 生育規劃與成員用同一個 bid，教練端按「產生／更新」才不會又生出第二位
+    expect(c.birthPlan[0].bid).toBe(kid.birthBid);
+  });
+
+  it("預計出生年已過（小孩已經出生）→ 仍走原本那一列 education", () => {
+    const born = { ...p, support: { ...p.support, birthYear: BASE_YEAR - 3 } };
+    const cb = buildCase(born, "已生");
+    expect(cb.members.some((m: { unborn?: boolean }) => m.unborn)).toBe(false);
+    expect(cb.birthPlan).toHaveLength(0);
+    const edu = cb.education[0];
+    expect(edu).toBeTruthy();
+    expect(edu.annual).toBe(Math.round(born.support.annualCost));
+    expect(edu.years).toBe(born.support.raiseToAge);
+    expect(edu.startIn).toBe(0);
+  });
+
   it("教育金填的是今日現值年費用，不重複計入學費成長", () => {
-    const edu = c.education[0];
+    const cb = buildCase({ ...p, support: { ...p.support, birthYear: BASE_YEAR - 3 } }, "已生");
+    const edu = cb.education[0];
     expect(edu).toBeTruthy();
     expect(edu.annual).toBe(Math.round(p.support.annualCost));
     expect(edu.years).toBe(p.support.raiseToAge);
 
     // 引擎自己會套成長率；投影裡的教育支出總額應對得上 passport 算的 perChildCost
     const caseForProj = {
-      ...c,
-      params: { ...c.params, tuitionGrowth: p.support.tuitionGrowth },
+      ...cb,
+      params: { ...cb.params, tuitionGrowth: p.support.tuitionGrowth },
     };
     const proj = E.projection(caseForProj);
     let eduTotal = 0;
-    const start = c.profile.age + edu.startIn;
+    const start = cb.profile.age + edu.startIn;
     for (const row of proj.rows) {
       if (row.age >= start && row.age < start + edu.years) {
         // projection 把 edu 併進 expense 欄，這裡改用引擎的公式直接驗算
