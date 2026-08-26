@@ -27,6 +27,7 @@ export type SessionRow = {
   reviewId: string | null;
   metricsBefore: unknown;
   metricsAfter: unknown;
+  closingNote: string | null;
 };
 
 const COLS = {
@@ -41,6 +42,7 @@ const COLS = {
   reviewId: consultSessions.reviewId,
   metricsBefore: consultSessions.metricsBefore,
   metricsAfter: consultSessions.metricsAfter,
+  closingNote: consultSessions.closingNote,
 };
 
 async function assertOwned(coachId: string, clientId: string): Promise<boolean> {
@@ -136,6 +138,8 @@ export type EndInput = {
   attendees?: string | null;
   reviewType?: string;
   nextAppt?: string | null;
+  /** 收尾時教練自己寫的一整段（訪談問卷的最後一題）。 */
+  closingNote?: string | null;
 };
 
 export type EndOutcome =
@@ -174,7 +178,7 @@ export async function endSession(coachId: string, sessionId: string, input: EndI
 
   // 3) 摘要 → reviews
   const fresh = await notesOfSession(sessionId);
-  const summary = buildSummary(fresh, s.metricsBefore as SessionMetrics | null, after);
+  const summary = buildSummary(fresh, s.metricsBefore as SessionMetrics | null, after, input.closingNote ?? null);
   const reviewId = await createReview(coachId, s.clientId, {
     date: ymdTaipei(new Date()),
     type: input.reviewType ?? "review",
@@ -194,7 +198,7 @@ export async function endSession(coachId: string, sessionId: string, input: EndI
 
   const [row] = await db
     .update(consultSessions)
-    .set({ endedAt: new Date(), closeReason: "manual", metricsAfter: after, reviewId })
+    .set({ endedAt: new Date(), closeReason: "manual", metricsAfter: after, reviewId, closingNote: input.closingNote ?? null })
     .where(eq(consultSessions.id, sessionId))
     .returning(COLS);
 
@@ -206,8 +210,13 @@ export function buildSummary(
   notes: { kind: string; body: string; visible: boolean; authorName: string | null }[],
   before: SessionMetrics | null,
   after: SessionMetrics | null,
+  closingNote?: string | null,
 ): string {
   const lines: string[] = [];
+  // 教練自己寫的那一段排在最前面——它是「這場談了什麼」的人話版本，
+  // 底下逐條列的決定與依據是它的佐證，不是反過來。
+  const closing = (closingNote ?? "").trim();
+  if (closing) lines.push(closing, "");
   const b = before?.shortPV ?? null;
   const a = after?.shortPV ?? null;
   if (b != null && a != null && b !== a) {

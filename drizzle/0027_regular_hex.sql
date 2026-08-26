@@ -1,0 +1,1 @@
+ALTER TABLE "consult_sessions" ADD COLUMN "closing_note" text;

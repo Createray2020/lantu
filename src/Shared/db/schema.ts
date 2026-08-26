@@ -914,6 +914,10 @@ export const consultSessions = pgTable('consult_sessions', {
   reviewId: uuid('review_id').references(() => reviews.id, { onDelete: 'set null' }),
   metricsBefore: jsonb('metrics_before'),
   metricsAfter: jsonb('metrics_after'),
+  // 收尾時教練自己從頭寫的一整段。
+  // 跟自動聚合的摘要不衝突：聚合負責「不漏」，這一段負責講那些不屬於任何單一區塊的話
+  // （客戶今天的狀態、談話的氣氛、下一步的判斷）。訪談問卷的最後一題就是它。
+  closingNote: text('closing_note'),
 }, (t) => [
   index('consult_sessions_client_started_idx').on(t.clientId, t.startedAt.desc()),
   // 一位客戶同時只能有一場未結束的諮詢。少了這條，忘記按結束又開新的一場，

@@ -49,13 +49,17 @@ export const ENTITY_KEYS = ["company"] as const;
 export type EntityKey = (typeof ENTITY_KEYS)[number];
 export type Entities = { company?: boolean };
 
+// ⚠️ 這個順序不是隨便排的，是照教練實際用了很久的 SurveyCake 訪談問卷抄過來的
+//    （見 docs/客戶入場問卷_規格拆解.md）。順序本身就是 know-how：
+//    先問職涯與置產這種「講得出口」的，再問婚姻子女這種私領域，最後才到退休與傳承。
+//    要動順序之前，先確認問卷那邊也改了——不然教練照著系統問會跟他的口條對不上。
 export const TARGET_META: TargetMeta[] = [
   { name: "職涯規劃", tab: "intent", tabName: "意圖/生涯", hint: "轉職・創業" },
-  { name: "購車規劃", tab: "goals", tabName: "目標/置產", hint: "車價・貸款", goalType: "購車" },
   { name: "購屋規劃", tab: "goals", tabName: "目標/置產", hint: "房價・成數", goalType: "購屋" },
+  { name: "購車規劃", tab: "goals", tabName: "目標/置產", hint: "車價・貸款", goalType: "購車" },
+  { name: "婚姻規劃", tab: "intent", tabName: "意圖/生涯", hint: "年齡・預算" },
   { name: "子女教養規劃", tab: "education", tabName: "子女教育", hint: "學程・學費" },
   { name: "孝親規劃", tab: "goals", tabName: "目標/置產", hint: "奉養・醫療", goalType: "孝親" },
-  { name: "婚姻規劃", tab: "intent", tabName: "意圖/生涯", hint: "年齡・預算" },
   { name: "旅遊規劃", tab: "goals", tabName: "目標/置產", hint: "頻率・預算", goalType: "旅遊" },
   { name: "休閒興趣規劃", tab: "goals", tabName: "目標/置產", hint: "年度預算", goalType: "休閒" },
   { name: "奢侈品購買規劃", tab: "goals", tabName: "目標/置產", hint: "品項・金額", goalType: "奢侈品" },
@@ -69,11 +73,14 @@ export const TARGET_META: TargetMeta[] = [
 export const TARGETS = TARGET_META.map((t) => t.name);
 
 // 地基層：不受目標勾選影響，一律要填，缺一塊人生模擬就失真。
+// ⚠️ 順序照訪談問卷：收支資債 → 信用/海外 → 保障中心 → 稅賦。
+//    保障需求排在最後不是隨意——問卷把它放在所有現況數字之後，因為那時候
+//    客戶已經把家庭與負債講完了，「萬一你走了誰接手」才問得下去。
 export const BASE_TABS: { tab: string; tabName: string }[] = [
   { tab: "family", tabName: "家庭 / 參數" },
   { tab: "finance", tabName: "收支資債" },
-  { tab: "coverage", tabName: "保障中心" },
   { tab: "credit", tabName: "信用/海外" },
+  { tab: "coverage", tabName: "保障中心" },
   { tab: "tax", tabName: "稅賦" },
 ];
 

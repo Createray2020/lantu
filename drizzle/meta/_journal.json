@@ -190,6 +190,13 @@
       "when": 1787696293218,
       "tag": "0026_lyrical_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1787707530289,
+      "tag": "0027_regular_hex",
+      "breakpoints": true
     }
   ]
 }

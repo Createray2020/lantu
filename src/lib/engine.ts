@@ -970,11 +970,35 @@ function leverGate(c,grade){
  return {grade:grade,block:block,reason:reason,rateCap:rateCap};
 }
 
+// 工作收入可調升的上限 %。
+//
+// 預設走後台的全域上限 CAP_INCOME_UP，但客戶如果在訪談時自己給了一個
+// 「再拚一年可以到多少月收入」的數字（profile.incomeCeiling），就**以他自己說的為準**。
+// 理由：客戶親口說得出口的上限比我們替他假設的 30% 有依據得多，
+// 而且之後把方案攤開來談時，那個數字是他自己給的，站得住。
+// 這一題來自教練實際在用的訪談問卷，見 docs/客戶入場問卷_規格拆解.md。
+//
+// ⚠️ 只有「工作收入」進分母——理財與其他收入不是靠拚就能拉高的，
+//    混進去會把上限稀釋成一個看起來很保守、實際上沒有意義的數字。
+function incomeCeilingPct(c){
+ var ceil=n(((c||{}).profile||{}).incomeCeiling);
+ if(!(ceil>0))return CAP_INCOME_UP;
+ var work=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
+ if(!(work>0))return CAP_INCOME_UP;
+ var pct=(ceil*12/work-1)*100;
+ // ⚠️ 自述上限「低於或等於」目前工作收入時，**不套用**，退回全域上限。
+ //    數學上它是負的、夾到 0 就等於把「增加收入」這根槓桿鎖死——而畫面上完全看不出來，
+ //    教練只會覺得「怎麼算不出方案」。
+ //    而且這種情況最常見的原因是客戶把題目聽成「你現在賺多少」，或收入含一次性獎金，
+ //    不是他真的到頂了。要提醒教練回去確認，不是默默照著算。
+ if(!(pct>0))return CAP_INCOME_UP;
+ return pct;
+}
 function leverRange(c,id,gate){
  gate=gate||leverGate(c);
  if(id==='rate')return {lo:effReturn(c),hi:Math.max(effReturn(c),gate.rateCap),step:0};
  if(id==='retire')return {lo:0,hi:CAP_RETIRE_DELAY,step:1};
- if(id==='income')return {lo:0,hi:CAP_INCOME_UP};
+ if(id==='income')return {lo:0,hi:incomeCeilingPct(c)};
  if(id==='expense')return {lo:0,hi:CAP_EXPENSE_CUT};
  if(id==='retireLevel')return {lo:0,hi:CAP_RETIRE_CUT};
  return {lo:0,hi:CAP_VISION_CUT};
@@ -1891,6 +1915,7 @@ export {
   GAP_CATS,
   PLAN_DISCOUNT,
   CAP_INCOME_UP,
+  incomeCeilingPct,
   CAP_EXPENSE_CUT,
   CAP_RATE,
   CAP_RETIRE_DELAY,

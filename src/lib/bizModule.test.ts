@@ -111,7 +111,8 @@ describe("主體開關", () => {
     c.intent.entities = { company: true };
     const h = renderTab("family");
     expect(w.baseTabsOf(c).map((b: string[]) => b[0])).toEqual(
-      ["family", "finance", "coverage", "credit", "tax", "company", "linkage", "bizgate"],
+      // 2026/08/26：地基層順序改照訪談問卷（收支資債 → 信用/海外 → 保障中心 → 稅賦）
+      ["family", "finance", "credit", "coverage", "tax", "company", "linkage", "bizgate"],
     );
     expect(h).toContain("公私勾稽");
   });

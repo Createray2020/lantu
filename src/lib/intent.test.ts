@@ -184,3 +184,49 @@ describe("lantu-app.html 常數與 intent.ts 一致", () => {
     expect(html).toContain(`var DEFAULT_TARGET='${DEFAULT_TARGET}'`);
   });
 });
+
+/**
+ * 分頁與面向的順序 ＝ 教練實際在用的 SurveyCake 訪談問卷的順序。
+ *
+ * 這不是美觀問題。教練是在客戶面前開著系統、照著順序一路問下去的，
+ * 順序一亂，他的口條就跟畫面對不上，會退回去用問卷（那就是雙重工）。
+ *
+ * 問卷順序來自 docs/客戶入場問卷_規格拆解.md（22 頁實體樣本拆解）。
+ * 要改順序之前，先確認問卷那邊也改了。
+ */
+describe("順序照訪談問卷", () => {
+  it("11 個規劃面向的順序，逐項對得上問卷", () => {
+    const 問卷順序 = [
+      "職涯規劃", "購屋規劃", "購車規劃", "婚姻規劃", "子女教養規劃", "孝親規劃",
+      "旅遊規劃", "休閒興趣規劃", "奢侈品購買規劃", "退休生活規劃", "傳承規劃",
+    ];
+    expect(TARGET_META.filter((m) => !m.entity).map((m) => m.name)).toEqual(問卷順序);
+  });
+
+  it("購屋排在購車之前（問卷是先問房再問車，不要對調）", () => {
+    const names = TARGET_META.map((m) => m.name);
+    expect(names.indexOf("購屋規劃")).toBeLessThan(names.indexOf("購車規劃"));
+  });
+
+  it("婚姻排在子女之前（先成家才有子女，問卷的因果順序）", () => {
+    const names = TARGET_META.map((m) => m.name);
+    expect(names.indexOf("婚姻規劃")).toBeLessThan(names.indexOf("子女教養規劃"));
+  });
+
+  it("退休與傳承排在最後兩項（人生最遠的兩件事，問到最後才談）", () => {
+    const personal = TARGET_META.filter((m) => !m.entity).map((m) => m.name);
+    expect(personal.slice(-2)).toEqual(["退休生活規劃", "傳承規劃"]);
+  });
+
+  it("地基層：保障中心排在信用之後（現況數字問完才問「萬一你走了」）", () => {
+    const tabs = BASE_TABS.map((b) => b.tab);
+    expect(tabs).toEqual(["family", "finance", "credit", "coverage", "tax"]);
+  });
+
+  it("企業三項永遠排在個人面向之後，順序不變", () => {
+    const biz = TARGET_META.filter((m) => m.entity === "company").map((m) => m.name);
+    expect(biz).toEqual(["報酬結構優化", "企業風險保障", "事業退場規劃"]);
+    const firstBiz = TARGET_META.findIndex((m) => !!m.entity);
+    expect(TARGET_META.slice(firstBiz).every((m) => !!m.entity)).toBe(true);
+  });
+});
