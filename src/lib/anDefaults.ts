@@ -89,6 +89,21 @@ export async function resetAnDefaults(): Promise<void> {
   updateTag(AN_DEFAULTS_TAG);
 }
 
+/**
+ * 把第 from 列搬到第 to 列（後台的拖曳排序與 ↑↓ 共用這一支）。
+ * ⚠️ 語意是「插到目標位置」而不是「跟目標對調」——拖曳的直覺是插入；
+ * 而 splice 先移除再插入很容易寫成差一格，所以獨立成純函式測。
+ * 回傳新陣列；index 超出範圍或原地不動時原樣回傳。
+ */
+export function reorder<T>(list: T[], from: number, to: number): T[] {
+  if (from === to) return list;
+  if (from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+  const next = list.slice();
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
 /** 後台頁用：合併後的完整清單，附標題與是否隱藏 */
 export function anBoardRows(payload: AnDefaultPayload): { k: string; t: string; cond?: string; hidden: boolean }[] {
   const hidden = new Set(payload.hidden);

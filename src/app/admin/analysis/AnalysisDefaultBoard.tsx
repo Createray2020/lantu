@@ -2,14 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { saveAnDefaultsAction, resetAnDefaultsAction, type ActionResult } from "./actions";
+import { reorder } from "@/lib/anDefaults";
 
 // 分析模組預設順序的後台面板。
 //
-// 為什麼用 ↑ ↓ 而不是拖曳：這一頁一次只會動一兩個模組，按鈕不用瞄準、不吃觸控板手感，
-// 也可以直接在 jsdom 測到（拖曳要模擬 dataTransfer，測起來脆）。iframe 那邊的拖曳保持原樣，
-// 那是教練現場快速調整的場合，需求不一樣。
+// 排序有兩種手勢，刻意都留：
+//   拖曳＝主要手段（21 列要把最後一個搬到最前面，按 ↑ 要按二十次）。
+//   ↑↓ ＝差一格的微調，以及拖曳失手時的退路（HTML5 拖曳在觸控裝置上不會動）。
+// 兩者共用 `reorder()`，語意是「插到目標位置」不是「跟目標對調」。
 //
-// ⚠️ 存的是「整串順序」而不是逐列 sortOrder：中途離開不會留下排到一半的資料。
+// ⚠️ 拖曳不自動存檔：拖完先看整體順序，滿意再按一次儲存。
+//    每拖一下就寫 DB 等於把排到一半的中間狀態推給全公司教練。
 
 export type BoardRow = { k: string; t: string; cond?: string; hidden: boolean };
 
@@ -22,6 +25,9 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // from＝正在拖的那一列；over＝游標目前壓在哪一列（畫插入線用）
+  const [from, setFrom] = useState<number | null>(null);
+  const [over, setOver] = useState<number | null>(null);
 
   const run = (fn: () => Promise<ActionResult>, okMsg: string, after?: () => void) =>
     start(async () => {
@@ -30,18 +36,22 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
       else { setErr(r.error); setMsg(null); }
     });
 
-  const move = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= list.length) return;
-    const next = list.slice();
-    [next[i], next[j]] = [next[j], next[i]];
+  const apply = (next: BoardRow[]) => {
+    if (next === list) return;
     setList(next); setDirty(true); setMsg(null);
+  };
+
+  const move = (i: number, dir: -1 | 1) => apply(reorder(list, i, i + dir));
+
+  const drop = (to: number) => {
+    if (from !== null) apply(reorder(list, from, to));
+    setFrom(null); setOver(null);
   };
 
   const toggle = (i: number) => {
     const next = list.slice();
     next[i] = { ...next[i], hidden: !next[i].hidden };
-    setList(next); setDirty(true); setMsg(null);
+    apply(next);
   };
 
   const save = () =>
@@ -71,6 +81,7 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
       </div>
       <p className="text-xs text-[#6f869c] mb-4 leading-relaxed">
         這是全平台教練<b className="text-[#a9bccf]">打開任何客戶分析頁時的起手順序</b>。
+        <b className="text-[#a9bccf]">整列可以直接拖曳</b>，要差一格再用右邊的 ↑↓。
         教練現場仍可自己拖曳、隱藏——那份偏好記在他自己的電腦、逐客戶各自記憶，
         <b className="text-[#e0bd8b]">這裡改了不會回頭覆蓋他已經調過的客戶</b>；
         他按分析頁上的「恢復預設」，才會重新吃這一份。
@@ -80,32 +91,51 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
       {(msg || err) && <p className={`text-sm mb-3 ${err ? "text-[#ff9b9b]" : "text-[#8fc0a3]"}`}>{err ?? msg}</p>}
 
       <ol className="mb-4">
-        {list.map((r, i) => (
-          <li
-            key={r.k}
-            data-k={r.k}
-            className={
-              "flex items-center gap-3 px-3 py-2 border-b border-white/8 " + (r.hidden ? "opacity-45" : "")
-            }
-          >
-            <span className="w-6 text-right text-xs text-[#6f869c] tabular-nums">{i + 1}</span>
-            <span className="flex-1 min-w-0">
-              <span className="text-sm">{r.t}</span>
-              {r.cond && <span className="ml-2 text-[11px] text-[#6f869c]">（{r.cond}）</span>}
-              {r.hidden && <span className="ml-2 text-[11px] text-[#e0bd8b]">預設收起</span>}
-            </span>
-            <button className={btn} onClick={() => move(i, -1)} disabled={i === 0 || pending} title="往上">↑</button>
-            <button className={btn} onClick={() => move(i, 1)} disabled={i === list.length - 1 || pending} title="往下">↓</button>
-            <button
-              className={btn + " w-24"}
-              onClick={() => toggle(i)}
-              disabled={pending}
-              title={r.hidden ? "改成預設顯示" : "改成預設收起"}
+        {list.map((r, i) => {
+          // 插入線畫在「往上拖就畫上緣、往下拖就畫下緣」，才看得出來會落在哪
+          const marker =
+            over === i && from !== null && from !== i
+              ? from > i
+                ? "border-t-2 border-t-[#c99a5b]"
+                : "border-b-2 border-b-[#c99a5b]"
+              : "";
+          return (
+            <li
+              key={r.k}
+              data-k={r.k}
+              draggable={!pending}
+              onDragStart={(e) => { setFrom(i); e.dataTransfer.effectAllowed = "move"; }}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOver(i); }}
+              onDragLeave={() => setOver((o) => (o === i ? null : o))}
+              onDrop={(e) => { e.preventDefault(); drop(i); }}
+              onDragEnd={() => { setFrom(null); setOver(null); }}
+              className={
+                "flex items-center gap-3 px-3 py-2 border-b border-white/8 cursor-grab active:cursor-grabbing " +
+                (r.hidden ? "opacity-45 " : "") +
+                (from === i ? "bg-[#17406a] " : "") +
+                marker
+              }
             >
-              {r.hidden ? "預設收起" : "預設顯示"}
-            </button>
-          </li>
-        ))}
+              <span className="text-[#4d6480] select-none" aria-hidden title="拖曳可調整順序">⋮⋮</span>
+              <span className="w-6 text-right text-xs text-[#6f869c] tabular-nums">{i + 1}</span>
+              <span className="flex-1 min-w-0">
+                <span className="text-sm">{r.t}</span>
+                {r.cond && <span className="ml-2 text-[11px] text-[#6f869c]">（{r.cond}）</span>}
+                {r.hidden && <span className="ml-2 text-[11px] text-[#e0bd8b]">預設收起</span>}
+              </span>
+              <button className={btn} onClick={() => move(i, -1)} disabled={i === 0 || pending} title="往上一格">↑</button>
+              <button className={btn} onClick={() => move(i, 1)} disabled={i === list.length - 1 || pending} title="往下一格">↓</button>
+              <button
+                className={btn + " w-24"}
+                onClick={() => toggle(i)}
+                disabled={pending}
+                title={r.hidden ? "改成預設顯示" : "改成預設收起"}
+              >
+                {r.hidden ? "預設收起" : "預設顯示"}
+              </button>
+            </li>
+          );
+        })}
       </ol>
 
       <div className="flex items-center gap-3 flex-wrap">

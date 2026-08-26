@@ -8,7 +8,7 @@ vi.mock("next/cache", () => ({
   updateTag: () => {},
 }));
 
-import { mergeAnDefaults, builtinAnDefaults, anBoardRows } from "./anDefaults";
+import { mergeAnDefaults, builtinAnDefaults, anBoardRows, reorder } from "./anDefaults";
 import { AN_MODULE_KEYS } from "./analysisModules";
 
 describe("後台預設的合併語意", () => {
@@ -82,5 +82,47 @@ describe("後台面板的列", () => {
     const rows = anBoardRows(builtinAnDefaults());
     expect(rows.find((r) => r.k === "biz")?.cond).toBeTruthy();
     expect(rows.find((r) => r.k === "property")?.cond).toBeTruthy();
+  });
+});
+
+describe("reorder：拖曳與 ↑↓ 共用的搬移語意", () => {
+  const L = ["a", "b", "c", "d", "e"];
+
+  it("往前搬＝插到目標位置（不是對調）", () => {
+    expect(reorder(L, 3, 1)).toEqual(["a", "d", "b", "c", "e"]);
+  });
+
+  it("往後搬也是插入，目標之後的整段往前遞補", () => {
+    expect(reorder(L, 1, 3)).toEqual(["a", "c", "d", "b", "e"]);
+  });
+
+  it("相鄰對調＝↑↓ 的行為", () => {
+    expect(reorder(L, 2, 1)).toEqual(["a", "c", "b", "d", "e"]);
+    expect(reorder(L, 2, 3)).toEqual(["a", "b", "d", "c", "e"]);
+  });
+
+  it("搬到頭、搬到尾", () => {
+    expect(reorder(L, 4, 0)).toEqual(["e", "a", "b", "c", "d"]);
+    expect(reorder(L, 0, 4)).toEqual(["b", "c", "d", "e", "a"]);
+  });
+
+  it("原地不動或超出範圍：原樣回傳同一個陣列（不會標成 dirty）", () => {
+    expect(reorder(L, 2, 2)).toBe(L);
+    expect(reorder(L, -1, 2)).toBe(L);
+    expect(reorder(L, 0, 5)).toBe(L);   // ↑↓ 在頭尾按下去不該把最後一個搬到最前面
+  });
+
+  it("不動到原陣列", () => {
+    const copy = L.slice();
+    reorder(L, 0, 3);
+    expect(L).toEqual(copy);
+  });
+
+  it("任何一次搬移都不會掉東西或長出東西", () => {
+    for (let f = 0; f < L.length; f++) {
+      for (let t = 0; t < L.length; t++) {
+        expect([...reorder(L, f, t)].sort()).toEqual([...L].sort());
+      }
+    }
   });
 });
