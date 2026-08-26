@@ -104,7 +104,13 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
               key={r.k}
               data-k={r.k}
               draggable={!pending}
-              onDragStart={(e) => { setFrom(i); e.dataTransfer.effectAllowed = "move"; }}
+              onDragStart={(e) => {
+                setFrom(i);
+                e.dataTransfer.effectAllowed = "move";
+                // ⚠️ 一定要 setData：Chrome 沒有它也拖得動，但 Firefox / Safari 會直接不啟動拖曳。
+                // 值本身用不到（順序靠 state 的 from），但這個呼叫不能省。
+                try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* 舊瀏覽器可能擋 */ }
+              }}
               onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOver(i); }}
               onDragLeave={() => setOver((o) => (o === i ? null : o))}
               onDrop={(e) => { e.preventDefault(); drop(i); }}
