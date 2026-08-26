@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import PassportWizard from "@/components/PassportWizard";
+import { currentPassportYear } from "@/lib/passport";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,8 @@ export default async function PublicPassportPage() {
         </p>
       </div>
 
-      <PassportWizard initial={null} mode="public" signedIn={!!userId} />
+      {/* baseYear 由伺服器算（台北時區的今年），見 /portal/passport 的註解。 */}
+      <PassportWizard initial={null} mode="public" signedIn={!!userId} baseYear={currentPassportYear()} />
     </div>
   );
 }

@@ -3,8 +3,8 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
-  computePassport, emptyPassport, BASE_YEAR, ntfmt, wan,
-  type PassportInputs, type LoanResult,
+  computePassport, emptyPassport, passportBaseYear, rollPassportForward, BASE_YEAR, ntfmt, wan,
+  type PassportInputs, type PassportFaces, type LoanResult,
 } from "@/lib/passport";
 import { readDraft, saveDraft, clearDraft, ASSUMED_WORK_START_AGE } from "@/lib/passportDraft";
 import { savePassportAction } from "@/app/portal/passport/actions";
@@ -162,12 +162,18 @@ function Face({
 // mode="public"：官網 /passport，未登入可玩。按存檔＝把草稿存進 sessionStorage 再導去註冊。
 // mode="private"：/portal/passport，登入後的正式頁。restore=true 時才吃草稿（註冊回來那一趟）。
 export default function PassportWizard({
-  initial, mode = "private", restore = false, signedIn = false,
+  initial, mode = "private", restore = false, signedIn = false, baseYear = BASE_YEAR,
 }: {
   initial: PassportInputs | null;
   mode?: "public" | "private";
   restore?: boolean;
   signedIn?: boolean;
+  /**
+   * 「今年」。⚠️ 由 server component 用 `currentPassportYear()` 算好傳進來——
+   * 在這裡直接 `new Date()` 會有 hydration 不一致（跨年那一刻伺服器與瀏覽器差一年）。
+   * 只用在**新建**的護照上；已存檔的護照一律沿用它自己存著的 baseYear。
+   */
+  baseYear?: number;
 }) {
   const isClient = useIsClient();
   const [edited, setEdited] = useState<PassportInputs | null>(null);
@@ -185,21 +191,33 @@ export default function PassportWizard({
     setDraftChecked(true);
     if (mode === "public" || restore) {
       const d = readDraft();
-      if (d) { setEdited(d); setFromDraft(true); }
+      // 草稿是「這一趟剛在官網做的、還沒存檔」的東西 → 蓋今年的章。
+      // ⚠️ 只重蓋草稿，絕不重蓋 initial（那是已存檔的護照，年份必須釘在它做出來的那一年）。
+      if (d) { setEdited({ ...d, baseYear }); setFromDraft(true); }
     }
   }
 
-  const p = edited ?? initial ?? emptyPassport();
+  const p = edited ?? initial ?? emptyPassport(baseYear);
+  // 這份護照的座標年。已存檔的用它自己那個；新建的就是今年。
+  const by = passportBaseYear(p);
+  const stale = by < baseYear;   // 舊年度的護照在新的一年被打開
   const m = useMemo(() => computePassport(p), [p]);
 
-  function set<K extends keyof PassportInputs>(face: K, key: keyof PassportInputs[K], v: number) {
+  function set<K extends keyof PassportFaces>(face: K, key: keyof PassportFaces[K], v: number) {
     setEdited((prev) => {
-      const base = prev ?? initial ?? emptyPassport();
+      const base = prev ?? initial ?? emptyPassport(baseYear);
       return { ...base, [face]: { ...base[face], [key]: v } };
     });
     if (status !== "saving") { setStatus("idle"); setErrMsg(null); }
   }
   const yr = (v: number) => `${v} 年`;
+
+  // 把整份護照往前推到今年。⚠️ 年份與年齡必須一起走——理由與不變量寫在 rollPassportForward()。
+  const rolledAge = rollPassportForward(p, baseYear).retire.curAge;
+  function rollForward() {
+    setEdited(rollPassportForward(p, baseYear));
+    if (status !== "saving") { setStatus("idle"); setErrMsg(null); }
+  }
 
   // 公開頁：不寫任何後端資料。草稿留在瀏覽器，導去註冊（已登入就直接進正式頁），回來再存。
   function goSignUp() {
@@ -245,11 +263,31 @@ export default function PassportWizard({
     <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-32">
       {/* 標頭＋每月應存彙總 */}
       <div className="rounded-2xl bg-gradient-to-br from-[#0d2b45] to-[#12334f] border border-[#c99a5b]/30 p-6 mb-6 text-center">
-        <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-1">MY LIFE PASSPORT · {BASE_YEAR} 年度</div>
+        <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-1">MY LIFE PASSPORT · {by} 年度</div>
         <h1 className="font-serif text-2xl mb-2">{mode === "public" ? "人生護照 · 免費試算" : "我的人生護照"}</h1>
         <div className="text-[#a7bacb] text-sm mb-1">每月應存合計</div>
         <div className="font-serif text-4xl text-[#e0bd8b]">{m.totalMonthlyWan.toFixed(1)} 萬</div>
         <p className="text-[11px] text-[#6f869c] mt-2">拉動下方條件，即時看你每月存這些錢能達成什麼。</p>
+        {/* ⚠️ 護照的年份存在資料裡，跨年不會自己走；「目前年齡」是客戶自己拉的，也不會自己長一歲。
+            **兩半必須一起前進**——只改年齡不改年份（或反過來）算出來的目標歲數反而更錯：
+            2026 年做的護照、購屋填 2036，客戶 30 歲 → 40 歲。
+            隔年他只把年齡改成 31 而年份還停在 2026 → 41 歲，但 2036 其實只剩 9 年，正解是 40。
+            所以做成一顆「一起前進一年」的按鈕，而不是一句提醒；也刻意不自動跑，
+            默默改掉客戶看過的數字比讓他自己按一下糟糕得多。 */}
+        {stale && (
+          <div className="mt-3 mx-auto max-w-lg rounded-lg border border-[#c99a5b]/40 bg-[#c99a5b]/10 px-3 py-2.5 text-[12px] leading-relaxed text-[#e0bd8b]">
+            這份護照是 <b>{by}</b> 年做的，現在是 <b>{baseYear}</b> 年。
+            各項目標填的是<b>西元年份</b>，所以它們沒有跑掉——但你的<b>目前年齡</b>還停在 {p.retire.curAge} 歲。
+            <button
+              type="button"
+              onClick={rollForward}
+              className="ml-2 rounded-md border border-[#c99a5b] px-2.5 py-1 text-[12px] font-semibold text-[#e0bd8b] hover:bg-[#c99a5b] hover:text-[#081a2b]"
+            >
+              更新到 {baseYear} 年（年齡 {p.retire.curAge} → {rolledAge} 歲）
+            </button>
+            <span className="block mt-1 text-[11px] text-[#c9a97a]">按了之後記得再存一次檔。</span>
+          </div>
+        )}
         <button
           type="button"
           onClick={() => setShowAssume((v) => !v)}
@@ -279,9 +317,9 @@ export default function PassportWizard({
         {/* 購房 */}
         <Face icon="🏠" label="購房" monthly={p.house.monthly}
           result={<LoanCard title="房價" icon="🏠" r={m.house} rate={p.house.rate} />}>
-          <Slider label="購買時間" value={p.house.buyYear} min={BASE_YEAR} max={BASE_YEAR + 30} onChange={(v) => set("house", "buyYear", v)} fmt={yr} minLabel={`${BASE_YEAR} 年`} maxLabel={`${BASE_YEAR + 30} 年`} />
+          <Slider label="購買時間" value={p.house.buyYear} min={by} max={by + 30} onChange={(v) => set("house", "buyYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 30} 年`} />
           <Slider label="月存入" value={p.house.monthly} min={0} max={10} step={0.1} onChange={(v) => set("house", "monthly", v)} fmt={(v) => `${v} 萬`} minLabel="0 萬" maxLabel="10 萬" />
-          <Slider label="月存入起始年" value={p.house.startYear} min={BASE_YEAR - 20} max={BASE_YEAR + 10} onChange={(v) => set("house", "startYear", v)} fmt={yr} minLabel={`${BASE_YEAR - 20}`} maxLabel={`${BASE_YEAR + 10}`} />
+          <Slider label="月存入起始年" value={p.house.startYear} min={by - 20} max={by + 10} onChange={(v) => set("house", "startYear", v)} fmt={yr} minLabel={`${by - 20}`} maxLabel={`${by + 10}`} />
           <Slider label="年報酬" value={p.house.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("house", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
           <Slider label="貸款成數" value={p.house.loanRatio} min={1} max={9} onChange={(v) => set("house", "loanRatio", v)} fmt={(v) => `${v} 成`} minLabel="1 成" maxLabel="9 成" />
           <Slider label="貸款年期" value={p.house.loanYears} min={5} max={40} onChange={(v) => set("house", "loanYears", v)} fmt={(v) => `${v} 年`} minLabel="5 年" maxLabel="40 年" />
@@ -290,9 +328,9 @@ export default function PassportWizard({
         {/* 購車 */}
         <Face icon="🚗" label="購車" monthly={p.car.monthly}
           result={<LoanCard title="車價" icon="🚗" r={m.car} rate={p.car.rate} />}>
-          <Slider label="購買時間" value={p.car.buyYear} min={BASE_YEAR} max={BASE_YEAR + 20} onChange={(v) => set("car", "buyYear", v)} fmt={yr} minLabel={`${BASE_YEAR} 年`} maxLabel={`${BASE_YEAR + 20} 年`} />
+          <Slider label="購買時間" value={p.car.buyYear} min={by} max={by + 20} onChange={(v) => set("car", "buyYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 20} 年`} />
           <Slider label="月存入" value={p.car.monthly} min={0} max={10} step={0.1} onChange={(v) => set("car", "monthly", v)} fmt={(v) => `${v} 萬`} minLabel="0 萬" maxLabel="10 萬" />
-          <Slider label="月存入起始年" value={p.car.startYear} min={BASE_YEAR - 20} max={BASE_YEAR + 10} onChange={(v) => set("car", "startYear", v)} fmt={yr} minLabel={`${BASE_YEAR - 20}`} maxLabel={`${BASE_YEAR + 10}`} />
+          <Slider label="月存入起始年" value={p.car.startYear} min={by - 20} max={by + 10} onChange={(v) => set("car", "startYear", v)} fmt={yr} minLabel={`${by - 20}`} maxLabel={`${by + 10}`} />
           <Slider label="年報酬" value={p.car.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("car", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
           <Slider label="貸款成數" value={p.car.loanRatio} min={1} max={9} onChange={(v) => set("car", "loanRatio", v)} fmt={(v) => `${v} 成`} minLabel="1 成" maxLabel="9 成" />
           <Slider label="貸款年期" value={p.car.loanYears} min={1} max={10} onChange={(v) => set("car", "loanYears", v)} fmt={(v) => `${v} 年`} minLabel="1 年" maxLabel="10 年" />
@@ -332,9 +370,9 @@ export default function PassportWizard({
               <div className="text-[11px] text-[#6f869c] mt-2">扶養至 {m.support.raiseToAge} 歲 / 學費上漲率 {p.support.tuitionGrowth}%</div>
             </div>
           }>
-          <Slider label="預計出生年份" value={p.support.birthYear} min={BASE_YEAR} max={BASE_YEAR + 30} onChange={(v) => set("support", "birthYear", v)} fmt={yr} minLabel={`${BASE_YEAR} 年`} maxLabel={`${BASE_YEAR + 30} 年`} />
+          <Slider label="預計出生年份" value={p.support.birthYear} min={by} max={by + 30} onChange={(v) => set("support", "birthYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 30} 年`} />
           <Slider label="月存入" value={p.support.monthly} min={0} max={10} step={0.1} onChange={(v) => set("support", "monthly", v)} fmt={(v) => `${v} 萬`} minLabel="0 萬" maxLabel="10 萬" />
-          <Slider label="月存入起始年" value={p.support.startYear} min={BASE_YEAR - 20} max={BASE_YEAR + 10} onChange={(v) => set("support", "startYear", v)} fmt={yr} minLabel={`${BASE_YEAR - 20}`} maxLabel={`${BASE_YEAR + 10}`} />
+          <Slider label="月存入起始年" value={p.support.startYear} min={by - 20} max={by + 10} onChange={(v) => set("support", "startYear", v)} fmt={yr} minLabel={`${by - 20}`} maxLabel={`${by + 10}`} />
           <Slider label="年報酬" value={p.support.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("support", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
           <Slider label="扶養到幾歲" value={p.support.raiseToAge} min={18} max={30} onChange={(v) => set("support", "raiseToAge", v)} fmt={(v) => `${v} 歲`} minLabel="18 歲" maxLabel="30 歲" />
         </Face>
@@ -349,9 +387,9 @@ export default function PassportWizard({
               <div className="text-[11px] text-[#6f869c] mt-2">月存 {ntfmt(m.travel.monthly * 10000)} 元 / 年報酬 {p.travel.annualReturn}%</div>
             </div>
           }>
-          <Slider label="旅遊時間" value={p.travel.travelYear} min={BASE_YEAR} max={BASE_YEAR + 15} onChange={(v) => set("travel", "travelYear", v)} fmt={yr} minLabel={`${BASE_YEAR} 年`} maxLabel={`${BASE_YEAR + 15} 年`} />
+          <Slider label="旅遊時間" value={p.travel.travelYear} min={by} max={by + 15} onChange={(v) => set("travel", "travelYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 15} 年`} />
           <Slider label="月存入" value={p.travel.monthly} min={0.1} max={10} step={0.1} onChange={(v) => set("travel", "monthly", v)} fmt={(v) => `${v} 萬`} minLabel="0.1 萬" maxLabel="10 萬" />
-          <Slider label="月存入起始年" value={p.travel.startYear} min={BASE_YEAR - 20} max={BASE_YEAR + 10} onChange={(v) => set("travel", "startYear", v)} fmt={yr} minLabel={`${BASE_YEAR - 20}`} maxLabel={`${BASE_YEAR + 10}`} />
+          <Slider label="月存入起始年" value={p.travel.startYear} min={by - 20} max={by + 10} onChange={(v) => set("travel", "startYear", v)} fmt={yr} minLabel={`${by - 20}`} maxLabel={`${by + 10}`} />
           <Slider label="年報酬" value={p.travel.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("travel", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
         </Face>
       </div>

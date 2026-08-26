@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildCase } from "./clientPlan";
-import { emptyPassport, computePassport, BASE_YEAR } from "./passport";
+import { emptyPassport, computePassport, rollPassportForward, BASE_YEAR } from "./passport";
 import * as EngineExports from "./engine";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,6 +93,66 @@ describe("buildCase：passport → case 的量綱", () => {
     it("購屋的 start 與 end 一致（一次性支出）", () => {
       const g = c.goals.find((x: { type: string }) => x.type === "購屋");
       expect(g.start).toBe(g.end);
+    });
+
+    /**
+     * ⚠️ 「現在是哪一年」存在護照自己的 baseYear 裡，不讀時鐘也不吃常數——
+     * 這樣 2026 年做的護照永遠用 2026 的座標、2027 年做的自動用 2027，
+     * 沒有人需要每年去改一行常數（而且測試不會 12 月綠、1 月紅）。
+     */
+    it("2027 年做的護照用 2027 當現在，同一個目標年會少算一年", () => {
+      const p27 = emptyPassport(BASE_YEAR + 1);
+      // 目標年拉回跟 2026 那份一樣，只有 baseYear 不同
+      const same = { ...p27, house: { ...p27.house, buyYear: p.house.buyYear } };
+      const c27 = buildCase(same, "2027 年做的");
+      const g = c27.goals.find((x: { type: string }) => x.type === "購屋");
+      expect(g.start).toBe(c27.profile.age + (p.house.buyYear - (BASE_YEAR + 1)));
+      expect(g.start).toBe(base.house! - 1);
+    });
+
+    it("舊護照（存檔時還沒有 baseYear 這個欄位）fallback 到 2026，數字一位不動", () => {
+      const legacy = { ...p } as Record<string, unknown>;
+      delete legacy.baseYear;
+      const cl = buildCase(legacy as typeof p, "舊資料");
+      expect(cl.goals.find((x: { type: string }) => x.type === "購屋").start).toBe(base.house);
+      expect(cl.goals.find((x: { type: string }) => x.type === "購車").start).toBe(base.car);
+      expect(cl.travel[0].start).toBe(base.travel);
+    });
+
+    it("emptyPassport 會把年份蓋在護照上（不是靠常數推回來）", () => {
+      expect(emptyPassport().baseYear).toBe(BASE_YEAR);
+      expect(emptyPassport(2030).baseYear).toBe(2030);
+    });
+
+    /**
+     * ⚠️⚠️ 這是整套「年份」設計的不變量：
+     * 跨年之後把護照往前推（baseYear 與 curAge **一起** +1），
+     * 每一個目標算出來的歲數必須**一位不動**——因為目標填的是西元年，
+     * 客戶老一歲、目標也近一年，兩件事互相抵銷。
+     * 只推一半（只改年齡、或只改年份）就會偏一年，而且不會報錯。
+     */
+    it("往前推一年：目標歲數一位不動（年齡＋1、目標近一年，互相抵銷）", () => {
+      const rolled = rollPassportForward(p, BASE_YEAR + 1);
+      expect(rolled.baseYear).toBe(BASE_YEAR + 1);
+      expect(rolled.retire.curAge).toBe(p.retire.curAge + 1);
+      expect(at(rolled)).toEqual(base);
+    });
+
+    it("往前推五年：還在未來的目標一位不動，已經過去的目標夾到「現在」", () => {
+      const r5 = rollPassportForward(p, BASE_YEAR + 5);
+      const got = at(r5);
+      // 購屋 2036 在 2031 年還是未來 → 歲數不變
+      expect(got.house).toBe(base.house);
+      // 旅遊 2028 到 2031 已經過去了 → 夾到「現在」＝當時的年齡，而不是排到過去
+      expect(p.travel.travelYear).toBeLessThan(BASE_YEAR + 5);
+      expect(got.travel).toBe(r5.retire.curAge);
+    });
+
+    it("⚠️ 只推一半就會偏一年（這就是為什麼不做成一句提醒）", () => {
+      const onlyAge = { ...p, retire: { ...p.retire, curAge: p.retire.curAge + 1 } };
+      expect(at(onlyAge).house).toBe(base.house! + 1);          // 只改年齡 → 晚一年
+      const onlyYear = { ...p, baseYear: BASE_YEAR + 1 };
+      expect(at(onlyYear).house).toBe(base.house! - 1);         // 只改年份 → 早一年
     });
   });
 

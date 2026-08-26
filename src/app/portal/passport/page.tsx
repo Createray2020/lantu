@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ensureClientUser } from "@/lib/clientUser";
 import { getClientOwnPlan } from "@/lib/clientPlan";
 import PassportWizard from "@/components/PassportWizard";
+import { currentPassportYear } from "@/lib/passport";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,9 @@ export default async function PassportPage({
   const own = await getClientOwnPlan(user.id);
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
-      <PassportWizard initial={own?.passport ?? null} mode="private" restore={sp.restore === "1"} />
+      {/* baseYear 由伺服器算（台北時區的今年）——在 client component 讀時鐘會有跨年的 hydration 不一致。
+          只用在「新建」的護照上；已存檔的護照沿用它自己存著的 baseYear。 */}
+      <PassportWizard initial={own?.passport ?? null} mode="private" restore={sp.restore === "1"} baseYear={currentPassportYear()} />
     </div>
   );
 }

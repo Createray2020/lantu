@@ -3,7 +3,7 @@ import {
   normalizeHero, heroToPassport, heroResult, parseDraft,
   HERO_DEFAULT, ASSUMED_WORK_START_AGE,
 } from "./passportDraft";
-import { computePassport, emptyPassport } from "./passport";
+import { computePassport, emptyPassport, BASE_YEAR } from "./passport";
 
 /**
  * 官網公開試算的草稿層。
@@ -27,6 +27,20 @@ describe("normalizeHero：邊界", () => {
     expect(h.curAge).toBe(20);
     expect(h.retireAge).toBe(100);
     expect(h.monthlySave).toBe(0);
+  });
+});
+
+describe("草稿要把護照的年份一起帶著走", () => {
+  it("heroToPassport 蓋上傳進來的年份（沒傳就是 BASE_YEAR）", () => {
+    const h = { curAge: 30, retireAge: 65, monthlySave: 1, salary: 5 };
+    expect(heroToPassport(h).baseYear).toBe(BASE_YEAR);
+    expect(heroToPassport(h, 2031).baseYear).toBe(2031);
+  });
+
+  it("parseDraft 不會把 baseYear 吃掉（吃掉的話草稿存回來就變成舊年度）", () => {
+    const inputs = heroToPassport({ curAge: 30, retireAge: 65, monthlySave: 1, salary: 5 }, 2031);
+    const back = parseDraft(JSON.stringify({ inputs }));
+    expect(back?.baseYear).toBe(2031);
   });
 });
 

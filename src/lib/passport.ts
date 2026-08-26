@@ -4,7 +4,35 @@
 
 import { fmtMoney0, fmtWan } from "@/lib/money";
 
+/**
+ * ⚠️ 這**不是**「今年」，是**舊護照的 fallback 年份**。
+ *
+ * 2026/08/26 起每一份新護照都會把自己的 `baseYear` 存進 `PassportInputs`
+ * （見 `emptyPassport()` 與 `passportBaseYear()`），所以這個常數只服務
+ * 那之前存下、沒有 `baseYear` 的舊資料。
+ * **它應該永遠停在 2026，不要每年來改它**——改了會讓所有舊護照的目標年份整批位移。
+ */
 export const BASE_YEAR = 2026;
+
+/**
+ * 今年（台北時區）。**全站唯一會讀時鐘的地方。**
+ *
+ * ⚠️ 只給 server component 呼叫，然後把值當 prop 傳給護照精靈。
+ *   在 client component 直接呼叫會有 hydration 不一致的風險：
+ *   跨年那一刻伺服器（UTC）與瀏覽器（UTC+8）算出來的年份會差一年。
+ */
+export function currentPassportYear(now: Date = new Date(), timeZone = "Asia/Taipei"): number {
+  return Number(new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric" }).format(now));
+}
+
+/**
+ * 這份護照是「哪一年做的」——所有「幾年後」的換算都以它為原點。
+ * 舊資料（沒有 baseYear）回 `BASE_YEAR`，數字才不會因為改版而位移。
+ */
+export function passportBaseYear(p: { baseYear?: number } | null | undefined): number {
+  const y = Number(p?.baseYear);
+  return Number.isFinite(y) && y >= 1900 && y <= 2200 ? Math.round(y) : BASE_YEAR;
+}
 
 // ---------- 財務基本函式 ----------
 const iMonthly = (annualPct: number) => annualPct / 100 / 12;
@@ -65,9 +93,18 @@ export type TravelInputs = {
   travelYear: number; monthly: number; startYear: number; annualReturn: number;
 };
 
-export type PassportInputs = {
+/** 五個面向本身。拆開來是為了讓「面向」與「這份護照的年份」在型別上分得清楚。 */
+export type PassportFaces = {
   house: HouseInputs; car: CarInputs; retire: RetireInputs;
   support: SupportInputs; travel: TravelInputs;
+};
+export type PassportInputs = PassportFaces & {
+  /**
+   * 這份護照是哪一年做的。**存在資料裡、不讀時鐘、不吃常數**——
+   * 這樣 2026 年做的護照永遠用 2026 的座標，2027 年做的自動用 2027，
+   * 沒有人需要每年去改一行常數。舊資料沒有這一欄，一律 fallback 到 BASE_YEAR。
+   */
+  baseYear?: number;
 };
 
 // ---------- 型別（各面向結果） ----------
@@ -95,11 +132,34 @@ export type PassportResult = {
 // ---------- 預設輸入 ----------
 export function emptyPassport(baseYear = BASE_YEAR): PassportInputs {
   return {
+    baseYear,
     house: { buyYear: baseYear + 10, monthly: 3, startYear: baseYear, annualReturn: 3, loanRatio: 7, loanYears: 20, graceMonths: 36, rate: 2 },
     car: { buyYear: baseYear + 5, monthly: 1, startYear: baseYear, annualReturn: 3, loanRatio: 7, loanYears: 5, graceMonths: 0, rate: 2 },
     retire: { curAge: 30, retireAge: 65, monthly: 0.5, startYear: baseYear, salary: 3, workYears: 35, annualReturn: 3, lifeExp: 85, contribRate: 6 },
     support: { birthYear: baseYear + 6, monthly: 1, startYear: baseYear, annualReturn: 3, raiseToAge: 22, annualCost: 150000, tuitionGrowth: 3 },
     travel: { travelYear: baseYear + 2, monthly: 1, startYear: baseYear, annualReturn: 3 },
+  };
+}
+
+/**
+ * 把一份護照往前推到 `toYear`（跨年之後客戶在畫面上按「更新到今年」時走這條）。
+ *
+ * ⚠️⚠️ `baseYear` 與 `retire.curAge` **必須一起走**，缺一個都會讓目標歲數算錯：
+ *   2026 年做的護照、購屋填 2036、客戶 30 歲 → 40 歲。
+ *   隔年只把年齡改成 31、年份還停在 2026 → 41 歲；但 2036 其實只剩 9 年，正解仍是 40。
+ *   反過來只把年份推到 2027、年齡不動 → 39 歲，一樣錯。
+ *
+ * 目標年份（buyYear／birthYear／travelYear）與 startYear 都是**西元年**，本來就不該動。
+ * `toYear` 不比現有的 baseYear 新就原樣回傳（不倒退）。
+ */
+export function rollPassportForward(p: PassportInputs, toYear: number): PassportInputs {
+  const from = passportBaseYear(p);
+  const years = Math.round(toYear) - from;
+  if (!Number.isFinite(years) || years <= 0) return p;
+  return {
+    ...p,
+    baseYear: Math.round(toYear),
+    retire: { ...p.retire, curAge: Math.min(100, num(p.retire.curAge) + years) },
   };
 }
 
@@ -178,7 +238,7 @@ export function computePassport(p: PassportInputs): PassportResult {
   return { house, car, retire, support, travel, totalMonthlyWan };
 }
 
-export const FACES: { key: keyof PassportInputs; label: string; icon: string }[] = [
+export const FACES: { key: keyof PassportFaces; label: string; icon: string }[] = [
   { key: "house", label: "購房", icon: "🏠" },
   { key: "car", label: "購車", icon: "🚗" },
   { key: "retire", label: "退休", icon: "🌴" },

@@ -4,7 +4,7 @@ import { and, eq, asc, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
 import { newCase } from "@/lib/engine";
-import { computePassport, BASE_YEAR, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
+import { computePassport, passportBaseYear, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
 import { normalizeIntent, DEFAULT_TARGET, type Intent } from "@/lib/intent";
 // 客戶端寫 plan.data 時也必須重算快照。舊版只 set({data})，教練列表上的階段/淨值會一直停在
 // 客戶「上次由教練存檔」時的舊值（實測正式庫有一筆淨值差 500 萬）。
@@ -22,8 +22,9 @@ const num = (v: unknown): number => {
 /**
  * 人生護照的「目標年份」→「本人幾歲時發生」。
  *
- * ⚠️⚠️ 這裡的「現在」是 **BASE_YEAR**，不是各面向的 `startYear`。
- *   `startYear` 是**月存入起始年**（護照那根滑桿可以拉到 BASE_YEAR−20，也就是二十年前就開始存），
+ * ⚠️⚠️ 這裡的「現在」是**這份護照自己的 `baseYear`**（做這份護照的那一年），
+ *   不是各面向的 `startYear`。
+ *   `startYear` 是**月存入起始年**（護照那根滑桿可以拉到 baseYear−20，也就是二十年前就開始存），
  *   它回答的是「存了幾年」，不是「距離現在幾年」。
  *   舊版房／車／旅遊三面向都拿 `goalYear − startYear` 當「幾年後」：
  *     · startYear 在過去（例：2006）→ 目標被排到晚二十年
@@ -31,10 +32,14 @@ const num = (v: unknown): number => {
  *   而且完全不會報錯——只有把客戶說的年份跟畫面上的歲數對一遍才看得出來。
  *   `computePassport()` 裡用 `goalYear − startYear` 算複利年數是**對的**，不要一起改。
  *
- * 目標年早於 BASE_YEAR（更早的年度做的護照）夾到 0 ＝ 現在就發生。
+ * ⚠️ 為什麼吃存在資料裡的 baseYear 而不是讀時鐘：`curAge` 是客戶自己拉的滑桿，
+ *   **不會自己長一歲**。年份自動前進、年齡停在原地的話，一位客戶隔年什麼都沒改就按存檔，
+ *   他的購屋會從 40 歲跳到 39 歲。兩半必須來自同一個時間點才會一致。
+ *
+ * 目標年早於 baseYear（護照做完之後又把目標往回拉）夾到 0 ＝ 現在就發生。
  */
-function ageAtYear(goalYear: unknown, curAge: number): number {
-  return curAge + Math.max(0, Math.round(num(goalYear)) - BASE_YEAR);
+function ageAtYear(goalYear: unknown, curAge: number, baseYear: number): number {
+  return curAge + Math.max(0, Math.round(num(goalYear)) - baseYear);
 }
 
 // 由五面向（能力分析）組出一份 v12 case：profile／goals／education／travel／retire 給合理值，
@@ -45,6 +50,7 @@ export function buildCase(p: PassportInputs, name: string): any {
   const r: PassportResult = computePassport(p);
   const c: any = newCase();
   const age = num(p.retire.curAge) || num(c.profile.age) || 35;
+  const by = passportBaseYear(p);   // 這份護照的「現在是哪一年」
   c.profile.name = name || "我的規劃";
   c.profile.age = age;
   c.profile.retireAge = num(p.retire.retireAge) || 65;
@@ -60,16 +66,16 @@ export function buildCase(p: PassportInputs, name: string): any {
 
   c.goals = [];
   if (r.house.price > 0)
-    c.goals.push({ name: "購屋", type: "購屋", present: Math.round(r.house.price), minPresent: Math.round(r.house.price), start: ageAtYear(p.house.buyYear, age), end: ageAtYear(p.house.buyYear, age), freq: 0, growth: "固定", appreciation: 0, loanRatio: num(p.house.loanRatio) * 10, imp: 4, prepared: 0 });
+    c.goals.push({ name: "購屋", type: "購屋", present: Math.round(r.house.price), minPresent: Math.round(r.house.price), start: ageAtYear(p.house.buyYear, age, by), end: ageAtYear(p.house.buyYear, age, by), freq: 0, growth: "固定", appreciation: 0, loanRatio: num(p.house.loanRatio) * 10, imp: 4, prepared: 0 });
   if (r.car.price > 0)
-    c.goals.push({ name: "購車", type: "購車", present: Math.round(r.car.price), minPresent: Math.round(r.car.price), start: ageAtYear(p.car.buyYear, age), end: ageAtYear(p.car.buyYear, age), freq: 0, growth: "固定", appreciation: 0, loanRatio: 0, imp: 3, prepared: 0 });
+    c.goals.push({ name: "購車", type: "購車", present: Math.round(r.car.price), minPresent: Math.round(r.car.price), start: ageAtYear(p.car.buyYear, age, by), end: ageAtYear(p.car.buyYear, age, by), freq: 0, growth: "固定", appreciation: 0, loanRatio: 0, imp: 3, prepared: 0 });
 
   c.travel = [];
   if (r.travel.fund > 0) {
     // travel.fund 是「存到旅遊那一年會累積到的一筆基金」＝一次性支出。
     // 舊版寫成 start=age, end=age+20, freq=1，被 lifestyleFactor 當成「每年花、連花 21 年」，
     // 生涯累計金額直接放大 21 倍。改成只在目標年度發生一次。
-    const travelAge = ageAtYear(p.travel.travelYear, age);
+    const travelAge = ageAtYear(p.travel.travelYear, age, by);
     c.travel.push({ cat: "綜合", sub: "旅遊", start: travelAge, end: travelAge, freq: 1, amount: Math.round(r.travel.fund), minAmount: Math.round(r.travel.fund), imp: 3 });
   }
 
@@ -93,7 +99,7 @@ export function buildCase(p: PassportInputs, name: string): any {
     //    教練端一打開就有整套推算；已經出生（或今年）→ 維持原本那一列 education。
     //
     //    「幾年後」一律走 ageAtYear() 的同一套換算（見該函式的註解）。
-    const bornIn = ageAtYear(p.support.birthYear, 0);
+    const bornIn = ageAtYear(p.support.birthYear, 0, by);
     if (bornIn > 0) {
       const bid = `pb${Math.round(num(p.support.birthYear))}`;
       c.members = c.members || [];
