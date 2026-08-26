@@ -36,8 +36,64 @@ describe("buildCase：passport → case 的量綱", () => {
   });
 
   it("旅遊發生在使用者設定的那一年", () => {
-    const yearsOut = p.travel.travelYear - p.travel.startYear;
-    expect(c.travel[0].start).toBe(c.profile.age + yearsOut);
+    expect(c.travel[0].start).toBe(c.profile.age + (p.travel.travelYear - BASE_YEAR));
+  });
+
+  /**
+   * ⚠️ 2026/08/26 修掉的一個不會報錯的算錯：
+   * 房／車／旅遊三面向原本拿「目標年 − 月存入起始年」當「幾年後」。
+   * 但 startYear 是**月存入起始年**（滑桿可拉到 BASE_YEAR−20），它回答的是「存了幾年」，
+   * 不是「距離現在幾年」——正解一律是「目標年 − BASE_YEAR」。
+   * 這一組測試把三個面向都釘住：**改 startYear 不可以動到任何目標的年份。**
+   */
+  describe("目標年份只看目標年，與「月存入起始年」無關", () => {
+    const at = (inp: typeof p) => {
+      const cc = buildCase(inp, "x");
+      return {
+        house: cc.goals.find((g: { type: string }) => g.type === "購屋")?.start,
+        car: cc.goals.find((g: { type: string }) => g.type === "購車")?.start,
+        travel: cc.travel[0]?.start,
+      };
+    };
+    const base = at(p);
+
+    it("月存入起始年在過去（十年前就開始存）→ 目標年份一位不動", () => {
+      const past = {
+        ...p,
+        house: { ...p.house, startYear: BASE_YEAR - 10 },
+        car: { ...p.car, startYear: BASE_YEAR - 10 },
+        travel: { ...p.travel, startYear: BASE_YEAR - 10 },
+      };
+      expect(at(past)).toEqual(base);
+    });
+
+    it("月存入起始年在未來（明年才開始存）→ 目標年份一位不動（金額會變小，年份不該變）", () => {
+      // 旅遊的預設目標年只有 BASE_YEAR+2，起始年再往後就存不到錢、那一列不會長出來
+      const future = {
+        ...p,
+        house: { ...p.house, startYear: BASE_YEAR + 1 },
+        car: { ...p.car, startYear: BASE_YEAR + 1 },
+        travel: { ...p.travel, startYear: BASE_YEAR + 1 },
+      };
+      expect(at(future)).toEqual(base);
+    });
+
+    it("三個面向都等於「現在年齡 ＋（目標年 − BASE_YEAR）」", () => {
+      expect(base.house).toBe(c.profile.age + (p.house.buyYear - BASE_YEAR));
+      expect(base.car).toBe(c.profile.age + (p.car.buyYear - BASE_YEAR));
+      expect(base.travel).toBe(c.profile.age + (p.travel.travelYear - BASE_YEAR));
+    });
+
+    it("目標年早於 BASE_YEAR（更早年度做的護照）夾到「現在」，不會排到過去", () => {
+      // 目標年與存款起始年都往回推，才算得出價格（buyYear < startYear 會存不到錢、價格 0、根本不長那一列）
+      const old = { ...p, house: { ...p.house, buyYear: BASE_YEAR - 5, startYear: BASE_YEAR - 15 } };
+      expect(at(old).house).toBe(c.profile.age);
+    });
+
+    it("購屋的 start 與 end 一致（一次性支出）", () => {
+      const g = c.goals.find((x: { type: string }) => x.type === "購屋");
+      expect(g.start).toBe(g.end);
+    });
   });
 
   // ⚠️ 2026/08/26 起：出生年還在未來 → 不再壓成一列 education，
