@@ -32,7 +32,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const isOwner = access === "owner";
   const collaborators = isOwner ? await listCollaborators(id) : [];
   // 「按了結束但沒存」的草稿。只有主責看得到（協作教練不能開場也不能結束）。
-  const draft = isOwner ? await pendingDraft(id) : null;
+  const draft = isOwner ? await pendingDraft(coach.id, id) : null;
 
   // 只傳前端需要的欄位（不把整份 plan.data jsonb 送到瀏覽器）。
   const client = {

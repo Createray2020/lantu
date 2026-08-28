@@ -156,7 +156,7 @@ export default function TrainingBoard({
       <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4">
         <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-2">外部課程認列</h3>
         <div className="flex flex-wrap items-end gap-2 mb-3">
-          <label className="text-xs text-[#a9bccf]">顧問
+          <label className="text-xs text-[#a9bccf]">教練
             <select value={ext.coachId} onChange={(e) => setExt({ ...ext, coachId: e.target.value })}
               className={`${INPUT} w-32 block mt-0.5`}>
               {peers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -227,7 +227,7 @@ export default function TrainingBoard({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
-                <th className="px-3 py-2">顧問</th>
+                <th className="px-3 py-2">教練</th>
                 <th className="px-3 py-2 text-right">內部研討會</th>
                 <th className="px-3 py-2 text-right">講師加倍</th>
                 <th className="px-3 py-2 text-right">外部（上限內）</th>
@@ -258,7 +258,7 @@ export default function TrainingBoard({
                 </tr>
               ))}
               {hours.length === 0 && (
-                <tr><td colSpan={7} className="px-3 py-6 text-center text-[#6f869c]">尚無顧問。</td></tr>
+                <tr><td colSpan={7} className="px-3 py-6 text-center text-[#6f869c]">尚無教練。</td></tr>
               )}
             </tbody>
           </table>

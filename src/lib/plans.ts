@@ -84,6 +84,13 @@ export async function getPlanForRead(coachId: string, planId: string): Promise<P
 
 // 存回 iframe 編輯的整份案件，同時用引擎重算快照。
 export async function updatePlanData(coachId: string, planId: string, data: unknown): Promise<{ netWorth: number | null; healthGrade: string | null }> {
+  // ⚠️ 形狀先擋，不能讓 undefined 走進去。
+  // Drizzle 對 `data: undefined` 的處理是「這一欄不要寫」，但同一句裡的
+  // healthGrade / netWorth 是照算照寫的 —— 於是 data 保持原樣、快照被 planSnapshot(undefined)
+  // 算成 null，列表上這位客戶的財務階段與淨值當場整欄清空，而畫面沒有任何錯誤。
+  // 後面 logRevision(..., undefined) 撞 plan_revisions.data 的 notNull，
+  // 又被 lib/revisions.ts 的 try/catch 靜默吞掉，連版本歷史都不會留下線索。
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("bad-plan-data");
   const plan = await ownedPlanLite(coachId, planId);
   if (!plan) throw new Error("forbidden");
   const snap = planSnapshot(data);
@@ -145,26 +152,70 @@ export async function clonePlan(coachId: string, planId: string): Promise<string
   return row.id;
 }
 
+/**
+ * 「已經有這一年的版本了」是使用者做得完的事（改年份、或改去編輯既有那一份），
+ * 所以它是回傳值不是例外 —— unique violation 往上丟只會變成 Next 的 digest 亂碼。
+ * 權限不足仍然 throw("forbidden")：那是資料層的邊界，跟其他寫入路徑一致。
+ */
+export type CreatePlanOutcome = { ok: true; planId: string } | { ok: false; error: string };
+
+/** Postgres 23505＝unique_violation。neon-http 把原始錯誤包了一層，兩層都看。 */
+function isUniqueViolation(e: unknown): boolean {
+  const seen = new Set<unknown>();
+  let cur: unknown = e;
+  while (cur && typeof cur === "object" && !seen.has(cur)) {
+    seen.add(cur);
+    const o = cur as { code?: unknown; cause?: unknown };
+    if (o.code === "23505") return true;
+    cur = o.cause;
+  }
+  return /duplicate key value|plans_client_id_year_track_uidx/.test(
+    e instanceof Error ? e.message : String(e),
+  );
+}
+
 // 手動新增一份空白年度版本。
-export async function createPlan(coachId: string, clientId: string, name: string, year?: number): Promise<string> {
+export async function createPlan(coachId: string, clientId: string, name: string, year?: number): Promise<CreatePlanOutcome> {
   if (!(await ownedClientId(coachId, clientId))) throw new Error("forbidden");
-  const y = year ?? new Date().getFullYear();
+  // ⚠️ 預設年份是「教練軌現有最大年 +1」，不是今年。
+  // createClient() 已經替每位新客戶建好一份「今年 + coach 軌」的初版，
+  // 所以舊的 `new Date().getFullYear()` 在最常見的情境（剛建的客戶按一下「新增版本」）
+  // 是**必定**撞上 plans_client_id_year_track_uidx 的。
+  // 這裡與 clonePlan 用同一條規則（同樣只算 coach 軌：客戶的人生護照也掛在同一個
+  // clientId 底下，算進去會讓年度憑空跳一格）。
+  let y = year;
+  if (y === undefined) {
+    const yearsRows = await db
+      .select({ year: plans.year })
+      .from(plans)
+      .where(and(eq(plans.clientId, clientId), eq(plans.track, COACH_TRACK)));
+    y = yearsRows.length
+      ? yearsRows.reduce((m, r) => Math.max(m, r.year), yearsRows[0].year) + 1
+      : new Date().getFullYear();
+  }
   const data = newCaseData(name);
   const snap = planSnapshot(data);
-  const [row] = await db
-    .insert(plans)
-    .values({
-      clientId,
-      year: y,
-      label: `${y} 新版`,
-      status: "draft",
-      basedOnDate: todayISO(),
-      data,
-      healthGrade: snap.healthGrade,
-      netWorth: snap.netWorth,
-    })
-    .returning({ id: plans.id });
-  return row.id;
+  try {
+    const [row] = await db
+      .insert(plans)
+      .values({
+        clientId,
+        year: y,
+        label: `${y} 新版`,
+        status: "draft",
+        basedOnDate: todayISO(),
+        data,
+        healthGrade: snap.healthGrade,
+        netWorth: snap.netWorth,
+      })
+      .returning({ id: plans.id });
+    return { ok: true, planId: row.id };
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      return { ok: false, error: `${y} 年已經有一份版本了，請改用年度重製，或先修改既有那一份的年份。` };
+    }
+    throw e;
+  }
 }
 
 export async function deletePlan(coachId: string, planId: string): Promise<void> {

@@ -12,7 +12,7 @@ export type ActionResult = { ok: true; note?: string } | { ok: false; error: str
 
 const MSG: Record<string, string> = {
   forbidden: "沒有後台權限",
-  "coach-not-found": "找不到顧問",
+  "coach-not-found": "找不到教練",
   "need-reason": "手動調整職級要填異動原因",
 };
 

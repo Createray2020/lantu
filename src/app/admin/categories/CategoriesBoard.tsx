@@ -470,7 +470,7 @@ function EduTable({
       <p className="mb-3 rounded-lg border border-white/10 bg-[#0b2136] px-3 py-2 text-xs leading-relaxed text-[#a9bccf]">
         金額一律「<b className="text-[#e0bd8b]">每學年（1 年）新台幣元</b>」，且是<b className="text-[#e0bd8b]">今日現值</b>——
         學費上漲率由客戶端的「學費上漲率」參數另外套，這裡不要先加通膨。
-        客戶端會依孩子年齡推出所在學段、自動帶入這些數字，顧問仍可逐格覆寫。
+        客戶端會依孩子年齡推出所在學段、自動帶入這些數字，教練仍可逐格覆寫。
         <br />
         政策前提：高中職 112 學年第 2 學期起<b>學費全免</b>（雜費／代辦／餐費仍自付）；私立大專每年補助 3.5 萬，
         <b>碩博士與延修生不適用</b>；公立大專<b>沒有</b>普及性減免。

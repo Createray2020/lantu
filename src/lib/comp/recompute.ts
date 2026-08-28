@@ -39,11 +39,41 @@ export async function recomputeAll(
   ]);
   const advisors = toAdvisorRows(coachRows);
   const cases = toCaseRows(caseRows);
+  const advisorById = new Map(advisors.map((a) => [a.id, a]));
+
+  /**
+   * ⚠️ 職級改了就要同步回記憶體裡的 advisors。
+   *
+   * advisors 是迴圈**開始前**算好的一份快照，而 buildOverview() 每一輪都拿它去解輔導鏈、
+   * 判斷上線夠不夠格帶人。少了這一句，同一次執行中已經晉升的人，對後面每一位的計算
+   * 而言都還停在舊職級 —— 結果會隨著 coaches.created_at 的排序而變，
+   * 而且要再跑第二次才收斂（「手動跑跟排程跑結果不一樣」正是從這裡長出來的）。
+   */
+  const syncRank = (coachId: string, toCode: string | null) => {
+    const a = advisorById.get(coachId);
+    if (a) a.rankCode = toCode;
+  };
 
   const out: RecomputeResult = {
     evaluated: 0, promoted: [], settled: [], atRisk: [], pendingReview: [],
   };
-  const maintRows = [];
+
+  /**
+   * ⚠️ 維持資格快照**分批**寫，不是整段跑完寫一次。
+   *
+   * 這支同時掛在 /api/cron/comp-recompute 底下，而那條路由的 maxDuration 是 60 秒。
+   * 舊版把全部人的快照存在記憶體裡、迴圈結束才 saveMaintenance() 一次 ——
+   * 逾時就是「一個人的快照都沒寫進去」，而職級卻已經在迴圈裡改掉了一半。
+   * 分批之後，逾時最多只掉最後那不到 20 位，而且重跑一次就補齊
+   *（saveMaintenance 是 onConflictDoUpdate，重跑不會疊列）。
+   */
+  const MAINT_CHUNK = 20;
+  let maintRows: Parameters<typeof saveMaintenance>[0] = [];
+  const flushMaint = async () => {
+    if (!maintRows.length) return;
+    await saveMaintenance(maintRows);
+    maintRows = [];
+  };
 
   for (const c of coachRows) {
     if (c.status !== "active") continue;
@@ -69,6 +99,7 @@ export async function recomputeAll(
       exempt: ov.maintenance.exempt,
       exemptReason: ov.maintenance.exemptReason ?? null,
     });
+    if (maintRows.length >= MAINT_CHUNK) await flushMaint();
     if (!ov.maintenance.pass) {
       out.atRisk.push({
         coachId: c.id, name,
@@ -83,6 +114,7 @@ export async function recomputeAll(
         c.id, ov.tenure.settledCode, "tenure", operatorId,
         ov.tenure.note ?? `真除期滿轉正為 ${ov.tenure.settledCode}`,
       );
+      syncRank(c.id, ov.tenure.settledCode);
       await db.update(coaches).set({ tenureRankCode: null, tenureUntil: null })
         .where(eq(coaches.id, c.id));
       out.settled.push({
@@ -104,11 +136,15 @@ export async function recomputeAll(
         out.promoted.push({
           coachId: c.id, name, from: c.rankCode, to: ov.promotion.nextCode, track,
         });
+        syncRank(c.id, ov.promotion.nextCode);
       }
     }
   }
 
+  // 最後一批無條件送出（就算是空的）：這一支跑完一定要有一次「我算過了」的寫入嘗試，
+  // 沒有任何 active 顧問時也一樣 —— saveMaintenance() 自己會對空陣列早退。
   await saveMaintenance(maintRows);
+  maintRows = [];
   return out;
 }
 

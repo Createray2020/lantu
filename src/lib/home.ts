@@ -143,10 +143,13 @@ function recruitFunnelFrom(rows: { stage: string }[]): { label: string; value: n
 async function teamWeeklyAppts(memberIds: string[]): Promise<number[]> {
   const week = [0, 0, 0, 0, 0, 0, 0];
   if (!memberIds.length) return week;
-  const clientRows = await db.select().from(clients).where(inArray(clients.coachId, memberIds));
+  // ⚠️ 明列欄位。這裡要的只有 id，而 `select()` 會把整批客戶列（含 contact jsonb、tags、
+  // 各種備註）撈回 Node 再丟掉 —— 一個 20 人的處，底下幾百位客戶，每次開主管首頁都搬一次。
+  const clientRows = await db.select({ id: clients.id }).from(clients).where(inArray(clients.coachId, memberIds));
   const cids = clientRows.map((c) => c.id);
   if (!cids.length) return week;
-  const rev = await db.select().from(reviews).where(inArray(reviews.clientId, cids));
+  // 同上：本週預約只用得到 nextAppt。
+  const rev = await db.select({ nextAppt: reviews.nextAppt }).from(reviews).where(inArray(reviews.clientId, cids));
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const start = new Date(today); start.setDate(start.getDate() - today.getDay()); // 本週日
   for (const r of rev) {

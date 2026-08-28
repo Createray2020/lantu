@@ -21,37 +21,73 @@ async function coachId(): Promise<string> {
 // 回傳成敗而不是用 throw：額度已滿與期限到期是「使用者要看到理由」的情況，
 // 而 Next 在正式環境會把 server action 丟出的錯誤訊息換成沒有意義的 digest，
 // 畫面上就只剩「建立失敗，請重試」——重試一百次也不會成功。
-export type CreateClientResult = { ok: true; id: string } | { ok: false; error: string };
+export type ActionResult = { ok: true } | { ok: false; error: string };
+export type IdResult = { ok: true; id: string } | { ok: false; error: string };
+export type CreateClientResult = IdResult;
+
+/** 未知錯誤的統一說法：不要留下「操作失敗」這種按幾次都一樣的死路。 */
+const FALLBACK_ERROR = "這個動作沒有完成。請重新整理頁面再試一次；若還是失敗請聯繫管理員。";
+
+// 少數會冒到這裡的技術性訊息，換成使用者看得懂的說法。
+const MSG: Record<string, string> = {
+  forbidden: "你的帳號沒有權限做這件事——請確認已登入，而且帳號已經開通。",
+};
+
+/**
+ * 把 throw 出來的錯誤轉成畫面看得到的理由。
+ *
+ * ⚠️ 只有**具名**錯誤（LicenseLockedError、QuotaFullError…）的 message 是寫給人看的中文，
+ *    才直接顯示；普通 `new Error("forbidden")` 或 DB 例外一律換成可行動的中文，
+ *    否則畫面上會出現一串沒人看得懂的英文（正式環境更會被換成無意義的 digest）。
+ */
+function fail(e: unknown): { ok: false; error: string } {
+  if (e instanceof Error) {
+    if (e.name !== "Error" && e.message) return { ok: false, error: e.message };
+    const mapped = MSG[e.message];
+    if (mapped) return { ok: false, error: mapped };
+  }
+  return { ok: false, error: FALLBACK_ERROR };
+}
 
 export async function createClientAction(input: Clients.ClientInput): Promise<CreateClientResult> {
-  const me = await requireWritableCoach();
   try {
+    const me = await requireWritableCoach();
     // 客戶數上限依級別（實習與 C1–C3 為 20 位、S1–S2 為 50 位、S3 與首席為 100 位）
     await requireClientQuota(me);
+    const id = await Clients.createClient(me.id, input);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clients");
+    revalidatePath("/dashboard/overview");
+    return { ok: true, id };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "已達客戶數上限" };
+    return fail(e);
   }
-  const id = await Clients.createClient(me.id, input);
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/clients");
-  revalidatePath("/dashboard/overview");
-  return { ok: true, id };
 }
 
-export async function updateClientAction(clientId: string, patch: Partial<Clients.ClientInput>): Promise<void> {
-  const cid = await coachId();
-  await Clients.updateClient(cid, clientId, patch);
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/clients");
-  revalidatePath(`/dashboard/clients/${clientId}`);
+export async function updateClientAction(clientId: string, patch: Partial<Clients.ClientInput>): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Clients.updateClient(cid, clientId, patch);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clients");
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
-export async function archiveClientAction(clientId: string): Promise<void> {
-  const cid = await coachId();
-  await Clients.setClientStatus(cid, clientId, "archived");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/clients");
-  revalidatePath(`/dashboard/clients/${clientId}`);
+export async function archiveClientAction(clientId: string): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Clients.setClientStatus(cid, clientId, "archived");
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clients");
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 // ── 年度版本 ─────────────────────────────────────────
@@ -62,77 +98,127 @@ export async function savePlanDataAction(planId: string, data: unknown): Promise
   return snap;
 }
 
-export async function clonePlanAction(planId: string): Promise<string> {
-  const cid = await coachId();
-  const id = await Plans.clonePlan(cid, planId);
-  // 唯一沒補 revalidatePath 的教練端寫入 action：呼叫端會 router.push 到新編輯器所以看不出來，
-  // 但使用者按上一頁回客戶頁時會看不到剛複製出的版本。
-  revalidatePath("/dashboard/clients");
-  return id;
+export async function clonePlanAction(planId: string): Promise<IdResult> {
+  try {
+    const cid = await coachId();
+    const id = await Plans.clonePlan(cid, planId);
+    // 唯一沒補 revalidatePath 的教練端寫入 action：呼叫端會 router.push 到新編輯器所以看不出來，
+    // 但使用者按上一頁回客戶頁時會看不到剛複製出的版本。
+    revalidatePath("/dashboard/clients");
+    return { ok: true, id };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
-export async function createPlanAction(clientId: string, name: string): Promise<string> {
-  const cid = await coachId();
-  const id = await Plans.createPlan(cid, clientId, name);
-  revalidatePath(`/dashboard/clients/${clientId}`);
-  return id;
+export async function createPlanAction(clientId: string, name: string): Promise<IdResult> {
+  try {
+    const cid = await coachId();
+    // 資料層改回 { ok } —— 建立年度版本會被額度／重複年度擋下，理由要原文傳給畫面。
+    const r = await Plans.createPlan(cid, clientId, name);
+    if (!r.ok) return { ok: false, error: r.error };
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    return { ok: true, id: r.planId };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
-export async function updatePlanMetaAction(clientId: string, planId: string, patch: Plans.PlanMetaPatch): Promise<void> {
-  const cid = await coachId();
-  await Plans.updatePlanMeta(cid, planId, patch);
-  revalidatePath(`/dashboard/clients/${clientId}`);
+export async function updatePlanMetaAction(clientId: string, planId: string, patch: Plans.PlanMetaPatch): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Plans.updatePlanMeta(cid, planId, patch);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
-export async function deletePlanAction(clientId: string, planId: string): Promise<void> {
-  const cid = await coachId();
-  await Plans.deletePlan(cid, planId);
-  revalidatePath(`/dashboard/clients/${clientId}`);
+export async function deletePlanAction(clientId: string, planId: string): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Plans.deletePlan(cid, planId);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 // ── 諮詢紀錄 ─────────────────────────────────────────
-export async function createReviewAction(clientId: string, input: Reviews.ReviewInput): Promise<void> {
-  const cid = await coachId();
-  await Reviews.createReview(cid, clientId, input);
-  revalidatePath(`/dashboard/clients/${clientId}`);
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/clients");
-  revalidatePath("/dashboard/overview");
+export async function createReviewAction(clientId: string, input: Reviews.ReviewInput): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Reviews.createReview(cid, clientId, input);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clients");
+    revalidatePath("/dashboard/overview");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
-export async function updateReviewAction(clientId: string, reviewId: string, patch: Partial<Reviews.ReviewInput>): Promise<void> {
-  const cid = await coachId();
-  await Reviews.updateReview(cid, reviewId, patch);
-  revalidatePath(`/dashboard/clients/${clientId}`);
+export async function updateReviewAction(clientId: string, reviewId: string, patch: Partial<Reviews.ReviewInput>): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Reviews.updateReview(cid, reviewId, patch);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
-export async function deleteReviewAction(clientId: string, reviewId: string): Promise<void> {
-  const cid = await coachId();
-  await Reviews.deleteReview(cid, reviewId);
-  revalidatePath(`/dashboard/clients/${clientId}`);
-  revalidatePath("/dashboard/overview");
+export async function deleteReviewAction(clientId: string, reviewId: string): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Reviews.deleteReview(cid, reviewId);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/dashboard/overview");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 // ── 動作項目 ─────────────────────────────────────────
-export async function createActionItemAction(clientId: string, input: Reviews.ActionItemInput): Promise<void> {
-  const cid = await coachId();
-  await Reviews.createActionItem(cid, clientId, input);
-  revalidatePath(`/dashboard/clients/${clientId}`);
-  revalidatePath("/dashboard/overview");
+export async function createActionItemAction(clientId: string, input: Reviews.ActionItemInput): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Reviews.createActionItem(cid, clientId, input);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/dashboard/overview");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
-export async function setActionItemDoneAction(clientId: string, itemId: string, done: boolean): Promise<void> {
-  const cid = await coachId();
-  await Reviews.setActionItemDone(cid, itemId, done);
-  revalidatePath(`/dashboard/clients/${clientId}`);
-  revalidatePath("/dashboard/overview");
+export async function setActionItemDoneAction(clientId: string, itemId: string, done: boolean): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Reviews.setActionItemDone(cid, itemId, done);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/dashboard/overview");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
-export async function deleteActionItemAction(clientId: string, itemId: string): Promise<void> {
-  const cid = await coachId();
-  await Reviews.deleteActionItem(cid, itemId);
-  revalidatePath(`/dashboard/clients/${clientId}`);
-  revalidatePath("/dashboard/overview");
+export async function deleteActionItemAction(clientId: string, itemId: string): Promise<ActionResult> {
+  try {
+    const cid = await coachId();
+    await Reviews.deleteActionItem(cid, itemId);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/dashboard/overview");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 // ── 區塊註記 ＋ 一場諮詢 ────────────────────────────────
@@ -209,8 +295,8 @@ export async function saveConsultRecordAction(
 
 /** 有沒有「按了結束但沒存」的草稿——客戶詳情頁與規劃編輯器都靠這條跳提醒。 */
 export async function pendingDraftAction(clientId: string): Promise<Session.PendingDraft | null> {
-  await coachId();
-  return Session.pendingDraft(clientId);
+  const cid = await coachId();
+  return Session.pendingDraft(cid, clientId);
 }
 
 /** 這一場決定不留紀錄：丟掉草稿（場次與還原點都保留）。 */
@@ -222,13 +308,13 @@ export async function discardDraftAction(clientId: string, sessionId: string): P
 }
 
 export async function openSessionAction(clientId: string): Promise<Session.SessionRow | null> {
-  await coachId();
-  return Session.openSession(clientId);
+  const cid = await coachId();
+  return Session.openSession(cid, clientId);
 }
 
 export async function listSessionsAction(clientId: string): Promise<Session.SessionRow[]> {
-  await coachId();
-  return Session.listSessions(clientId);
+  const cid = await coachId();
+  return Session.listSessions(cid, clientId);
 }
 
 export type RestoreResult = { ok: true; planId: string } | { ok: false; error: string };
@@ -242,7 +328,7 @@ export type RestoreResult = { ok: true; planId: string } | { ok: false; error: s
  */
 export async function restoreToSessionAction(clientId: string, sessionId: string): Promise<RestoreResult> {
   const cid = await coachId();
-  const sessions = await Session.listSessions(clientId, 200);
+  const sessions = await Session.listSessions(cid, clientId, 200);
   const s = sessions.find((x) => x.id === sessionId);
   if (!s) return { ok: false, error: "找不到這一場諮詢" };
   if (!s.planId || !s.revisionId) return { ok: false, error: "這一場沒有可還原的版本快照" };

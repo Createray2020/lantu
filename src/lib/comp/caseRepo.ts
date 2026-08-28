@@ -113,6 +113,22 @@ export function computePayouts(
  * 不做原地 update —— 分潤是要對帳的東西，改過什麼必須看得出來。
  * （neon-http 沒有互動式交易；萬一 void 成功而 insert 失敗，重按一次「重算分潤」即可補上。）
  */
+function payoutValues(caseId: string, l: PayoutLine) {
+  return {
+    caseId,
+    payeeId: l.payeeId,
+    payeeKey: l.payeeId ?? l.kind,
+    payeeName: l.name,
+    kind: l.kind,
+    role: l.role,
+    rankCode: l.rankCode,
+    promoPct: l.promoPct, execPct: l.execPct, bonusPct: l.bonusPct, totalPct: l.totalPct,
+    amount: l.amount,
+    status: "pending",
+    trace: l.trace,
+  };
+}
+
 export async function writePayouts(caseId: string, lines: PayoutLine[]) {
   await db.update(compPayouts).set({ status: "void" })
     .where(and(
@@ -120,21 +136,7 @@ export async function writePayouts(caseId: string, lines: PayoutLine[]) {
       inArray(compPayouts.status, ["pending", "batched"]),
     ));
   if (!lines.length) return;
-  await db.insert(compPayouts).values(
-    lines.map((l) => ({
-      caseId,
-      payeeId: l.payeeId,
-      payeeKey: l.payeeId ?? l.kind,
-      payeeName: l.name,
-      kind: l.kind,
-      role: l.role,
-      rankCode: l.rankCode,
-      promoPct: l.promoPct, execPct: l.execPct, bonusPct: l.bonusPct, totalPct: l.totalPct,
-      amount: l.amount,
-      status: "pending",
-      trace: l.trace,
-    })),
-  );
+  await db.insert(compPayouts).values(lines.map((l) => payoutValues(caseId, l)));
 }
 
 export type CaseInput = {
@@ -158,10 +160,10 @@ function yearOf(input: CaseInput): number {
   return input.caseYear ?? (d ? Number(d.slice(0, 4)) : new Date().getUTCFullYear());
 }
 
-export async function createCase(input: CaseInput): Promise<CaseRecord> {
-  const version = await ensureActiveVersion();
-  const rows = await db.insert(compCases).values({
-    versionId: version.id,
+/** 純資料整形，不碰 DB。createCase 與 createCasesBatch 共用同一份規則。 */
+function caseValues(versionId: string, input: CaseInput) {
+  return {
+    versionId,
     clientId: input.clientId || null,
     clientName: input.clientName,
     serviceType: input.serviceType || "full",
@@ -176,9 +178,48 @@ export async function createCase(input: CaseInput): Promise<CaseRecord> {
     caseYear: yearOf(input),
     status: input.surveyAt ? "closed" : "open",
     note: input.note || null,
-  }).returning();
+  };
+}
+
+export async function createCase(input: CaseInput): Promise<CaseRecord> {
+  const version = await ensureActiveVersion();
+  const rows = await db.insert(compCases).values(caseValues(version.id, input)).returning();
   const created = rows[0];
   await recalcCase(created.id);
+  return created;
+}
+
+/**
+ * CSV 批次匯入專用：一次進 N 筆案件。
+ *
+ * 逐筆呼叫 createCase() 的成本不是「多幾次往返」而已 —— 它每一筆都走 recalcCase()，
+ * 而 recalcCase() 每一次都重新 loadParams()（整個制度版本的職級表、門檻表、模塊表）
+ * 加上 listAdvisors()（全教練名冊）。50 列的 CSV 就是 50 次完整參數載入、
+ * 50 次全表名冊查詢，全部拿到的還是同一份資料。
+ *
+ * 這裡把兩件事拆開：
+ *   1. 全部案件**一句** insert（單一語句本身就是原子的：要嘛整批進、要嘛一列都沒有）。
+ *   2. 參數與名冊**只載一次**，再逐筆算 payouts。
+ *
+ * ⚠️ 去重（同一份 CSV 重傳兩次會變成兩批案件）**沒有**在這裡解決：那需要一組
+ * 牽涉產品判斷的唯一鍵，不是資料層自己決定得了的。這一支只處理效能與參數載入。
+ */
+export async function createCasesBatch(inputs: CaseInput[]): Promise<CaseRecord[]> {
+  if (!inputs.length) return [];
+  const version = await ensureActiveVersion();
+  const created = await db
+    .insert(compCases)
+    .values(inputs.map((i) => caseValues(version.id, i)))
+    .returning();
+
+  const params = await loadParams(version.id);
+  const advisors = toAdvisorRows(await listAdvisors());
+  // 剛建立的案件不可能有舊的 payouts，所以跳過 writePayouts() 的「先標 void」那一句，
+  // 並且把整批明細併成一句 insert。
+  const values = created.flatMap((c) =>
+    computePayouts(c, advisors, params).lines.map((l) => payoutValues(c.id, l)),
+  );
+  if (values.length) await db.insert(compPayouts).values(values);
   return created;
 }
 
@@ -370,12 +411,17 @@ export async function setAdvisorRank(
   const cur = (await db.select().from(coaches).where(eq(coaches.id, coachId)).limit(1))[0];
   if (!cur) throw new Error("coach-not-found");
   if (cur.rankCode === toCode) return;
-  await db.update(coaches).set({ rankCode: toCode }).where(eq(coaches.id, coachId));
-  await db.insert(compRankEvents).values({
-    coachId, fromCode: cur.rankCode, toCode, reason,
-    effectiveAt: new Date().toISOString().slice(0, 10),
-    operatorId, note: note || null,
-  });
+  // ⚠️ 職級與異動紀錄必須一起成立。分開兩趟往返時，第二句失敗就留下一位
+  // 「職級變了但時間軸上查不到為什麼」的顧問——而職級決定分潤率，這是財務紀錄。
+  // neon-http 沒有互動式交易，db.batch() 是這裡唯一的原子寫法。
+  await db.batch([
+    db.update(coaches).set({ rankCode: toCode }).where(eq(coaches.id, coachId)),
+    db.insert(compRankEvents).values({
+      coachId, fromCode: cur.rankCode, toCode, reason,
+      effectiveAt: new Date().toISOString().slice(0, 10),
+      operatorId, note: note || null,
+    }),
+  ]);
 }
 
 export async function saveMaintenance(rows: {

@@ -3,9 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // 客戶端問卷的契約，重點在權限：
 // 案件歸屬必須在伺服器端重查，不能相信前端傳來的 caseId——
 // 少了這道，任何登入者改個 id 就能讀寫別人的案件。
+// 題目同理：前端根本不送，伺服器自己從生效版制度設定取。
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/clientUser", () => ({ ensureClientUser: vi.fn() }));
-vi.mock("@/lib/comp/survey", () => ({ submitSurvey: vi.fn() }));
+vi.mock("@/lib/comp/survey", () => ({ submitSurvey: vi.fn(), questionsOf: vi.fn() }));
+vi.mock("@/lib/comp/repo", () => ({ ensureActiveVersion: vi.fn(), loadParams: vi.fn() }));
 
 const whereMock = vi.fn();
 vi.mock("@/Shared/db", () => ({
@@ -21,13 +23,13 @@ vi.mock("@/Shared/db", () => ({
 }));
 
 import { ensureClientUser } from "@/lib/clientUser";
-import { submitSurvey } from "@/lib/comp/survey";
+import { submitSurvey, questionsOf } from "@/lib/comp/survey";
+import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import { submitClientSurveyAction } from "./actions";
 
 const asMock = (f: unknown) => f as unknown as ReturnType<typeof vi.fn>;
 const input = {
   caseId: "case1",
-  questions: ["Q1", "Q2", "Q3"],
   answers: ["  答一  ", "", "答三"],
   marketingOptIn: true,
 };
@@ -36,6 +38,9 @@ beforeEach(() => {
   vi.resetAllMocks();
   asMock(ensureClientUser).mockResolvedValue({ id: "cu1" });
   whereMock.mockResolvedValue([{ id: "case1" }]);
+  asMock(ensureActiveVersion).mockResolvedValue({ id: "v1" });
+  asMock(loadParams).mockResolvedValue({ settings: {} });
+  asMock(questionsOf).mockReturnValue(["制度題一", "制度題二", "制度題三"]);
 });
 
 describe("submitClientSurveyAction", () => {
@@ -45,6 +50,14 @@ describe("submitClientSurveyAction", () => {
     expect(arg.answers).toEqual(["答一", "", "答三"]);
     expect(arg.submittedBy).toBe("client");
     expect(arg.submitterId).toBe("cu1");
+  });
+
+  it("題目一律由伺服器取，前端塞不進去（勾了見證同意的那筆會對外展示）", async () => {
+    // 舊介面允許呼叫端夾帶 questions；現在多餘的鍵不會有任何作用。
+    const spoof = { ...input, questions: ["我是自己編的題目"] } as Parameters<typeof submitClientSurveyAction>[0];
+    expect(await submitClientSurveyAction(spoof)).toEqual({ ok: true });
+    const arg = asMock(submitSurvey).mock.calls[0][0];
+    expect(arg.questions).toEqual(["制度題一", "制度題二", "制度題三"]);
   });
 
   it("案件不屬於本人時擋下，且不碰資料層", async () => {

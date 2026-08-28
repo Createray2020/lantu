@@ -13,11 +13,13 @@ export default function RequestList({ requests }: { requests: Req[] }) {
   async function respond(id: string, accept: boolean) {
     setBusy(id); setErr(null);
     try {
+      // 資料層會回 { ok:false, error }（例如接受後會超過客戶數上限）——理由要原文顯示給教練看，
+      // 「處理失敗」只會讓人一直重按。防呆寫法：拿不到形狀就退回一句可行動的說明。
       const r = await respondLinkAction(id, accept);
-      if (r.ok) setList((l) => l.filter((x) => x.id !== id));
-      else setErr(r.error || "處理失敗");
+      if (r && r.ok) setList((l) => l.filter((x) => x.id !== id));
+      else setErr((r && r.error) || "處理失敗，請重新整理後再試一次。");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "處理失敗");
+      setErr(e instanceof Error && e.name !== "Error" && e.message ? e.message : "處理失敗，請重新整理後再試一次。");
     } finally {
       setBusy(null);
     }

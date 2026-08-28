@@ -99,7 +99,7 @@ export default async function AdvisorsPage() {
           )}
           <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
         </Link>
-        <span className="text-[#a9bccf] text-xs">顧問職級與晉升</span>
+        <span className="text-[#a9bccf] text-xs">教練職級與晉升</span>
         <div className="flex-1" />
         
         <UserButton />
@@ -108,7 +108,7 @@ export default async function AdvisorsPage() {
 
       <section className="p-6 max-w-7xl">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">顧問職級與晉升追蹤</h1>
+          <h1 className="text-xl font-bold">教練職級與晉升追蹤</h1>
           <p className="text-sm text-[#a9bccf] mt-1">
             累計指標由案件即時推導（唯讀），職級異動一律留紀錄。制度版本：
             <b className="text-[#e0bd8b] ml-1">{version.version}</b>

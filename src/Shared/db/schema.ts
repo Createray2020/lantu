@@ -213,6 +213,9 @@ export const clientCollaborators = pgTable('client_collaborators', {
   index('ccollab_coach_status_idx').on(t.coachId, t.status),
   // 客戶詳情頁的協作面板。
   index('ccollab_client_id_idx').on(t.clientId),
+  // invited_by 是 CASCADE：移除一位教練時 Postgres 要掃這張表找出他發出過的邀請，
+  // 沒有索引就是全表掃描（而且刪除會連帶把別人案子的協作關係一起帶走，慢在鎖上）。
+  index('ccollab_invited_by_idx').on(t.invitedBy),
 ]);
 
 // 年度版本（每年重製一份完整規劃；整份案件存 data jsonb）
@@ -385,6 +388,8 @@ export const coachInvites = pgTable('coach_invites', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('coach_invites_coach_id_idx').on(t.coachId),
+  // used_by_client_user_id 是 SET NULL：刪一位 client_user 會掃全表找他用過的邀請碼。
+  index('coach_invites_used_by_idx').on(t.usedByClientUserId),
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -578,6 +583,8 @@ export const compBatches = pgTable('comp_batches', {
 }, (t) => [
   // 一個月一批：少了它，重複按「產生批次」會把同一筆分潤分進兩批。
   uniqueIndex('comp_batches_period_uidx').on(t.period),
+  // approved_by 是 SET NULL：移除／停用一位教練時要掃全表找他核可過的批次。
+  index('comp_batches_approved_by_idx').on(t.approvedBy),
 ]);
 
 // ── 業務制度 波3：訓練時數、職級異動 ────────────────────────────────────────
@@ -594,6 +601,8 @@ export const compTrainingSessions = pgTable('comp_training_sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('comp_training_sessions_held_on_idx').on(t.heldOn),
+  // speaker_id 是 SET NULL：移除一位教練時要掃全表找他講過的場次。
+  index('comp_training_sessions_speaker_id_idx').on(t.speakerId),
 ]);
 
 // 訓練時數紀錄。kind: internal（出席內部場次）/ speaker（擔任講師）/ external（外部課程）。
@@ -615,6 +624,13 @@ export const compTrainingRecords = pgTable('comp_training_records', {
   index('comp_training_records_session_id_idx').on(t.sessionId),
   // 同一場次同一人只能有一筆出席紀錄（重複點名會讓時數翻倍）。
   uniqueIndex('comp_training_records_session_coach_uidx').on(t.sessionId, t.coachId, t.kind),
+  // ⚠️ 上面那條的第一欄是 session_id，而線上課程補時數寫的是 session_id = NULL——
+  //    Postgres 的 UNIQUE 對 NULL 視為互異，所以它一列都擋不住：
+  //    「完課補時數」連點兩次就會讓維持資格的 trainHours 翻倍。
+  //    憑證字串（evidence，例如 'learn:<courseId>'）才是真正的去重鍵，補一條 partial unique。
+  //    evidence 為 null 的列（人工登錄的外部課程沒有憑證）不受這條約束。
+  uniqueIndex('comp_training_records_coach_evidence_uidx')
+    .on(t.coachId, t.evidence).where(sql`evidence is not null`),
 ]);
 
 // 職級異動時間軸（晉升／真除轉正／人工調整／退費扣回）。
@@ -631,6 +647,8 @@ export const compRankEvents = pgTable('comp_rank_events', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('comp_rank_events_coach_id_idx').on(t.coachId),
+  // operator_id 是 SET NULL：移除一位管理者時要掃全表找他操作過的異動列。
+  index('comp_rank_events_operator_id_idx').on(t.operatorId),
 ]);
 
 // 年度維持資格快照（第十六～十九條）。每人每年一列，由排程或手動重算寫入。

@@ -5,7 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, compCases } from "@/Shared/db/schema";
 import { ensureClientUser } from "@/lib/clientUser";
-import { submitSurvey } from "@/lib/comp/survey";
+import { submitSurvey, questionsOf } from "@/lib/comp/survey";
+import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -26,10 +27,14 @@ function fail(e: unknown): ActionResult {
  * 客戶自己送出問卷。
  * 案件歸屬一律在伺服器端重查一次（不信任前端傳來的 caseId）——
  * 少了這道，任何登入者都能靠改 id 讀寫別人的案件。
+ *
+ * ⚠️ 題目（questions）也一樣不收前端的：舊版把前端傳來的字串原樣存進 compSurveys，
+ *    而勾了 marketingOptIn 的那筆會進見證素材 —— 等於任何客戶都能自訂
+ *    「嵐途替我做了什麼」這句話的題幹，再讓它掛著公司名字對外展示。
+ *    題目一律由伺服器從生效版制度設定取（跟 /portal/survey 頁面同一個來源）。
  */
 export async function submitClientSurveyAction(input: {
   caseId: string;
-  questions: string[];
   answers: string[];
   marketingOptIn: boolean;
 }): Promise<ActionResult> {
@@ -48,9 +53,13 @@ export async function submitClientSurveyAction(input: {
     const answers = input.answers.map((a) => (a ?? "").trim());
     if (!answers.some(Boolean)) throw new Error("empty-answers");
 
+    const version = await ensureActiveVersion();
+    const params = await loadParams(version.id);
+    const questions = questionsOf(params.settings);
+
     await submitSurvey({
       caseId: input.caseId,
-      questions: input.questions,
+      questions,
       answers,
       marketingOptIn: !!input.marketingOptIn,
       submittedBy: "client",

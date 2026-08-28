@@ -45,7 +45,7 @@ export default function SurveyForm({
             {done.map((c) => (
               <div key={c.id} className="rounded-xl border border-white/10 bg-[#0d2b45] px-4 py-3">
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-semibold">{c.moduleName || "顧問服務"}</span>
+                  <span className="font-semibold">{c.moduleName || "教練服務"}</span>
                   <span className="text-xs text-[#6f869c]">{c.signedAt ?? ""}</span>
                   <span className="text-xs text-[#7fb894]">已於 {c.surveyAt} 回覆 ✓</span>
                 </div>
@@ -81,11 +81,11 @@ function OneSurvey({
   return (
     <section className="rounded-2xl border border-white/10 bg-[#0d2b45] p-5">
       <div className="flex flex-wrap items-baseline gap-2 mb-1">
-        <h2 className="font-semibold text-base">{c.moduleName || "顧問服務"}</h2>
+        <h2 className="font-semibold text-base">{c.moduleName || "教練服務"}</h2>
         {c.signedAt && <span className="text-xs text-[#6f869c]">{c.signedAt}</span>}
       </div>
       <p className="text-xs text-[#7f9ab2] mb-4">
-        三個問題，想到什麼寫什麼就好。你的回覆會直接回到為你服務的顧問手上。
+        三個問題，想到什麼寫什麼就好。你的回覆會直接回到為你服務的教練手上。
       </p>
 
       <div className="space-y-4">
@@ -109,7 +109,7 @@ function OneSurvey({
             onChange={(e) => setOptIn(e.target.checked)}
             className="mt-1 h-4 w-4 accent-[#c99a5b]" />
           <span className="text-[#a7bacb]">
-            我同意上述回饋可作為嵐途與顧問的服務見證使用（不勾選不影響任何權益）
+            我同意上述回饋可作為嵐途與教練的服務見證使用（不勾選不影響任何權益）
           </span>
         </label>
       )}
@@ -121,8 +121,9 @@ function OneSurvey({
           onClick={() => {
             setMsg(null);
             start(async () => {
+              // 題目不從這裡送——伺服器自己去制度設定取，見 actions.ts 的說明。
               const r = await submitClientSurveyAction({
-                caseId: c.id, questions, answers, marketingOptIn: optIn,
+                caseId: c.id, answers, marketingOptIn: optIn,
               });
               setMsg(r.ok ? { ok: true, text: "已送出，謝謝你的回饋" } : { ok: false, text: r.error });
               if (r.ok) router.refresh();

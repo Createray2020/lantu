@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import {
-  createBatch, createCase, markBatchPaid, recalcCase, refundCase, updateCase,
+  createBatch, createCase, createCasesBatch, markBatchPaid, recalcCase, refundCase, updateCase,
   type CaseInput,
 } from "@/lib/comp/caseRepo";
 import { submitSurvey } from "@/lib/comp/survey";
@@ -17,7 +17,7 @@ const MSG: Record<string, string> = {
   forbidden: "沒有後台權限",
   "case-not-found": "找不到案件",
   "batch-paid": "該月批次已發放，不能再收案",
-  "no-executor": "請選擇執案顧問",
+  "no-executor": "請選擇執案教練",
   "no-client": "請填客戶姓名",
   "bad-fee": "顧問費要大於 0",
   "case-closed-invalid": "已退費或作廢的案件不能填問卷",
@@ -206,7 +206,9 @@ export async function confirmImportAction(csv: string): Promise<
       return { ok: false, error: `缺少欄位：${missingHeaders.join("、")}` };
     }
     const valid = rows.filter((r) => r.input);
-    for (const r of valid) await createCase(r.input!);
+    // 逐筆 createCase() 會讓 50 列的 CSV 跑 50 次「載入制度參數＋撈全部教練」，
+    // 中途逾時就留下一半案件而畫面只說「匯入失敗」。改成整批一次進。
+    await createCasesBatch(valid.map((r) => r.input!));
     const skipped = rows.length - valid.length;
     return {
       ok: true,

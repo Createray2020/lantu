@@ -7,12 +7,13 @@
 //   3. metricsBefore/After → 摘要開頭那句「這次改善了多少」。
 //
 // ⚠️ 開場／結束一律只有主責教練（ownedClient）。協作教練能寫註記，但不能開場。
+import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clientNotes, clients, consultSessions, planRevisions, plans } from "@/Shared/db/schema";
+import { actionItems, clientNotes, clients, consultSessions, planRevisions, plans, reviews } from "@/Shared/db/schema";
 import { ownedClient } from "./clientScope";
 import { sessionMetrics, type SessionMetrics } from "./snapshot";
-import { createActionItem, createReview } from "./reviews";
+import { assertPlanOfClient } from "./reviews";
 import { notesOfSession } from "./notes";
 
 export type SessionRow = {
@@ -56,21 +57,32 @@ async function assertOwned(coachId: string, clientId: string): Promise<boolean> 
   return !!row;
 }
 
-/** 目前這位客戶有沒有一場開著的諮詢。 */
-export async function openSession(clientId: string): Promise<SessionRow | null> {
+/**
+ * ⚠️⚠️ 讀取三支（openSession / listSessions / pendingDraft）也要吃 coachId。
+ *
+ * 這裡的租戶條件不是可有可無的裝飾：呼叫端（app/dashboard/actions.ts）只驗「你是不是一位
+ * 有效的教練」，clientId 直接來自參數。少了 innerJoin(clients) + ownedClient()，
+ * 任何一位登入中的教練換一個 clientId 就讀得到別人客戶的整段諮詢摘要（draft_summary）、
+ * 總缺口與淨值（metrics_before / metrics_after）、收尾備註，連帶還原點也一併看光。
+ *
+ * 寫法比照 lib/plans.ts 的 ownedPlan()：條件守在資料層，不交給呼叫端補。
+ */
+export async function openSession(coachId: string, clientId: string): Promise<SessionRow | null> {
   const [row] = await db
     .select(COLS)
     .from(consultSessions)
-    .where(and(eq(consultSessions.clientId, clientId), isNull(consultSessions.endedAt)))
+    .innerJoin(clients, eq(clients.id, consultSessions.clientId))
+    .where(and(eq(consultSessions.clientId, clientId), ownedClient(coachId), isNull(consultSessions.endedAt)))
     .limit(1);
   return row ?? null;
 }
 
-export async function listSessions(clientId: string, limit = 40): Promise<SessionRow[]> {
+export async function listSessions(coachId: string, clientId: string, limit = 40): Promise<SessionRow[]> {
   return db
     .select(COLS)
     .from(consultSessions)
-    .where(eq(consultSessions.clientId, clientId))
+    .innerJoin(clients, eq(clients.id, consultSessions.clientId))
+    .where(and(eq(consultSessions.clientId, clientId), ownedClient(coachId)))
     .orderBy(desc(consultSessions.startedAt))
     .limit(limit);
 }
@@ -247,33 +259,70 @@ export async function saveSessionRecord(
   const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
   if (!s) return { ok: false, error: "找不到這一場諮詢" };
   if (!(await assertOwned(coachId, s.clientId))) return { ok: false, error: "只有主責教練能存這一場的紀錄" };
+  // 早退一步（省掉整批寫入）。真正的冪等鎖是底下那句 `where review_id is null`，不是這裡。
   if (s.reviewId) return { ok: false, error: "這一場的紀錄已經存過了" };
 
-  const reviewId = await createReview(coachId, s.clientId, {
+  const planId = input.planId !== undefined ? input.planId : s.planId;
+  // createReview() 幫我們做的兩道檢查在這裡要自己補：主責由上面的 assertOwned 擋掉，
+  // 「planId 屬於同一位客戶」用共用的那支。
+  await assertPlanOfClient(planId, s.clientId);
+
+  const fresh = await notesOfSession(sessionId);
+  const todoRows = fresh
+    .filter((n) => n.kind === "todo")
+    .map((n) => ({ clientId: s.clientId, title: n.body.slice(0, 200) }));
+
+  /**
+   * ⚠️⚠️ 先占，而且三句寫在同一個 db.batch() 裡。
+   *
+   * 舊寫法是 ①createReview → ②逐筆 createActionItem → ③最後才 update review_id。
+   * 冪等鎖 `if (s.reviewId) return` 讀的正是第③步才寫進去的欄位，所以整個 ①②
+   * 都在鎖生效之前 —— 網路斷在中間、或教練連按兩次存檔，就會留下兩筆諮詢紀錄
+   * 與兩份一模一樣的待辦，而場次上一個 review_id 都沒掛。
+   *
+   * 現在改成：
+   *   句1 insert reviews（用預先產生的 uuid，不是等 DB 給）
+   *   句2 insert action_items（掛在同一個 reviewId 底下）
+   *   句3 update consult_sessions set review_id=<那個 uuid> where id=? and review_id is null returning
+   * 第③句回 0 列＝別人已經存過，這一輪就整個不算數。
+   *
+   * 順序不能對調：consult_sessions.review_id 有外鍵指向 reviews.id，
+   * 先占一個還不存在的 uuid 會當場違反外鍵。
+   * neon-http 驅動沒有互動式交易（db.transaction() 會直接丟錯），但 db.batch()
+   * 是單一交易 —— 三句要嘛都成立、要嘛都不成立。
+   */
+  const reviewId = randomUUID();
+  const reviewStmt = db.insert(reviews).values({
+    id: reviewId,
+    clientId: s.clientId,
     date: input.date,
     type: input.type,
-    planId: input.planId !== undefined ? input.planId : s.planId,
+    planId: planId ?? null,
     attendees: input.attendees ?? null,
     summary: input.summary ?? null,
     nextAppt: input.nextAppt ?? null,
   });
-
-  // 待辦 → action_items（這個功能一出生就有下游）。放在存檔這一步，
-  // 才不會「按了結束就先冒出一堆待辦、但紀錄根本還沒存」。
-  const fresh = await notesOfSession(sessionId);
-  let todos = 0;
-  for (const nrow of fresh) {
-    if (nrow.kind !== "todo") continue;
-    await createActionItem(coachId, s.clientId, { title: nrow.body.slice(0, 200), reviewId });
-    todos++;
-  }
-
-  await db
+  const claimStmt = db
     .update(consultSessions)
     .set({ reviewId, draftSummary: null })
-    .where(eq(consultSessions.id, sessionId));
+    .where(and(eq(consultSessions.id, sessionId), isNull(consultSessions.reviewId)))
+    .returning({ id: consultSessions.id });
 
-  return { ok: true, reviewId, todos };
+  let claimed: { id: string }[];
+  if (todoRows.length) {
+    const itemsStmt = db.insert(actionItems).values(todoRows.map((t) => ({ ...t, reviewId })));
+    claimed = (await db.batch([reviewStmt, itemsStmt, claimStmt]))[2];
+  } else {
+    claimed = (await db.batch([reviewStmt, claimStmt]))[1];
+  }
+
+  if (!claimed.length) {
+    // 沒占到＝別人（另一個分頁／重試）已經存過。把剛剛寫進去的收回去，不留孤兒列：
+    // action_items.review_id 是 ON DELETE CASCADE，刪掉 review 就一起帶走。
+    await db.delete(reviews).where(eq(reviews.id, reviewId));
+    return { ok: false, error: "這一場的紀錄已經存過了" };
+  }
+  return { ok: true, reviewId, todos: todoRows.length };
 }
 
 /**
@@ -282,13 +331,15 @@ export async function saveSessionRecord(
  * ⚠️ 只認手動結束的（closeReason='manual'）：自動封場刻意不產草稿，
  * 沒人整理過的東西不該變成待處理的提醒，不然每次忘記按結束都會冒一條。
  */
-export async function pendingDraft(clientId: string): Promise<PendingDraft | null> {
+export async function pendingDraft(coachId: string, clientId: string): Promise<PendingDraft | null> {
   const [row] = await db
     .select(COLS)
     .from(consultSessions)
+    .innerJoin(clients, eq(clients.id, consultSessions.clientId))
     .where(
       and(
         eq(consultSessions.clientId, clientId),
+        ownedClient(coachId),
         isNull(consultSessions.reviewId),
         sql`${consultSessions.draftSummary} is not null`,
       ),

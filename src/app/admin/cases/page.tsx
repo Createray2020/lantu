@@ -102,7 +102,7 @@ export default async function CasesPage() {
         </div>
         {peers.length === 0 ? (
           <div className="rounded-lg border border-[#e0bd8b]/40 bg-[#e0bd8b]/10 px-4 py-3 text-sm text-[#e0bd8b]">
-            還沒有已開通的顧問，無法登錄案件。
+            還沒有已開通的教練，無法登錄案件。
           </div>
         ) : moduleOptions.length === 0 ? (
           <div className="rounded-lg border border-[#e0bd8b]/40 bg-[#e0bd8b]/10 px-4 py-3 text-sm text-[#e0bd8b]">

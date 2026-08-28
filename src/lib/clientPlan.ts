@@ -2,7 +2,7 @@
 // coachId=null（還沒掛教練）；掛上教練、被授權後才「真的進入規劃」。
 import { and, eq, asc, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clients, plans } from "@/Shared/db/schema";
+import { clients, coachDisplayName, coaches, plans } from "@/Shared/db/schema";
 import { newCase } from "@/lib/engine";
 import { computePassport, passportBaseYear, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
 import { normalizeIntent, DEFAULT_TARGET, type Intent } from "@/lib/intent";
@@ -152,6 +152,7 @@ async function ownPlanRow(clientId: string): Promise<{ id: string; data: unknown
 
 const PASSPORT_LABEL = "人生護照";
 const CLIENT_TRACK = "client";
+const COACH_TRACK = "coach";
 
 export type ClientOwnPlan = {
   clientId: string;
@@ -277,18 +278,68 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
   await logRevision(plan.id, "client", user.id, user.name, c);
 }
 
-// 取要餵給 lantu-app.html 客戶端唯讀檢視的 case。
-// 刻意仍取「最新一份」（跨兩軌）——掛了教練之後，客戶在「我的財務藍圖」看到的就是教練做的年度版，
-// 這是對的：客戶要看的是最新的規劃，不是自己當初的護照骨架。
-// 「客戶能改哪些 section」是另一件事（見 客戶可編頁面清單），與這裡取哪一份無關。
-export async function getClientPlanCase(clientUserId: string): Promise<{ planId: string; clientId: string; data: unknown; code: string | null } | null> {
+/**
+ * 客戶端「我的財務藍圖」要看的那一份。
+ *
+ * ⚠️ 舊版是 `where(clientId).orderBy(createdAt desc).limit(1)`，**一個 track 條件都沒有**，
+ * 所以掛上教練之後兩個入口會讀到不同的 plan：
+ *   /portal       首頁走 ownPlanRow() → 永遠是客戶軌（人生護照）
+ *   /portal/plan  藍圖走這裡 → 建立時間最新的那一份，也就是教練軌
+ * 客戶改了護照存檔，回首頁數字變了、點進藍圖卻紋風不動，而畫面上沒有任何東西
+ * 說明「你正在看的是教練做的版本」。
+ *
+ * 現在是明確的選擇而不是排序的副作用：**優先教練軌的最新一份，沒有才落回客戶軌**。
+ * 這個順序是對的 —— 掛了教練之後，客戶要看的就是教練做的規劃，不是自己當初的骨架。
+ * 但選了哪一軌必須講出來，所以回傳值多帶 track / planYear / coachName 給畫面用
+ *（「客戶能改哪些 section」是另一件事，與這裡取哪一份無關）。
+ */
+export type ClientPlanCase = {
+  planId: string;
+  clientId: string;
+  data: unknown;
+  code: string | null;
+  /** 這一份屬於哪一軌：coach＝教練做的年度版，client＝客戶自己的人生護照。 */
+  track: "coach" | "client";
+  /** 這一份的年度。`year` 與 `planYear` 是同一個值的兩個名字（畫面端讀 `year`）。 */
+  planYear: number;
+  year: number;
+  /** 主責教練的顯示名稱；沒有掛教練就是 null。 */
+  coachName: string | null;
+};
+
+export async function getClientPlanCase(clientUserId: string): Promise<ClientPlanCase | null> {
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, clientUserId)).limit(1);
   const client = cRows[0];
   if (!client) return null;
-  const pRows = await db.select().from(plans).where(eq(plans.clientId, client.id)).orderBy(desc(plans.createdAt)).limit(1);
-  const plan = pRows[0];
+
+  const pick = async (track: string) => {
+    const rows = await db
+      .select({ id: plans.id, data: plans.data, year: plans.year, track: plans.track })
+      .from(plans)
+      .where(and(eq(plans.clientId, client.id), eq(plans.track, track)))
+      .orderBy(desc(plans.year), desc(plans.createdAt))
+      .limit(1);
+    return rows[0] ?? null;
+  };
+  const plan = (await pick(COACH_TRACK)) ?? (await pick(CLIENT_TRACK));
   if (!plan) return null;
-  return { planId: plan.id, clientId: client.id, data: plan.data, code: client.code ?? null };
+
+  let coachName: string | null = null;
+  if (client.coachId) {
+    const co = await db.select({ name: coachDisplayName }).from(coaches).where(eq(coaches.id, client.coachId)).limit(1);
+    coachName = co[0]?.name ?? null;
+  }
+
+  return {
+    planId: plan.id,
+    clientId: client.id,
+    data: plan.data,
+    code: client.code ?? null,
+    track: plan.track === COACH_TRACK ? "coach" : "client",
+    planYear: plan.year,
+    year: plan.year,
+    coachName,
+  };
 }
 
 /**

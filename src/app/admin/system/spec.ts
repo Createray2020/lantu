@@ -102,13 +102,13 @@ export const TABS: TabSpec[] = [
           { key: "teamCreditPeerInverted", label: "平階／倒掛案件業績計入直屬主管", type: "bool" },
           { key: "teamCreditEachLevel", label: "沿輔導鏈逐層向上，鏈上各層皆計入", type: "bool" },
           { key: "teamCreditExecChain", label: "推廣／執案分屬不同鏈時歸執案者的鏈", type: "bool" },
-          { key: "teamCreditPeerRecruit", label: "同業招募顧問業績計入推薦人", type: "bool" },
+          { key: "teamCreditPeerRecruit", label: "同業招募教練業績計入推薦人", type: "bool" },
           { key: "teamCreditChainOnly", label: "非該鏈之協助／轉介不得計入", type: "bool" },
         ],
       },
       {
         title: "代管（第九條）",
-        note: "認證顧問招募到平階或更高階顧問時，由其上層（達門檻職級者）暫代輔導。",
+        note: "認證教練招募到平階或更高階教練時，由其上層（達門檻職級者）暫代輔導。",
         fields: [
           { key: "custodyMinRankCode", label: "推薦人未達此職級即由上層代管", type: "rank", hint: "V4＝S1" },
           { key: "custodyUseCustodian", label: "代管期間差％與平階獎金依代管者計算", type: "bool" },
@@ -140,7 +140,7 @@ export const TABS: TabSpec[] = [
         title: "B 軌配套（第十三條）",
         fields: [
           { key: "trackBMinRankCode", label: "B 軌開放的最低起始職級", type: "rank", hint: "V4＝S1" },
-          { key: "selfExecFirstN", label: "認證顧問階段須親自執案案數", type: "num", unit: "案", hint: "V4＝5" },
+          { key: "selfExecFirstN", label: "認證教練階段須親自執案案數", type: "num", unit: "案", hint: "V4＝5" },
         ],
       },
     ],
@@ -213,7 +213,7 @@ export const TABS: TabSpec[] = [
       {
         title: "未達門檻之處理（第十七、十八條）",
         fields: [
-          { key: "penaltySuspendRecruit", label: "暫停「招募直轄顧問」資格", type: "bool" },
+          { key: "penaltySuspendRecruit", label: "暫停「招募直轄教練」資格", type: "bool" },
           { key: "penaltySuspendLead", label: "暫停「公司派案」受派資格", type: "bool" },
           { key: "penaltyNoDemote", label: "職級不因未達門檻而降級", type: "bool" },
           { key: "penaltyKeepDiff", label: "既有直轄團隊差％照常領取", type: "bool" },

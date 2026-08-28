@@ -12,42 +12,79 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  *   endSession()        定案客戶可見 → 算後指標 → 產草稿 → 封場（**不產 review**）
  *   saveSessionRecord() 教練改完（日期／類型／全文）按存檔 → 才產 review 與 action_items
  *
- * ⚠️ 這裡守的最重要一條：草稿一定要落地。場次已封而紀錄還沒生出來的空窗，
- * 中間把視窗關掉就是資料損失——違反「忘記按結束絕不能造成資料損失」那條原則。
+ * ⚠️ 這裡守的最重要兩條：
+ *   1. 草稿一定要落地。場次已封而紀錄還沒生出來的空窗，中間把視窗關掉就是資料損失。
+ *   2. saveSessionRecord() 是**先占**的。舊版的冪等鎖讀的是最後一步才寫進去的 review_id，
+ *      所以整段 createReview + createActionItem 都在鎖生效之前跑 —— 連按兩次存檔
+ *      就是兩筆諮詢紀錄加兩份一樣的待辦，而場次上一個 review_id 都沒掛。
  */
+type Row = Record<string, unknown>;
+type Stmt = Record<string, unknown> & { _run: () => Row[] };
+
 const state = vi.hoisted(() => ({
-  rows: [] as unknown[][],          // 每次 .limit() 依序取一組
-  updates: [] as Record<string, unknown>[],
-  reviews: [] as Record<string, unknown>[],
-  items: [] as string[],
+  rows: [] as unknown[][],                                    // 每次 .limit() 依序取一組
+  updates: [] as Record<string, unknown>[],                   // 每一次 update().set(v) 的 v
+  inserts: [] as { table: string; values: Record<string, unknown>[] }[],
+  deletes: [] as string[],                                    // delete from <table>
+  /** 先占那一句 `where review_id is null ... returning` 回幾列。[] ＝別人已經存過。 */
+  claim: [{ id: "s1" }] as Record<string, unknown>[],
   notes: [] as { kind: string; body: string; visible: boolean; authorAccess: string; id: string; authorName: string | null }[],
 }));
 
-vi.mock("@/Shared/db", () => ({
-  db: {
-    select: () => {
-      const o: Record<string, unknown> = {};
-      for (const k of ["from", "where", "orderBy", "innerJoin"]) o[k] = () => o;
-      o.limit = () => Promise.resolve(state.rows.shift() ?? []);
-      return o;
-    },
-    update: () => ({
-      set: (v: Record<string, unknown>) => {
-        state.updates.push(v);
-        const r: Record<string, unknown> = {};
-        r.where = () => r;
-        r.returning = () => Promise.resolve([{ id: "s1", clientId: "c1", planId: "p1", draftSummary: v.draftSummary ?? null }]);
-        // 沒有 .returning() 的呼叫（例如清草稿）要能直接 await
-        return Object.assign(Promise.resolve(), r);
+vi.mock("@/Shared/db", () => {
+  const chain = (run: () => Row[]): Stmt => {
+    const c = { _run: run } as Stmt;
+    for (const k of ["where", "returning", "orderBy", "innerJoin", "onConflictDoNothing"]) c[k] = () => c;
+    c.limit = () => Promise.resolve(run());
+    // batch 拿到的是還沒被 await 的語句物件；直接 await 時才「執行」。
+    c.then = (res: (v: Row[]) => unknown, rej: (e: unknown) => unknown) => Promise.resolve(run()).then(res, rej);
+    return c;
+  };
+  const nameOf = (t: unknown) => String((t as { _n?: string })?._n ?? "?");
+  return {
+    db: {
+      select: () => {
+        const o: Record<string, unknown> = {};
+        for (const k of ["from", "where", "orderBy", "innerJoin"]) o[k] = () => o;
+        o.limit = () => Promise.resolve(state.rows.shift() ?? []);
+        return o;
       },
-    }),
-    insert: () => ({ values: () => ({ returning: () => Promise.resolve([{ id: "new" }]) }) }),
-  },
-}));
-// 假 schema：每個欄位都是個空物件就夠了（真正的 where 條件由假 drizzle 吃掉）。
+      update: (t: unknown) => ({
+        set: (v: Record<string, unknown>) => {
+          state.updates.push(v);
+          // 先占那一句（唯一一句會 set reviewId 的 update）回 state.claim；
+          // 其餘（封場、改註記可見性）回一列假的場次。
+          const isClaim = nameOf(t) === "consult_sessions" && "reviewId" in v;
+          return chain(() =>
+            isClaim
+              ? state.claim
+              : [{ id: "s1", clientId: "c1", planId: "p1", draftSummary: v.draftSummary ?? null }],
+          );
+        },
+      }),
+      insert: (t: unknown) => ({
+        values: (v: Record<string, unknown> | Record<string, unknown>[]) => {
+          state.inserts.push({ table: nameOf(t), values: Array.isArray(v) ? v : [v] });
+          return chain(() => [{ id: "new" }]);
+        },
+      }),
+      delete: (t: unknown) => {
+        state.deletes.push(nameOf(t));
+        return chain(() => []);
+      },
+      // neon-http 的 db.batch()：一次交易送多句，依序回每一句的結果。
+      batch: (items: Stmt[]) => Promise.resolve(items.map((i) => i._run())),
+    },
+  };
+});
+// 假 schema：欄位給空物件就夠（真正的 where 條件由假 drizzle 吃掉），
+// 但表要認得出自己是誰 —— 先占／回滾都要分辨寫的是哪一張表。
 vi.mock("@/Shared/db/schema", () => {
-  const tbl = () => new Proxy({}, { get: () => ({}) });
-  return { consultSessions: tbl(), clients: tbl(), clientNotes: tbl(), planRevisions: tbl(), plans: tbl(), reviews: tbl(), actionItems: tbl() };
+  const tbl = (n: string) => new Proxy({}, { get: (_t, k) => (k === "_n" ? n : {}) });
+  return {
+    consultSessions: tbl("consult_sessions"), clients: tbl("clients"), clientNotes: tbl("client_notes"),
+    planRevisions: tbl("plan_revisions"), plans: tbl("plans"), reviews: tbl("reviews"), actionItems: tbl("action_items"),
+  };
 });
 vi.mock("drizzle-orm", () => {
   const f = () => ({});
@@ -56,16 +93,7 @@ vi.mock("drizzle-orm", () => {
 vi.mock("./clientScope", () => ({ ownedClient: () => ({}) }));
 vi.mock("./snapshot", () => ({ sessionMetrics: () => ({ shortPV: 3_240_000, net: 0, gap: null }) }));
 vi.mock("./notes", () => ({ notesOfSession: async () => state.notes }));
-vi.mock("./reviews", () => ({
-  createReview: async (_c: string, _cl: string, input: Record<string, unknown>) => {
-    state.reviews.push(input);
-    return "rev1";
-  },
-  createActionItem: async (_c: string, _cl: string, input: { title: string }) => {
-    state.items.push(input.title);
-    return "it1";
-  },
-}));
+vi.mock("./reviews", () => ({ assertPlanOfClient: async () => {} }));
 
 const Session = await import("./consultSession");
 
@@ -74,8 +102,11 @@ const N = (kind: string, body: string) =>
 
 const openSessionRow = { id: "s1", clientId: "c1", coachId: "u1", planId: "p1", revisionId: "r1", startedAt: new Date(), endedAt: null, closeReason: null, reviewId: null, metricsBefore: { shortPV: 4_860_000, net: 0, gap: null }, metricsAfter: null, closingNote: null, draftSummary: null };
 
+const inserted = (table: string) => state.inserts.filter((i) => i.table === table).flatMap((i) => i.values);
+
 beforeEach(() => {
-  state.rows = []; state.updates = []; state.reviews = []; state.items = []; state.notes = [];
+  state.rows = []; state.updates = []; state.inserts = []; state.deletes = [];
+  state.claim = [{ id: "s1" }]; state.notes = [];
 });
 
 describe("endSession：只產草稿，不產紀錄", () => {
@@ -91,8 +122,8 @@ describe("endSession：只產草稿，不產紀錄", () => {
   it("⚠️ 不會寫任何 review 或 action_item——那是存檔那一步的事", async () => {
     const r = await Session.endSession("u1", "s1", { closingNote: "客戶今天很開放" });
     expect(r.ok).toBe(true);
-    expect(state.reviews, "按結束的當下不該有正式紀錄").toEqual([]);
-    expect(state.items, "待辦也要等存檔才進追蹤").toEqual([]);
+    expect(inserted("reviews"), "按結束的當下不該有正式紀錄").toEqual([]);
+    expect(inserted("action_items"), "待辦也要等存檔才進追蹤").toEqual([]);
   });
 
   it("⚠️⚠️ 草稿一定要落地（關掉視窗不能掉東西）", async () => {
@@ -139,34 +170,58 @@ describe("saveSessionRecord：教練改完才變正式紀錄", () => {
       date: "2026-08-05", type: "adhoc", summary: "貼進來的一整段", attendees: "本人、配偶", nextAppt: null,
     });
     expect(r.ok).toBe(true);
-    expect(state.reviews.length).toBe(1);
-    expect(state.reviews[0].date, "不可以被覆蓋成今天").toBe("2026-08-05");
-    expect(state.reviews[0].type).toBe("adhoc");
-    expect(state.reviews[0].summary).toBe("貼進來的一整段");
+    const revs = inserted("reviews");
+    expect(revs.length).toBe(1);
+    expect(revs[0].date, "不可以被覆蓋成今天").toBe("2026-08-05");
+    expect(revs[0].type).toBe("adhoc");
+    expect(revs[0].summary).toBe("貼進來的一整段");
   });
 
   it("待辦這時候才進追蹤", async () => {
     await Session.saveSessionRecord("u1", "s1", { date: "2026-08-05", type: "review" });
-    expect(state.items).toEqual(["請個案提供三筆負債對帳單"]);
+    expect(inserted("action_items").map((i) => i.title)).toEqual(["請個案提供三筆負債對帳單"]);
   });
 
   it("存完要把草稿清掉、掛上 reviewId（提醒才會消失）", async () => {
-    await Session.saveSessionRecord("u1", "s1", { date: "2026-08-05", type: "review" });
-    const done = state.updates.find((u) => "draftSummary" in u && u.draftSummary === null);
-    expect(done, "草稿要清空").toBeTruthy();
-    expect(done!.reviewId).toBe("rev1");
+    const r = await Session.saveSessionRecord("u1", "s1", { date: "2026-08-05", type: "review" });
+    expect(r.ok).toBe(true);
+    const done = state.updates.find((u) => "reviewId" in u);
+    expect(done, "要占位並掛上 reviewId").toBeTruthy();
+    expect(done!.draftSummary, "草稿要一起清空").toBe(null);
+    // 掛上去的就是預先產生的那一組 uuid，跟寫進 reviews 的那一列同一個。
+    if (!r.ok) return;
+    expect(done!.reviewId).toBe(r.reviewId);
+    expect(inserted("reviews")[0].id).toBe(r.reviewId);
   });
 
-  it("同一場不能存兩次紀錄", async () => {
+  it("同一場不能存兩次紀錄（快取到的舊列就已經有 reviewId）", async () => {
     state.rows = [[{ ...closed, reviewId: "already" }], [{ id: "c1" }]];
     const r = await Session.saveSessionRecord("u1", "s1", { date: "2026-08-05", type: "review" });
     expect(r.ok).toBe(false);
-    expect(state.reviews).toEqual([]);
+    expect(inserted("reviews")).toEqual([]);
   });
 
   it("沒有 planId 傳進來時沿用場次自己的版本", async () => {
     await Session.saveSessionRecord("u1", "s1", { date: "2026-08-05", type: "review" });
-    expect(state.reviews[0].planId).toBe("p1");
+    expect(inserted("reviews")[0].planId).toBe("p1");
+  });
+
+  it("⚠️⚠️ 先占：id 是自己產的，而且 review 要在占位之前寫（外鍵指向它）", async () => {
+    await Session.saveSessionRecord("u1", "s1", { date: "2026-08-05", type: "review" });
+    const order = state.inserts.map((i) => i.table);
+    expect(order[0], "reviews 必須第一句：consult_sessions.review_id 的外鍵指向它").toBe("reviews");
+    expect(order).toContain("action_items");
+    expect(inserted("reviews")[0].id, "id 由 Node 先產，不是等 DB 給").toMatch(/^[0-9a-f-]{36}$/);
+    expect(inserted("action_items")[0].reviewId).toBe(inserted("reviews")[0].id);
+  });
+
+  it("⚠️⚠️ 沒占到（別人同時存過）→ 回失敗，而且把剛剛寫進去的 review 收回去", async () => {
+    state.claim = []; // where review_id is null 回 0 列
+    const r = await Session.saveSessionRecord("u1", "s1", { date: "2026-08-05", type: "review" });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toContain("存過");
+    expect(state.deletes, "孤兒 review 要刪掉（action_items 是 CASCADE，會一起走）").toEqual(["reviews"]);
   });
 });
 

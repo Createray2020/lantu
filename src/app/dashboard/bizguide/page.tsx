@@ -82,7 +82,7 @@ export default async function BizGuidePage() {
         <div>
           <h1 className="font-serif text-2xl">企業主財務規劃 · 作業手冊</h1>
           <p className="text-xs text-[#6f869c] mt-1">
-            顧問的背景知識與現場工具。資料基準 {BIZ_TAX_BASIS}，法規數字統一維護於 <code className="text-[#e0bd8b]">src/lib/bizTax.ts</code>。
+            教練的背景知識與現場工具。資料基準 {BIZ_TAX_BASIS}，法規數字統一維護於 <code className="text-[#e0bd8b]">src/lib/bizTax.ts</code>。
             本頁不構成稅務或法律建議。
           </p>
         </div>
@@ -191,7 +191,7 @@ export default async function BizGuidePage() {
               ["把公司股權當成流動資產", "高估可動用淨值，做出他執行不了的規劃", "放進資產表但獨立標註「不流動」，另算流動性淨值"],
               ["忽略個人連帶保證", "嚴重低估負債，保障額度算錯", "主動詢問每一筆借款的保證條件"],
               ["太早談產品", "客戶立刻進入防衛狀態，關係結束", "前三次會談的目標是「讓他覺得被理解」"],
-              ["只做稅務或保險，不碰治理", "治標；客戶明年還是同樣的問題", "能指出「你要先整理帳」的顧問，才是長期夥伴"],
+              ["只做稅務或保險，不碰治理", "治標；客戶明年還是同樣的問題", "能指出「你要先整理帳」的教練，才是長期夥伴"],
             ]}
           />
         </Card>

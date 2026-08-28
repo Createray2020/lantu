@@ -1,7 +1,7 @@
 // 諮詢紀錄與動作項目資料層（教練隔離；透過 clientId → coachId 驗證）。
 import { and, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { actionItems, clients, reviews } from "@/Shared/db/schema";
+import { actionItems, clients, plans, reviews } from "@/Shared/db/schema";
 
 async function assertClientOwned(coachId: string, clientId: string): Promise<void> {
   const [row] = await db
@@ -10,6 +10,27 @@ async function assertClientOwned(coachId: string, clientId: string): Promise<voi
     .where(and(eq(clients.id, clientId), eq(clients.coachId, coachId)))
     .limit(1);
   if (!row) throw new Error("forbidden");
+}
+
+/**
+ * 諮詢紀錄掛的 planId 必須是**同一位客戶**的規劃。
+ *
+ * 少了這一句，只要驗過 clientId（那是呼叫端唯一會驗的東西），planId 就原樣寫進去了：
+ * 拿別位客戶（甚至別位教練名下客戶）的 plan id 送進來也照收。後果不是外洩——
+ * reviews.plan_id 只是個 uuid，畫面不會去讀它——而是資料默默錯位：
+ * 客戶詳情頁的「這次檢視的是哪一版」指到不存在於這位客戶的版本，
+ * 而 deletePlan 的 ON DELETE SET NULL 又會在別人刪版本時把它清成 null，事後查不出原本指到誰。
+ *
+ * planId 為 null／undefined＝這筆紀錄不掛版本，是正常情況，直接放行。
+ */
+export async function assertPlanOfClient(planId: string | null | undefined, clientId: string): Promise<void> {
+  if (!planId) return;
+  const [row] = await db
+    .select({ id: plans.id })
+    .from(plans)
+    .where(and(eq(plans.id, planId), eq(plans.clientId, clientId)))
+    .limit(1);
+  if (!row) throw new Error("plan-not-of-client");
 }
 
 export type ReviewInput = {
@@ -23,6 +44,7 @@ export type ReviewInput = {
 
 export async function createReview(coachId: string, clientId: string, input: ReviewInput): Promise<string> {
   await assertClientOwned(coachId, clientId);
+  await assertPlanOfClient(input.planId, clientId);
   const [row] = await db
     .insert(reviews)
     .values({
@@ -49,7 +71,9 @@ async function reviewOwnerClient(coachId: string, reviewId: string): Promise<str
 }
 
 export async function updateReview(coachId: string, reviewId: string, patch: Partial<ReviewInput>): Promise<void> {
-  if (!(await reviewOwnerClient(coachId, reviewId))) throw new Error("forbidden");
+  const clientId = await reviewOwnerClient(coachId, reviewId);
+  if (!clientId) throw new Error("forbidden");
+  if (patch.planId !== undefined) await assertPlanOfClient(patch.planId, clientId);
   await db
     .update(reviews)
     .set({

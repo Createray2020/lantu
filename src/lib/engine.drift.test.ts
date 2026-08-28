@@ -144,6 +144,91 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(E.kindNorm("壽險")).toBe("壽險");
   });
 
+  // 2026/08/28：existingCover 的保單側漏了 policyActive()——同檔的 annualPremiumBy()、
+  // policyBenefitRows() 都有過，只有這一支沒有，標「失效／停效」的保額仍被算成已備。
+  it("existingCover：失效／停效的保單不算已備（兩邊同一條）", () => {
+    expect(HTML).toContain(
+      "var f=POLICY_MAP[kind];var fromPol=f?sum(c.policies,function(p){return (policyActive(p)&&p.insured===member)?n(p[f]):0}):0;",
+    );
+
+    const c = E.sampleCase();
+    const pm = E.primaryMember(c).name;
+    const before = E.existingCover(c, pm, "壽險");
+    expect(before).toBeGreaterThan(0);
+    c.policies.forEach((p: { insured: string; status?: string }) => {
+      if (p.insured === pm) p.status = "失效";
+    });
+    expect(E.existingCover(c, pm, "壽險")).toBe(0);
+    // 停效同理；手動 coverages[] 那一半不受影響
+    c.policies.forEach((p: { status?: string }) => { p.status = "停效"; });
+    expect(E.existingCover(c, pm, "壽險")).toBe(0);
+    c.coverages = [{ member: pm, kind: "壽險", comm: 1_000_000, social: 0 }];
+    expect(E.existingCover(c, pm, "壽險")).toBe(1_000_000);
+    // 留空＝有效（刻意的，不要改）
+    c.coverages = [];
+    c.policies.forEach((p: { status?: string }) => { delete p.status; });
+    expect(E.existingCover(c, pm, "壽險")).toBe(before);
+  });
+
+  // 2026/08/28：advice() 的「可調整資產」直接讀原幣 a.value，外幣資產少乘匯率。
+  it("advice()：可調整資產走 aVal（換匯），兩邊逐字相同", () => {
+    expect(HTML).toContain("var movable=sum(c.assets,function(a){return a.movable?aVal(a):0});");
+
+    const c = E.sampleCase();
+    c.assets = c.assets.map((a: { movable?: boolean }) => ({ ...a, movable: false }));
+    c.assets.push({ name: "美股", owner: "本人", mainCat: "可投資資產", type: "股票",
+      cls: "流動", currency: "美金", fxRate: 32, value: 100000, movable: true });
+    const row = E.advice(c).find((x: string[]) => x[0] === "資產活化配置");
+    expect(row, "應該要有『資產活化配置』這一條").toBeTruthy();
+    // 100,000 美金 × 32 ＝ 3,200,000（漏乘匯率的話這裡會是 100,000）
+    expect(row[1]).toContain(E.fmt(3_200_000));
+  });
+
+  // 2026/08/28：唯一的真實引擎漂移。html 的 allocInvest 會把調整動作裡的
+  // 定期定額／單筆投入 map 成投資列再 concat，engine 只有 own 那一半
+  // → plan.useAllocReturn 打開時 effReturn 與 allocPV 兩邊不同，
+  //   寫進 DB 的 shortPV／願景達成度／health_grade 與教練畫面上的不是同一個數字。
+  // 以 html 版為準移植進 engine.ts。
+  it("allocInvest：手填的 plan.invest ＋ 動作帶來的投資列，兩邊一致", () => {
+    expect(HTML).toContain(
+      "var fromAct=planActionsOn(c).filter(function(a){return a.cat==='regular'||a.cat==='lump'}).map(function(a){",
+    );
+    expect(HTML).toContain("years:Math.max(1,to-from+(a.cat==='lump'?1:0)),");
+    expect(HTML).toContain("fromAction:true,actionId:a.id};");
+    expect(HTML).toContain("function allocInvestOwn(c){return ((c.plan||{}).invest)||[]}");
+
+    const c = E.sampleCase();
+    c.plan = { invest: [{ name: "手填", src: "新增投入", principal: 0, yearly: 120000, years: 10, ret: 5 }] };
+    c.actions = [
+      { id: "a1", on: true, cat: "regular", name: "每月定期定額", tool: "ETF",
+        payFrom: 41, payTo: 60, payMonthly: 10000, growth: 6 },
+      { id: "a2", on: true, cat: "lump", name: "年終單筆", tool: "ETF",
+        payFrom: 42, payTo: 42, payLump: 500000, growth: 6 },
+      { id: "a3", on: true, cat: "income", name: "加薪", getMonthly: 5000 },
+      { id: "a4", on: false, cat: "regular", name: "關掉的", payMonthly: 99999 },
+    ];
+    const rows = E.allocInvest(c);
+    // 手填 1 列 ＋ regular/lump 各 1 列；income 與關掉的都不算
+    expect(rows).toHaveLength(3);
+    expect(E.allocInvestOwn(c)).toHaveLength(1);
+    const reg = rows[1], lump = rows[2];
+    expect(reg.fromAction).toBe(true);
+    expect(reg.actionId).toBe("a1");
+    expect(reg.yearly).toBe(120000);
+    expect(reg.years).toBe(19);          // 定期定額：60−41（單筆才 +1）
+    expect(reg.ret).toBe(6);
+    expect(lump.principal).toBe(500000);
+    expect(lump.years).toBe(1);          // 單筆：42→42，+1
+    // 動作沒填名稱時退回類別預設名（actCat 也一起移植過來了）
+    c.actions[0].name = "";
+    expect(E.allocInvest(c)[1].name).toBe("定期定額");
+    expect(E.actCat("lump").n).toBe("單筆投入");
+
+    // useAllocReturn 打開時，加權報酬率必須吃得到動作那幾列
+    c.plan.useAllocReturn = true;
+    expect(E.effReturn(c)).toBeGreaterThan(5);
+  });
+
   it("lifeNeed 兩邊都把父母奉養費 × 保障年數 算進責任", () => {
     expect(HTML).toContain("familyAnnualParentSupport(c)*n(nd.protectYears)");
     const c = E.sampleCase();
@@ -212,6 +297,41 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   it("retireNeed：有明細表走逐年折現、沒有走封閉式年金，兩邊一致", () => {
     expect(HTML).toContain("total+=retireAnnual(c,ra+1+k,Math.pow(1+infl,years)*Math.pow(1+g,k))/Math.pow(1+rr,k+1);");
     expect(HTML).toContain("else{total=annualFV*(1-Math.pow((1+g)/(1+rr),m))/(rr-g);}");
+  });
+
+  // 2026/08/28：valid 原本只有 engine 端有，html 連回傳都沒有。
+  // 真實資料裡有一位客戶是 retireAge=100 / lifeExp=85，這個分支一定會被看到。
+  it("retireNeed：valid 兩邊逐字一致，且 html 有把它接上警語", () => {
+    expect(HTML).toContain(
+      "return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,gap:Math.max(0,total-prepared),valid:m>0};",
+    );
+    // 警語本體與四個落點（退休分頁 big3／需求明細／分析頁 retire 模組／報告書退休段）
+    expect(HTML).toContain("function retireInvalidHTML(c,light){");
+    expect(HTML).toContain("退休需求無法計算——請先到「家庭」分頁修正這兩個數字。");
+    expect(HTML).toContain("if(rn.valid===false)return retireInvalidHTML(c);");                    // retireHeroHTML
+    expect(HTML).toContain("if(rn.valid===false)return detailBox('退休需求計算明細',retireInvalidHTML(c));");
+    expect(HTML).toContain("if(x.valid===false)return retireInvalidHTML(c);");                     // 分析頁模組
+    expect(HTML).toContain("(rn.valid===false");                                                   // 報告書
+
+    const c = E.sampleCase();
+    expect(E.retireNeed(c).valid).toBe(true);
+    c.profile.retireAge = 100;
+    c.profile.lifeExp = 85;
+    const rn = E.retireNeed(c);
+    expect(rn.valid).toBe(false);
+    expect(rn.余年).toBe(0);
+    expect(rn.gap).toBe(0);   // ← 這個 0 就是會被誤讀成「沒有退休缺口」的那個
+  });
+
+  it("health()：safety 的 0~100 clamp 兩邊都要有", () => {
+    expect(HTML).toContain(
+      "var safety=Math.max(0,Math.min(100,Math.round((balScore*25+reserve*15+credit*15+debtBal*15+riskCover*30))));",
+    );
+  });
+
+  it("riskQScore()：題目索引越界時回 0，兩邊都要有防護", () => {
+    expect(HTML).toContain("function riskQScore(qi,list){var Q=RISK_Q[qi],mx=0;if(!Q)return 0;");
+    expect(E.riskQScore(999, [0])).toBe(0);
   });
 
   it("延後退休會推每位賺薪成員的退休年齡，兩邊一致", () => {

@@ -30,7 +30,6 @@ import {
   STATUS_LABEL,
   PLAN_STATUS_LABEL,
   REVIEW_TYPE_LABEL,
-  REVIEW_TYPES,
   CLIENT_SOURCES,
 } from "../../format";
 
@@ -42,6 +41,10 @@ type ReviewLite = { id: string; date: string; type: string; planId: string | nul
 type ItemLite = { id: string; title: string; owner: string | null; dueDate: string | null; done: boolean; reviewId: string | null };
 // 數字欄位可能是 null＝「這一版的 data 算不出來」，畫面顯示「—」而不是假的 0。
 type Compare = { id: string; year: number; label: string | null; status: string; net: number | null; assetTotal: number | null; debtTotal: number | null; incTotal: number | null; expTotal: number | null; save: number | null; gap: number | null; grade: string | null; safety: number | null; freedom: number | null; vision: number | null };
+
+type ActionOutcome = { ok: true } | { ok: false; error: string };
+type IdOutcome = { ok: true; id: string } | { ok: false; error: string };
+const FALLBACK_ERR = "這個動作沒有完成。請重新整理頁面再試一次；若還是失敗請聯繫管理員。";
 
 const field = "w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7]";
 const btn = "px-3 py-1.5 text-sm font-bold rounded-md";
@@ -77,15 +80,38 @@ export default function ClientDetail({
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
 
-  function run(fn: () => Promise<unknown>, after?: (r: unknown) => void) {
+  // server action 一律回 { ok } —— 失敗時「為什麼」才是使用者要的東西
+  // （到期唯讀、額度已滿、沒有權限…），「操作失敗，請重試」只會讓人重試一百次。
+  function run(fn: () => Promise<ActionOutcome>, after?: () => void) {
     setErr("");
     start(async () => {
       try {
         const r = await fn();
-        if (after) after(r);
+        if (!r.ok) {
+          setErr(r.error || FALLBACK_ERR);
+          return;
+        }
+        if (after) after();
         else router.refresh();
-      } catch {
-        setErr("操作失敗，請重試。");
+      } catch (e) {
+        setErr(e instanceof Error && e.name !== "Error" && e.message ? e.message : FALLBACK_ERR);
+      }
+    });
+  }
+
+  /** 需要新版本 id 才知道要跳去哪的兩支（複製、開新版）。 */
+  function runId(fn: () => Promise<IdOutcome>, after: (id: string) => void) {
+    setErr("");
+    start(async () => {
+      try {
+        const r = await fn();
+        if (!r.ok) {
+          setErr(r.error || FALLBACK_ERR);
+          return;
+        }
+        after(r.id);
+      } catch (e) {
+        setErr(e instanceof Error && e.name !== "Error" && e.message ? e.message : FALLBACK_ERR);
       }
     });
   }
@@ -146,8 +172,8 @@ export default function ClientDetail({
           pending={pending}
           readOnly={readOnly}
           onOpen={(id) => router.push(`/dashboard/plans/${id}/edit`)}
-          onClone={(id) => run(() => clonePlanAction(id), (r) => router.push(`/dashboard/plans/${r as string}/edit`))}
-          onNew={() => run(() => createPlanAction(client.id, client.name), (r) => router.push(`/dashboard/plans/${r as string}/edit`))}
+          onClone={(id) => runId(() => clonePlanAction(id), (newId) => router.push(`/dashboard/plans/${newId}/edit`))}
+          onNew={() => runId(() => createPlanAction(client.id, client.name), (newId) => router.push(`/dashboard/plans/${newId}/edit`))}
           onStatus={(id, status) => run(() => updatePlanMetaAction(client.id, id, { status }))}
           onDelete={(id) => { if (confirm("刪除此年度版本？此動作無法復原。")) run(() => deletePlanAction(client.id, id)); }}
         />
@@ -164,8 +190,14 @@ export default function ClientDetail({
           pending={pending}
           readOnly={readOnly}
           onAddReview={(input) => run(() => createReviewAction(client.id, input))}
-          onSaveDraft={(sessionId, input) => run(async () => { await saveConsultRecordAction(client.id, sessionId, input); })}
-          onDiscardDraft={(sessionId) => run(async () => { await discardDraftAction(client.id, sessionId); })}
+          onSaveDraft={(sessionId, input) => run(async () => {
+            const r = await saveConsultRecordAction(client.id, sessionId, input);
+            return r.ok ? { ok: true } : { ok: false, error: r.error };
+          })}
+          onDiscardDraft={(sessionId) => run(async () => {
+            const ok = await discardDraftAction(client.id, sessionId);
+            return ok ? { ok: true } : { ok: false, error: "草稿丟不掉——它可能已經被存成正式紀錄了，重新整理看看。" };
+          })}
           onUpdateReview={(id, input) => run(() => updateReviewAction(client.id, id, input))}
           onDeleteReview={(id) => { if (confirm("刪除此諮詢紀錄？")) run(() => deleteReviewAction(client.id, id)); }}
           onAddItem={(input) => run(() => createActionItemAction(client.id, input))}

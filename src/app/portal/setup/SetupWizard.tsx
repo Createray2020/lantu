@@ -20,6 +20,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 const inputCls =
   "w-full bg-[#0a1a28] border border-white/12 rounded-lg px-3 py-2 text-[#eef2f7] text-sm focus:border-[#c99a5b] outline-none";
+const inputErrCls =
+  "w-full bg-[#0a1a28] border border-[#ff9b9b]/70 rounded-lg px-3 py-2 text-[#eef2f7] text-sm focus:border-[#ff9b9b] outline-none";
 
 const emptyBasics: ClientBasics = { name: "", birth: "", gender: "", phone: "", email: "", marital: "", dependents: 0 };
 const emptyCross: CrossInputs = { income: 0, expense: 0, assets: 0, liabilities: 0 };
@@ -41,14 +43,31 @@ export default function SetupWizard({
   const [localLink, setLocalLink] = useState<LinkStatus>(link);
   const [reqStatus, setReqStatus] = useState<"idle" | "sending" | "error">("idle");
   const [reqErr, setReqErr] = useState<string | null>(null);
+  // 姓名與生日是後面所有計算的地基（年齡決定退休年期、教練名冊靠姓名認人），全空存下去
+  // 只會生出一份誰也用不上的空規劃，還回客戶一個看起來像評價的 0%。
+  const [fieldErr, setFieldErr] = useState<{ name?: string; birth?: string }>({});
 
   const gap = useMemo(() => computeGap(monthlyNeedWan, c), [monthlyNeedWan, c]);
   const ratePct = Math.round(gap.achieveRate * 100);
+  // 十字表四格全 0＝還沒填，不是「缺口為零」。這時候算出來的達成率沒有意義。
+  const crossEmpty = !c.income && !c.expense && !c.assets && !c.liabilities;
 
-  const setBasic = (k: keyof ClientBasics, v: string | number) => setB((p) => ({ ...p, [k]: v }));
+  const setBasic = (k: keyof ClientBasics, v: string | number) => {
+    setB((p) => ({ ...p, [k]: v }));
+    if (k === "name" || k === "birth") setFieldErr((p) => ({ ...p, [k]: undefined }));
+  };
   const setCross = (k: keyof CrossInputs, v: number) => { setC((p) => ({ ...p, [k]: v })); };
 
   async function onSubmitCurrent() {
+    const errs: { name?: string; birth?: string } = {};
+    if (!b.name.trim()) errs.name = "請填姓名";
+    if (!b.birth) errs.birth = "請填生日——年齡是所有試算的起點";
+    setFieldErr(errs);
+    if (errs.name || errs.birth) {
+      setSaveStatus("error");
+      setSaveErr("請先補上上方標示的必填欄位");
+      return;
+    }
     setSaveStatus("saving"); setSaveErr(null);
     try {
       const res = await saveSetupAction(b, c, it);
@@ -81,8 +100,25 @@ export default function SetupWizard({
       <section className="rounded-2xl bg-[#12334f] border border-white/8 p-5 sm:p-6 mb-4">
         <h2 className="font-serif text-lg mb-4">👤 基本資料</h2>
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="姓名"><input className={inputCls} value={b.name} onChange={(e) => setBasic("name", e.target.value)} /></Field>
-          <Field label="生日"><input type="date" className={inputCls} value={b.birth} onChange={(e) => setBasic("birth", e.target.value)} /></Field>
+          <Field label="姓名">
+            <input
+              className={fieldErr.name ? inputErrCls : inputCls}
+              aria-invalid={!!fieldErr.name}
+              value={b.name}
+              onChange={(e) => setBasic("name", e.target.value)}
+            />
+            {fieldErr.name && <span className="block text-[11px] text-[#ff9b9b] mt-1">⚠ {fieldErr.name}</span>}
+          </Field>
+          <Field label="生日">
+            <input
+              type="date"
+              className={fieldErr.birth ? inputErrCls : inputCls}
+              aria-invalid={!!fieldErr.birth}
+              value={b.birth}
+              onChange={(e) => setBasic("birth", e.target.value)}
+            />
+            {fieldErr.birth && <span className="block text-[11px] text-[#ff9b9b] mt-1">⚠ {fieldErr.birth}</span>}
+          </Field>
           <Field label="性別">
             <select className={inputCls} value={b.gender} onChange={(e) => setBasic("gender", e.target.value)}>
               <option value="">請選擇</option><option value="男">男</option><option value="女">女</option>
@@ -121,7 +157,15 @@ export default function SetupWizard({
       </section>
 
       {/* 缺口 ＋ 願景達成率 */}
-      {showGap && (
+      {showGap && crossEmpty && (
+        <section className="rounded-2xl bg-gradient-to-br from-[#0d2b45] to-[#12334f] border border-[#c99a5b]/30 p-6 mb-4">
+          <h2 className="font-serif text-lg mb-2">📊 你的缺口與願景達成率</h2>
+          {/* 四格全 0 就不要端一個 0% 出來：那不是「你差很多」，是「還沒有資料」。 */}
+          <p className="text-sm text-[#cdd9e5]">先填上你的收入與支出，我們才算得出缺口。</p>
+        </section>
+      )}
+
+      {showGap && !crossEmpty && (
         <section className="rounded-2xl bg-gradient-to-br from-[#0d2b45] to-[#12334f] border border-[#c99a5b]/30 p-6 mb-4">
           <h2 className="font-serif text-lg mb-4">📊 你的缺口與願景達成率</h2>
           <div className="grid sm:grid-cols-2 gap-6 items-center">
@@ -139,10 +183,13 @@ export default function SetupWizard({
               <div className="flex justify-between border-t border-white/10 pt-1.5"><span>目前淨資產</span><b>{wan(gap.netWorth)} 萬</b></div>
             </div>
           </div>
+          {/* ⚠️ 缺口是規劃的起點，不是成績單。
+              「還差 X 才能達成」「做得很好」都把它講成了考試分數——而嵐途的命題是
+              「比原本更優化」，不是「補平」。教練端 planHeroV2 已經是這個口徑，這裡跟上。 */}
           <p className="text-[11px] text-[#6f869c] mt-4">
             {gap.monthlyGap > 0
-              ? `目前每月還差 NT$ ${ntfmt(gap.monthlyGap)} 才能達成所有目標。掛上教練，一起把缺口補起來。`
-              : "你目前的存錢能力已足以支應所有目標，做得很好！掛上教練可以幫你更精準地配置。"}
+              ? `以目前的收支，每月差 NT$ ${ntfmt(gap.monthlyGap)}。多數人在這個階段都有缺口，這是規劃的起點，不是壞消息——教練會陪你排出先做哪一件、每一步能改善多少。`
+              : `以目前的收支，每月結餘已覆蓋這些目標所需的金額。接下來要看的是配置與順序：哪些錢放在哪裡、哪一步先做，教練會陪你一起排。`}
           </p>
         </section>
       )}

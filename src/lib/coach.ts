@@ -295,33 +295,71 @@ export async function setCoachOrg(id: string, orgRank: string, uplineId: string 
 //   clients   —— 客戶與規劃是公司資產，要先轉移給接手教練
 //   compCases —— 分潤案件是財務紀錄，一旦有過就不可移除（只能停權）
 
-export type CoachWorkload = { clients: number; cases: number };
+/**
+ * 移除前要看的全部數字。
+ *
+ * ⚠️ `promoterCases` 是 2026/08/28 補上的，它原本整個不存在，而缺它是會讓錢消失的：
+ * comp_cases.promoter_id 是 ON DELETE **SET NULL**（不是 executor_id 的 RESTRICT），
+ * 所以一位「只做推廣、從來不執案」的教練在這裡永遠算出 cases=0、暢行無阻地被移除，
+ * 而他推廣過的每一筆案件的 promoter_id 全部靜靜變成 null。下一次重算分潤時
+ * 那些案件會被當成「沒有推廣者」，推廣端的整段分潤憑空消失，帳上也沒有任何一列說明為什麼。
+ *
+ * `downlines` / `sponsored` 不擋人（upline_id / sponsor_id 都是 SET NULL，刪掉不會失敗），
+ * 但要回給管理端：組織樹斷掉是不可逆的，刪之前總得先讓人看見會斷掉誰。
+ */
+export type CoachWorkload = {
+  clients: number;
+  /** 以執案人身分掛著的案件（RESTRICT，有就一定不能移除）。 */
+  cases: number;
+  /** 以推廣人身分掛著的案件（SET NULL，會被靜靜清空，所以也要擋）。 */
+  promoterCases: number;
+  /** 直屬下線（upline_id 指向他的人）。 */
+  downlines: number;
+  /** 由他推薦入職的人（sponsor_id 指向他的人）。 */
+  sponsored: number;
+};
 
-// 一次算出所有教練的「名下客戶數 / 分潤案件數」，給 /admin 列表用。
+const EMPTY_WORKLOAD: CoachWorkload = { clients: 0, cases: 0, promoterCases: 0, downlines: 0, sponsored: 0 };
+
+// 一次算出所有教練的「名下客戶數 / 分潤案件數 / 推廣案件數 / 下線數」，給 /admin 列表用。
 // 不逐列查：教練數會長，逐列查就是 N+1。
 export async function coachWorkloads(): Promise<Record<string, CoachWorkload>> {
-  const [cl, cs] = await Promise.all([
+  const [cl, cs, pr, up, sp] = await Promise.all([
     db.select({ id: clients.coachId, n: count() }).from(clients).groupBy(clients.coachId),
     db.select({ id: compCases.executorId, n: count() }).from(compCases).groupBy(compCases.executorId),
+    db.select({ id: compCases.promoterId, n: count() }).from(compCases).groupBy(compCases.promoterId),
+    db.select({ id: coaches.uplineId, n: count() }).from(coaches).groupBy(coaches.uplineId),
+    db.select({ id: coaches.sponsorId, n: count() }).from(coaches).groupBy(coaches.sponsorId),
   ]);
   const out: Record<string, CoachWorkload> = {};
-  for (const r of cl) {
-    if (!r.id) continue; // coachId 為 null＝自助客戶，不屬於任何教練
-    out[r.id] = { clients: Number(r.n), cases: 0 };
-  }
-  for (const r of cs) {
-    if (!r.id) continue;
-    out[r.id] = { clients: out[r.id]?.clients ?? 0, cases: Number(r.n) };
-  }
+  const put = (id: string | null, key: keyof CoachWorkload, n: number) => {
+    if (!id) return; // null＝自助客戶／公司來案／組織樹頂點，不屬於任何教練
+    out[id] = { ...EMPTY_WORKLOAD, ...out[id], [key]: n };
+  };
+  for (const r of cl) put(r.id, "clients", Number(r.n));
+  for (const r of cs) put(r.id, "cases", Number(r.n));
+  for (const r of pr) put(r.id, "promoterCases", Number(r.n));
+  for (const r of up) put(r.id, "downlines", Number(r.n));
+  for (const r of sp) put(r.id, "sponsored", Number(r.n));
   return out;
 }
 
 export async function coachWorkload(coachId: string): Promise<CoachWorkload> {
-  const [cl, cs] = await Promise.all([
+  // 五個 count 都走既有索引（comp_cases_promoter_id_idx 早就在了），成本為零。
+  const [cl, cs, pr, up, sp] = await Promise.all([
     db.select({ n: count() }).from(clients).where(eq(clients.coachId, coachId)),
     db.select({ n: count() }).from(compCases).where(eq(compCases.executorId, coachId)),
+    db.select({ n: count() }).from(compCases).where(eq(compCases.promoterId, coachId)),
+    db.select({ n: count() }).from(coaches).where(eq(coaches.uplineId, coachId)),
+    db.select({ n: count() }).from(coaches).where(eq(coaches.sponsorId, coachId)),
   ]);
-  return { clients: Number(cl[0]?.n ?? 0), cases: Number(cs[0]?.n ?? 0) };
+  return {
+    clients: Number(cl[0]?.n ?? 0),
+    cases: Number(cs[0]?.n ?? 0),
+    promoterCases: Number(pr[0]?.n ?? 0),
+    downlines: Number(up[0]?.n ?? 0),
+    sponsored: Number(sp[0]?.n ?? 0),
+  };
 }
 
 // 把 from 名下的客戶整批轉給 to。只動 clients.coachId ——
@@ -356,6 +394,12 @@ export async function removeCoach(
   const w = await coachWorkload(id);
   if (w.cases > 0) {
     return { ok: false, error: `有 ${w.cases} 筆案件分潤紀錄，依稽核不可移除，請改用停權` };
+  }
+  // ⚠️ 推廣案件也要擋，而且 DB 幫不上忙：promoter_id 是 SET NULL，
+  //    刪除不會失敗，只會把那些案件的推廣者靜靜清空 → 重算分潤時推廣端的錢整批消失。
+  //    純推廣的教練（executorId 一筆都沒有）以前正好就是從這個縫掉下去的。
+  if (w.promoterCases > 0) {
+    return { ok: false, error: `有 ${w.promoterCases} 筆案件由他推廣，移除會讓那些案件變成「無推廣者」並影響分潤，請改用停權` };
   }
   if (w.clients > 0) {
     return { ok: false, error: `名下還有 ${w.clients} 位客戶，請先轉移給接手教練` };

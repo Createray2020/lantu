@@ -70,6 +70,52 @@ export default function SystemEditor({
   const current = versions.find((v) => v.id === versionId);
   const editable = current?.status !== "archived";
 
+  // 有沒有還沒存的改動。用「跟載進來的那份比對」而不是各處埋旗標——
+  // 漏掉一個 setter 就等於漏掉一次警告，而這裡寧可多問一次也不要靜靜丟掉東西。
+  const dirty = useMemo(
+    () =>
+      JSON.stringify({ settings, ranks, thresholds: ths, modules: mods }) !==
+      JSON.stringify({
+        settings: initial.settings ?? {},
+        ranks: initial.ranks ?? [],
+        thresholds: initial.thresholds ?? [],
+        modules: initial.modules ?? [],
+      }),
+    [settings, ranks, ths, mods, initial],
+  );
+
+  /**
+   * 一次把整個版本的設定都送出。
+   *
+   * ⚠️ 舊寫法是「只存當前分頁那一種」：在「晉升」頁改了門檻、切到「真除」頁再按儲存，
+   *    晉升那些改動就無聲無息地不見了（state 還在畫面上，看起來像存過了）。
+   *    分頁只是版面的分組，資料是同一份 —— 存就整份存。
+   */
+  async function saveAll(): Promise<{ ok: boolean; error?: string }> {
+    const m = await saveModulesAction(versionId, mods);
+    if (!m.ok) return m;
+
+    // 職級表依 moduleCode 分區覆寫：預設表（""）與每個有自訂表的模塊都要各存一次。
+    const scopes = [...new Set(ranks.map((r) => r.moduleCode ?? ""))];
+    if (!scopes.includes("")) scopes.push("");
+    for (const scope of scopes) {
+      const r = await saveRanksAction(
+        versionId,
+        ranks.filter((x) => (x.moduleCode ?? "") === scope),
+        scope,
+      );
+      if (!r.ok) return r;
+    }
+
+    const kinds: ThresholdKind[] = ["promotion_a", "promotion_b", "tenure"];
+    for (const kind of kinds) {
+      const r = await saveThresholdsAction(versionId, kind, ths.filter((x) => x.kind === kind));
+      if (!r.ok) return r;
+    }
+
+    return saveSettingsAction(versionId, settings);
+  }
+
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, okText: string) {
     setMsg(null);
     start(async () => {
@@ -99,7 +145,13 @@ export default function SystemEditor({
         <span className="text-xs text-[#a9bccf]">制度版本</span>
         <select
           value={versionId}
-          onChange={(e) => router.push(`/admin/system?v=${e.target.value}`)}
+          // 換版本＝整頁重載，state 裡沒存的東西全部消失。先問一句。
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next === versionId) return;
+            if (dirty && !confirm("這個版本有還沒儲存的變更，切換版本會把它們丟掉。確定要切換？")) return;
+            router.push(`/admin/system?v=${next}`);
+          }}
           className={FILLED}
         >
           {versions.map((v) => (
@@ -274,35 +326,17 @@ export default function SystemEditor({
           <button
             type="button"
             disabled={pending || !editable}
-            onClick={() => {
-              if (spec.custom === "modules") {
-                run(async () => {
-                  const m = await saveModulesAction(versionId, mods);
-                  if (!m.ok) return m;
-                  return saveSettingsAction(versionId, settings);
-                }, "服務模塊已儲存");
-              } else if (spec.custom === "ranks") {
-                run(() => saveRanksAction(versionId, rankRowsOfModule, rankModule), "職級表已儲存");
-              } else if (spec.custom === "promotion") {
-                run(async () => {
-                  const a = await saveThresholdsAction(versionId, "promotion_a", ths.filter((t) => t.kind === "promotion_a"));
-                  if (!a.ok) return a;
-                  return saveThresholdsAction(versionId, "promotion_b", ths.filter((t) => t.kind === "promotion_b"));
-                }, "晉升門檻已儲存");
-              } else if (spec.custom === "tenure") {
-                run(async () => {
-                  const t = await saveThresholdsAction(versionId, "tenure", ths.filter((x) => x.kind === "tenure"));
-                  if (!t.ok) return t;
-                  return saveSettingsAction(versionId, settings);
-                }, "真除設定已儲存");
-              } else {
-                run(() => saveSettingsAction(versionId, settings), "已儲存");
-              }
-            }}
+            onClick={() => run(saveAll, "已儲存全部設定")}
             className={BTN_SOLID}
           >
-            {pending ? "存檔中…" : "儲存這一頁"}
+            {pending ? "存檔中…" : "儲存變更"}
           </button>
+          <span className="text-xs text-[#7f9ab2]">
+            一次存下全部分頁的改動（服務模塊、職級表、門檻、參數）。
+          </span>
+          {dirty && !msg && (
+            <span className="text-sm text-[#e0bd8b]">有未儲存的變更</span>
+          )}
           {msg && (
             <span className={`text-sm ${msg.ok ? "text-[#7fb894]" : "text-[#e08b7a]"}`}>
               {msg.ok ? `${msg.text} ✓` : `儲存失敗：${msg.text}`}

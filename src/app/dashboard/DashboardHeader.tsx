@@ -30,6 +30,8 @@ export default function DashboardHeader({
   // 全組織品牌 Logo：有上傳就換掉預設標記（保留「嵐途」文字）。
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
+  // 讀不到待處理數（斷線／DB 出問題）：紅點換成灰點，讓人知道「這個數字現在不可信」。
+  const [pendingErr, setPendingErr] = useState(false);
   useEffect(() => {
     let alive = true;
     fetch("/api/brand", { cache: "no-store" })
@@ -41,9 +43,18 @@ export default function DashboardHeader({
     fetch("/api/pending-links", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (alive && typeof d?.count === "number") setPending(d.count);
+        if (!alive) return;
+        // 查不到就標灰點，不要當成「沒有待處理」——那是兩件不同的事。
+        if (!d || d.error) {
+          setPendingErr(true);
+          return;
+        }
+        setPendingErr(false);
+        if (typeof d.count === "number") setPending(d.count);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (alive) setPendingErr(true);
+      });
     return () => {
       alive = false;
     };
@@ -74,11 +85,18 @@ export default function DashboardHeader({
         <Link href="/dashboard/overview" className={tab(onOverview)}>儀表板</Link>
         <Link href="/dashboard/requests" className={`${tab(onRequests)} relative`}>
           客戶連結
-          {pending > 0 && (
+          {pendingErr ? (
+            <span
+              title="待處理數暫時讀不到，請重新整理"
+              className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#6b7d8f] text-[#0d2b45] text-[10px] font-bold grid place-items-center"
+            >
+              ?
+            </span>
+          ) : pending > 0 ? (
             <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#e5484d] text-white text-[10px] font-bold grid place-items-center">
               {pending}
             </span>
-          )}
+          ) : null}
         </Link>
         <Link href="/dashboard/my-business" className={tab(onBusiness)}>我的業務</Link>
         <Link href="/dashboard/bizguide" className={tab(onBizGuide)}>企業主手冊</Link>

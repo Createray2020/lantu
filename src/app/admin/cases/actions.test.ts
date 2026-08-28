@@ -36,7 +36,7 @@ describe("createCaseAction", () => {
     expect(createCase).not.toHaveBeenCalled();
   });
 
-  it("沒選執案顧問／沒填客戶／顧問費為 0 都擋下", async () => {
+  it("沒選執案教練／沒填客戶／顧問費為 0 都擋下", async () => {
     expect((await createCaseAction({ ...ok, executorId: "" })).ok).toBe(false);
     expect((await createCaseAction({ ...ok, clientName: "  " })).ok).toBe(false);
     expect((await createCaseAction({ ...ok, fee: 0 })).ok).toBe(false);

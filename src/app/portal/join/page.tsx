@@ -52,7 +52,14 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
     return <Shell><p className="text-[#a7bacb]">邀請連結不完整。</p><div className="mt-4"><Link href="/portal" className="underline underline-offset-4">回我的首頁</Link></div></Shell>;
   }
 
-  const r = await redeemInvite(code, user);
+  // 兌換可能被擋下（連結失效、教練停權、教練客戶數已滿…）。
+  // ⚠️ 防呆兩層：回傳的 { ok:false, error } 要照原文顯示給客戶看；
+  //    真的 throw 出來也不能讓整頁掉進錯誤頁——那會變成一個沒有任何說明的白畫面。
+  const r = await redeemInvite(code, user).catch((e: unknown) => ({
+    ok: false as const,
+    error: e instanceof Error && e.message ? e.message : "連結時發生問題，請稍後再試一次。",
+    coachName: null,
+  }));
   return (
     <Shell>
       {r.ok ? (
@@ -68,7 +75,7 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
       ) : (
         <>
           <h1 className="font-serif text-2xl mb-2">無法連結</h1>
-          <p className="text-[#ff9b9b] mb-6">⚠ {r.error}</p>
+          <p className="text-[#ff9b9b] mb-6">⚠ {r.error || "這個邀請連結目前無法使用，請向教練確認。"}</p>
           <Link href="/portal" className="underline underline-offset-4">回我的首頁</Link>
         </>
       )}

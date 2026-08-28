@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -41,8 +42,15 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
 
 export default function AdminNav() {
   const pathname = usePathname();
-  // /admin 是精確比對，其餘用前綴——否則每一頁都會把「教練帳號」一起點亮。
-  const isOn = (href: string) => (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href));
+  // 最長前綴唯一勝出：一條路徑可能同時前綴命中好幾個入口
+  // （/admin/system/simulator 同時是 /admin、/admin/system、/admin/system/simulator 的子路徑），
+  // 只點亮最長的那一個。逐項寫精確比對特例是補不完的——每加一個子頁就得再補一次。
+  const active = useMemo(() => {
+    const hrefs = GROUPS.flatMap((g) => g.items.map((i) => i.href));
+    const hit = hrefs.filter((h) => pathname === h || pathname.startsWith(h.endsWith("/") ? h : h + "/"));
+    return hit.sort((a, b) => b.length - a.length)[0] ?? null;
+  }, [pathname]);
+  const isOn = (href: string) => href === active;
 
   return (
     <nav className="border-b border-white/10 bg-[#0b2036]">

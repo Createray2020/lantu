@@ -17,6 +17,8 @@ export async function GET() {
     ]);
     return NextResponse.json({ count: links + collab });
   } catch {
-    return NextResponse.json({ count: 0 });
+    // ⚠️ 不要把「查不到」偽裝成「沒有待處理」：DB 掛掉時 count:0 會讓教練以為沒人在等他，
+    //    而待接受的客戶連結申請放著不理就是流失。帶 error 讓前端改標灰點。
+    return NextResponse.json({ count: 0, error: true });
   }
 }

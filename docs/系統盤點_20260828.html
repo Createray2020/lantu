@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>嵐途系統盤點 0828</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#FAF8F4; --surface:#FFFFFF; --surface-2:#F4F0E8;
+  --ink:#201B15; --ink-2:#6B6157; --ink-3:#948A7D;
+  --rule:#E3DDD2; --rule-2:#CFC6B7;
+  --accent:#8A6A18; --accent-soft:#F0E4C4;
+  --crit:#BC3A33; --warn:#B8860B; --low:#1A6FA8;
+  --crit-ink:#A3302A; --warn-ink:#8A6408; --low-ink:#155C8C;
+  --crit-wash:#FBEDEB; --warn-wash:#F8F0DC; --low-wash:#E9F1F8;
+  --ok:#2F6E52; --ok-wash:#E6F1EA;
+  --serif:"Noto Serif TC",Georgia,"Songti TC",serif;
+  --sans:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#14120E; --surface:#1D1A15; --surface-2:#252118;
+    --ink:#F0EAE0; --ink-2:#9C9284; --ink-3:#786F63;
+    --rule:#2E2A23; --rule-2:#413B31;
+    --accent:#E3B54A; --accent-soft:#3A3020;
+    --crit-ink:#E8776A; --warn-ink:#DFAA4A; --low-ink:#6FAEE0;
+    --crit-wash:#2E1A17; --warn-wash:#2B2312; --low-wash:#152430;
+    --ok:#6FB48F; --ok-wash:#16281F;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14120E; --surface:#1D1A15; --surface-2:#252118;
+  --ink:#F0EAE0; --ink-2:#9C9284; --ink-3:#786F63;
+  --rule:#2E2A23; --rule-2:#413B31;
+  --accent:#E3B54A; --accent-soft:#3A3020;
+  --crit-ink:#E8776A; --warn-ink:#DFAA4A; --low-ink:#6FAEE0;
+  --crit-wash:#2E1A17; --warn-wash:#2B2312; --low-wash:#152430;
+  --ok:#6FB48F; --ok-wash:#16281F;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 96px}
+
+/* ---------- hero ---------- */
+.hero{padding:64px 0 40px;border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+h1{font-family:var(--serif);font-weight:700;font-size:clamp(30px,5.2vw,46px);
+  line-height:1.24;margin:0 0 16px;text-wrap:balance;letter-spacing:-.01em}
+.lede{max-width:660px;color:var(--ink-2);font-size:16px;margin:0 0 34px}
+.lede strong{color:var(--ink);font-weight:500}
+
+.nums{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule);margin-bottom:36px}
+.num{flex:1 1 160px;padding:20px 22px 18px;border-right:1px solid var(--rule)}
+.num:last-child{border-right:0}
+.num b{display:block;font-family:var(--mono);font-weight:700;
+  font-size:clamp(26px,4vw,36px);line-height:1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.num span{display:block;margin-top:9px;font-size:12.5px;color:var(--ink-2)}
+.num.c b{color:var(--crit-ink)} .num.g b{color:var(--ok)}
+
+figure{margin:0}
+figcaption{font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:14px}
+.chartbox{overflow-x:auto}
+svg.chart{display:block;width:100%;max-width:720px;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;
+  margin-right:7px;vertical-align:-1px}
+
+/* ---------- filter ---------- */
+.filter{position:sticky;top:0;z-index:20;background:var(--bg);
+  border-bottom:1px solid var(--rule);padding:12px 0;margin-bottom:8px;
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filter .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);margin-right:4px}
+button.chip{font-family:var(--mono);font-size:12px;padding:5px 11px;
+  border:1px solid var(--rule-2);background:transparent;color:var(--ink-2);
+  border-radius:3px;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+button.chip:hover{border-color:var(--ink-3);color:var(--ink)}
+button.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- sections ---------- */
+section{padding-top:52px;scroll-margin-top:60px}
+.sechead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:6px}
+.sechead h2{font-family:var(--serif);font-weight:700;font-size:23px;margin:0;letter-spacing:-.01em}
+.sechead .tally{font-family:var(--mono);font-size:12px;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;margin-left:auto}
+.secnote{color:var(--ink-2);font-size:14px;max-width:780px;margin:14px 0 26px}
+h3.grp{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);margin:38px 0 0;
+  padding-bottom:8px;border-bottom:1px solid var(--rule)}
+
+/* ---------- finding ---------- */
+.f{border-bottom:1px solid var(--rule);padding:22px 0}
+.f.hide{display:none}
+.f-top{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:9px}
+.sev{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  padding:3px 8px;border-radius:3px;white-space:nowrap;line-height:1.4}
+.sev::before{content:"";display:inline-block;width:7px;height:7px;border-radius:1px;
+  margin-right:6px;vertical-align:0}
+.sev.crit{color:var(--crit-ink);background:var(--crit-wash)}
+.sev.crit::before{background:var(--crit)}
+.sev.warn{color:var(--warn-ink);background:var(--warn-wash)}
+.sev.warn::before{background:var(--warn)}
+.sev.low{color:var(--low-ink);background:var(--low-wash)}
+.sev.low::before{background:var(--low)}
+.fid{font-family:var(--mono);font-size:12px;color:var(--ink-3);font-weight:500}
+.f h4{font-family:var(--serif);font-weight:700;font-size:18px;line-height:1.55;
+  margin:0;flex:1 1 100%;letter-spacing:-.005em;text-wrap:balance;max-width:840px}
+.f h4 code{font-size:.86em;overflow-wrap:anywhere}
+.loc{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);
+  margin:0 0 12px;word-break:break-all;line-height:1.7}
+.kv{display:grid;grid-template-columns:76px 1fr;gap:5px 18px;
+  max-width:840px;font-size:14.2px}
+.kv dt{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--ink-3);
+  padding-top:5px;line-height:1.55}
+.kv dd{margin:0;color:var(--ink-2)}
+.kv dd strong{color:var(--ink);font-weight:500}
+code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);
+  padding:1px 5px;border-radius:3px;color:var(--ink);overflow-wrap:anywhere}
+.ev{margin-top:14px;background:var(--surface);border:1px solid var(--rule);
+  border-left:3px solid var(--accent);padding:12px 16px;max-width:840px}
+.ev .h{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:7px}
+.ev p{margin:0;font-size:13.6px;color:var(--ink-2);line-height:1.7}
+.ev b{font-family:var(--mono);color:var(--ink);font-weight:700;
+  font-variant-numeric:tabular-nums}
+.ev.good{border-left-color:var(--ok);background:var(--ok-wash)}
+.ev.good .h{color:var(--ok)}
+
+table.dead{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.4px}
+table.dead th,table.dead td{text-align:left;padding:7px 12px 7px 0;
+  border-bottom:1px solid var(--rule);vertical-align:top}
+table.dead th{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:500}
+table.dead td:first-child{font-family:var(--mono);font-size:12.4px;color:var(--ink);white-space:nowrap}
+table.dead td:last-child{font-family:var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--crit-ink);white-space:nowrap;text-align:right;padding-right:0}
+.tblwrap{overflow-x:auto}
+
+details.more{margin-top:14px;max-width:840px}
+details.more>summary{font-family:var(--mono);font-size:11.5px;color:var(--accent);
+  cursor:pointer;list-style:none;padding:5px 0}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+details.more[open]>summary::before{content:"▾ "}
+details.more>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+details.more .body{padding:6px 0 4px;font-size:13.8px;color:var(--ink-2)}
+
+.close{margin-top:32px;padding:28px 30px;background:var(--surface);
+  border:1px solid var(--rule)}
+.close h3{font-family:var(--serif);font-size:19px;margin:0 0 16px}
+ol.first{margin:0;padding-left:22px;font-size:14.6px;color:var(--ink-2);max-width:840px}
+ol.first li{margin-bottom:11px;padding-left:4px}
+ol.first strong{color:var(--ink);font-weight:500}
+.foot{margin-top:44px;padding-top:20px;border-top:1px solid var(--rule);
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-3);line-height:1.9}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:640px){
+  .kv{grid-template-columns:1fr;gap:2px}
+  .kv dt{padding-top:10px}
+  .num{flex-basis:50%;border-right:0;border-bottom:1px solid var(--rule)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <p class="eyebrow">嵐途 LAN TU · 全系統稽核 · 2026.08.28 · HEAD aa25e73</p>
+  <h1>一次盤點：82 項發現，20 項會讓數字講錯話</h1>
+  <p class="lede">這一輪把整套系統從三個角度走了一遍——程式面的計算缺陷、資料庫的勾稽斷點、三端使用者的動線。<strong>沒有修改任何程式或資料</strong>，全程只讀。與過去幾次不同的是，這次連上 Neon 把 <strong>全庫 61 份規劃、142 張保單</strong>都用現在的引擎重算了一遍，所以下面每一項標了「實測」的，都是真實客戶資料的數字，不是推論。</p>
+
+  <div class="nums">
+    <div class="num"><b>82</b><span>項發現</span></div>
+    <div class="num c"><b>20</b><span>項致命（數字會錯或權限外洩）</span></div>
+    <div class="num"><b>15</b><span>項附生產資料實測佐證</span></div>
+    <div class="num g"><b>61/61</b><span>財務階段快照與引擎完全一致</span></div>
+  </div>
+
+  <figure>
+    <figcaption>三個面向 × 嚴重度</figcaption>
+    <div class="chartbox">
+    <svg class="chart" viewBox="0 0 720 196" role="img" aria-label="面向一程式面 22 項（致命 7、中 10、低 5）；面向二資料庫 28 項（致命 2、中 11、低 15）；面向三順暢度 32 項（致命 11、中 15、低 6）">
+      <g font-family="JetBrains Mono, monospace" font-size="12" fill="currentColor">
+        <text x="0" y="30" opacity=".62">面向一 · 程式面</text>
+        <text x="0" y="90" opacity=".62">面向二 · 資料庫</text>
+        <text x="0" y="150" opacity=".62">面向三 · 順暢度</text>
+      </g>
+      <!-- 每項 = 16px，2px gap；起點 x=130 -->
+      <g>
+        <rect x="130" y="14" width="112" height="22" rx="3" fill="#BC3A33"/>
+        <rect x="244" y="14" width="160" height="22" rx="3" fill="#B8860B"/>
+        <rect x="406" y="14" width="80"  height="22" rx="3" fill="#1A6FA8"/>
+        <rect x="130" y="74" width="32"  height="22" rx="3" fill="#BC3A33"/>
+        <rect x="164" y="74" width="176" height="22" rx="3" fill="#B8860B"/>
+        <rect x="342" y="74" width="240" height="22" rx="3" fill="#1A6FA8"/>
+        <rect x="130" y="134" width="176" height="22" rx="3" fill="#BC3A33"/>
+        <rect x="308" y="134" width="240" height="22" rx="3" fill="#B8860B"/>
+        <rect x="550" y="134" width="96"  height="22" rx="3" fill="#1A6FA8"/>
+      </g>
+      <g font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#fff">
+        <text x="142" y="30">7</text><text x="256" y="30">10</text><text x="418" y="30">5</text>
+        <text x="140" y="90">2</text><text x="176" y="90">11</text><text x="354" y="90">15</text>
+        <text x="188" y="150">11</text><text x="320" y="150">15</text><text x="562" y="150">6</text>
+      </g>
+      <g font-family="JetBrains Mono, monospace" font-size="12.5" font-weight="700" fill="currentColor">
+        <text x="498" y="30">22</text><text x="594" y="90">28</text><text x="658" y="150">32</text>
+      </g>
+      <line x1="130" y1="176" x2="700" y2="176" stroke="currentColor" opacity=".16"/>
+    </svg>
+    </div>
+    <div class="legend">
+      <span><i style="background:#BC3A33"></i>致命 20</span>
+      <span><i style="background:#B8860B"></i>中 36</span>
+      <span><i style="background:#1A6FA8"></i>低 26</span>
+    </div>
+  </figure>
+</header>
+
+<nav class="filter" aria-label="篩選">
+  <span class="lbl">面向</span>
+  <button class="chip" data-dim="all" aria-pressed="true">全部</button>
+  <button class="chip" data-dim="b" aria-pressed="false">程式面</button>
+  <button class="chip" data-dim="d" aria-pressed="false">資料庫</button>
+  <button class="chip" data-dim="u" aria-pressed="false">順暢度</button>
+  <span class="lbl" style="margin-left:14px">嚴重度</span>
+  <button class="chip" data-sev="all" aria-pressed="true">全部</button>
+  <button class="chip" data-sev="crit" aria-pressed="false">只看致命</button>
+  <button class="chip" data-sev="warn" aria-pressed="false">中</button>
+  <button class="chip" data-sev="low" aria-pressed="false">低</button>
+</nav>
+
+<section id="b" data-dim="b">
+  <div class="sechead">
+    <h2>面向一 · 程式面 BUG</h2>
+    <span class="tally">22 項 · 致命 7 · 中 10 · 低 5</span>
+  </div>
+  <p class="secnote">系統有<strong>兩份引擎實作</strong>——React 端的 <code>src/lib/engine.ts</code>（檔頭是 <code>@ts-nocheck</code>，所以 tsc 對它完全無效）與教練端 <code>public/lantu-app.html</code> 內的鏡像。我把 152 支具名函式逐支去註解、去空白後對拍：<strong>130 支完全等價</strong>，19 支只有格式差異，真正的語意漂移只有一支（B-08）。所以引擎漂移不是主要問題——真正的問題是下面這些「算得出來但沒接上」與「錯了不噴錯」。</p>
+
+  <h3 class="grp">致命 — 數字會錯，而且錯在你要指給客戶看的地方</h3>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">B-01</span>
+      <h4>財務指標與財務階段是「把整張表加總」，完全不看收支的起訖歲</h4></div>
+    <p class="loc">engine.ts:663-680（incTotal 664 / expTotal 670）· lantu-app.html:1807</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>metrics()</code> 用 <code>sum(c.incomes, i =&gt; n(i.amount))</code> 加總整張表，不看 <code>i.start / i.end</code>；而 <code>projection()</code> 是逐年判斷起訖的。<strong>同一份資料，兩套口徑。</strong></dd>
+      <dt>實例</dt><dd>把示範案年齡改成 70（收入列是 40–65、40–60，都已結束）：<code>incTotal</code> 仍是 1,900,000、所得穩定度 100%、儲蓄率 35.26%；同一年 <code>projection().rows[0]</code> 卻是 <code>work:0, bal:-1,322,400</code>。財務階段判成 <strong>C（啟程期）</strong>，依實際現金流應該是 <strong>D（整裝期）</strong>。</dd>
+      <dt>影響</dt><dd>財務安全度、25 項比率體檢全部、財務階段（會寫進 <code>plans.health_grade</code>）、客戶列表的階段欄、報告書。<strong>凡是已退休、房貸已繳完、教育金已結束的客戶都踩得到</strong>——而這正是「規劃到一半」的客戶樣貌。</dd>
+      <dt>建議</dt><dd><code>incTotal/expTotal</code> 改成只加總「現齡落在 start–end 內」的列（即 projection 第 0 年的口徑），或拆成 <code>incTotalRaw</code>（表面總額）與 <code>incTotalNow</code>（現齡有效），ratios/health 一律吃後者。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">B-02</span>
+      <h4>「預估壽命」與「模擬到幾歲」是兩個各走各的時鐘，拉長壽命缺口不會變大</h4></div>
+    <p class="loc">engine.ts:747（<code>aEnd = params.horizon || 85</code>）vs engine.ts:309-311（<code>le = profile.lifeExp</code>）· 輸入欄 html:3375 與 html:3503</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>retireNeed()</code> 用 <code>profile.lifeExp</code> 算餘命，<code>projection()</code> 的迴圈上界卻是 <code>params.horizon</code>。兩個欄位互不校驗，教練只會改前者。</dd>
+      <dt>實例</dt><dd>示範案把 lifeExp 85→95、horizon 留 85：退休總需求 17,943,403 → <strong>25,340,312（+740 萬）</strong>，而現值缺口 <code>shortPV</code> <strong>完全不變</strong>（541,711）。把 horizon 也改成 95，<code>shortPV</code> 才跳到 2,008,629（4 倍）。</dd>
+      <dt>影響</dt><dd>現值缺口、願景達成度、財務階段、缺口帳、三個處方、六根槓桿反解、諮詢前後對照。教練當著客戶的面把壽命拉長，退休需求變了、缺口不動——這個矛盾在畫面上同時看得到。</dd>
+      <dt>建議</dt><dd><code>aEnd = Math.max(horizon, lifeExp)</code>，或把「模擬到幾歲」預設綁死在預估壽命上並保留覆寫。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>全庫 61 份規劃有 <b>7 份</b>兩個值不一致，差距 1～5 歲（黃俊傑 86/85、張文山 90/85、周雅琪 90/85、吳念真 88/85、林曉薇 88/85、王國樑 88/85、李佩珊 87/85）。這 7 份的退休需求算到 lifeExp，逐年金流只跑到 85。</p></div>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">B-03</span>
+      <h4>預估壽命小於退休年齡時，退休需求與現值缺口一起靜靜歸零——<code>valid</code> 旗標算了但沒有任何人讀</h4></div>
+    <p class="loc">engine.ts:311（<code>m = Math.max(0, le-ra)</code>）· engine.ts:333（回傳 <code>valid: m&gt;0</code>）· html:1253-1266（html 版連 valid 欄位都沒有）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>valid</code> 的註解寫著「呼叫端要據此顯示『參數有誤』」，但全 repo 只有 <code>engine.test.ts:120</code> 在斷言它，<strong>沒有任何 UI 或報告讀它</strong>。同時 <code>retireAnnual()</code> 的 <code>en = endAge || le</code> 讓退休期支出列在投影裡也全被跳過。</dd>
+      <dt>實例</dt><dd>示範案 lifeExp 設 60、退休 65：<code>retireNeed()</code> 回 <code>{餘年:0, total:0, gap:0, valid:false}</code>，<code>shortPV</code> 由 541,711 → <strong>0</strong>，階段仍是 C。畫面呈現的是「沒有退休缺口」，而不是「參數有誤」。</dd>
+      <dt>建議</dt><dd>兩份 <code>retireNeed()</code> 都回 <code>valid</code>，退休分頁／明細／報告書在 <code>valid===false</code> 時渲染紅色警語；並在 <code>lifeExp</code> 輸入當下就擋。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測 — 這一項已經爆了</div><p>真實客戶 <b>昱豪 陳（2608066，客戶軌）</b>的 <code>retireAge = 100</code>、<code>lifeExp = 85</code>。他的畫面上退休需求是 0，看起來像「沒有退休缺口」。這不是假設，是現在資料庫裡的狀態。</p></div>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">B-04</span>
+      <h4>「保障需求反推明細」漏算父母奉養費與連帶保證，跟同一頁的五欄表對不上</h4></div>
+    <p class="loc">html:1717-1722（毛需求算式在 1720）· 正解在 html:1578 / engine.ts:409-413 的 <code>grossLifeNeed()</code></p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>lifeNeedDetailHTML()</code> 沒有呼叫 <code>grossLifeNeed()</code>，而是自己重算一次：<code>gross = living + liab + edu + funeral + estateTax</code>，少了 <code>familyAnnualParentSupport × protectYears</code> 與 <code>guaranteeFor()</code>。這是 2026/08 統一缺口口徑那次留下的<strong>第三份實作</strong>。</dd>
+      <dt>影響</dt><dd>明細框正是教練用來跟客戶解釋「為什麼是這個數字」的地方——<strong>解釋的過程跟結論不一樣</strong>。示範案實測：明細框顯示毛需求 16,524,396／淨缺口 2,044,396，同一頁的五欄表顯示 need 17,724,396／缺口 3,244,396。</dd>
+      <dt>建議</dt><dd>明細框改成拆解 <code>grossLifeNeed()</code> 的實際組成（多印兩列：父母奉養費、個人連帶保證），不要第二次手寫算式。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>全庫有 <b>41 筆</b>保障需求列的客戶支出表含孝親／奉養列，明細框全部少算。差額實測 <b>120 萬～240 萬</b>（例：董建成 少 240 萬、林國棟 少 216 萬、多數示範案少 120 萬）。另有 <b>1 份</b>（林國棟）同時有個人連帶保證，差額更大。</p></div>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">B-05</span>
+      <h4>保單標成「失效／停效」後，保費歸零了，保額還算在「已備保障」裡</h4></div>
+    <p class="loc">engine.ts:358-362（<code>existingCover</code>）· html:1292 · 對照組 <code>annualPremiumBy()</code>(459)、<code>policyBenefitRows()</code>(609) 都有過 <code>policyActive()</code></p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>existingCover()</code> 只用 <code>p.insured === member</code> 過濾，<strong>沒有經過 <code>policyActive(p)</code></strong>。</dd>
+      <dt>實例</dt><dd>示範案把全部保單 status 改成「失效」：<code>existingCover(c,'王大明','壽險')</code> 仍是 <strong>3,000,000</strong>（應為 0），而 <code>annualPremiumBy</code> 正確歸零。教練把舊保單標成失效，保費消失了、缺口沒有變大。</dd>
+      <dt>影響</dt><dd>缺口表、五欄比對表、<code>health().riskCover</code>（佔財務安全度 30 分）、缺口帳、保單檢查報告、寫進 DB 的 <code>health_grade</code>。</dd>
+      <dt>建議</dt><dd><code>fromPol</code> 加上 <code>policyActive(p) &amp;&amp;</code>（手動的 <code>coverages[]</code> 列不受影響）。一行。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測 — 未爆的地雷</div><p>全庫 <b>142 張保單</b>：49 張標「有效」、<b>93 張 status 留空</b>、<b>0 張</b>標失效或停效。<code>policyActive()</code> 把留空視為有效，所以目前<strong>還沒有人踩到</strong>。但只要任何一位教練第一次用「失效」這個選項，缺口就會少算。</p></div>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">B-06</span>
+      <h4>新客戶的自動保費列 start/end 是空字串：進了總支出，卻整段被逐年金流排除</h4></div>
+    <p class="loc">html:1001（<code>var span={start:'',end:''}</code>）、html:1013 · 消費端 engine.ts:298-306（<code>if(age&lt;n(e.start)||age&gt;n(e.end))return;</code>）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>syncPremium()</code> 只在「有舊的個人保費列可以繼承起訖」時才填 span；新客戶沒有舊列 → span 留空 → <code>n('') === 0</code> → 每一年都命中 <code>age &gt; 0</code> 而被 return。而 <code>metrics().expTotal</code>（見 B-01）不看起訖，照算。</dd>
+      <dt>影響</dt><dd>現值缺口、願景達成度、三個處方、缺口帳<strong>全部低估一整條保費現金流</strong>；同時支出收入比／保費支出比／低彈性支出比／儲蓄率又照算——畫面上兩組數字互相矛盾。</dd>
+      <dt>建議</dt><dd>span 預設改成 <code>{start: profile.age, end: lifeExp || horizon}</code>；並在 <code>workPhaseExpense</code>／<code>projection</code> 把「起訖留空」一律當成全期間有效，而不是 0–0。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>目前 <b>1 筆</b>：金思妤（2608064）的「人身保險(保障型)」年繳 <b>20,913</b>，start/end 皆空。這筆保費進了她的總支出、沒進她的逐年金流。數量少是因為多數客戶是從舊資料遷移來的（有舊列可繼承）——<strong>之後每一位從零建檔的新客戶都會是這樣</strong>。</p></div>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">B-07</span>
+      <h4>沒有任何賺薪成員填退休年齡時，退休期支出整段從投影裡消失</h4></div>
+    <p class="loc">engine.ts:257-268（<code>earnerRetirePoints</code>：<code>if(!(ra&gt;0))return;</code>）· 270-281（<code>retiredWeight</code> 空陣列回 0）· 785</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>三段式權重 <code>w</code> 完全由「賺薪成員的退休時點」推出。<code>profile.retireAge</code> 為 0／空時本人不會被 push 進 <code>pts</code>；配偶也沒填就 <code>pts</code> 為空 → <code>w</code> 永遠 0 → <code>retireDraw</code> 永遠 0，而工作期生活費照 <code>(1-w)=1</code> 全額算。<strong>沒有任何降級路徑補上這一段，也沒有任何提示。</strong></dd>
+      <dt>實例</dt><dd>示範案把 <code>retireAge</code> 設 0：<code>shortPV</code> 由 541,711 掉到 <strong>72,600</strong>。刪掉「本人」那一列成員、或把 <code>role</code> 清空，也走到同一條路。</dd>
+      <dt>建議</dt><dd><code>retiredWeight()</code> 在 <code>pts</code> 為空時退回預設退休年齡 65，並在 UI 對「沒有任何賺薪成員／退休年齡未填」直接擋下計算。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測 — 未爆的地雷</div><p>全庫 61 份規劃<strong>全部都有填退休年齡</strong>，目前 0 筆受影響。但 <code>addRow('members')</code> 的範本 <code>role:''</code> 本來就允許空角色，這條路隨時走得到。</p></div>
+  </article>
+
+  <h3 class="grp">中 — 功能失效或口徑不一致</h3>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-08</span>
+      <h4>唯一一處真正的引擎漂移：<code>allocInvest()</code>——html 把調整動作算進投資配置，engine.ts 沒有</h4></div>
+    <p class="loc">engine.ts:1205（<code>return ((c.plan||{}).invest)||[]</code>）vs html:2353-2368（把 <code>planActionsOn(c)</code> 的 regular/lump 動作 map 成投資列再 concat）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>這支函式沒有被 <code>engine.drift.test.ts</code> 的任何一條斷言碰到——drift test 只比對 <code>allocPV</code> 的呼叫者，而 <code>allocPV</code> 本身兩邊逐字相同，<strong>漂移藏在它呼叫的 <code>allocInvest</code> 裡</strong>。</dd>
+      <dt>實例</dt><dd>示範案 + <code>plan.useAllocReturn=true</code> + 一筆月投 10,000／成長 7% 的動作：<code>effReturn</code> engine <strong>5%</strong> vs html <strong>7%</strong>；<code>allocPV().pv</code> engine <strong>0</strong> vs html <strong>1,376,320</strong>。</dd>
+      <dt>影響</dt><dd><code>effReturn</code> 是 <code>projection()</code> 的報酬率來源 → <strong>寫進 DB 的 shortPV／願景達成度／health_grade 與教練畫面上看到的是不同的數字</strong>。只在 <code>useAllocReturn</code> 打開時發生（預設 false）。</dd>
+      <dt>建議</dt><dd>把 html 的 <code>allocInvest</code>（含 <code>fromAct</code>）整段移植進 engine.ts，並在 drift test 加一條字串斷言釘住它。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-09</span>
+      <h4>保障缺口總額把「元」「元/日」「元/月」三種單位直接相加</h4></div>
+    <p class="loc">engine.ts:405（<code>totalGap</code>）· engine.ts:1450-1451（<code>health().riskCover</code>）· 單位定義在 502</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>coverageGaps()</code> 每一列的 <code>gap</code> 單位不同（<code>coverageCheckupRows()</code> 自己知道要標「元/日」「元/月」），但 <code>totalGap()</code> 無差別相加。</dd>
+      <dt>實例</dt><dd>示範案 <code>totalGap = 5,629,396</code>，其中含住院醫療 3,000（元/日）、癌症住院 2,000（元/日）、每月照護 30,000（元/月）。</dd>
+      <dt>影響</dt><dd><code>advice()</code> 的「保障缺口合計約 X 元」、<code>health().riskCover</code>（財務安全度 30 分權重）、缺口帳、報告書。</dd>
+      <dt>建議</dt><dd><code>totalGap()</code> 只加一次性給付類（壽險／意外傷殘／初次罹癌／重病）；日額與月額用 <code>careMonths</code>／住院天數假設換算成總額再併入（正好把 B-14 的 <code>careMonths</code> 接上），或至少分兩個數字呈現。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-10</span>
+      <h4>「薪資補償」需求填日額、保單填月額、單位標月額——同一個欄位三個地方三種說法</h4></div>
+    <p class="loc">需求輸入標「日額」html:8265 · 保單欄位標「(月)」html:7586 · 比對 engine.ts:387、單位標成「元/月」engine.ts:502</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>同一個 key <code>incomeComp</code> 在需求端與保單端被定義成不同時間單位，直接對減。</dd>
+      <dt>影響</dt><dd>任何有填「薪資補償」的客戶。示範案 need 50,000、have 0、gap 50,000——這 5 萬到底是日還是月，畫面上沒有人說得準。</dd>
+      <dt>建議</dt><dd>統一為「元/月」，改掉需求端標籤；既有資料在 <code>migrateCase</code> 一次性換算，或標「舊值待確認」。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-11</span>
+      <h4>醫療日額需求的說明文字與實際公式對不上</h4></div>
+    <p class="loc">html:8264（hint：「病房費＋看護費＋<strong>薪資補償</strong>＝住院醫療日額需求」）vs engine.ts:352（<code>medicalDailyNeed = room + selfPay + nursing</code>）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>公式加的是「自付差額」而不是「薪資補償」。示範案 need = 2000+1500+1500 = 5000；照 hint 應為 2000+1500+50000。</dd>
+      <dt>建議</dt><dd>確認業務定義後改其中一邊；engine.ts 與 html 的 <code>medicalDailyNeed</code> 目前逐字相同，兩邊要一起改。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-12</span>
+      <h4>成員改名會靜默切斷所有以「姓名」為外鍵的連結</h4></div>
+    <p class="loc">html:2881（<code>set()</code> 只寫值，無連動）· html:3367 · 受害端 engine.ts:354（<code>memberDep</code> 找不到就回 <strong>100</strong>）、358、366</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>成員明明有 <code>mid</code> 這個穩定 id（<code>newMid()</code>、<code>ensureMemberIds</code>），但 <code>needs[].member</code>／<code>coverages[].member</code>／<code>policies[].insured</code>／<code>incomes[].owner</code>／<code>assets[].owner</code>／<code>liabilities[].owner</code>／<code>guarantees[].owner</code>／<code>actions[].member</code> 全部以<strong>字串姓名</strong>關聯，改名時沒有任何 propagate。</dd>
+      <dt>觸發</dt><dd><code>newCaseData()</code> 只改 <code>profile.name</code>，<code>members[0].name</code> 留在預設值「本人」。教練先填收支資債（owner 自動帶「本人」），之後回家庭分頁改成客戶真名 → 所有既有列的 owner 當場變孤兒。<strong>這是必然會發生的動線。</strong></dd>
+      <dt>影響</dt><dd><code>memberDep</code> 找不到就回 100，家計負擔若原本是 60，壽險毛需求會憑空多出 <code>0.4 × 家庭年生活費 × 保障年數</code>（示範案量級 +144 萬）而且不報錯；分組小計會多長出一個畫面上不存在的成員；配上 B-13 更危險。</dd>
+      <dt>建議</dt><dd>短期：改名時掃上述八個欄位做字串替換。長期：改成以 <code>mid</code> 關聯，姓名只做顯示。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>全庫有 <b>109 處</b>孤兒引用。含 <b>1 位真實客戶</b>：王誼宸（2608062）的 members 只有「誼宸 王」，而 incomes／assets／liabilities 的 owner 全是「王誼宸」。另有 8 份示範案的 needs／coverages／policies 指向「王大明」而 members 是「陳建豪｜王太太｜王小寶」——<strong>需求與保單目前恰好都指向同一個孤兒名字，所以已備保障暫時算得對</strong>；但只要教練碰一下「被保人」下拉（見 B-13），需求會跳到第一位成員、保單還留在王大明，已備當場從 300 萬掉到 0，缺口憑空多 300 萬。</p></div>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-13</span>
+      <h4>「舊值靜默跳第一項」只修了兩個表格產生器，另外四個沒接上——最危險的是「被保人／持有人」</h4></div>
+    <p class="loc">已修的 <code>selOpts()</code> 在 html:7186，只被 <code>tableSec</code>(7121) 與 <code>groupedTable</code>(8430) 使用。<strong>未接上</strong>：<code>ofld()</code> html:6045（傳承/職涯/婚姻/理財模式/信用/海外共 15 欄）、<code>fFld()</code> html:3218（含<strong>需求卡的被保人 8292</strong>）、<code>finSel()</code> html:7177、<code>finMem()/memsel</code> html:7176、7120、8426</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>瀏覽器對「目前值不在 option 清單裡」的行為是<strong>靜靜選第一個</strong>。修根因時只改了兩個產生器，其餘四個仍是 <code>list.map(o =&gt; '&lt;option '+(v===o?'selected':'')+'&gt;')</code>。</dd>
+      <dt>影響</dt><dd>教練只是打開那一列看一眼，資料就被改掉了，而且畫面上看不出來。配合 B-12 的 109 處孤兒，這是一顆已經上膛的槍。</dd>
+      <dt>建議</dt><dd><code>ofld</code>／<code>fFld</code>／<code>finSel</code>／<code>finMem</code>／<code>memsel</code> 全部改走 <code>selOpts()</code>（memsel 版本要允許非成員的舊值並標「舊值」）。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-14</span>
+      <h4>13 個死欄位：填得進去、看得到、但沒有任何下游消費者</h4></div>
+    <dl class="kv">
+      <dt>真因</dt><dd>這就是你說的「計算沒有連結在一起」。每一個都有輸入 UI、有些還有提示文字說它會影響什麼，但引擎裡沒有讀取點。下表右欄是<strong>全庫實際已經填了資料的筆數</strong>。</dd>
+    </dl>
+    <div class="tblwrap">
+    <table class="dead">
+      <thead><tr><th>欄位</th><th>UI 說它會影響</th><th>實際</th><th>實測筆數</th></tr></thead>
+      <tbody>
+      <tr><td>expenses[].cut</td><td>「減少支出」槓桿的每列上限</td><td><code>applyLevers()</code> 對所有生活/消費列一律砍同一個 %</td><td>63</td></tr>
+      <tr><td>needs[].careMonths</td><td>長照總需求＝每月照護金×月數</td><td>完全沒有讀取點；缺口只比月額</td><td>60</td></tr>
+      <tr><td>assets[].ret</td><td>被動現金流</td><td>只在 income 為 null/'' 時才用；<code>addRow</code> 範本一律寫 <code>income:0</code>，新建的資產列永遠走不到</td><td>41</td></tr>
+      <tr><td>retire.prepared[].method</td><td>一次領 vs 月領的口徑</td><td><code>retireNeed()</code> 只 <code>sum(amount)</code>；「月領 30,000」被當成一次領 3 萬</td><td>36</td></tr>
+      <tr><td>members[].indepAge</td><td>UI 明說「會自動從壽險保障需求中移除」</td><td>只進 <code>deathProjection()</code> 那張圖，<code>grossLifeNeed()</code> 完全不看</td><td>32</td></tr>
+      <tr><td>legacy.feedEstate</td><td>報告書寫「已把傳承金額納入遺產稅試算」</td><td><code>estateTax()</code> 根本沒讀它</td><td>25</td></tr>
+      <tr><td>liabilities[].repay</td><td>只付利息／暫緩還款的現金流</td><td><code>lRemain()</code>／<code>annualDebtPay()</code> 一律套本息攤還</td><td>5</td></tr>
+      <tr><td>savings[].start/end</td><td>儲蓄投入的起訖</td><td><code>savingInvest()</code> 只加總 amount</td><td>2</td></tr>
+      <tr><td>liabilities[].grace</td><td>前 N 個月只繳息</td><td>無讀取點</td><td>0</td></tr>
+      <tr><td>members[].nhiSalary/nhiDeps</td><td>健保費</td><td>全站沒有任何健保費計算</td><td>0</td></tr>
+      <tr><td>policies[].pAmount</td><td>產險保額</td><td><code>POLICY_MAP</code> 不含它，不進任何比對</td><td>0</td></tr>
+      <tr><td>policies[].paidYears</td><td>累計已繳保費</td><td><code>masterAnalysis()</code> 只從 effDate 回推；沒填生效日 → paid=0</td><td>0</td></tr>
+      <tr><td>params.freeSaving</td><td>自由儲蓄 %</td><td>無讀取點</td><td>0</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="ev"><div class="h">生產資料實測</div><p>前 8 個欄位<strong>全部都有真實資料</strong>。最刺眼的三個：<b>36 筆</b>「已準備退休金」勾了「月領」（例：董建成 360 萬、龔國棟 528 萬、柯正雄 374 萬），全部被當成一次領；<b>60 筆</b>照護月數（多數 120 個月＝10 年），教練填了「每月 3 萬 × 120 個月＝360 萬」的長照需求，系統只比月額；<b>63 筆</b>可刪減%（生活費 10%、孝親費 20%），教練設了保護線，槓桿照砍不誤。</p></div>
+    <dl class="kv" style="margin-top:14px">
+      <dt>建議</dt><dd>分三類處理——<strong>接上引擎</strong>（cut／careMonths／repay+grace／ret，這四個會改變規劃結論）；<strong>改文案標「僅供記錄」</strong>（feedEstate／nhi*／pAmount／indepAge 的提示現在是在說謊）；<strong>直接移除</strong>（freeSaving）。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-15</span>
+      <h4><code>advice()</code> 的「可調整資產」漏乘匯率</h4></div>
+    <p class="loc">engine.ts:1517 · html:2737（兩邊逐字相同）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>sum(c.assets, a =&gt; a.movable ? n(a.value) : 0)</code> 直接讀原幣 <code>a.value</code>，沒有走同一檔案裡既有的 <code>aVal(a)</code>（<code>value × fxRate</code>）。</dd>
+      <dt>影響</dt><dd>建議清單、行動清單、報告書。示範案印「可調整資產約 7,140,000 元」，正解是 11,480,000。</dd>
+      <dt>建議</dt><dd>改用 <code>aVal(a)</code>（或直接用既有的 <code>liquidMovable(c)</code>），兩邊同步。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>全庫 <b>14 筆</b>外幣可調整資產（都是「美股組合」，<code>fxRate = 32</code>），分布在 14 位客戶。這 14 位的建議文字全部低估 31/32 的美股部位。</p></div>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-16</span>
+      <h4>購屋目標的「貸款成數」與「已備」不進逐年金流，而 <code>propertyGaps()</code> 另外算一套</h4></div>
+    <p class="loc">engine.ts:779-782（<code>goalOut</code> 只算 <code>present × (1+gr)^t</code>）· 另一套在 engine.ts:653 · 畫面提示 html:8385-8386、8421</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>loanRatio</code> 不進金流是<strong>已知並已在畫面上標註</strong>的；但 <code>prepared</code>（已備）也不進，這一項沒有文件記載。實測示範案把換屋目標的 prepared 設 1,200 萬、loanRatio 設 100 → <code>shortPV</code> 完全不變。</dd>
+      <dt>影響</dt><dd>同一個目標，置產缺口表與逐年金流給出不同數字。</dd>
+      <dt>建議</dt><dd><code>loanRatio</code> 維持現狀但確認報告書也有提示；<code>prepared</code> 需先釐清語意——若「已備」的錢已經在資產表裡，現況是對的、而 <code>propertyGaps</code> 才是重複扣。<strong>這一題要你拍板。</strong></dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">B-17</span>
+      <h4>html 的 <code>uid()</code> 撞號率 15.5%</h4></div>
+    <p class="loc">html:604（<code>'c'+Math.floor(performance.now()*1000%1e9)+app.cases.length</code>）· 程式碼自己在 html:3247 已經記過「實測三位成員拿到同一個 id」</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>連續呼叫 200 次只得到 <strong>169 個不同值</strong>。<code>app.cases.length</code> 在同一輪迴圈裡是常數，起不到區隔作用。</dd>
+      <dt>影響</dt><dd>目前 <code>uid()</code> 只用在 <code>sampleCase().id</code>／<code>newCase().id</code>／<code>migrateCase()</code> 補 id，而 iframe 一次只帶一份個案，實務衝擊有限。但 <code>migrateCase</code> 是所有資料入口的必經之路，教練端本機模式多筆時就會踩到。<code>polId()</code>／<code>cid()</code>／<code>actId()</code>／<code>bthId()</code>／<code>newMid()</code> 都已補序號，<strong>只有 <code>uid()</code> 漏網</strong>。</dd>
+      <dt>建議</dt><dd>加一個模組層序號，或直接改用 engine.ts:34-35 那一份實作。</dd>
+    </dl>
+  </article>
+
+  <h3 class="grp">低 — 潛在風險與良性漂移</h3>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">B-18</span>
+      <h4><code>retireNeed()</code> 的 <code>valid</code> 欄位只有 engine.ts 有，html 版連回傳都沒有</h4></div>
+    <p class="loc">engine.ts:333 vs html:1266</p>
+    <dl class="kv"><dt>說明</dt><dd>目前無人消費（見 B-03）；修 B-03 時兩邊要一起補。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">B-19</span>
+      <h4><code>health()</code> 的 safety clamp 只有 engine.ts 有</h4></div>
+    <p class="loc">engine.ts:1454（<code>Math.max(0,Math.min(100,…))</code>）vs html:2648（無 clamp）</p>
+    <dl class="kv"><dt>說明</dt><dd><strong>已驗證為良性</strong>——五個分項都各自夾在 0~1，實測兩邊 safety 都是 86。建議仍補上，以免未來新增分項時破表。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">B-20</span>
+      <h4><code>riskQScore()</code> 在 html 缺越界防護</h4></div>
+    <p class="loc">html:6265 vs engine.ts:1762（有 <code>if(!Q)return 0</code>）</p>
+    <dl class="kv"><dt>說明</dt><dd>目前唯一呼叫點的迴圈上界是 <code>RISK_Q.length</code>，打不到；但這是 drift test 沒守到的一處，未來若有其他呼叫點會 <code>TypeError</code> 白畫面。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">B-21</span>
+      <h4><code>params.planInit / planYearly / planSaving</code>（計劃儲蓄）只存在於 html 的 <code>projection()</code></h4></div>
+    <p class="loc">html:1893、1983-1986 產生 <code>rows[].planBal/planDraw/planOut</code>；engine.ts:746 完全沒有</p>
+    <dl class="kv"><dt>說明</dt><dd>目前只餵支出來源圖與年度結餘圖的虛線，不影響 <code>bal</code>／<code>raw</code>／<code>shortPV</code>。若之後 React 端要畫同樣的圖就會缺資料。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">B-22</span>
+      <h4><code>incomes[].subType</code> 的下拉沒有 <code>selOpts()</code>，而它是稅額分流的依據</h4></div>
+    <p class="loc">html:3587 · 消費端 engine.ts:1548-1549（<code>subType==='執行業務所得'</code> 拆兩條路）</p>
+    <dl class="kv"><dt>說明</dt><dd>選項清單開頭有一個空選項，所以舊值不在清單時會顯示空白而不是跳到第一項，破壞性比其他 select 小；但值一旦被改掉，綜所稅會跳。</dd></dl>
+  </article>
+</section>
+
+<section id="d" data-dim="d">
+  <div class="sechead">
+    <h2>面向二 · 資料庫勾稽</h2>
+    <span class="tally">28 項 · 致命 2 · 中 11 · 低 15</span>
+  </div>
+  <p class="secnote">先講好消息：我把全庫 61 份 <code>plans.data</code> 用現在的引擎重算，跟存進 DB 的快照逐筆比對——<strong>財務階段 61/61 完全一致、淨值 61/61 完全一致</strong>。三把租戶尺（<code>ownedClient</code>／<code>readableClient</code>／<code>annotatableClient</code>）在 <code>clients.ts</code>／<code>plans.ts</code>／<code>reviews.ts</code> 也守得很緊，<code>/api/**</code> 八支路由沒有一支缺認證。壞消息全部集中在兩個地方：<strong>一支被漏掉的租戶條件</strong>，以及 <strong>jsonb 內部的參照完整性——DB 幫不上忙，全靠應用層，而應用層有一半沒做</strong>。</p>
+
+  <div class="ev good" style="max-width:none;margin-bottom:8px">
+    <div class="h">全庫實測 · 沒有問題的部分</div>
+    <p><b>61/61</b> 份規劃的 <code>health_grade</code> 與現在引擎算出的完全相同；<b>61/61</b> 份的 <code>net_worth</code> 也完全相同。<b>0</b> 位客戶沒有規劃、<b>0</b> 份 plans 缺快照、<b>0</b> 張附約 <code>riderOf</code> 懸空、<b>0</b> 筆 goals 的類型落在下拉清單之外、<b>0</b> 筆生育規劃孤兒、<b>0</b> 筆未出生成員誤寫年齡。上一輪修的東西<strong>沒有留下殘留</strong>。</p>
+  </div>
+
+  <h3 class="grp">致命</h3>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">D-01</span>
+      <h4>諮詢場次的三支讀取 API 完全沒有租戶條件——任何有效教練可讀取全庫任一客戶的諮詢摘要與註記</h4></div>
+    <p class="loc">consultSession.ts:60-67（<code>openSession</code>）、69-76（<code>listSessions</code>）、285-307（<code>pendingDraft</code>）· dashboard/actions.ts:211-214、224-227、229-232</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>這三支的 where 只有 <code>eq(consultSessions.clientId, clientId)</code>，沒有 <code>ownedClient()</code> 也沒有 <code>readableClient()</code>。同檔案的 <code>startSession</code>／<code>endSession</code>／<code>saveSessionRecord</code>／<code>discardDraft</code> 都有 <code>assertOwned()</code>，<strong>唯獨這三支漏掉</strong>。而 server action 端只做 <code>coachId()</code>＝<code>requireWritableCoach()</code>——那只驗「你是不是一位有效教練」，<strong>沒有驗「這位客戶是不是你的」</strong>，<code>clientId</code> 直接來自參數。</dd>
+      <dt>為什麼守門網沒抓到</dt><dd><code>clientScope.drift.test.ts:115-119</code> 只驗「<code>consultSession.ts</code> 這個檔案裡出現過 <code>ownedClient</code>」——出現一次就通過，掃不到逐支函式。</dd>
+      <dt>洩漏什麼</dt><dd><code>pendingDraft</code> 回傳整段諮詢摘要全文＋待辦註記內文；<code>listSessions</code>／<code>openSession</code> 回傳 <code>metricsBefore/metricsAfter</code>（總缺口 shortPV、淨值）與教練收尾寫的整段 <code>closingNote</code>。<strong>這正是最敏感的客戶財務與談話內容，而且完全繞過共同執案的授權機制。</strong></dd>
+      <dt>難度</dt><dd>clientId 是 uuid 不好猜；但共同執案被移除（revoked）的人、客戶移轉前的原教練、曾在網址列看過 <code>/dashboard/clients/&lt;uuid&gt;</code> 的人都握有它。</dd>
+      <dt>建議</dt><dd>三支都吃 <code>coachId</code> 參數並在 where 併上 <code>ownedClient(coachId)</code>（比照 <code>plans.ts</code> 的 <code>ownedPlan</code> 用 innerJoin）；<code>restoreToSessionAction:245</code> 的 <code>listSessions</code> 一併改。drift test 改成逐函式掃描：每一支 export 的 async function 都要出現 <code>assertOwned</code> 或 <code>ownedClient</code>。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">D-02</span>
+      <h4>已發放案件的重算／退費必定撞唯一鍵，而且會<strong>先</strong>把 pending 分潤洗成 void 才炸</h4></div>
+    <p class="loc">comp/caseRepo.ts:116-138（<code>writePayouts</code>）、213-220（<code>recalcCase</code>）、223-232（<code>refundCase</code>）· schema.ts:564-565（partial unique on <code>(case_id, payee_key) WHERE status &lt;&gt; 'void'</code>）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>writePayouts</code> 只把 pending／batched 標成 void，<strong>刻意不動 paid</strong>——但接下來 <code>computePayouts</code> 仍然會為同一批受款人產生新列（status='pending'）並整批 insert。partial unique 的條件是 <code>status &lt;&gt; 'void'</code>，paid 舊列與 pending 新列同時落在索引內、<code>(caseId, payeeKey)</code> 完全相同 → 衝突。<strong>註解假設「不動 paid」等於「不會產生 paid 那幾列」，但程式沒有任何一行做這件事。</strong></dd>
+      <dt>後果</dt><dd>① 退費流程整條走不通，而退費本來就是發放後才會發生的事（辦法 §23）。② void 已經先執行成功、insert 才炸掉 → 若該案件同時有 paid 與 pending 兩批，<strong>那批 pending 會被永久標 void 而沒有新列補上，應付分潤憑空消失</strong>，畫面上只看到一個 Next digest 錯誤。③ <code>refundAmount</code> 已經寫進 <code>comp_cases</code> 才呼叫 recalc → 帳面與應付對不起來。</dd>
+      <dt>建議</dt><dd><code>recalcCase</code> 先撈既有 <code>status='paid'</code> 的 payeeKey 集合，<code>writePayouts</code> 跳過這些 payee；退費的正確語意是「產生一筆負數沖回列」而不是重算。UI 在 status='paid' 時把「重算分潤」換成「產生沖回」。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測 — 未爆的地雷</div><p><code>comp_cases</code> 目前 <b>0 筆</b>、<code>comp_payouts</code> <b>0 筆</b>、<code>comp_batches</code> <b>0 筆</b>。整套業務制度<strong>還沒有任何真實案件</strong>，所以這一項尚未爆炸。但它會在「第一次有人退費」的那一天爆，而那一天你在處理的是錢。</p></div>
+  </article>
+
+  <h3 class="grp">中 — 資料會壞或使用者走進死路</h3>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-03</span>
+      <h4><code>plan_revisions</code> 無上限成長，而且完全沒有任何清理機制</h4></div>
+    <p class="loc">revisions.ts:10-22（<code>logRevision</code>）· PlanEditor.tsx:196-207（700ms debounce 自動存檔）· schema.ts:364-375</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>每一次 <code>savePlanDataAction</code> 都無條件插入一列<strong>完整的 plans.data jsonb</strong>。全庫搜尋 <code>planRevisions</code> 的所有寫入點只有這一個 insert——<strong>沒有 delete、沒有 TTL、沒有保留筆數上限、沒有壓縮</strong>。唯一會刪的是 plans 被刪時的 CASCADE。</dd>
+      <dt>為什麼沒被發現</dt><dd><code>listRevisions</code> 有 <code>limit(60)</code>、<code>listClientTimeline</code> 有 <code>limit(120)</code>，所以查詢永遠不會變慢。<strong>容量爆掉之前完全沒有任何可觀察的症狀。</strong></dd>
+      <dt>建議</dt><dd><code>logRevision</code> 之後補一段「同一 planId 只保留最近 200 版」的單語句刪除；或改成「內容 hash 相同就不寫」＋每日排程壓縮（<code>/api/cron</code> 已有現成授權骨架）。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測 — 這是目前最急的一項</div><p>現況 <b>2,287 筆 / 13 MB</b>，而整個資料庫才 <b>26 MB</b>——<strong>plan_revisions 佔了一半</strong>。這 2,287 筆只來自 <b>23 份</b>規劃（單一份最高 <b>740 版</b>）。逐週看成長：<b>8/10 那週 250 筆 / 627 kB → 8/17 那週 733 筆 / 2.2 MB → 8/24 那週 1,304 筆 / 8.5 MB</b>。<strong>上週一週就長了 8.5 MB，而且週成長率是 3.5 倍。</strong>目前是 15 位教練、60 位客戶、還沒對外收客戶。Neon 免費方案上限 512 MB。</p></div>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-04</span>
+      <h4><code>actions[].ref</code> 用陣列<strong>位置索引</strong>指向 expenses/assets，刪列或拖曳排序會靜默指到別列</h4></div>
+    <p class="loc">html:5109-5122（產生 <code>expenses:3</code>）· 5285-5289（<code>arr[+t[1]]</code> 解析）· 3023（<code>delRow</code> 直接 splice）· 7198 <code>dragCell</code>、7323、7405（expenses/assets 都可拖曳）· 報告書引用 9346</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>ref 存的是「陣列第幾個」。<code>delRow</code> 只做 splice、<code>dragCell</code> 提供拖曳重排，兩者都會讓所有 ref 的語意整批偏移，<strong>全檔沒有任何一處在刪除／重排後回頭修 ref</strong>。更早一步：<code>migrateCase → syncPremium</code>（html:1006-1014）在第一次遷移時會 filter 掉保費列再 push 兩列新的——<strong>舊資料載入的當下就把 ref 打偏了</strong>。</dd>
+      <dt>影響</dt><dd>動作列旁的「此項目前每月 X」「刪減額超過該項金額」提示、以及報告書的「↳ 指向明細」全部指向錯誤的項目。教練與客戶看到「我們決定刪減 A」但脈絡數字是 B 的，<strong>而畫面上完全看不出來</strong>（指到的那列一樣存在、一樣有金額）。</dd>
+      <dt>建議</dt><dd>比照 <code>pid</code>／<code>mid</code>／<code>cid</code>，給 expenses/assets 每列補穩定 id（<code>migrateCase</code> 冪等補），ref 改存 <code>"expenses:&lt;id&gt;"</code>，遷移時一次性轉換。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-05</span>
+      <h4>成員改名不傳播（資料層視角）：<code>memsel</code> 缺舊值保護，畫面顯示的持有人與存的值不同</h4></div>
+    <p class="loc">html:2881-2887、7118-7120（<code>memsel</code>）、7176（<code>finMem</code>）· 有保護的 <code>selOpts</code> 在 7187-7195</p>
+    <dl class="kv">
+      <dt>說明</dt><dd>與 B-12／B-13 同源，這裡列出資料層的後果：<code>groupedTable</code> 會多長出一個叫「本人」的分組（畫面上沒有這個成員）；下拉顯示第一位成員但實存值仍是舊名；<code>coverageGaps</code> 的需求／保單配對、<code>assetPassive</code>、依持有人的小計全部歸錯人。<strong>檔案自己在 html:7182-7186 用一整段註解記錄過這個陷阱，修法只套用到 <code>sel:</code> 型欄位，漏掉了 <code>memsel</code>。</strong></dd>
+      <dt>建議</dt><dd>(a) <code>memsel</code>／<code>finMem</code> 改走 selOpts 同款保護；(b) <code>set()</code> 偵測到成員改名時把舊名在七個欄位一次換掉；(c) <code>migrateCase</code> 補一次孤兒回收。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-06</span>
+      <h4>刪除教練不檢查 <code>comp_cases.promoter_id</code>，會靜默把別人案件的推廣者清空</h4></div>
+    <p class="loc">coach.ts:319-325（<code>coachWorkload</code> 只數 executorId）、348-367（<code>removeCoach</code>）· schema.ts:514（promoterId SET NULL）vs 517（executorId RESTRICT）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>removeCoach</code> 的兩道擋人條件是「名下客戶數」與「executor 案件數」。<code>promoterId</code> 是 SET NULL，既沒有 RESTRICT 也沒有計入 workload。</dd>
+      <dt>後果</dt><dd>一位純推廣、自己沒執案也沒客戶的教練被移除 → 他推廣過的案件 <code>promoter_id</code> 全變 null。之後任何人按一次「重算分潤」，<code>computePayouts</code> 會走成「無推廣者」結構，<strong>推廣端的錢整批消失，而且沒有任何紀錄看得出原本是誰</strong>。<code>coaches.upline_id</code>／<code>sponsor_id</code> 同樣是 SET NULL 且沒有事前擋。</dd>
+      <dt>建議</dt><dd><code>coachWorkload</code> 加 <code>promoterCases</code> 計數（索引已存在，成本為零），<code>removeCoach</code> 一併擋；刪除前把 upline/sponsor 的下線列出來讓管理員確認。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-07</span>
+      <h4>「把諮詢存成正式紀錄」不是原子的，中途失敗會產生重複的 review 與重複的待辦</h4></div>
+    <p class="loc">consultSession.ts:242-277（<code>saveSessionRecord</code>）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>三段寫入沒有交易（neon-http 不支援）：① <code>createReview()</code> → ② 逐筆 <code>createActionItem()</code> → ③ update <code>reviewId</code>。冪等鎖是 <code>if (s.reviewId) return</code>，但 <strong>reviewId 是最後一步才寫的</strong>。</dd>
+      <dt>後果</dt><dd>待辦 5 筆、第 3 筆遇到連線抖動，或 Vercel function 在 ③ 之前逾時 → 教練看到「存檔失敗」再按一次 → 客戶時間軸出現兩筆同一天的諮詢紀錄、<code>action_items</code> 出現重複待辦（沒有唯一鍵可擋），而 <code>pendingDraft</code> 因為 reviewId 仍是 null 會繼續跳「摘要還沒存」。</dd>
+      <dt>建議</dt><dd>順序反過來：先 <code>db.batch()</code> 寫 review + action_items（neon-http 支援 batch），成功後才 update session；或用「先占 reviewId」的單語句 update returning。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-08</span>
+      <h4>課程完課補訓練時數是「先查再寫」，而唯一鍵因為 <code>session_id</code> 為 NULL 擋不住</h4></div>
+    <p class="loc">learn.ts:131-163（<code>completeCourseHours</code>）· schema.ts:617（unique on <code>(session_id, coach_id, kind)</code>）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>判重用「select 有沒有 <code>evidence='learn:&lt;courseId&gt;'</code> → 沒有才 insert」。唯一索引第一欄是 <code>session_id</code>，線上課程寫入的是 <code>null</code>——<strong>Postgres 的 UNIQUE 對 NULL 視為互異</strong>。這正是本專案在 <code>comp_ranks.module_code</code>、<code>comp_payouts.payee_key</code>、<code>ins_products.code</code> 三處刻意用空字串規避的同一個坑，這裡沒規避。</dd>
+      <dt>後果</dt><dd>快速連點兩次「標記完成」→ 長出兩列 approved 時數 → 年度維持資格的 <code>trainHours</code> 直接翻倍 → <code>trainPass</code> 誤判通過。schema 註解自陳「時數帳是維持資格依據，重複寫等於灌水」。</dd>
+      <dt>建議</dt><dd>加 <code>uniqueIndex(coachId, evidence).where(evidence is not null)</code>，insert 改 <code>onConflictDoNothing</code>。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-09</span>
+      <h4>「新增版本」在最常見的情境下必定撞唯一鍵，錯誤訊息是「操作失敗，請重試」——重試永遠不會成功</h4></div>
+    <p class="loc">plans.ts:149-168（<code>const y = year ?? new Date().getFullYear()</code>）· schema.ts:244（unique <code>client_id,year,track</code>）· clients.ts:138-150（createClient 已建一份當年度）· ClientDetail.tsx:80-91</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>createClient</code> 一定會建一份「今年 + coach 軌」的初版；<code>createPlan</code> 預設也用今年。唯一鍵是刻意加的，但應用層沒有任何 catch／轉譯，unique violation 直接往上丟，被 <code>catch { setErr("操作失敗，請重試。") }</code> 吃掉。</dd>
+      <dt>諷刺的是</dt><dd><code>dashboard/actions.ts:20-23</code> 自己寫過這個反模式的註解：<em>「畫面上就只剩『建立失敗，請重試』——重試一百次也不會成功」</em>，但那道修法只套用在 <code>createClientAction</code> 一支。</dd>
+      <dt>建議</dt><dd><code>createPlan</code> 改成先查該客戶 coach 軌的 <code>max(year)</code>、預設用 max+1（與 clonePlan 一致）；或 <code>onConflictDoNothing().returning()</code>，空回傳就回可讀的錯誤。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-10</span>
+      <h4>接受客戶連結申請與邀請碼兩條路徑完全繞過客戶數上限</h4></div>
+    <p class="loc">coachLink.ts:120-132（<code>respondToLinkRequest</code>）、170-202（<code>redeemInvite</code>）· guard.ts:46-50（<code>requireClientQuota</code>）· 唯一呼叫點 dashboard/actions.ts:26-39</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>requireClientQuota()</code> 只在 <code>createClientAction</code> 被呼叫一次。「客戶申請→教練接受」與「邀請碼→自動掛上」兩條路都是 <code>update clients set coach_id</code>，都會讓 <code>usedClientCount()</code> 增加，<strong>兩條都沒查額度</strong>。</dd>
+      <dt>後果</dt><dd><code>comp_ranks.client_cap</code> 的分級定價形同虛設（實習與 C1–C3 的 20 位上限可以無限突破），而畫面上的「額度 x/y」會顯示超過分母。</dd>
+      <dt>建議</dt><dd>兩條路徑都先過 <code>requireClientQuota</code>，並回 <code>{ok:false, error}</code> 而不是 throw。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-11</span>
+      <h4>cron 的全體職級重算是逐筆寫入、無交易、<code>maxDuration=60</code>，中斷會留下一半新一半舊</h4></div>
+    <p class="loc">comp/recompute.ts:44-105 · caseRepo.ts:363-379（<code>setAdvisorRank</code>）· api/cron/comp-recompute/route.ts:18</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>迴圈中每位晉升／真除的教練要 2 次序列 round-trip，而 <code>saveMaintenance</code> 是<strong>整段迴圈跑完才寫一次</strong>。中途拋錯或逾時 → 前半段職級已改、後半段沒改、<strong>且全部人都沒有維持資格快照</strong>。<code>setAdvisorRank</code> 本身也不原子：update 成功而 insert rank_event 失敗 → 職級變了但沒有異動紀錄。另外 <code>advisors</code> 是迴圈開始前算好的，所以同一次執行的結果取決於 <code>createdAt</code> 排序。</dd>
+      <dt>影響</dt><dd>職級＝分潤比例。</dd>
+      <dt>建議</dt><dd><code>saveMaintenance</code> 分批（每 20 位寫一次）；<code>setAdvisorRank</code> 改 <code>db.batch()</code>；迴圈中同步更新記憶體的 advisors；加一張進度表讓下一次可以續跑。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-12</span>
+      <h4>CSV 批次匯入無交易、無去重，重傳同一份會整批重複並重算分潤</h4></div>
+    <p class="loc">admin/cases/actions.ts:192-215（<code>for (const r of valid) await createCase(...)</code>）· caseRepo.ts:161-183、213-220</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>50 列 CSV ＝ 50 次 insert + 50 次「載入制度參數 + 撈全部教練 + void + insert payouts」。沒有交易、<code>comp_cases</code> 上也沒有任何可去重的唯一鍵。</dd>
+      <dt>後果</dt><dd>中途逾時 → 前 N 筆已進 DB、畫面回「匯入失敗」→ 管理員重傳 → 整批重複，分潤照重複案件全額再算一次。</dd>
+      <dt>建議</dt><dd><code>createCase</code> 抽出 recalc，改成「先 batch insert 全部案件 → 再用一次 loadParams 逐筆算 payouts」；<code>comp_cases</code> 加匯入批次欄或 <code>(executor_id, client_name, signed_at, fee)</code> 唯一鍵讓重傳變成 upsert。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">D-13</span>
+      <h4><code>guard.drift.test.ts</code> 只掃檔名恰好是 <code>actions.ts</code> 的檔案，保護網有洞</h4></div>
+    <p class="loc">guard.drift.test.ts:29-36、18（<code>ROOT = src/app/dashboard</code>）· 掃不到：<code>clients/[id]/collabActions.ts</code>、<code>admin/licenseActions.ts</code>、<code>coaches/actions.ts</code>、<code>bizcheck/actions.ts</code>、<code>uiScaleAction.ts</code></p>
+    <dl class="kv">
+      <dt>現況</dt><dd><strong>目前沒有實際破口</strong>——我逐檔看過，<code>collabActions.ts:18</code> 有 licenseState 檢查、其餘幾支或不需要期限閘。但「下一次有人在 /dashboard 底下開一個 <code>xxxActions.ts</code>」就會漏。</dd>
+      <dt>建議</dt><dd>比對條件改成 <code>/[Aa]ctions\.ts$/</code>，<code>ROOT</code> 擴到 <code>src/app</code>，<code>/admin/**</code> 改成檢查 isAdmin。</dd>
+    </dl>
+  </article>
+
+  <h3 class="grp">低 — 參照完整性與環境現況</h3>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-14</span>
+      <h4><code>client_notes.block_key = 'policy:&lt;pid&gt;'</code> 是 DB↔jsonb 的跨界外鍵，完全沒有清理</h4></div>
+    <p class="loc">schema.ts:898 · html:10781（寫入 key）· html:10672-10676（nameOf fallback）</p>
+    <dl class="kv">
+      <dt>說明</dt><dd>保單註記掛在 <code>clientId + 'policy:'+pid</code>，pid 住在 <code>plans.data.policies[]</code>，DB 完全不知道這個關係。刪保單或刪掉再重建（新 pid）都會留下孤兒註記。有 fallback 不會白畫面，但若當初勾了「客戶可見」，它會<strong>繼續出現在客戶端</strong>，指向一張已經不存在的保單。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>全庫 <b>142 張保單</b>中有 <b>100 張沒有 pid</b>（70%，都是較早的資料）。這 100 張既不能被附約掛上，也接不了保單註記。<code>client_notes</code> 目前只有 <b>1 筆</b>，所以孤兒註記還沒發生。</p></div>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-15</span>
+      <h4>生育規劃 ↔ members/goals/expenses 的孤兒清理只在單一方向，而且只在按鈕觸發時</h4></div>
+    <p class="loc">html:4224-4278（<code>applyBirthPlan</code>，清理只在 4227-4232）· 4217-4222 · 成員卡的 <code>delRow('members', idx)</code> html:3364</p>
+    <dl class="kv">
+      <dt>說明</dt><dd>清理只寫在 <code>applyBirthPlan()</code> 裡，而它只有兩個呼叫點。反方向（教練從家庭分頁直接刪掉那位「尚未出生」的子女）沒有任何對應清理，而且下一次 applyBirthPlan 會依 <code>bid</code> 把成員<strong>重新長回來</strong>。<code>migrateCase</code> 不呼叫它，所以載入時不做勾稽。</dd>
+      <dt>建議</dt><dd>把那三行孤兒回收搬進 <code>migrateCase</code>（冪等）；<code>delRow('members')</code> 時若該成員有 <code>birthBid</code> 就一併從 birthPlan 移除。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>目前 <b>0 筆</b>孤兒——生育規劃是 8/26 才上線的，還沒有人踩到。</p></div>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-16</span>
+      <h4>刪掉主約後，附約的 <code>riderOf</code> 變成永久懸空</h4></div>
+    <p class="loc">html:3023（<code>delRow</code> 只 splice）· 7712-7727（<code>riderCardsHTML</code>）· 7746-7762（排序有把孤兒排最後，這點是好的）</p>
+    <dl class="kv">
+      <dt>說明</dt><dd>孤兒附約在保單列表看得到（排最後），但主約卡片不會再列出它們，「附約 N 張・年繳保費合計」與主約合計對不起來；而 <code>policyKind='附約'</code> 的下拉仍顯示一個已不存在的主約。</dd>
+      <dt>建議</dt><dd><code>delRow</code> 對 policies 特判：把所有 <code>riderOf === 被刪的 pid</code> 改成空字串。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>全庫 <b>18 張</b>附約，<b>0 張</b>懸空。目前乾淨。</p></div>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-17</span>
+      <h4><code>education</code> 只回收 <code>auto:true</code> 的孤兒列，手動列的 <code>mid</code> 不回收</h4></div>
+    <p class="loc">html:3972-3986（<code>syncEduAll</code>，3982 明確排除手動列）</p>
+    <dl class="kv"><dt>說明</dt><dd>註解說明這是<strong>刻意</strong>的（「手動列是顧問自己填的舊資料，一列都不能碰」）。但手動列同樣帶 mid，成員刪掉後就對應不到任何人，教育金需求裡會多一筆歸屬不明的支出。屬已知取捨，僅記錄。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-18</span>
+      <h4><code>reviews.planId</code> 從不驗證屬於同一位客戶</h4></div>
+    <p class="loc">reviews.ts:24-39、51-64 · consultSession.ts:255（<code>input.planId</code> 直接來自表單）</p>
+    <dl class="kv"><dt>說明</dt><dd><code>assertClientOwned</code> 只驗 clientId，planId 原樣寫入。目前 UI 沒有這條路，影響有限，但這是一條沒被守住的參照。建議 planId 非 null 時多一句 <code>exists(select 1 from plans where id=? and client_id=?)</code>。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-19</span>
+      <h4><code>updatePlanData</code> 收到 undefined 會靜默把 <code>health_grade</code>／<code>net_worth</code> 洗成 null</h4></div>
+    <p class="loc">plans.ts:86-95 · PlanEditor.tsx:195-197（<code>latest.current = msg.data</code> 未驗證）· revisions.ts:17-21（try/catch 靜默吞掉）</p>
+    <dl class="kv"><dt>說明</dt><dd><code>data</code> 為 undefined 時 Drizzle 會略過該欄位，而同一句的 <code>healthGrade: null, netWorth: null</code> 照寫。一次格式異常的 postMessage 就會讓該版本的階段／淨值歸零，而 data 完好無損 → 客戶列表顯示「未評」，看不出原因。建議開頭加形狀檢查。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-20</span>
+      <h4><code>createClient</code>／<code>savePassport</code>／<code>redeemInvite</code> 的多段寫入沒有原子性</h4></div>
+    <p class="loc">clients.ts:121-152（allocCode → insert clients → insert plans）· clientPlan.ts:194-224 · coachLink.ts:184-201</p>
+    <dl class="kv"><dt>說明</dt><dd>plans insert 失敗 → 客戶存在但沒有任何規劃，而因為 D-09 的唯一鍵問題，「新增版本」在同一年會撞鍵——<strong>等於這位客戶救不回來</strong>。建議改 <code>db.batch()</code>。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-21</span>
+      <h4>五條外鍵沒有索引</h4></div>
+    <p class="loc">schema.ts:204（<code>clientCollaborators.invitedBy</code>，CASCADE）、383（<code>coachInvites.usedByClientUserId</code>）、575（<code>compBatches.approvedBy</code>）、592（<code>compTrainingSessions.speakerId</code>）、629（<code>compRankEvents.operatorId</code>）</p>
+    <dl class="kv"><dt>說明</dt><dd>schema 檔頭自陳「Postgres 不會自動幫 FK 建索引」，<code>coaches_upline_id_idx</code> 就是為此而建，這五條漏了。目前資料量小不會痛。至少補 <code>invitedBy</code>（它是 CASCADE，最可能被踩到）。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-22</span>
+      <h4><code>teamWeeklyAppts</code> 為了數約訪，把整批客戶列（含 contact jsonb）撈回 Node</h4></div>
+    <p class="loc">home.ts:143-159（<code>db.select().from(clients)</code> 無欄位清單）· 對照 clients.ts:84 的「明列欄位」註解</p>
+    <dl class="kv"><dt>說明</dt><dd>主管首頁每次 render 把整個下線團隊的客戶資料（含聯絡方式）拉進記憶體，只為了取 id。改成 <code>select({ id: clients.id })</code>。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-23</span>
+      <h4><code>clients.code</code> 建了唯一索引，但全庫沒有任何查詢路徑</h4></div>
+    <p class="loc">schema.ts:146-147（註解寫「教練端用它搜尋」）· 實際只出現在 schema 定義與 clientCollab.ts:133 的顯示</p>
+    <dl class="kv"><dt>說明</dt><dd>沒有任何 <code>where clients.code = ?</code>（對照組 <code>findCoachByCode</code> 是有的）。索引本身仍有防重號價值。單純記錄一處文件與實作漂移——<strong>或者這是一個該做卻沒做的功能</strong>。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-24</span>
+      <h4><code>/api/pending-links</code> 把所有錯誤吞成 <code>count: 0</code></h4></div>
+    <p class="loc">api/pending-links/route.ts:19-21</p>
+    <dl class="kv"><dt>說明</dt><dd>DB 掛掉或 ensureCoach 出錯時紅點靜靜歸零，教練以為沒有待處理的申請。建議回 <code>{count:0, error:true}</code> 讓前端顯示灰點。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-25</span>
+      <h4>客戶提交問卷時可自訂 <code>questions</code> 題目文字</h4></div>
+    <p class="loc">portal/survey/actions.ts:30-58（questions 原樣傳給 submitSurvey）· comp/survey.ts:114-127（<code>listTestimonials</code> 把它交出去當行銷素材）</p>
+    <dl class="kv"><dt>說明</dt><dd><code>caseId</code> 有在伺服器端重查歸屬（做得很好），但 questions 完全信任前端。若該筆勾了 <code>marketingOptIn</code>，客戶送出的任意文字會進見證素材。建議 questions 一律由伺服器端的 <code>questionsOf(settings)</code> 取。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-26</span>
+      <h4>engine.ts 與 html 的 <code>newCase()</code> 清空清單不一致，靠「sampleCase 剛好沒有那些鍵」保平安</h4></div>
+    <p class="loc">engine.ts:124（清 15 個陣列）vs html:697（清 26 個）· <code>CASE_ARRAYS</code> html:867（28 個）</p>
+    <dl class="kv"><dt>說明</dt><dd>伺服器端少清 birthPlan／actions／companies／七張企業表／lifeGoals。<strong>目前無害</strong>，因為 <code>sampleCase()</code> 根本沒有這些鍵。但這是隱性依賴——只要哪天有人往 engine.ts 的 sampleCase 補一列示範用的 companies 或 actions，<strong>每一位新客戶就會憑空帶著示範資料</strong>。建議抽成單一常數，或加 drift test 斷言「清空清單 ⊇ sampleCase 的所有陣列鍵」。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-27</span>
+      <h4>伺服器端沒有 <code>migrateCase</code>：<code>planSnapshot</code> 是直接把原始 jsonb 餵給引擎</h4></div>
+    <p class="loc">snapshot.ts:6（只 import metrics/health/totalGap/newCase）· <code>migrateCase</code> 只住在 html:869-919</p>
+    <dl class="kv"><dt>說明</dt><dd>寫進 DB 的 <code>health_grade</code>／<code>net_worth</code> 走的是「未遷移」的資料，教練畫面走的是「已遷移」的。<strong>實測 61/61 兩者一致</strong>，所以現況安全——因為目前的遷移邏輯都是「補預設值」而不是「改值」。但只要 <code>migrateCase</code> 未來加入任何會改變數字的正規化（例如 B-10 的薪資補償單位換算），快照與畫面就會當場分岔。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">D-28</span>
+      <h4>兩張後台參數表是空的，全部走程式端 fallback</h4></div>
+    <p class="loc"><code>biz_tax_params</code> 0 筆 · <code>birth_cost_params</code> 0 筆</p>
+    <dl class="kv"><dt>說明</dt><dd>seed 沒有跑過。企業/稅務常數、<strong>規劃求解上限 <code>PLAN_DISCOUNT</code>／<code>CAP_*</code></strong>、保單健檢的 <code>CHECKUP_BAND</code>／<code>TRIANGLE_*</code>、以及生育費用參數全部落在 <code>bizTax.ts</code>／<code>birthCosts.defaults.ts</code> 的預設值。功能正常，但<strong>後台頁上調的任何數字都還沒有基準列可改</strong>——管理員打開那兩頁會看到空的。</dd></dl>
+    <div class="ev"><div class="h">生產資料實測 · 其他環境現況</div><p><b>34 / 60</b> 位客戶仍是示範資料（57%）；<b>2</b> 位客戶沒有 coach；<b>7</b> 個 <code>client_users</code> 沒有對應的 client；<b>71</b> 筆待辦未完成；<code>consult_sessions</code> 開著 <b>0</b> 場、<code>coach_link_requests</code> pending <b>0</b> 筆（收尾機制正常）。</p></div>
+  </article>
+</section>
+
+<section id="u" data-dim="u">
+  <div class="sechead">
+    <h2>面向三 · 使用者順暢度</h2>
+    <span class="tally">32 項 · 致命 11 · 中 15 · 低 6</span>
+  </div>
+  <p class="secnote">評判標準用你自己定的那兩條：<strong>你是坐在客戶旁邊做諮詢，畫面要能一眼指著說「你看，這裡掉下去了」</strong>；以及<strong>首屏一張圖 ＋ ≤3 個數字，其餘收合</strong>。這一節的「致命」不是會當機，是<strong>會讓你在客戶面前卡住或講錯</strong>。</p>
+
+  <h3 class="grp">教練端 — 拉了不動：<code>set()</code> 不 render 的受害者</h3>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-01</span>
+      <h4>規劃參數（通膨／投報／緊急預備金／安全感預備金）改了，全系統的衍生數字都不動</h4></div>
+    <p class="loc">繫結 html:3497（14 個欄位全走 <code>setMeta</code>）· 處理器 html:2934 · 受害顯示 html:3515-3535</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>setMeta()</code> 教練端不 render，<strong>而且連 <code>syncDerived()</code> 都沒呼叫</strong>（<code>set()</code> 至少還有）。所以 <code>data-calc</code> 節點也不會重算。</dd>
+      <dt>最刺眼的一處</dt><dd><code>safetyCashHint</code> 顯示「系統算的（月支出 × N 個月）」與「客戶心裡的門檻比系統算的高 X 元」。那段註解自己寫著：這一題的價值就是把兩個數字擺在一起讓教練當場看見落差。<strong>而這個落差數字是唯一一個改了不會動的。</strong>你當著客戶的面輸入「你說 200 萬才睡得著」，畫面回你一個舊值。</dd>
+      <dt>建議</dt><dd>兩步：(1) <code>setMeta</code> 尾巴補一行 <code>syncDerived();</code>——最低成本止血。(2) 把 <code>safetyCashHint(c)</code> 包進 <code>data-calc</code> 並在 <code>CALC</code> 註冊。這正是 html:2900 註解說的機制，只是漏掉了。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-02</span>
+      <h4>購置試算：房貸利率、年期、裝修款改了，月付／頭期款／總利息不動</h4></div>
+    <p class="loc">繫結 html:8408-8410（<code>finNum</code>＝<code>setLive</code>/<code>set</code>）· 受害顯示 html:8413-8418（<code>down/loan/mp/totInt</code> 直接內嵌 HTML，無 <code>data-calc</code>）</p>
+    <dl class="kv">
+      <dt>為什麼致命</dt><dd>這是全系統最典型的「拉了要當場看到」的元件——把利率從 2.0 調到 2.1，就是要指著月付說「你看，多兩千」。目前調完只會看到舊數字或「填了利率與年期才算得出月付」，要切走再切回來。</dd>
+      <dt>建議</dt><dd>把 html:8398-8419 的 cards 抽成 <code>houseCalcCardsHTML(c)</code>，包 <code>data-calc="houseCalc"</code>，<code>CALC</code> 加一個 key。零風險，跟 <code>eduTotal</code> 完全同一套。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-03</span>
+      <h4>「已準備退休金」加一筆或改金額，退休缺口不動</h4></div>
+    <p class="loc">繫結 html:3727（<code>tableSec('已準備退休金','prepared',…)</code>）· 受害顯示 html:3733-3734（big3 純內嵌，無 <code>data-calc</code>）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>prepared</code> 走 <code>tableSec</code> → <code>set()</code> 不 render，且 <code>prepared</code> 不在 <code>PLAN_ARRS</code> 裡。<code>addRow</code> 有 render，所以按「＋新增」會刷一次——刷出來的是<strong>金額 0 的那一版</strong>；打進金額之後就再也不動了。</dd>
+      <dt>為什麼致命</dt><dd>退休缺口是這一頁唯一的結論，而「調一調看缺口變多少」正是這一頁存在的理由。</dd>
+      <dt>建議</dt><dd>把 html:3729-3734 的 big3 抽成 <code>retireHeroHTML(c)</code> 包 <code>data-calc</code>。同一招也解掉 U-02。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-11</span>
+      <h4>保障需求卡：改「保障年數」，正下方兩公分處的「自動帶入的責任」四列不動</h4></div>
+    <p class="loc">繫結 html:8269（<code>sb</code> ＝純 <code>set()</code>）· 受害顯示 html:8276-8281 · 外層 <code>data-calc="coverageDerived"</code> 在 8311，而 <code>needsTbl</code>（8314）在容器之外</p>
+    <dl class="kv">
+      <dt>為什麼不順</dt><dd>「保障年數」是你跟客戶當場議價的那一個旋鈕（「留 5 年還是 10 年？」）。旋鈕轉了，旁邊的金額不動。</dd>
+      <dt>建議</dt><dd>把 <code>needsTbl</code> 一起搬進 8311 那個 <code>data-calc</code> 容器（<code>coverageHubParts</code> 已同時回傳兩者，重組成本很低）。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-12</span>
+      <h4><code>setObj()</code> 完全不呼叫 <code>syncDerived()</code>，是 <code>set()</code> 的漏網版本</h4></div>
+    <p class="loc">html:5898 · 受害：<code>ofld()</code> 產生的所有欄位（傳承／職涯／婚姻／理財模式／信用現況／海外資產）</p>
+    <dl class="kv">
+      <dt>可驗證的後果</dt><dd>每個 data 分頁最上方的完整度計數器（<code>completenessHTML</code>）判定含 <code>legacy.heirs &gt; 0</code>。教練在意圖分頁填「繼承人數 2」→ <strong>完整度與那顆點的顏色不會變</strong>，要切走再回來才亮。信用/海外分頁的 <code>overseas.hasAssets</code> 同理。</dd>
+      <dt>建議</dt><dd><code>setObj</code> 尾巴補 <code>syncDerived()</code>，並把 <code>completenessHTML</code> 包進 <code>data-calc</code>。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">U-17</span>
+      <h4>「所得替代率 %」改了，正旁邊按鈕上的百分比不變——按鈕在說謊</h4></div>
+    <p class="loc">繫結 html:3713（<code>setRetire</code> 只 save+syncDerived，不 render）· 受害顯示 html:3714（按鈕文字是 render 時算的）</p>
+    <dl class="kv"><dt>說明</dt><dd>改成 60% 之後按鈕還寫「↓ 依工作期帶入（75%）」，但實際帶入用的是 60%。繫結改成 <code>…;render()</code> 即可（同頁其他兩處已經這樣做）。</dd></dl>
+  </article>
+
+  <h3 class="grp">教練端 — 首屏違反「一張圖 ＋ ≤3 個數字」</h3>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-04</span>
+      <h4>分析分頁首屏＝4 個數字 ＋ 21 顆晶片 ＋ 5 顆跳轉鈕，一張圖都沒有</h4></div>
+    <p class="loc">html:8661-8684（<code>analysisPane</code>）· 21 個模組預設 <code>open</code> 為空陣列 html:8528</p>
+    <dl class="kv">
+      <dt>現況</dt><dd><code>kpis</code>（淨資產／年結餘／退休缺口／資產轉負，4 個）＋ <code>anBarHTML</code>（21 顆可拖曳晶片）＋ <code>financeNavHTML</code>（5 顆 sticky 跳轉鈕）＋ 21 張<strong>全部收合</strong>的 details。第一屏是純文字。</dd>
+      <dt>為什麼致命</dt><dd>這是你跟客戶「一起看結果」的主畫面。規則是首屏一張圖＋≤3 個數字；現況是 4 個數字 ＋ 26 個可點物件 ＋ 0 張圖。要指著說「你看這裡掉下去了」，得先自己找到 <code>cashflow</code> 那顆晶片、點開、等它算。</dd>
+      <dt>建議</dt><dd><code>anBarHTML</code> 之前放一張固定的英雄圖（<code>annualBalanceSVG</code> 或 <code>careerBlueprint</code>），KPI 砍成 3 個（「年結餘」已經在圖上），晶片列與跳轉列收進圖下方一行 details。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-05</span>
+      <h4>「SVG 只准縮小不准放大」的規則，在教練端主要圖表上全面失守——包括調整方案的首屏主圖</h4></div>
+    <p class="loc">規則註解 html:404-411（2026/08/24 就是為了修這個而寫的）· <code>.main</code> 沒有 max-width（html:29、36）</p>
+    <dl class="kv">
+      <dt>失守清單</dt><dd>以下都是 <code>width="100%"</code> 但<strong>沒有</strong> <code>max-width</code>：<code>html:4702</code> 願景時間軸（<strong>調整方案首屏主圖</strong>，viewBox 980）、1638 保障準備度、2634 蒙地卡羅、4548 壽險需求、5681 目標歷程、8341 真實追蹤、8819/8844/8892/8957 支出來源／年度結餘／生涯藍圖／責任遞減（viewBox 都是 760）。</dd>
+      <dt>算給你看</dt><dd>1920 螢幕上 <code>.main</code> 約 1610px：760 的圖被拉 <strong>2.1 倍</strong>、980 的圖被拉 <strong>1.64 倍</strong>。SVG 內的 <code>font-size="10"</code> 是使用者單位，會一起放大成 21px，比周圍 UI 大一倍——<strong>這就是你回報過的「字體過大／跑版」</strong>。修法已經寫在 html:404-407 的註解裡，也已經套用在報告書那幾處，只是沒有推廣到教練端。</dd>
+      <dt>建議</dt><dd>加一條全域兜底 <code>.main svg[viewBox]{max-width:980px;margin:0 auto;display:block}</code>，再逐一補上各自的 <code>max-width</code>。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-13</span>
+      <h4>21 個分析模組裡有 10 個是純表格，其中包含最該有圖的「規劃前 / 後對照」</h4></div>
+    <p class="loc">無 SVG 的模組：<code>beforeafter</code>(5684-5696)、<code>retire</code>(8586)、<code>gap</code>(8593)、<code>property</code>(8605)、<code>tax</code>(8615)、<code>ratio_flow</code>／<code>ratio_bs</code>(8556)、<code>retireflow</code>(8989)、<code>cross</code>(5641)、<code>tables</code>(8472)</p>
+    <dl class="kv">
+      <dt>最重要的一個</dt><dd><code>beforeafter</code> 整張表就是「比大小」——而且它是<strong>全系統唯一直接回答「所以我做這件事有沒有比較好」的模組</strong>，正是你定的評判標準。它現在只有數字。</dd>
+      <dt>其餘</dt><dd><code>ratio_flow</code>／<code>ratio_bs</code> 是「現況 vs 理想值」＝教科書等級的 bullet chart；<code>retireflow</code> 是 16 列逐年表＝教科書等級的堆疊柱；<code>gap</code> 更冤——<strong>報告書版本已經用 <code>rGapBars()</code> 畫成圖了（html:10128），分析頁卻只有表</strong>。反過來 <code>cross</code>（十字表）與 <code>tables</code>（三表）保留表格是對的，那是逐列事實。</dd>
+      <dt>建議優先序</dt><dd>① <code>beforeafter</code> 改成 7 條成對水平長條（灰＝前、金＝後，同一條軸），數字保留在旁；② ratio 兩張的「現況」欄換成 bullet（理想區間畫底色帶、現值一根針），燈號色沿用 <code>rColor()</code>；③ <code>gap</code> 直接把 <code>rGapBars</code> 的深色版接上——這一項幾乎不用寫新程式。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-14</span>
+      <h4>退休分頁首屏是 6 欄表格 ＋ 9 個數字</h4></div>
+    <p class="loc">html:3728-3735（<code>retirePhaseHTML</code> 6 欄表 → 5 個數字 → 明細 → 又一組 4 數字）</p>
+    <dl class="kv">
+      <dt>對照組</dt><dd>逐一檢查 15 個資料子分頁後，<strong>只有這一頁需要動</strong>。<code>plan</code>（調整方案）100% 符合規則、<code>coverage</code>／<code>tracking</code>／<code>family</code>／<code>intent</code> 都有圖在前，其餘是純輸入頁可接受。<code>goals</code> 的 12 欄寬表需橫捲，屬次要。</dd>
+      <dt>建議</dt><dd>退休時點表收進 details，big3 砍到 3 個（總需求／已準備／缺口），<code>laborPensionBox</code> 也收合；上方補一張退休期資產曲線（<code>rLine</code> 的深色版已存在 html:9601）。</dd>
+    </dl>
+  </article>
+
+  <h3 class="grp">教練端 — 卡點與死路</h3>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-06</span>
+      <h4>12 支 server action 用 throw 傳錯誤 → 畫面只剩「操作失敗，請重試」，而重試永遠不會成功</h4></div>
+    <p class="loc">dashboard/actions.ts:41,49,65,74,81,87,94,103,109,117,124,131 · ClientDetail.tsx:80-91（<code>catch { setErr("操作失敗，請重試。") }</code>）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>Next 在正式環境會把 server action 丟出的錯誤訊息換成沒有意義的 digest。<code>actions.ts:20-23</code> 的註解已經診斷過這件事，但那道修法<strong>只套用在 <code>createClientAction</code> 一支</strong>；<code>updateClient</code>／<code>archiveClient</code>／<code>createPlan</code>／<code>clonePlan</code>／<code>deletePlan</code>／<code>updatePlanMeta</code>／三支 review／三支 actionItem 全部仍是 <code>Promise&lt;void&gt;</code> + throw。</dd>
+      <dt>最痛的情境</dt><dd>使用期限到期的教練點「建立年度版本」→ <code>LicenseLockedError</code> 帶著明確訊息丟出來 → 被序列化成 digest → 畫面顯示「操作失敗，請重試。」他重試、重開、換瀏覽器，都不會成功，<strong>也永遠不知道要去找管理員延期</strong>。</dd>
+      <dt>建議</dt><dd>把 <code>{ok,error}</code> 模式推到其餘 12 支（<code>guard.ts</code> 已有具名 error class）。至少先做 <code>createPlan</code>／<code>clonePlan</code>／<code>updateClient</code>——那是最常在客戶面前按的三顆。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-07</span>
+      <h4>規劃器存檔失敗只有右上角 12px 的四個字，沒有重試、沒有離站攔截</h4></div>
+    <p class="loc">PlanEditor.tsx:195-208、218-224、252-254</p>
+    <dl class="kv">
+      <dt>三個問題疊在一起</dt><dd>① 網路斷或 session 過期 → 你繼續填一整場諮詢，全部進不了 DB，畫面上只有右上角一個 12px 的「儲存失敗」。② 700ms debounce ＋ 沒有 <code>beforeunload</code>：最後一次輸入後 700ms 內關分頁或按「← 返回客戶」，那一筆就沒了。③ <code>readOnly</code> 時直接 return，連狀態都不設——唯讀教練的輸入完全靜默丟棄（輸入框沒 disabled 是刻意的）。</dd>
+      <dt>建議</dt><dd>(1) catch 內指數退避重試 3 次；(2) 仍失敗就換成整條紅色橫幅 ＋「立即重試」按鈕（<code>applyReadOnly</code> 已有現成的 sticky bar 樣式可抄）；(3) <code>saving/error</code> 時掛 <code>beforeunload</code>。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-08</span>
+      <h4>註記與諮詢場次的失敗完全靜默——你在客戶面前記的重點會憑空消失</h4></div>
+    <p class="loc">PlanEditor.tsx:152-184（<code>onNoteMsg</code> 整段包在 <code>try{}catch{}</code>）· html:10894-10932（樂觀更新）· html:10455-10460（<code>LN.restore</code>）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>iframe 端是<strong>樂觀更新</strong>：先在畫面上長出一則 <code>pending:true</code> 的假註記，再 postMessage 給父層。父層 action 失敗被 catch 吞掉 → <strong>那則假註記永遠留在畫面上，你以為記下來了，重新載入後消失。</strong></dd>
+      <dt>最嚴重的一顆</dt><dd><code>LN.restore</code>（「回到開場狀態」）失敗時是 <code>if (r.ok) router.refresh()</code>，<code>else</code> 什麼都沒有——一個看起來會改寫資料的按鈕，按下去<strong>完全沒有任何反應</strong>。</dd>
+      <dt>建議</dt><dd><code>onNoteMsg</code> 每一支在失敗時 postMessage 回 iframe（<code>lantu:noteerr</code>）；iframe 收到就把 pending 那列標紅並附「重送」，restore 失敗走既有的 <code>flash()</code>。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-15</span>
+      <h4>諮詢紀錄表單的送出／捨棄沒有 catch，失敗時畫面凍在原地</h4></div>
+    <p class="loc">PlanEditor.tsx:274-286（只有 <code>finally</code>，沒有 <code>catch</code>）</p>
+    <dl class="kv">
+      <dt>後果</dt><dd>action 一 throw，例外往外拋，<code>setDraft(null)</code> 與 <code>router.refresh()</code> 都不執行 → 表單留在原地、spinner 停掉、<strong>沒有任何錯誤訊息</strong>。而這是「結束一場諮詢」的最後一步，草稿是系統依註記自動生的，你當場改完就要收工。按了沒反應，只能再按一次（可能寫進兩筆，見 D-07）或直接關掉。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-16</span>
+      <h4>iframe 握手失敗時落到一個沒有出口的空畫面</h4></div>
+    <p class="loc">html:10258（1.5 秒 fallback）· html:3069（「請於左側點選客戶」）· html:177-178（embed 模式 <code>.side</code> 被 <code>display:none!important</code>）</p>
+    <dl class="kv">
+      <dt>後果</dt><dd>畫面顯示「尚未選取客戶／請於左側點選客戶，或按『＋ 新增客戶』」，<strong>而那句話指向的東西在 embed 模式下不存在</strong>——畫面上沒有任何可點的東西。建議 fallback 改成「資料載入逾時 — [重新載入]」。</dd>
+    </dl>
+  </article>
+
+  <h3 class="grp">教練端 — 動線順序</h3>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-09</span>
+      <h4>訪談檢核清單要求 13 次分頁切換，「意圖/生涯」被切回 5 次</h4></div>
+    <p class="loc">html:6124-6165（<code>INTERVIEW_STEPS</code>）· 6193-6214（<code>interviewSec</code>）</p>
+    <dl class="kv">
+      <dt>現況</dt><dd>20 個步驟的 tab 依序是 <code>intent → family → intent → goals → goals → intent → education → goals → lifestyle×3 → retire → intent → finance×4 → credit → coverage → intent</code>。照清單走最少 <strong>13 次切換</strong>，intent 被切回 5 次（第 1/3/6/13/20 步）。程式碼自己在 html:6166-6168 已經註明知道這個聚集現象，只解掉了「按了沒反應」，沒解掉「跳來跳去」。</dd>
+      <dt>為什麼不順</dt><dd>這份清單的定位是「照著走就不會漏」，你會真的照著走。而客戶在旁邊等的時候，畫面一直在跳。</dd>
+      <dt>建議</dt><dd><code>INTERVIEW_STEPS</code> 保持問卷順序（那是 know-how），但 <code>interviewSec</code> 渲染時<strong>依 tab 二次分群</strong>：同分頁的步驟收攏成一群，群內維持原始序號（1. 3. 6. 13. 20.）。你仍知道自己在問卷的第幾題，動線從 13 跳變成 7 段。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-10</span>
+      <h4>「未來的需求」排在「現在的狀況」之前，但退休與保障的自動帶入吃的是現況資料</h4></div>
+    <p class="loc">分頁分組 html:3080-3085（3076-3079 明確說明這是刻意的：先講夢想再問錢）· <code>fillRetireFromWork</code> html:3695-3705 · 保障需求卡自動帶入 html:8274-8281</p>
+    <dl class="kv">
+      <dt>現況</dt><dd>退休分頁的「↓ 依工作期帶入」在支出表為空時直接 <code>alert()</code>；保障需求卡的四列自動帶入吃的是<strong>負債表餘額、支出表孝親、子女教育金</strong>。呈現順序（心理學）與資料相依（工程）是反的，所以實務上一定得「②填一半 → 跳③ → 回②」。</dd>
+      <dt>建議</dt><dd>不動分組順序。在退休分頁與保障需求卡加一行<strong>前置條件列</strong>：「這一段的自動帶入需要：支出表（未填 · 前往）／負債表（已填 ✓）／子女教育（未填 · 前往）」，用既有的 <code>jumpTab()</code> 當連結。<strong>事前知道要繞一趟，跟事後撞到 alert，是兩種體驗。</strong></dd>
+    </dl>
+  </article>
+
+  <h3 class="grp">客戶端 — /portal 與 /passport</h3>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-18</span>
+      <h4>客戶端少傳一個參數，整張「生涯資產模擬藍圖」憑空消失</h4></div>
+    <p class="loc">html:10181（<code>cashflowCharts(proj)</code>）vs 教練端 html:8644（<code>cashflowCharts(m().proj, null, c)</code>）· 函式本體 html:8913-8915</p>
+    <dl class="kv">
+      <dt>真因</dt><dd><code>cashflowCharts(proj, theme, c)</code> 的第一段是 <code>c ? '…生涯資產模擬藍圖…' + careerBlueprint(c,proj,theme) : ''</code>。<strong>沒有第三個參數就整段不畫。</strong>教練端三張圖，客戶端兩張。</dd>
+      <dt>為什麼致命</dt><dd><code>careerBlueprint</code> 是最適合給客戶看的那一張——「收入・支出・累積資產總額一圖綜覽」，正好是首屏那張圖該有的樣子。而這不是設計決定，<strong>是呼叫時漏了一個參數</strong>。</dd>
+      <dt>建議</dt><dd>html:10181 改成 <code>cashflowCharts(proj, null, c)</code>。一行。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-19</span>
+      <h4><code>/portal</code> 首頁與「我的完整財務藍圖」讀的是<strong>不同的兩份 plan</strong>，畫面上零標示</h4></div>
+    <p class="loc">clientPlan.ts:139-151（<code>ownPlanRow</code>，鎖 <code>track='client'</code>）vs clientPlan.ts:284-292（<code>getClientPlanCase</code>，<strong>完全沒有 track 條件</strong>，只取最新建立的一份）</p>
+    <dl class="kv">
+      <dt>真因</dt><dd>寫入路徑修好了（<code>ownPlanRow</code> 的註解記載舊版無 orderBy 會「把教練做了數小時的規劃整份覆寫成護照骨架」），<strong>但讀取路徑 <code>getClientPlanCase</code> 沒有一起修</strong>。所以 <code>/portal</code> 首頁／setup／passport 走客戶軌，而「查看我的完整財務藍圖」走的是最新建立的那一份——掛上教練後就是教練軌。</dd>
+      <dt>後果</dt><dd>客戶按「重新調整人生護照」改了數字、存檔 → 回首頁數字變了 → 點「查看我的完整財務藍圖」→ <strong>藍圖沒變</strong>。他會以為存檔沒生效，再存一次。而兩個頁面的頁首都只寫「我的財務藍圖」／「你的人生護照」，<strong>沒有任何一個字說明這是誰做的、哪一份</strong>。</dd>
+      <dt>建議</dt><dd>(1) <code>getClientPlanCase</code> 明確選擇：優先 <code>track='coach'</code> 的最新一份，沒有才落回客戶軌——<strong>並把選到哪一軌回傳出來</strong>。(2) <code>ClientPlanFrame</code> 頁首依此顯示「我的財務藍圖 · <strong>由 {教練名} 規劃</strong>（{年度} 年度版）」或「· 依你的人生護照自動產生」，客戶軌時附一行「這份是你自己填的；教練接手後會有更完整的一份」。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測</div><p>目前有 <b>6 份</b>客戶軌 plans 與 <b>55 份</b>教練軌。其中王誼宸、浩軍邱、昱豪陳、Mandy 等人<strong>同時有兩軌</strong>——他們現在點那兩個入口看到的就是兩份不同的規劃。</p></div>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-20</span>
+      <h4><code>/portal</code> 首頁首屏＝1 個大數字 ＋ 10 個小數字 ＋ 4 顆同級 CTA，零張圖</h4></div>
+    <p class="loc">portal/page.tsx:85-127（五列 rows 各兩個數字）· 114-127（四顆並排按鈕）</p>
+    <dl class="kv">
+      <dt>為什麼不順</dt><dd>這是客戶自己看的頁面，最該吃「一張圖＋≤3 個數字」那條規則。<strong>而且 PassportWizard 裡每個面向本來就有圖</strong>（房車的 Donut、退休的三條 Bar）——存檔後回到首頁卻退化成純數字列表。四顆同權重 CTA 也讓「下一步」消失了：底下明明有一段「下一步：補完現況、選一位教練」，那段卻沒有按鈕。</dd>
+      <dt>建議</dt><dd>五列換成一張水平堆疊條（房/車/退休/扶養/旅遊 各佔月存多少），大數字保留、其餘收 details；四顆 CTA 降成一主三次，主要那顆與底下那段呼應。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-21</span>
+      <h4>SetupWizard 沒有任何必填驗證，全空也能存，然後回客戶一個 0%</h4></div>
+    <p class="loc">portal/setup/SetupWizard.tsx:51-58（<code>onSubmitCurrent</code> 直接 save）· clientPlan.ts:241-251（<code>basics.name || client.name</code> 兜底）</p>
+    <dl class="kv">
+      <dt>為什麼不順</dt><dd>姓名、生日、性別全空也會存成功並算出缺口；十字表四格全 0 時 <code>monthlyCapacity = 0</code>、達成率 0%。<strong>客戶跳過欄位不是不小心，是不確定要不要填。系統照單全收，然後回他一個 0%——他會以為系統壞了，或以為自己真的很糟。</strong></dd>
+      <dt>建議</dt><dd>送出前擋姓名與生日（教練接手時這兩個是硬需求）；十字表全 0 時不顯示缺口區，改顯示「先填上收支，我們才算得出來」。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-22</span>
+      <h4>客戶端首屏把教練診斷用的完整指標表整張倒出來，圖排在最下面</h4></div>
+    <p class="loc">html:10173-10181（hero2 → kpis 4 個 → 三個 gauge → <strong>完整 ratio 表十幾列</strong> → 才是圖）</p>
+    <dl class="kv">
+      <dt>說明</dt><dd><code>ratios(c)</code> 的完整表是給教練診斷用的（教練端還特地拆成兩個模組），客戶端一次全倒出來、而且排在圖前面。建議 ratio 表收進 details，<code>cashflowCharts</code> 上移到 kpis 之後，KPI 砍成 3 個。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-23</span>
+      <h4>客戶看不出「哪些數字是我填的、哪些是教練做的」</h4></div>
+    <p class="loc">ClientPlanFrame.tsx:39 · html:10426-10432（註記層的分軌做得很好，資料層沒有）</p>
+    <dl class="kv">
+      <dt>說明</dt><dd>註記層分得很清楚（<code>meName()</code> 回「客戶本人」、只有主責能勾客戶可見、客戶只看得到 visible 的）。但<strong>資料層</strong>沒有任何來源標記：<code>saveClientSetup</code> 把客戶填的十字表彙總進 <code>incomes/expenses/assets/liabilities</code>，教練接手後在同一批陣列上編輯。客戶下次來看，數字跟他記憶中不一樣，沒有任何線索。</dd>
+      <dt>建議</dt><dd>寫入時給那些列打一個 <code>src:'client'</code> 旗標（不影響任何計算），客戶端在對應列加一個小標「你填的」，教練端不顯示。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">U-24</span>
+      <h4>客戶端的缺口文案把「缺口」寫成失敗，跟你的核心命題相反</h4></div>
+    <p class="loc">SetupWizard.tsx:142-146</p>
+    <dl class="kv">
+      <dt>現況</dt><dd>「目前每月還差 NT$ X 才能達成所有目標。掛上教練，一起把缺口<strong>補起來</strong>。」／「你目前的存錢能力已足以支應所有目標，<strong>做得很好！</strong>」</dd>
+      <dt>為什麼不順</dt><dd>你的命題是「缺口是常態不是異常，評判標準是比原本更優化不是補平」。這兩句正好相反。<strong>教練端已經把這條規則寫進 <code>planHeroV2</code>（html:5369：「屬動態調整區，逐年檢視即可，比原本更優化就算有效」），客戶端沒同步。</strong></dd>
+      <dt>建議</dt><dd>改成「多數人在這個階段都有缺口，這是規劃的起點不是壞消息。教練會陪你排出先做哪一件、每一步能改善多少。」</dd>
+    </dl>
+  </article>
+
+  <h3 class="grp">後台與管理端</h3>
+
+  <article class="f" data-sev="crit">
+    <div class="f-top"><span class="sev crit">致命</span><span class="fid">U-27</span>
+      <h4>主管／核心成員首頁把示範資料與真實資料混在同一排 KPI，而最上面那行大字沒有標記</h4></div>
+    <p class="loc">HomeView.tsx:183-188、243-248、303 · HomeSwitcher.tsx:63 · home.ts:3</p>
+    <dl class="kv">
+      <dt>現況</dt><dd>同一排四張 KPI：「團隊收益（本月）」標<em>示範資料</em>、「團隊達成率」<strong>無標記</strong>、「本月活動量」<strong>無標記</strong>、「待審核/簽核」標<em>真實資料</em>。核心成員視角同樣四種狀態擠在一排。而 Hero 那一行「<strong>組織健康度 89 分 · 本月業績 X 萬，月成長 Y%</strong>」<strong>完全沒有標記</strong>——底下的 KPI 標了，最上面同一個數字的大字沒標。<code>團隊業績排行</code>、<code>活動量看板</code>、<code>增員漏斗</code>、<code>本週約訪熱度</code>、<code>各團隊業績對比</code>、<code>月成長趨勢</code>、<code>Top 5 排行榜</code> 這七張圖表也全部沒有標記。唯一的總說明是頁尾一行 11.5px 灰字。</dd>
+      <dt>為什麼致命</dt><dd>這是核心成員第一眼看到的畫面。<strong>一個「組織健康度 89 分」的模擬數字，上線後會被當成真的拿去開會。</strong></dd>
+      <dt>建議</dt><dd>二選一。(A) 頂部一條無法忽略的橫幅「⚠ 業績／活動量／增員為示範資料，尚未接入真實來源」＋ 給每個示範數字統一的灰化視覺。(B) 更乾淨：<code>home.ts</code> 加 <code>DEMO_ENABLED</code> 開關，關掉時所有示範區塊改成 <code>&lt;Empty&gt;尚未啟用&lt;/Empty&gt;</code>（元件已存在）。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-28</span>
+      <h4>30+ 處使用者可見的「顧問」與職級表的「教練」互相矛盾，其中一處印在交給客戶的報告書上</h4></div>
+    <p class="loc">職級真相 comp/preset.ts:18-25（實習教練／認證教練 C1–C3／資深教練 S1–S3／首席教練）</p>
+    <dl class="kv">
+      <dt>最嚴重的三處</dt><dd><strong><code>html:10831</code> 的「顧問註記」——印進客戶版報告書</strong>；<code>portal/survey/*</code>（客戶直接讀到：「你的回覆會直接回到為你服務的顧問手上」「作為嵐途與顧問的服務見證」）；<code>admin/system/page.tsx:48</code>「財務顧問業務制度」——後台最大的標題。</dd>
+      <dt>其餘 A 類（指人，該改）</dt><dd><code>admin/advisors/page.tsx:102,111</code>、<code>AdvisorsBoard.tsx:113,124,194</code>、<code>TrainingBoard.tsx:159,230,261</code>、<code>admin/cases/page.tsx:105</code>、<code>CasesBoard.tsx:286,511,600</code>、<code>cases/actions.ts:20,68</code>（⚠️ <strong>68 是寫進 DB 的值</strong>「顧問代填」，要一併考慮既有資料）、<code>system/spec.ts:105,111,143,216</code>、<code>CategoriesBoard.tsx:473</code>、<code>preset.ts:49,200</code>、<code>bizguide/page.tsx:85,194</code>、<code>html:7090,9028</code>。</dd>
+      <dt>B 類（「顧問費」＝費用科目，<strong>要你拍板</strong>）</dt><dd><code>CasesBoard</code>／<code>AdvisorsBoard</code>／<code>SystemEditor</code>／<code>Simulator</code>／<code>spec.ts</code>／<code>handbook</code>／<code>MyBusiness</code> 共 14 處。《業務制度辦法 V4.0》§2 的正式名詞就是「顧問費」，<code>preset.ts:63</code> 是直接引用條文。<strong>要連同制度辦法一起改成「教練費／諮詢費」，還是保留法律文件用語？我沒有自作主張批次取代。</strong></dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-25</span>
+      <h4>品牌設定是唯一沒有存檔回饋的後台頁，而且破壞性的「移除」沒有確認</h4></div>
+    <p class="loc">BrandSettings.tsx:157-172（無 try/catch、無成功訊息）· admin/actions.ts:122-130（<code>saveBrandLogo</code> 會 throw <code>missing-logo</code>）· 184-193（「移除，還原預設」無 confirm）</p>
+    <dl class="kv">
+      <dt>對照組</dt><dd>其他後台頁都有明確回饋（<code>SystemEditor</code>「已儲存 ✓」／「儲存失敗：{原因}」、<code>CategoriesBoard</code>、<code>AdvisorsBoard</code>、<code>AnalysisDefaultBoard</code>、<code>LearnBoard</code>）。品牌設定按下「儲存並替換」後預覽消失（<code>reset()</code>），<strong>成功與失敗看起來一模一樣</strong>。而「移除」影響全組織，旁邊的「重算全體職級」與「清空版本」都有 confirm，它沒有。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="warn">
+    <div class="f-top"><span class="sev warn">中</span><span class="fid">U-26</span>
+      <h4>制度設定切分頁會靜默丟掉未存的門檻，換版本也不警告</h4></div>
+    <p class="loc">admin/system/SystemEditor.tsx:276-304（<code>ths</code> 只存當前分頁那一種 kind）· 100-104（版本下拉直接 <code>router.push</code>）</p>
+    <dl class="kv">
+      <dt>現況</dt><dd><code>settings</code> 是跨分頁共用的 object，整包寫回，所以開關類欄位安全。但門檻只存當前 kind：在「晉升」頁改了 <code>promotion_a/b</code> → 切到「真除」頁 → 按「儲存這一頁」→ 只寫 tenure + settings，<strong>晉升的改動留在 React state 裡，離開頁面就沒了</strong>。版本下拉換路由時未存的一切消失，沒有任何確認。</dd>
+      <dt>建議</dt><dd>加 <code>dirty</code> 旗標攔截版本切換與 <code>beforeunload</code>；或更簡單——「儲存這一頁」改成「儲存全部變更」，一次把 modules/ranks/thresholds/settings 都送出。</dd>
+    </dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">U-29</span>
+      <h4><code>/admin/system/simulator</code> 會同時點亮兩顆導覽</h4></div>
+    <p class="loc">AdminNav.tsx:45（<code>href === "/admin" ? pathname === "/admin" : pathname.startsWith(href)</code>）</p>
+    <dl class="kv"><dt>說明</dt><dd><code>/admin</code> 有精確比對特例，<code>/admin/system</code> 沒有。改成「最長前綴唯一勝出」。三組導覽的<strong>分組本身沒有問題</strong>，不用動。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">U-30</span>
+      <h4>未定級／未設期限是刻意的 fail-open，但沒有彙總視圖，上線前只能逐列用眼睛掃</h4></div>
+    <p class="loc">license.ts:198-209、179-195（兩個 fail-open 都有註解說明理由）· LicenseCell.tsx:82-95（per-row 標示是有的）</p>
+    <dl class="kv">
+      <dt>建議</dt><dd><code>/admin</code> 教練名單頂端加一行狀態列：「共 N 位 · <strong>未定級 X 位</strong> · 未設期限 Y 位 · 30 天內到期 Z 位」，每個數字可點擊篩選。純 client-side，資料已經在 props 裡。</dd>
+    </dl>
+    <div class="ev"><div class="h">生產資料實測 — 上線前要處理</div><p>15 位在職教練中：<b>8 位未定級</b>（洧嘉劉、誼宸王、Carey Li、yue、毅鋒伍、小朋李、懋陞陳、boa）——依派案閘規則，<strong>這 8 位在官網不可被客戶直接指定</strong>。<b>12 位未設使用期限</b>（不鎖，但也代表分級定價還沒生效）。已設期限的 3 位中，<b>尼克陳的期限是 2026-09-25——距今 4 週</b>，到期當天他的所有寫入會被鎖住，而依 U-06 他看到的訊息會是「操作失敗，請重試」。</p></div>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">U-31</span>
+      <h4><code>/lantu-app.html</code> 是公開靜態檔，直接開啟會看到一份完整的「王大明(示範)」財務規劃</h4></div>
+    <p class="loc">html:606-608、1021-1023、10187-10189（非 embed 模式走 <code>load()</code>，localStorage 空的話載入 <code>sampleCase()</code>）</p>
+    <dl class="kv"><dt>說明</dt><dd>資料只在 localStorage、沒有外洩風險，但這是一個對外可見、不受品牌控制的入口。建議非 embed 模式掛一條「示範模式 — 這不是任何真實客戶的資料」橫幅，或在 <code>vercel.json</code> 加 rewrite 導去 <code>/home</code>。</dd></dl>
+  </article>
+
+  <article class="f" data-sev="low">
+    <div class="f-top"><span class="sev low">低</span><span class="fid">U-32</span>
+      <h4>「去老闆化程度」會印進交給企業主的財務診斷書</h4></div>
+    <p class="loc">html:6969、6971、<strong>9196（診斷書）</strong>· 內文另有 6708-6716、6612、6900、9246、bizTax.ts:78、bizguide/page.tsx:329,351</p>
+    <dl class="kv">
+      <dt>判定</dt><dd>這些「老闆」指的是「客戶本人是企業主」，不是組織職級的 owner（那一條<strong>執行得很乾淨</strong>：<code>OrgCell.tsx:16</code>／<code>HomeSwitcher.tsx:8</code>／<code>coach.ts:224-225</code> 都正確用「核心成員」）。但「去老闆化程度」當著企業主的面說，語氣本身有點衝。建議至少把 6969/6971/9196 三處標題換成「<strong>經營者依賴度</strong>」或「去個人化程度」，其餘白話內文可留。</dd>
+    </dl>
+  </article>
+</section>
+
+<section id="close">
+  <div class="sechead"><h2>如果只做十件事</h2></div>
+  <p class="secnote">依「投入成本 ÷ 影響範圍」排的。前四件都是<strong>一到兩行</strong>，第五件是容量問題、時間站在它的對立面。</p>
+  <div class="close">
+    <h3>今天就能做的（一到兩行，零風險）</h3>
+    <ol class="first">
+      <li><strong>D-01 · 補上三支諮詢 API 的租戶條件。</strong>這是唯一一項權限外洩，而且修法明確（比照同檔案已有的 <code>assertOwned</code>）。同時把 drift test 改成逐函式掃描，否則下一支還是會漏。</li>
+      <li><strong>U-18 · <code>html:10181</code> 補一個參數 <code>c</code>。</strong>客戶端當場拿回「生涯資產模擬藍圖」——最適合給客戶看的那張圖。</li>
+      <li><strong>U-01 / U-12 · <code>setMeta</code> 與 <code>setObj</code> 各補一行 <code>syncDerived()</code>。</strong>解掉「安全感預備金落差不動」與「完整度不亮」，也是後續 <code>data-calc</code> 補完的地基。</li>
+      <li><strong>B-05 · <code>existingCover()</code> 加 <code>policyActive(p) &amp;&amp;</code>。</strong>現在改是零成本（全庫沒有人標過失效）；等有人標了再改，就要回頭處理已經算錯的缺口。</li>
+      <li><strong>D-03 · 給 <code>plan_revisions</code> 加保留上限。</strong>上週一週長了 8.5 MB、週成長 3.5 倍，而這還是<strong>對外收客戶之前</strong>。它不會有任何症狀，直到某天寫不進去。</li>
+    </ol>
+    <h3 style="margin-top:30px">這一輪該排的（會改變給客戶的數字）</h3>
+    <ol class="first" start="6">
+      <li><strong>B-01 · <code>metrics()</code> 的收支加總改成看起訖歲。</strong>這是唯一一項會<strong>翻轉財務階段</strong>的缺陷，而且受害的正是「規劃到一半」的客戶。動它之前先乾跑印「改前→改後」，範圍確認過再寫。</li>
+      <li><strong>B-02 + B-03 · 把兩個時鐘綁起來，並讓 <code>valid</code> 真的被讀。</strong>7 份規劃兩個值不一致，1 位真實客戶（昱豪陳）的退休需求現在是靜靜的 0。</li>
+      <li><strong>B-14 · 死欄位分三類處理。</strong>先接 <code>careMonths</code>（60 筆）與 <code>cut</code>（63 筆）——教練填了長照月數與保護線，系統整個沒讀。其餘改文案標「僅供記錄」，不要讓提示文字繼續說謊。</li>
+      <li><strong>B-12 + B-13 + D-05 · 姓名外鍵。</strong>109 處孤兒目前恰好「錯得一致」所以數字還對；但只要有人碰一下「被保人」下拉就會炸。先補 <code>selOpts</code> 保護（防止再惡化），再做改名傳播。</li>
+      <li><strong>U-04 + U-05 + U-13 · 分析頁的首屏與圖。</strong>放一張英雄圖、KPI 砍到 3 個、SVG 全域補 <code>max-width</code>（你回報過的「字太大／跑版」真因就是這個）、<code>beforeafter</code> 改圖。<strong>最後這一項最重要——它是全系統唯一直接回答「比原本更優化了多少」的地方。</strong></li>
+    </ol>
+  </div>
+
+  <div class="sechead" style="margin-top:56px"><h2>不用動的部分</h2></div>
+  <p class="secnote">稽核的另一半是說清楚哪裡是好的，免得下一輪有人「順手改一改」把它弄壞。</p>
+  <div class="close">
+    <ol class="first" style="list-style:none;padding-left:0">
+      <li><strong>引擎雙實作其實很穩。</strong>152 支具名函式逐字對拍，130 支完全等價，真正的語意漂移只有 <code>allocInvest</code> 一支。<code>projection</code> 金流主體、25 項比率、<code>grossLifeNeed</code>／<code>coverageGaps</code>、三段式退休權重、六根槓桿、<code>gapLedger</code>、<code>monteCarlo</code> 全部一致。</li>
+      <li><strong>快照與引擎沒有漂移。</strong>全庫 61/61 的 <code>health_grade</code> 與 <code>net_worth</code> 都對得上。</li>
+      <li><strong>三把租戶尺與註記的合規線。</strong><code>clients.ts</code>／<code>plans.ts</code>／<code>reviews.ts</code> 的每一支寫入都只用 <code>ownedClient()</code>；<code>notes.ts</code> 的 <code>visible</code> 由資料層強制、DB 層 default false、三道配套完整。<code>/admin</code> 44 支 export 逐一驗過都有 guard；<code>/api</code> 八支路由沒有一支缺認證；<code>/portal</code> 七支頁面都有 <code>ensureClientUser()</code>。</li>
+      <li><strong>調整方案分頁的版面。</strong>首屏＝一張圖（願景時間軸，含旗子與十年分界）＋3 個數字＋判語，其餘九個區塊全部收合。<strong>這是全系統唯一 100% 符合規則的頁面，其他頁應該照抄它。</strong></li>
+      <li><strong>人生護照的整條存檔路徑。</strong>未登入草稿存 localStorage、註冊後帶回並提示、已有規劃時停下來問（覆蓋不可逆）、25 秒逾時保護、session 掉了自動重存再導登入、跨年做成一顆說明清楚的按鈕而不是自動改。這是全 repo 最完整的一條使用者流程。</li>
+      <li><strong>分析模組的三層偏好治理。</strong>後台預設 → 教練逐客戶偏好 → 當下畫面，逐維度判斷，<code>anPatch</code> 只寫被動到的那一維，後台文案把語意講給人聽。設定治理的最佳實踐。</li>
+      <li><strong>財務階段語彙與「核心成員」。</strong>四階段名稱＋當前課題、列表註明「非優劣排序，是誰先需要陪伴」、還有一條測試守著「不使用等級語彙」。DB 值保持 <code>owner</code>、只換顯示字串。這兩條執行得最乾淨。</li>
+      <li><strong>後台不用保險語彙。</strong>全 repo 沒有 FYC／繼續率／保單件數作為後台指標，<code>promotion.ts:84</code> 甚至留了「名字叫業績、值其實是件數」的註解。</li>
+      <li><strong><code>postMessage</code> 的 origin 收斂、<code>renderKeepFocus</code>、<code>crossTableAfter</code> 的顯示層疊加、<code>setCreditScore</code> 的跨分頁雙向同步、結束諮詢的「哪幾則要給客戶看」預設全不勾＋合規警告</strong>——這幾處的註解都把「為什麼要這樣做」寫清楚了，是這個 codebase 最有價值的資產。</li>
+    </ol>
+  </div>
+
+  <p class="foot">
+    稽核方法：雲端工作副本 HEAD <code>aa25e73</code>（與裝置端一致）· 全套靜態檢查全綠（vitest 1382 tests / tsc 0 error / eslint 1 warning / depcruise clean / next build 成功）<br>
+    程式面：152 支引擎函式逐字對拍、六份鏡像檔比對、jsdom 驅動實測 · 資料面：連 Neon 撈全庫 61 份 <code>plans.data</code> 用現行引擎重算並逐項勾稽<br>
+    全程唯讀 — 未修改任何程式、未寫入任何資料庫。稽核用的暫存測試檔已刪除。
+  </p>
+</section>
+</div>
+
+<script>
+(function(){
+  var dim="all", sev="all";
+  var chips=[].slice.call(document.querySelectorAll("button.chip"));
+  function apply(){
+    [].slice.call(document.querySelectorAll("article.f")).forEach(function(f){
+      var sec=f.closest("section");
+      var okDim = dim==="all" || (sec && sec.getAttribute("data-dim")===dim);
+      var okSev = sev==="all" || f.getAttribute("data-sev")===sev;
+      f.classList.toggle("hide", !(okDim&&okSev));
+    });
+    [].slice.call(document.querySelectorAll("section[data-dim]")).forEach(function(s){
+      var vis=s.querySelectorAll("article.f:not(.hide)").length;
+      s.style.display = vis? "" : "none";
+    });
+    [].slice.call(document.querySelectorAll("h3.grp")).forEach(function(h){
+      var n=0, el=h.nextElementSibling;
+      while(el && el.tagName==="ARTICLE"){ if(!el.classList.contains("hide")) n++; el=el.nextElementSibling; }
+      h.style.display = n? "" : "none";
+    });
+  }
+  chips.forEach(function(c){
+    c.addEventListener("click",function(){
+      var g = c.hasAttribute("data-dim") ? "data-dim" : "data-sev";
+      chips.filter(function(x){return x.hasAttribute(g);})
+           .forEach(function(x){ x.setAttribute("aria-pressed", String(x===c)); });
+      if(g==="data-dim") dim=c.getAttribute("data-dim"); else sev=c.getAttribute("data-sev");
+      apply();
+    });
+  });
+})();
+</script>
+</body>
+</html>

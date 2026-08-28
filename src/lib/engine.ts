@@ -357,7 +357,7 @@ var POLICY_MAP={'壽險':'life','意外傷殘':'accident','住院醫療':'medica
 
 function existingCover(c,member,kind){
  var fromCov=sum(c.coverages,function(cv){return (cv.member===member&&kindNorm(cv.kind)===kindNorm(kind))?(n(cv.comm)+n(cv.social)):0});
- var f=POLICY_MAP[kind];var fromPol=f?sum(c.policies,function(p){return p.insured===member?n(p[f]):0}):0;
+ var f=POLICY_MAP[kind];var fromPol=f?sum(c.policies,function(p){return (policyActive(p)&&p.insured===member)?n(p[f]):0}):0;
  return fromCov+fromPol;
 }
 
@@ -1202,7 +1202,44 @@ function applyPlanCaps(values){
 
 var ALLOC_SRC=['新增投入','既有轉入'];
 
-function allocInvest(c){return ((c.plan||{}).invest)||[]}
+// 調整動作的類別表。這一份是從 public/lantu-app.html 移植過來的（allocInvest 依賴 actCat 取預設名稱），
+// engine 端只用得到 k / n 兩個欄位，其餘留著是為了兩邊逐字對得上。
+var ACT_CATS=[
+ {k:'income',   n:'增加工作收入', lane:'A', hint:'每月增加多少'},
+ {k:'expense',  n:'刪減支出',     lane:'C', hint:'每月省下多少', ref:'expenses'},
+ {k:'regular',  n:'定期定額',     lane:'B', hint:'每月投入、自帶報酬率'},
+ {k:'lump',     n:'單筆投入',     lane:'B', hint:'一次投入、自帶報酬率'},
+ {k:'liquidate',n:'資產變現',     lane:'B', hint:'填淨變現金額', ref:'assets'},
+ {k:'loan',     n:'貸款取得資金', lane:'B', hint:'利率隱含在月付裡'},
+ {k:'insure',   n:'購買保障',     lane:'B', hint:'保額會接回保障缺口'}
+];
+function actCat(k){for(var i=0;i<ACT_CATS.length;i++)if(ACT_CATS[i].k===k)return ACT_CATS[i];return ACT_CATS[2]}
+
+// 投資型配置＝手填的 c.plan.invest ＋ **調整動作裡的定期定額／單筆投入**。
+// 那兩類本來就是投資，理論上就該出現在配置圓餅與加權報酬裡；
+// 「建議資產配置」本身是規劃不是現況，所以這裡合併沒有語意衝突
+//（跟十字表不一樣——十字表是現況，動作只能疊加顯示、不能寫進去）。
+// ⚠️ 動作帶來的列標 `fromAction:true`，畫面上不可編輯，要改請回動作清單。
+// ⚠️⚠️ 2026/08/28：engine 端原本只有 own 那一半，plan.useAllocReturn 打開時
+//   effReturn / allocPV 與教練畫面差一截 → 寫進 DB 的 shortPV 跟畫面上不是同一個數字。
+//   以 html 版為準移植過來，engine.drift.test.ts 釘住。
+function allocInvest(c){
+ var own=((c.plan||{}).invest)||[];
+ var A=n((c||{}).profile&&c.profile.age)||40,R=n((c||{}).profile&&c.profile.retireAge)||65;
+ var fromAct=planActionsOn(c).filter(function(a){return a.cat==='regular'||a.cat==='lump'}).map(function(a){
+  var from=n(a.payFrom)||A,to=n(a.payTo)||R;
+  return {name:((a.name||'').trim()||actCat(a.cat).n),
+   kind:(a.tool||'').trim()||'—',
+   principal:n(a.payLump),
+   yearly:n(a.payMonthly)*12,
+   years:Math.max(1,to-from+(a.cat==='lump'?1:0)),
+   ret:n(a.growth),
+   src:'新增投入',
+   fromAction:true,actionId:a.id};
+ });
+ return own.concat(fromAct);
+}
+function allocInvestOwn(c){return ((c.plan||{}).invest)||[]}
 function allocProtect(c){return ((c.plan||{}).protect)||[]}
 
 /** 這一列的投入年數：留空＝從現在到退休。 */
@@ -1514,7 +1551,7 @@ function advice(c){
  if(eduTotal(c)>0)list.push(['子女教育準備','教育金總需求(終值)約 '+fmt(eduTotal(c))+' 元，建議專款專用、定期定額提前準備。']);
  if(m.incFinancial/(m.expTotal||1)<1)list.push(['增加理財收入','理財收入僅覆蓋 '+(m.incFinancial/(m.expTotal||1)*100).toFixed(0)+'% 總支出，建議資產活化創造被動現金流。']);
  var tg=totalGap(c);if(tg>0)list.push(['風險保全規劃','保障缺口合計約 '+fmt(tg)+' 元，優先補足壽險／房貸壽險。']);
- var movable=sum(c.assets,function(a){return a.movable?n(a.value):0});
+ var movable=sum(c.assets,function(a){return a.movable?aVal(a):0});
  if(movable>0)list.push(['資產活化配置','可調整資產約 '+fmt(movable)+' 元，建議多元配置分散風險。']);
  if(m.tax/(m.incTotal||1)>0.1)list.push(['節稅規劃','稅負佔收入偏高，建議檢視申報方式與資產架構。']);
  var lg=legacyNeed(c);if(lg>0)list.push(['傳承規劃','規劃現金傳承約 '+fmt(lg)+' 元（'+n((c.legacy||{}).heirs)+' 位繼承人）。建議以保單指定受益人＋海外配置，達到資產保全與節稅傳承。']);
@@ -1930,7 +1967,10 @@ export {
   planLevers,
   planActions,
   ALLOC_SRC,
+  ACT_CATS,
+  actCat,
   allocInvest,
+  allocInvestOwn,
   allocProtect,
   allocYears,
   annuityPV,

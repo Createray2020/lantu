@@ -118,3 +118,42 @@ describe("annotatableClient() 只准住在 lib/notes.ts", () => {
     expect(READ_SCOPE.test(src)).toBe(false);
   });
 });
+
+/**
+ * 一場諮詢：**逐支** export 都要有租戶條件。
+ *
+ * ⚠️ 這支測試上一版寫成「consultSession.ts 這個檔案裡出現過 ownedClient」——
+ * 出現一次就通過，所以 openSession / listSessions / pendingDraft 三支從頭到尾
+ * 只有 `eq(consultSessions.clientId, clientId)`、一個租戶條件都沒有，
+ * 而測試一路是綠的。呼叫端只驗「你是不是一位有效教練」，clientId 直接來自參數，
+ * 於是任何登入中的教練換一個 id 就讀得到別人客戶的諮詢摘要、總缺口與淨值。
+ *
+ * 所以改成逐支掃：每一支 export 的 async function 都必須自己出現 assertOwned 或 ownedClient，
+ * 要例外就寫進 SESSION_EXEMPT 並附理由 —— 沒有理由的例外就是破口。
+ */
+describe("lib/consultSession.ts 每一支 export 都要有租戶條件", () => {
+  const SESSION_EXEMPT: Record<string, string> = {
+    autoCloseStaleSessions: "隔天自動封場：排程掃全表，沒有「某位教練」這個維度，也只寫自己的場次不外傳任何內容",
+  };
+
+  const src = R("src/lib/consultSession.ts");
+  const fns = functionsOf(src);
+  const exported = Object.keys(fns).filter((n) =>
+    new RegExp(`export\\s+async\\s+function\\s+${n}\\b`).test(src),
+  );
+
+  it("至少掃得到幾支（改寫成別的形式要讓測試壞掉，不是靜靜通過）", () => {
+    expect(exported.length).toBeGreaterThanOrEqual(6);
+    for (const must of ["openSession", "listSessions", "pendingDraft"]) {
+      expect(exported, `${must}() 不見了，改過名字就要順手更新這支測試`).toContain(must);
+    }
+  });
+
+  it.each(exported)("%s 自己帶著租戶條件", (name) => {
+    if (SESSION_EXEMPT[name]) return;
+    expect(
+      /assertOwned|ownedClient/.test(fns[name]),
+      `${name}() 沒有任何租戶條件——換一個 clientId 就讀／寫得到別人的客戶`,
+    ).toBe(true);
+  });
+});

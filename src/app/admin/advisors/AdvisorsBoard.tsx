@@ -110,7 +110,7 @@ export default function AdvisorsBoard({
         )}
         <button type="button" disabled={pending} className={BTN_SOLID}
           onClick={() => {
-            if (confirm(`依目前制度重算 ${year} 年度全體顧問的晉升／真除／維持資格？達標者會自動晉升並留下異動紀錄。`))
+            if (confirm(`依目前制度重算 ${year} 年度全體教練的晉升／真除／維持資格？達標者會自動晉升並留下異動紀錄。`))
               run(() => recomputeAllAction(year), "已重算");
           }}>
           {pending ? "重算中…" : "重算全體"}
@@ -121,7 +121,7 @@ export default function AdvisorsBoard({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
-              <th className="px-3 py-2">顧問</th>
+              <th className="px-3 py-2">教練</th>
               <th className="px-3 py-2">職級</th>
               <th className="px-3 py-2">直屬主管</th>
               <th className="px-3 py-2">真除</th>
@@ -191,7 +191,7 @@ export default function AdvisorsBoard({
               </Fragment>
             ))}
             {shown.length === 0 && (
-              <tr><td colSpan={12} className="px-3 py-8 text-center text-[#6f869c]">沒有符合的顧問。</td></tr>
+              <tr><td colSpan={12} className="px-3 py-8 text-center text-[#6f869c]">沒有符合的教練。</td></tr>
             )}
           </tbody>
         </table>

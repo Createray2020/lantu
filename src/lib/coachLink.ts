@@ -7,6 +7,31 @@ import { clients, coaches, coachLinkRequests, coachInvites, coachDisplayName } f
 import type { ClientUser } from "@/lib/clientUser";
 import { allocCode } from "@/lib/codeAlloc";
 import { normalizeCode } from "@/lib/codes";
+import { QUOTA_FULL_MESSAGE } from "@/lib/license";
+import { clientQuota } from "@/lib/quota";
+
+/**
+ * 客戶數上限的第二、第三個入口。
+ *
+ * usedClientCount() 數的是 `clients.coach_id`，所以**任何**會設 coach_id 的路徑都在花額度。
+ * 目前有三條：`createClientAction`（教練自己建，已經有 requireClientQuota）、
+ * 接受連結申請、以及邀請碼兌換。後兩條原本一句額度都沒查 ——
+ * 上限 30 位的教練可以靠邀請連結收到第 200 位，畫面上的「x/y」只會顯示超額，
+ * 而且是既成事實：客戶已經掛上去了，要收回只能把人踢掉。
+ *
+ * 這裡刻意回 { ok:false, error } 而不是 throw：兩條路徑都是使用者按一下就到底的動作，
+ * 訊息要能直接顯示給人看（Next 會把 throw 出去的訊息換成沒有意義的 digest）。
+ */
+async function quotaBlocked(coachId: string): Promise<string | null> {
+  const rows = await db
+    .select({ id: coaches.id, rankCode: coaches.rankCode, clientCapOverride: coaches.clientCapOverride })
+    .from(coaches)
+    .where(eq(coaches.id, coachId))
+    .limit(1);
+  if (!rows[0]) return "找不到這位教練";
+  const q = await clientQuota(rows[0]);
+  return q.full && q.cap != null ? QUOTA_FULL_MESSAGE(q.cap) : null;
+}
 
 export type ActiveCoach = { id: string; name: string | null; title: string | null; orgRank: string };
 
@@ -123,6 +148,10 @@ export async function respondToLinkRequest(requestId: string, coachId: string, a
   if (!req || req.coachId !== coachId) return { ok: false, error: "找不到申請或無權處理" };
   if (req.status !== "pending") return { ok: false, error: "此申請已處理過" };
   if (accept) {
+    // 接受＝多一位掛在自己名下的客戶，跟「新增客戶」一樣要先過額度。
+    // 婉拒不佔額度，所以只擋 accept 這一支。
+    const blocked = await quotaBlocked(coachId);
+    if (blocked) return { ok: false, error: blocked };
     await db.update(clients).set({ coachId, updatedAt: new Date() }).where(eq(clients.id, req.clientId));
     await db.update(coachLinkRequests).set({ status: "accepted", respondedAt: new Date() }).where(eq(coachLinkRequests.id, requestId));
   } else {
@@ -178,6 +207,17 @@ export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok
   if (coachRows[0]?.status !== "active") return { ok: false, error: "這位教練目前無法接受新客戶" };
   const cRows = await db.select().from(clients).where(eq(clients.clientUserId, user.id)).limit(1);
   let client = cRows[0];
+  // ⚠️ 順序有意義：先處理「已經連結過」再查額度。
+  // 邀請連結是一碼多人可用、而且可以重複開的，同一位客戶再點一次同一條連結必須照樣成功——
+  // 那一次並不會多佔一個名額，拿額度去擋它只會讓已經掛好的客戶看到「教練已滿」。
+  if (client?.coachId) {
+    if (client.coachId === inv.coachId) return { ok: true, coachName: inv.coachName }; // 已連結同一位＝視同成功（可重複開）
+    return { ok: false, error: "你已連結其他教練，請先解除再用此連結" };
+  }
+  // 這條路真的會多一位客戶了 → 過額度。擋在建 clients 列之前，
+  // 免得擋掉之後還留下一筆沒有教練、也沒有護照的空客戶（和白發掉的一組客戶編號）。
+  const blocked = await quotaBlocked(inv.coachId);
+  if (blocked) return { ok: false, error: blocked };
   // 還沒填人生護照也要能綁：邀請連結＝一鍵入場。舊版在這裡擋掉（「請先完成人生護照」），
   // 新客戶會卡在中間，回頭多半找不到那條連結，教練就永遠收不到人。
   // 先用 Clerk 姓名開一筆空的 clients 列，綁上教練，再引導去填人生護照（savePassport 會沿用這一列）。
@@ -188,10 +228,6 @@ export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok
       .returning();
     client = ins[0];
     if (!client) return { ok: false, error: "建立客戶資料失敗，請稍後再試" };
-  }
-  if (client.coachId) {
-    if (client.coachId === inv.coachId) return { ok: true, coachName: inv.coachName }; // 已連結同一位＝視同成功（可重複開）
-    return { ok: false, error: "你已連結其他教練，請先解除再用此連結" };
   }
   await db.update(clients).set({ coachId: inv.coachId, updatedAt: new Date() }).where(eq(clients.id, client.id));
   await db.update(coachLinkRequests)

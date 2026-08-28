@@ -222,7 +222,7 @@ describe("客戶報告書：註記貼在對應章節，不集中成一章", () =
     w.app.reportDoc = "family";
     w.render();
     const html = w.document.querySelector("#app").innerHTML as string;
-    expect(html).toMatch(/顧問註記/);
+    expect(html).toMatch(/教練註記/);   // 2026/08/28 術語統一：指人的一律用「教練」
     expect(html).toMatch(/壽險缺口分兩年補足/);
     expect(html, "沒勾客戶可見的絕不能印進客戶文件").not.toMatch(/這句是對內的/);
   });

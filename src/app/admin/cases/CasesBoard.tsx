@@ -283,7 +283,7 @@ export default function CasesBoard({
                     <td className="px-3 py-2 text-[#a9bccf]">{nameOf(c.executorId)}</td>
                     <td className="px-3 py-2 text-[#a9bccf]">
                       {c.surveyAt
-                        ? <>{c.surveyAt}{c.surveyBy === "coach" && <span className="block text-[11px] text-[#6f869c]">顧問代填</span>}</>
+                        ? <>{c.surveyAt}{c.surveyBy === "coach" && <span className="block text-[11px] text-[#6f869c]">教練代填</span>}</>
                         : <span className="text-[#c99a5b]">未回收</span>}
                     </td>
                     <td className="px-3 py-2 text-[#a9bccf]">{c.paidAt ?? <span className="text-[#c99a5b]">未實收</span>}</td>
@@ -508,7 +508,7 @@ function ImportPanel({
     <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4">
       <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-1">批次匯入案件</h3>
       <p className="text-xs text-[#7f9ab2] mb-3">
-        顧問以 Email 對應（姓名會重複、內部 id 不適合手填）。上傳後會先預覽，確認才寫入；
+        教練以 Email 對應（姓名會重複、內部 id 不適合手填）。上傳後會先預覽，確認才寫入；
         有問題的列會標出來且不會被匯入。日期可用 YYYY-MM-DD 或民國年。
       </p>
       <div className="flex flex-wrap items-center gap-2">
@@ -597,7 +597,7 @@ function CoachSurvey({
       <div className="text-sm font-bold mb-1">回饋問卷{c.surveyAt ? `（已於 ${c.surveyAt} 回收）` : "・代填"}</div>
       <p className="text-xs text-[#7f9ab2] mb-3">
         優先請客戶自己在客戶端填寫；這裡是客戶不方便自填、或案件沒掛 CRM 客戶時的備援，
-        送出後會標記為「顧問代填」。
+        送出後會標記為「教練代填」。
       </p>
       <div className="space-y-2">
         {questions.map((q, i) => (

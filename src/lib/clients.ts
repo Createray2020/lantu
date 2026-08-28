@@ -1,4 +1,5 @@
 // 客戶資料層（教練隔離）。所有查詢都以 coachId 為租戶維度。
+import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { actionItems, clientCollaborators, clients, coachDisplayName, coaches, plans, reviews } from "@/Shared/db/schema";
@@ -117,11 +118,29 @@ async function decorateClients(rows: Client[]): Promise<ClientListItem[]> {
   });
 }
 
-// 新客戶：建立客戶身份 + 自動建第一份年度版本（草稿）。
+/**
+ * 新客戶：建立客戶身份 + 自動建第一份年度版本（草稿）。
+ *
+ * ⚠️ 兩句寫入必須是原子的。舊版是「insert clients → insert plans」兩趟往返，
+ * 中間斷掉就留下一位**一份規劃都沒有**的客戶：詳情頁空白、沒有東西可編輯，
+ * 而「新增版本」在修好之前又預設今年、正好撞上這位客戶不存在的那份初版的唯一鍵，
+ * 等於救不回來，只能刪掉重建（連客戶編號都白發一組）。
+ *
+ * neon-http 驅動沒有互動式交易（db.transaction() 會直接丟錯），但 db.batch() 是單一交易。
+ * batch 裡拿不到前一句的 returning 值來當後一句的參數，所以 client id 自己先產：
+ * uuid v4 由 Node 產跟由 Postgres 的 gen_random_uuid() 產，對這張表沒有任何差別。
+ */
 export async function createClient(coachId: string, input: ClientInput): Promise<string> {
-  const [row] = await db
-    .insert(clients)
-    .values({
+  const clientId = randomUUID();
+  const year = new Date().getFullYear();
+  const data = newCaseData(input.name);
+  const snap = planSnapshot(data);
+  // 發號本身會寫 code_counters，不能放進 batch（放進去等於同一筆號碼在交易外先被消耗）。
+  const code = await allocCode("client");
+
+  await db.batch([
+    db.insert(clients).values({
+      id: clientId,
       coachId,
       name: input.name,
       source: input.source ?? null,
@@ -131,24 +150,20 @@ export async function createClient(coachId: string, input: ClientInput): Promise
       birthDate: input.birthDate ?? null,
       status: input.status ?? "active",
       // 客戶編號在「建立那一刻」發，之後不再變動（規則見 lib/codes.ts）。
-      code: await allocCode("client"),
-    })
-    .returning({ id: clients.id });
-
-  const year = new Date().getFullYear();
-  const data = newCaseData(input.name);
-  const snap = planSnapshot(data);
-  await db.insert(plans).values({
-    clientId: row.id,
-    year,
-    label: `${year} 初版`,
-    status: "draft",
-    basedOnDate: todayISO(),
-    data,
-    healthGrade: snap.healthGrade,
-    netWorth: snap.netWorth,
-  });
-  return row.id;
+      code,
+    }),
+    db.insert(plans).values({
+      clientId,
+      year,
+      label: `${year} 初版`,
+      status: "draft",
+      basedOnDate: todayISO(),
+      data,
+      healthGrade: snap.healthGrade,
+      netWorth: snap.netWorth,
+    }),
+  ]);
+  return clientId;
 }
 
 /**

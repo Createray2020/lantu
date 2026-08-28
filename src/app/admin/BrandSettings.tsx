@@ -1,7 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { saveBrandLogo, removeBrandLogo } from "./actions";
+
+// saveBrandLogo 會 throw（例如 missing-logo），而正式環境會把訊息換成無意義的 digest——
+// 這裡把技術性代碼換成看得懂的一句話，其餘照原訊息顯示。
+const MSG: Record<string, string> = {
+  "missing-logo": "沒有可儲存的圖：請先選一張圖片再按儲存",
+  forbidden: "只有管理員可以改品牌設定",
+};
+function reason(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  return MSG[raw] ?? raw ?? "未知錯誤";
+}
 
 const ACCEPT = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 const MAX_FILE = 5 * 1024 * 1024; // 5MB 原始檔上限
@@ -58,10 +69,28 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
   const [iconUrl, setIconUrl] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // 這一頁是後台唯一沒有存檔回饋的頁：按下去畫面完全沒變化，分不出「存好了」還是「壞了」。
+  // 照 CategoriesBoard 的 run() 模式補上。
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  function run(fn: () => Promise<void>, okText: string, after?: () => void) {
+    setMsg(null);
+    start(async () => {
+      try {
+        await fn();
+        setMsg({ ok: true, text: okText });
+        after?.();
+      } catch (e) {
+        setMsg({ ok: false, text: reason(e) });
+      }
+    });
+  }
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     setErr(null);
+    setMsg(null);
     const file = e.target.files?.[0];
     if (!file) return;
     if (!ACCEPT.includes(file.type)) {
@@ -154,42 +183,51 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
         />
         {busy && <span className="text-xs text-[#a9bccf]">處理中…</span>}
 
-        <form
-          action={async (fd) => {
+        <button
+          type="button"
+          disabled={!logoUrl || !iconUrl || busy || pending}
+          onClick={() => {
+            const fd = new FormData();
             fd.set("logoUrl", logoUrl ?? "");
             fd.set("iconUrl", iconUrl ?? "");
-            await saveBrandLogo(fd);
-            reset();
+            run(() => saveBrandLogo(fd), "已儲存", reset);
           }}
+          className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold px-4 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <button
-            type="submit"
-            disabled={!logoUrl || !iconUrl || busy}
-            className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold px-4 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            儲存並替換
-          </button>
-        </form>
+          {pending ? "儲存中…" : "儲存並替換"}
+        </button>
 
         {(logoUrl || iconUrl) && (
           <button
             type="button"
             onClick={reset}
-            className="rounded-md border border-white/20 text-[#a9bccf] px-3 py-1.5 text-sm"
+            disabled={pending}
+            className="rounded-md border border-white/20 text-[#a9bccf] px-3 py-1.5 text-sm disabled:opacity-40"
           >
             取消
           </button>
         )}
 
         {currentLogo && !logoUrl && (
-          <form action={removeBrandLogo}>
-            <button
-              type="submit"
-              className="rounded-md border border-[#b05a4a]/60 text-[#e08a68] px-3 py-1.5 text-sm"
-            >
-              移除，還原預設
-            </button>
-          </form>
+          <button
+            type="button"
+            disabled={pending}
+            // 這一顆影響全組織每一個人看到的 Logo，而且沒有復原鍵——按錯就要重新上傳原圖。
+            onClick={() => {
+              if (confirm("移除後全組織會回到嵐途預設標記，確定？")) {
+                run(() => removeBrandLogo(), "已移除，已還原成嵐途預設標記");
+              }
+            }}
+            className="rounded-md border border-[#b05a4a]/60 text-[#e08a68] px-3 py-1.5 text-sm disabled:opacity-40"
+          >
+            移除，還原預設
+          </button>
+        )}
+
+        {msg && (
+          <span className={`text-sm ${msg.ok ? "text-[#6f8f74]" : "text-[#e08a7a]"}`}>
+            {msg.ok ? `${msg.text} ✓` : `儲存失敗：${msg.text}`}
+          </span>
         )}
       </div>
     </section>

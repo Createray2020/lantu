@@ -125,8 +125,14 @@ export async function markLesson(coachId: string, lessonId: string, done: boolea
 
 /**
  * 全部單元完成 → 補一筆訓練時數（若該課程有設 trainingHours）。
- * 只寫一次：先查有沒有同一門課的紀錄（用 title 當識別，evidence 存課程 id）。
- * 時數帳是制度的維持資格依據，重複寫等於灌水。
+ *
+ * ⚠️ 去重靠的是 DB 的唯一鍵（comp_training_records_coach_evidence_uidx：coach_id + evidence，
+ *    partial index on evidence is not null）＋ onConflictDoNothing，**不是**「先 select 再 insert」。
+ *    舊寫法在兩個地方靠不住：
+ *      1) 先查再寫中間有空窗，連點兩下「已完成」兩邊都查不到既有列，就寫進兩筆。
+ *      2) 原本以為 comp_training_records_session_coach_uidx 會兜底，但它的第一欄是 session_id，
+ *         線上課程寫的是 NULL —— Postgres 的 UNIQUE 對 NULL 視為互異，那條一列都擋不住。
+ *    時數帳是維持資格的依據，重複寫等於灌水。
  */
 async function completeCourseHours(coachId: string, courseId: string): Promise<void> {
   const c = await getCourse(courseId);
@@ -144,14 +150,6 @@ async function completeCourseHours(coachId: string, courseId: string): Promise<v
   if (done.length < lessons.length) return;
 
   const year = new Date().getUTCFullYear();
-  const existing = await db.select({ id: compTrainingRecords.id }).from(compTrainingRecords)
-    .where(and(
-      eq(compTrainingRecords.coachId, coachId),
-      eq(compTrainingRecords.evidence, `learn:${courseId}`),
-    ))
-    .limit(1);
-  if (existing[0]) return;
-
   await db.insert(compTrainingRecords).values({
     coachId,
     year,
@@ -160,7 +158,7 @@ async function completeCourseHours(coachId: string, courseId: string): Promise<v
     title: `線上課程：${c.title}`,
     evidence: `learn:${courseId}`,
     status: "approved",
-  });
+  }).onConflictDoNothing();
 }
 
 // ── 後台 ─────────────────────────────────────────────────────

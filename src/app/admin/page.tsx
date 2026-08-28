@@ -8,8 +8,9 @@ import StatusActions from "./StatusActions";
 import RemoveCoach from "./RemoveCoach";
 import AdminNav from "./AdminNav";
 import LicenseCell from "./LicenseCell";
+import CoachRoster, { type RosterRow } from "./CoachRoster";
 import { rankCaps } from "@/lib/quota";
-import { clientCapOf, RANK_ORDER } from "@/lib/license";
+import { clientCapOf, licenseState, RANK_ORDER } from "@/lib/license";
 
 export const dynamic = "force-dynamic";
 
@@ -69,15 +70,17 @@ export default async function Admin() {
 
       <section className="p-6 max-w-4xl">
 
-        <div className="flex items-center gap-4 mb-5">
+        <div className="flex items-center gap-4 mb-3">
           <h1 className="text-xl font-bold">教練帳號</h1>
-          <span className="text-sm text-[#a9bccf]">
-            共 {coaches.length} 位 · 待審核 <b className="text-[#e0bd8b]">{pending}</b> 位
-          </span>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-sm">
+        {/* 半成品帳號（開通了卻沒定級／沒設期限）與快到期的，一律先彙總在頂端 ——
+            這三件事只印在每一列的角落時，二十列以後就沒有人看得出來還剩幾個沒處理。 */}
+        <CoachRoster
+          total={coaches.length}
+          pending={pending}
+          colSpan={8}
+          head={
             <thead>
               <tr className="bg-[#12334f] text-[#a9bccf] text-left">
                 <th className="px-3 py-2 font-semibold">姓名 / Email</th>
@@ -90,11 +93,17 @@ export default async function Admin() {
                 <th className="px-3 py-2 font-semibold text-right">動作</th>
               </tr>
             </thead>
-            <tbody>
-              {coaches.map((c) => {
+          }
+          rows={coaches.map((c): RosterRow => {
                 const s = STATUS[c.status] ?? { label: c.status, color: "#a9bccf" };
                 const admin = c.role === "admin";
-                return (
+                const lic = licenseState({ licenseUntil: c.licenseUntil, status: c.status });
+                return {
+                  key: c.id,
+                  unranked: !c.rankCode,
+                  noLicense: !lic.managed,
+                  expiring: lic.managed && !lic.expired && (lic.daysLeft ?? 999) <= 30,
+                  node: (
                   <tr key={c.id} className="border-t border-white/8">
                     <td className="px-3 py-2">
                       <div className="font-semibold">{c.name || "（未命名）"}</div>
@@ -172,18 +181,10 @@ export default async function Admin() {
                       )}
                     </td>
                   </tr>
-                );
+                  ),
+                };
               })}
-              {coaches.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-[#6f869c]">
-                    尚無教練註冊。
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        />
 
         <p className="mt-4 text-xs text-[#6f869c]">
           運作方式：教練用 Google／Email 註冊後為「待審核」，無法進入系統；你在此按「核准開通」（確認收款後）即可啟用。停權可隨時收回存取，且不動任何資料 —— 離職請用停權。

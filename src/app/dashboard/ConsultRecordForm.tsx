@@ -35,6 +35,7 @@ export default function ConsultRecordForm({
   initial,
   todos = [],
   notice,
+  error = null,
   submitLabel = "存檔",
   pending = false,
   onSubmit,
@@ -47,6 +48,8 @@ export default function ConsultRecordForm({
   todos?: string[];
   /** 表單上方的一句說明（例如「這是 8/26 那一場的草稿」）。 */
   notice?: string;
+  /** 送出／捨棄失敗的理由。顯示在表單最上方——內容還在框裡，使用者改完可以直接再按一次。 */
+  error?: string | null;
   submitLabel?: string;
   pending?: boolean;
   onSubmit: (v: ConsultRecordValue) => void;
@@ -63,6 +66,11 @@ export default function ConsultRecordForm({
 
   return (
     <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
+      {error && (
+        <div role="alert" className="text-[12.5px] font-bold text-[#ffd7d8] bg-[#5b1f22] border border-[#ff9d9f]/45 rounded-lg px-3 py-2">
+          ⚠️ {error}
+        </div>
+      )}
       {notice && (
         <div className="text-[12px] text-[#e0bd8b] bg-[#c99a5b]/10 border border-[#c99a5b]/40 rounded-lg px-3 py-2">
           {notice}

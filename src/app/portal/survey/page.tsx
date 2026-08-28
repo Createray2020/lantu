@@ -58,7 +58,7 @@ export default async function SurveyPage() {
       <main className="flex-1 px-5 sm:px-8 py-6 max-w-2xl w-full mx-auto">
         <h1 className="text-xl font-bold mb-1">服務回饋</h1>
         <p className="text-sm text-[#a7bacb] mb-6">
-          你的回饋是顧問改進服務的依據，也是這份服務正式結案的一步。
+          你的回饋是教練改進服務的依據，也是這份服務正式結案的一步。
         </p>
         <SurveyForm
           cases={views}
