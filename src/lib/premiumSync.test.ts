@@ -138,6 +138,37 @@ describe("接管：手填的人身保費換成兩列投影", () => {
     expect(T({ cat: "生活", subCat: "" , name: "保險費" }), "別的大類一律不碰").toBe(false);
   });
 
+  it("⚠️ 投影列要繼承原本那幾列的起訖（不然金流的時間被悄悄改掉）", () => {
+    // 舊列多半寫著「40–85 歲」，投影列如果留空＝一生都在繳。
+    // 教練沒有動任何東西，現金流的時間卻不一樣了——這種改動最難被發現。
+    const c = base();
+    c.expenses = [{ name: "保險費", cat: "保險", subCat: "", period: "年", amount: 120_000, start: 40, end: 85 }];
+    c.policies = [pol("終身壽險", 76_500)];
+    w.syncPremium(c);
+    expect(prem(c, "protect").start).toBe(40);
+    expect(prem(c, "protect").end).toBe(85);
+    expect(prem(c, "invest").start).toBe(40);
+  });
+
+  it("多列起訖不同時取最寬的區間", () => {
+    const c = base();
+    c.expenses = [
+      { name: "壽險保費", cat: "保險", subCat: "壽險保費", period: "年", amount: 60_000, start: 45, end: 80 },
+      { name: "醫療險", cat: "保險", subCat: "醫療/健康險保費", period: "年", amount: 40_000, start: 40, end: 90 },
+    ];
+    c.policies = [pol("終身壽險", 76_500)];
+    w.syncPremium(c);
+    expect(prem(c, "protect").start).toBe(40);
+    expect(prem(c, "protect").end).toBe(90);
+  });
+
+  it("原本就沒有保費列 → 起訖留空（＝一生），這是對的", () => {
+    const c = base();
+    c.policies = [pol("終身壽險", 76_500)];
+    w.syncPremium(c);
+    expect(prem(c, "protect").start).toBe("");
+  });
+
   it("失效／停效的保單不算保費", () => {
     const c = base();
     c.policies = [pol("終身壽險", 120_000), { ...pol("終身壽險", 999_999), status: "失效" }];

@@ -90,6 +90,10 @@ function sampleCase(){return {
   {member:'王大明',kind:'住院醫療',comm:0,social:0}
  ],
  policies:[
+  // ⚠️ 示範案原本的保單表只有 76,500，卻在支出寫「保險費 120,000」——自己跟自己對不上。
+  // 保費改由保單表投影之後這個矛盾會直接顯示出來，所以補一張儲蓄壽險把差額補齊，
+  // 順便讓理財金三角的「理財型保費」在示範案裡不再是 0。
+  {insured:'王大明',name:'增額儲蓄壽險',subtype:'增額/儲蓄壽險',premium:43500,life:0,accident:0,medical:0,medMisc:0,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:300000},
   {insured:'王大明',name:'國泰終身醫療',premium:47536,life:0,accident:0,medical:2000,medMisc:100000,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0},
   {insured:'王大明',name:'重大傷病定期',premium:20100,life:0,accident:0,medical:0,firstCancer:0,cancerHosp:0,critical:2000000,monthCare:0,cashValue:0},
   {insured:'王大明',name:'定期壽險',premium:8864,life:3000000,accident:1000000,medical:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0}

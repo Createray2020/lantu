@@ -660,6 +660,10 @@ function sampleCase(){return {
   {member:'王大明',kind:'住院醫療',comm:0,social:0}
  ],
  policies:[
+  // ⚠️ 示範案原本的保單表只有 76,500，卻在支出寫「保險費 120,000」——自己跟自己對不上。
+  // 保費改由保單表投影之後這個矛盾會直接顯示出來，所以補一張儲蓄壽險把差額補齊，
+  // 順便讓理財金三角的「理財型保費」在示範案裡不再是 0。
+  {insured:'王大明',name:'增額儲蓄壽險',subtype:'增額/儲蓄壽險',premium:43500,life:0,accident:0,medical:0,medMisc:0,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:300000},
   {insured:'王大明',name:'國泰終身醫療',premium:47536,life:0,accident:0,medical:2000,medMisc:100000,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0},
   {insured:'王大明',name:'重大傷病定期',premium:20100,life:0,accident:0,medical:0,firstCancer:0,cancerHosp:0,critical:2000000,monthCare:0,cashValue:0},
   {insured:'王大明',name:'定期壽險',premium:8864,life:3000000,accident:1000000,medical:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0}
@@ -992,14 +996,21 @@ function syncPremium(c){
  var already=c.expenses.some(function(e){return !!e.premAuto;});
  if(!hasPrem&&!already)return;
  var amt={protect:annualPremiumBy(c,'保障型'),invest:annualPremiumBy(c,'理財型')};
+ // ⚠️ 接管時要把原本那幾列的**起訖繼承下來**。舊列多半寫著「40–85 歲」，
+ //    投影列如果留空＝一生都在繳，教練沒有改任何東西、金流的時間卻被動過了。
+ var span={start:'',end:''};
  if(!already){
-  // 第一次接管：把手填的人身保費列收走（產險/勞健保/國民年金不動）。
+  var old=c.expenses.filter(isPersonalPremRow);
+  var ss=old.map(function(e){return n(e.start)}).filter(function(v){return v>0});
+  var ee=old.map(function(e){return n(e.end)}).filter(function(v){return v>0});
+  if(ss.length)span.start=Math.min.apply(null,ss);
+  if(ee.length)span.end=Math.max.apply(null,ee);
   c.expenses=c.expenses.filter(function(e){return !isPersonalPremRow(e);});
  }
  ['protect','invest'].forEach(function(k){
   var row=null;
   for(var i=0;i<c.expenses.length;i++)if(c.expenses[i].premAuto===k){row=c.expenses[i];break;}
-  if(!row){row={name:PREM_AUTO_SUB[k],cat:'保險',subCat:PREM_AUTO_SUB[k],period:'年',infl:false,cut:0,start:'',end:'',premAuto:k};c.expenses.push(row);}
+  if(!row){row={name:PREM_AUTO_SUB[k],cat:'保險',subCat:PREM_AUTO_SUB[k],period:'年',infl:false,cut:0,start:span.start,end:span.end,premAuto:k};c.expenses.push(row);}
   row.cat='保險';row.subCat=PREM_AUTO_SUB[k];row.name=PREM_AUTO_SUB[k];
   row.amount=amt[k];row.period='年';row.infl=false;
  });
