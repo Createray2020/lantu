@@ -59,7 +59,8 @@ describe("defaultIntent / goalTabs", () => {
 
   it("goalTabs 依已選目標帶出分頁、去重、排除地基層", () => {
     const tabs = goalTabs(["退休生活規劃", "購屋規劃", "旅遊規劃", "子女教養規劃"]);
-    expect(tabs.map((t) => t.tab)).toEqual(["retire", "goals", "education"]); // 購屋/旅遊同屬 goals 只算一次
+    // 2026/08/28：旅遊改帶「生活願望」分頁（原本跟購屋擠在 goals，見 intent.ts 的整併註解）。
+    expect(tabs.map((t) => t.tab)).toEqual(["retire", "goals", "lifestyle", "education"]);
   });
 
   it("沒選任何目標時分母只剩地基層", () => {

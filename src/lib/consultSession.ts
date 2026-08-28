@@ -28,6 +28,7 @@ export type SessionRow = {
   metricsBefore: unknown;
   metricsAfter: unknown;
   closingNote: string | null;
+  draftSummary: string | null;
 };
 
 const COLS = {
@@ -43,6 +44,7 @@ const COLS = {
   metricsBefore: consultSessions.metricsBefore,
   metricsAfter: consultSessions.metricsAfter,
   closingNote: consultSessions.closingNote,
+  draftSummary: consultSessions.draftSummary,
 };
 
 async function assertOwned(coachId: string, clientId: string): Promise<boolean> {
@@ -135,22 +137,43 @@ export async function startSession(
 export type EndInput = {
   /** 這一場的「決定」裡，哪幾則要給客戶看（批次勾選的結果）。 */
   visibleNoteIds?: string[];
-  attendees?: string | null;
-  reviewType?: string;
-  nextAppt?: string | null;
   /** 收尾時教練自己寫的一整段（訪談問卷的最後一題）。 */
   closingNote?: string | null;
 };
 
 export type EndOutcome =
-  | { ok: true; session: SessionRow; reviewId: string; todos: number }
+  | { ok: true; session: SessionRow; draft: string; todos: string[] }
   | { ok: false; error: string };
 
+/** 一份還沒存成正式紀錄的草稿（按了結束但沒存檔就把視窗關掉）。 */
+export type PendingDraft = {
+  sessionId: string;
+  planId: string | null;
+  endedAt: Date | null;
+  draft: string;
+  todos: string[];
+};
+
 /**
- * 結束諮詢並產出摘要。
+ * 結束諮詢，產出**草稿**並封場。
  *
- * 順序有意義：先把「客戶可見」定案 → 再產摘要文字 → 再寫 review 與 action_items。
- * 反過來的話，摘要會用到還沒定案的可見性，印出去的內容跟教練勾的不一樣。
+ * ⚠️⚠️ 2026/08/28 起這裡不再直接寫 review。原因（教練回饋）：
+ * 「結束並摘要」產出的內容跟教練實際談的幾乎無關、而且只有一句話——因為 buildSummary()
+ * 只讀得到「教練在區塊上留的註記」，系統沒有任何談話內容可讀（沒錄音、沒逐字稿）。
+ * 教練的心智模型是「AI 幫我摘要這場談話」，跟系統實際能做的事對不起來。
+ * 而他真正的用法是**事後把 AI 整理好的一大段貼進來**，日期還是過去的某一天，
+ * 但這條路的 review 日期是寫死 new Date() 的今天。
+ *
+ * 所以拆成兩段：這裡定案可見性、算後指標、產草稿、封場；
+ * 教練在表單裡改完（可改日期、類型、貼全文）按存檔才走 saveSessionRecord()。
+ *
+ * ⚠️ 草稿一定要落地（draft_summary）：場次已封而紀錄還沒生出來的空窗，
+ * 中間把視窗關掉就是資料損失——違反「忘記按結束絕不能造成資料損失」那條原則。
+ *
+ * 順序仍然有意義：先把「客戶可見」定案 → 再產摘要文字。反過來的話，
+ * 摘要會用到還沒定案的可見性，印出去的內容跟教練勾的不一樣。
+ * ⚠️ 合規：批次勾「客戶可見」刻意留在按下結束的這一刻，不搬進表單——
+ * 那是教練正在決定要跟客戶講什麼的時間點。
  */
 export async function endSession(coachId: string, sessionId: string, input: EndInput): Promise<EndOutcome> {
   const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
@@ -176,19 +199,68 @@ export async function endSession(coachId: string, sessionId: string, input: EndI
     if (p) after = sessionMetrics(p.data);
   }
 
-  // 3) 摘要 → reviews
+  // 3) 摘要草稿（還不是正式紀錄）
   const fresh = await notesOfSession(sessionId);
-  const summary = buildSummary(fresh, s.metricsBefore as SessionMetrics | null, after, input.closingNote ?? null);
+  const draft = buildSummary(fresh, s.metricsBefore as SessionMetrics | null, after, input.closingNote ?? null);
+  const todos = fresh.filter((n) => n.kind === "todo").map((n) => n.body.slice(0, 200));
+
+  // 4) 封場＋草稿落地。⚠️ 這裡**不**產 review、也**不**產 action_items——
+  //    那兩件事等教練在表單按存檔（saveSessionRecord）才做。
+  const [row] = await db
+    .update(consultSessions)
+    .set({
+      endedAt: new Date(),
+      closeReason: "manual",
+      metricsAfter: after,
+      closingNote: input.closingNote ?? null,
+      draftSummary: draft,
+    })
+    .where(eq(consultSessions.id, sessionId))
+    .returning(COLS);
+
+  return { ok: true, session: row, draft, todos };
+}
+
+/**
+ * 把草稿存成正式的諮詢紀錄。
+ *
+ * 這是「一場諮詢」與「手動補記」合併之後的唯一出口：不論當場結束還是事後補寫，
+ * 都是同一個表單、同一條路。教練可以改日期（補記過去的諮詢）、改類型、貼一整段全文。
+ */
+export type SaveRecordInput = {
+  date: string;
+  type: string;
+  planId?: string | null;
+  attendees?: string | null;
+  summary?: string | null;
+  nextAppt?: string | null;
+};
+export type SaveRecordOutcome =
+  | { ok: true; reviewId: string; todos: number }
+  | { ok: false; error: string };
+
+export async function saveSessionRecord(
+  coachId: string,
+  sessionId: string,
+  input: SaveRecordInput,
+): Promise<SaveRecordOutcome> {
+  const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
+  if (!s) return { ok: false, error: "找不到這一場諮詢" };
+  if (!(await assertOwned(coachId, s.clientId))) return { ok: false, error: "只有主責教練能存這一場的紀錄" };
+  if (s.reviewId) return { ok: false, error: "這一場的紀錄已經存過了" };
+
   const reviewId = await createReview(coachId, s.clientId, {
-    date: ymdTaipei(new Date()),
-    type: input.reviewType ?? "review",
-    planId: s.planId,
+    date: input.date,
+    type: input.type,
+    planId: input.planId !== undefined ? input.planId : s.planId,
     attendees: input.attendees ?? null,
-    summary,
+    summary: input.summary ?? null,
     nextAppt: input.nextAppt ?? null,
   });
 
-  // 4) 待辦 → action_items（這個功能一出生就有下游）
+  // 待辦 → action_items（這個功能一出生就有下游）。放在存檔這一步，
+  // 才不會「按了結束就先冒出一堆待辦、但紀錄根本還沒存」。
+  const fresh = await notesOfSession(sessionId);
   let todos = 0;
   for (const nrow of fresh) {
     if (nrow.kind !== "todo") continue;
@@ -196,13 +268,51 @@ export async function endSession(coachId: string, sessionId: string, input: EndI
     todos++;
   }
 
-  const [row] = await db
+  await db
     .update(consultSessions)
-    .set({ endedAt: new Date(), closeReason: "manual", metricsAfter: after, reviewId, closingNote: input.closingNote ?? null })
-    .where(eq(consultSessions.id, sessionId))
-    .returning(COLS);
+    .set({ reviewId, draftSummary: null })
+    .where(eq(consultSessions.id, sessionId));
 
-  return { ok: true, session: row, reviewId, todos };
+  return { ok: true, reviewId, todos };
+}
+
+/**
+ * 這位客戶有沒有「按了結束但沒存」的草稿。
+ *
+ * ⚠️ 只認手動結束的（closeReason='manual'）：自動封場刻意不產草稿，
+ * 沒人整理過的東西不該變成待處理的提醒，不然每次忘記按結束都會冒一條。
+ */
+export async function pendingDraft(clientId: string): Promise<PendingDraft | null> {
+  const [row] = await db
+    .select(COLS)
+    .from(consultSessions)
+    .where(
+      and(
+        eq(consultSessions.clientId, clientId),
+        isNull(consultSessions.reviewId),
+        sql`${consultSessions.draftSummary} is not null`,
+      ),
+    )
+    .orderBy(desc(consultSessions.endedAt))
+    .limit(1);
+  if (!row) return null;
+  const fresh = await notesOfSession(row.id);
+  return {
+    sessionId: row.id,
+    planId: row.planId,
+    endedAt: row.endedAt,
+    draft: row.draftSummary ?? "",
+    todos: fresh.filter((n) => n.kind === "todo").map((n) => n.body.slice(0, 200)),
+  };
+}
+
+/** 教練決定這一場不留紀錄：丟掉草稿（場次本身保留，還原點還在）。 */
+export async function discardDraft(coachId: string, sessionId: string): Promise<boolean> {
+  const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
+  if (!s) return false;
+  if (!(await assertOwned(coachId, s.clientId))) return false;
+  await db.update(consultSessions).set({ draftSummary: null }).where(eq(consultSessions.id, sessionId));
+  return true;
 }
 
 /** 摘要文字。開頭那句是「改善了多少」——評判標準是比原本更優化，不是補平。 */

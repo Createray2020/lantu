@@ -9,7 +9,10 @@ import {
   updatePlanMetaAction,
   deletePlanAction,
   createReviewAction,
+  updateReviewAction,
   deleteReviewAction,
+  saveConsultRecordAction,
+  discardDraftAction,
   createActionItemAction,
   setActionItemDoneAction,
   deleteActionItemAction,
@@ -18,6 +21,7 @@ import {
 } from "../../actions";
 import { StageGuideModal } from "../../StageGuide";
 import Collaborators, { type CollaboratorLite } from "./Collaborators";
+import ConsultRecordForm, { type ConsultRecordValue } from "../../ConsultRecordForm";
 import {
   fmtMoney,
   stageColor,
@@ -49,6 +53,7 @@ export default function ClientDetail({
   passportPlan,
   reviews,
   actionItems,
+  draft,
   compare,
   readOnly = false,
   isOwner = true,
@@ -58,6 +63,7 @@ export default function ClientDetail({
   plans: PlanLite[];
   reviews: ReviewLite[];
   actionItems: ItemLite[];
+  draft: DraftLite | null;
   compare: Compare[];
   passportPlan: PassportPlan | null;
   /** 唯讀：使用期限到期，或我是被邀來共同執案的協作教練。所有寫入按鈕都收起來。 */
@@ -154,9 +160,13 @@ export default function ClientDetail({
           actionItems={actionItems}
           plans={plans}
           planYear={planYear}
+          draft={draft}
           pending={pending}
           readOnly={readOnly}
           onAddReview={(input) => run(() => createReviewAction(client.id, input))}
+          onSaveDraft={(sessionId, input) => run(async () => { await saveConsultRecordAction(client.id, sessionId, input); })}
+          onDiscardDraft={(sessionId) => run(async () => { await discardDraftAction(client.id, sessionId); })}
+          onUpdateReview={(id, input) => run(() => updateReviewAction(client.id, id, input))}
           onDeleteReview={(id) => { if (confirm("刪除此諮詢紀錄？")) run(() => deleteReviewAction(client.id, id)); }}
           onAddItem={(input) => run(() => createActionItemAction(client.id, input))}
           onToggleItem={(id, done) => run(() => setActionItemDoneAction(client.id, id, done))}
@@ -413,109 +423,184 @@ function Plans({ plans, compare, pending, readOnly = false, onOpen, onClone, onN
 }
 
 // ── 諮詢紀錄分頁 ───────────────────────────────────
-function Reviews({ clientId, reviews, actionItems, plans, planYear, pending, readOnly = false, onAddReview, onDeleteReview, onAddItem, onToggleItem, onDeleteItem }: {
-  clientId: string; reviews: ReviewLite[]; actionItems: ItemLite[]; plans: PlanLite[]; planYear: Map<string, number>; pending: boolean; readOnly?: boolean;
-  onAddReview: (input: { date: string; type: string; planId: string | null; attendees: string | null; summary: string | null; nextAppt: string | null }) => void;
+type DraftLite = { sessionId: string; planId: string | null; endedAt: string | null; draft: string; todos: string[] };
+
+/**
+ * 諮詢紀錄分頁 —— 2026/08/28 改成 A 案版面（上下配置、時間軸吃整寬）。
+ *
+ * 為什麼要改：教練把 AI 整理好的諮詢紀錄整段貼進來，內容被塞進右半欄裡就撐爆版面。
+ * 三案並排給 Ray 挑（docs/諮詢紀錄版面_三案原型.html），他選 A：
+ * 新增表單收成一顆按鈕，時間軸橫跨整頁，長稿展開時有完整寬度。
+ *
+ * ⚠️ A 案把動作項目推到最底下，所以頂端補一條「未完成待辦 N 件」——
+ *    那是追蹤的核心（儀表板的「逾期未檢視」吃的就是它），不能讓它沉下去看不到。
+ */
+function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pending, readOnly = false, onAddReview, onSaveDraft, onDiscardDraft, onUpdateReview, onDeleteReview, onAddItem, onToggleItem, onDeleteItem }: {
+  clientId: string; reviews: ReviewLite[]; actionItems: ItemLite[]; plans: PlanLite[]; planYear: Map<string, number>;
+  draft: DraftLite | null; pending: boolean; readOnly?: boolean;
+  onAddReview: (input: ConsultRecordValue) => void;
+  onSaveDraft: (sessionId: string, input: ConsultRecordValue) => void;
+  onDiscardDraft: (sessionId: string) => void;
+  onUpdateReview: (id: string, input: ConsultRecordValue) => void;
   onDeleteReview: (id: string) => void;
   onAddItem: (input: { title: string; owner: string | null; dueDate: string | null }) => void;
   onToggleItem: (id: string, done: boolean) => void;
   onDeleteItem: (id: string) => void;
 }) {
   void clientId;
-  const [date, setDate] = useState(todayISO());
-  const [type, setType] = useState("review");
-  const [planId, setPlanId] = useState("");
-  const [attendees, setAttendees] = useState("");
-  const [summary, setSummary] = useState("");
-  const [nextAppt, setNextAppt] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftOpen, setDraftOpen] = useState(false);
 
   const [itTitle, setItTitle] = useState("");
   const [itOwner, setItOwner] = useState("");
   const [itDue, setItDue] = useState("");
 
+  const planOpts = plans.map((p) => ({ id: p.id, year: p.year }));
+  const openItems = actionItems.filter((i) => !i.done);
+  // 收合列只顯示摘要的第一行——時間軸要能一眼掃過去，長稿點開才看。
+  const firstLine = (t: string | null) => {
+    const l = (t ?? "").split("\n").map((x) => x.trim()).find((x) => x.length > 0) ?? "";
+    return l.length > 60 ? l.slice(0, 60) + "…" : l;
+  };
+
   return (
-    <div className="grid md:grid-cols-2 gap-6">
-      <section className="grid gap-3">
-        {/* 唯讀（協作教練或期限到期）：新增表單整塊收起來，只留下清單。
-            留著一個按不動的表單只會讓人以為是壞掉了。 */}
-        {!readOnly && (
-        <>
-        <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f]">新增諮詢</h3>
-        <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
-          <div className="grid grid-cols-2 gap-2">
-            <div><label className="text-[11px] text-[#a9bccf]">日期</label><input type="date" className={field} value={date} onChange={(e) => setDate(e.target.value)} /></div>
-            <div><label className="text-[11px] text-[#a9bccf]">類型</label><select className={field} value={type} onChange={(e) => setType(e.target.value)}>{REVIEW_TYPES.map((t) => <option key={t} value={t}>{REVIEW_TYPE_LABEL[t]}</option>)}</select></div>
+    <div className="grid gap-5">
+      {/* ── 草稿提醒：按了結束卻沒存，場次已封但紀錄還沒生出來 ── */}
+      {draft && !readOnly && (
+        <div className="bg-[#c99a5b]/10 border border-[#c99a5b]/45 rounded-xl px-3.5 py-3 grid gap-2">
+          <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
+            <span className="text-[#e0bd8b] font-bold">⚠️ {draft.endedAt ?? ""} 那一場的摘要還沒存</span>
+            <span className="text-[#6b7d8f] text-[12px]">結束諮詢時產了草稿，但沒有送出成正式紀錄。</span>
+            <div className="flex-1" />
+            {!draftOpen && (
+              <button className={btn + " bg-[#c99a5b] text-[#08202a]"} onClick={() => setDraftOpen(true)}>開啟草稿</button>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div><label className="text-[11px] text-[#a9bccf]">對應版本</label><select className={field} value={planId} onChange={(e) => setPlanId(e.target.value)}><option value="">—</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.year} 版</option>)}</select></div>
-            <div><label className="text-[11px] text-[#a9bccf]">下次預約</label><input type="date" className={field} value={nextAppt} onChange={(e) => setNextAppt(e.target.value)} /></div>
-          </div>
-          <div><label className="text-[11px] text-[#a9bccf]">出席</label><input className={field} value={attendees} onChange={(e) => setAttendees(e.target.value)} /></div>
-          <div><label className="text-[11px] text-[#a9bccf]">摘要</label><textarea className={field + " min-h-[64px]"} value={summary} onChange={(e) => setSummary(e.target.value)} /></div>
-          <button
-            className={btn + " bg-[#c99a5b] text-[#08202a] disabled:opacity-60"}
-            disabled={pending || !date}
-            onClick={() => {
-              onAddReview({ date, type, planId: planId || null, attendees: attendees || null, summary: summary || null, nextAppt: nextAppt || null });
-              setAttendees(""); setSummary(""); setNextAppt("");
-            }}
-          >
-            新增諮詢
-          </button>
+          {draftOpen && (
+            <ConsultRecordForm
+              plans={planOpts}
+              initial={{ summary: draft.draft, planId: draft.planId, date: draft.endedAt ?? undefined }}
+              todos={draft.todos}
+              notice="這是系統依你在各區塊留下的註記與缺口改善產出的草稿。日期、類型、內容都可以改——把整理好的紀錄整段貼上來也可以。"
+              submitLabel="存成諮詢紀錄"
+              pending={pending}
+              onSubmit={(v) => { onSaveDraft(draft.sessionId, v); setDraftOpen(false); }}
+              onCancel={() => setDraftOpen(false)}
+              onDiscard={() => { onDiscardDraft(draft.sessionId); setDraftOpen(false); }}
+            />
+          )}
         </div>
+      )}
 
-        <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mt-2">動作項目</h3>
-        <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
-          <input className={field} value={itTitle} onChange={(e) => setItTitle(e.target.value)} placeholder="事項" />
-          <div className="grid grid-cols-2 gap-2">
-            <input className={field} value={itOwner} onChange={(e) => setItOwner(e.target.value)} placeholder="負責人" />
-            <input type="date" className={field} value={itDue} onChange={(e) => setItDue(e.target.value)} />
-          </div>
-          <button
-            className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"}
-            disabled={pending || !itTitle.trim()}
-            onClick={() => { onAddItem({ title: itTitle.trim(), owner: itOwner || null, dueDate: itDue || null }); setItTitle(""); setItOwner(""); setItDue(""); }}
-          >
-            ＋ 新增待辦
+      {/* ── 頂端：待辦提要 ＋ 新增入口 ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        {!readOnly && !adding && (
+          <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10"} onClick={() => { setAdding(true); setEditing(null); }}>
+            ＋ 新增諮詢
           </button>
-        </div>
-        </>
         )}
+        <span className="text-[12px] text-[#6b7d8f]">補記過去的諮詢也走這裡，日期可以自己選。</span>
+        <div className="flex-1" />
+        {openItems.length > 0 && (
+          <a href="#actionItems" className="text-[12px] text-[#e0bd8b] hover:underline">
+            未完成待辦 {openItems.length} 件 ↓
+          </a>
+        )}
+      </div>
 
-        <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mt-2">動作項目清單</h3>
-        <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
-          {actionItems.length === 0 && <p className="text-[12px] text-[#6b7d8f]">目前沒有動作項目。</p>}
-          {actionItems.map((i) => (
-            <label key={i.id} className="flex items-start gap-2 border-t border-white/5 pt-2">
-              <input type="checkbox" checked={i.done} disabled={readOnly} onChange={() => onToggleItem(i.id, !i.done)} className="mt-1 disabled:opacity-50" />
-              <span className={"flex-1 text-sm " + (i.done ? "line-through text-[#6b7d8f]" : "")}>
-                {i.title}
-                <span className="block text-[11px] text-[#6b7d8f]">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
-              </span>
-              {!readOnly && <button className="text-[#6b7d8f] text-xs" onClick={() => onDeleteItem(i.id)}>刪</button>}
-            </label>
-          ))}
-        </div>
-      </section>
+      {adding && !readOnly && (
+        <ConsultRecordForm
+          plans={planOpts}
+          submitLabel="新增諮詢"
+          pending={pending}
+          onSubmit={(v) => { onAddReview(v); setAdding(false); }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
 
+      {/* ── 諮詢時間軸（整寬，全部預設收合）── */}
       <section>
         <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">諮詢時間軸</h3>
         {reviews.length === 0 ? <Empty>尚無諮詢紀錄</Empty> : (
           <div className="grid gap-2">
             {reviews.map((r) => (
-              <div key={r.id} className="bg-[#0c2135] border border-white/10 rounded-lg px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-[#e0bd8b] font-bold">{r.date}</span>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf]">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
-                  {r.planId && planYear.get(r.planId) && <span className="text-[11px] text-[#6b7d8f]">對應 {planYear.get(r.planId)} 版</span>}
-                  <div className="flex-1" />
-                  {!readOnly && <button className="text-[#6b7d8f] text-xs" onClick={() => onDeleteReview(r.id)}>刪除</button>}
-                </div>
-                {r.attendees && <div className="text-[12px] text-[#6b7d8f] mt-1">出席：{r.attendees}</div>}
-                {r.summary && <div className="text-[13px] text-[#a9bccf] mt-1 whitespace-pre-wrap">{r.summary}</div>}
-                {r.nextAppt && <div className="text-[12px] text-[#e0bd8b] mt-1">下次預約 {r.nextAppt}</div>}
-              </div>
+              editing === r.id ? (
+                <ConsultRecordForm
+                  key={r.id}
+                  plans={planOpts}
+                  initial={r}
+                  submitLabel="儲存修改"
+                  pending={pending}
+                  onSubmit={(v) => { onUpdateReview(r.id, v); setEditing(null); }}
+                  onCancel={() => setEditing(null)}
+                />
+              ) : (
+                <details key={r.id} className="bg-[#0c2135] border border-white/10 rounded-lg open:border-[#c99a5b]/45">
+                  <summary className="list-none cursor-pointer px-3 py-2.5 flex items-center gap-2.5">
+                    <span className="text-[#6b7d8f] text-[11px] shrink-0">▸</span>
+                    <span className="text-[#e0bd8b] font-bold tabular-nums shrink-0">{r.date}</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] shrink-0">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
+                    <span className="text-[12.5px] text-[#6b7d8f] truncate">{firstLine(r.summary)}</span>
+                  </summary>
+                  <div className="px-3 pb-3 pt-1 border-t border-white/5">
+                    <div className="text-[11.5px] text-[#6b7d8f] my-2">
+                      {r.attendees ? `出席：${r.attendees}` : "未填出席"}
+                      {r.planId && planYear.get(r.planId) ? ` · 對應 ${planYear.get(r.planId)} 版` : ""}
+                      {r.nextAppt ? ` · 下次預約 ${r.nextAppt}` : ""}
+                    </div>
+                    {r.summary
+                      ? <div className="text-[13px] text-[#a9bccf] whitespace-pre-wrap leading-relaxed">{r.summary}</div>
+                      : <div className="text-[12px] text-[#6b7d8f]">這一筆沒有內容。</div>}
+                    {!readOnly && (
+                      <div className="flex gap-2 mt-3">
+                        <button className="text-[11.5px] px-2.5 py-1 rounded-md border border-white/10 text-[#a9bccf]" onClick={() => { setEditing(r.id); setAdding(false); }}>編輯</button>
+                        <button className="text-[11.5px] px-2.5 py-1 rounded-md border border-white/10 text-[#6b7d8f]" onClick={() => onDeleteReview(r.id)}>刪除</button>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )
             ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── 動作項目 ── */}
+      <section id="actionItems" className="grid gap-3 md:grid-cols-2">
+        <div>
+          <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">動作項目清單</h3>
+          <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
+            {actionItems.length === 0 && <p className="text-[12px] text-[#6b7d8f]">目前沒有動作項目。</p>}
+            {actionItems.map((i) => (
+              <label key={i.id} className="flex items-start gap-2 border-t border-white/5 pt-2 first:border-0 first:pt-0">
+                <input type="checkbox" checked={i.done} disabled={readOnly} onChange={() => onToggleItem(i.id, !i.done)} className="mt-1 disabled:opacity-50" />
+                <span className={"flex-1 text-sm " + (i.done ? "line-through text-[#6b7d8f]" : "")}>
+                  {i.title}
+                  <span className="block text-[11px] text-[#6b7d8f]">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
+                </span>
+                {!readOnly && <button className="text-[#6b7d8f] text-xs" onClick={() => onDeleteItem(i.id)}>刪</button>}
+              </label>
+            ))}
+          </div>
+        </div>
+        {!readOnly && (
+          <div>
+            <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">新增待辦</h3>
+            <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
+              <input className={field} value={itTitle} onChange={(e) => setItTitle(e.target.value)} placeholder="事項" />
+              <div className="grid grid-cols-2 gap-2">
+                <input className={field} value={itOwner} onChange={(e) => setItOwner(e.target.value)} placeholder="負責人" />
+                <input type="date" className={field} value={itDue} onChange={(e) => setItDue(e.target.value)} />
+              </div>
+              <button
+                className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"}
+                disabled={pending || !itTitle.trim()}
+                onClick={() => { onAddItem({ title: itTitle.trim(), owner: itOwner || null, dueDate: itDue || null }); setItTitle(""); setItOwner(""); setItDue(""); }}
+              >
+                ＋ 新增待辦
+              </button>
+            </div>
           </div>
         )}
       </section>

@@ -167,6 +167,37 @@ describe("訪談檢核清單", () => {
     expect(w.ivDone(w.activeCase(), step)).toBe("manual");
   });
 
+  // ⚠️ Ray 回報第 1/3/6/13/20 項「前往」沒反應。真因：這五項的 tab 全部是 'intent'，
+  //    而檢核清單本身就 render 在 intent 分頁上 → app.dataTab='intent' 等於原地不動。
+  //    修法是 ivGoto() 切分頁後捲到錨點，所以「同分頁的步驟一定要有錨點」是這條的守門員。
+  it("跟清單同一個分頁的步驟，一定要有錨點——否則按了畫面不會動", () => {
+    const sameTab = w.INTERVIEW_STEPS.filter((s: { tab: string }) => s.tab === "intent");
+    expect(sameTab.map((s: { k: string }) => s.k)).toEqual(["purpose", "career", "marry", "legacy", "doc"]);
+    const noAnchor = sameTab.filter((s: { a?: string }) => !s.a).map((s: { k: string }) => s.k);
+    expect(noAnchor, `這些步驟按「前往」會沒有任何反應：${noAnchor.join(", ")}`).toEqual([]);
+  });
+
+  it("每個錨點在它自己的分頁上真的找得到（未選的目標也要找得到）", () => {
+    fresh();
+    const withAnchor = w.INTERVIEW_STEPS.filter((s: { a?: string }) => s.a);
+    expect(withAnchor.length).toBeGreaterThanOrEqual(8);
+    const missing: string[] = [];
+    for (const st of withAnchor) {
+      go(st.tab);
+      if (!w.document.querySelector(`#app ${st.a}`)) missing.push(`${st.k}(${st.a})`);
+    }
+    expect(missing, `這些錨點捲不到：${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("ivGoto 會切到該步驟的分頁", () => {
+    fresh();
+    go("intent");
+    w.ivGoto("house");
+    expect(w.app.dataTab).toBe("goals");
+    w.ivGoto("purpose");
+    expect(w.app.dataTab).toBe("intent");
+  });
+
   it("每一段都指得到一個真的分頁", () => {
     const known = new Set([
       ...w.BASE_TABS.map((b: string[]) => b[0]),
@@ -207,7 +238,8 @@ describe("健保三欄", () => {
 describe("資產的「可變動」要能寫理由", () => {
   it("進階欄有可變動的說明欄位", () => {
     const c = fresh();
-    w.app.finOpen = { assets: { 0: true }, liabilities: {} };
+    // 刻意只給一半的鍵：四張表都有展開區之後，缺鍵不能讓渲染整個掛掉。
+    w.app.finOpen = { assets: { 0: true } };
     go("finance");
     const html = w.document.querySelector("#app").innerHTML as string;
     expect(html).toMatch(/可變動的說明/);

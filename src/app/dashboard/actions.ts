@@ -181,8 +181,10 @@ export async function startSessionAction(
   return r;
 }
 
+// ⚠️ 2026/08/28：結束諮詢只產草稿、不再直接寫 review。教練在表單改完按存檔
+//    （saveConsultRecordAction）才變成正式紀錄。理由見 consultSession.ts 的 endSession 註解。
 export type EndSessionResult =
-  | { ok: true; reviewId: string; todos: number }
+  | { ok: true; sessionId: string; draft: string; todos: string[] }
   | { ok: false; error: string };
 
 export async function endSessionAction(clientId: string, sessionId: string, input: Session.EndInput): Promise<EndSessionResult> {
@@ -190,7 +192,33 @@ export async function endSessionAction(clientId: string, sessionId: string, inpu
   const r = await Session.endSession(cid, sessionId, input);
   if (!r.ok) return r;
   revalidatePath(`/dashboard/clients/${clientId}`);
-  return { ok: true, reviewId: r.reviewId, todos: r.todos };
+  return { ok: true, sessionId: r.session.id, draft: r.draft, todos: r.todos };
+}
+
+/** 把草稿存成正式的諮詢紀錄（可改日期、類型、全文）。 */
+export async function saveConsultRecordAction(
+  clientId: string,
+  sessionId: string,
+  input: Session.SaveRecordInput,
+): Promise<Session.SaveRecordOutcome> {
+  const cid = await coachId();
+  const r = await Session.saveSessionRecord(cid, sessionId, input);
+  if (r.ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return r;
+}
+
+/** 有沒有「按了結束但沒存」的草稿——客戶詳情頁與規劃編輯器都靠這條跳提醒。 */
+export async function pendingDraftAction(clientId: string): Promise<Session.PendingDraft | null> {
+  await coachId();
+  return Session.pendingDraft(clientId);
+}
+
+/** 這一場決定不留紀錄：丟掉草稿（場次與還原點都保留）。 */
+export async function discardDraftAction(clientId: string, sessionId: string): Promise<boolean> {
+  const cid = await coachId();
+  const ok = await Session.discardDraft(cid, sessionId);
+  if (ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return ok;
 }
 
 export async function openSessionAction(clientId: string): Promise<Session.SessionRow | null> {

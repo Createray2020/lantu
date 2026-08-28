@@ -206,9 +206,25 @@ function lRemain(l,age,a0){
  return Math.max(0,Math.min(P,P*f-pay*(f-1)/i));
 }
 
-function assetPassive(c){return sum(c.assets,function(a){return (a.income!=null&&a.income!=='')?aInc(a):((a.type==='股票'||a.type==='基金'||a.type==='債券')?aVal(a)*n(a.ret)/100:0)})}
+function assetPassive(c){return sum(c.assets,function(a){
+ if(aMatured(c,a))return 0;          // 到期之後就不再生錢（債權還本、租約結束）
+ return (a.income!=null&&a.income!=='')?aInc(a):((a.type==='股票'||a.type==='基金'||a.type==='債券')?aVal(a)*n(a.ret)/100:0)})}
 
-function liquidMovable(c){return sum(c.assets,function(a){return (a.cls==='流動'&&a.movable)?aVal(a):0})}
+// ⚠️⚠️ 資產的流動性有時間性：私人債權還完款、租約到期之後，那筆錢就變成可動用的現金。
+//    全站吃 cls 的地方一律走這支，不要再直接讀 a.cls。
+//    ⚠️ 這些呼叫點**全部都是現值快照**（沒有 age 參數），所以「到期年齡」的效果會在
+//    實際過了那一歲之後才反映，不會出現在逐年模擬裡。這是刻意的：把流動性也做成
+//    逐年是另一件大工程，而緊急預備金月數、核心資產比本來就是現值指標。
+function aCls(a,curAge){
+ if(!a)return '固定';
+ var m=n(a.matureAge);
+ if(m>0&&n(curAge)>=m)return '流動';
+ return a.cls==='流動'?'流動':'固定';
+}
+function aLiquid(c,a){return aCls(a,n(((c||{}).profile||{}).age))==='流動';}
+// 到期之後這筆資產就不再生錢了（債權還本、租約結束）。
+function aMatured(c,a){var m=n((a||{}).matureAge);return m>0&&n(((c||{}).profile||{}).age)>=m;}
+function liquidMovable(c){return sum(c.assets,function(a){return (aLiquid(c,a)&&a.movable)?aVal(a):0})}
 
 // ---------- 願景選定閘 ----------
 // 財務規劃的第一步是「先選定要執行哪些願景」，沒選的完全不進計算：
@@ -650,7 +666,7 @@ function metrics(c){
  var expTotal=sum(c.expenses,function(e){return n(e.amount)})+annualDebtPay(c);
  var saveInvest=savingInvest(c);
  var cash=sum(c.assets,function(a){return (a.type==='現金'||a.type==='定存')?aVal(a):0});
- var liquid=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
+ var liquid=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
  var assetTotal=sum(c.assets,function(a){return aVal(a)});
  var debtTotal=sum(c.liabilities,function(l){return lBal(l)});
  var net=assetTotal-debtTotal, save_=incTotal-expTotal, interest=annualDebtInterest(c), monthExp=expTotal/12;
@@ -727,8 +743,8 @@ function projection(c,lump,rateOverride){
  var a0=n(c.profile.age)||40,aEnd=n(c.params.horizon)||85,infl=n(c.params.inflation)/100;
  // rateOverride＝求解器拿「同一份個案、換一個報酬率假設」再跑一次時用；lump＝今天先塞一筆錢進去。
  var ret=((rateOverride!==undefined&&rateOverride!==null&&rateOverride!=='')?n(rateOverride):effReturn(c))/100;
- var invest=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0})+n(lump);
- var fixedAssets=sum(c.assets,function(a){return a.cls==='固定'?aVal(a):0});
+ var invest=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0})+n(lump);
+ var fixedAssets=sum(c.assets,function(a){return aLiquid(c,a)?0:aVal(a)});
  var rows=[],turnNeg=null,totalOut=0;
  var eduByYear={}; var g=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){var ag=s+yy;eduByYear[ag]=(eduByYear[ag]||0)+n(e.annual)*Math.pow(1+g,n(e.startIn)+yy)}});
@@ -1264,7 +1280,7 @@ function migrateAlloc(c){
  if(p.allocations&&p.allocations.length&&!p._allocMigrated){
   // 比例% 換算成本金：以目前的可投資資產為基數，來源標「既有轉入」——
   // 舊表講的本來就是「現有資產怎麼分」，不是「再拿新錢出來」。
-  var liquid=sum((c.assets||[]),function(a){return a.cls==='流動'?aVal(a):0});
+  var liquid=sum((c.assets||[]),function(a){return aLiquid(c,a)?aVal(a):0});
   p.allocations.forEach(function(a){
    if(!(n(a.pct)>0)&&!a.name)return;
    p.invest.push({kind:'投資',name:a.name||'',src:'既有轉入',
@@ -1386,7 +1402,7 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  // 迴圈不執行 → neg=0 → pSuccess 顯示「不破產機率 100%」而圖是空的。
  var a0=n(c.profile.age)||40,aEnd=n(c.params.horizon)||85,years=Math.max(0,aEnd-a0+1);
  var bR=n(c.params.invReturn),sR=n(c.params.invReturnStd),bI=n(c.params.inflation),sI=n(c.params.inflationStd),bG=n(c.params.salaryGrowth),sG=n(c.params.salaryStd);
- var liquid0=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
+ var liquid0=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
  var passive=assetPassive(c);
  var workBase=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
  var edu=[];var g0=n(c.params.tuitionGrowth)/100;
@@ -1696,8 +1712,8 @@ function crossTable(c){var m=metrics(c);
  var expLoan=manualLoanPay(c)+annualDebtPay(c);
  var expSupport=sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0});
  var expOther=sum(c.expenses,function(e){return ['生活','消費','稅賦','保險','孝親','貸款'].indexOf(e.cat)<0?n(e.amount):0});
- var aSelf=sum(c.assets,function(a){return a.cls==='固定'?aVal(a):0});
- var aInv=sum(c.assets,function(a){return a.cls==='流動'?aVal(a):0});
+ var aSelf=sum(c.assets,function(a){return aLiquid(c,a)?0:aVal(a)});
+ var aInv=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
  var dCons=sum(c.liabilities,function(l){return isConsumerDebt(l)?lBal(l):0});
  var dInv=m.debtTotal-dCons;
  return {incWork:incWork,incFin:incFin,incOther:incOther,incTotal:m.incTotal,expLive:expLive,expLoan:expLoan,expSupport:expSupport,expTax:expTax,expIns:expIns,expOther:expOther,expTotal:m.expTotal,saveInvest:m.saveInvest,
@@ -1724,7 +1740,10 @@ var RISK_Q=[
  {q:'若投資一年內下跌20%，您會？',o:[['立刻全部贖回、不再投資',1],['贖回大部分',2],['觀望、暫不動作',3],['續抱等待回升',4],['視為機會、加碼買進',5]]},
  {q:'您能接受這筆資金最大的本金虧損幅度？',o:[['不能接受任何虧損',1],['5%以內',2],['約10–15%',3],['約20–30%',4],['30%以上也可承受',5]]},
  {q:'下列報酬/風險組合，您偏好哪一種？',o:[['報酬2%，幾乎不虧',1],['報酬4%，最差-5%',2],['報酬6%，最差-15%',3],['報酬9%，最差-25%',4],['報酬12%，最差-40%',5]]},
- {q:'投資期間內您臨時需要動用這筆資金的可能性？',o:[['非常高',1],['偏高',2],['普通',3],['偏低',4],['幾乎不會',5]]}
+ // ⚠️ 2026/08/28 改版：原本問「臨時需要動用這筆資金的可能性」，改問緊急預備金。
+ //    題號與 ans 的索引刻意不動（ans 用題目索引當 key，改順序會靜默對到錯的題目），
+ //    滿分仍是 60、四個分級門檻不變。改版前已作答的走 riskQuiz.q12Legacy 標記。
+ {q:'您目前的緊急預備金（可隨時動用的現金）大約可以支應幾個月的生活支出？',hint:'系統參數的「緊急預備金(月)」預設是 6 個月，可作為對照。',o:[['沒有準備',1],['不到 3 個月',2],['3–6 個月',3],['6–12 個月',4],['12 個月以上',5]]}
 ];
 
 var RISK_TIERS=[
@@ -1765,6 +1784,9 @@ export {
   familyAnnualLiving,
   aVal,
   aInc,
+  aCls,
+  aLiquid,
+  aMatured,
   lBal,
   lPay,
   lRemain,

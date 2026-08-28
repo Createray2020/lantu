@@ -938,6 +938,12 @@ export const consultSessions = pgTable('consult_sessions', {
   // 跟自動聚合的摘要不衝突：聚合負責「不漏」，這一段負責講那些不屬於任何單一區塊的話
   // （客戶今天的狀態、談話的氣氛、下一步的判斷）。訪談問卷的最後一題就是它。
   closingNote: text('closing_note'),
+  // ⚠️⚠️ 2026/08/28：「結束並摘要」從一個原子動作拆成兩段——按結束時定案客戶可見、
+  // 算後指標、產草稿、封場；教練在表單裡改完（可改日期、類型、貼全文）按存檔才產 review。
+  // 中間如果他把視窗關掉，場次已封但紀錄還沒生出來 → 草稿必須落地，否則就是資料損失
+  // （違反「忘記按結束絕不能造成資料損失」那條原則）。有 draft_summary 而 review_id 還是
+  // null 的場次＝「摘要還沒存」，客戶詳情頁與規劃編輯器都會跳提醒。
+  draftSummary: text('draft_summary'),
 }, (t) => [
   index('consult_sessions_client_started_idx').on(t.clientId, t.startedAt.desc()),
   // 一位客戶同時只能有一場未結束的諮詢。少了這條，忘記按結束又開新的一場，

@@ -60,9 +60,11 @@ export const TARGET_META: TargetMeta[] = [
   { name: "婚姻規劃", tab: "intent", tabName: "意圖/生涯", hint: "年齡・預算" },
   { name: "子女教養規劃", tab: "education", tabName: "子女教育", hint: "學程・學費" },
   { name: "孝親規劃", tab: "goals", tabName: "目標/置產", hint: "奉養・醫療", goalType: "孝親" },
-  { name: "旅遊規劃", tab: "goals", tabName: "目標/置產", hint: "頻率・預算", goalType: "旅遊" },
-  { name: "休閒興趣規劃", tab: "goals", tabName: "目標/置產", hint: "年度預算", goalType: "休閒" },
-  { name: "奢侈品購買規劃", tab: "goals", tabName: "目標/置產", hint: "品項・金額", goalType: "奢侈品" },
+  // ⚠️⚠️ 2026/08/28：這三類整併到生活願望（見 lantu-app.html 的 TARGET_META 註解）。
+  // 兩張表都進引擎，留兩個家＝同一筆旅遊被算兩次。
+  { name: "旅遊規劃", tab: "lifestyle", tabName: "生活願望", hint: "國內外・頻率・單次預算" },
+  { name: "休閒興趣規劃", tab: "lifestyle", tabName: "生活願望", hint: "類型・頻率・每次花費" },
+  { name: "奢侈品購買規劃", tab: "lifestyle", tabName: "生活願望", hint: "品項・金額・年齡" },
   { name: "退休生活規劃", tab: "retire", tabName: "退休", hint: "年齡・月費" },
   { name: "傳承規劃", tab: "intent", tabName: "意圖/生涯", hint: "繼承人・金額", goalType: "傳承" },
   { name: "報酬結構優化", tab: "bizcomp", tabName: "報酬結構", hint: "薪資・股利・租金", entity: "company" },

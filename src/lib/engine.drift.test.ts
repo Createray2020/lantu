@@ -304,6 +304,40 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     }
   });
 
+  // 2026/08/28 改版：第 12 題從「臨時需要動用的可能性」換成「緊急預備金可支應幾個月」。
+  // ⚠️ ans 是用題目索引當 key，所以題號、選項數、配分都不能動——這條守住兩邊題目逐字一致。
+  it("第 12 題（緊急預備金）兩邊逐字一致，且題數與配分不變", () => {
+    const Q = E.RISK_Q[11];
+    expect(Q.q).toBe("您目前的緊急預備金（可隨時動用的現金）大約可以支應幾個月的生活支出？");
+    expect(HTML).toContain(`{q:'${Q.q}'`);
+    for (const [label, pt] of Q.o) expect(HTML).toContain(`['${label}',${pt}]`);
+    expect(E.RISK_Q.length).toBe(12);
+    expect(E.RISK_Q.reduce((s: number, q: { o: [string, number][] }) =>
+      s + Math.max(...q.o.map((x) => x[1])), 0)).toBe(60);
+  });
+
+  // 2026/08/28：資產的流動性有時間性（債權還款、租約到期）。全站吃 cls 的地方
+  // 一律走 aCls()，兩份實作都要有——漏改一邊，教練端與報告書會看到不同的流動資產。
+  it("aCls：到期年齡過了就轉流動，兩邊都要有", () => {
+    expect(E.aCls({ cls: "固定", matureAge: 41 }, 42)).toBe("流動");
+    expect(E.aCls({ cls: "固定", matureAge: 41 }, 39)).toBe("固定");
+    expect(E.aCls({ cls: "流動" }, 30)).toBe("流動");
+    expect(HTML).toContain("function aCls(a,curAge){");
+    expect(HTML).toContain("function aLiquid(c,a){");
+    expect(HTML).toContain("function aMatured(c,a){");
+    // ⚠️ 不可以再有人直接讀 a.cls——只剩 aCls 自己那一行
+    expect((HTML.match(/cls==='流動'/g) || []).length, "html 只剩 aCls 內部那一處").toBe(1);
+  });
+
+  it("到期之後被動現金流停算（本金不動，它本來就在資產總額裡）", () => {
+    const c = E.sampleCase();
+    c.profile.age = 42;
+    c.assets = [{ name: "債權", mainCat: "可投資資產", type: "應收帳款/借出款", cls: "固定", currency: "台幣", fxRate: 1, value: 6_000_000, income: 216_000, matureAge: 41 }];
+    expect(E.assetPassive(c)).toBe(0);
+    c.profile.age = 39;
+    expect(E.assetPassive(c)).toBe(216_000);
+  });
+
   it("KYC 複選題：兩邊都把第 7、8 題標成 multi，且計分取最高分", () => {
     expect(E.RISK_Q[6].multi).toBe(true);
     expect(E.RISK_Q[7].multi).toBe(true);

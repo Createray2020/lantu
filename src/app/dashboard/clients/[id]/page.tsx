@@ -4,6 +4,7 @@ import { getClientDetail } from "@/lib/clients";
 import { comparePlans } from "@/lib/plans";
 import { clientAccess } from "@/lib/clientScope";
 import { listCollaborators } from "@/lib/clientCollab";
+import { pendingDraft } from "@/lib/consultSession";
 import DashboardHeader from "../../DashboardHeader";
 import { headerProps } from "../../headerProps";
 import ReadOnlyBanner from "../../ReadOnlyBanner";
@@ -30,6 +31,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   if (!detail || !access) notFound();
   const isOwner = access === "owner";
   const collaborators = isOwner ? await listCollaborators(id) : [];
+  // 「按了結束但沒存」的草稿。只有主責看得到（協作教練不能開場也不能結束）。
+  const draft = isOwner ? await pendingDraft(id) : null;
 
   // 只傳前端需要的欄位（不把整份 plan.data jsonb 送到瀏覽器）。
   const client = {
@@ -96,6 +99,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         passportPlan={passportPlan}
         reviews={reviews}
         actionItems={actionItems}
+        draft={draft ? { sessionId: draft.sessionId, planId: draft.planId, endedAt: draft.endedAt ? draft.endedAt.toISOString().slice(0, 10) : null, draft: draft.draft, todos: draft.todos } : null}
         compare={compare}
         readOnly={readOnly}
         isOwner={isOwner}

@@ -199,7 +199,9 @@ export async function getClientDetail(coachId: string, clientId: string): Promis
       createdAt: plans.createdAt, updatedAt: plans.updatedAt,
     }).from(plans).where(eq(plans.clientId, clientId)).orderBy(desc(plans.year), desc(plans.createdAt)),
 
-    db.select().from(reviews).where(eq(reviews.clientId, clientId)).orderBy(desc(reviews.date)),
+    // ⚠️ 依「日期」排不是建立時間——教練會補記過去的諮詢，要落回它自己的日期。
+    // 建立時間只當同一天兩場時的次要鍵（少了它，同日兩筆的先後每次查都可能不一樣）。
+    db.select().from(reviews).where(eq(reviews.clientId, clientId)).orderBy(desc(reviews.date), desc(reviews.createdAt)),
     db.select().from(actionItems).where(eq(actionItems.clientId, clientId)).orderBy(asc(actionItems.done), asc(actionItems.dueDate)),
   ]);
   // 兩軌分開回：`plans` 只給教練的年度版（UI 上帶著編輯／複製／刪除／改狀態等操作），

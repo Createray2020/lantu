@@ -113,6 +113,11 @@ const expense: CatSeed[] = [
   { kind: "expense", parent: "孝親", label: "孝親金" },
   { kind: "expense", parent: "孝親", label: "長輩生活費" },
   { kind: "expense", parent: "孝親", label: "長輩醫療/照護" },
+  // ⚠️ 2026/08/28：人身保費改由保單表投影（支出表兩列、鎖住不可手改），
+  // 見 lantu-app.html 的 syncPremium()。下面五個舊細類保留給既有資料顯示用，
+  // 接管之後不會再有新的列用到它們。
+  { kind: "expense", parent: "保險", label: "人身保險(保障型)" },
+  { kind: "expense", parent: "保險", label: "人身保險(理財型)" },
   { kind: "expense", parent: "保險", label: "壽險保費" },
   { kind: "expense", parent: "保險", label: "醫療/健康險保費" },
   { kind: "expense", parent: "保險", label: "意外險保費" },

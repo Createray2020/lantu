@@ -87,14 +87,39 @@ export const PLAN_STATUS_LABEL: Record<string, string> = {
   archived: "已封存",
 };
 
+// 2026/08/28 教練回饋：6 種擴充成 10 種，順序照教練實際的服務流程排。
+// ⚠️ intro 只改顯示名（「初談」→「首次面談／正式諮詢」），key 不動＝既有資料不會壞。
+// ⚠️ annual 維持「年度重製」不改成「重置」——系統裡「年度重製」是年度版本重製那個
+//    動作的專有名詞，換字會跟那個功能混淆。
 export const REVIEW_TYPE_LABEL: Record<string, string> = {
-  intro: "初談",
+  casual: "非正式會談",
+  intro: "首次面談／正式諮詢",
+  proposal: "提案書會談",
+  deep: "深度會談",
+  report: "報告書會談",
   review: "檢視",
   quarter: "季檢視",
   half: "半年檢視",
   annual: "年度重製",
-  adhoc: "臨時",
+  adhoc: "臨時諮詢",
+};
+
+// 每一種的定義（教練選類型時的說明，避免十種看起來差不多）。
+export const REVIEW_TYPE_DESC: Record<string, string> = {
+  casual: "在非正式場合介紹服務、引起對方興趣，並促成首次面談。",
+  intro: "首次針對個人財務需求與關注議題進行的正式諮詢。",
+  proposal: "說明提案內容與報價，並確認合作方式及後續安排。",
+  deep: "深入了解個案的基本資料、個人目標、財務現況與實際需求。",
+  report: "討論財務現況、決策影響與規劃建議，並確認解決方案及執行細節。",
+  review: "追蹤特定事項與近期執行情況，並依實際需要調整執行方式。",
+  quarter: "每季回顧執行成果與目標進度，並確認下一季的行動重點。",
+  half: "每半年檢視整體執行成效與規劃適用性，並調整後續方向。",
+  annual: "當目標、家庭或財務狀況發生重大變動時，重新評估並調整整體規劃。",
+  adhoc: "因突發事件、臨時需求或重要決策，隨時安排的非例行諮詢。",
 };
 
 export const CLIENT_SOURCES = ["原生人脈", "活動認識", "網路開發", "廣告開發", "人脈轉介", "客戶轉介", "公司分配", "其他"] as const;
-export const REVIEW_TYPES = ["intro", "review", "quarter", "half", "annual", "adhoc"] as const;
+export const REVIEW_TYPES = [
+  "casual", "intro", "proposal", "deep", "report",
+  "review", "quarter", "half", "annual", "adhoc",
+] as const;

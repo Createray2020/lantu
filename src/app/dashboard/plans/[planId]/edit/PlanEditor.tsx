@@ -10,12 +10,15 @@ import {
   listNotesAction,
   startSessionAction,
   endSessionAction,
+  saveConsultRecordAction,
+  discardDraftAction,
   openSessionAction,
   listSessionsAction,
   restoreToSessionAction,
 } from "../../../actions";
 import type { NoteRow, NoteInput } from "@/lib/notes";
 import type { SessionRow, EndInput } from "@/lib/consultSession";
+import ConsultRecordForm from "../../../ConsultRecordForm";
 import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
 import { LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 
@@ -77,6 +80,10 @@ export default function PlanEditor({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef<unknown>(null);
   const [state, setState] = useState<SaveState>("idle");
+  // ⚠️ 結束諮詢不再直接寫紀錄，而是回一份草稿讓教練當場改（可改日期、類型、貼全文）。
+  //    表單跟客戶詳情頁是同一個元件，就地彈出＝不用離開規劃編輯器。
+  const [draft, setDraft] = useState<{ sessionId: string; draft: string; todos: string[] } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // 註記與諮詢場次不住在 plans.data 裡（它們掛在客戶身上，年度重製時要延續），
   // 所以走自己的通道：父層持有狀態，變動後整批 push 進 iframe。
@@ -165,6 +172,7 @@ export default function PlanEditor({
           if (r.ok) {
             await reload();
             router.refresh();
+            setDraft({ sessionId: r.sessionId, draft: r.draft, todos: r.todos });
           }
         } else if (msg.type === "lantu:session" && msg.op === "restore") {
           const r = await restoreToSessionAction(clientId, msg.sessionId);
@@ -245,6 +253,41 @@ export default function PlanEditor({
           {statusText[state]}
         </span>
       </div>
+      {/* 結束諮詢後就地彈出的紀錄表單。⚠️ 蓋在 iframe 上，教練不用離開編輯器；
+          關掉也不會掉東西——草稿已經寫進 consult_sessions.draft_summary，
+          客戶詳情頁會跳「摘要還沒存」。 */}
+      {draft && (
+        <div className="fixed inset-0 z-50 bg-[#040c14]/75 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
+          <div className="w-full max-w-[680px]">
+            <div className="flex items-center gap-2 mb-2">
+              <h2 className="text-sm font-bold text-[#eef2f7]">這一場的諮詢紀錄</h2>
+              <div className="flex-1" />
+              <button className="text-[#6b7d8f] text-lg leading-none px-2" title="稍後再存" onClick={() => setDraft(null)}>✕</button>
+            </div>
+            <ConsultRecordForm
+              plans={[{ id: planId, year }]}
+              initial={{ planId, summary: draft.draft }}
+              todos={draft.todos}
+              notice="這是依你在各區塊留下的註記與缺口改善產出的草稿。日期、類型、內容都可以改——把整理好的紀錄整段貼上來也可以。現在不存也沒關係，客戶詳情頁會提醒你。"
+              submitLabel="存成諮詢紀錄"
+              pending={saving}
+              onSubmit={async (v) => {
+                setSaving(true);
+                try { await saveConsultRecordAction(clientId, draft.sessionId, v); } finally { setSaving(false); }
+                setDraft(null);
+                router.refresh();
+              }}
+              onCancel={() => setDraft(null)}
+              onDiscard={async () => {
+                setSaving(true);
+                try { await discardDraftAction(clientId, draft.sessionId); } finally { setSaving(false); }
+                setDraft(null);
+                router.refresh();
+              }}
+            />
+          </div>
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         src="/lantu-app.html?embed=1"
