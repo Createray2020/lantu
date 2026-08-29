@@ -371,9 +371,15 @@ export const planRevisions = pgTable('plan_revisions', {
   editorId: text('editor_id'),
   editorName: text('editor_name'),
   data: jsonb('data').notNull(),
+  // 內容指紋（sha256 of JSON.stringify(data)）。前端是 700ms debounce 自動存檔，
+  // 大量版本其實內容一模一樣；寫入前比對上一版的 hash 相同就整個跳過。
+  // ⚠️ 可為 null：這個欄位是後來才加的，既有 2,287 列都沒有 hash。
+  //    比不到 hash 一律視為「不同」（寧可多寫一列，也不能漏掉真的有改的那一版）。
+  dataHash: text('data_hash'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   // 全庫成長最快的表；版本紀錄頁與 plan 刪除的 cascade 都靠它。
+  // 「取該 plan 最新一列的 hash」與「刪掉最近 200 列以外的」也都走這條索引。
   index('plan_revisions_plan_id_created_at_idx').on(t.planId, t.createdAt.desc()),
 ]);
 

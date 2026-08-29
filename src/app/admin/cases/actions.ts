@@ -22,6 +22,7 @@ const MSG: Record<string, string> = {
   "bad-fee": "顧問費要大於 0",
   "case-closed-invalid": "已退費或作廢的案件不能填問卷",
   "empty-answers": "請至少回答一題",
+  "has-paid-payouts": "這筆案件的分潤已經發放，不能重算；要退費請用「產生沖回」。",
 };
 
 function fail(e: unknown): ActionResult {
@@ -105,7 +106,10 @@ export async function updateCaseAction(
 export async function recalcCaseAction(id: string): Promise<ActionResult> {
   try {
     await guard();
-    await recalcCase(id);
+    // 已發放的案件不重算（會撞唯一鍵，而且發出去的錢不該被制度異動改掉）。
+    // 這裡要**明講**，不能安靜地什麼都不做——不然就是「按了沒反應」。
+    const r = await recalcCase(id);
+    if (!r.recalculated) throw new Error("has-paid-payouts");
     touch();
     return { ok: true };
   } catch (e) {

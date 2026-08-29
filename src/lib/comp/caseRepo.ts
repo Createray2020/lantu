@@ -11,6 +11,7 @@ import {
 } from "@/Shared/db/schema";
 import { resolveChain, type AdvisorRow } from "./chain";
 import { splitForModule, type PayoutLine } from "./engine";
+import { hasPaidPayout, planReversals, type ReversalLine } from "./reversal";
 import { loadParams, ensureActiveVersion } from "./repo";
 import type { CompParams } from "./types";
 import type { CaseRow } from "./stats";
@@ -111,7 +112,6 @@ export function computePayouts(
 /**
  * 把算好的明細寫進 DB：舊列先標 void，再寫新列。
  * 不做原地 update —— 分潤是要對帳的東西，改過什麼必須看得出來。
- * （neon-http 沒有互動式交易；萬一 void 成功而 insert 失敗，重按一次「重算分潤」即可補上。）
  */
 function payoutValues(caseId: string, l: PayoutLine) {
   return {
@@ -129,14 +129,62 @@ function payoutValues(caseId: string, l: PayoutLine) {
   };
 }
 
-export async function writePayouts(caseId: string, lines: PayoutLine[]) {
-  await db.update(compPayouts).set({ status: "void" })
+/**
+ * 沖回列的欄位。百分比一律 0（見 reversal.ts 的說明），status 走 `pending` ——
+ * 錢要拿回來，就得跟一般分潤走同一條月結批次的路，只是金額是負的。
+ */
+function reversalValues(caseId: string, l: ReversalLine) {
+  return {
+    caseId,
+    payeeId: l.payeeId,
+    payeeKey: l.payeeKey,
+    payeeName: l.payeeName,
+    kind: l.kind,
+    role: l.role,
+    rankCode: l.rankCode,
+    promoPct: 0, execPct: 0, bonusPct: 0, totalPct: 0,
+    amount: l.amount,
+    status: "pending",
+    trace: l.trace,
+  };
+}
+
+/**
+ * 重寫某案件的分潤明細。
+ *
+ * ⚠️⚠️ 兩件事在這裡是不可退讓的：
+ *
+ * 1. **已有 paid 列時直接擋下**。舊版只把 pending/batched 標 void、刻意不動 paid，
+ *    但接著仍為同一批受款人 insert 新的 pending 列 —— partial unique
+ *    `(case_id, payee_key) where status <> 'void'` 讓 paid 舊列與 pending 新列
+ *    必定衝突。已發放的案件要動帳，唯一的路是 refundCase() 產生負數沖回列。
+ *
+ * 2. **void 與 insert 必須同生共死**。舊版是兩趟往返：void 成功、insert 炸掉，
+ *    那批 pending 就被永久標 void 而沒有新列補上，應付分潤憑空消失，
+ *    畫面上只看得到一個 Next digest 錯誤。neon-http 沒有互動式交易，
+ *    db.batch() 是這裡唯一的原子寫法。
+ */
+export async function writePayouts(
+  caseId: string,
+  lines: PayoutLine[],
+  existing?: { status: string }[],
+) {
+  const rows = existing ?? await listPayouts(caseId);
+  if (hasPaidPayout(rows)) throw new Error("has-paid-payouts");
+
+  const voidOld = db.update(compPayouts).set({ status: "void" })
     .where(and(
       eq(compPayouts.caseId, caseId),
       inArray(compPayouts.status, ["pending", "batched"]),
     ));
-  if (!lines.length) return;
-  await db.insert(compPayouts).values(lines.map((l) => payoutValues(caseId, l)));
+  if (!lines.length) {
+    await voidOld;
+    return;
+  }
+  await db.batch([
+    voidOld,
+    db.insert(compPayouts).values(lines.map((l) => payoutValues(caseId, l))),
+  ]);
 }
 
 export type CaseInput = {
@@ -250,26 +298,76 @@ export async function updateCase(id: string, patch: Partial<CaseInput> & { statu
   await recalcCase(id);
 }
 
-/** 重算分潤。已發放（paid）的列不動——發出去的錢不會因為改制度而改變（§31）。 */
-export async function recalcCase(id: string) {
+/** recalcCase 的結果。已發放的案件不重算，但那不是「錯誤」——只是什麼都沒做。 */
+export type RecalcOutcome = { recalculated: boolean; reason?: "has-paid" };
+
+/**
+ * 重算分潤。已發放（paid）的列不動——發出去的錢不會因為改制度而改變（§31）。
+ *
+ * 案件只要有一筆已發放的分潤就整筆不重算，並把原因回給呼叫端：
+ * updateCase()／createCase() 只是順手重算，安靜跳過就好；
+ * 後台按「重算分潤」的人則必須看到明確訊息，否則就是「按了沒反應」。
+ */
+export async function recalcCase(id: string): Promise<RecalcOutcome> {
   const c = await getCase(id);
   if (!c) throw new Error("case-not-found");
+  const existing = await listPayouts(id);
+  if (hasPaidPayout(existing)) return { recalculated: false, reason: "has-paid" };
   const params = await loadParams(c.versionId);
   const advisors = toAdvisorRows(await listAdvisors());
   const { lines } = computePayouts(c, advisors, params);
-  await writePayouts(id, lines);
+  await writePayouts(id, lines, existing);
+  return { recalculated: true };
 }
 
-/** 退費／解約（§23）。金額寫回案件並依實收重算；全額退費時整筆不計晉升指標。 */
-export async function refundCase(id: string, refundAmount: number) {
+export type RefundOutcome = {
+  /** reversal＝已發放，產生負數沖回列；recalc＝還沒發放，照舊依實收重算。 */
+  mode: "reversal" | "recalc";
+  lines: ReversalLine[];
+};
+
+/**
+ * 退費／解約（§23）。
+ *
+ * 分兩條路，判準是「這筆案件的分潤發出去了沒有」：
+ *
+ * - **還沒發放** → 照舊把退費金額寫回案件、依實收重算（§23-2）。錢還在公司手上，
+ *   直接改應付金額是最乾淨的。
+ * - **已經發放** → 依退費金額按比例，為每一位已發放的受款人產生一筆**負數沖回列**，
+ *   原本的 paid 列原封不動（Ray 2026/08 拍板）。帳上同時看得到「發了多少、退了多少」，
+ *   可稽核；沖回列帶著不同的 payeeKey，也不會撞 partial unique。
+ *
+ * refundAmount 收到的是**退費總額**而不是增量，所以沖回只針對「這次多退的那一段」，
+ * 否則把退費從 3 萬改成 6 萬會沖回 9 萬。
+ *
+ * ⚠️ 案件金額與沖回列必須同生共死：只更新了 comp_cases.refund_amount 而沖回列沒寫成功，
+ *    帳面與應付就對不起來。neon-http 沒有互動式交易 → db.batch()。
+ */
+export async function refundCase(id: string, refundAmount: number): Promise<RefundOutcome> {
   const c = await getCase(id);
   if (!c) throw new Error("case-not-found");
   const amount = Math.max(0, Math.min(refundAmount, c.fee));
   const full = amount >= c.fee;
-  await db.update(compCases)
-    .set({ refundAmount: amount, status: full ? "refunded" : c.status, updatedAt: new Date() })
-    .where(eq(compCases.id, id));
-  await recalcCase(id);
+  const caseSet = { refundAmount: amount, status: full ? "refunded" : c.status, updatedAt: new Date() };
+  const existing = await listPayouts(id);
+
+  if (!hasPaidPayout(existing)) {
+    await db.update(compCases).set(caseSet).where(eq(compCases.id, id));
+    await recalcCase(id);
+    return { mode: "recalc", lines: [] };
+  }
+
+  const lines = planReversals(existing, c.fee, amount - (c.refundAmount ?? 0));
+  if (!lines.length) {
+    // 退費金額沒有往上調（或已發放金額本來就是 0）：只更新案件，不產生空的沖回列。
+    await db.update(compCases).set(caseSet).where(eq(compCases.id, id));
+    return { mode: "reversal", lines: [] };
+  }
+  await db.batch([
+    db.update(compCases).set(caseSet).where(eq(compCases.id, id)),
+    db.insert(compPayouts).values(lines.map((l) => reversalValues(id, l))),
+  ]);
+  return { mode: "reversal", lines };
 }
 
 // ── 發放批次（§22） ─────────────────────────────────────────────────────────
@@ -281,6 +379,10 @@ export async function listBatches(): Promise<BatchRecord[]> {
 /**
  * 產生某個月份的發放批次：把「已實收、尚未入批」的 pending 分潤收進來。
  * 未實收的案件不進批（§22-1）。
+ *
+ * ⚠️ 已退費的案件只擋**正數**列。負數沖回列必須進得來，否則「已發放後才退費」
+ *    產生的沖回列會永遠卡在 pending：全額退費會把案件標成 refunded，
+ *    而錢是要從下一期的應付裡扣回來的。正數列照樣擋著（§22-1 沒有被放寬）。
  */
 export async function createBatch(period: string, payoutDate: string | null) {
   const existing = await db.select().from(compBatches).where(eq(compBatches.period, period)).limit(1);
@@ -296,7 +398,7 @@ export async function createBatch(period: string, payoutDate: string | null) {
       eq(compPayouts.status, "pending"),
       isNull(compPayouts.batchId),
       sql`${compCases.paidAt} is not null`,
-      sql`${compCases.status} <> 'refunded'`,
+      sql`(${compCases.status} <> 'refunded' or ${compPayouts.amount} < 0)`,
     ));
 
   if (rows.length) {

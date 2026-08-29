@@ -115,7 +115,9 @@ describe("保障險種：意外傷殘 / 醫療雜費 / 薪資補償", () => {
   it("KINDS 換成需求分析在問的那組（意外險 → 意外傷殘）", () => {
     expect(E.KINDS).toContain("意外傷殘");
     expect(E.KINDS).toContain("醫療雜費");
-    expect(E.KINDS).toContain("薪資補償");
+    // 2026/08/29 B1：拆成日額／月額兩個險種（日對日、月對月，不做隱藏換算）
+    expect(E.KINDS).toContain("薪資補償（日）");
+    expect(E.KINDS).toContain("薪資補償（月）");
     expect(E.KINDS).not.toContain("意外險");
     // 癌症住院刻意保留：既有案子已經填了值，拿掉會靜默歸零
     expect(E.KINDS).toContain("癌症住院");
@@ -139,11 +141,12 @@ describe("保障險種：意外傷殘 / 醫療雜費 / 薪資補償", () => {
 
   it("保單的醫療雜費 / 薪資補償欄位會被對應的缺口吃到", () => {
     const c = blank();
-    c.needs = [{ member: "本人", funeral: 0, protectYears: 0, estateTax: 0, room: 0, selfPay: 0, nursing: 0, miscDaily: 100_000, incomeComp: 50_000, disability: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, careMonths: 0 }];
-    c.policies = [{ insured: "本人", name: "實支實付", premium: 0, life: 0, accident: 0, medical: 0, medMisc: 60_000, incomeComp: 20_000, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, cashValue: 0 }];
+    c.needs = [{ member: "本人", funeral: 0, protectYears: 0, estateTax: 0, room: 0, selfPay: 0, nursing: 0, miscDaily: 100_000, incomeCompMonth: 50_000, disability: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, careMonths: 0 }];
+    c.policies = [{ insured: "本人", name: "實支實付", premium: 0, life: 0, accident: 0, medical: 0, medMisc: 60_000, incomeCompMonth: 20_000, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, cashValue: 0 }];
     const g = E.coverageGaps(c);
     const misc = g.find((x: { kind: string }) => x.kind === "醫療雜費");
-    const comp = g.find((x: { kind: string }) => x.kind === "薪資補償");
+    // 2026/08/29 B1：薪資補償拆日／月兩列，這一筆走月額
+    const comp = g.find((x: { kind: string }) => x.kind === "薪資補償（月）");
     expect(misc.gap).toBe(40_000);
     expect(comp.gap).toBe(30_000);
   });

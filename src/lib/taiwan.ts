@@ -152,6 +152,94 @@ export const NP_BONUS_A = 4049;
 /** 老年年金 B 式給付率（月投保金額 × 年資 × 1.3%） */
 export const NP_RATE_B = 0.013;
 
+// ─────────────────────────────────────────────
+// 全民健康保險（一般保險費）
+// ─────────────────────────────────────────────
+// ⚠️ 補充保費（二代健保）的費率／門檻不在這裡，在 src/lib/bizTax.ts
+//    （NHI_SUPP_RATE / NHI_SUPP_MIN / NHI_SUPP_CAP / NHI_SUPP_BONUS_MULT）。
+//    分家的理由：一般保費是「制度級距」（跟勞保分級表同一種東西、每年隨基本工資調），
+//    補充保費是「稅務型參數」（改得更勤、且已經在 bizTax 的後台可調參數表裡）。
+
+/** NHI_* 所適用的年度。115（2026）年 1 月 1 日生效。 */
+export const NHI_YEAR = 2026;
+
+/**
+ * 一般保險費率。健保法 §18；現行 5.17%，自 110（2021）年 1 月 1 日起適用，115 年未調整。
+ * 來源：衛福部中央健保署「保險費計算公式」。
+ */
+export const NHI_RATE = 0.0517;
+
+/**
+ * 投保金額分級表（115.01.01 生效）的下限與上限。第 1 級 29,500（＝基本工資）、
+ * 第 58 級 313,000。⚠️ 這是**另一張表**，不是勞保投保薪資分級表（上限 45,800）
+ * 也不是勞退提繳分級表（上限 150,000）——三張表混用會讓高薪客戶的健保費低估到荒謬。
+ */
+export const NHI_SALARY_MIN = 29500;
+export const NHI_SALARY_MAX = 313000;
+/** 投保金額分級表的級數（58 級）。畫面上標示用，不進計算。 */
+export const NHI_SALARY_GRADES = 58;
+
+/**
+ * 眷口計費上限。健保法 §27：超過三口眷屬依附於同一被保險人時，以三口計算。
+ * ⚠️ 沒有這個上限的話，五個小孩的客戶健保費會被高估近一倍。
+ */
+export const NHI_DEP_CAP = 3;
+
+/**
+ * 健保投保類別 → 被保險人自付比率（%）。
+ * 公式：投保金額 × 5.17% × 負擔比率 × (本人＋眷屬人數)。
+ * 來源：健保署「第 1 類到第 3 類投保單位負擔及被保險人、眷屬自付保險費的計算公式及釋例」
+ * 與各類「保險費負擔金額表」。
+ *
+ * ⚠️ 前 8 個字串是改版前 lantu-app.html 就在用的選項，**一個字都不能改**
+ *    （既有資料的 members[].nhiCat 存的就是這些字）。新增的細分排在後面。
+ * ⚠️ 第一類刻意拆成「受僱者」與「雇主／自營作業者」：兩者差 30% vs 100%，
+ *    差距 3.3 倍，混在一起等於沒算。舊字串「第一類 受雇者」保守維持 30%。
+ */
+export const NHI_CATS: [string, number][] = [
+  ["第一類 受雇者", 30],
+  ["第二類 職業工會/漁會", 60],
+  ["第三類 農會/水利會", 30],
+  ["第四類 軍眷/替代役", 0],
+  ["第五類 低收入戶", 0],
+  ["第六類 榮民/其他地區人口", 60],
+  ["眷屬(依附投保)", 0],
+  ["未投保", 0],
+  ["第一類 公務人員/志願役軍人", 30],
+  ["第一類 私立學校教職員", 30],
+  ["第一類 雇主/自營業主/專技自行執業", 100],
+  ["第六類 榮民本人", 0],
+  ["第六類 榮民眷屬", 30],
+];
+
+/** 自付比率（%）。查不到的類別回 null，由呼叫端決定要不要退回受僱者的 30%。 */
+export function nhiSelfRatio(cat: string | null | undefined): number | null {
+  for (const [k, v] of NHI_CATS) if (k === cat) return v;
+  return null;
+}
+
+/**
+ * 工作類別 → 預設健保投保類別。
+ * ⚠️ 沿用既有的 JOB_TYPES（與 jobInsType 同一套分類），不另開一套身分別：
+ *    業務工作者走職業工會（跟 jobInsType 一致）、企業主走雇主自付 100%、
+ *    家管／投資者沒有雇主也不是工會會員 → 第六類地區人口。
+ */
+export function nhiJobCat(jobType: string): string {
+  if (jobType === "業務工作者") return "第二類 職業工會/漁會";
+  if (jobType === "企業主") return "第一類 雇主/自營業主/專技自行執業";
+  if (isNoEmployerJob(jobType)) return "第六類 榮民/其他地區人口";
+  return "第一類 受雇者";
+}
+
+/** 實際月薪 → 健保月投保金額（只做上下限截斷；58 級的中間級距不在本檔展開）。 */
+export function nhiSalaryOf(monthly: number): number {
+  const m = Number(monthly);
+  if (!isFinite(m) || m <= 0) return 0;
+  if (m < NHI_SALARY_MIN) return NHI_SALARY_MIN;
+  if (m > NHI_SALARY_MAX) return NHI_SALARY_MAX;
+  return Math.round(m);
+}
+
 /** 視同勞保系（可套勞保老年年金＋勞退新制）的投保類型 */
 export const LABOR_LIKE_INS = ['勞保', '職業工會', '就業保險', '勞工職業災害保險'] as const;
 

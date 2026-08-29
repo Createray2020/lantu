@@ -9,9 +9,9 @@ vi.mock("@/lib/comp/caseRepo", () => ({
 }));
 
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { createBatch, createCase, markBatchPaid, refundCase } from "@/lib/comp/caseRepo";
+import { createBatch, createCase, markBatchPaid, recalcCase, refundCase } from "@/lib/comp/caseRepo";
 import {
-  createBatchAction, createCaseAction, markBatchPaidAction, refundCaseAction,
+  createBatchAction, createCaseAction, markBatchPaidAction, recalcCaseAction, refundCaseAction,
 } from "./actions";
 
 const asMock = (f: unknown) => f as unknown as ReturnType<typeof vi.fn>;
@@ -53,6 +53,22 @@ describe("refundCaseAction", () => {
   it("負數退費視為 0", async () => {
     await refundCaseAction("case1", -500);
     expect(refundCase).toHaveBeenCalledWith("case1", 0);
+  });
+});
+
+describe("recalcCaseAction", () => {
+  it("正常重算回 ok", async () => {
+    asMock(recalcCase).mockResolvedValue({ recalculated: true });
+    expect(await recalcCaseAction("case1")).toEqual({ ok: true });
+  });
+
+  it("已發放的案件：不能安靜地什麼都不做，要回一個看得懂的錯誤", async () => {
+    // 資料層對已發放的案件是「不重算」而不是丟例外——動作層必須把它翻成訊息，
+    // 否則管理員按下「重算分潤」只會看到成功提示，卻什麼都沒變。
+    asMock(recalcCase).mockResolvedValue({ recalculated: false, reason: "has-paid" });
+    expect(await recalcCaseAction("case1")).toEqual({
+      ok: false, error: "這筆案件的分潤已經發放，不能重算；要退費請用「產生沖回」。",
+    });
   });
 });
 

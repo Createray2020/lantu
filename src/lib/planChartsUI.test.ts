@@ -298,8 +298,13 @@ describe("拉桿要能當場改變上面的數字（用真的拉桿，不呼叫�
     w.app.dataTab = "plan"; w.render();
     const before = bigs();
     expect(before[0]).not.toBe("0");          // 範例個案本來就有缺口
+    // ⚠️ 2026/08/29 C1（expenses[].cut 接上）：「減少支出」拉桿的上限改吃 expenseCutCap()
+    //    ＝各列「可刪減%」保護線裡最寬鬆的那一條。示範案只有一列生活費、cut:10，
+    //    所以上限就是 10%——拉到 15 會被拉桿自己 clamp 回 10。
+    //    這正是這一輪要修的東西：拉得過去卻砍不到，那個 15 是假的。
     pull(1, "15");                            // 0=增加收入 1=減少支出
-    expect(w.n(cur().plan.draft.expense)).toBe(15);
+    expect(w.expenseCutCap(cur()), "示範案的可刪減上限＝生活費那一列的 cut:10").toBe(10);
+    expect(w.n(cur().plan.draft.expense)).toBe(10);
     const after = bigs();
     expect(after[0], "現值缺口要跟著變").not.toBe(before[0]);
     expect(after[2], "願景達成度要跟著變").not.toBe(before[2]);

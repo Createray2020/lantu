@@ -4,6 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import { getBrand } from "@/lib/brand";
 import { listBatches, listCases, listAdvisors, listPayouts } from "@/lib/comp/caseRepo";
+import { isReversalKey } from "@/lib/comp/reversal";
 import { ensureActiveVersion, listVersions, loadParams } from "@/lib/comp/repo";
 import { listSurveys, questionsOf } from "@/lib/comp/survey";
 import CasesBoard, { type CaseView, type ModuleOption, type PayoutView } from "./CasesBoard";
@@ -34,12 +35,15 @@ export default async function CasesPage() {
 
   const views: CaseView[] = cases.map((c, i) => {
     const payouts: PayoutView[] = payoutsByCase[i].map((p) => ({
-      id: p.id, payeeId: p.payeeId, payeeName: p.payeeName, kind: p.kind, role: p.role,
+      id: p.id, payeeId: p.payeeId, payeeKey: p.payeeKey, payeeName: p.payeeName,
+      kind: p.kind, role: p.role,
       rankCode: p.rankCode, promoPct: p.promoPct, execPct: p.execPct, bonusPct: p.bonusPct,
       totalPct: p.totalPct, amount: p.amount, status: p.status,
+      reversal: isReversalKey(p.payeeKey),
       trace: Array.isArray(p.trace) ? (p.trace as string[]) : [],
     }));
-    const sum = payouts.reduce((a, p) => a + p.totalPct, 0);
+    // 沖回列不參與「全鏈合計 100%」的驗算——它是退費的軌跡，不是分潤的一部分。
+    const sum = payouts.filter((p) => !p.reversal).reduce((a, p) => a + p.totalPct, 0);
     return {
       id: c.id, clientName: c.clientName, serviceType: c.serviceType, fee: c.fee,
       moduleCode: c.moduleCode,
@@ -55,7 +59,7 @@ export default async function CasesPage() {
       surveyBy: surveyByCase.get(c.id)?.submittedBy ?? null,
       payouts,
       // 沒有分潤列時不判定為「未達 100%」——那是還沒算，不是算錯。
-      balanced: payouts.length === 0 || Math.abs(sum - 100) < 1e-4,
+      balanced: payouts.every((p) => p.reversal) || Math.abs(sum - 100) < 1e-4,
     };
   });
 

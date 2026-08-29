@@ -15,6 +15,10 @@ import {
   PLAN_DISCOUNT, CAP_INCOME_UP, CAP_EXPENSE_CUT, CAP_RATE, CAP_RETIRE_DELAY,
   CAP_RETIRE_CUT, CAP_VISION_CUT, CAP_RATE_STARTER,
   CHECKUP_BAND, TRIANGLE_RISK, TRIANGLE_INVEST,
+  NHI_SUPP_CAP, NHI_SUPP_BONUS_MULT, NHI_SUPP_WAGE_MIN,
+  QUAKE_BASIC_SUM, QUAKE_LODGING, PROP_PING_COST, PROP_BUILDING_RATIO,
+  CAR_LIAB_BODILY, CAR_LIAB_PROPERTY, CALI_DEATH, CALI_MEDICAL,
+  EMPLOYER_COMP_MONTHS,
 } from "./bizTax";
 
 export const BIZ_TAX_TAG = "biz-tax";
@@ -62,6 +66,22 @@ const seed: Omit<BizTaxRow, "sortOrder">[] = [
   { key: "CHECKUP_BAND", label: "健檢「適中」寬容帶（%）", grp: "保單健檢", unit: "num", value: CHECKUP_BAND, basis: BIZ_TAX_BASIS, note: "|HAVE−NEED|÷NEED 在此帶內判「適中」；設 0 ＝ 只要不相等就判偏高/偏低" },
   { key: "TRIANGLE_RISK", label: "理財金三角：保障型佔年收入（%）", grp: "保單健檢", unit: "num", value: TRIANGLE_RISK, basis: BIZ_TAX_BASIS, note: "保費需求的分母，6:3:1 的 1" },
   { key: "TRIANGLE_INVEST", label: "理財金三角：理財型佔年收入（%）", grp: "保單健檢", unit: "num", value: TRIANGLE_INVEST, basis: BIZ_TAX_BASIS, note: "6:3:1 的 3" },
+  // 二代健保：一般保費的費率與級距是制度常數，住 taiwan.ts；這裡只放補充保費那幾個
+  // 「有可能單獨被調」的門檻。⚠️ NHI_SUPP_WAGE_MIN 必須與 taiwan.ts 的 NHI_SALARY_MIN
+  // 相同（分級表第 1 級本來就釘在基本工資上），有護欄測試守著，改這裡也要改那裡。
+  { key: "NHI_SUPP_CAP", label: "補充保費單次扣取上限", grp: "二代健保", unit: "money", value: NHI_SUPP_CAP, basis: BIZ_TAX_BASIS, note: "健保署補充保險費計算公式" },
+  { key: "NHI_SUPP_BONUS_MULT", label: "高額獎金門檻＝投保金額倍數", grp: "二代健保", unit: "x", value: NHI_SUPP_BONUS_MULT, basis: BIZ_TAX_BASIS, note: "全年累計超過當月投保金額 4 倍的部分才計費" },
+  { key: "NHI_SUPP_WAGE_MIN", label: "兼職所得起扣門檻（基本工資）", grp: "二代健保", unit: "money", value: NHI_SUPP_WAGE_MIN, basis: BIZ_TAX_BASIS, note: "⚠️ 與 taiwan.ts 的投保金額第 1 級同一個數，兩邊要一起改" },
+  // 產物保險：法定值與市場估算值混在一組，note 有標明哪些是估算。
+  { key: "QUAKE_BASIC_SUM", label: "住宅地震基本保險 保險金額", grp: "產物保險", unit: "money", value: QUAKE_BASIC_SUM, basis: BIZ_TAX_BASIS, note: "法定定額，每一住宅一張" },
+  { key: "QUAKE_LODGING", label: "住宅地震基本保險 臨時住宿費用", grp: "產物保險", unit: "money", value: QUAKE_LODGING, basis: BIZ_TAX_BASIS, note: "法定；未達全損的紅單 10 萬，期間合計上限 20 萬" },
+  { key: "PROP_PING_COST", label: "建物重置成本 每坪單價", grp: "產物保險", unit: "money", value: PROP_PING_COST, basis: BIZ_TAX_BASIS, note: "⚠️ 估算值。產險公會造價表區間 4.3~13.2 萬，取中值；理想上應做成地區×樓層的表" },
+  { key: "PROP_BUILDING_RATIO", label: "建物佔房地市價比例（粗估）", grp: "產物保險", unit: "rate", value: PROP_BUILDING_RATIO, basis: BIZ_TAX_BASIS, note: "⚠️ 估算值、無權威來源。只在教練沒填建坪時用；市區可能僅 15~20%、郊區可到 50%" },
+  { key: "CAR_LIAB_BODILY", label: "第三人責任(任意) 體傷每人建議額", grp: "產物保險", unit: "money", value: CAR_LIAB_BODILY, basis: BIZ_TAX_BASIS, note: "⚠️ 市場級距 150 萬~1000 萬，無法定標準" },
+  { key: "CAR_LIAB_PROPERTY", label: "第三人責任(任意) 財損每次事故建議額", grp: "產物保險", unit: "money", value: CAR_LIAB_PROPERTY, basis: BIZ_TAX_BASIS, note: "⚠️ 市場級距 20~100 萬，無法定標準" },
+  { key: "CALI_DEATH", label: "強制車險 死亡/失能給付上限", grp: "產物保險", unit: "money", value: CALI_DEATH, basis: BIZ_TAX_BASIS, note: "金管會保險局，115.07.01 起由 200 萬提高" },
+  { key: "CALI_MEDICAL", label: "強制車險 傷害醫療給付上限", grp: "產物保險", unit: "money", value: CALI_MEDICAL, basis: BIZ_TAX_BASIS, note: "與死亡/失能合計上限 320 萬" },
+  { key: "EMPLOYER_COMP_MONTHS", label: "職災死亡補償月數", grp: "產物保險", unit: "num", value: EMPLOYER_COMP_MONTHS, basis: BIZ_TAX_BASIS, note: "勞基法 §59：死亡補償 40 個月＋喪葬費 5 個月" },
 ];
 
 export function defaultBizTaxRows(): BizTaxRow[] {

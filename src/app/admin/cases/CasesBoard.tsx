@@ -11,6 +11,7 @@ import {
   updateCaseAction, type ImportPreview,
 } from "./actions";
 import { fmtMoney } from "@/lib/money";
+import { hasPaidPayout, planReversals } from "@/lib/comp/reversal";
 import MoneyInput from "@/components/MoneyInput";
 
 const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1 text-sm text-[#eef2f7] outline-none";
@@ -19,9 +20,13 @@ const BTN = "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf
 const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-[#1d5c8a] border border-[#2b7cb5] text-white hover:bg-[#226ba0] disabled:opacity-40";
 
 export type PayoutView = {
-  id: string; payeeId: string | null; payeeName: string; kind: string; role: string | null;
+  id: string; payeeId: string | null; payeeKey: string; payeeName: string;
+  kind: string; role: string | null;
   rankCode: string | null; promoPct: number; execPct: number; bonusPct: number; totalPct: number;
-  amount: number; status: string; trace: string[];
+  amount: number; status: string;
+  /** 退費沖回列（負數）。不參與驗算，畫面上也要看得出來它不是一般分潤。 */
+  reversal: boolean;
+  trace: string[];
 };
 export type CaseView = {
   id: string; clientName: string; serviceType: string; fee: number; refundAmount: number;
@@ -331,9 +336,11 @@ export default function CasesBoard({
                                     <td className="px-3 py-1.5 text-right tabular-nums">{p.execPct || "—"}</td>
                                     <td className="px-3 py-1.5 text-right tabular-nums">{p.bonusPct || "—"}</td>
                                     <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{p.totalPct}%</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(p.amount)}</td>
+                                    <td className={`px-3 py-1.5 text-right tabular-nums ${p.reversal ? "text-[#e08b7a]" : ""}`}>
+                                      {fmtMoney(p.amount)}
+                                    </td>
                                     <td className="px-3 py-1.5 text-[11px] text-[#a9bccf]">
-                                      {p.status === "pending" ? "待入批" : p.status === "batched" ? "已入批" : "已發放"}
+                                      {p.reversal ? "退費沖回" : p.status === "pending" ? "待入批" : p.status === "batched" ? "已入批" : "已發放"}
                                     </td>
                                     <td className="px-3 py-1.5 text-right">
                                       <button type="button" className="text-xs text-[#a9bccf] underline"
@@ -354,7 +361,9 @@ export default function CasesBoard({
                               <tr className="border-t-2 border-white/20 bg-[#12334f]/40">
                                 <td className="px-3 py-1.5 font-bold" colSpan={5}>驗算</td>
                                 <td className="px-3 py-1.5 text-right font-bold tabular-nums">
-                                  {c.payouts.reduce((a, p) => a + p.totalPct, 0).toFixed(2).replace(/\.00$/, "")}%
+                                  {/* 沖回列不帶百分比、也不算進驗算——它是退費的軌跡，不是分潤的一部分。 */}
+                                  {c.payouts.filter((p) => !p.reversal)
+                                    .reduce((a, p) => a + p.totalPct, 0).toFixed(2).replace(/\.00$/, "")}%
                                 </td>
                                 <td className="px-3 py-1.5 text-right font-bold tabular-nums">
                                   {fmtMoney(c.payouts.reduce((a, p) => a + p.amount, 0))}
@@ -366,10 +375,18 @@ export default function CasesBoard({
                         </div>
 
                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <button type="button" disabled={pending} className={BTN}
-                            onClick={() => run(() => recalcCaseAction(c.id), "已重算分潤")}>
-                            重算分潤
-                          </button>
+                          {/* 已發放的案件不提供「重算分潤」：發出去的錢不會因為改制度而改變（§31），
+                              而且重算會撞 (case_id, payee_key) 的唯一鍵。要動帳只能走沖回。 */}
+                          {hasPaidPayout(c.payouts) ? (
+                            <span className="text-[11px] text-[#8fa6ba]">
+                              分潤已發放，不能重算；要退費請用下方的「產生沖回」。
+                            </span>
+                          ) : (
+                            <button type="button" disabled={pending} className={BTN}
+                              onClick={() => run(() => recalcCaseAction(c.id), "已重算分潤")}>
+                              重算分潤
+                            </button>
+                          )}
                           <button type="button" disabled={pending} className={BTN}
                             onClick={() => setSurveyOf(surveyOf === c.id ? null : c.id)}>
                             {c.surveyAt ? "檢視問卷" : "代填問卷"}
@@ -383,8 +400,12 @@ export default function CasesBoard({
                               標記實收
                             </button>
                           )}
-                          <RefundBox caseId={c.id} fee={c.fee} disabled={pending}
-                            onRefund={(amt) => run(() => refundCaseAction(c.id, amt), "已依實收重算分潤")} />
+                          <RefundBox fee={c.fee} refundAmount={c.refundAmount} payouts={c.payouts}
+                            disabled={pending}
+                            onRefund={(amt, reversal) => run(
+                              () => refundCaseAction(c.id, amt),
+                              reversal ? "已產生沖回列" : "已依實收重算分潤",
+                            )} />
                         </div>
 
                         {surveyOf === c.id && (
@@ -624,25 +645,80 @@ function CoachSurvey({
   );
 }
 
+/**
+ * 退費。分潤還沒發放時是「依實收重算」；已經發放時改成「產生沖回」——
+ * 錢已經出去了，不能重算（會撞唯一鍵、也會把發出去的金額改掉），
+ * 只能另記一筆負數列把該退的部分沖回來（Ray 2026/08 拍板）。
+ *
+ * 沖回是動錢的動作，所以按下去之前一定要先看到「會產生哪幾筆、各多少」——
+ * 這裡用的是與伺服器端同一支 planReversals()，畫面上看到的就是真的會寫進去的。
+ */
 function RefundBox({
-  fee, disabled, onRefund,
+  fee, refundAmount, payouts, disabled, onRefund,
 }: {
-  caseId: string; fee: number; disabled: boolean; onRefund: (amt: number) => void;
+  fee: number;
+  refundAmount: number;
+  payouts: PayoutView[];
+  disabled: boolean;
+  onRefund: (amt: number, reversal: boolean) => void;
 }) {
   const [amt, setAmt] = useState("");
+  const paid = hasPaidPayout(payouts);
+  const n = amt === "" ? 0 : Number(amt);
+  // refundAmount 是「累計退費總額」，所以只沖回這次多退的那一段。
+  const delta = Math.max(0, Math.min(n, fee)) - refundAmount;
+  const preview = useMemo(
+    () => (paid ? planReversals(payouts, fee, delta) : []),
+    [paid, payouts, fee, delta],
+  );
+  const total = preview.reduce((a, l) => a + l.amount, 0);
+
   return (
-    <span className="flex items-center gap-1">
-      <MoneyInput value={amt === "" ? null : Number(amt)} allowEmpty
-        onChange={(v) => setAmt(v === null ? "" : String(v))} placeholder="退費金額"
-        className={`${amt ? INPUT : EMPTY} w-28`} />
-      <button type="button" disabled={disabled || !amt} className={BTN}
-        onClick={() => {
-          const n = Number(amt);
-          if (confirm(`退費 ${fmtMoney(n)} 元（原 ${fmtMoney(fee)}）？系統會依實收比例重算全鏈分潤。`))
-            onRefund(n);
-        }}>
-        退費重算
-      </button>
-    </span>
+    <div className="w-full">
+      <div className="flex items-center gap-1">
+        <MoneyInput value={amt === "" ? null : Number(amt)} allowEmpty
+          onChange={(v) => setAmt(v === null ? "" : String(v))} placeholder="退費金額"
+          className={`${amt ? INPUT : EMPTY} w-28`} />
+        <button type="button" disabled={disabled || !amt || (paid && !preview.length)} className={BTN}
+          onClick={() => {
+            const msg = paid
+              ? `退費 ${fmtMoney(n)} 元（原顧問費 ${fmtMoney(fee)}${refundAmount ? `，已退 ${fmtMoney(refundAmount)}` : ""}）？\n`
+                + `分潤已發放，系統不會重算，而是產生 ${preview.length} 筆負數沖回列，合計 ${fmtMoney(total)} 元。`
+              : `退費 ${fmtMoney(n)} 元（原 ${fmtMoney(fee)}）？系統會依實收比例重算全鏈分潤。`;
+            if (confirm(msg)) onRefund(n, paid);
+          }}>
+          {paid ? "產生沖回" : "退費重算"}
+        </button>
+        {paid && (
+          <span className="text-[11px] text-[#8fa6ba]">
+            {refundAmount > 0 && `已退 ${fmtMoney(refundAmount)}；`}只沖回本次新增的退費金額
+          </span>
+        )}
+      </div>
+
+      {paid && amt !== "" && (
+        <div className="mt-2 rounded-lg border border-[#e08b7a]/40 bg-[#e08b7a]/10 px-3 py-2 text-xs">
+          {preview.length === 0 ? (
+            <span className="text-[#e0bd8b]">
+              這個金額不會產生沖回列（退費金額沒有高於已登錄的 {fmtMoney(refundAmount)} 元）。
+            </span>
+          ) : (
+            <>
+              <div className="text-[#e08b7a] mb-1">按下「產生沖回」會寫入以下負數列：</div>
+              {preview.map((l) => (
+                <div key={l.payeeKey} className="flex justify-between gap-4 py-0.5 text-[#cfdcea]">
+                  <span>{l.payeeName}<span className="text-[#8fa6ba]">（{l.role}）</span></span>
+                  <span className="tabular-nums text-[#e08b7a]">{fmtMoney(l.amount)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between gap-4 border-t border-white/15 mt-1 pt-1 font-semibold">
+                <span>合計</span>
+                <span className="tabular-nums text-[#e08b7a]">{fmtMoney(total)}</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

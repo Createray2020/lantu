@@ -204,7 +204,9 @@ describe("保單：生效日與附約", () => {
     const h = pane();
     expect(h).toContain("意外傷殘保額");
     expect(h).toContain("醫療雜費(住院)");
-    expect(h).toContain("薪資補償(月)");
+    // 2026/08/29 B1：「薪資補償(月)」拆成日額／月額兩欄（保單端與需求端都拆）
+    expect(h).toContain("薪資補償(日額)");
+    expect(h).toContain("薪資補償(月額)");
     expect(h).toContain("選填給付");
   });
 

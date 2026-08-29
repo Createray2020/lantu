@@ -18,16 +18,39 @@ import {
   JOB_TYPES, NO_EMPLOYER_JOBS, isNoEmployerJob, jobInsType, ageFromBirth,
   PROF_EXPENSE, profStdRate, profExpenseRate,
   HOUSE_TAX_RATE, LAND_TAX_RATE,
+  NHI_YEAR, NHI_RATE, NHI_SALARY_MIN, NHI_SALARY_MAX, NHI_SALARY_GRADES, NHI_DEP_CAP,
+  NHI_CATS, nhiSelfRatio, nhiJobCat, nhiSalaryOf,
 } from "@/lib/taiwan";
+// 二代健保補充保費與產險基準參數（後台 biz_tax_params 可調）。
+import {
+  NHI_SUPP_RATE, NHI_SUPP_MIN, NHI_SUPP_YEAR, NHI_SUPP_CAP, NHI_SUPP_BONUS_MULT, NHI_SUPP_WAGE_MIN,
+  PROP_INS_YEAR, QUAKE_BASIC_SUM, QUAKE_LODGING, PROP_PING_COST, PROP_BUILDING_RATIO,
+  CAR_LIAB_BODILY, CAR_LIAB_PROPERTY, CALI_DEATH, CALI_MEDICAL,
+  EMPLOYER_COMP_MONTHS, PUBLIC_LIAB_STD,
+} from "@/lib/bizTax";
 
 // 保障險種。2026/08 對齊 Excel 需求分析三大塊（責任／重病重殘／醫療）：
 //  ・「意外險」更名「意外傷殘」——需求分析問的是傷殘失能，不是意外醫療雜支。
 //  ・新增「醫療雜費」（住院雜費，實支實付的主戰場）與「薪資補償」（失能所得）。
 //  ・「癌症住院」保留不刪：既有案子已經填了值，拿掉會靜默歸零；UI 收進選填區。
 // 舊資料的 coverages[].kind 仍可能是「意外險」，由 KIND_ALIAS 正規化，不會對不上。
-var KINDS=['壽險','意外傷殘','住院醫療','醫療雜費','薪資補償','初次罹癌','癌症住院','重病給付','每月照護'];
-var KIND_ALIAS={'意外險':'意外傷殘'};
+//  ・2026/08/29「薪資補償」拆成「薪資補償（日）」「薪資補償（月）」兩個險種（Ray 拍板）：
+//    改版前需求端標「日額」、保單端標「(月)」、單位表寫「元/月」，三種說法卻直接對減。
+//    拆開之後日對日、月對月，缺口表出兩列，刻意**不做任何隱藏換算**。
+//    舊資料的 kind='薪資補償' 由 KIND_ALIAS 一律歸到「月」（見 KIND_ALIAS 的註解）。
+var KINDS=['壽險','意外傷殘','住院醫療','醫療雜費','薪資補償（日）','薪資補償（月）','初次罹癌','癌症住院','重病給付','每月照護'];
+// 舊值正規化。'薪資補償' → 月額：保單端的欄位本來就標 (月)、引擎的單位表也是元/月，
+// 這是多數慣例；⚠️ 刻意不依金額大小猜單位（3,000 看起來像日額，但那是猜的）。
+var KIND_ALIAS={'意外險':'意外傷殘','薪資補償':'薪資補償（月）'};
 function kindNorm(k){return KIND_ALIAS[k]||k;}
+// ===== 險種的給付單位：一次性給付（元）／日額（元/日）／月額（元/月）=====
+// ⚠️⚠️ 這是「保障缺口三個總額怎麼分堆」（gapTotals）與五欄表單位欄的**唯一**依據。
+//    改版前 totalGap() 把三種單位直接相加，示範案 5,629,396 裡混著住院醫療 3,000 元/日、
+//    癌症住院 2,000 元/日、每月照護 30,000 元/月——那個數字沒有任何意義。
+var KIND_UNIT={'壽險':'元','意外傷殘':'元','住院醫療':'元/日','醫療雜費':'元',
+ '薪資補償（日）':'元/日','薪資補償（月）':'元/月','初次罹癌':'元','癌症住院':'元/日',
+ '重病給付':'元','每月照護':'元/月'};
+function kindUnit(k){return KIND_UNIT[kindNorm(k)]||'元';}
 
 var EDU_STAGES=['嬰兒','幼稚園','小學','國中','高中職','大學','研究所','博士班'];
 
@@ -37,7 +60,10 @@ function uid(){return 'c'+Date.now().toString(36)+(__uidSeq++).toString(36)+Math
 function sampleCase(){return {
  id:uid(),
  profile:{name:'王大明(示範)',gender:'男',birth:'',age:40,retireAge:65,lifeExp:85,credit:700,jobTypeOther:''},
- params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,freeSaving:1,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
+ // ⚠️ 2026/08/29 移除 params.freeSaving（自由儲蓄%）：全庫 61 份一律是範本預設的 1，
+ //    沒有任何人改過，也沒有任何一支函式讀它——一個填得進去卻不影響任何結果的欄位，
+ //    留著只會讓教練以為自己在調整什麼。UI 的輸入框一併拿掉。
+ params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
  tracking:[{year:2024,age:40,net:9500000},{year:2025,age:41,net:9950000}],
  riskQuiz:{ans:{0:1,1:2,2:2,3:2,4:1,5:2,6:2,7:2,8:2,9:2,10:2,11:2}},
  members:[
@@ -83,7 +109,7 @@ function sampleCase(){return {
  hobby:[{sub:'體能類',start:40,end:75,freq:12,amount:3000,minAmount:2000,imp:2}],
  luxury:[{sub:'首飾配件',start:41,end:41,freq:1,amount:300000,minAmount:0,imp:2}],
  needs:[
-  {member:'王大明',funeral:600000,protectYears:5,estateTax:0,room:2000,selfPay:1500,nursing:1500,miscDaily:3000,incomeComp:50000,disability:3000000,firstCancer:300000,cancerHosp:2000,critical:2000000,monthCare:30000,careMonths:120}
+  {member:'王大明',funeral:600000,protectYears:5,estateTax:0,room:2000,selfPay:1500,nursing:1500,miscDaily:3000,incomeCompDay:0,incomeCompMonth:50000,disability:3000000,firstCancer:300000,cancerHosp:2000,critical:2000000,monthCare:30000,careMonths:120}
  ],
  coverages:[
   {member:'王大明',kind:'壽險',comm:0,social:0},
@@ -93,8 +119,8 @@ function sampleCase(){return {
   // ⚠️ 示範案原本的保單表只有 76,500，卻在支出寫「保險費 120,000」——自己跟自己對不上。
   // 保費改由保單表投影之後這個矛盾會直接顯示出來，所以補一張儲蓄壽險把差額補齊，
   // 順便讓理財金三角的「理財型保費」在示範案裡不再是 0。
-  {insured:'王大明',name:'增額儲蓄壽險',subtype:'增額/儲蓄壽險',premium:43500,life:0,accident:0,medical:0,medMisc:0,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:300000},
-  {insured:'王大明',name:'國泰終身醫療',premium:47536,life:0,accident:0,medical:2000,medMisc:100000,incomeComp:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0},
+  {insured:'王大明',name:'增額儲蓄壽險',subtype:'增額/儲蓄壽險',premium:43500,life:0,accident:0,medical:0,medMisc:0,incomeCompDay:0,incomeCompMonth:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:300000},
+  {insured:'王大明',name:'國泰終身醫療',premium:47536,life:0,accident:0,medical:2000,medMisc:100000,incomeCompDay:0,incomeCompMonth:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0},
   {insured:'王大明',name:'重大傷病定期',premium:20100,life:0,accident:0,medical:0,firstCancer:0,cancerHosp:0,critical:2000000,monthCare:0,cashValue:0},
   {insured:'王大明',name:'定期壽險',premium:8864,life:3000000,accident:1000000,medical:0,firstCancer:0,cancerHosp:0,critical:0,monthCare:0,cashValue:0}
  ],
@@ -155,9 +181,13 @@ function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(m){retu
 
 function pct(x){x=Number(x);if(!isFinite(x))return '—';return (x*100).toFixed(2)+'%'}
 
+// 年利息負擔＝現齡當年的應計利息。⚠️ 刻意維持「原始餘額 × 年利率」的既有口徑
+// （不改成 lRemain，那會動到每一個既有個案的利息數字，是另一件事）。
+// 只付利息 → 這正好就是實付；暫緩還款 → 利息照樣發生，只是沒付、滾進本金。
 function annualDebtInterest(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;return (a0>=sa)?lBal(l)*n(l.rate)/100:0})}
 
-function annualDebtPay(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;var elapsed=(a0-sa)*12;return (a0>=sa&&(n(l.months)-elapsed)>0)?lPay(l)*12:0})}
+// 年應付本息。⚠️ 走 debtPayAt()，攤還方式與寬限期在這裡生效。
+function annualDebtPay(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){return debtPayAt(l,a0,a0)})}
 
 function familyAnnualLiving(c){return sum(c.expenses,function(e){return (e.cat==='生活'||e.cat==='消費')?n(e.amount):0})}
 
@@ -168,10 +198,51 @@ function familyAnnualParentSupport(c){return sum(c.expenses,function(e){return e
 // 支出側手動登錄的貸款支出（大類「貸款」）。
 // 負債表那邊由 annualDebtPay() 反推，兩者相加＝家庭貸款總支出；
 // 手動列是給「沒登在負債表的貸款」用的，UI 會標出可能重複的細類。
-function manualLoanPay(c){return sum(c.expenses,function(e){return e.cat==='貸款'?n(e.amount):0})}
+// ⚠️ 與 annualDebtPay 一樣只算現齡有效的列（貸款壓力比的分子，口徑要跟分母一致）。
+function manualLoanPay(c){return sum(c.expenses,function(e){return (e.cat==='貸款'&&activeNow(c,e))?n(e.amount):0})}
 
 // 儲蓄理財投入（c.savings[]）。不進總支出——在原表它就放在總支出之外。
-function savingInvest(c){return sum(c.savings,function(x){return n(x.amount)})}
+// ⚠️ 2026/08/29 接上每一列的起訖（start/end）：範本本來就寫 start/end，
+//    改版前 savingInvest() 卻只加總 amount，等於「30 歲存到 65 歲」與「一輩子都在存」
+//    在有效儲蓄率上一模一樣。走既有的 activeNow()／inSpan()——留空＝全期間有效。
+function savingInvest(c){return sum(c.savings,function(x){return activeNow(c,x)?n(x.amount):0})}
+
+// ===== 起訖（start / end）語意的唯一真相 =====
+// ⚠️ 留空一律當「全期間有效」，不是 0–0（＝立刻失效）。
+//    起訖欄位走 set(...,'num')，教練把欄位清空存進去的是數字 0；
+//    舊資料（syncPremium 自動建的人身保費列）存的是空字串。兩種都代表「沒設這個界線」，
+//    舊寫法 age<n(e.start)||age>n(e.end) 會被 n('')===0 判成 age>0 → 整列一毛都不計。
+// ⚠️ 收支加總（metrics / ratios / crossTable）與逐年投影（projection）一律走這一支，
+//    這就是「同一份資料只有一套口徑」的保證。engine.drift.test.ts 逐字對拍。
+function inSpan(x,age){
+ var s=n(x&&x.start),e=n(x&&x.end);
+ if(s>0&&age<s)return false;
+ if(e>0&&age>e)return false;
+ return true;
+}
+// 比率／體檢的「現齡」＝ projection 第 0 年的那個年齡（含 ||40 的退回），兩邊才對得上。
+function nowAge(c){return n((c&&c.profile||{}).age)||40;}
+// 現齡有效：metrics / ratios / crossTable 的每一筆收支都要過這一關。
+function activeNow(c,x){return inSpan(x,nowAge(c));}
+
+// ===== 模擬到幾歲（horizon）：預設綁死「預估壽命」，可手動覆寫 =====
+// 舊版兩個欄位互不校驗：壽命改 85→95、horizon 留 85，退休總需求跳了 740 萬，
+// 投影卻還是只跑到 85 → shortPV 一動也不動。
+// ⚠️ 相容舊資料：params.horizonManual 不存在時，horizon 與 lifeExp 相同視為「未覆寫」、
+//    不同視為「已覆寫」——既有那 7 份不一致的個案數字一位不動。
+function horizonManual(c){
+ var p=(c&&c.params)||{},pr=(c&&c.profile)||{};
+ if(p.horizonManual===true)return true;
+ if(p.horizonManual===false)return false;
+ var h=n(p.horizon),le=n(pr.lifeExp);
+ return h>0&&le>0&&h!==le;
+}
+// 投影／蒙地卡羅／時間軸圖一律吃這個值，不要再直接讀 params.horizon。
+function effHorizon(c){
+ var p=(c&&c.params)||{},pr=(c&&c.profile)||{};
+ if(horizonManual(c))return n(p.horizon)||85;
+ return n(pr.lifeExp)||n(p.horizon)||85;
+}
 
 // 資產布局（Excel「資產布局規劃」）：核心／衛星／短期保留／生活用。
 // 預設由既有欄位推導，a.layer 有值才視為顧問手動覆寫。
@@ -196,7 +267,25 @@ function lBal(l){return n(l.balance)*(n(l.fxRate)||1)}
 
 function lPay(l){return n(l.pay)*(n(l.fxRate)||1)}
 
-// 貸款剩餘本金（本息攤還）。舊版用「餘額 − 月繳×12×年數」線性遞減，把每期利息也當本金攤掉，
+// ===== 攤還方式（liabilities[].repay）與寬限期（liabilities[].grace）=====
+// ⚠️⚠️ 改版前 lRemain()／annualDebtPay() 一律套「本息攤還」＋ pay×12：
+//    選「只付利息」「暫緩還款」跟選「本息攤還」算出來一模一樣，grace（寬限期月數）
+//    更是全站沒有任何讀取點。實測庫內有 5 筆（李育鏷 2 筆、零 3 筆）在裸奔。
+// 語意（台灣實務）：
+//  ・只付利息：每期只繳息，本金一毛不減 → 剩餘本金恆等於原始餘額，年現金流＝餘額 × 年利率。
+//  ・暫緩還款：本息都不付，**利息滾入本金**（緩繳／展期銀行不會白送這段利息，
+//    到期一次結清或重新攤還）→ 本金以複利長大，該年現金流＝0。
+//    ⚠️ 這是「本金會變大」的唯一一種模式，生涯藍圖的淨資產會因此往下修——那是實話。
+//  ・寬限期 grace（月）：前 N 個月只繳息、本金不動，第 N 個月之後才開始攤本金。
+//    ⚠️ 判斷粒度是「年」（跨越寬限期結束的那一年整年算只繳息），與 projection 逐年一格
+//       的解析度一致，不做月內插值。
+// ⚠️ 未填 repay（或填「本息攤還」）＝維持改版前語意，既有個案一位不動。
+// ⚠️ 選單裡的「本金平均」這一輪**不接**（全庫 0 筆在用），仍照本息攤還算；
+//    要接得讓 annualDebtPay 逐年變動（本金固定、利息遞減），是另一件事，已在回報提出。
+function repayMode(l){var r=(l&&l.repay)||'';return (r==='只付利息'||r==='暫緩還款')?r:'本息攤還';}
+function graceMonths(l){var g=n(l&&l.grace);return g>0?Math.round(g):0;}
+
+// 貸款剩餘本金。舊版用「餘額 − 月繳×12×年數」線性遞減，把每期利息也當本金攤掉，
 // 2% 的 1000 萬房貸第 10 年會少算約 170 萬負債，生涯藍圖的淨資產因此系統性樂觀。
 function lRemain(l,age,a0){
  var sa=n(l.startAge)||a0; if(age<sa)return 0;
@@ -204,15 +293,43 @@ function lRemain(l,age,a0){
  var k=Math.max(0,Math.round((age-sa)*12));
  var total=n(l.months); if(total>0)k=Math.min(k,total);
  var i=n(l.rate)/12/100, pay=lPay(l);
+ var mode=repayMode(l);
+ if(mode==='只付利息')return P;                                  // 本金一毛不減
+ if(mode==='暫緩還款')return (i<=0)?P:P*Math.pow(1+i,k);          // 利息滾入本金
+ var g=graceMonths(l); if(g>0)k=Math.max(0,k-g);                  // 寬限期內本金不動
  if(pay<=0)return P;
  if(i<=0)return Math.max(0,P-pay*k);
  var f=Math.pow(1+i,k);
  return Math.max(0,Math.min(P,P*f-pay*(f-1)/i));
 }
+// 某一年要付出去的負債現金流。
+// ⚠️⚠️ annualDebtPay()／projection()／monteCarlo() 三邊一律走這一支——
+//    改版前三處各自寫了一模一樣的 `(age>=sa&&months-el>0)?lPay(l)*12:0`，
+//    攤還方式一接上就會變成「投影照本息付、比率表只付息」這種對不上的狀態。
+function debtPayAt(l,age,a0){
+ var sa=n(l.startAge)||a0; if(age<sa)return 0;
+ var el=(age-sa)*12;
+ if(!(n(l.months)-el>0))return 0;                                 // 已經還完
+ var mode=repayMode(l);
+ if(mode==='暫緩還款')return 0;                                    // 本息都不付
+ if(mode==='只付利息')return lBal(l)*n(l.rate)/100;                // 只繳息
+ if(el<graceMonths(l))return lRemain(l,age,a0)*n(l.rate)/100;      // 寬限期內只繳息
+ return lPay(l)*12;
+}
 
+// ===== 資產被動現金流：收益金額（income）優先，其次報酬率（assets[].ret）=====
+// ⚠️⚠️ 改版前的判斷是「income 為 null/'' 才看 ret」，而 addRow 的資產範本**一律寫 income:0**
+//    → 新建的資產列永遠走不到 ret 那一支，41 筆填了報酬率的資產（現金活存 0.5%、
+//      儲蓄型保單現值 2% …）一毛被動收入都沒產生。教練填了一個純裝飾的欄位。
+// 新語意：**收益金額有正值就用收益金額，否則有填報酬率就用「現值 × ret%」**。
+//  ・也不再限定股票/基金/債券——活存利息、儲蓄險增值一樣是被動現金流。
+//  ・addRow 的資產範本同步改成 income:''，讓「沒填收益」與「真的填 0」分得開。
+//  ⚠️ 這一項會讓既有客戶的理財收入、財務自由度、投影收入全部往上動——見乾跑報告。
 function assetPassive(c){return sum(c.assets,function(a){
  if(aMatured(c,a))return 0;          // 到期之後就不再生錢（債權還本、租約結束）
- return (a.income!=null&&a.income!=='')?aInc(a):((a.type==='股票'||a.type==='基金'||a.type==='債券')?aVal(a)*n(a.ret)/100:0)})}
+ var inc=aInc(a);
+ if(inc>0)return inc;
+ return n(a.ret)>0?aVal(a)*n(a.ret)/100:0;})}
 
 // ⚠️⚠️ 資產的流動性有時間性：私人債權還完款、租約到期之後，那筆錢就變成可動用的現金。
 //    全站吃 cls 的地方一律走這支，不要再直接讀 a.cls。
@@ -238,7 +355,7 @@ function liquidMovable(c){return sum(c.assets,function(a){return (aLiquid(c,a)&&
 //     否則既有客戶的願景會在改版當下全部消失、缺口一夜歸零。
 function visionOn(x){return !x||x.on!==false}
 
-function lifestyleFactor(c,age,factor){var s=0;[c.travel,c.hobby,c.luxury].forEach(function(arr){(arr||[]).forEach(function(it){if(!visionOn(it))return;if(age>=n(it.start)&&age<=n(it.end))s+=n(it.amount)*(n(it.freq)||1)*factor})});return s;}
+function lifestyleFactor(c,age,factor){var s=0;[c.travel,c.hobby,c.luxury].forEach(function(arr){(arr||[]).forEach(function(it){if(!visionOn(it))return;if(inSpan(it,age))s+=n(it.amount)*(n(it.freq)||1)*factor})});return s;}
 
 function lifestyleAnnualNow(c){return lifestyleFactor(c,n(c.profile.age),1);}
 
@@ -266,9 +383,22 @@ function earnerRetirePoints(c){
  });
  return out;
 }
+// 沒有任何賺薪成員填退休年齡時的預設切換點。
+// ⚠️ 舊版在 pts 為空時 retiredWeight 一律回 0 → retireDraw 永遠 0、工作期生活費照 (1−0) 全額算，
+//    退休期支出整段從投影裡消失，畫面上還一聲不吭。有數字總比靜靜歸零好，
+//    但一定要讓 UI 明說「這 65 是系統假設的、不是客戶填的」→ retireAgeAssumed()。
+var DEFAULT_RETIRE_AGE=65;
+// 沒有任何賺薪成員填退休年齡 → true（UI 據此顯示假設提示）。
+function retireAgeAssumed(c){return earnerRetirePoints(c).length===0;}
+// 給 retiredWeight 用的退休時點：真的一個都沒有時，退回「本人 65 歲一次切換」。
+function retirePoints(c){
+ var pts=earnerRetirePoints(c);
+ if(pts.length)return pts;
+ return [{name:((primaryMember(c)||{}).name)||'',primary:true,share:0,at:DEFAULT_RETIRE_AGE,assumed:true}];
+}
 // 某一年的「已退休權重」0~1。
 function retiredWeight(c,age){
- var pts=earnerRetirePoints(c);
+ var pts=retirePoints(c);
  if(!pts.length)return 0;
  var tot=0;pts.forEach(function(p){tot+=p.share;});
  if(tot<=0){
@@ -298,11 +428,66 @@ function retireAnnual(c,age,inflFactor){
 function workPhaseExpense(c,age,inflFactor,w){
  var s=0;
  ((c||{}).expenses||[]).forEach(function(e){
-  if(age<n(e.start)||age>n(e.end))return;
+  if(!inSpan(e,age))return;
   var v=n(e.amount)*(e.infl?inflFactor:1);
   s+=isLivingCat(e.cat)?v*(1-w):v;
  });
  return s;
+}
+
+// 成長型年金現值：每期成長 g、折現 rr、共 m 期，第 1 期落在 1 年後年底。
+// ⚠️ 與 retireNeed() 算 total 用的是同一條公式——需求端與已備端用同一把尺，
+//    「月領剛好等於每月需求」的個案才會乾淨地相消。
+// ⚠️ 名字不可以叫 annuityPV——那個名字已經被「追蹤表的定期定額現值」佔用了
+//    （annuityPV(pmt,yrs,ratePct)，簽章完全不同）。html 是同一個全域命名空間，
+//    撞名會讓後宣告的那一支靜靜蓋掉前面那一支。
+function growingAnnuityPV(annual,rr,g,m){
+ annual=n(annual);m=n(m);
+ if(!(m>0)||!annual)return 0;
+ if(Math.abs(rr-g)<1e-6)return annual*m/(1+rr);
+ return annual*(1-Math.pow((1+g)/(1+rr),m))/(rr-g);
+}
+// ===== 已準備退休金的「領取方式」（retire.prepared[].method）=====
+// ⚠️⚠️ 改版前 retireNeed() 只 sum(amount)：填「月領 30,000」被當成「一次領 3 萬」，
+//    UI 上那個下拉選單從頭到尾沒有任何讀取點。
+// 語意（Ray 2026/08/29 拍板「全部接上」）：
+//  ・一次領（含未填）＝退休當下就位的一筆錢，原值計入。
+//  ・月領＝**每月**領取金額，換算成退休期的年金現值：年領＝amount×12，
+//    以退休期報酬率 retire.retireReturn 折現、退休通膨 retire.retireInflation 成長，
+//    期數＝預估壽命 − 起領年齡。起領年齡（p.age）晚於退休年齡時，再折回退休年。
+//  ・自提＝勞退自提。專戶累積的是一筆本金，退休時可一次領也可月退，
+//    欄位本身沒有交代是哪一種 → **當一次領**（原值計入）。已列入回報請 Ray 拍板。
+// ⚠️⚠️ 金額單位的坑：這個欄位的 label 只寫「金額」，庫內 30 筆「月領」裡有 26 筆
+//    填的是六、七位數（勞退新制 2,707,500、商業年金 6,300,000）——那是**總額**不是月額。
+//    引擎照拍板的語意做（月領＝月額），刻意**不依金額大小猜單位**（與 KIND_ALIAS 同一條原則）；
+//    UI 改成當場顯示「≈ 換算總額」讓錯的資料自己現形，並已在回報裡請 Ray 拍板要不要加單位欄。
+// ⚠️⚠️ 月額合理性守門員（PREPARED_MONTHLY_MAX）。
+//    這**不是**「依金額大小猜單位」（那是 KIND_ALIAS 明文禁止的事——猜的是「這個值屬於
+//    哪一個險種」）。這是**輸入合理性驗證**：每月 30 萬以上的退休月退金在台灣不存在
+//    （勞保老年年金上限約 2.8 萬／月），這種數字只可能是把「總額」填進了月額欄。
+//    2026/08/29 乾跑實測：庫內 30 筆「月領」有 26 筆填的是 1,147,500 ~ 7,560,000，
+//    照月額換算會得出 2.2 億 ~ 17.9 億的現值，20 位客戶的退休缺口一夜歸零——
+//    那不是「大幅改變」，那是把還差 1,200 萬的客戶報成「已經準備好了」。
+//    所以超過上限的月領列**不換算**：維持改版前的原值計入（數字一位不動），
+//    同時標 suspect=true 讓 UI 當場示警，請教練把金額改成月額。
+//    ⚠️ 一定要留活路：教練確認「這真的是月額」時，在該列勾「確認為月額」（monthlyOk）
+//       就會照常換算，不會有資料永遠算不出來。
+var PREPARED_MONTHLY_MAX=300000;
+function preparedSuspect(p){
+ return ((p&&p.method)||'')==='月領'&&!(p&&p.monthlyOk)&&n(p&&p.amount)>PREPARED_MONTHLY_MAX;
+}
+function preparedPV(c,p){
+ var r=(c&&c.retire)||{},pr=(c&&c.profile)||{};
+ var amt=n(p&&p.amount);
+ if(((p&&p.method)||'一次領')!=='月領')return amt;        // 一次領／自提／未填
+ if(preparedSuspect(p))return amt;                        // 金額看起來是總額不是月額 → 不換算，等教練確認
+ var ra=n(pr.retireAge),le=n(pr.lifeExp);
+ var from=n(p&&p.age)||ra;                                 // 起領年齡，沒填就從退休年起算
+ if(from<ra)from=ra;                                       // 早於退休年的一律從退休年起算
+ var rr=n(r.retireReturn)/100,g=n(r.retireInflation)/100;
+ var pv=growingAnnuityPV(amt*12,rr,g,Math.max(0,le-from));
+ var back=from-ra;
+ return (back>0&&rr>-1)?pv/Math.pow(1+rr,back):pv;
 }
 
 function retireNeed(c){
@@ -327,10 +512,18 @@ function retireNeed(c){
  }
  else if(Math.abs(rr-g)<1e-6){total=annualFV*m/(1+rr);}
  else{total=annualFV*(1-Math.pow((1+g)/(1+rr),m))/(rr-g);}
- var prepared=sum(r.prepared,function(p){return n(p.amount)});
+ // 已備退休金：逐列依「領取方式」換算成退休當下的現值（見 preparedPV）。
+ // preparedRows 給 UI 用：月領那一列旁邊要顯示「≈ 換算總額」，教練才看得懂那一列被當成什麼在算。
+ var preparedRows=(r.prepared||[]).map(function(p){
+  var method=(p&&p.method)||'一次領';
+  var sus=preparedSuspect(p);
+  return {item:(p&&p.item)||'',age:n(p&&p.age),amount:n(p&&p.amount),method:method,
+   pv:preparedPV(c,p),converted:method==='月領'&&!sus,suspect:sus};
+ });
+ var prepared=sum(preparedRows,function(p){return p.pv});
  // valid=false 代表「退休年齡 ≥ 預期壽命」，余年 0 → total/gap 都是 0。
  // 呼叫端要據此顯示「參數有誤」而不是「沒有退休缺口」。
- return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,gap:Math.max(0,total-prepared),valid:m>0};
+ return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,preparedRows:preparedRows,gap:Math.max(0,total-prepared),valid:m>0};
 }
 
 // 某位成員簽下的連帶保證餘額。沒指定保證人的舊列一律歸給「本人」。
@@ -353,11 +546,21 @@ function medicalDailyNeed(nd){return n(nd.room)+n(nd.selfPay)+n(nd.nursing)}
 
 function memberDep(c,name){var m=(c.members||[]).find(function(x){return x.name===name});return m?n(m.depRatio):100}
 
-var POLICY_MAP={'壽險':'life','意外傷殘':'accident','住院醫療':'medical','醫療雜費':'medMisc','薪資補償':'incomeComp','初次罹癌':'firstCancer','癌症住院':'cancerHosp','重病給付':'critical','每月照護':'monthCare'};
+var POLICY_MAP={'壽險':'life','意外傷殘':'accident','住院醫療':'medical','醫療雜費':'medMisc','薪資補償（日）':'incomeCompDay','薪資補償（月）':'incomeCompMonth','初次罹癌':'firstCancer','癌症住院':'cancerHosp','重病給付':'critical','每月照護':'monthCare'};
+
+// 需求列／保單列上的保額欄位取值，含舊欄位相容。
+// ⚠️⚠️ 舊的單一欄位 incomeComp 一律讀成「月額」（保單端的欄位本來就標 (月)、單位表也是元/月）。
+//    migrateCase() 會把它搬成 incomeCompMonth 並標 incomeCompLegacy，但那只跑在瀏覽器端；
+//    engine.ts 這一份跑在伺服器（planSnapshot 寫 plans.health_grade），拿到的是 plans.data
+//    原封不動的舊資料，不會經過 migrateCase——所以相容一定要做在「讀取」這一層。
+function coverAmt(x,f){
+ if(f==='incomeCompMonth'){var v=x&&x.incomeCompMonth;return (v==null||v==='')?n(x&&x.incomeComp):n(v);}
+ return n(x&&x[f]);
+}
 
 function existingCover(c,member,kind){
  var fromCov=sum(c.coverages,function(cv){return (cv.member===member&&kindNorm(cv.kind)===kindNorm(kind))?(n(cv.comm)+n(cv.social)):0});
- var f=POLICY_MAP[kind];var fromPol=f?sum(c.policies,function(p){return (policyActive(p)&&p.insured===member)?n(p[f]):0}):0;
+ var f=POLICY_MAP[kindNorm(kind)];var fromPol=f?sum(c.policies,function(p){return (policyActive(p)&&p.insured===member)?coverAmt(p,f):0}):0;
  return fromCov+fromPol;
 }
 
@@ -382,7 +585,8 @@ function coverageGaps(c){
    '意外傷殘':n(nd.disability),
    '住院醫療':medicalDailyNeed(nd),
    '醫療雜費':n(nd.miscDaily),
-   '薪資補償':n(nd.incomeComp),
+   '薪資補償（日）':coverAmt(nd,'incomeCompDay'),
+   '薪資補償（月）':coverAmt(nd,'incomeCompMonth'),
    '初次罹癌':n(nd.firstCancer),
    '癌症住院':n(nd.cancerHosp),
    '重病給付':n(nd.critical),
@@ -396,18 +600,101 @@ function coverageGaps(c){
    // ⚠️ 不接這一條的話，買保險在試算上永遠只是「保費讓缺口變大」，
    //    教練排了保障動作卻看到情況更糟——那是錯的訊號。
    ex+=actionCover(c,nd.member,k);
-   rows.push({member:nd.member,kind:k,need:need,have:ex,gap:need-ex});
+   var row={member:nd.member,kind:k,need:need,have:ex,gap:need-ex};
+   // 「每月照護」多帶長照月數與換算總額（見 careMonthsOf）。⚠️ 只是佐證欄位，
+   //    gapTotals()／health()／shortPV 一律不看它們。
+   if(k==='每月照護'){
+    var cm=careMonthsOf(nd);
+    row.months=cm.months;row.monthsAssumed=cm.assumed;
+    row.needTotal=need*cm.months;row.haveTotal=ex*cm.months;
+    row.gapTotal=Math.max(0,need-ex)*cm.months;
+   }
+   rows.push(row);
   });
  });
  return rows;
 }
 
-function totalGap(c){return sum(coverageGaps(c),function(g){return Math.max(0,g.gap)})}
+// ===== 長照月數（needs[].careMonths）：把「每月照護」換算成長照總需求 =====
+// ⚠️⚠️ 改版前 careMonths 完全沒有讀取點：教練填的「每月 3 萬 × 120 個月 ＝ 360 萬」
+//    這個長照總需求從來沒在畫面上出現過，缺口只比得出「每月 3 萬」的月額。
+// ⚠️⚠️ 缺口已經拆成 {lump, daily, monthly} 三堆（gapTotals），「每月照護」屬 monthly。
+//    careMonths 換算出來的總額**刻意不併進 lump**——那會違反 Ray 2026/08/29
+//    「三種給付單位不相加」的拍板。它的定位是月額那一列旁邊的**佐證數字**：
+//    「每月缺口 30,000 元/月 × 120 個月 ≈ 3,600,000 元」，讓月額有重量感，但不進任何分數。
+var DEFAULT_CARE_MONTHS=120;   // 未填時的假設：10 年。庫內 60 筆有填的眾數就是 120，也是長照規劃的慣用期間。
+// 回 {months, assumed}：assumed=true 代表這 120 是系統假設的、不是客戶填的，UI 一定要標出來。
+function careMonthsOf(nd){
+ var m=n(nd&&nd.careMonths);
+ return m>0?{months:m,assumed:false}:{months:DEFAULT_CARE_MONTHS,assumed:true};
+}
+// 每一位被保人的長照換算列。⚠️ 全部是佐證數字，不進 gapTotals / health / shortPV。
+function careNeedRows(c){
+ return coverageGaps(c).filter(function(g){return g.kind==='每月照護';}).map(function(g){
+  return {member:g.member,monthly:g.need,have:g.have,gap:g.gap,
+   months:g.months,assumed:g.monthsAssumed,
+   needTotal:g.needTotal,haveTotal:g.haveTotal,gapTotal:g.gapTotal};
+ });
+}
+
+// ===== 保障缺口總額：一次性給付 vs 定期給付，刻意不相加（Ray 2026/08/29 拍板）=====
+// 改版前 totalGap() 把「元」「元/日」「元/月」直接相加：示範案的 5,629,396 裡混著
+// 住院醫療 3,000 元/日、癌症住院 2,000 元/日、每月照護 30,000 元/月——那個數字沒有意義。
+// ⚠️ 分堆的依據只有 KIND_UNIT 一份（kindUnit），不要在呼叫端各自判斷險種名稱。
+// 文案原則（Ray 的核心命題）：缺口是常態，是「還沒被安排到的那一段」，不是不及格。
+function gapTotals(c){
+ var t={lump:0,daily:0,monthly:0};
+ coverageGaps(c).forEach(function(g){
+  var v=Math.max(0,g.gap);if(v<=0)return;
+  var u=kindUnit(g.kind);
+  if(u==='元/日')t.daily+=v;else if(u==='元/月')t.monthly+=v;else t.lump+=v;
+ });
+ return t;
+}
+// 各單位的「需求」基數，給準備度／riskCover 當分母用（分子分母一定要同一堆）。
+function gapNeedBase(c){
+ var t={lump:0,daily:0,monthly:0};
+ coverageGaps(c).forEach(function(g){
+  var u=kindUnit(g.kind),v=n(g.need);
+  if(u==='元/日')t.daily+=v;else if(u==='元/月')t.monthly+=v;else t.lump+=v;
+ });
+ return t;
+}
+// ⚠️ 向後相容的呼叫方式：仍然回一個數字，但語意已收斂成「一次性給付缺口」。
+//    src/lib/snapshot.ts（不在本輪可改範圍）用它寫 plans 快照的 gap 欄位；
+//    那一欄本來就該是與保額同維度、可以直接比的數字，日額／月額不該混進去。
+function totalGap(c){return gapTotals(c).lump}
 // 保障準備度用的「毛需求」：與 lifeNeed() 同一條分子，但**不扣已備**。
 // html 端一直有這一支（coverageReadiness 用它），engine.ts 之前缺席；
 // 2026/08/24 保單檢查報告的五欄表要毛對毛，兩邊都得有。
+// ===== 財務獨立歲（members[].indepAge）：責任遞減 =====
+// ⚠️⚠️ UI 一直明說「到 N 歲後，其『支出比例』份額會自動從壽險保障需求中移除」，
+//    但改版前只有 deathProjection()（那張責任遞減圖）真的照做，grossLifeNeed() 完全沒看它
+//    → 同一份資料「圖上責任遞減、需求數字不遞減」，UI 的承諾是空的。
+// ⚠️ 篩選條件與 deathProjection() 的 deps 逐字一致：不是被保人自己、indepAge 有填、支出比例 > 0。
+function indepDeps(c,name){
+ return ((c||{}).members||[]).filter(function(x){
+  // ⚠️ indepAge 留空／0 ＝「沒設財務獨立歲」＝全程都算進責任，與全站 start/end 的
+  //    「≤0 代表不設界線」同一條規則（inSpan）。0 絕對不能讀成「一出生就獨立」。
+  return !!x&&x.name!==name&&n(x.indepAge)>0&&n(x.expRatio)>0;});
+}
+// 家庭生活費實際要保障幾「年」：protectYears 年裡逐年扣掉當年已經財務獨立的成員份額。
+// ⚠️ 沒有任何成員填 indepAge（或都還沒到獨立歲）→ 等於 protectYears，既有個案一位不動。
+// ⚠️ 只作用在「家庭生活費」那一項。孝親（父母奉養）不套用——父母不會財務獨立。
+function protectYearsEff(c,nd){
+ var yrs=Math.max(0,n(nd&&nd.protectYears));
+ var deps=indepDeps(c,nd&&nd.member);
+ if(!deps.length||!yrs)return yrs;
+ var s=0;
+ for(var y=0;y<yrs;y++){
+  var frac=0;
+  for(var j=0;j<deps.length;j++){var d=deps[j];if(n(d.age)+y>=n(d.indepAge))frac+=n(d.expRatio)/100;}
+  s+=Math.max(0,1-Math.min(1,frac));
+ }
+ return s;
+}
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
- return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*n(nd.protectYears)
+ return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd)
   +familyAnnualParentSupport(c)*n(nd.protectYears)
   +sum(c.liabilities,function(l){return lBal(l)})+eduTotal(c)+n(nd.funeral)+n(nd.estateTax)
   +guaranteeFor(c,nd.member);}
@@ -482,7 +769,8 @@ function coverageCheckupRows(c){
    '意外傷殘':n(nd.disability),
    '住院醫療':medicalDailyNeed(nd),
    '醫療雜費':n(nd.miscDaily),
-   '薪資補償':n(nd.incomeComp),
+   '薪資補償（日）':coverAmt(nd,'incomeCompDay'),
+   '薪資補償（月）':coverAmt(nd,'incomeCompMonth'),
    '初次罹癌':n(nd.firstCancer),
    '癌症住院':n(nd.cancerHosp),
    '重病給付':n(nd.critical),
@@ -499,8 +787,7 @@ function coverageCheckupRows(c){
  });
  return ord.map(function(k){
   var o=by[k];
-  var u=(k==='住院醫療'||k==='癌症住院')?'元/日':((k==='每月照護'||k==='薪資補償')?'元/月':'元');
-  return checkupRow(k,o.have,o.need,u);
+  return checkupRow(k,o.have,o.need,kindUnit(k));
  });
 }
 
@@ -639,6 +926,10 @@ function masterAnalysis(c,calYear){
  var Y=n(calYear);
  return (c.policies||[]).filter(function(p){return p.policyKind!=='附約';}).map(function(p){
   var polY=policyYearAt(p,Y);
+  // ⚠️ 沒填生效日 → policyYearAt() 回不出保單年度（0）→ paid=0、ratio=0，整張效益分析空白。
+  //    備援：教練填的「已繳年數」（policies[].paidYears）。
+  //    生效日永遠優先——它是可驗證的事實，已繳年數是人填的記憶。兩個都沒有才是真的算不出來。
+  if(polY<=0)polY=Math.max(0,Math.round(n(p.paidYears)));
   var yrs=n(p.payYears);
   var paid=polY>0?n(p.premium)*(yrs>0?Math.min(polY,yrs):polY):0;
   var sur=surrenderAt(p,polY)||n(p.cashValue);
@@ -649,6 +940,238 @@ function masterAnalysis(c,calYear){
  });
 }
 
+
+// ═══ 二代健保：一般保險費 ＋ 補充保費 ═══════════════════════════════
+// 改版前 members[].nhiSalary / nhiDeps 是純死欄位（填得進去、全站沒有任何計算，
+// 全庫 61 份 0 筆有填）。這一段把它算出來，並經由 syncNHI() 進支出表影響現金流。
+//
+// 一般保費公式（健保署「保險費計算公式」原文）：
+//   投保金額 × 保險費率 × 負擔比率 × (本人 ＋ 眷屬人數)，眷屬超過三口以三口計。
+// ⚠️ 負擔比率依身分別差到 3.3 倍（受僱者 30%、雇主/自營 100%），不能只用一個數字。
+//    身分別的預設由既有的 JOB_TYPES 推（nhiJobCat），不另開一套工作分類。
+//
+// 補充保費：六類所得各自的門檻與計費基礎。
+// ⚠️⚠️ 薪資本身（'薪資'/'加班費'/'差旅補貼'）**不扣補充保費**——它已經在投保金額裡，
+//    再扣一次就是把同一筆錢課兩遍。所以判定一律用白名單（NHI_SUPP_KINDS），不是黑名單。
+var NHI_SUPP_KINDS=[
+ // mode:'excess' ＝ 只就「超過門檻的部分」計費；mode:'each' ＝ 單次給付達門檻就按**全額**計費。
+ // ⚠️ 這兩種計費基礎差很多：領 19,999 元股利扣 0、領 20,000 元扣 422（不是扣 0.02 元）。
+ {key:'bonus',label:'高額獎金',mode:'excess',subs:['年終獎金','三節獎金','績效/季獎金','佣金/業績獎金','股票/員工分紅']},
+ {key:'parttime',label:'兼職薪資',mode:'each',subs:['兼職']},
+ {key:'prof',label:'執行業務收入',mode:'each',subs:['執行業務所得']},
+ {key:'dividend',label:'股利所得',mode:'each',subs:['股利/利息','事業盈餘分配','基金/ETF 配息']},
+ {key:'interest',label:'利息所得',mode:'each',subs:['存款利息','債券配息']},
+ {key:'rent',label:'租金收入',mode:'each',subs:['租金收入']}
+];
+function nhiSuppKindOf(subType){
+ for(var i=0;i<NHI_SUPP_KINDS.length;i++){if(NHI_SUPP_KINDS[i].subs.indexOf(subType)>=0)return NHI_SUPP_KINDS[i];}
+ return null;
+}
+// 一年幾次給付。incomes[].amount 一律是**年額**，period 只是輸入單位——
+// 「月」＝一年 12 次給付，「年」＝一次。補充保費是按「單次給付」判門檻的，這個換算不能省。
+function nhiPayTimes(x){return (x&&x.period==='月')?12:1;}
+// 單次給付的起扣門檻：兼職薪資是基本工資，其餘五類是 20,000。
+function nhiSuppMinOf(k){return (k&&k.key==='parttime')?NHI_SUPP_WAGE_MIN:NHI_SUPP_MIN;}
+
+// 某位成員的一般保費。未填 nhiSalary（rawSalary<=0）→ 一律回 0，不猜。
+function nhiGeneral(c,m){
+ var jt=(m&&m.jobType)||(((c||{}).profile)||{}).jobType||'一般就業者';
+ var cat=(m&&m.nhiCat)||nhiJobCat(jt);
+ var r=nhiSelfRatio(cat),ratioAssumed=(r==null);
+ if(r==null)r=30;                       // 認不得的身分別退回受僱者，並標成假設值
+ var raw=n(m&&m.nhiSalary),salary=nhiSalaryOf(raw);
+ var deps=Math.max(0,Math.round(n(m&&m.nhiDeps)));
+ var depsCounted=Math.min(deps,NHI_DEP_CAP);
+ // ⚠️ 進位順序照健保署公告的負擔金額表：**先算一口的保費四捨五入到元、再乘口數**，
+ //    不是「乘完再進位」。差 1 元看起來沒事，但教練拿系統的數字對客戶的繳費單會對不起來
+ //    （官方釋例：雇主 57,800 × 5.17% × 100% × (1+1) 印的是 5,976，先乘後進位會得到 5,977）。
+ var perUnit=(raw>0)?Math.round(salary*NHI_RATE*(r/100)):0;
+ var monthly=perUnit*(1+depsCounted);
+ return {member:(m&&m.name)||'',cat:cat,ratio:r,ratioAssumed:ratioAssumed,perUnit:perUnit,
+  rawSalary:raw,salary:salary,clamped:(raw>0&&salary!==Math.round(raw)),
+  deps:deps,depsCounted:depsCounted,depsCut:(deps>depsCounted),units:1+depsCounted,
+  monthly:monthly,annual:monthly*12};
+}
+
+// 某位成員的補充保費明細（逐列對到 c.incomes[]）。
+function nhiSuppRows(c,m){
+ var name=(m&&m.name)||'',pm=(primaryMember(c)||{}).name;
+ var base=nhiSalaryOf(n(m&&m.nhiSalary))||NHI_SALARY_MIN;
+ var baseAssumed=!(n(m&&m.nhiSalary)>0);
+ var bonusCap=base*NHI_SUPP_BONUS_MULT,out=[];
+ ((c||{}).incomes||[]).forEach(function(x){
+  if(!x)return;
+  if(((x.owner||'').trim()||pm)!==name)return;
+  var k=nhiSuppKindOf(x.subType);if(!k)return;
+  var annual=n(x.amount);if(annual<=0)return;
+  var times=nhiPayTimes(x),per=annual/times,charged=0,threshold;
+  if(k.mode==='excess'){
+   threshold=bonusCap;
+   charged=Math.min(Math.max(0,annual-bonusCap),NHI_SUPP_CAP);
+  }else{
+   threshold=nhiSuppMinOf(k);
+   if(per>=threshold)charged=Math.min(per,NHI_SUPP_CAP)*times;
+  }
+  out.push({member:name,kind:k.key,label:k.label,mode:k.mode,
+   name:(x.name||'').trim()||x.subType||'',subType:x.subType||'',
+   annual:annual,times:times,per:per,threshold:threshold,charged:charged,
+   fee:Math.round(charged*NHI_SUPP_RATE),baseAssumed:baseAssumed});
+ });
+ return out;
+}
+
+// 全家健保費。⚠️ filled=false（沒有任何一位成員填健保投保薪資）時一切回 0，
+//    而且 syncNHI() 不會產生支出列——「沒填」不等於「零保費」，是「還沒問」。
+function nhiFamily(c){
+ var mems=((c||{}).members)||[];
+ var gen=mems.map(function(m){return nhiGeneral(c,m);});
+ var supp=[];mems.forEach(function(m){supp=supp.concat(nhiSuppRows(c,m));});
+ var filled=gen.some(function(g){return g.rawSalary>0;});
+ var gm=filled?gen.reduce(function(s,g){return s+g.monthly;},0):0;
+ var sa=filled?supp.reduce(function(s,r){return s+r.fee;},0):0;
+ return {rows:gen,supp:supp,filled:filled,
+  generalMonthly:gm,generalAnnual:gm*12,suppAnnual:sa,annual:gm*12+sa,
+  year:NHI_YEAR,rate:NHI_RATE,suppRate:NHI_SUPP_RATE};
+}
+
+// ── 支出表同步：比照 syncPremium()，一列「全民健康保險」════════════
+// ⚠️ 穩定標記 nhiAuto（比照 birthBid 的作法）：重按是**更新**不是複製。
+// ⚠️ 教練可以關掉（c.nhiExpenseOff）——關掉就把那一列收回去，不留殘骸。
+// ⚠️ subCat 用既有的「勞健保自付」，它在 PREM_KEEP 名單裡，syncPremium() 不會把它接管掉。
+var NHI_AUTO_NAME='全民健康保險（系統試算）';
+function nhiExpenseOn(c){return !((c||{}).nhiExpenseOff);}
+function syncNHI(c){
+ if(!c||!Array.isArray(c.expenses))return;
+ var idx=-1;
+ for(var i=0;i<c.expenses.length;i++){if(c.expenses[i]&&c.expenses[i].nhiAuto){idx=i;break;}}
+ var f=nhiFamily(c);
+ if(!f.filled||!nhiExpenseOn(c)){if(idx>=0)c.expenses.splice(idx,1);return;}
+ var row=(idx>=0)?c.expenses[idx]:null;
+ if(!row){
+  // 起訖預設「現齡 → 預估壽命」，與 syncPremium() 同一套（留空在 inSpan() 下是全期間有效，
+  // 但預設仍要給一段看得見、改得動的區間）。建立之後不再覆蓋，教練改了就是他的。
+  row={cat:'保險',subCat:'勞健保自付',name:NHI_AUTO_NAME,period:'年',infl:false,cut:0,
+   start:n((c.profile||{}).age)||'',end:n((c.profile||{}).lifeExp)||effHorizon(c)||'',nhiAuto:true};
+  c.expenses.push(row);
+ }
+ row.cat='保險';row.subCat='勞健保自付';row.name=NHI_AUTO_NAME;
+ row.period='年';row.infl=false;row.nhiAuto=true;row.amount=f.annual;
+}
+
+// ═══ 產險比對線（平行於 KINDS 的產險骨幹）═══════════════════════════
+// ⚠️⚠️ 刻意**不**把產險塞進 KINDS：那會讓「保障準備度」「全家保障地圖」「五欄表」
+//    全部多出不相干的列（那三張表的骨架是「成員 × 人身險種」）。產險的需求端是
+//    **資產與責任**，不是人；缺口也刻意不併進 gapTotals()／health().riskCover——
+//    與 Ray 2026/08/29「單位不同不相加」是同一條原則。
+var PKINDS=['住宅火險','住宅地震基本保險','汽車第三人責任（體傷·每人）','汽車第三人責任（財損·每次事故）','車體損失險','雇主責任（每人）','公共意外責任（每一事故體傷）'];
+// Ray 拍板的四項 → 上面七列的分組。
+var PKIND_GROUP={'住宅火險':'住宅火險＋地震險','住宅地震基本保險':'住宅火險＋地震險',
+ '汽車第三人責任（體傷·每人）':'第三人責任險（車）','汽車第三人責任（財損·每次事故）':'第三人責任險（車）',
+ '車體損失險':'車體險','雇主責任（每人）':'雇主／公共意外責任','公共意外責任（每一事故體傷）':'雇主／公共意外責任'};
+var PGROUPS=['住宅火險＋地震險','第三人責任險（車）','車體險','雇主／公共意外責任'];
+// 保單端：險種細分（POLICY_SUB['產物']）→ 取哪一個保額欄位。
+// pAmount 是既有欄位（保額/主要限額）；pBodily / pProperty 是這一批新增的體傷／財損限額。
+var PPOLICY_MAP={
+ '住宅火險':{subs:['住宅火險','居家綜合'],field:'pAmount'},
+ '住宅地震基本保險':{subs:['地震險'],field:'pAmount'},
+ '汽車第三人責任（體傷·每人）':{subs:['汽車第三人責任','機車第三人'],field:'pBodily'},
+ '汽車第三人責任（財損·每次事故）':{subs:['汽車第三人責任','機車第三人'],field:'pProperty'},
+ '車體損失險':{subs:['汽車車體'],field:'pAmount'},
+ '雇主責任（每人）':{subs:['雇主責任'],field:'pBodily'},
+ '公共意外責任（每一事故體傷）':{subs:['公共意外'],field:'pBodily'}
+};
+// 保單險種細分 → 它會對到產險比對的哪幾列（保單卡上直接告訴教練）。
+function propKindsOfSub(sub){
+ return PKINDS.filter(function(k){return PPOLICY_MAP[k].subs.indexOf(sub)>=0;});
+}
+// 需求端覆寫欄位（住在 plans.data 的 c.propNeed，不需要 migration）。
+var PNEED_FIELD={'住宅火險':'fire','住宅地震基本保險':'quake',
+ '汽車第三人責任（體傷·每人）':'liabBodily','汽車第三人責任（財損·每次事故）':'liabProperty',
+ '車體損失險':'ownDamage','雇主責任（每人）':'employer','公共意外責任（每一事故體傷）':'publicLiab'};
+function propNeedOf(c){var o=(c&&c.propNeed);return (o&&typeof o==='object')?o:{};}
+
+// 不動產（建物）與車輛的挑選。
+// ⚠️ 「土地」與「車位」刻意排除：土地不會燒掉也不需要重置，把它算進火險保額
+//    等於系統性高估保額（也是實務上最常見的超額投保原因）。
+var PROP_REALTY_TYPES=['自住不動產','不動產','出租不動產'];
+function propRealty(c){return (((c||{}).assets)||[]).filter(function(a){
+ if(!a||a.type==='土地'||a.type==='車位')return false;
+ return PROP_REALTY_TYPES.indexOf(a.type)>=0||/房|宅/.test(String(a.name||''));});}
+function propVehicles(c){return (((c||{}).assets)||[]).filter(function(a){
+ if(!a||a.type==='車位')return false;
+ return a.type==='自用車輛'||/車/.test(String(a.type||'')+String(a.name||''));});}
+function propRealtyValue(c){return sum(propRealty(c),function(a){return aVal(a);});}
+function propVehicleValue(c){return sum(propVehicles(c),function(a){return aVal(a);});}
+// 企業側：員工數與平均月薪（雇主責任／公共意外的推估基礎）。
+function propEmployees(c){
+ var pn=propNeedOf(c),v=n(pn.employees);
+ if(v>0)return v;
+ return sum(((c||{}).companies)||[],function(co){return n(co&&co.employees);});
+}
+function propAvgWage(c){var v=n(propNeedOf(c).avgWage);return v>0?v:NHI_SALARY_MIN;}
+
+// 需求端自動帶入。回 {need, auto, src}：auto=true 代表這個數字是系統估的，UI 一定要標。
+function propAutoNeed(c,kind){
+ var pn=propNeedOf(c),hasHouse=propRealty(c).length>0,hasCar=propVehicles(c).length>0;
+ var emp=propEmployees(c),hasBiz=(((c||{}).companies)||[]).length>0||emp>0;
+ if(kind==='住宅火險'){
+  if(!hasHouse)return {need:0,auto:true,src:'資產表沒有不動產'};
+  var ping=n(pn.ping),unit=n(pn.pingPrice)||PROP_PING_COST;
+  if(ping>0)return {need:Math.round(ping*unit),auto:true,src:'建坪 '+ping+' 坪 × 每坪重置單價 '+fmt(unit)+' 元（不含土地）'};
+  var ratio=n(pn.buildRatio)>0?n(pn.buildRatio)/100:PROP_BUILDING_RATIO;
+  return {need:Math.round(propRealtyValue(c)*ratio),auto:true,
+   src:'未填建坪 → 由不動產市價 '+fmt(propRealtyValue(c))+' × 建物佔比 '+Math.round(ratio*100)+'% 粗估（請改填建坪會準得多）'};
+ }
+ if(kind==='住宅地震基本保險'){
+  var units=propRealty(c).length;
+  return {need:units*QUAKE_BASIC_SUM,auto:true,
+   src:units?('住宅 '+units+' 戶 × 法定基本保額 '+fmt(QUAKE_BASIC_SUM)+' 元／戶（另有臨時住宿費用 '+fmt(QUAKE_LODGING)+' 元，非保額）'):'資產表沒有不動產'};
+ }
+ if(kind==='汽車第三人責任（體傷·每人）')
+  return {need:hasCar?CAR_LIAB_BODILY:0,auto:true,src:hasCar?('市場級距建議值（強制險身故／失能上限僅 '+fmt(CALI_DEATH)+' 元，超過的部分靠任意險）'):'資產表沒有車輛'};
+ if(kind==='汽車第三人責任（財損·每次事故）')
+  return {need:hasCar?CAR_LIAB_PROPERTY:0,auto:true,src:hasCar?'市場級距建議值（強制險完全不賠財損）':'資產表沒有車輛'};
+ if(kind==='車體損失險'){
+  var v=Math.round(propVehicleValue(c));
+  return {need:v,auto:true,src:v?('車輛資產現值合計 '+fmt(v)+' 元'):'資產表沒有車輛'};
+ }
+ if(kind==='雇主責任（每人）')
+  return {need:hasBiz?Math.round(propAvgWage(c)*EMPLOYER_COMP_MONTHS):0,auto:true,
+   src:hasBiz?('平均月薪 '+fmt(propAvgWage(c))+' × '+EMPLOYER_COMP_MONTHS+' 個月（勞基法 §59 職災死亡補償 40 個月＋喪葬費 5 個月）'):'沒有登錄公司或員工數'};
+ if(kind==='公共意外責任（每一事故體傷）')
+  return {need:hasBiz?PUBLIC_LIAB_STD[1]:0,auto:true,
+   src:hasBiz?('多數縣市自治條例的最低投保基準：每人 '+fmt(PUBLIC_LIAB_STD[0])+'／每一事故 '+fmt(PUBLIC_LIAB_STD[1])+'／財損 '+fmt(PUBLIC_LIAB_STD[2])+'／期間總額 '+fmt(PUBLIC_LIAB_STD[3])):'沒有登錄公司或員工數'};
+ return {need:0,auto:true,src:''};
+}
+
+// 已備：有效的產物保單，依險種細分對到欄位。
+function propHave(c,kind){
+ var mp=PPOLICY_MAP[kind];if(!mp)return 0;
+ return sum(((c||{}).policies)||[],function(p){
+  if(!p||p.bigCat!=='產物'||!policyActive(p))return 0;
+  return (mp.subs.indexOf(p.subtype)>=0)?n(p[mp.field]):0;
+ });
+}
+
+// 產險比對表。⚠️ 單位全部是「元」的保險金額，但**刻意不併進 gapTotals()**：
+//    人身缺口的分母是「人的責任」，產險的分母是「資產與責任限額」，加起來沒有意義。
+function propGaps(c){
+ return PKINDS.map(function(k){
+  var a=propAutoNeed(c,k),ov=n(propNeedOf(c)[PNEED_FIELD[k]]);
+  var need=ov>0?ov:a.need,have=propHave(c,k);
+  return {kind:k,group:PKIND_GROUP[k],need:need,have:have,gap:need-have,
+   auto:!(ov>0),src:(ov>0?'教練手動指定':a.src),autoNeed:a.need};
+ });
+}
+// 產險缺口總額。⚠️ 獨立呈現，不進 gapTotals()／health().riskCover／shortPV。
+function propGapTotals(c){
+ var t={need:0,have:0,gap:0,rows:0};
+ propGaps(c).forEach(function(g){
+  if(g.need<=0&&g.have<=0)return;
+  t.rows++;t.need+=g.need;t.have+=g.have;t.gap+=Math.max(0,g.gap);
+ });
+ return t;
+}
 
 function propertyGaps(c){
  return (c.goals||[]).filter(function(g){return g.type==='購屋'||g.type==='置產'}).map(function(g){
@@ -661,13 +1184,21 @@ function propertyGaps(c){
 }
 
 function metrics(c){
- var incTotal=sum(c.incomes,function(i){return n(i.amount)});
+ // ⚠️⚠️ 收支加總一律「只算現齡有效的列」，與 projection 第 0 年同一套判斷（inSpan）。
+ //    舊版把整張表加總、完全不看每列起訖 → 同一份資料兩套口徑：
+ //    現齡 70、收入列 40–65 全部結束，incTotal 仍是 190 萬、所得穩定度 100%、階段判 C，
+ //    而同一年的 projection().rows[0] 是 work:0 / bal:−1,322,400（正解是 D）。
+ //    真的需要「表面總額」（不看起訖、教練打字打了什麼就是什麼）的地方，用 incTotalRaw / expTotalRaw。
+ var incTotalRaw=sum(c.incomes,function(i){return n(i.amount)});
+ var incTotal=sum(c.incomes,function(i){return activeNow(c,i)?n(i.amount):0});
  var passive=assetPassive(c);
- var incFinancial=sum(c.incomes,function(i){return i.type==='理財'?n(i.amount):0})+passive;
+ var incFinancial=sum(c.incomes,function(i){return (i.type==='理財'&&activeNow(c,i))?n(i.amount):0})+passive;
  var living=familyAnnualLiving(c);
- var tax=sum(c.expenses,function(e){return e.cat==='稅賦'?n(e.amount):0});
- var ins=sum(c.expenses,function(e){return e.cat==='保險'?n(e.amount):0});
- var expTotal=sum(c.expenses,function(e){return n(e.amount)})+annualDebtPay(c);
+ var tax=sum(c.expenses,function(e){return (e.cat==='稅賦'&&activeNow(c,e))?n(e.amount):0});
+ var ins=sum(c.expenses,function(e){return (e.cat==='保險'&&activeNow(c,e))?n(e.amount):0});
+ // annualDebtPay() 本來就只算「現齡還在攤還中」的負債，語意不變。
+ var expTotalRaw=sum(c.expenses,function(e){return n(e.amount)})+annualDebtPay(c);
+ var expTotal=sum(c.expenses,function(e){return activeNow(c,e)?n(e.amount):0})+annualDebtPay(c);
  var saveInvest=savingInvest(c);
  var cash=sum(c.assets,function(a){return (a.type==='現金'||a.type==='定存')?aVal(a):0});
  var liquid=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
@@ -676,6 +1207,7 @@ function metrics(c){
  var net=assetTotal-debtTotal, save_=incTotal-expTotal, interest=annualDebtInterest(c), monthExp=expTotal/12;
  var proj=projection(c);
  return {incTotal:incTotal,incFinancial:incFinancial,living:living,tax:tax,ins:ins,expTotal:expTotal,saveInvest:saveInvest,cash:cash,liquid:liquid,
+  incTotalRaw:incTotalRaw,expTotalRaw:expTotalRaw,retireAgeAssumed:retireAgeAssumed(c),
   assetTotal:assetTotal,debtTotal:debtTotal,net:net,save:save_,interest:interest,monthExp:monthExp,visionNeed:proj.totalOutflow,proj:proj};
 }
 
@@ -684,16 +1216,18 @@ function metrics(c){
 function ratios(c){var m=metrics(c),r={};
  var inc=m.incTotal||1, at=m.assetTotal||1;
  // 收支流量子聚合
- var incWork=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
- var livingCore=sum(c.expenses,function(e){return e.cat==='生活'?n(e.amount):0});
- var discretionary=sum(c.expenses,function(e){return (e.cat==='消費'||e.cat==='其他')?n(e.amount):0});
- var rent=sum(c.expenses,function(e){return (e.cat==='生活'&&/租/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
- var insAll=sum(c.expenses,function(e){return e.cat==='保險'?n(e.amount):0});
- var social=sum(c.expenses,function(e){return (e.cat==='保險'&&/(勞保|健保|勞健保|社會|國保|國民年金)/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
+ // ⚠️ 分母 inc / m.expTotal 已經是「現齡有效」，這些分子也一定要同一個口徑，
+ //    否則現齡 70、收入列都結束的個案會算出「所得穩定度 190000%」這種東西。
+ var incWork=sum(c.incomes,function(i){return (i.type==='工作'&&activeNow(c,i))?n(i.amount):0});
+ var livingCore=sum(c.expenses,function(e){return (e.cat==='生活'&&activeNow(c,e))?n(e.amount):0});
+ var discretionary=sum(c.expenses,function(e){return ((e.cat==='消費'||e.cat==='其他')&&activeNow(c,e))?n(e.amount):0});
+ var rent=sum(c.expenses,function(e){return (e.cat==='生活'&&activeNow(c,e)&&/租/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
+ var insAll=sum(c.expenses,function(e){return (e.cat==='保險'&&activeNow(c,e))?n(e.amount):0});
+ var social=sum(c.expenses,function(e){return (e.cat==='保險'&&activeNow(c,e)&&/(勞保|健保|勞健保|社會|國保|國民年金)/.test((e.name||'')+(e.subCat||'')))?n(e.amount):0});
  var premium=Math.max(0,insAll-social);
  var loanPay=annualDebtPay(c)+manualLoanPay(c);
  var eduNow=sum(c.education,function(e){var s=n(e.startIn);return (s<=0&&0<s+n(e.years))?n(e.annual):0});
- var support=sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0})+eduNow;
+ var support=sum(c.expenses,function(e){return (e.cat==='孝親'&&activeNow(c,e))?n(e.amount):0})+eduNow;
  // 有效儲蓄率的分子：有登錄「儲蓄理財投入」就用它（對齊原表），
  // 沒有才退回舊的參數欄／年結餘——既有案子的數字不變。
  var saveActive=m.saveInvest>0?m.saveInvest:(n(c.params.planYearly)||Math.max(0,m.save));
@@ -723,7 +1257,7 @@ function ratios(c){var m=metrics(c),r={};
  add(g1,'名目儲蓄率',pct(m.save/inc),'20%~30%','年結餘 ÷ 總收入',bandLow(m.save/inc*100,20));
  add(g1,'有效儲蓄率',pct(saveActive/inc),'20%~30%','儲蓄理財投入 ÷ 總收入',bandLow(saveActive/inc*100,20));
  add(g1,'理財收入比',pct(m.incFinancial/inc),'—','理財收入 ÷ 總收入','na');
- add(g1,'財務自由度',pct(m.incFinancial/(m.expTotal||1)),'≥100% 即財務自由','理財收入 ÷ 總支出',m.incFinancial>=m.expTotal?'good':m.incFinancial>=m.expTotal*0.3?'warn':'na');
+ add(g1,'財務自由度',m.expTotal>0?pct(m.incFinancial/m.expTotal):'—（現齡沒有有效支出）','≥100% 即財務自由','理財收入 ÷ 總支出',m.expTotal<=0?'na':(m.incFinancial>=m.expTotal?'good':(m.incFinancial>=m.expTotal*0.3?'warn':'na')));
  add(g2,'資產變現性',pct(m.liquid/at),'>30%','流動資產 ÷ 總資產',bandLow(m.liquid/at*100,30));
  add(g2,'生活準備金適足',fmt(emReq)+' 元','6 個月支出','(年支出/12)×6','na');
  add(g2,'超額現金比率',emReq?pct(m.cash/emReq):'—','50%~100%','現金 ÷ 生活準備金',emReq?bandRange(m.cash/emReq*100,50,100):'na');
@@ -740,11 +1274,22 @@ function ratios(c){var m=metrics(c),r={};
  else add(g2,'資產淨值增長率','—（需兩年度資料）','愈高愈好','需連續兩年淨值','na');
  var _vr=visionRateOf(m.proj);
  add(g2,'願景達成率',pct(_vr/100),'≥100%','1 −（現值缺口 ÷ 一生需求現值）',bandLow(_vr,100));
+ /* ⚠️ A1 之後 incTotal 真的可能是 0（現齡不落在任何一列收入的起訖內）。
+    以收入為分母的那幾項這時全都是「除以 1」的假數字（−50,400,000% 之類，示範案林曉薇就是），
+    一律換成「—」並熄燈——沒有有效收入就算不出收入比，硬給一個數字比留白更誤導。
+    是哪幾列的起訖不含現齡，由「比率計算原料」那一段點名。
+    ⚠️ 只在「有收入列、但沒有一列涵蓋現齡」時才換（incTotalRaw>0）——
+       整張收入表本來就空白的個案維持改版前的顯示，不要順手改動不相干的數字。*/
+ if(m.incTotal<=0&&m.incTotalRaw>0){
+  ['所得穩定度','支出收入比','生活費用比','貸款壓力比','租金壓力比','保費支出比','低彈性支出比','撫養壓力比','消費隨興比','名目儲蓄率','有效儲蓄率','理財收入比'].forEach(function(k){
+   if(r[k]){r[k].v='—（現齡沒有有效收入）';r[k].status='na';r[k].ok=false;}
+  });
+ }
  return r;
 }
 
 function projection(c,lump,rateOverride){
- var a0=n(c.profile.age)||40,aEnd=n(c.params.horizon)||85,infl=n(c.params.inflation)/100;
+ var a0=n(c.profile.age)||40,aEnd=effHorizon(c),infl=n(c.params.inflation)/100;
  // rateOverride＝求解器拿「同一份個案、換一個報酬率假設」再跑一次時用；lump＝今天先塞一筆錢進去。
  var ret=((rateOverride!==undefined&&rateOverride!==null&&rateOverride!=='')?n(rateOverride):effReturn(c))/100;
  var invest=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0})+n(lump);
@@ -767,16 +1312,16 @@ function projection(c,lump,rateOverride){
  var evts=[], legacyTarget=legacyNeed(c);
  for(var age=a0;age<=aEnd;age++){
   var t=age-a0;
-  var workIncome=sum(c.incomes,function(i){return (i.type==='工作'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
-  var finIncome=sum(c.incomes,function(i){return (i.type==='理財'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0})+assetPassive(c);
-  var otherIncome=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
+  var workIncome=sum(c.incomes,function(i){return (i.type==='工作'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
+  var finIncome=sum(c.incomes,function(i){return (i.type==='理財'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0})+assetPassive(c);
+  var otherIncome=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
   var income=workIncome+finIncome+otherIncome;
   // 三段式：w＝已退休賺薪成員的支出比例權重。生活/消費依 w 從工作期換到退休期。
   var inflF=Math.pow(1+infl,t);
   var w=retiredWeight(c,age);
   var expense=workPhaseExpense(c,age,inflF,w);
-  var debt=sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;var el=(age-sa)*12;return (age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0});
-  var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(age<n(gg.start)||age>n(gg.end))return 0;
+  var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)});
+  var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(!inSpan(gg,age))return 0;
     var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;
     var gr=gg.growth==='通膨'?infl:(gg.growth==='薪資'?n(c.params.salaryGrowth)/100:(gg.type==='購屋'?n(gg.appreciation)/100:0));
     return n(gg.present)*Math.pow(1+gr,t);});
@@ -1014,12 +1559,37 @@ function incomeCeilingPct(c){
  if(!(pct>0))return CAP_INCOME_UP;
  return pct;
 }
+// ===== 每一列自己的「可刪減%」保護線（expenses[].cut）=====
+// ⚠️⚠️ 改版前 applyLevers() 對所有生活/消費列一律砍 set.expense%，完全不看每列的 cut：
+//    教練在訪談裡一列一列問出「這一項最多只能砍 10%」設了保護線，槓桿照樣砍 30%
+//    （實測 cut=10% 的生活費用列，槓桿砍 30% 時仍被砍到 504,000）。
+// ⚠️ 未填（0 或空）＝**沒有設上限**＝吃槓桿的全額。
+//    絕對不能反過來當「不可刪減」——全庫只有 63 筆有填，反過來會讓整根槓桿一夜失效。
+//    UI 的欄位提示要把這句話寫出來（見 finDF('可刪減 %') 的 hint）。
+function rowCutPct(e,leverPct){
+ var cap=n(e&&e.cut);
+ return cap>0?Math.min(leverPct,cap):leverPct;
+}
+// 「減少支出」這根槓桿真正還推得動的上限＝所有生活/消費列裡最寬鬆的那一條保護線。
+// ⚠️⚠️ 求解器的 hi 一定要吃這個值：否則 leverRange 說「可以砍到 30%」、applyLevers
+//    實際只砍得到 10%，二分法會在 10~30 之間收斂到一個「做得到」但其實毫無作用的答案，
+//    處方箋會開出一個假的方案（"求解器以為砍得到、實際砍不到"）。
+// ⚠️ 完全沒有生活/消費列時回 0 → solveLever 的 lo=hi=0，直接判 infeasible，這是對的。
+function expenseCutCap(c){
+ var cap=0;
+ ((c||{}).expenses||[]).forEach(function(e){
+  if(!isLivingCat(e.cat)||!(n(e.amount)>0))return;
+  var rc=n(e.cut);
+  cap=Math.max(cap,rc>0?Math.min(rc,CAP_EXPENSE_CUT):CAP_EXPENSE_CUT);
+ });
+ return Math.min(cap,CAP_EXPENSE_CUT);
+}
 function leverRange(c,id,gate){
  gate=gate||leverGate(c);
  if(id==='rate')return {lo:effReturn(c),hi:Math.max(effReturn(c),gate.rateCap),step:0};
  if(id==='retire')return {lo:0,hi:CAP_RETIRE_DELAY,step:1};
  if(id==='income')return {lo:0,hi:incomeCeilingPct(c)};
- if(id==='expense')return {lo:0,hi:CAP_EXPENSE_CUT};
+ if(id==='expense')return {lo:0,hi:expenseCutCap(c)};
  if(id==='retireLevel')return {lo:0,hi:CAP_RETIRE_CUT};
  return {lo:0,hi:CAP_VISION_CUT};
 }
@@ -1041,7 +1611,8 @@ function applyLevers(c,set){
  var inc=n(set.income);
  if(inc)(a.incomes||[]).forEach(function(i){if(i.type==='工作')i.amount=n(i.amount)*(1+inc/100)});
  var cut=n(set.expense);
- if(cut)(a.expenses||[]).forEach(function(e){if(isLivingCat(e.cat))e.amount=n(e.amount)*(1-cut/100)});
+ // ⚠️ 每一列取 min(槓桿要求的%, 該列的可刪減%)——教練設的保護線不能被槓桿蓋過去。見 rowCutPct。
+ if(cut)(a.expenses||[]).forEach(function(e){if(isLivingCat(e.cat))e.amount=n(e.amount)*(1-rowCutPct(e,cut)/100)});
  if(set.rate!==undefined&&set.rate!==null&&set.rate!==''){
   a.params=a.params||{};a.params.invReturn=n(set.rate);
   a.plan=a.plan||{};a.plan.useAllocReturn=false;   // 手動指定報酬率就不再跟著配置走
@@ -1145,9 +1716,11 @@ function gapLedger(c){
  var now=[];
  var covs={};
  coverageGaps(c).forEach(function(g){if(g.gap>0)covs[g.kind]=(covs[g.kind]||0)+g.gap});
- Object.keys(covs).forEach(function(k){now.push({name:'保障・'+k,amount:covs[k],kind:'保障'})});
+ // ⚠️ 每一列都要帶自己的單位：這張清單同時放得下「壽險 500 萬元」與「住院醫療 3,000 元/日」，
+ //    少了 unit 就會被讀成同一種錢（B3 的起因）。amount 一律不換算。
+ Object.keys(covs).forEach(function(k){now.push({name:'保障・'+k,amount:covs[k],kind:'保障',unit:kindUnit(k)})});
  var emReq=m.monthExp*(n(c.params.emergencyMonths)||6),emGap=Math.max(0,emReq-m.cash);
- if(emGap>0)now.push({name:'緊急預備金',amount:emGap,kind:'流動性'});
+ if(emGap>0)now.push({name:'緊急預備金',amount:emGap,kind:'流動性',unit:'元'});
  now.sort(function(a,b){return b.amount-a.amount});
  // 每年要補多少：用償債基金公式（不是把現值缺口直接除以年數——那會低估到離譜）。
  // 期數取「到退休」與「到第一個不足年」孰早：錢要在缺口發生之前就位，
@@ -1298,7 +1871,7 @@ function allocReconcile(c,set){
  });
  var protect=led.now.map(function(x){
   var have=byKey[x.name]||0;
-  return {name:x.name,kind:x.kind,need:x.amount,have:have,short:Math.max(0,x.amount-have),ok:have>=x.amount-0.5};
+  return {name:x.name,kind:x.kind,unit:x.unit||'元',need:x.amount,have:have,short:Math.max(0,x.amount-have),ok:have>=x.amount-0.5};
  });
  var unassigned=protect.filter(function(p){return !p.ok});
  var orphan=Object.keys(byKey).filter(function(k){
@@ -1425,7 +1998,7 @@ function planActions(c,set){
  (led.now||[]).forEach(function(x){
   acts.push({axis:(x.kind==='保障'?'保障':'流動性'),
    title:(x.kind==='保障'?'補足保障缺口':'補足緊急預備金'),
-   detail:x.name+' 尚差 '+fmt(x.amount)+' 元',
+   detail:x.name+' 尚差 '+fmt(x.amount)+' '+(x.unit||'元'),
    note:'不併入現值缺口——這是事件發生才要的錢／隨時要能動用的錢'});
  });
 
@@ -1441,7 +2014,7 @@ function gauss(rng,m,sd){var u=0,v=0;while(u===0)u=rng();while(v===0)v=rng();ret
 function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(hashStr(c.id)+N);
  // horizon 沒填時要退回 85（與 projection 一致）。少了 ||85 會讓 years 變負數 →
  // 迴圈不執行 → neg=0 → pSuccess 顯示「不破產機率 100%」而圖是空的。
- var a0=n(c.profile.age)||40,aEnd=n(c.params.horizon)||85,years=Math.max(0,aEnd-a0+1);
+ var a0=n(c.profile.age)||40,aEnd=effHorizon(c),years=Math.max(0,aEnd-a0+1);
  var bR=n(c.params.invReturn),sR=n(c.params.invReturnStd),bI=n(c.params.inflation),sI=n(c.params.inflationStd),bG=n(c.params.salaryGrowth),sG=n(c.params.salaryStd);
  var liquid0=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
  var passive=assetPassive(c);
@@ -1452,14 +2025,14 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  for(var s=0;s<N;s++){var invest=liquid0,cumI=1,cumG=1,broke=false,traj=[];
   for(var age=a0;age<=aEnd;age++){var t=age-a0;
    var ret=gauss(rng,bR,sR)/100,infl=gauss(rng,bI,sI)/100,sg=gauss(rng,bG,sG)/100;
-   var work=(function(){var w=0;c.incomes.forEach(function(i){if(i.type==='工作'&&age>=n(i.start)&&age<=n(i.end))w+=n(i.amount)*cumG});return w})();
-   var other=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount):0});
-   var fin=sum(c.incomes,function(i){return (i.type==='理財'&&age>=n(i.start)&&age<=n(i.end))?n(i.amount):0})+passive;
+   var work=(function(){var w=0;c.incomes.forEach(function(i){if(i.type==='工作'&&inSpan(i,age))w+=n(i.amount)*cumG});return w})();
+   var other=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&inSpan(i,age))?n(i.amount):0});
+   var fin=sum(c.incomes,function(i){return (i.type==='理財'&&inSpan(i,age))?n(i.amount):0})+passive;
    var income=work+other+fin;
    var wMC=retiredWeight(c,age);
    var expense=workPhaseExpense(c,age,cumI,wMC);
-   var debt=sum(c.liabilities,function(l){var sa=n(l.startAge)||a0;var el=(age-sa)*12;return (age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0});
-   var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(age<n(gg.start)||age>n(gg.end))return 0;var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;var gr=gg.growth==='通膨'?cumI:1;return n(gg.present)*gr});
+   var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)});
+   var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(!inSpan(gg,age))return 0;var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;var gr=gg.growth==='通膨'?cumI:1;return n(gg.present)*gr});
    var eduY=edu[age]||0;
    var lifeY=lifestyleFactor(c,age,cumI);
    var retireDraw=retireAnnual(c,age,cumI)*wMC;
@@ -1484,12 +2057,22 @@ function health(c){
  // 用 cs/100 會讓 700 分算成 7.0、safety 直接飆到 183。與 lantu-app.html:827 一致。
  var cs=creditScoreOf(c);var credit=cs>=200?Math.min(1,Math.max(0,(cs-200)/600)):0;
  var dr=m.debtTotal/(m.assetTotal||1);var debtBal=dr<0.2?1:Math.max(0,1-(dr-0.2)/0.6);
- var need=totalGap(c),needBase=sum(coverageGaps(c),function(g){return g.need})||1;
+ /* ⚠️⚠️ 風險保全（安全度 30 分權重）只吃「一次性給付缺口」。
+    改版前的分子是 totalGap()＝三種單位硬加，分母是同樣硬加的需求總額，
+    等於拿「500 萬元 ＋ 3,000 元/日 ＋ 30,000 元/月」去除以另一個同樣沒有意義的和。
+    一次性給付是唯一與保額同維度、可以直接比的數字；日額／月額缺口改在畫面上
+    獨立呈現（gapTotals().daily / .monthly），不進分數。 */
+ var need=gapTotals(c).lump,needBase=gapNeedBase(c).lump||1;
  var riskCover=Math.max(0,1-need/needBase);
  var balScore=savingRate>=0?1:Math.max(0,1+savingRate);
  // 五項加權滿分 100；clamp 是防呆，任何一項若因資料異常超出 0~1 都不該讓總分破表。
  var safety=Math.max(0,Math.min(100,Math.round((balScore*25+reserve*15+credit*15+debtBal*15+riskCover*30))));
- var freedom=Math.round(Math.min(1,m.incFinancial/(m.expTotal||1))*100);
+ /* ⚠️ A1 之後 expTotal 真的可能是 0（現齡不落在任何一列的起訖內）。
+    舊寫法 m.incFinancial/(m.expTotal||1) 會把「沒有任何有效支出」讀成
+    「理財收入覆蓋了 100% 的支出」→ 財務階段直接跳到 A 遠行期
+    （2025 示範案的張文山 29 歲、每一列都從 40 歲起算，就是這樣 D→A）。
+    沒有支出可以覆蓋，那不是財務自由，是資料不完整。*/
+ var freedom=m.expTotal>0?Math.round(Math.min(1,m.incFinancial/m.expTotal)*100):0;
  // 願景達成度＝1 −（現值缺口 ÷ 一生需求現值）。舊公式是「淨資產 ÷ 一生總流出」——
  // 分子存量、分母流量，而且完全不看未來收入，導致幾乎每個客戶都卡在兩三成、教練無從判斷輕重。
  // m.proj 是 metrics() 已經跑過的那一份，這裡不會多跑一次 projection。
@@ -1550,7 +2133,12 @@ function advice(c){
  if(rn.gap>0)list.push(['退休缺口','退休總需求約 '+fmt(rn.total)+' 元、已備 '+fmt(rn.prepared)+' 元，缺口 '+fmt(rn.gap)+' 元，建議建立長期儲蓄與配置。']);
  if(eduTotal(c)>0)list.push(['子女教育準備','教育金總需求(終值)約 '+fmt(eduTotal(c))+' 元，建議專款專用、定期定額提前準備。']);
  if(m.incFinancial/(m.expTotal||1)<1)list.push(['增加理財收入','理財收入僅覆蓋 '+(m.incFinancial/(m.expTotal||1)*100).toFixed(0)+'% 總支出，建議資產活化創造被動現金流。']);
- var tg=totalGap(c);if(tg>0)list.push(['風險保全規劃','保障缺口合計約 '+fmt(tg)+' 元，優先補足壽險／房貸壽險。']);
+ // 缺口分兩種給付形態呈現，刻意不相加（見 gapTotals）。
+ var gt=gapTotals(c),gtx=[];
+ if(gt.lump>0)gtx.push('一次性給付缺口約 '+fmt(gt.lump)+' 元');
+ if(gt.daily>0)gtx.push('定期給付缺口日額 '+fmt(gt.daily)+' 元/日');
+ if(gt.monthly>0)gtx.push('定期給付缺口月額 '+fmt(gt.monthly)+' 元/月');
+ if(gtx.length)list.push(['風險保全規劃',gtx.join('、')+'。三者單位不同、刻意不相加。這是還沒被安排到的那一段，先從壽險／房貸壽險補起。']);
  var movable=sum(c.assets,function(a){return a.movable?aVal(a):0});
  if(movable>0)list.push(['資產活化配置','可調整資產約 '+fmt(movable)+' 元，建議多元配置分散風險。']);
  if(m.tax/(m.incTotal||1)>0.1)list.push(['節稅規劃','稅負佔收入偏高，建議檢視申報方式與資產架構。']);
@@ -1608,7 +2196,16 @@ function incomeTax(c){
 function estateTax(c,netOverride){
  var tp=(c||{}).taxParams||{};
  var lg=(c||{}).legacy||{};
- var net=(netOverride!=null)?netOverride:metrics(c).net;
+ var netBase=(netOverride!=null)?netOverride:metrics(c).net;
+ /* ===== 傳承金額納入遺產稅稅基（legacy.feedEstate）=====
+    ⚠️⚠️ 改版前 estateTax() 根本沒讀 feedEstate（25 份勾了），報告書卻寫
+    「本次規劃已把傳承金額納入遺產稅的試算」——那句文案在說謊。
+    勾了就真的把 legacyNeed(c)（＝繼承人數 × 每人現金傳承）加進稅基：要留給繼承人的
+    那筆現金本來就得先進遺產、先被課一次稅，客戶才留得住。沒勾＝維持改版前的算法。
+    ⚠️ 這一項**只做遺產稅這一段**。legacyNeed 仍然沒有進 projection() 的 needPV
+       （那裡目前只做旗標），那是另一個地基決定，已在回報裡提出來給 Ray，不自作主張。 */
+ var legacyFed=lg.feedEstate?legacyNeed(c):0;
+ var net=netBase+legacyFed;
  var heirs=Math.max(0,n(lg.heirs));
  var ded={
   exempt:ESTATE_EXEMPT,
@@ -1620,7 +2217,8 @@ function estateTax(c,netOverride){
  var totalDed=ded.exempt+ded.spouse+ded.lineal+ded.funeral+ded.other;
  var base=Math.max(0,net-totalDed);
  var b=bracket(base,EST_BR);
- return {base:base,rate:b.rate,tax:b.tax,net:net,heirs:heirs,deductions:ded,totalDeduction:totalDed};
+ // net＝實際課稅用的遺產淨額（已含傳承）；netBase＝未加傳承的家庭淨值；legacyFed＝這次加了多少。
+ return {base:base,rate:b.rate,tax:b.tax,net:net,netBase:netBase,legacyFed:legacyFed,heirs:heirs,deductions:ded,totalDeduction:totalDed};
 }
 
 function propertyTax(c){var tp=c.taxParams||{};var house=n(tp.houseAssessed)*HOUSE_TAX_RATE,land=n(tp.landAssessed)*LAND_TAX_RATE,car=n(tp.carTax);return {house:house,land:land,car:car,total:house+land+car}}
@@ -1744,15 +2342,17 @@ function scenario(c){
 }
 
 function crossTable(c){var m=metrics(c);
- var incWork=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
- var incFin=sum(c.incomes,function(i){return i.type==='理財'?n(i.amount):0});
- var incOther=sum(c.incomes,function(i){return i.type==='其他'?n(i.amount):0});
- var expLive=sum(c.expenses,function(e){return (e.cat==='生活'||e.cat==='消費')?n(e.amount):0});
+ // ⚠️ 每一列都跟 m.incTotal / m.expTotal 同一個口徑（現齡有效），
+ //    否則收支損益表的「合計」會對不上上面那幾列的和。
+ var incWork=sum(c.incomes,function(i){return (i.type==='工作'&&activeNow(c,i))?n(i.amount):0});
+ var incFin=sum(c.incomes,function(i){return (i.type==='理財'&&activeNow(c,i))?n(i.amount):0});
+ var incOther=sum(c.incomes,function(i){return (i.type==='其他'&&activeNow(c,i))?n(i.amount):0});
+ var expLive=sum(c.expenses,function(e){return ((e.cat==='生活'||e.cat==='消費')&&activeNow(c,e))?n(e.amount):0});
  var expTax=m.tax, expIns=m.ins;
  // 對齊 Excel 收支損益表：貸款與撫育（孝親＋教育）各自成列，不要全部倒進「其他」。
  var expLoan=manualLoanPay(c)+annualDebtPay(c);
- var expSupport=sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0});
- var expOther=sum(c.expenses,function(e){return ['生活','消費','稅賦','保險','孝親','貸款'].indexOf(e.cat)<0?n(e.amount):0});
+ var expSupport=sum(c.expenses,function(e){return (e.cat==='孝親'&&activeNow(c,e))?n(e.amount):0});
+ var expOther=sum(c.expenses,function(e){return (activeNow(c,e)&&['生活','消費','稅賦','保險','孝親','貸款'].indexOf(e.cat)<0)?n(e.amount):0});
  var aSelf=sum(c.assets,function(a){return aLiquid(c,a)?0:aVal(a)});
  var aInv=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
  var dCons=sum(c.liabilities,function(l){return isConsumerDebt(l)?lBal(l):0});
@@ -1808,6 +2408,12 @@ function pmt(bal,rate,months){months=n(months);if(!(months>0))return 0;var i=n(r
 
 export {
   KINDS,
+  KIND_UNIT,
+  kindUnit,
+  coverAmt,
+  DEFAULT_CARE_MONTHS,
+  careMonthsOf,
+  careNeedRows,
   EDU_STAGES,
   uid,
   sampleCase,
@@ -1844,7 +2450,15 @@ export {
   existingCover,
   coverageGaps,
   totalGap,
+  gapTotals,
+  gapNeedBase,
   grossLifeNeed,
+  indepDeps,
+  protectYearsEff,
+  growingAnnuityPV,
+  preparedPV,
+  preparedSuspect,
+  PREPARED_MONTHLY_MAX,
   CHECKUP_LABEL,
   applyCheckupParams,
   checkupState,
@@ -1877,6 +2491,62 @@ export {
   policyYearAt,
   surrenderAt,
   masterAnalysis,
+  // ── 二代健保 ──
+  NHI_YEAR,
+  NHI_RATE,
+  NHI_SALARY_MIN,
+  NHI_SALARY_MAX,
+  NHI_SALARY_GRADES,
+  NHI_DEP_CAP,
+  NHI_CATS,
+  nhiSelfRatio,
+  nhiJobCat,
+  nhiSalaryOf,
+  NHI_SUPP_RATE,
+  NHI_SUPP_MIN,
+  NHI_SUPP_YEAR,
+  NHI_SUPP_CAP,
+  NHI_SUPP_BONUS_MULT,
+  NHI_SUPP_WAGE_MIN,
+  NHI_SUPP_KINDS,
+  nhiSuppKindOf,
+  nhiPayTimes,
+  nhiSuppMinOf,
+  nhiGeneral,
+  nhiSuppRows,
+  nhiFamily,
+  NHI_AUTO_NAME,
+  nhiExpenseOn,
+  syncNHI,
+  // ── 產險比對線 ──
+  PROP_INS_YEAR,
+  QUAKE_BASIC_SUM,
+  QUAKE_LODGING,
+  PROP_PING_COST,
+  PROP_BUILDING_RATIO,
+  CAR_LIAB_BODILY,
+  CAR_LIAB_PROPERTY,
+  CALI_DEATH,
+  CALI_MEDICAL,
+  EMPLOYER_COMP_MONTHS,
+  PUBLIC_LIAB_STD,
+  PKINDS,
+  PGROUPS,
+  PKIND_GROUP,
+  PPOLICY_MAP,
+  propKindsOfSub,
+  PNEED_FIELD,
+  propNeedOf,
+  propRealty,
+  propVehicles,
+  propRealtyValue,
+  propVehicleValue,
+  propEmployees,
+  propAvgWage,
+  propAutoNeed,
+  propHave,
+  propGaps,
+  propGapTotals,
   propertyGaps,
   metrics,
   ratios,
@@ -1928,9 +2598,22 @@ export {
   isEarnerRole,
   isLivingCat,
   earnerRetirePoints,
+  retirePoints,
+  retireAgeAssumed,
+  DEFAULT_RETIRE_AGE,
   retiredWeight,
   retireAnnual,
   workPhaseExpense,
+  inSpan,
+  nowAge,
+  activeNow,
+  repayMode,
+  graceMonths,
+  debtPayAt,
+  rowCutPct,
+  expenseCutCap,
+  horizonManual,
+  effHorizon,
   familyAnnualParentSupport,
   manualLoanPay,
   savingInvest,

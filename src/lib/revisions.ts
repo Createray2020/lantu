@@ -2,10 +2,51 @@
 //
 // 雙軌：同一位客戶底下有兩條並行的 plan 軌（track='coach' 教練年度版 / track='client' 人生護照），
 // 兩軌的版本合併成一條時間軸呈現，最新的在最上面，每一版都可以回復。
-import { and, desc, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { planRevisions, plans } from "@/Shared/db/schema";
 import { planSnapshot } from "./snapshot";
+
+/**
+ * 每份規劃保留的版本上限（Ray 2026/08 拍板）。
+ *
+ * 背景：這張表 13 MB / 2,287 列全部只來自 23 份規劃（單份最高 740 版），
+ * 佔整個資料庫的一半，而且週成長 3.5 倍——卻因為 listRevisions/listClientTimeline
+ * 都有 limit，容量爆掉之前不會有任何可觀察的症狀。
+ */
+export const MAX_REVISIONS_PER_PLAN = 200;
+
+/**
+ * 內容指紋。JSON.stringify 不是標準化序列化（欄位順序換了就是另一個 hash），
+ * 但誤判的方向是安全的：算出不同 → 多寫一列；不會把「真的改過」的版本吃掉。
+ */
+export function revisionHash(data: unknown): string {
+  return createHash("sha256").update(JSON.stringify(data) ?? "null").digest("hex");
+}
+
+/**
+ * 刪掉這份規劃「最近 MAX_REVISIONS_PER_PLAN 列以外」的舊版本。
+ *
+ * ⚠️ 只在「這一次真的有寫入新版本」之後才呼叫，而且只針對那一個 planId ——
+ *    Ray 要的是「只對新產生的生效、不做一次性清理」：沒有人再編輯的規劃
+ *    一列都不會被動到，收斂發生在該份規劃下一次被存檔的時候。
+ * ⚠️ 自己吞掉例外。版本紀錄本來就是 best-effort，清理更不該把存檔弄壞。
+ */
+async function pruneRevisions(planId: string): Promise<void> {
+  try {
+    await db.delete(planRevisions).where(sql`
+      ${planRevisions.id} in (
+        select id from plan_revisions
+        where plan_id = ${planId}
+        order by created_at desc
+        offset ${MAX_REVISIONS_PER_PLAN}
+      )
+    `);
+  } catch (e) {
+    console.error("[pruneRevisions]", e);
+  }
+}
 
 export async function logRevision(
   planId: string,
@@ -15,7 +56,22 @@ export async function logRevision(
   data: unknown,
 ): Promise<void> {
   try {
-    await db.insert(planRevisions).values({ planId, editorType, editorId, editorName, data: data as object });
+    const hash = revisionHash(data);
+    // 上一版的內容一模一樣就整個跳過：700ms debounce 的自動存檔會產生大量
+    // 「其實沒改到東西」的版本，那才是這張表真正的成長來源。
+    // 舊列沒有 hash（null）→ 比不出來 → 照寫，不會因此漏版本。
+    const last = await db
+      .select({ dataHash: planRevisions.dataHash })
+      .from(planRevisions)
+      .where(eq(planRevisions.planId, planId))
+      .orderBy(desc(planRevisions.createdAt))
+      .limit(1);
+    if (last[0]?.dataHash && last[0].dataHash === hash) return;
+
+    await db.insert(planRevisions).values({
+      planId, editorType, editorId, editorName, data: data as object, dataHash: hash,
+    });
+    await pruneRevisions(planId);
   } catch (e) {
     console.error("[logRevision]", e);
   }
@@ -107,6 +163,10 @@ export type RestoreOutcome = { ok: true; planId: string } | { ok: false; error: 
 //    使用者按一次回復就永久失去中間的編輯。時間軸必須是只增不減的。
 // 2. planId 必須與 revision 實際所屬的 plan 相符，且呼叫端要先驗過這個 plan 屬於誰。
 //    少了這道檢查，帶一個別人的 revisionId 進來就能把任意內容寫進自己的 plan。
+//
+// 內容去重不會破壞第 1 點：唯一會被去重吃掉的情況是「回復的內容與目前最新版一模一樣」，
+// 而那種回復本來就沒有改變任何東西，不會有版本因此變成回不去。回復到內容不同的舊版時，
+// hash 必然與最新版不同，照樣記下新的一版。
 export async function restoreRevision(
   planId: string,
   revisionId: string,

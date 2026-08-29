@@ -162,11 +162,28 @@ describe("接管：手填的人身保費換成兩列投影", () => {
     expect(prem(c, "protect").end).toBe(90);
   });
 
-  it("原本就沒有保費列 → 起訖留空（＝一生），這是對的", () => {
-    const c = base();
+  // 2026/08/29 A4：原本這裡斷言 start===''，理由寫的是「留空＝一生，這是對的」——
+  // 但引擎那邊 n('')===0，workPhaseExpense 的 age>n(e.end) 每一年都命中，
+  // 這一列其實是「一毛都不計」，跟註解說的完全相反（全庫有一筆：金思妤的人身保險(保障型) 20,913）。
+  // Ray 拍板兩層都補：(a) 新列預設帶「現齡 → 預估壽命」；(b) 引擎把留空當全期間有效（見 inSpan）。
+  it("原本就沒有保費列 → 起訖預設帶「現齡 → 預估壽命」", () => {
+    const c = base();               // newCase：現齡 40、預估壽命 85
     c.policies = [pol("終身壽險", 76_500)];
     w.syncPremium(c);
-    expect(prem(c, "protect").start).toBe("");
+    expect(prem(c, "protect").start).toBe(40);
+    expect(prem(c, "protect").end).toBe(85);
+    expect(prem(c, "invest").start).toBe(40);
+    expect(prem(c, "invest").end).toBe(85);
+  });
+
+  it("A4b：就算起訖真的留空，引擎也當「全期間有效」而不是 0–0", () => {
+    const c = base();
+    c.expenses = [{ name: "人身保險(保障型)", cat: "保險", subCat: "人身保險(保障型)", period: "年",
+      amount: 20_913, infl: false, cut: 0, start: "", end: "", premAuto: "protect" }];
+    // 現齡與投影兩邊都要看得到這 20,913
+    expect(w.metrics(c).expTotal).toBe(20_913);
+    expect(w.workPhaseExpense(c, 40, 1, 0)).toBe(20_913);
+    expect(w.workPhaseExpense(c, 84, 1, 0)).toBe(20_913);
   });
 
   it("失效／停效的保單不算保費", () => {

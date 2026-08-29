@@ -132,10 +132,76 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   });
 
   // ── 2026/08 對齊 Excel 那一輪新增的共用語意 ──
+  // 2026/08/29 B1：「薪資補償」拆成日額／月額兩個險種，KINDS 從 9 變 10。
   it("KINDS 與 POLICY_MAP：險種清單與保單欄位對照兩邊一致", () => {
-    expect(HTML).toContain("var KINDS=['壽險','意外傷殘','住院醫療','醫療雜費','薪資補償','初次罹癌','癌症住院','重病給付','每月照護'];");
-    expect(HTML).toContain("var POLICY_MAP={'壽險':'life','意外傷殘':'accident','住院醫療':'medical','醫療雜費':'medMisc','薪資補償':'incomeComp','初次罹癌':'firstCancer','癌症住院':'cancerHosp','重病給付':'critical','每月照護':'monthCare'};");
-    expect(E.KINDS).toEqual(["壽險", "意外傷殘", "住院醫療", "醫療雜費", "薪資補償", "初次罹癌", "癌症住院", "重病給付", "每月照護"]);
+    expect(HTML).toContain("var KINDS=['壽險','意外傷殘','住院醫療','醫療雜費','薪資補償（日）','薪資補償（月）','初次罹癌','癌症住院','重病給付','每月照護'];");
+    expect(HTML).toContain("var POLICY_MAP={'壽險':'life','意外傷殘':'accident','住院醫療':'medical','醫療雜費':'medMisc','薪資補償（日）':'incomeCompDay','薪資補償（月）':'incomeCompMonth','初次罹癌':'firstCancer','癌症住院':'cancerHosp','重病給付':'critical','每月照護':'monthCare'};");
+    expect(E.KINDS).toEqual(["壽險", "意外傷殘", "住院醫療", "醫療雜費", "薪資補償（日）", "薪資補償（月）", "初次罹癌", "癌症住院", "重病給付", "每月照護"]);
+  });
+
+  // 單位表是 gapTotals() 分三堆與五欄表單位欄的唯一依據，兩邊逐字對拍。
+  it("KIND_UNIT：每個險種的給付單位兩邊一致", () => {
+    expect(HTML).toContain("var KIND_UNIT={'壽險':'元','意外傷殘':'元','住院醫療':'元/日','醫療雜費':'元',");
+    expect(HTML).toContain(" '薪資補償（日）':'元/日','薪資補償（月）':'元/月','初次罹癌':'元','癌症住院':'元/日',");
+    expect(HTML).toContain(" '重病給付':'元','每月照護':'元/月'};");
+    expect(HTML).toContain("function kindUnit(k){return KIND_UNIT[kindNorm(k)]||'元';}");
+    for (const k of E.KINDS) expect(["元", "元/日", "元/月"]).toContain(E.kindUnit(k));
+    expect(E.kindUnit("薪資補償（日）")).toBe("元/日");
+    expect(E.kindUnit("薪資補償（月）")).toBe("元/月");
+    // 舊值先過 kindNorm 再查表
+    expect(E.kindUnit("薪資補償")).toBe("元/月");
+  });
+
+  it("KIND_ALIAS：舊的『薪資補償』一律歸到月額（兩邊同一條）", () => {
+    expect(HTML).toContain("var KIND_ALIAS={'意外險':'意外傷殘','薪資補償':'薪資補償（月）'};");
+    expect(E.kindNorm("薪資補償")).toBe("薪資補償（月）");
+  });
+
+  // 舊的單一欄位 incomeComp 讀成月額：engine.ts 跑在伺服器端、拿到的是沒過 migrateCase 的
+  // plans.data 原始資料，相容一定要做在讀取這一層。
+  it("coverAmt：舊 incomeComp 讀成月額，日額不沾（兩邊逐字相同）", () => {
+    expect(HTML).toContain("function coverAmt(x,f){");
+    expect(HTML).toContain(" if(f==='incomeCompMonth'){var v=x&&x.incomeCompMonth;return (v==null||v==='')?n(x&&x.incomeComp):n(v);}");
+    expect(E.coverAmt({ incomeComp: 40000 }, "incomeCompMonth")).toBe(40000);
+    expect(E.coverAmt({ incomeComp: 40000 }, "incomeCompDay")).toBe(0);
+    // 明確填了新欄位就以新欄位為準
+    expect(E.coverAmt({ incomeComp: 40000, incomeCompMonth: 1000 }, "incomeCompMonth")).toBe(1000);
+  });
+
+  // 2026/08/29 B3：三種給付單位分開總計，刻意不相加。
+  it("gapTotals / totalGap：三個總額分開，totalGap 收斂成一次性給付（兩邊同一條）", () => {
+    expect(HTML).toContain("function gapTotals(c){");
+    expect(HTML).toContain("  if(u==='元/日')t.daily+=v;else if(u==='元/月')t.monthly+=v;else t.lump+=v;");
+    expect(HTML).toContain("function totalGap(c){return gapTotals(c).lump}");
+
+    const c = E.sampleCase();
+    const gt = E.gapTotals(c);
+    const rows = E.coverageGaps(c);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pos = (u: string) => rows.filter((g: any) => E.kindUnit(g.kind) === u)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .reduce((a: number, g: any) => a + Math.max(0, g.gap), 0);
+    expect(gt.lump).toBeCloseTo(pos("元"), 6);
+    expect(gt.daily).toBeCloseTo(pos("元/日"), 6);
+    expect(gt.monthly).toBeCloseTo(pos("元/月"), 6);
+    expect(E.totalGap(c)).toBeCloseTo(gt.lump, 6);
+  });
+
+  // riskCover 只吃 lump——這是唯一與保額同維度、可以直接比的數字。
+  it("health().riskCover 只吃一次性給付缺口（兩邊同一條）", () => {
+    expect(HTML).toContain(" var need=gapTotals(c).lump,needBase=gapNeedBase(c).lump||1;");
+
+    const c = E.sampleCase();
+    const before = E.health(c).raw.riskCover;
+    // 把日額／月額的需求整個拉高：riskCover 一位都不能動
+    c.needs[0].room = 99999;
+    c.needs[0].monthCare = 999999;
+    c.needs[0].incomeCompDay = 88888;
+    c.needs[0].incomeCompMonth = 77777;
+    expect(E.health(c).raw.riskCover).toBeCloseTo(before, 10);
+    // 一次性給付的需求拉高才會動
+    c.needs[0].funeral = E.n(c.needs[0].funeral) + 5_000_000;
+    expect(E.health(c).raw.riskCover).toBeLessThan(before);
   });
 
   it("existingCover 兩邊都經 kindNorm 正規化（舊資料的『意外險』不能對不上）", () => {
@@ -147,8 +213,10 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   // 2026/08/28：existingCover 的保單側漏了 policyActive()——同檔的 annualPremiumBy()、
   // policyBenefitRows() 都有過，只有這一支沒有，標「失效／停效」的保額仍被算成已備。
   it("existingCover：失效／停效的保單不算已備（兩邊同一條）", () => {
+    // 2026/08/29 B1：欄位查表前先過 kindNorm（舊值『薪資補償』要對得上月額那一欄），
+    // 取值改走 coverAmt（舊的單一 incomeComp 欄位讀成月額）。policyActive 那一段沒動。
     expect(HTML).toContain(
-      "var f=POLICY_MAP[kind];var fromPol=f?sum(c.policies,function(p){return (policyActive(p)&&p.insured===member)?n(p[f]):0}):0;",
+      "var f=POLICY_MAP[kindNorm(kind)];var fromPol=f?sum(c.policies,function(p){return (policyActive(p)&&p.insured===member)?coverAmt(p,f):0}):0;",
     );
 
     const c = E.sampleCase();
@@ -253,7 +321,8 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   });
 
   it("crossTable：貸款／撫育／儲蓄理財投入的分列兩邊一致", () => {
-    expect(HTML).toContain("var expOther=sum(c.expenses,function(e){return ['生活','消費','稅賦','保險','孝親','貸款'].indexOf(e.cat)<0?n(e.amount):0});");
+    // 2026/08/29：crossTable 的每一列都改吃「現齡有效」（activeNow），合計才對得上分項。
+    expect(HTML).toContain("var expOther=sum(c.expenses,function(e){return (activeNow(c,e)&&['生活','消費','稅賦','保險','孝親','貸款'].indexOf(e.cat)<0)?n(e.amount):0});");
     const ct = E.crossTable(E.sampleCase());
     for (const k of ["expLoan", "expSupport", "expOther", "saveInvest"]) {
       expect(ct[k], k).toBeTypeOf("number");
@@ -302,8 +371,9 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   // 2026/08/28：valid 原本只有 engine 端有，html 連回傳都沒有。
   // 真實資料裡有一位客戶是 retireAge=100 / lifeExp=85，這個分支一定會被看到。
   it("retireNeed：valid 兩邊逐字一致，且 html 有把它接上警語", () => {
+    // 2026/08/29 C5：回傳多了 preparedRows（每一列的領取方式換算），斷言字串跟著更新。
     expect(HTML).toContain(
-      "return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,gap:Math.max(0,total-prepared),valid:m>0};",
+      "return {years:years,余年:m,monthFV:monthFV,total:total,prepared:prepared,preparedRows:preparedRows,gap:Math.max(0,total-prepared),valid:m>0};",
     );
     // 警語本體與四個落點（退休分頁 big3／需求明細／分析頁 retire 模組／報告書退休段）
     expect(HTML).toContain("function retireInvalidHTML(c,light){");
@@ -372,11 +442,86 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(E.visionOn.toString().replace(/\s+/g, "")).toContain("x.on!==false");
 
     // 六個攔截點（html 端逐一釘住，engine 端由下面的數字斷言守）
-    expect(HTML).toContain("(arr||[]).forEach(function(it){if(!visionOn(it))return;if(age>=n(it.start)");
-    expect(HTML).toContain("sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(age<n(gg.start)");
+    // 2026/08/29：起訖判斷搬到共用的 inSpan()（留空＝全期間有效），攔截點本身沒有搬家。
+    expect(HTML).toContain("(arr||[]).forEach(function(it){if(!visionOn(it))return;if(inSpan(it,age))");
+    expect(HTML).toContain("sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(!inSpan(gg,age))return 0;");
     expect(HTML).toContain("return visionOn(g)?Math.max(0,n(g.present)-goalFloor(g)):0");
     expect(HTML).toContain("(a.goals||[]).forEach(function(g){if(!visionOn(g))return;var f=goalFloor(g)");
     expect(HTML).toContain("function legacyNeed(c){var lg=c.legacy||{};if(lg.on===false)return 0;");
+  });
+
+  // ── 2026/08/29 A1｜收支加總只算「現齡有效」 ──
+  it("metrics()：incTotal / expTotal 只加總現齡有效的列，兩邊逐字一致", () => {
+    expect(HTML).toContain("var incTotal=sum(c.incomes,function(i){return activeNow(c,i)?n(i.amount):0});");
+    expect(HTML).toContain("var expTotal=sum(c.expenses,function(e){return activeNow(c,e)?n(e.amount):0})+annualDebtPay(c);");
+    // 表面總額另外留一份給真的需要它的地方用
+    expect(HTML).toContain("var incTotalRaw=sum(c.incomes,function(i){return n(i.amount)});");
+    expect(HTML).toContain("var expTotalRaw=sum(c.expenses,function(e){return n(e.amount)})+annualDebtPay(c);");
+    expect(HTML).toContain("incTotalRaw:incTotalRaw,expTotalRaw:expTotalRaw,retireAgeAssumed:retireAgeAssumed(c),");
+    // ratios 的分子也要同一個口徑，否則分子/分母兩套會算出 190000% 這種比率
+    expect(HTML).toContain("var incWork=sum(c.incomes,function(i){return (i.type==='工作'&&activeNow(c,i))?n(i.amount):0});");
+
+    // 示範案（現齡 40、收入列 40–65／40–60）：現齡有效 ＝ 表面總額
+    const c = E.sampleCase();
+    expect(E.metrics(c).incTotal).toBe(E.metrics(c).incTotalRaw);
+    // 把現齡推到 70：兩條收入列都已結束 → 現齡有效 0，表面總額仍是 190 萬
+    c.profile.age = 70;
+    const m = E.metrics(c);
+    expect(m.incTotalRaw).toBe(1_900_000);
+    expect(m.incTotal).toBe(0);
+    // 與 projection 第 0 年同一個口徑
+    expect(m.proj.rows[0].work).toBe(0);
+    expect(E.health(c).grade).toBe("D");
+  });
+
+  it("A1 的兩個除以零破口：兩邊的防護逐字一致", () => {
+    // 沒有有效支出 → 財務自由度不可以讀成 100%
+    expect(HTML).toContain("var freedom=m.expTotal>0?Math.round(Math.min(1,m.incFinancial/m.expTotal)*100):0;");
+    expect(HTML).toContain("add(g1,'財務自由度',m.expTotal>0?pct(m.incFinancial/m.expTotal):'—（現齡沒有有效支出）'");
+    // 有收入列但沒有一列涵蓋現齡 → 以收入為分母的比率一律「—」
+    expect(HTML).toContain(" if(m.incTotal<=0&&m.incTotalRaw>0){");
+    expect(HTML).toContain("   if(r[k]){r[k].v='—（現齡沒有有效收入）';r[k].status='na';r[k].ok=false;}");
+    // 舊寫法不可以再存在於任何一邊
+    expect(HTML).not.toContain("var freedom=Math.round(Math.min(1,m.incFinancial/(m.expTotal||1))*100);");
+  });
+
+  it("A4b｜起訖留空＝全期間有效：inSpan() 兩邊逐字一致", () => {
+    expect(HTML).toContain("function inSpan(x,age){");
+    expect(HTML).toContain(" var s=n(x&&x.start),e=n(x&&x.end);");
+    expect(HTML).toContain(" if(s>0&&age<s)return false;");
+    expect(HTML).toContain(" if(e>0&&age>e)return false;");
+    expect(HTML).toContain("function nowAge(c){return n((c&&c.profile||{}).age)||40;}");
+    expect(HTML).toContain("function activeNow(c,x){return inSpan(x,nowAge(c));}");
+    // 三個依起訖過濾的地方都改走同一支
+    expect(HTML).toContain("  if(!inSpan(e,age))return;");                       // workPhaseExpense
+    expect(HTML).toContain("(i.type==='工作'&&inSpan(i,age))");                  // projection 收入
+    // 舊的逐列寫法不可以再存在於任何一邊
+    expect(HTML).not.toContain("if(age<n(e.start)||age>n(e.end))return;");
+
+    expect(E.inSpan({ start: "", end: "" }, 40)).toBe(true);
+    expect(E.inSpan({ start: 0, end: 0 }, 999)).toBe(true);
+    expect(E.inSpan({ start: 50, end: "" }, 40)).toBe(false);
+    expect(E.inSpan({ start: "", end: 50 }, 60)).toBe(false);
+    expect(E.inSpan({ start: 40, end: 65 }, 40)).toBe(true);
+  });
+
+  it("A2｜模擬到幾歲綁死預估壽命＋可覆寫：effHorizon() 兩邊逐字一致", () => {
+    expect(HTML).toContain("function horizonManual(c){");
+    expect(HTML).toContain(" if(p.horizonManual===true)return true;");
+    expect(HTML).toContain(" if(p.horizonManual===false)return false;");
+    expect(HTML).toContain(" return h>0&&le>0&&h!==le;");
+    expect(HTML).toContain("function effHorizon(c){");
+    expect(HTML).toContain(" if(horizonManual(c))return n(p.horizon)||85;");
+    expect(HTML).toContain(" return n(pr.lifeExp)||n(p.horizon)||85;");
+    expect(HTML).toContain("var a0=n(c.profile.age)||40,aEnd=effHorizon(c),infl=n(c.params.inflation)/100;");
+    expect(HTML).toContain("var a0=n(c.profile.age)||40,aEnd=effHorizon(c),years=Math.max(0,aEnd-a0+1);");
+  });
+
+  it("A3｜沒人填退休年齡時退回 65：retirePoints() 兩邊逐字一致", () => {
+    expect(HTML).toContain("var DEFAULT_RETIRE_AGE=65;");
+    expect(HTML).toContain("function retireAgeAssumed(c){return earnerRetirePoints(c).length===0;}");
+    expect(HTML).toContain(" return [{name:((primaryMember(c)||{}).name)||'',primary:true,share:0,at:DEFAULT_RETIRE_AGE,assumed:true}];");
+    expect(HTML).toContain(" var pts=retirePoints(c);");
   });
 
   it("求解上限常數：兩邊的預設值一致，且都吃得到後台覆蓋", () => {
@@ -621,5 +766,345 @@ describe("雙實作對拍：estimateSocialPension（engine.ts ↔ lantu-app.html
     for (const k of ["ins", "pensionBase", "monthly", "lump", "fund", "fundNow", "fundNew", "insA", "insB", "npA", "npB", "total"]) {
       expect(b[k], k).toBeCloseTo(a[k], 6);
     }
+  });
+});
+
+/**
+ * 2026/08/29「死欄位」接線（C1–C11）的雙實作對拍。
+ *
+ * 這一批動到 lRemain／annualDebtPay／assetPassive／retireNeed／grossLifeNeed／
+ * estateTax／masterAnalysis／applyLevers／leverRange／coverageGaps／savingInvest——
+ * 幾乎每一支都同時餵 DB 快照（engine.ts）與畫面（lantu-app.html）。
+ * 任何一邊改了計算而沒同步，這一組就會紅。
+ *
+ * ⚠️ 行為釘在 src/lib/deadFields.test.ts，這裡只做「兩邊逐字一致 ＋ 同一份個案同一個數字」。
+ */
+describe("雙實作對拍：死欄位接線（C1–C11）", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let w: any;
+  beforeAll(async () => {
+    const { JSDOM } = await import("jsdom");
+    const dom = new JSDOM(HTML, { runScripts: "dangerously", url: "https://lantu.test/" });
+    w = dom.window;
+    await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
+  });
+
+  it("C1 可刪減%：rowCutPct / expenseCutCap / applyLevers 兩邊逐字一致", () => {
+    expect(HTML).toContain("function rowCutPct(e,leverPct){");
+    expect(HTML).toContain(" var cap=n(e&&e.cut);\n return cap>0?Math.min(leverPct,cap):leverPct;");
+    expect(HTML).toContain("cap=Math.max(cap,rc>0?Math.min(rc,CAP_EXPENSE_CUT):CAP_EXPENSE_CUT);");
+    expect(HTML).toContain("if(cut)(a.expenses||[]).forEach(function(e){if(isLivingCat(e.cat))e.amount=n(e.amount)*(1-rowCutPct(e,cut)/100)});");
+    expect(HTML).toContain("if(id==='expense')return {lo:0,hi:expenseCutCap(c)};");
+
+    const c = E.sampleCase();
+    expect(w.expenseCutCap(JSON.parse(JSON.stringify(c)))).toBe(E.expenseCutCap(c));
+    const a = E.applyLevers(c, { expense: 30 });
+    const b = w.applyLevers(JSON.parse(JSON.stringify(c)), { expense: 30 });
+    expect(b.expenses.map((e: { amount: number }) => e.amount))
+      .toEqual(a.expenses.map((e: { amount: number }) => e.amount));
+  });
+
+  it("C2 照護月數：careMonthsOf / careNeedRows 兩邊逐字一致，且 120 的預設兩邊相同", () => {
+    expect(HTML).toContain("var DEFAULT_CARE_MONTHS=120;");
+    expect(HTML).toContain("function careMonthsOf(nd){");
+    expect(HTML).toContain(" return m>0?{months:m,assumed:false}:{months:DEFAULT_CARE_MONTHS,assumed:true};");
+    expect(HTML).toContain("row.needTotal=need*cm.months;row.haveTotal=ex*cm.months;");
+
+    const c = E.sampleCase();
+    expect(w.DEFAULT_CARE_MONTHS).toBe(E.DEFAULT_CARE_MONTHS);
+    expect(w.careNeedRows(JSON.parse(JSON.stringify(c)))).toEqual(E.careNeedRows(c));
+  });
+
+  it("C3 攤還方式／寬限期：repayMode / graceMonths / lRemain / debtPayAt 兩邊逐字一致", () => {
+    expect(HTML).toContain("function repayMode(l){var r=(l&&l.repay)||'';return (r==='只付利息'||r==='暫緩還款')?r:'本息攤還';}");
+    expect(HTML).toContain("function graceMonths(l){var g=n(l&&l.grace);return g>0?Math.round(g):0;}");
+    expect(HTML).toContain(" if(mode==='只付利息')return P;");
+    expect(HTML).toContain(" if(mode==='暫緩還款')return (i<=0)?P:P*Math.pow(1+i,k);");
+    expect(HTML).toContain(" var g=graceMonths(l); if(g>0)k=Math.max(0,k-g);");
+    expect(HTML).toContain("function debtPayAt(l,age,a0){");
+    expect(HTML).toContain(" if(el<graceMonths(l))return lRemain(l,age,a0)*n(l.rate)/100;");
+    // 三個呼叫端一律走 debtPayAt（annualDebtPay / projection / monteCarlo）
+    expect(HTML).toContain("function annualDebtPay(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){return debtPayAt(l,a0,a0)})}");
+    expect(HTML.match(/var debt=sum\(c\.liabilities,function\(l\)\{return debtPayAt\(l,age,a0\)\}\);/g)?.length).toBe(2);
+    expect(HTML).not.toContain("(age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0");
+
+    for (const mode of ["本息攤還", "只付利息", "暫緩還款", ""]) {
+      for (const grace of [0, 24]) {
+        const l = { name: "x", balance: 10_000_000, rate: 2, pay: 44_000, months: 360, startAge: 40, repay: mode, grace };
+        for (const age of [40, 42, 50, 60]) {
+          expect(w.lRemain(l, age, 40), mode + "/" + grace + "/" + age).toBeCloseTo(E.lRemain(l, age, 40), 6);
+          expect(w.debtPayAt(l, age, 40), mode + "/" + grace + "/" + age).toBeCloseTo(E.debtPayAt(l, age, 40), 6);
+        }
+      }
+    }
+  });
+
+  it("C4 資產報酬率：assetPassive 兩邊逐字一致，且範本都改成 income:''", () => {
+    expect(HTML).toContain(" var inc=aInc(a);\n if(inc>0)return inc;\n return n(a.ret)>0?aVal(a)*n(a.ret)/100:0;})}");
+    expect(HTML).toContain("cost:0,value:0,ret:0,income:'',movable:true}");
+    const c = E.sampleCase();
+    expect(w.assetPassive(JSON.parse(JSON.stringify(c)))).toBeCloseTo(E.assetPassive(c), 6);
+  });
+
+  it("C5 領取方式：growingAnnuityPV / preparedPV / 守門員 兩邊逐字一致", () => {
+    expect(HTML).toContain("function growingAnnuityPV(annual,rr,g,m){");
+    expect(HTML).toContain(" if(Math.abs(rr-g)<1e-6)return annual*m/(1+rr);\n return annual*(1-Math.pow((1+g)/(1+rr),m))/(rr-g);");
+    expect(HTML).toContain("var PREPARED_MONTHLY_MAX=300000;");
+    expect(HTML).toContain(" return ((p&&p.method)||'')==='月領'&&!(p&&p.monthlyOk)&&n(p&&p.amount)>PREPARED_MONTHLY_MAX;");
+    expect(HTML).toContain(" var pv=growingAnnuityPV(amt*12,rr,g,Math.max(0,le-from));");
+    expect(HTML).toContain(" return (back>0&&rr>-1)?pv/Math.pow(1+rr,back):pv;");
+    // ⚠️ 名字不可以撞到追蹤表那支 annuityPV(pmt,yrs,ratePct)——html 是同一個全域命名空間
+    expect(HTML).toContain("function annuityPV(pmt,yrs,ratePct){");
+    expect(w.PREPARED_MONTHLY_MAX).toBe(E.PREPARED_MONTHLY_MAX);
+
+    const c = E.sampleCase();
+    c.profile.retireAge = 65; c.profile.lifeExp = 85;
+    c.retire.prepared = [
+      { item: "一次領", age: 65, amount: 1_000_000, method: "一次領" },
+      { item: "月領", age: 65, amount: 25_000, method: "月領" },
+      { item: "晚領", age: 70, amount: 20_000, method: "月領" },
+      { item: "自提", age: 65, amount: 5_000_000, method: "自提" },
+      { item: "疑似總額", age: 65, amount: 3_600_000, method: "月領" },
+      { item: "確認月額", age: 65, amount: 400_000, method: "月領", monthlyOk: true },
+    ];
+    const a = E.retireNeed(c), b = w.retireNeed(JSON.parse(JSON.stringify(c)));
+    expect(b.prepared).toBeCloseTo(a.prepared, 6);
+    expect(b.gap).toBeCloseTo(a.gap, 6);
+    expect(b.preparedRows.map((r: { pv: number }) => Math.round(r.pv)))
+      .toEqual(a.preparedRows.map((r: { pv: number }) => Math.round(r.pv)));
+    expect(b.preparedRows.map((r: { suspect: boolean }) => r.suspect))
+      .toEqual(a.preparedRows.map((r: { suspect: boolean }) => r.suspect));
+  });
+
+  it("C6 財務獨立歲：indepDeps / protectYearsEff / grossLifeNeed 兩邊逐字一致", () => {
+    expect(HTML).toContain("function indepDeps(c,name){");
+    expect(HTML).toContain("  return !!x&&x.name!==name&&n(x.indepAge)>0&&n(x.expRatio)>0;});");
+    expect(HTML).toContain("function protectYearsEff(c,nd){");
+    expect(HTML).toContain("  for(var j=0;j<deps.length;j++){var d=deps[j];if(n(d.age)+y>=n(d.indepAge))frac+=n(d.expRatio)/100;}");
+    expect(HTML).toContain("/100*famLiving*protectYearsEff(c,nd)");
+    // 責任遞減圖與需求數字現在吃同一支 indepDeps（改版前是兩份手寫篩選）
+    expect(HTML).toContain(" var deps=indepDeps(c,mb.name);");
+
+    const c = E.sampleCase();
+    c.needs[0].protectYears = 30;
+    expect(w.protectYearsEff(JSON.parse(JSON.stringify(c)), c.needs[0]))
+      .toBeCloseTo(E.protectYearsEff(c, c.needs[0]), 6);
+    expect(w.grossLifeNeed(JSON.parse(JSON.stringify(c)), c.needs[0]))
+      .toBeCloseTo(E.grossLifeNeed(c, c.needs[0]), 6);
+  });
+
+  it("C7 傳承進遺產稅：estateTax 兩邊逐字一致", () => {
+    expect(HTML).toContain(" var legacyFed=lg.feedEstate?legacyNeed(c):0;\n var net=netBase+legacyFed;");
+    expect(HTML).toContain("net:net,netBase:netBase,legacyFed:legacyFed,heirs:heirs");
+    for (const on of [true, false]) {
+      const c = E.sampleCase();
+      c.legacy.feedEstate = on;
+      const a = E.estateTax(c), b = w.estateTax(JSON.parse(JSON.stringify(c)));
+      expect(b.tax, "feedEstate=" + on).toBeCloseTo(a.tax, 6);
+      expect(b.legacyFed).toBeCloseTo(a.legacyFed, 6);
+      expect(b.net).toBeCloseTo(a.net, 6);
+    }
+  });
+
+  it("C8 已繳年數備援：masterAnalysis 兩邊逐字一致", () => {
+    expect(HTML).toContain("  if(polY<=0)polY=Math.max(0,Math.round(n(p.paidYears)));");
+    const c = E.sampleCase();
+    c.policies = [
+      { name: "無生效日", policyKind: "主約", premium: 50_000, payYears: 20, life: 3_000_000, effDate: "", paidYears: 8 },
+      { name: "有生效日", policyKind: "主約", premium: 50_000, payYears: 20, life: 3_000_000, effDate: "2020/01/01", paidYears: 99 },
+      { name: "都沒填", policyKind: "主約", premium: 50_000, payYears: 20, life: 3_000_000, effDate: "", paidYears: "" },
+    ];
+    const a = E.masterAnalysis(c, 2026), b = w.masterAnalysis(JSON.parse(JSON.stringify(c)), 2026);
+    expect(b.map((x: { polYear: number }) => x.polYear)).toEqual(a.map((x: { polYear: number }) => x.polYear));
+    expect(b.map((x: { paid: number }) => x.paid)).toEqual(a.map((x: { paid: number }) => x.paid));
+  });
+
+  it("C9 自由儲蓄%：兩邊的範本都不再帶這個欄位", () => {
+    expect(HTML).not.toContain("freeSaving:1");
+    expect(HTML).not.toContain("'freeSaving'");
+    expect(E.sampleCase().params.freeSaving).toBeUndefined();
+    expect(w.sampleCase().params.freeSaving).toBeUndefined();
+  });
+
+  it("C10 儲蓄起訖：savingInvest 兩邊逐字一致", () => {
+    expect(HTML).toContain("function savingInvest(c){return sum(c.savings,function(x){return activeNow(c,x)?n(x.amount):0})}");
+    const c = E.sampleCase();
+    c.savings = [
+      { name: "全期間", amount: 120_000 },
+      { name: "已結束", amount: 60_000, start: 30, end: 35 },
+      { name: "未開始", amount: 90_000, start: 50, end: 65 },
+      { name: "只設起", amount: 30_000, start: 30, end: 0 },
+    ];
+    expect(w.savingInvest(JSON.parse(JSON.stringify(c)))).toBe(E.savingInvest(c));
+    expect(E.savingInvest(c)).toBe(150_000);
+  });
+
+  it("整份示範案：健康度／缺口／退休／遺產稅 兩邊仍然一位不差", () => {
+    const c = E.sampleCase();
+    const j = () => JSON.parse(JSON.stringify(c));
+    expect(w.health(j()).grade).toBe(E.health(c).grade);
+    expect(w.health(j()).safety).toBe(E.health(c).safety);
+    expect(w.gapTotals(j())).toEqual(E.gapTotals(c));
+    expect(w.retireNeed(j()).gap).toBeCloseTo(E.retireNeed(c).gap, 6);
+    expect(w.estateTax(j()).tax).toBeCloseTo(E.estateTax(c).tax, 6);
+    expect(w.metrics(j()).proj.shortPV).toBeCloseTo(E.metrics(c).proj.shortPV, 6);
+  });
+});
+
+/**
+ * 雙實作對拍：D1 二代健保費 ／ D2 產險比對線（2026/08/29）。
+ *
+ * 兩件事一起守：
+ *   ① 制度常數的三份同步 —— src/lib/taiwan.ts（一般保費）與 src/lib/bizTax.ts（補充保費／產險基準）
+ *      是唯一真相，public/lantu-app.html 另存一份鏡像，這裡逐字比對。
+ *   ② 計算兩邊等價 —— 同一份個案餵給 engine.ts 與 html，數字必須一位不差。
+ *
+ * ⚠️ 常數的年度（NHI_YEAR / NHI_SUPP_YEAR / PROP_INS_YEAR）也一併釘住：
+ *    跨年沒回頭查健保署／金管會公告，taiwan.test.ts 那條「今年 ≤ 年度＋1」的護欄會先紅。
+ */
+describe("雙實作對拍：D1 二代健保費 ／ D2 產險比對線", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let w: any;
+  beforeAll(async () => {
+    const { JSDOM } = await import("jsdom");
+    const dom = new JSDOM(HTML, { runScripts: "dangerously", url: "https://lantu.test/" });
+    w = dom.window;
+    await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
+  });
+
+  it("健保一般保費常數（taiwan.ts → html）兩邊一致", () => {
+    expect(HTML).toContain("var NHI_YEAR=" + E.NHI_YEAR);
+    expect(HTML).toContain("var NHI_RATE=" + E.NHI_RATE);
+    expect(HTML).toContain("var NHI_SALARY_MIN=" + E.NHI_SALARY_MIN);
+    expect(HTML).toContain("var NHI_SALARY_MAX=" + E.NHI_SALARY_MAX);
+    expect(HTML).toContain("var NHI_SALARY_GRADES=" + E.NHI_SALARY_GRADES);
+    expect(HTML).toContain("var NHI_DEP_CAP=" + E.NHI_DEP_CAP);
+    // 每一個投保類別與它的自付比率都要在 html 那份鏡像裡逐字出現
+    for (const [k, v] of E.NHI_CATS) expect(HTML).toContain("['" + k + "'," + v + "]");
+    expect(w.NHI_CATS.length).toBe(E.NHI_CATS.length);
+  });
+
+  it("補充保費與產險基準常數（bizTax.ts → html）兩邊一致", () => {
+    expect(HTML).toContain("var NHI_SUPP_RATE=" + E.NHI_SUPP_RATE);
+    expect(HTML).toContain("var NHI_SUPP_MIN=" + E.NHI_SUPP_MIN);
+    expect(HTML).toContain("var NHI_SUPP_YEAR=" + E.NHI_SUPP_YEAR);
+    expect(HTML).toContain("var NHI_SUPP_CAP=" + E.NHI_SUPP_CAP);
+    expect(HTML).toContain("var NHI_SUPP_BONUS_MULT=" + E.NHI_SUPP_BONUS_MULT);
+    expect(HTML).toContain("var NHI_SUPP_WAGE_MIN=" + E.NHI_SUPP_WAGE_MIN);
+    expect(HTML).toContain("var PROP_INS_YEAR=" + E.PROP_INS_YEAR);
+    expect(HTML).toContain("var QUAKE_BASIC_SUM=" + E.QUAKE_BASIC_SUM);
+    expect(HTML).toContain("var QUAKE_LODGING=" + E.QUAKE_LODGING);
+    expect(HTML).toContain("var PROP_PING_COST=" + E.PROP_PING_COST);
+    expect(HTML).toContain("var PROP_BUILDING_RATIO=" + E.PROP_BUILDING_RATIO);
+    expect(HTML).toContain("var CAR_LIAB_BODILY=" + E.CAR_LIAB_BODILY);
+    expect(HTML).toContain("var CAR_LIAB_PROPERTY=" + E.CAR_LIAB_PROPERTY);
+    expect(HTML).toContain("var CALI_DEATH=" + E.CALI_DEATH);
+    expect(HTML).toContain("var CALI_MEDICAL=" + E.CALI_MEDICAL);
+    expect(HTML).toContain("var EMPLOYER_COMP_MONTHS=" + E.EMPLOYER_COMP_MONTHS);
+    expect(HTML).toContain("var PUBLIC_LIAB_STD=[" + E.PUBLIC_LIAB_STD.join(",") + "]");
+  });
+
+  it("⚠️ 兼職所得門檻與健保投保金額第 1 級是同一個數（分屬兩個檔，兩邊都要改）", () => {
+    expect(E.NHI_SUPP_WAGE_MIN).toBe(E.NHI_SALARY_MIN);
+    expect(w.NHI_SUPP_WAGE_MIN).toBe(w.NHI_SALARY_MIN);
+  });
+
+  it("一般保費公式與進位順序兩邊逐字一致", () => {
+    expect(HTML).toContain(" var perUnit=(raw>0)?Math.round(salary*NHI_RATE*(r/100)):0;");
+    expect(HTML).toContain(" var monthly=perUnit*(1+depsCounted);");
+    expect(HTML).toContain(" var depsCounted=Math.min(deps,NHI_DEP_CAP);");
+  });
+
+  it("補充保費：六類白名單與計費基礎兩邊逐字一致（薪資不在名單裡＝不重複扣）", () => {
+    expect(HTML).toContain("{key:'bonus',label:'高額獎金',mode:'excess',subs:['年終獎金','三節獎金','績效/季獎金','佣金/業績獎金','股票/員工分紅']},");
+    expect(HTML).toContain("function nhiPayTimes(x){return (x&&x.period==='月')?12:1;}");
+    expect(HTML).toContain("function nhiSuppMinOf(k){return (k&&k.key==='parttime')?NHI_SUPP_WAGE_MIN:NHI_SUPP_MIN;}");
+    expect(w.NHI_SUPP_KINDS.map((k: { key: string }) => k.key))
+      .toEqual(E.NHI_SUPP_KINDS.map((k: { key: string }) => k.key));
+    for (let i = 0; i < E.NHI_SUPP_KINDS.length; i++) {
+      expect(w.NHI_SUPP_KINDS[i].subs).toEqual(E.NHI_SUPP_KINDS[i].subs);
+      expect(w.NHI_SUPP_KINDS[i].mode).toBe(E.NHI_SUPP_KINDS[i].mode);
+    }
+  });
+
+  it("同一份個案：一般保費／補充保費／全家合計，兩邊一位不差", () => {
+    const c = E.sampleCase();
+    c.members[0].nhiCat = "第一類 受雇者";
+    c.members[0].nhiSalary = 53_000;
+    c.members[0].nhiDeps = 5;                       // 眷口上限要在兩邊都生效
+    c.members[1].nhiCat = "第一類 雇主/自營業主/專技自行執業";
+    c.members[1].nhiSalary = 57_800;
+    c.members[1].nhiDeps = 1;
+    c.incomes.push(
+      { owner: "王大明", type: "工作", subType: "年終獎金", period: "年", amount: 400_000 },
+      { owner: "王大明", type: "理財", subType: "租金收入", period: "月", amount: 360_000 },
+      { owner: "王太太", type: "理財", subType: "股利/利息", period: "年", amount: 19_999 },
+      { owner: "王大明", type: "工作", subType: "薪資", period: "年", amount: 1_200_000 },
+    );
+    const j = () => JSON.parse(JSON.stringify(c));
+    expect(w.nhiFamily(j()).generalAnnual).toBe(E.nhiFamily(c).generalAnnual);
+    expect(w.nhiFamily(j()).suppAnnual).toBe(E.nhiFamily(c).suppAnnual);
+    expect(w.nhiFamily(j()).annual).toBe(E.nhiFamily(c).annual);
+    // 王大明 53,000 × 5.17% × 30% ＝ 822/口，眷屬 5 口被上限壓成 3 口 → 4 口 ＝ 3,288/月；
+    // 王太太（雇主）57,800 × 5.17% × 100% ＝ 2,988/口 × 2 口 ＝ 5,976/月；王小寶沒填 → 0。
+    expect(E.nhiFamily(c).generalAnnual).toBe((3_288 + 5_976) * 12);
+    // 補充保費：獎金 400,000 − 53,000×4 ＝ 188,000／租金月 30,000 × 12 全額 360,000／
+    // 股利 19,999 未達門檻 0／薪資 1,200,000 不重複扣。
+    expect(E.nhiFamily(c).suppAnnual).toBe(Math.round(188_000 * 0.0211) + Math.round(360_000 * 0.0211));
+  });
+
+  it("syncNHI()：兩邊產生的支出列一模一樣（金額／起訖／標記）", () => {
+    const c = E.sampleCase();
+    c.members[0].nhiCat = "第一類 受雇者";
+    c.members[0].nhiSalary = 45_800;
+    c.members[0].nhiDeps = 2;
+    const a = JSON.parse(JSON.stringify(c));
+    const b = JSON.parse(JSON.stringify(c));
+    E.syncNHI(a); w.syncNHI(b);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pick = (x: any) => x.expenses.filter((e: { nhiAuto?: boolean }) => e.nhiAuto);
+    expect(pick(a).length).toBe(1);
+    expect(pick(b)).toEqual(pick(a));
+    expect(HTML).toContain("var NHI_AUTO_NAME='全民健康保險（系統試算）';");
+  });
+
+  it("產險骨幹（PKINDS／PPOLICY_MAP／PNEED_FIELD）兩邊一致，且與 KINDS 不交集", () => {
+    expect(w.PKINDS).toEqual(E.PKINDS);
+    expect(w.PGROUPS).toEqual(E.PGROUPS);
+    expect(w.PKIND_GROUP).toEqual(E.PKIND_GROUP);
+    expect(w.PPOLICY_MAP).toEqual(E.PPOLICY_MAP);
+    expect(w.PNEED_FIELD).toEqual(E.PNEED_FIELD);
+    for (const k of E.PKINDS) expect(w.KINDS).not.toContain(k);
+  });
+
+  it("同一份個案：產險比對表與缺口總額兩邊一位不差", () => {
+    const c = E.sampleCase();
+    c.propNeed = { ping: 45, pingPrice: 82_000 };
+    c.companies = [{ cid: "co1", name: "甲公司", employees: 12 }];
+    c.assets.push({
+      name: "自用車", owner: "王大明", mainCat: "自用資產", type: "自用車輛", cls: "固定",
+      currency: "台幣", fxRate: 1, cost: 900_000, value: 700_000, ret: 0, income: 0, movable: false,
+    });
+    c.policies.push(
+      { insured: "王大明", name: "住宅火險", bigCat: "產物", subtype: "住宅火險", status: "有效", premium: 4000, pAmount: 3_000_000 },
+      { insured: "王大明", name: "第三人責任", bigCat: "產物", subtype: "汽車第三人責任", status: "有效", premium: 6000, pBodily: 2_000_000, pProperty: 300_000 },
+      { insured: "王大明", name: "雇主責任", bigCat: "產物", subtype: "雇主責任", status: "有效", premium: 9000, pBodily: 1_000_000 },
+    );
+    const j = () => JSON.parse(JSON.stringify(c));
+    expect(w.propGaps(j())).toEqual(E.propGaps(c));
+    expect(w.propGapTotals(j())).toEqual(E.propGapTotals(c));
+    expect(E.propGapTotals(c).rows).toBeGreaterThan(0);
+  });
+
+  it("⚠️ 產險缺口不進人身險：兩邊的 gapTotals／health 都不受產險影響", () => {
+    const c = E.sampleCase();
+    const j = () => JSON.parse(JSON.stringify(c));
+    const before = { e: E.gapTotals(c), h: E.health(c).safety, we: w.gapTotals(j()), wh: w.health(j()).safety };
+    c.propNeed = { ping: 60 };
+    c.policies.push({ insured: "王大明", name: "住宅火險", bigCat: "產物", subtype: "住宅火險", status: "有效", premium: 4000, pAmount: 8_000_000 });
+    expect(E.gapTotals(c)).toEqual(before.e);
+    expect(E.health(c).safety).toBe(before.h);
+    expect(w.gapTotals(j())).toEqual(before.we);
+    expect(w.health(j()).safety).toBe(before.wh);
   });
 });

@@ -218,6 +218,13 @@
       "when": 1787934835980,
       "tag": "0030_ancient_ben_urich",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788039477481,
+      "tag": "0031_colossal_grey_gargoyle",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,9 @@ vi.mock("@/Shared/db", () => {
           return Promise.resolve();
         },
       }),
+      // 版本保留的清理會呼叫 delete。假 db 少了它不會讓測試變紅（清理失敗本來就
+      // 被吞掉、不擋存檔），但會在測試輸出裡留一行 TypeError 噪音，看起來像壞掉。
+      delete: () => ({ where: () => Promise.resolve() }),
     },
   };
 });
