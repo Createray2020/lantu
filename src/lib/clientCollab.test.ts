@@ -120,7 +120,9 @@ const STRANGER = "coach-stranger";
 const CID = "client-1";
 
 function seed(collabStatus: string | null = "accepted") {
-  h.store.clients = [{ id: CID, coachId: OWNER, name: "陳純愛", code: "2608078", status: "active" }];
+  // isTemplate 是 DB 的 NOT NULL DEFAULT false，真實的列一定有值；
+  // 假資料少了它，兩把尺的 `is_template = false` 條件就求不到值（整列會被濾掉）。
+  h.store.clients = [{ id: CID, coachId: OWNER, name: "陳純愛", code: "2608078", status: "active", isTemplate: false }];
   h.store.coaches = [
     { id: OWNER, name: "主責教練", displayName: null, code: "FC2608001", status: "active", title: null },
     { id: HELPER, name: "協作教練", displayName: null, code: "FC2608012", status: "active", title: null },

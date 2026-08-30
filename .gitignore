@@ -56,3 +56,9 @@ _backup_*
 lantu_backup_*.json
 *_dump.json
 mock_backup_*.json
+
+# 示範範本的產出物（原始碼是 scripts/templates/cases.ts，這些是 build.mjs 產的）
+scripts/templates/raw.json
+scripts/templates/built.json
+scripts/templates/shots/
+.tpl/

@@ -31,15 +31,25 @@ export async function rankCaps(): Promise<Record<string, number | null>> {
 }
 
 /**
- * 目前佔用的客戶數：**不含已封存**。
+ * 目前佔用的客戶數：**不含已封存、不含共用示範範本**。
+ *
  * 封存＝不再服務，若也計入上限，教練就永遠沒辦法靠整理舊資料騰出空間，
  * 只能刪資料 —— 那正是我們不希望發生的事。
+ *
+ * ⚠️ `is_template = false` 是明確排除，不是備援（同 lib/clientScope.ts）。
+ * 範本的 coach_id 本來就是 null，照理說這個 count 選不到它；但只要有一列範本
+ * 的 coach_id 被誤設成某位教練，他的額度就會憑空少一格，而他的客戶列表上
+ * 看不到任何多出來的人——這種帳對不起來的問題幾乎不可能從畫面查出原因。
  */
 export async function usedClientCount(coachId: string): Promise<number> {
   const r = await db
     .select({ n: count() })
     .from(clients)
-    .where(and(eq(clients.coachId, coachId), ne(clients.status, "archived")));
+    .where(and(
+      eq(clients.coachId, coachId),
+      ne(clients.status, "archived"),
+      eq(clients.isTemplate, false),
+    ));
   return Number(r[0]?.n ?? 0);
 }
 

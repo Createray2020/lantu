@@ -121,12 +121,14 @@ const COACH = "coach-1";
 const CLIENT_ID = "client-1";
 
 function seed() {
-  h.store.clients = [{ id: CLIENT_ID, coachId: COACH, name: "測試客戶" }];
-  // mock 不模擬 innerJoin，所以把 join 後才會有的 coachId 直接掛在 plan 列上，
-  // 讓 ownedPlan 的 eq(clients.coachId, …) 條件求得到值。
+  // isTemplate 是 DB 的 NOT NULL DEFAULT false，真實的列一定有值；
+  // 假資料少了它，ownedClient()／readableClient() 的 `is_template = false` 條件就求不到值。
+  h.store.clients = [{ id: CLIENT_ID, coachId: COACH, name: "測試客戶", isTemplate: false }];
+  // mock 不模擬 innerJoin，所以把 join 後才會有的 clients 欄位（coachId／isTemplate）
+  // 直接掛在 plan 列上，讓 ownedPlan 的 ownedClient() 條件求得到值。
   h.store.plans = [
-    { id: "p-coach-2026", coachId: COACH, clientId: CLIENT_ID, year: 2026, track: "coach", label: "2026 初版", status: "active", data: {}, healthGrade: "B", netWorth: 5_000_000, createdAt: new Date("2026-03-01"), updatedAt: new Date("2026-03-01"), basedOnDate: null },
-    { id: "p-client-2026", coachId: COACH, clientId: CLIENT_ID, year: 2026, track: "client", label: "人生護照", status: "draft", data: {}, healthGrade: "D", netWorth: 120_000, createdAt: new Date("2026-08-01"), updatedAt: new Date("2026-08-01"), basedOnDate: null },
+    { id: "p-coach-2026", coachId: COACH, isTemplate: false, clientId: CLIENT_ID, year: 2026, track: "coach", label: "2026 初版", status: "active", data: {}, healthGrade: "B", netWorth: 5_000_000, createdAt: new Date("2026-03-01"), updatedAt: new Date("2026-03-01"), basedOnDate: null },
+    { id: "p-client-2026", coachId: COACH, isTemplate: false, clientId: CLIENT_ID, year: 2026, track: "client", label: "人生護照", status: "draft", data: {}, healthGrade: "D", netWorth: 120_000, createdAt: new Date("2026-08-01"), updatedAt: new Date("2026-08-01"), basedOnDate: null },
   ];
   h.store.reviews = [];
   h.store.action_items = [];

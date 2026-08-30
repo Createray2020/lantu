@@ -4,9 +4,11 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ClientListItem, SharedClientItem } from "@/lib/clients";
+import type { TemplateListItem } from "@/lib/templates";
 import type { QuotaState } from "@/lib/license";
 import { QUOTA_FULL_MESSAGE, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { createClientAction } from "./actions";
+import { copyTemplateAction } from "./templates/actions";
 import { StageGuideModal } from "./StageGuide";
 import {
   fmtMoney,
@@ -22,12 +24,15 @@ type SortKey = "updated" | "next" | "net" | "stage";
 export default function ClientList({
   clients,
   shared = [],
+  templates = [],
   quota,
   readOnly = false,
 }: {
   clients: ClientListItem[];
   /** 別人邀我共同執案的客戶（唯讀）。刻意跟自己的客戶分兩區，也不計入額度。 */
   shared?: SharedClientItem[];
+  /** 全公司共用的示範範本（唯讀、不計入額度）。同樣分開一區，理由見下方那一節。 */
+  templates?: TemplateListItem[];
   /** 客戶數上限（依級別）。未定級或不限時 cap 為 null。 */
   quota?: QuotaState;
   /** 使用期限到期＝唯讀。 */
@@ -266,6 +271,10 @@ export default function ClientList({
         </section>
       )}
 
+      {templates.length > 0 && (
+        <TemplateShelf templates={templates} quota={quota} readOnly={readOnly} />
+      )}
+
       {guideFor !== false && <StageGuideModal current={guideFor} onClose={() => setGuideFor(false)} />}
 
       {showNew && <NewClientDialog onClose={() => setShowNew(false)} onCreated={(id) => router.push(`/dashboard/clients/${id}`)} />}
@@ -368,4 +377,110 @@ export default function ClientList({
       </div>
     );
   }
+}
+
+/**
+ * 示範範本區。
+ *
+ * ⚠️ 刻意**不併進上面的客戶清單**：那份清單的每一列都是「我的客戶」——有編號、
+ *    計入額度、點進去可以改。範本三件事都不是。混在一起的第一個後果是教練把它
+ *    當成自己的客戶開始編輯，然後發現存不進去；第二個後果更糟——他會以為
+ *    自己的額度被系統莫名其妙吃掉了幾個。
+ */
+function TemplateShelf({
+  templates,
+  quota,
+  readOnly,
+}: {
+  templates: TemplateListItem[];
+  quota?: QuotaState;
+  readOnly: boolean;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  // 哪一份正在複製：整區共用一個 disabled 會讓四顆按鈕一起變灰，看起來像壞掉。
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+
+  const blocked = readOnly
+    ? LICENSE_LOCKED_MESSAGE
+    : quota?.full && quota.cap != null
+      ? QUOTA_FULL_MESSAGE(quota.cap)
+      : "";
+
+  return (
+    <section className="mt-8 pt-6 border-t border-white/10">
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className="font-serif text-lg tracking-wide">示範範本</h2>
+        <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#c99a5b]/50 text-[#e0bd8b] bg-[#c99a5b]/10 font-bold">唯讀</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/15 text-[#a9bccf] font-bold">不計入額度</span>
+        <span className="text-[#6b7d8f] text-sm">{templates.length}</span>
+      </div>
+      <p className="text-[12px] text-[#6b7d8f] mb-3">
+        坐在客戶旁邊翻給他看的示範個案，全公司教練共用同一份，誰都改不了。
+        想拿某一份當起點做試算，按「複製一份給自己」——複製出來的那位就是你名下的一般客戶，
+        可以隨意修改，並且會計入你的客戶數。
+      </p>
+
+      {err && (
+        <div role="alert" className="mb-3 text-sm text-[#ffd7d8] bg-[#e5484d]/15 border border-[#e5484d]/40 rounded-lg px-3 py-2">
+          {err}
+        </div>
+      )}
+
+      <div className="grid gap-2">
+        {templates.map((t) => (
+          <div
+            key={t.id}
+            className="grid grid-cols-1 md:grid-cols-[1.8fr_1fr_1fr_auto] gap-3 items-center bg-[#0c2135] border border-[#c99a5b]/25 rounded-lg px-3 py-3"
+          >
+            <div className="min-w-0">
+              <Link href={`/dashboard/templates/${t.id}`} className="font-bold hover:text-[#e0bd8b]">
+                {t.name}
+              </Link>
+              {t.templateLabel && (
+                <div className="text-[11px] text-[#a9bccf] mt-0.5">{t.templateLabel}</div>
+              )}
+            </div>
+            <div className="text-[12px] font-bold" style={{ color: stageColor(t.healthGrade) }}>
+              {t.healthGrade ? stageName(t.healthGrade) : "—"}
+            </div>
+            <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(t.netWorth ?? null)}</div>
+            <div className="flex items-center gap-2 justify-end">
+              <Link
+                href={`/dashboard/templates/${t.id}`}
+                className="text-xs rounded-md border border-white/15 text-[#a9bccf] px-2.5 py-1.5 hover:bg-[#17406a]"
+              >
+                翻給客戶看
+              </Link>
+              <button
+                type="button"
+                disabled={pending || !!blocked}
+                title={blocked}
+                onClick={() => {
+                  setErr("");
+                  setBusy(t.id);
+                  start(async () => {
+                    try {
+                      const r = await copyTemplateAction(t.id);
+                      if (!r.ok) { setErr(r.error); return; }
+                      // 複製完直接進去——他要的是「用這份開始做」，不是回清單再找一次。
+                      router.push(`/dashboard/clients/${r.clientId}`);
+                    } catch {
+                      setErr("複製失敗，請重試。");
+                    } finally {
+                      setBusy(null);
+                    }
+                  });
+                }}
+                className="text-xs font-bold rounded-md border border-[#c99a5b]/50 text-[#e0bd8b] px-2.5 py-1.5 hover:bg-[#c99a5b]/10 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {busy === t.id && pending ? "複製中…" : "複製一份給自己"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }

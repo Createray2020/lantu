@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, sep } from "node:path";
 
 /**
  * 「讀範圍」不可以外洩到「寫入路徑」的漂移測試。
@@ -155,5 +155,157 @@ describe("lib/consultSession.ts 每一支 export 都要有租戶條件", () => {
       /assertOwned|ownedClient/.test(fns[name]),
       `${name}() 沒有任何租戶條件——換一個 clientId 就讀／寫得到別人的客戶`,
     ).toBe(true);
+  });
+});
+
+/**
+ * 第四把尺 templateClient() 的圍欄。
+ *
+ * 它跟 annotatableClient() 的風險方向相反：annotatable 是「範圍窄、但可寫」，
+ * templateClient 是「不可寫、但範圍是全公司」——共用示範範本對每一位教練都是同一份。
+ * 一旦它被接到任何 update/delete 上，就是**任何一位教練都改得動所有教練的展示素材**，
+ * 而甲改壞的東西是乙坐在客戶旁邊時才發現。
+ *
+ * 所以這裡守三件事：
+ *   1. templateClient() 只准住在 lib/templates.ts（逐檔掃 src/lib/** 與 src/app/**）。
+ *   2. 寫入路徑一律不得出現它（範本的寫入只走 templates.ts 的管理端，那四支自己驗 isAdmin）。
+ *   3. ownedClient() / readableClient() 必須明確排除 isTemplate ——
+ *      少了它，一個 coach_id 被誤設的範本就會混進某位教練的客戶列表：可讀、可寫、還佔額度。
+ */
+describe("templateClient() 只准住在 lib/templates.ts", () => {
+  const ALLOWED = ["src/lib/clientScope.ts", "src/lib/templates.ts"];
+
+  /** 遞迴列出一棵目錄下的 .ts/.tsx，測試檔不算（測試不是執行路徑，而且會 mock 這些名字）。 */
+  function sources(dir: string): string[] {
+    const out: string[] = [];
+    for (const e of readdirSync(join(process.cwd(), dir), { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) out.push(...sources(p));
+      else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) out.push(p);
+    }
+    return out;
+  }
+
+  const SCAN = [...sources("src/lib"), ...sources("src/app")].map((p) => p.split(sep).join("/"));
+
+  it("掃得到足夠多的檔案（掃描本身壞掉要讓測試紅，不是靜靜通過）", () => {
+    expect(SCAN.length).toBeGreaterThan(50);
+    expect(SCAN).toContain("src/lib/templates.ts");
+    expect(SCAN).toContain("src/lib/clients.ts");
+  });
+
+  it.each(SCAN)("%s", (file) => {
+    if (ALLOWED.includes(file)) return;
+    expect(
+      /templateClient/.test(R(file)),
+      `${file} 用到了 templateClient()——那是跨租戶的可見範圍，只准 lib/templates.ts 用`,
+    ).toBe(false);
+  });
+
+  it("lib/templates.ts 真的有用到它（不然這條圍欄是在守一個不存在的東西）", () => {
+    expect(R("src/lib/templates.ts")).toMatch(/templateClient\(\)/);
+  });
+});
+
+describe("寫入路徑一律不得沾到範本範圍", () => {
+  const WRITE_PATHS = [
+    "src/lib/clients.ts",
+    "src/lib/plans.ts",
+    "src/lib/reviews.ts",
+    "src/lib/revisions.ts",
+    "src/lib/notes.ts",
+  ];
+
+  it.each(WRITE_PATHS)("%s 不引用 templateClient", (file) => {
+    expect(
+      /templateClient/.test(R(file)),
+      `${file} 用到了 templateClient()——共用示範範本會從此變成「任何教練都改得動」`,
+    ).toBe(false);
+  });
+
+  it("範本的寫入只走 lib/templates.ts 的管理端，而且每一支自己驗 admin", () => {
+    const fns = functionsOf(R("src/lib/templates.ts"));
+    for (const name of ["createTemplate", "updateTemplate", "deleteTemplate", "reorderTemplates"]) {
+      expect(fns[name], `templates.ts 找不到 ${name}()，改過名字就要順手更新這支測試`).toBeTruthy();
+      expect(
+        /assertAdmin\(\)/.test(fns[name]),
+        `${name}() 沒有自己驗 admin——只要有第二個入口忘記擋，任何教練都能改全公司的展示素材`,
+      ).toBe(true);
+      // 授權是 assertAdmin()，可見範圍那把尺不能拿來當寫入的租戶條件。
+      expect(/templateClient/.test(fns[name])).toBe(false);
+    }
+  });
+});
+
+describe("兩把舊尺都要主動排除範本", () => {
+  /**
+   * 上面的 functionsOf() 只認 `async function`（它服務的是 DB 存取函式）。
+   * 三把尺都是同步的純條件建構子，所以這裡自己切一份。
+   */
+  function sourceOf(src: string, name: string): string | null {
+    const at = src.search(new RegExp(`export function ${name}\\b`));
+    if (at < 0) return null;
+    const raw = src.slice(at);
+    const end = raw.indexOf("\n}\n");
+    return end >= 0 ? raw.slice(0, end + 3) : raw;
+  }
+
+  const scopeSrc = R("src/lib/clientScope.ts");
+
+  it.each(["ownedClient", "readableClient"])("%s() 自己帶著 is_template 的排除條件", (name) => {
+    const fn = sourceOf(scopeSrc, name);
+    expect(fn, `clientScope.ts 找不到 ${name}()，改過名字就要順手更新這支測試`).toBeTruthy();
+    expect(
+      fn!.includes("eq(clients.isTemplate, false)"),
+      `${name}() 沒有排除範本——coach_id 被誤設的範本會混進客戶列表：可讀、可寫、還佔額度`,
+    ).toBe(true);
+  });
+
+  it("templateClient() 是「只選範本」，不是「不排除範本」", () => {
+    const fn = sourceOf(scopeSrc, "templateClient");
+    expect(fn).toBeTruthy();
+    expect(fn!).toContain("eq(clients.isTemplate, true)");
+    // 它不帶 coachId：範本對全體教練是同一份，帶了就代表有人在這把尺上加租戶語意。
+    expect(/export function templateClient\(\)/.test(scopeSrc)).toBe(true);
+  });
+
+  it("usedClientCount() 也要排除（不然範本會吃掉教練的客戶數上限）", () => {
+    const quota = functionsOf(R("src/lib/quota.ts"));
+    expect(quota["usedClientCount"]).toBeTruthy();
+    expect(quota["usedClientCount"]).toContain("eq(clients.isTemplate, false)");
+  });
+});
+
+/**
+ * 範本只給教練端。
+ *
+ * Ray 拍板：客戶端 /portal 完全不出現範本。這件事沒有任何資料層條件擋得住——
+ * 範本對「登入中的教練」是公開的，而 /portal 的登入者是客戶；只要有人在 portal 的
+ * 某個 server component 裡 import 了 lib/templates，那些示範個案（含完整財務數字）
+ * 就會直接出現在客戶眼前，而且看起來像是系統本來就該顯示的東西。
+ * 所以邊界只能守在「誰可以 import 它」。
+ */
+describe("lib/templates.ts 不得被客戶端引用", () => {
+  function tsFiles(dir: string): string[] {
+    const out: string[] = [];
+    for (const e of readdirSync(join(process.cwd(), dir), { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) out.push(...tsFiles(p));
+      else if (/\.tsx?$/.test(e.name)) out.push(p);
+    }
+    return out;
+  }
+
+  const PORTAL = tsFiles("src/app/portal").map((p) => p.split(sep).join("/"));
+
+  it("掃得到 portal 的檔案（掃描壞掉要紅）", () => {
+    expect(PORTAL.length).toBeGreaterThan(5);
+  });
+
+  it.each(PORTAL)("%s 不引用 lib/templates", (file) => {
+    expect(
+      /from\s+["'](@\/lib\/templates|.*\/templates)["']/.test(R(file)),
+      `${file} 引用了 lib/templates——共用示範範本會出現在客戶端`,
+    ).toBe(false);
   });
 });

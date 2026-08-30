@@ -225,6 +225,13 @@
       "when": 1788039477481,
       "tag": "0031_colossal_grey_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1788097143226,
+      "tag": "0032_spicy_satana",
+      "breakpoints": true
     }
   ]
 }

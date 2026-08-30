@@ -5,6 +5,7 @@
 //
 //   ownedClient(me)    ＝ 我是主責 → 可讀、可寫
 //   readableClient(me) ＝ 我是主責 **或** 我是已接受的協作教練 → 只可讀
+//   templateClient()   ＝ 共用示範範本 → 全體教練可讀，**沒有人可寫**（第四把尺，見檔尾）
 //
 // ⚠️ 任何會改資料的路徑（lib/clients 的 update、lib/plans 的 save/clone/delete、
 //    lib/reviews、lib/revisions 的 restore）一律只能用 ownedClient()。
@@ -17,9 +18,24 @@ import { clientCollaborators, clients } from "@/Shared/db/schema";
 /** 協作關係生效中的狀態值。pending/declined/revoked 都看不到任何東西。 */
 export const COLLAB_ACCEPTED = "accepted";
 
-/** 寫入範圍：只有主責教練。 */
+/**
+ * 共用示範範本一律不算「客戶」。
+ *
+ * ⚠️ 這個條件是明確的排除，不是備援。範本的形狀本來就是 coach_id = null，
+ * 照理說 `eq(clients.coachId, me)` 永遠選不到它——但那是「剛好安全」：
+ * 只要哪天有人手滑把某個範本的 coach_id 設成某位教練（最可能的路徑是「把既有客戶
+ * 轉成範本」時忘了清 coach_id），那個範本就會直接出現在他的客戶列表、可寫、還佔他的額度，
+ * 而且第一個發現的人會是被改壞展示的另一位教練。
+ * 加上這一句之後，這件事在資料層就不可能發生，跟資料乾不乾淨無關。
+ *
+ * ⚠️ 條件**逐支函式寫死**、不抽成共用常數：clientScope.drift.test.ts 是逐字掃
+ * `eq(clients.isTemplate, false)` 這串原始碼的。抽成常數會讓掃描漂過去，
+ * 而「掃得到」正是這道防線唯一的維持方式。
+ */
+
+/** 寫入範圍：只有主責教練（且必定不是範本）。 */
 export function ownedClient(coachId: string): SQL {
-  return eq(clients.coachId, coachId) as SQL;
+  return and(eq(clients.coachId, coachId), eq(clients.isTemplate, false)) as SQL;
 }
 
 /**
@@ -30,20 +46,24 @@ export function ownedClient(coachId: string): SQL {
  * 會讓「剛被移除」的協作者還能讀到一次。
  */
 export function readableClient(coachId: string): SQL {
-  return or(
-    eq(clients.coachId, coachId),
-    exists(
-      db
-        .select({ one: sql`1` })
-        .from(clientCollaborators)
-        .where(
-          and(
-            eq(clientCollaborators.clientId, clients.id),
-            eq(clientCollaborators.coachId, coachId),
-            eq(clientCollaborators.status, COLLAB_ACCEPTED),
+  return and(
+    or(
+      eq(clients.coachId, coachId),
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(clientCollaborators)
+          .where(
+            and(
+              eq(clientCollaborators.clientId, clients.id),
+              eq(clientCollaborators.coachId, coachId),
+              eq(clientCollaborators.status, COLLAB_ACCEPTED),
+            ),
           ),
-        ),
+      ),
     ),
+    // 範本永遠走 templateClient()，不從這裡外洩（理由見上方 NOT-TEMPLATE 那段）。
+    eq(clients.isTemplate, false),
   ) as SQL;
 }
 
@@ -85,4 +105,52 @@ export async function clientAccess(coachId: string, clientId: string): Promise<C
  */
 export function annotatableClient(coachId: string): SQL {
   return readableClient(coachId);
+}
+
+/**
+ * 共用示範範本的可見範圍。**第四把尺，而且是唯一一把跨租戶的尺。**
+ *
+ * 前三把尺都帶著 coachId：它們回答的是「這位客戶跟我是什麼關係」。
+ * 這一把不帶任何身分——它回答的是「這一列是不是公司的公開展示素材」，
+ * 所以只要是登入中的 active 教練，看到的都是同一份。
+ *
+ * 為什麼要開這把尺：教練坐在客戶旁邊時需要一份「已經有內容」的個案翻給對方看，
+ * 而那份東西不能是任何一位真實客戶（會外洩），也不能是每位教練各自建一份
+ * （改壞了沒人救得回來、還白白吃掉每個人的客戶額度）。
+ * 所以它是一份公司維護的、全體共用的、誰都改不動的展示資料。
+ *
+ * ⚠️⚠️ 它的邊界只有一條，但這一條非常硬：
+ *
+ *   **沒有任何寫入路徑可以吃這把尺。**
+ *
+ * 它跟 annotatableClient() 的風險方向剛好相反：annotatable 是「範圍窄、但可寫」，
+ * 一旦外流是多幾個人改得動一位客戶；templateClient 是「不可寫、但範圍是全公司」，
+ * 一旦被接到任何 update/delete 上，就是**任何一位教練都改得動所有教練的展示素材**，
+ * 而且甲改壞的東西是乙在客戶面前才發現。所以範本的寫入完全不走這裡：
+ * 只走 lib/templates.ts 的管理端四支，那四支**自己驗 isAdmin()**，
+ * 用的租戶條件是「你是不是管理員」，不是這把尺。
+ *
+ * 開它的四道配套，缺一不可：
+ *
+ *   1. 這支函式**只准出現在 `src/lib/templates.ts`**（與本檔）。
+ *      任何寫入路徑（clients / plans / reviews / revisions / notes）沾到它，
+ *      就是上面那個「全公司互相改壞」的情境。
+ *      → `clientScope.drift.test.ts` 逐檔掃原始碼守著。
+ *
+ *   2. `ownedClient()` 與 `readableClient()` 都明確排除 `isTemplate`。
+ *      缺這道 → 誤設了 coach_id 的範本會混進某位教練的客戶列表：可寫、且佔額度。
+ *
+ *   3. `usedClientCount()`（lib/quota.ts）同樣排除。
+ *      缺這道 → 範本佔掉全體教練的客戶數上限，而他們的列表上根本看不到那幾位是誰。
+ *
+ *   4. 讀取端回傳的東西要**在型別上標成唯讀**（templates.ts 的 `readOnly: true`），
+ *      UI 才有東西可以掛唯讀橫幅。缺這道 → 畫面長得跟一般客戶一模一樣，
+ *      教練會照常編輯，然後每一次存檔都被資料層默默擋掉（他只會覺得系統壞了）。
+ *
+ * 想拿範本來實際試算，走 `copyTemplateToCoach()`：複製成一位**正常的客戶**
+ * （coachId＝自己、isTemplate=false、發真實客戶編號、計入額度），從那一刻起
+ * 它就只受第一把尺管轄，跟這裡再也沒有關係。
+ */
+export function templateClient(): SQL {
+  return eq(clients.isTemplate, true) as SQL;
 }

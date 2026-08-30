@@ -134,7 +134,30 @@ export const clients = pgTable('clients', {
   birthDate: date('birth_date'),
   // 客戶編號（2026/08/24 Ray 拍板）：西元年後兩碼 + 月 + 三碼流水號，不加身分前綴
   // （2610005 ＝ 2026/10 第五位客戶）。以「建立月」計，發出後不變。
+  //
+  // ⚠️ 範本（is_template）不發編號 → code 留 null。範本不是客戶，發了會白白吃掉一個
+  //    流水號、還會印在報告書表頭上。
   code: text('code'),
+  // ── 共用示範範本（2026/08/30 Ray 拍板）──────────────────────────────
+  // 一組「所有教練都看得到、誰都改不了」的示範個案，用來坐在客戶旁邊翻給他看。
+  //
+  // 為什麼寄生在 clients 而不是另開一張表：範本要能被 plans / 報告書 / 引擎原封不動地讀，
+  // 另開一張表等於把 plans.client_id 變成兩種語意（或再複製一張 template_plans），
+  // 整條讀取鏈都要分岔。共用一張表，差別只在「租戶維度是誰」。
+  //
+  // 範本的三個欄位形狀：coach_id = null、client_user_id = null、is_template = true。
+  //   - 跟自助客戶（人生護照）天然分得開：後者一定有 client_user_id。
+  //   - 跟教練客戶天然分得開：後者一定有 coach_id。
+  // ⚠️ 但「天然分得開」只是剛好安全。真正的邊界寫在 lib/clientScope.ts：
+  //    ownedClient() / readableClient() 都明確排除 is_template，
+  //    所以就算哪天有人手滑把某個範本的 coach_id 設成某位教練，它也不會出現在他的
+  //    客戶列表、不會可寫、也不會佔掉他的額度。
+  isTemplate: boolean('is_template').default(false).notNull(),
+  // 客群標籤（例「雙薪育兒家庭」）。只有範本會用；一般客戶留 null。
+  templateLabel: text('template_label'),
+  // 後台排序用（小的在前）。教練端清單依它排，不是依 updated_at——
+  // 範本是「教學素材」，順序是後台編排出來的，不該因為誰動了一下就跳到最前面。
+  templateOrder: integer('template_order').default(0).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
@@ -145,6 +168,10 @@ export const clients = pgTable('clients', {
   uniqueIndex('clients_client_user_id_uidx').on(t.clientUserId),
   // 客戶編號：教練端用它搜尋、報告書印它。唯一性同 coaches_code_uidx 的理由。
   uniqueIndex('clients_code_uidx').on(t.code),
+  // 範本清單（每一位教練每次開示範抽屜都打這一次）。partial index：
+  // 全表絕大多數列是一般客戶，是否範本的選擇性極差，只有 where is_template 的
+  // 部分索引才小到能整個待在記憶體裡，也才會被 planner 選中。
+  index('clients_template_order_idx').on(t.templateOrder, t.updatedAt.desc()).where(sql`is_template`),
 ]);
 
 // 編號流水號計數器（教練編號 / 客戶編號共用一張表，用 kind 分流）。
