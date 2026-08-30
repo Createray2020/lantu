@@ -231,8 +231,9 @@ describe("C6：SVG 只准縮小、不准放大", () => {
 
 describe("C7：客戶端的生涯資產模擬藍圖要畫得出來", () => {
   it("clientView 帶第三個參數 c", () => {
-    expect(HTML).toContain("cashflowCharts(proj,null,c);}");
-    expect(HTML).not.toContain("   cashflowCharts(proj);}");
+    // 圖上移到 KPI 之後，這一行不再是 else 區塊的最後一句；要釘的一直是「第三個參數有帶 c」。
+    expect(HTML).toContain("cashflowCharts(proj,null,c)");
+    expect(HTML).not.toContain("cashflowCharts(proj);");
   });
 
   it("少了 c 就整段不畫，帶了 c 才有「生涯資產模擬藍圖」", () => {

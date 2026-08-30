@@ -6,7 +6,7 @@ import { listClientCases } from "@/lib/comp/survey";
 import { getClientOwnPlan, getClientSetup } from "@/lib/clientPlan";
 import { normalizeIntent } from "@/lib/intent";
 import UiScaleToggle from "@/components/UiScaleToggle";
-import { wan, ntfmt } from "@/lib/passport";
+import { computePassport, wan, ntfmt } from "@/lib/passport";
 import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches } from "@/Shared/db/schema";
@@ -22,7 +22,11 @@ export default async function Portal() {
   if (!client) redirect("/client/sign-in");
   const name = client.name || "貴賓";
   const own = await getClientOwnPlan(client.id);
-  const r = own?.result ?? null;
+  // ⚠️ 這一頁的數字一律走 src/lib/passport.ts 的 computePassport()——
+  //    也就是 fv / pmt / annuityPayout / loanAbility / retireAbility / supportAbility / travelAbility
+  //    那一整組唯一真相，不在這裡重抄一份公式。
+  //    存檔時算過一次的 own.result 只當作沒有 inputs（很舊的資料）時的退路。
+  const r = own?.passport ? computePassport(own.passport) : (own?.result ?? null);
   const setup = await getClientSetup(client.id);
   // 待填回饋問卷：制度上問卷回收才算結案，所以這是客戶端的主動提示而不是被動等通知。
   const pendingSurveys = (await listClientCases(client.id)).filter((c) => !c.surveyAt).length;
@@ -31,6 +35,11 @@ export default async function Portal() {
   // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。
   // 教練端頁首早就有「我的規劃」指過來，這條是把單向補成雙向。
   const isCoach = (await db.select({ id: coaches.id }).from(coaches).where(eq(coaches.id, client.id)).limit(1)).length > 0;
+
+  // 五個面向的顏色。刻意**不動用** #ef6f6f（缺口）與 #f0c34e（可投資資產本金）這兩個
+  // 全站既有的語意色——這裡的五段只是身分類別，沒有好壞。
+  // （dataviz 驗證器 --mode dark --surface #12334f：CVD / 常視 / 對比三項 PASS。）
+  const FACE_COLORS = ["#5b93d6", "#5cc08a", "#b07d3d", "#7fb0e6", "#e0bd8b"];
 
   const rows = r
     ? [
@@ -41,6 +50,28 @@ export default async function Portal() {
         { icon: "✈️", label: "旅遊", head: `旅遊基金 ${ntfmt(r.travel.fund)} 元`, monthly: r.travel.monthly },
       ]
     : [];
+
+  // 一條水平堆疊條：這筆月存，五個面向各佔多少。
+  // ⚠️ 直接標籤優先——塞得下就寫「面向 X萬」，只塞得下兩個字就寫面向名，都塞不下才交給下方圖例。
+  //    門檻是量出來的（11px 粗體：「購車 1萬」42px、「退休」22px）。
+  // ⚠️⚠️ 門檻是**比例**、條寬卻會隨螢幕縮，所以一組門檻不夠用：
+  //    桌機（sm 以上）整條 ≈ 630px → 13% ≈ 82px、6.5% ≈ 41px，兩種標籤都放得下；
+  //    360px 的手機整條只剩 ≈ 270px → 同一個 13% 的段只有 39px，標籤會溢出去疊到隔壁色塊
+  //    （實測 iPhone SE 有三段互疊）。所以手機用一組照 270px 重算的門檻（32% / 17%），
+  //    塞不下的一律交給下方圖例——這正是原本設計的第三檔，不是新規則。
+  //    每一段另外掛 overflow-hidden 當最後的安全網。
+  const totalWan = rows.reduce((sum, x) => sum + x.monthly, 0);
+  const segments = rows.map((row, i) => {
+    const pct = totalWan > 0 ? (row.monthly / totalWan) * 100 : 0;
+    const full = `${row.label} ${row.monthly}萬`;
+    return {
+      ...row,
+      pct,
+      color: FACE_COLORS[i],
+      inner: pct >= 13 ? full : pct >= 6.5 ? row.label : "",
+      innerNarrow: pct >= 32 ? full : pct >= 17 ? row.label : "",
+    };
+  });
 
   return (
     <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] flex flex-col">
@@ -96,61 +127,79 @@ export default async function Portal() {
               <div className="font-serif text-4xl text-[#e0bd8b] mt-2">{r.totalMonthlyWan.toFixed(1)} 萬</div>
             </div>
 
-            <div className="rounded-2xl bg-[#12334f] border border-white/8 divide-y divide-white/8 mb-6">
-              {rows.map((row) => (
-                <div key={row.label} className="flex items-center justify-between px-5 py-3.5">
-                  <span className="flex items-center gap-3 text-[#cdd9e5]">
-                    <span>{row.icon}</span>
-                    <span>{row.label}</span>
+            <div className="rounded-2xl bg-[#12334f] border border-white/8 p-5 mb-6">
+              <div className="text-[12.5px] text-[#a7bacb] mb-2">
+                這 {r.totalMonthlyWan.toFixed(1)} 萬，五個面向各佔多少
+              </div>
+              <div className="flex h-[26px] rounded-md overflow-hidden bg-white/5">
+                {segments.map((seg) => (
+                  <span
+                    key={seg.label}
+                    title={`${seg.label} 月存 ${seg.monthly} 萬`}
+                    className="flex items-center justify-center overflow-hidden text-[11px] font-extrabold text-[#08202a] whitespace-nowrap"
+                    style={{ width: `calc(${seg.pct.toFixed(1)}% - 2px)`, marginRight: 2, background: seg.color }}
+                  >
+                    <span className="sm:hidden">{seg.innerNarrow}</span>
+                    <span className="hidden sm:inline">{seg.inner}</span>
                   </span>
-                  <span className="text-right">
-                    <span className="font-semibold text-[#e0bd8b]">{row.head}</span>
-                    <span className="block text-[11px] text-[#6f869c]">月存 {row.monthly} 萬</span>
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
+              {/* 圖例是完整的——條上塞不下標籤的那幾段，答案在這裡。 */}
+              <div className="grid gap-y-1.5 gap-x-4 mt-3 sm:grid-cols-2">
+                {segments.map((seg) => (
+                  <div key={seg.label} className="flex items-center gap-2 text-[12px] text-[#a7bacb]">
+                    <span className="w-[11px] h-[11px] rounded-[3px] shrink-0" style={{ background: seg.color }} />
+                    <b className="text-[#cdd9e5] font-bold">{seg.label}</b>
+                    <span>{seg.head}</span>
+                    <span className="ml-auto text-[#6f869c] tabular-nums">月存 {seg.monthly} 萬</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+            {/* 四顆同權重的 CTA 等於沒有 CTA——降成一主三次，主行動只留「看完整藍圖」。 */}
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 mb-8">
               <Link href="/portal/plan" className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg text-sm">
                 查看我的完整財務藍圖
               </Link>
-              <Link href="/portal/setup" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
+              <Link href="/portal/setup" className="text-[12.5px] text-[#a7bacb] hover:text-white underline underline-offset-[3px]">
                 補資料 · 看缺口 · 選教練
               </Link>
-              <Link href="/portal/passport" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
+              <Link href="/portal/passport" className="text-[12.5px] text-[#a7bacb] hover:text-white underline underline-offset-[3px]">
                 重新調整人生護照
               </Link>
-              <Link href="/portal/history" className="font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg text-sm">
+              <Link href="/portal/history" className="text-[12.5px] text-[#a7bacb] hover:text-white underline underline-offset-[3px]">
                 版本紀錄
               </Link>
             </div>
 
-            {mustHave.length > 0 && (
-              <div className="rounded-xl border border-white/8 bg-[#12334f] p-5 mb-6">
-                <div className="text-[#e0bd8b] text-sm font-bold mb-1">你的必達目標 · 優先序</div>
-                <p className="text-[11px] text-[#6f869c] mb-3">錢不夠時，我們會從順位在後的開始調整。可到「補資料」頁重新排。</p>
-                <div className="flex flex-wrap gap-2">
-                  {mustHave.map((t, i) => (
-                    <span key={t} className="inline-flex items-center gap-2 rounded-lg bg-[#0a2137] border border-white/10 px-3 py-1.5">
-                      <span className="font-serif text-[13px] font-extrabold text-[#e0bd8b]">{i + 1}</span>
-                      <span className="text-[13px] text-[#cdd9e5]">{t}</span>
-                    </span>
-                  ))}
-                </div>
+            {/* 必達目標與下一步都是「還可以再看」的內容，收起來讓大數字與那條帶子先講完話。 */}
+            <details className="rounded-xl border border-white/8 bg-[#12334f] overflow-hidden">
+              <summary className="cursor-pointer px-5 py-3 text-[13px] font-bold text-[#e0bd8b] list-none">
+                必達目標優先序與下一步
+              </summary>
+              <div className="px-5 pb-5">
+                {mustHave.length > 0 ? (
+                  <>
+                    <p className="text-[11px] text-[#6f869c] mb-3">錢不夠時，我們會從順位在後的開始調整。可到「補資料」頁重新排。</p>
+                    <div className="flex flex-wrap gap-2">
+                      {mustHave.map((t, i) => (
+                        <span key={t} className="inline-flex items-center gap-2 rounded-lg bg-[#0a2137] border border-white/10 px-3 py-1.5">
+                          <span className="font-serif text-[13px] font-extrabold text-[#e0bd8b]">{i + 1}</span>
+                          <span className="text-[13px] text-[#cdd9e5]">{t}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-[13px] text-[#6f869c]">尚未設定必達目標。到「補資料」頁就能排。</p>
+                )}
+                <p className="text-[#a7bacb] text-[13px] leading-relaxed mt-4">
+                  下一步：補完現況、選一位教練——填上基本資料與財務現況，看你的缺口與願景達成率；
+                  再選一位教練送出連結邀請，對方接受後就能一起把規劃做深。
+                </p>
               </div>
-            )}
-
-            <div className="rounded-xl border border-[#c99a5b]/30 bg-[#0d2b45]/50 p-5 text-center">
-              <div className="inline-flex items-center gap-2 text-sm text-[#e0bd8b] mb-2">
-                <span className="w-2 h-2 rounded-full bg-[#c99a5b]" />
-                下一步：補完現況、選一位教練
-              </div>
-              <p className="text-[#a7bacb] text-sm leading-relaxed">
-                填上基本資料與財務現況，看你的缺口與願景達成率；
-                再選一位教練送出連結邀請，對方接受後就能一起把規劃做深。
-              </p>
-            </div>
+            </details>
           </div>
         ) : (
           <div className="max-w-lg mx-auto text-center pt-6">

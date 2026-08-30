@@ -137,7 +137,8 @@ describe("A1｜收支加總只算現齡有效（vs 表面總額）", () => {
     expect(html).toContain(w.fmt(1_900_000));   // 表面總額仍要看得到
     expect(html).toContain("把起訖歲改對");
     // 掛在收支流量比率表的正上方
-    expect(HTML).toContain("html:function(){return flowScopeHTML(c)+ratioTbl('收支流量')}},");
+    // 收支流量比率表改成 bullet chart 之後，flowScopeHTML 仍然掛在最上面（不是收進 details 裡）。
+    expect(HTML).toContain("html:function(){return flowScopeHTML(c)+ratioBulletBlock(r(),'收支流量',ratioTbl('收支流量'))}},");
   });
 
   it("兩份實作的 metrics 對同一份資料給同一組數字", () => {
@@ -304,7 +305,8 @@ describe("A3｜沒有任何賺薪成員填退休年齡 → 退回 65", () => {
 
   it("UI：四個落點（退休首屏／退休時點／分析頁 retire 模組／報告書）都接上了", () => {
     expect(HTML).toContain("function retireAssumedHTML(c,light){");
-    expect(HTML).toContain("return retireAssumedHTML(c)+'<div class=\"big3\"><div class=\"b\"><div class=\"l\">退休後餘年</div>");
+    // 退休首屏改成「三格＋中間值收合」之後，假設提示仍然是 retireHeroHTML() 吐出來的第一段。
+    expect(HTML).toContain("return retireAssumedHTML(c)+big+");
     expect(HTML).toContain("+warn+assumed+'</div>';");
     expect(HTML).toContain("return retireAssumedHTML(c)+'<div class=\"big3\">");
     expect(HTML).toContain("'<h2>§、退休與教育需求</h2>'+retireAssumedHTML(c,true)+");
