@@ -2087,10 +2087,36 @@ function protectYearsEff(c,nd){
  }
  return s;
 }
+// ===== 「清償負債」與「準備教育金」該不該算進這個人的壽險需求 =====
+// ⚠️⚠️ 2026/08/30 Ray 拍板。改版前 grossLifeNeed() 把全部負債餘額與全部教育金加進
+//    **每一位**被保人的需求，不分他有沒有在賺錢——3 歲的孩子會被算出
+//    「房貸 920 萬 ＋ 兩個孩子的學費 ＋ 喪葬」＝ 1,436 萬的壽險缺口，
+//    而教練得當著客戶的面解釋那個數字。
+//    需求分析問的是「這個人走了，家裡少掉什麼」：孩子走了，家庭收入沒有減少，
+//    房貸不會需要立刻清償、學費也不會突然變成缺口。
+// ⚠️ 判定順序：手動勾選 > 角色。needs 列上的 payDebt／fundEdu 只要是布林就聽它
+//    （成年子女是主要經濟來源這種情況，教練自己勾）；沒設才依角色。
+// ⚠️ 成員名字對不上（打錯字、改名還沒同步）一律回 true，維持改版前的行為。
+//    一個字打錯就把整筆需求靜默歸零，比「算多了」難發現得多。
+function needRoleOf(c,name){
+ var m=((c||{}).members||[]).filter(function(x){return !!x&&x.name===name})[0];
+ return m?(m.role||''):null;
+}
+function needCoversDebt(c,nd){
+ if(typeof (nd&&nd.payDebt)==='boolean')return nd.payDebt;
+ var r=needRoleOf(c,nd&&nd.member);
+ return r===null?true:isEarnerRole(r);
+}
+function needCoversEdu(c,nd){
+ if(typeof (nd&&nd.fundEdu)==='boolean')return nd.fundEdu;
+ var r=needRoleOf(c,nd&&nd.member);
+ return r===null?true:isEarnerRole(r);
+}
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
  return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd)
   +familyAnnualParentSupport(c)*n(nd.protectYears)
-  +sum(c.liabilities,function(l){return lBal(l)})+eduTotal(c)+n(nd.funeral)+n(nd.estateTax)
+  +(needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0)
+  +(needCoversEdu(c,nd)?eduTotal(c):0)+n(nd.funeral)+n(nd.estateTax)
   +guaranteeFor(c,nd.member);}
 function coverageReadiness(c){var out=[],pm=(primaryMember(c)||{}).name;
  (c.needs||[]).forEach(function(nd){
@@ -2274,7 +2300,11 @@ function lifeNeedDetailHTML(c){var nds=c.needs||[];if(!nds.length)return '';var 
     :('保障 '+py+' 年');
    var existing=existingCover(c,nd.member,'壽險'),liq=nd.member===pm?liquidMovable(c):0;
    var gross=grossLifeNeed(c,nd);
-   var rows=[['家庭年生活費 '+fmt(famLiving)+' × 扶養比 '+(depR*100)+'% × '+pyLabel,Math.round(living)],['父母奉養費 '+fmt(parentAnnual)+' × 保障 '+py+' 年',Math.round(parents)],['負債餘額',Math.round(liab)],['教育金總需求',Math.round(edu)],['生命禮儀費',n(nd.funeral)],['遺產稅預留',n(nd.estateTax)],['個人連帶保證',Math.round(gtee)],['＝ 壽險毛需求',Math.round(gross),'var(--amber2)'],['− 已備壽險',Math.round(existing)],['− 可動用流動資產',Math.round(liq)],['＝ 壽險淨缺口',Math.round(Math.max(0,gross-existing-liq)),'var(--warn)']];
+   // ⚠️ 這兩列一定要跟著 needCoversDebt()／needCoversEdu() 走，否則下面的
+   //    「＝ 壽險毛需求」就不會等於 grossLifeNeed(c,nd)，這張明細的全部價值就沒了。
+   var liabN=needCoversDebt(c,nd)?liab:0,eduN=needCoversEdu(c,nd)?edu:0;
+   var offTag='（'+esc(nd.member||'這位')+'不是家庭收入來源，不列入）';
+   var rows=[['家庭年生活費 '+fmt(famLiving)+' × 扶養比 '+(depR*100)+'% × '+pyLabel,Math.round(living)],['父母奉養費 '+fmt(parentAnnual)+' × 保障 '+py+' 年',Math.round(parents)],['負債餘額'+(liabN?'':offTag),Math.round(liabN)],['教育金總需求'+(eduN?'':offTag),Math.round(eduN)],['生命禮儀費',n(nd.funeral)],['遺產稅預留',n(nd.estateTax)],['個人連帶保證',Math.round(gtee)],['＝ 壽險毛需求',Math.round(gross),'var(--amber2)'],['− 已備壽險',Math.round(existing)],['− 可動用流動資產',Math.round(liq)],['＝ 壽險淨缺口',Math.round(Math.max(0,gross-existing-liq)),'var(--warn)']];
    return '<div style="margin-bottom:8px"><div class="hint">'+esc(nd.member)+'</div>'+kvTbl(rows)+'</div>';}).join('');
  return detailBox('保障需求反推明細',blocks);}
 // 社會保險老年給付 / 勞退計算明細
@@ -2601,6 +2631,52 @@ function propGapTotals(c){
  return t;
 }
 
+// ═══ 購置目標的貸款：把「那一年一次付清」拆成頭期款 ＋ 逐年還款 ═══════════
+// ⚠️⚠️ 2026/08/30 Ray 拍板。改版前 projection() 完全沒有讀 goals[].loanRatio（只有
+//    propertyGaps() 讀），所以填總價 1,100 萬的購屋目標，那一年就整整扣 1,100 萬：
+//    貸款不存在、月付不存在、房子也沒進資產——同一筆目標，一生金流與購屋缺口
+//    兩張表講兩件不一樣的事。當時不改的理由是「會動到所有含購屋目標的既有客戶」，
+//    正式站清空之後那個理由消失了。
+//
+// ⚠️ 合成一筆**與 liabilities 同形狀**的虛擬負債，直接餵既有的 debtPayAt()／lRemain()。
+//    攤還數學（本息攤還／只付利息／寬限期）已經有一份寫好的，不要再寫第二套——
+//    兩套攤還公式遲早會漂移，而漂移的那一天沒有人看得出來。
+//
+// ⚠️ 觸發條件嚴格，任一項不成立就**完全退回改版前的行為**（那一年扣全額）：
+//    ・有納入、類型是購屋／置產（UI 只在這兩種類型給利率與年期欄位；車貸不適用，
+//      車子也不該被算成保值資產）
+//    ・非週期性（freq ≤ 0）：一份目標對一筆貸款
+//    ・貸款成數／利率／年期三個都 > 0 —— 只填成數就當有貸款，會讓房子看起來免費，
+//      那比「一次付清」更危險
+//    ・購置年不早於現齡（已經發生過的購置不再生成新貸款）
+// ⚠️ 刻意**不扣 g.prepared**：那筆「已備」本來就躺在資產池裡，這裡再扣一次等於免費。
+function goalLoans(c){
+ var a0=n(((c||{}).profile||{}).age),infl=n(((c||{}).params||{}).inflation)/100;
+ var sg=n(((c||{}).params||{}).salaryGrowth)/100;
+ var out=[];
+ ((c||{}).goals||[]).forEach(function(g,idx){
+  if(!g||!visionOn(g))return;
+  if(g.type!=='購屋'&&g.type!=='置產')return;
+  if(n(g.freq)>0)return;
+  var ratio=n(g.loanRatio),rate=n(g.loanRate),yrs=n(g.loanYears);
+  if(!(ratio>0&&rate>0&&yrs>0))return;
+  var buyAge=n(g.start);if(!(buyAge>=a0))return;
+  var t=Math.max(0,buyAge-a0);
+  // ⚠️ 成長依據與 projection() 的 goalOut 逐字相同，否則頭期款與總價會對不上。
+  var gr=g.growth==='通膨'?infl:(g.growth==='薪資'?sg:(g.type==='購屋'?n(g.appreciation)/100:0));
+  var price=n(g.present)*Math.pow(1+gr,t);
+  var loan=price*Math.min(100,ratio)/100;
+  var months=Math.round(yrs*12);
+  out.push({idx:idx,buyAge:buyAge,price:price,loan:loan,down:Math.max(0,price-loan),
+   // pay 是**月付**（debtPayAt 回 lPay(l)*12）。startAge 就是購置年：
+   // 那一年頭期款與第一年還款一起發生，比「隔年才開始還」保守，也不會讓
+   // 淨值曲線在購置當年只看到房子、看不到貸款。
+   liab:{balance:loan,rate:rate,pay:pmt(loan,rate,months),months:months,
+         startAge:buyAge,grace:0,repay:'本息攤還',fxRate:1}});
+ });
+ return out;
+}
+
 function propertyGaps(c){
  return (c.goals||[]).filter(function(g){return g.type==='購屋'||g.type==='置產'}).map(function(g){
   var years=n(g.start)-n(c.profile.age);
@@ -2718,6 +2794,8 @@ function projection(c,lump,rateOverride){
  var ret=((rateOverride!==undefined&&rateOverride!==null&&rateOverride!=='')?n(rateOverride):effReturn(c))/100;
  var invest=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0})+n(lump);
  var fixedAssets=sum(c.assets,function(a){return aLiquid(c,a)?0:aVal(a)});
+ // 購置目標的貸款（見 goalLoans 上方）。空陣列時下面每一行都退化成改版前的算式。
+ var gLoans=goalLoans(c);
  var rows=[],turnNeg=null,totalOut=0;
  var planBal=n(c.params.planInit)||0,planRet=n(c.params.planSaving)/100,planYr=n(c.params.planYearly)||0;
  var eduByYear={}; var g=n(c.params.tuitionGrowth)/100;
@@ -2745,11 +2823,16 @@ function projection(c,lump,rateOverride){
   var inflF=Math.pow(1+infl,t);
   var w=retiredWeight(c,age);
   var expense=workPhaseExpense(c,age,inflF,w);
-  var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)});
-  var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(!inSpan(gg,age))return 0;
-    var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;
-    var gr=gg.growth==='通膨'?infl:(gg.growth==='薪資'?n(c.params.salaryGrowth)/100:(gg.type==='購屋'?n(gg.appreciation)/100:0));
-    return n(gg.present)*Math.pow(1+gr,t);});
+  var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)})+sum(gLoans,function(L){return debtPayAt(L.liab,age,a0)});
+  // 有貸款計畫的那幾筆只扣頭期款，貸款那一段走上面的 debt。
+  var goalOut=0;
+  (c.goals||[]).forEach(function(gg,gi){
+   if(!visionOn(gg))return;if(!inSpan(gg,age))return;
+   var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return;
+   var gl=null;for(var li=0;li<gLoans.length;li++)if(gLoans[li].idx===gi)gl=gLoans[li];
+   if(gl){goalOut+=gl.down;return;}
+   var gr=gg.growth==='通膨'?infl:(gg.growth==='薪資'?n(c.params.salaryGrowth)/100:(gg.type==='購屋'?n(gg.appreciation)/100:0));
+   goalOut+=n(gg.present)*Math.pow(1+gr,t);});
   var edu=eduByYear[age]||0;
   var life=lifestyleFactor(c,age,Math.pow(1+infl,t));
   var retireDraw=retireAnnual(c,age,inflF)*w;
@@ -2796,8 +2879,11 @@ function projection(c,lump,rateOverride){
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
   var totalInv=invest+potSum;
   if(turnNeg===null&&totalInv<0)turnNeg=age;
-  var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)});
-  var netEst=totalInv+fixedAssets-remDebt;
+  var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)})+sum(gLoans,function(L){return lRemain(L.liab,age,a0)});
+  // 買下來的房子從購置年起進固定資產。⚠️ 以購置當年的價格計、之後不再增值——
+  // 保守，也避免「房價自己漲出淨值」這種一被問就站不住的數字。
+  var fixedAt=fixedAssets+sum(gLoans,function(L){return age>=L.buyAge?L.price:0});
+  var netEst=totalInv+fixedAt-remDebt;
   var planOut=goalOut+edu+life;
 
   // 願景事件的可負擔性標記。
@@ -3430,6 +3516,10 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  var workBase=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
  var edu=[];var g0=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){edu[s+yy]=(edu[s+yy]||0)+n(e.annual)*Math.pow(1+g0,n(e.startIn)+yy)}});
+ // 購置貸款：與 projection() 同一份，否則「不破產機率」會跟主圖講不同的話。
+ // ⚠️ 頭期款用確定性的成長率算（goalLoans 內），不隨每一次抽樣的通膨走——
+ //    貸款契約的金額本來就在簽約當下就固定了。
+ var gLoansMC=goalLoans(c);
  var matrix=[],finals=[],neg=0;
  for(var s=0;s<N;s++){var invest=liquid0,cumI=1,cumG=1,broke=false,traj=[];
   for(var age=a0;age<=aEnd;age++){var t=age-a0;
@@ -3440,8 +3530,14 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
    var income=work+other+fin;
    var wMC=retiredWeight(c,age);
    var expense=workPhaseExpense(c,age,cumI,wMC);
-   var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)});
-   var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(!inSpan(gg,age))return 0;var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;var gr=gg.growth==='通膨'?cumI:1;return n(gg.present)*gr});
+   var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)})+sum(gLoansMC,function(L){return debtPayAt(L.liab,age,a0)});
+   var goalOut=0;
+   (c.goals||[]).forEach(function(gg,gi){
+    if(!visionOn(gg))return;if(!inSpan(gg,age))return;
+    var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return;
+    var gl=null;for(var li=0;li<gLoansMC.length;li++)if(gLoansMC[li].idx===gi)gl=gLoansMC[li];
+    if(gl){goalOut+=gl.down;return;}
+    var gr=gg.growth==='通膨'?cumI:1;goalOut+=n(gg.present)*gr;});
    var eduY=edu[age]||0;
    var lifeY=lifestyleFactor(c,age,cumI);
    var retireDraw=retireAnnual(c,age,cumI)*wMC;
@@ -9808,14 +9904,20 @@ function needCard(c,nd,i){
  var living=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*familyAnnualLiving(c)*pyEff;
  var indepList=indepDeps(c,nd.member);
  var parents=familyAnnualParentSupport(c)*py;
- var loans=sum(c.liabilities,function(l){return lBal(l)});
- var edu=eduTotal(c);
+ // ⚠️ 這兩項要不要算給這個人，由 needCoversDebt()／needCoversEdu() 決定（預設依角色）。
+ //    這張表是 grossLifeNeed() 的**逐項拆解**，公式那邊不算的，這裡就必須顯示 0——
+ //    表上寫著 920 萬、需求數字裡卻沒有它，是最糟的一種「兩個數字對不起來」。
+ var coversDebt=needCoversDebt(c,nd),coversEdu=needCoversEdu(c,nd);
+ var ndRole=needRoleOf(c,nd.member);
+ var offWhy='不列入 — '+esc(nd.member||'這位')+(ndRole?'（'+esc(ndRole)+'）':'')+'不是家庭收入來源；他身故家庭收入沒有減少，房貸不會需要立刻清償、學費也不會變成缺口。要列入請在上方勾選。';
+ var loans=coversDebt?sum(c.liabilities,function(l){return lBal(l)}):0;
+ var edu=coversEdu?eduTotal(c):0;
  auto='<table class="rtable" style="margin:6px 0 10px"><tr><th>自動帶入的責任</th><th>金額</th><th>來源</th></tr>'+
   '<tr><td class="k">家庭生活費</td><td class="calc">'+fmt(living)+'</td><td class="muted" style="font-size:11.5px">家計負擔 '+n(memberDep(c,nd.member))+'% × 家庭年生活費 × '+py+' 年'+
    (Math.abs(pyEff-py)>0.005?'<br>\u2705 責任遞減：'+indepList.map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立（支出比例 '+n(d.expRatio)+'%）';}).join('、')+'，等效 '+pyEff.toFixed(2)+' 年':'')+'</td></tr>'+
   '<tr><td class="k">父母奉養費</td><td class="calc">'+fmt(parents)+'</td><td class="muted" style="font-size:11.5px">支出表「孝親」年額 × '+py+' 年</td></tr>'+
-  '<tr><td class="k">貸款</td><td class="calc">'+fmt(loans)+'</td><td class="muted" style="font-size:11.5px">負債表餘額合計</td></tr>'+
-  '<tr><td class="k">子女教育費</td><td class="calc">'+fmt(edu)+'</td><td class="muted" style="font-size:11.5px">教育規劃分頁（終值）</td></tr>'+
+  '<tr><td class="k">貸款</td><td class="calc">'+fmt(loans)+'</td><td class="muted" style="font-size:11.5px">'+(coversDebt?'負債表餘額合計':offWhy)+'</td></tr>'+
+  '<tr><td class="k">子女教育費</td><td class="calc">'+fmt(edu)+'</td><td class="muted" style="font-size:11.5px">'+(coversEdu?'教育規劃分頁（終值）':offWhy)+'</td></tr>'+
   '</table>';
  var blocks=NEED_BLOCKS.map(function(b){
   return '<div class="subhd" style="color:'+b.tone+'">'+b.title+'</div>'+
@@ -9827,8 +9929,18 @@ function needCard(c,nd,i){
  }).join('');
  var hd='<div class="phd"><span class="av">'+esc((nd.member||'需').slice(0,1))+'</span><div class="pident"><div class="who">'+esc(nd.member||'（未指定被保人）')+'</div><div class="rolewrap"><span class="polco">保障需求</span></div></div>'+
   '<button class="pcdel" title="刪除這位的需求" onclick="delRow(\'needs\','+i+')">✕</button></div>';
+ // 責任開關。預設依角色（本人／配偶要清償負債與備教育金，子女／父母不要），
+ // 勾了就是教練說了算——成年子女是主要經濟來源這種情況一定會遇到。
+ var ndCk=function(field,label,on,hint){
+  return '<div class="f"><label>'+label+'</label>'+
+   '<label style="display:flex;align-items:center;gap:7px;padding:7px 0">'+
+   '<input type="checkbox" '+(on?'checked ':'')+'onchange="set(\'needs:'+i+'\',\''+field+'\',this.checked)">'+
+   '<span class="muted" style="font-size:11.5px">'+hint+'</span></label></div>';
+ };
  var memSel='<div class="subhd">被保人</div><div class="fgrid">'+fFld(sb('member'),'被保人',nd.member,null,memOpts)+
-  fFld(sb('depRatioOverride','num'),'家計負擔覆寫%（留空＝用成員卡的值）',nd.depRatioOverride,'num')+'</div>';
+  fFld(sb('depRatioOverride','num'),'家計負擔覆寫%（留空＝用成員卡的值）',nd.depRatioOverride,'num')+
+  ndCk('payDebt','身故要清償家庭負債',coversDebt,'預設依角色：本人／配偶列入，子女／父母不列入')+
+  ndCk('fundEdu','身故要備妥子女教育金',coversEdu,'預設依角色，同上')+'</div>';
  return '<div class="pcard">'+hd+'<div class="pbody">'+memSel+blocks+'</div></div>';
 }
 function needsSec(c){
@@ -9924,9 +10036,10 @@ function freqCell(arr,i,val){
 // 教練回饋：購屋想多幾個參數（總價、頭期、房貸利率年期、預估時間、裝修款）。
 // 查下來 goals 已經有一半——總價＝present、成數＝loanRatio、時間＝start，
 // 缺的只有利率、年期、裝修款。
-// ⚠️⚠️ Ray 拍板「只算給人看」：引擎仍把購屋當「那一年的一次性支出」，
-//    既有客戶的數字**一位都不會動**。要讓房貸真的長成後續月付是引擎級改動
-//    （goalOut 目前根本沒有用 loanRatio 生成任何現金流），會動到所有含購屋目標的客戶。
+// ⚠️ 2026/08/30 Ray 改判：房貸真的長成後續月付了（見 goalLoans()）。
+//    原本的決定是「只算給人看」，理由是引擎級改動會動到所有含購屋目標的既有客戶；
+//    正式站清空之後那個理由消失，就趁沒有真實客戶的時候把它改對。
+//    ⚠️ 觸發要三個欄位（成數／利率／年期）都有值，缺一個就退回「那一年一次付清」。
 // ⚠️ 裝修款不自動併進總價——教練很可能已經把裝修含在房價裡了，自動加會重複。
 //    給一顆按鈕，按了才加，並記 decoIn 防止重複按。
 function addDecoToPrice(i){
@@ -9976,13 +10089,13 @@ function houseCalcDerivedHTML(c,i){
   '頭期款（總價 × '+(100-ratio)+'%）<b style="color:var(--amber2)">'+fmt(down)+'</b>　·　'+
   '貸款金額 <b>'+fmt(loan)+'</b>　·　'+
   (mp>0?('月付 <b style="color:var(--amber2)">'+fmt(mp)+'</b>　·　總利息 <b>'+fmt(totInt)+'</b>')
-       :'<span style="color:var(--warn)">填了利率與年期才算得出月付</span>')+
+       :'<span style="color:var(--warn)">填了利率與年期才算得出月付——也才會進一生金流；現在這筆是「'+n(g.start)+' 歲那一年一次付清 '+fmt(price)+'」</span>')+
   '</div>';
 }
 function houseCalcSec(c){
  var cards=houseCalcCardsHTML(c);
  if(!cards)return '';
- return '<div class="sec"><h4>購置試算 <span class="hint">只做試算與呈現：引擎仍把購屋當「那一年的一次性支出」，這裡的利率與年期不會改變金流</span></h4>'+cards+'</div>';
+ return '<div class="sec"><h4>購置試算 <span class="hint">利率與年期填了，這筆貸款就會真的進一生金流：那一年只扣頭期款，之後逐年扣月付，房子進固定資產。三個欄位（成數／利率／年期）缺一個就退回「那一年一次付清」</span></h4>'+cards+'</div>';
 }
 function tableSec(title,arr,list,cols,hint){var c=activeCase();
  var head='<tr>'+cols.map(function(cl){return '<th>'+cl[1]+'</th>'}).join('')+'<th></th></tr>';

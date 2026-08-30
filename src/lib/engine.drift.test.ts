@@ -444,7 +444,9 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     // 六個攔截點（html 端逐一釘住，engine 端由下面的數字斷言守）
     // 2026/08/29：起訖判斷搬到共用的 inSpan()（留空＝全期間有效），攔截點本身沒有搬家。
     expect(HTML).toContain("(arr||[]).forEach(function(it){if(!visionOn(it))return;if(inSpan(it,age))");
-    expect(HTML).toContain("sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(!inSpan(gg,age))return 0;");
+    // 2026/08/30：purchase-loan 之後 goalOut 從 sum() 換成帶索引的 forEach（要認得出「這一筆有沒有貸款」），
+    // 攔截點本身沒有搬家——projection 與 monteCarlo 各一處。
+    expect(HTML.match(/if\(!visionOn\(gg\)\)return;if\(!inSpan\(gg,age\)\)return;/g)?.length).toBe(2);
     expect(HTML).toContain("return visionOn(g)?Math.max(0,n(g.present)-goalFloor(g)):0");
     expect(HTML).toContain("(a.goals||[]).forEach(function(g){if(!visionOn(g))return;var f=goalFloor(g)");
     expect(HTML).toContain("function legacyNeed(c){var lg=c.legacy||{};if(lg.on===false)return 0;");
@@ -543,7 +545,7 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
 
   it("負債一律換匯（lBal），不可直接讀 l.balance", () => {
     // 兩邊的 grossLifeNeed 都要用 lBal，否則外幣房貸在「缺口」與「準備度」兩頁會差一個匯率
-    expect(HTML).toContain("+sum(c.liabilities,function(l){return lBal(l)})+eduTotal(c)");
+    expect(HTML).toContain("+(needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0)");
 
     const c = E.sampleCase();
     c.liabilities = [{ name: "美金房貸", currency: "美金", fxRate: 32, balance: 100000, rate: 2, pay: 500, months: 240, startAge: 38 }];
@@ -825,7 +827,8 @@ describe("雙實作對拍：死欄位接線（C1–C11）", () => {
     expect(HTML).toContain(" if(el<graceMonths(l))return lRemain(l,age,a0)*n(l.rate)/100;");
     // 三個呼叫端一律走 debtPayAt（annualDebtPay / projection / monteCarlo）
     expect(HTML).toContain("function annualDebtPay(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){return debtPayAt(l,a0,a0)})}");
-    expect(HTML.match(/var debt=sum\(c\.liabilities,function\(l\)\{return debtPayAt\(l,age,a0\)\}\);/g)?.length).toBe(2);
+    // 2026/08/30：projection 與 monteCarlo 的 debt 都多接了購置貸款那一段（goalLoans）。
+    expect(HTML.match(/var debt=sum\(c\.liabilities,function\(l\)\{return debtPayAt\(l,age,a0\)\}\)\+sum\(gLoans(MC)?,function\(L\)\{return debtPayAt\(L\.liab,age,a0\)\}\);/g)?.length).toBe(2);
     expect(HTML).not.toContain("(age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0");
 
     for (const mode of ["本息攤還", "只付利息", "暫緩還款", ""]) {

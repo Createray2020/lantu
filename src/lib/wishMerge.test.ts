@@ -203,13 +203,26 @@ describe("購置試算：參數齊全，但只算給人看", () => {
     expect(mp).toBeLessThan(32_500);
   });
 
-  it("⚠️ 引擎行為完全不變——利率年期不會改變任何金流", () => {
+  // ⚠️ 2026/08/30 Ray 改判：這一段原本斷言的是「利率年期只做試算、不改變任何金流」。
+  //    現在貸款真的長進一生金流了（goalLoans），所以這裡反過來守新的合約。
+  it("利率與年期會改變一生金流——而且三個欄位缺一個就完全不生效", () => {
     const c = withHouse();
-    const before = w.metrics(c).proj.shortPV;
-    c.goals[0].loanRate = 5;
-    c.goals[0].loanYears = 40;
-    const after = w.metrics(w.activeCase()).proj.shortPV;
-    expect(after, "利率年期只做試算").toBe(before);
+    const full = w.metrics(c).proj;
+    // 50 歲那一年只扣頭期款（總價 1,200 萬 × 1.02^10 × 30%），不是全額
+    const buy = full.rows.find((r: { age: number }) => r.age === 50);
+    const price = 12_000_000 * Math.pow(1.02, 10);
+    expect(buy.goal).toBeCloseTo(price * 0.3, 2);
+
+    // 利率拉高 → 月付變重 → 缺口變大
+    const c2 = withHouse();
+    c2.goals[0].loanRate = 5;
+    expect(w.metrics(c2).proj.shortPV).toBeGreaterThan(full.shortPV);
+
+    // 年期清掉 → 整筆退回「那一年一次付清」
+    const c3 = withHouse();
+    c3.goals[0].loanYears = 0;
+    const b3 = w.metrics(c3).proj.rows.find((r: { age: number }) => r.age === 50);
+    expect(b3.goal).toBeCloseTo(price, 2);
   });
 
   it("裝修款要按了才併進總價，而且不會重複按", () => {

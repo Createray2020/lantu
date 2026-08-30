@@ -69,9 +69,6 @@ export function dualIncome(): C {
     { name: "托育與才藝", cat: "生活", amount: 264_000, infl: true, start: 38, end: 56, cut: 15 },
     { name: "孝親費", cat: "孝親", amount: 144_000, infl: false, start: 38, end: 76, cut: 10 },
     { name: "綜合所得稅", cat: "稅賦", amount: 96_000, infl: false, start: 38, end: 65, cut: 0 },
-    // 換屋後新增的貸款月付（賣舊買新、貸款金額變大的那一段）。
-    // 舊房貸在 64 歲攤完，這一列從 52 歲接上去，到 77 歲為止。
-    { name: "換屋後新增房貸月付", cat: "居住", amount: 300_000, infl: false, start: 52, end: 77, cut: 0 },
   ];
 
   c.assets = [
@@ -109,12 +106,13 @@ export function dualIncome(): C {
   ];
 
   c.goals = [
-    { name: "換車", type: "購車", present: 900_000, minPresent: 600_000, start: 45, end: 45, freq: 0, growth: "固定", imp: 3, prepared: 0, loanRatio: 50, appreciation: 0 },
-    // ⚠️ 購屋目標填的是**自備款＋裝潢稅費**，不是總價。
-    //    引擎的一生金流（projection）沒有讀 goals[].loanRatio——填總價的話，
-    //    52 歲那一年會被一次扣掉兩千多萬，圖上直接崩掉，而那不是這個家真正的現金流。
-    //    貸款那一段以「換屋後房貸月付」那一列支出表示（見 expenses）。已列入回報給 Ray。
-    { name: "換屋自備款與裝潢", type: "購屋", present: 5_400_000, minPresent: 4_200_000, start: 52, end: 52, freq: 0, growth: "固定", imp: 4, prepared: 0, loanRatio: 0, appreciation: 2 },
+    // ⚠️ 車貸不填成數：引擎的購置貸款只做購屋／置產（車子不該被算成保值資產），
+    //    填了也不會生效，留著只會讓人以為它有作用。
+    { name: "換車", type: "購車", present: 900_000, minPresent: 600_000, start: 45, end: 45, freq: 0, growth: "固定", imp: 3, prepared: 0, loanRatio: 0, appreciation: 0 },
+    // 賣舊買新：填的是**價差＋裝潢稅費**，不是新房總價。舊房子與舊房貸都還在模型裡跑
+    //（引擎沒有「賣掉一間房、清掉一筆貸款」這個動作），所以只把實際多借的那一段放進來。
+    // 六成貸款、2.15%、20 年 —— 三個欄位齊全，引擎會自己拆成頭期款＋逐年月付（見 goalLoans）。
+    { name: "換屋價差與裝潢", type: "購屋", present: 5_400_000, minPresent: 4_200_000, start: 52, end: 52, freq: 0, growth: "固定", imp: 4, prepared: 0, loanRatio: 60, loanRate: 2.15, loanYears: 20, appreciation: 2 },
   ];
   c.travel = [
     { cat: "國內", sub: "認知旅遊", start: 38, end: 80, freq: 2, amount: 25_000, minAmount: 18_000, imp: 4 },
@@ -127,12 +125,11 @@ export function dualIncome(): C {
     // protectYears 20：撐到小樹經濟獨立為止，這是雙薪育兒家庭壽險需求的真正長度。
     { member: "林家豪", funeral: 800_000, protectYears: 20, estateTax: 0, room: 2_500, selfPay: 2_000, nursing: 2_200, miscDaily: 3_000, incomeCompDay: 0, incomeCompMonth: 60_000, disability: 5_000_000, firstCancer: 1_000_000, cancerHosp: 3_000, critical: 3_000_000, monthCare: 40_000, careMonths: 120 },
     { member: "陳怡君", funeral: 800_000, protectYears: 20, estateTax: 0, room: 2_500, selfPay: 2_000, nursing: 2_200, miscDaily: 3_000, incomeCompDay: 0, incomeCompMonth: 45_000, disability: 4_000_000, firstCancer: 1_000_000, cancerHosp: 3_000, critical: 3_000_000, monthCare: 40_000, careMonths: 120 },
-    // ⚠️ 兩個孩子**刻意不列進需求分析表**。需求分析問的是「這個人走了，家裡少掉什麼」，
-    //    孩子不是經濟支柱，答案是喪葬費，不是房貸與學費。
-    //    （順帶避開一個引擎面的問題：grossLifeNeed() 會把全部負債與教育金加進**每一位**
-    //      被保人的壽險需求，不分他有沒有在賺錢——照填會讓 3 歲的孩子算出一千四百萬的
-    //      壽險缺口。已列入回報給 Ray，這裡先用「只列經濟支柱」這個本來就正確的做法。）
-    //    他們的醫療險仍在保單表裡，給付明細與保費投影都照算。
+    // 兩個孩子：保障年數 0、扶養比 0——他們不是經濟支柱，壽險的需求就只有喪葬費。
+    // 引擎會依角色自動不把「清償負債」與「準備教育金」算到他們頭上（needCoversDebt／
+    // needCoversEdu），所以這裡列出來是安全的，全家保障地圖也才完整。
+    { member: "林小雨", funeral: 300_000, protectYears: 0, estateTax: 0, room: 2_000, selfPay: 1_500, nursing: 0, miscDaily: 1_000, incomeCompDay: 0, incomeCompMonth: 0, disability: 1_000_000, firstCancer: 500_000, cancerHosp: 2_000, critical: 1_000_000, monthCare: 0, careMonths: 0 },
+    { member: "林小樹", funeral: 300_000, protectYears: 0, estateTax: 0, room: 2_000, selfPay: 1_500, nursing: 0, miscDaily: 1_000, incomeCompDay: 0, incomeCompMonth: 0, disability: 1_000_000, firstCancer: 500_000, cancerHosp: 2_000, critical: 1_000_000, monthCare: 0, careMonths: 0 },
   ];
   // 公司團保：不是自己買的保單，但確實有保障，所以走 coverages 的 comm 欄。
   c.coverages = [
@@ -215,8 +212,7 @@ export function single(): C {
     { name: "房租", cat: "居住", amount: 264_000, infl: true, start: 29, end: 36, cut: 10 },
     { name: "孝親費", cat: "孝親", amount: 96_000, infl: false, start: 29, end: 70, cut: 0 },
     { name: "綜合所得稅", cat: "稅賦", amount: 26_000, infl: false, start: 29, end: 65, cut: 0 },
-    // 36 歲買房：房租那一列結束，換成房貸月付（880 萬、2.1%、30 年 ≈ 33,000／月）。
-    { name: "房貸月付（36 歲買房後）", cat: "居住", amount: 396_000, infl: false, start: 36, end: 66, cut: 0 },
+    // 房租只到 36 歲——那一年買房，房貸月付由購屋目標自己長出來（不要手寫，會重複）。
   ];
   c.assets = [
     { name: "活存", owner: "吳宜靜", mainCat: "自用資產", type: "現金", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: 62_000, value: 62_000, ret: 0.5, income: 0, movable: true },
@@ -243,8 +239,9 @@ export function single(): C {
   ];
   c.education = [];
   c.goals = [
-    // 同上：填的是自備款＋裝潢稅費（總價約 1,100 萬、貸八成），不是總價。
-    { name: "買第一間房（自備款與裝潢）", type: "購屋", present: 2_600_000, minPresent: 2_000_000, start: 36, end: 36, freq: 0, growth: "固定", imp: 5, prepared: 0, loanRatio: 0, appreciation: 2 },
+    // 總價 1,100 萬、貸八成、2.1%、30 年。三個欄位齊全 → 引擎自己拆成
+    // 「36 歲扣頭期款」＋「36–65 歲每年扣月付」，房子也會進固定資產（見 goalLoans）。
+    { name: "買第一間房", type: "購屋", present: 11_000_000, minPresent: 9_000_000, start: 36, end: 36, freq: 0, growth: "固定", imp: 5, prepared: 0, loanRatio: 80, loanRate: 2.1, loanYears: 30, appreciation: 2 },
     { name: "進修（在職專班）", type: "其他", present: 400_000, minPresent: 300_000, start: 32, end: 32, freq: 0, growth: "固定", imp: 3, prepared: 0, loanRatio: 0, appreciation: 0 },
   ];
   c.travel = [

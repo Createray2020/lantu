@@ -693,10 +693,36 @@ function protectYearsEff(c,nd){
  }
  return s;
 }
+// ===== 「清償負債」與「準備教育金」該不該算進這個人的壽險需求 =====
+// ⚠️⚠️ 2026/08/30 Ray 拍板。改版前 grossLifeNeed() 把全部負債餘額與全部教育金加進
+//    **每一位**被保人的需求，不分他有沒有在賺錢——3 歲的孩子會被算出
+//    「房貸 920 萬 ＋ 兩個孩子的學費 ＋ 喪葬」＝ 1,436 萬的壽險缺口，
+//    而教練得當著客戶的面解釋那個數字。
+//    需求分析問的是「這個人走了，家裡少掉什麼」：孩子走了，家庭收入沒有減少，
+//    房貸不會需要立刻清償、學費也不會突然變成缺口。
+// ⚠️ 判定順序：手動勾選 > 角色。needs 列上的 payDebt／fundEdu 只要是布林就聽它
+//    （成年子女是主要經濟來源這種情況，教練自己勾）；沒設才依角色。
+// ⚠️ 成員名字對不上（打錯字、改名還沒同步）一律回 true，維持改版前的行為。
+//    一個字打錯就把整筆需求靜默歸零，比「算多了」難發現得多。
+function needRoleOf(c,name){
+ var m=((c||{}).members||[]).filter(function(x){return !!x&&x.name===name})[0];
+ return m?(m.role||''):null;
+}
+function needCoversDebt(c,nd){
+ if(typeof (nd&&nd.payDebt)==='boolean')return nd.payDebt;
+ var r=needRoleOf(c,nd&&nd.member);
+ return r===null?true:isEarnerRole(r);
+}
+function needCoversEdu(c,nd){
+ if(typeof (nd&&nd.fundEdu)==='boolean')return nd.fundEdu;
+ var r=needRoleOf(c,nd&&nd.member);
+ return r===null?true:isEarnerRole(r);
+}
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
  return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd)
   +familyAnnualParentSupport(c)*n(nd.protectYears)
-  +sum(c.liabilities,function(l){return lBal(l)})+eduTotal(c)+n(nd.funeral)+n(nd.estateTax)
+  +(needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0)
+  +(needCoversEdu(c,nd)?eduTotal(c):0)+n(nd.funeral)+n(nd.estateTax)
   +guaranteeFor(c,nd.member);}
 
 
@@ -1173,6 +1199,52 @@ function propGapTotals(c){
  return t;
 }
 
+// ═══ 購置目標的貸款：把「那一年一次付清」拆成頭期款 ＋ 逐年還款 ═══════════
+// ⚠️⚠️ 2026/08/30 Ray 拍板。改版前 projection() 完全沒有讀 goals[].loanRatio（只有
+//    propertyGaps() 讀），所以填總價 1,100 萬的購屋目標，那一年就整整扣 1,100 萬：
+//    貸款不存在、月付不存在、房子也沒進資產——同一筆目標，一生金流與購屋缺口
+//    兩張表講兩件不一樣的事。當時不改的理由是「會動到所有含購屋目標的既有客戶」，
+//    正式站清空之後那個理由消失了。
+//
+// ⚠️ 合成一筆**與 liabilities 同形狀**的虛擬負債，直接餵既有的 debtPayAt()／lRemain()。
+//    攤還數學（本息攤還／只付利息／寬限期）已經有一份寫好的，不要再寫第二套——
+//    兩套攤還公式遲早會漂移，而漂移的那一天沒有人看得出來。
+//
+// ⚠️ 觸發條件嚴格，任一項不成立就**完全退回改版前的行為**（那一年扣全額）：
+//    ・有納入、類型是購屋／置產（UI 只在這兩種類型給利率與年期欄位；車貸不適用，
+//      車子也不該被算成保值資產）
+//    ・非週期性（freq ≤ 0）：一份目標對一筆貸款
+//    ・貸款成數／利率／年期三個都 > 0 —— 只填成數就當有貸款，會讓房子看起來免費，
+//      那比「一次付清」更危險
+//    ・購置年不早於現齡（已經發生過的購置不再生成新貸款）
+// ⚠️ 刻意**不扣 g.prepared**：那筆「已備」本來就躺在資產池裡，這裡再扣一次等於免費。
+function goalLoans(c){
+ var a0=n(((c||{}).profile||{}).age),infl=n(((c||{}).params||{}).inflation)/100;
+ var sg=n(((c||{}).params||{}).salaryGrowth)/100;
+ var out=[];
+ ((c||{}).goals||[]).forEach(function(g,idx){
+  if(!g||!visionOn(g))return;
+  if(g.type!=='購屋'&&g.type!=='置產')return;
+  if(n(g.freq)>0)return;
+  var ratio=n(g.loanRatio),rate=n(g.loanRate),yrs=n(g.loanYears);
+  if(!(ratio>0&&rate>0&&yrs>0))return;
+  var buyAge=n(g.start);if(!(buyAge>=a0))return;
+  var t=Math.max(0,buyAge-a0);
+  // ⚠️ 成長依據與 projection() 的 goalOut 逐字相同，否則頭期款與總價會對不上。
+  var gr=g.growth==='通膨'?infl:(g.growth==='薪資'?sg:(g.type==='購屋'?n(g.appreciation)/100:0));
+  var price=n(g.present)*Math.pow(1+gr,t);
+  var loan=price*Math.min(100,ratio)/100;
+  var months=Math.round(yrs*12);
+  out.push({idx:idx,buyAge:buyAge,price:price,loan:loan,down:Math.max(0,price-loan),
+   // pay 是**月付**（debtPayAt 回 lPay(l)*12）。startAge 就是購置年：
+   // 那一年頭期款與第一年還款一起發生，比「隔年才開始還」保守，也不會讓
+   // 淨值曲線在購置當年只看到房子、看不到貸款。
+   liab:{balance:loan,rate:rate,pay:pmt(loan,rate,months),months:months,
+         startAge:buyAge,grace:0,repay:'本息攤還',fxRate:1}});
+ });
+ return out;
+}
+
 function propertyGaps(c){
  return (c.goals||[]).filter(function(g){return g.type==='購屋'||g.type==='置產'}).map(function(g){
   var years=n(g.start)-n(c.profile.age);
@@ -1294,6 +1366,8 @@ function projection(c,lump,rateOverride){
  var ret=((rateOverride!==undefined&&rateOverride!==null&&rateOverride!=='')?n(rateOverride):effReturn(c))/100;
  var invest=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0})+n(lump);
  var fixedAssets=sum(c.assets,function(a){return aLiquid(c,a)?0:aVal(a)});
+ // 購置目標的貸款（見 goalLoans 上方）。空陣列時下面每一行都退化成改版前的算式。
+ var gLoans=goalLoans(c);
  var rows=[],turnNeg=null,totalOut=0;
  var eduByYear={}; var g=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){var ag=s+yy;eduByYear[ag]=(eduByYear[ag]||0)+n(e.annual)*Math.pow(1+g,n(e.startIn)+yy)}});
@@ -1320,11 +1394,16 @@ function projection(c,lump,rateOverride){
   var inflF=Math.pow(1+infl,t);
   var w=retiredWeight(c,age);
   var expense=workPhaseExpense(c,age,inflF,w);
-  var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)});
-  var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(!inSpan(gg,age))return 0;
-    var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;
-    var gr=gg.growth==='通膨'?infl:(gg.growth==='薪資'?n(c.params.salaryGrowth)/100:(gg.type==='購屋'?n(gg.appreciation)/100:0));
-    return n(gg.present)*Math.pow(1+gr,t);});
+  var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)})+sum(gLoans,function(L){return debtPayAt(L.liab,age,a0)});
+  // 有貸款計畫的那幾筆只扣頭期款，貸款那一段走上面的 debt。
+  var goalOut=0;
+  (c.goals||[]).forEach(function(gg,gi){
+   if(!visionOn(gg))return;if(!inSpan(gg,age))return;
+   var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return;
+   var gl=null;for(var li=0;li<gLoans.length;li++)if(gLoans[li].idx===gi)gl=gLoans[li];
+   if(gl){goalOut+=gl.down;return;}
+   var gr=gg.growth==='通膨'?infl:(gg.growth==='薪資'?n(c.params.salaryGrowth)/100:(gg.type==='購屋'?n(gg.appreciation)/100:0));
+   goalOut+=n(gg.present)*Math.pow(1+gr,t);});
   var edu=eduByYear[age]||0;
   var life=lifestyleFactor(c,age,Math.pow(1+infl,t));
   var retireDraw=retireAnnual(c,age,inflF)*w;
@@ -1371,8 +1450,11 @@ function projection(c,lump,rateOverride){
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
   var totalInv=invest+potSum;
   if(turnNeg===null&&totalInv<0)turnNeg=age;
-  var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)});
-  var netEst=totalInv+fixedAssets-remDebt;
+  var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)})+sum(gLoans,function(L){return lRemain(L.liab,age,a0)});
+  // 買下來的房子從購置年起進固定資產。⚠️ 以購置當年的價格計、之後不再增值——
+  // 保守，也避免「房價自己漲出淨值」這種一被問就站不住的數字。
+  var fixedAt=fixedAssets+sum(gLoans,function(L){return age>=L.buyAge?L.price:0});
+  var netEst=totalInv+fixedAt-remDebt;
 
   // 願景事件的可負擔性標記。
   // ⚠️ 刻意**不改變現金流**（維持「照付、餘額可以轉負」的既有語意，否則所有既有客戶
@@ -2021,6 +2103,10 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  var workBase=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
  var edu=[];var g0=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){edu[s+yy]=(edu[s+yy]||0)+n(e.annual)*Math.pow(1+g0,n(e.startIn)+yy)}});
+ // 購置貸款：與 projection() 同一份，否則「不破產機率」會跟主圖講不同的話。
+ // ⚠️ 頭期款用確定性的成長率算（goalLoans 內），不隨每一次抽樣的通膨走——
+ //    貸款契約的金額本來就在簽約當下就固定了。
+ var gLoansMC=goalLoans(c);
  var matrix=[],finals=[],neg=0;
  for(var s=0;s<N;s++){var invest=liquid0,cumI=1,cumG=1,broke=false,traj=[];
   for(var age=a0;age<=aEnd;age++){var t=age-a0;
@@ -2031,8 +2117,14 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
    var income=work+other+fin;
    var wMC=retiredWeight(c,age);
    var expense=workPhaseExpense(c,age,cumI,wMC);
-   var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)});
-   var goalOut=sum(c.goals,function(gg){if(!visionOn(gg))return 0;if(!inSpan(gg,age))return 0;var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return 0;var gr=gg.growth==='通膨'?cumI:1;return n(gg.present)*gr});
+   var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)})+sum(gLoansMC,function(L){return debtPayAt(L.liab,age,a0)});
+   var goalOut=0;
+   (c.goals||[]).forEach(function(gg,gi){
+    if(!visionOn(gg))return;if(!inSpan(gg,age))return;
+    var hit=(n(gg.freq)<=0)?(age===n(gg.start)):(((age-n(gg.start))%n(gg.freq))===0);if(!hit)return;
+    var gl=null;for(var li=0;li<gLoansMC.length;li++)if(gLoansMC[li].idx===gi)gl=gLoansMC[li];
+    if(gl){goalOut+=gl.down;return;}
+    var gr=gg.growth==='通膨'?cumI:1;goalOut+=n(gg.present)*gr;});
    var eduY=edu[age]||0;
    var lifeY=lifestyleFactor(c,age,cumI);
    var retireDraw=retireAnnual(c,age,cumI)*wMC;
@@ -2453,6 +2545,8 @@ export {
   gapTotals,
   gapNeedBase,
   grossLifeNeed,
+  needCoversDebt,
+  needCoversEdu,
   indepDeps,
   protectYearsEff,
   growingAnnuityPV,
@@ -2547,6 +2641,7 @@ export {
   propHave,
   propGaps,
   propGapTotals,
+  goalLoans,
   propertyGaps,
   metrics,
   ratios,
