@@ -49,3 +49,10 @@ lantu_src_v1.tgz
 *.tgz
 _stage*
 _incoming*
+
+# ⚠️ 資料庫 dump／備份：裡面是真實客戶的完整財務資料，而這個 repo 是 public。
+# 一次 git add -A 就會永久推上 GitHub（git 歷史刪不乾淨），所以一律擋在源頭。
+_backup_*
+lantu_backup_*.json
+*_dump.json
+mock_backup_*.json
