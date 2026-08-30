@@ -7,12 +7,16 @@ import type { TemplateListItem } from "@/lib/templates";
 import { fmtMoney, stageColor, stageName } from "../../dashboard/format";
 import {
   createTemplateAction,
-  deleteTemplateAction,
+  purgeTemplateAction,
   reorderTemplatesAction,
+  setTemplateArchivedAction,
   updateTemplateAction,
 } from "./actions";
 
 const field = "w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7]";
+
+/** 已下架＝status 不是 active。舊資料沒有這個欄位時視為上架中。 */
+const archivedOf = (t: TemplateListItem) => t.status === "archived";
 
 export default function TemplateAdmin({ templates }: { templates: TemplateListItem[] }) {
   const router = useRouter();
@@ -20,8 +24,9 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
   const [err, setErr] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<TemplateListItem | null>(null);
-  // 刪除是真刪（plans 一起 CASCADE），所以不做「按一下就沒了」。
-  // 兩段式：第一下把那一列變成確認狀態，第二下才真的送出。
+  // 永久刪除是真刪（plans 一起 CASCADE），所以不做「按一下就沒了」：
+  // 第一下把那一列變成確認狀態，第二下才真的送出。
+  // ⚠️ 下架本身不需要確認——它可回復，多一道確認只是讓人少用它。
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
 
   // 排序在本地先動，畫面才不會「按了上移、等一秒才跳」。
@@ -89,10 +94,15 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
         </div>
       ) : (
         <div className="grid gap-2">
-          {order.map((t, i) => (
+          {order.map((t, i) => {
+            const archived = archivedOf(t);
+            return (
             <div
               key={t.id}
-              className="grid grid-cols-1 md:grid-cols-[1.7fr_1fr_1fr_auto] gap-3 items-center bg-[#0c2135] border border-white/10 rounded-lg px-3 py-3"
+              className={
+                "grid grid-cols-1 md:grid-cols-[1.7fr_1fr_1fr_auto] gap-3 items-center rounded-lg px-3 py-3 border " +
+                (archivedOf(t) ? "bg-[#0a1a2b] border-white/8 opacity-70" : "bg-[#0c2135] border-white/10")
+              }
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -100,6 +110,9 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
                   <Link href={`/admin/templates/${t.id}`} className="font-bold hover:text-[#e0bd8b] truncate">
                     {t.name}
                   </Link>
+                  {archivedOf(t) && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/20 text-[#6b7d8f]">已下架</span>
+                  )}
                 </div>
                 {t.templateLabel && (
                   <div className="ml-7 mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] border border-white/10">
@@ -141,35 +154,61 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
                 >
                   改名稱
                 </button>
-                {confirmDel === t.id ? (
+                {archived ? (
                   <>
                     <button
-                      onClick={() => { setConfirmDel(null); run(() => deleteTemplateAction(t.id)); }}
+                      onClick={() => run(() => setTemplateArchivedAction(t.id, false))}
                       disabled={pending}
-                      className="text-xs font-bold rounded-md bg-[#e5484d] text-white px-2.5 py-1.5 disabled:opacity-40"
+                      className="text-xs font-bold rounded-md border border-[#7bbf6a]/50 text-[#8fd07e] px-2.5 py-1.5 hover:bg-[#7bbf6a]/10 disabled:opacity-40"
                     >
-                      確定下架
+                      重新上架
                     </button>
-                    <button onClick={() => setConfirmDel(null)} className="text-xs text-[#a9bccf] px-1.5">取消</button>
+                    {confirmDel === t.id ? (
+                      <>
+                        <button
+                          onClick={() => { setConfirmDel(null); run(() => purgeTemplateAction(t.id)); }}
+                          disabled={pending}
+                          className="text-xs font-bold rounded-md bg-[#e5484d] text-white px-2.5 py-1.5 disabled:opacity-40"
+                        >
+                          確定永久刪除
+                        </button>
+                        <button onClick={() => setConfirmDel(null)} className="text-xs text-[#a9bccf] px-1.5">取消</button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDel(t.id)}
+                        disabled={pending}
+                        className="text-xs rounded-md border border-[#e5484d]/40 text-[#ff9d9f] px-2.5 py-1.5 hover:bg-[#e5484d]/10 disabled:opacity-40"
+                      >
+                        永久刪除
+                      </button>
+                    )}
                   </>
                 ) : (
                   <button
-                    onClick={() => setConfirmDel(t.id)}
+                    onClick={() => { setConfirmDel(null); run(() => setTemplateArchivedAction(t.id, true)); }}
                     disabled={pending}
-                    className="text-xs rounded-md border border-[#e5484d]/40 text-[#ff9d9f] px-2.5 py-1.5 hover:bg-[#e5484d]/10 disabled:opacity-40"
+                    title="教練端就看不到了；內容一個字都不會少，隨時可以再上架"
+                    className="text-xs rounded-md border border-white/15 text-[#a9bccf] px-2.5 py-1.5 hover:bg-[#17406a] disabled:opacity-40"
                   >
                     下架
                   </button>
                 )}
               </div>
+              {archived && confirmDel !== t.id && (
+                <p className="md:col-span-4 text-[12px] text-[#a9bccf] bg-[#0d2b45]/60 border border-white/10 rounded-md px-3 py-2">
+                  已下架：教練端的清單看不到這一份，內容完整保留著。要真的刪掉才按「永久刪除」。
+                </p>
+              )}
               {confirmDel === t.id && (
                 <p className="md:col-span-4 text-[12px] text-[#ffb9ba] bg-[#5b1f22]/40 border border-[#e5484d]/30 rounded-md px-3 py-2">
-                  下架會把這份範本連同它所有年度版本一起刪掉，救不回來。
+                  永久刪除會把這份範本連同它所有年度版本一起刪掉，<b>救不回來</b>。
                   已經有教練「複製一份給自己」的那些客戶不受影響——那些是各自獨立的資料。
                 </p>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

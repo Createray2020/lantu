@@ -225,7 +225,11 @@ describe("寫入路徑一律不得沾到範本範圍", () => {
 
   it("範本的寫入只走 lib/templates.ts 的管理端，而且每一支自己驗 admin", () => {
     const fns = functionsOf(R("src/lib/templates.ts"));
-    for (const name of ["createTemplate", "updateTemplate", "deleteTemplate", "reorderTemplates"]) {
+    // 2026/08/30：deleteTemplate 拆成 setTemplateArchived（可回復的下架）＋ purgeTemplate（真刪）。
+    for (const name of [
+      "createTemplate", "updateTemplate", "setTemplateArchived", "purgeTemplate",
+      "reorderTemplates", "updateTemplatePlan", "addTemplatePlan",
+    ]) {
       expect(fns[name], `templates.ts 找不到 ${name}()，改過名字就要順手更新這支測試`).toBeTruthy();
       expect(
         /assertAdmin\(\)/.test(fns[name]),

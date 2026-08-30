@@ -11,7 +11,8 @@ vi.mock("@/lib/coach", () => ({ ensureCoach: vi.fn(), isAdmin: vi.fn() }));
 vi.mock("@/lib/templates", () => ({
   createTemplate: vi.fn(),
   updateTemplate: vi.fn(),
-  deleteTemplate: vi.fn(),
+  purgeTemplate: vi.fn(),
+  setTemplateArchived: vi.fn(),
   reorderTemplates: vi.fn(),
   addTemplatePlan: vi.fn(),
   updateTemplatePlan: vi.fn(),
@@ -22,7 +23,8 @@ import { ensureCoach, isAdmin } from "@/lib/coach";
 import {
   addTemplatePlan,
   createTemplate,
-  deleteTemplate,
+  purgeTemplate,
+  setTemplateArchived,
   reorderTemplates,
   updateTemplate,
   updateTemplatePlan,
@@ -30,7 +32,8 @@ import {
 import {
   addTemplatePlanAction,
   createTemplateAction,
-  deleteTemplateAction,
+  purgeTemplateAction,
+  setTemplateArchivedAction,
   reorderTemplatesAction,
   saveTemplatePlanAction,
   updateTemplateAction,
@@ -48,12 +51,13 @@ beforeEach(() => {
 
 // ⚠️ 範本是全公司共用的展示素材：一位普通教練改得動它，等於改得動每個人的畫面。
 describe("管理員閘", () => {
-  it("非管理員：六支全部擋下，資料層一支都沒被呼叫到", async () => {
+  it("非管理員：七支全部擋下，資料層一支都沒被呼叫到", async () => {
     asMock(isAdmin).mockResolvedValue(false);
     const calls = [
       createTemplateAction({ name: "x" }),
       updateTemplateAction("t1", { name: "y" }),
-      deleteTemplateAction("t1"),
+      setTemplateArchivedAction("t1", true),
+      purgeTemplateAction("t1"),
       reorderTemplatesAction(["a", "b"]),
       addTemplatePlanAction("t1", 2026),
       saveTemplatePlanAction("p1", { a: 1 }),
@@ -61,7 +65,7 @@ describe("管理員閘", () => {
     for (const r of await Promise.all(calls)) {
       expect(r).toEqual({ ok: false, error: "沒有後台權限" });
     }
-    for (const fn of [createTemplate, updateTemplate, deleteTemplate, reorderTemplates, addTemplatePlan, updateTemplatePlan]) {
+    for (const fn of [createTemplate, updateTemplate, setTemplateArchived, purgeTemplate, reorderTemplates, addTemplatePlan, updateTemplatePlan]) {
       expect(fn).not.toHaveBeenCalled();
     }
   });
@@ -99,11 +103,22 @@ describe("建立與編輯", () => {
 });
 
 describe("下架與排序", () => {
-  it("下架就是呼叫 deleteTemplate，並讓教練端清單一起更新", async () => {
-    expect(await deleteTemplateAction("t1")).toEqual({ ok: true });
-    expect(deleteTemplate).toHaveBeenCalledWith("t1");
+  it("下架是狀態切換、不是刪除，並讓教練端清單一起更新", async () => {
+    expect(await setTemplateArchivedAction("t1", true)).toEqual({ ok: true });
+    expect(setTemplateArchived).toHaveBeenCalledWith("t1", true);
+    expect(purgeTemplate, "下架不可以順手真刪").not.toHaveBeenCalled();
     // 剛下架的範本不該還留在別人的清單上
     expect(revalidatePath).toHaveBeenCalledWith("/dashboard/clients");
+  });
+
+  it("重新上架走同一支，只是換一個布林", async () => {
+    expect(await setTemplateArchivedAction("t1", false)).toEqual({ ok: true });
+    expect(setTemplateArchived).toHaveBeenCalledWith("t1", false);
+  });
+
+  it("永久刪除是另一支——按錯一顆按鈕不會讓整份範本消失", async () => {
+    expect(await purgeTemplateAction("t1")).toEqual({ ok: true });
+    expect(purgeTemplate).toHaveBeenCalledWith("t1");
   });
 
   it("重排把整串順序一次送出（不是逐筆送，中途斷掉會留下兩份同號）", async () => {

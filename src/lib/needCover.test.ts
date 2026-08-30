@@ -49,32 +49,43 @@ describe("依角色判定（沒有手動勾選時）", () => {
   const c = family();
 
   it("本人與配偶：負債與教育金都算進去", () => {
-    expect(E.needCoversDebt(c, c.needs[0])).toBe(true);
-    expect(E.needCoversEdu(c, c.needs[0])).toBe(true);
-    expect(E.needCoversDebt(c, c.needs[1])).toBe(true);
-    expect(E.needCoversEdu(c, c.needs[1])).toBe(true);
+    for (const nd of [c.needs[0], c.needs[1]]) {
+      expect(E.needCoversDebt(c, nd)).toBe(true);
+      expect(E.needCoversEdu(c, nd)).toBe(true);
+      expect(E.needCoversParents(c, nd)).toBe(true);
+    }
   });
 
   it("子女與父母：兩項都不算——他們走了，家庭收入沒有減少", () => {
     for (const nd of [c.needs[2], c.needs[3]]) {
       expect(E.needCoversDebt(c, nd)).toBe(false);
       expect(E.needCoversEdu(c, nd)).toBe(false);
+      expect(E.needCoversParents(c, nd)).toBe(false);
     }
   });
 
-  it("孩子的壽險毛需求裡不再有房貸與學費", () => {
-    const kid = E.grossLifeNeed(c, c.needs[2]);
-    // 剩下的是「喪葬 ＋ 父母奉養 × 保障年數」——負債與教育金整段消失。
-    const parents = E.familyAnnualParentSupport(c) * NEED.protectYears;
-    expect(kid).toBeCloseTo(NEED.funeral + parents, 6);
-    // 改版前那一段是「＋ 全部負債 ＋ 全部教育金」，規模就是這個
+  it("孩子的壽險毛需求只剩喪葬——房貸、學費、父母奉養三項都不列入", () => {
+    expect(E.grossLifeNeed(c, c.needs[2])).toBe(NEED.funeral);
+    // 改版前那三段的規模：負債 ＋ 教育金
     expect(debtAndEdu(c)).toBeGreaterThan(10_000_000);
+    // 以及父母奉養 × 保障年數
+    expect(E.familyAnnualParentSupport(c) * NEED.protectYears).toBeGreaterThan(0);
   });
 
-  it("保障年數填 0 的孩子（正常填法）→ 需求就只剩喪葬費", () => {
+  it("三個開關都可以手動打開，語意各自獨立", () => {
     const c2 = family();
-    c2.needs[2].protectYears = 0;
-    expect(E.grossLifeNeed(c2, c2.needs[2])).toBe(NEED.funeral);
+    c2.needs[2].supportParents = true;
+    expect(E.needCoversParents(c2, c2.needs[2])).toBe(true);
+    expect(E.needCoversDebt(c2, c2.needs[2])).toBe(false);
+    expect(E.grossLifeNeed(c2, c2.needs[2]))
+      .toBeCloseTo(NEED.funeral + E.familyAnnualParentSupport(c2) * NEED.protectYears, 6);
+  });
+
+  it("本人也可以關掉父母奉養（例如兄弟姊妹已經分擔）", () => {
+    const c2 = family();
+    c2.needs[0].supportParents = false;
+    expect(E.needCoversParents(c2, c2.needs[0])).toBe(false);
+    expect(E.needCoversDebt(c2, c2.needs[0])).toBe(true);   // 三個開關互不干擾
   });
 
   it("本人的需求一位不動——這次改動不准動到經濟支柱的數字", () => {
@@ -90,8 +101,8 @@ describe("手動勾選蓋過角色", () => {
     c.needs[2].payDebt = true;
     c.needs[2].fundEdu = true;
     expect(E.needCoversDebt(c, c.needs[2])).toBe(true);
-    const parents = E.familyAnnualParentSupport(c) * NEED.protectYears;
-    expect(E.grossLifeNeed(c, c.needs[2])).toBeCloseTo(NEED.funeral + parents + debtAndEdu(c), 6);
+    // 只勾了負債與教育金，父母奉養那一項沒勾 → 仍然不列入
+    expect(E.grossLifeNeed(c, c.needs[2])).toBeCloseTo(NEED.funeral + debtAndEdu(c), 6);
   });
 
   it("本人也可以關掉（例如房貸有房貸壽險已經涵蓋）", () => {
@@ -106,8 +117,7 @@ describe("手動勾選蓋過角色", () => {
     c.needs[2].fundEdu = true;                            // 只備教育金、不清償負債
     expect(E.needCoversDebt(c, c.needs[2])).toBe(false);
     expect(E.needCoversEdu(c, c.needs[2])).toBe(true);
-    const parents = E.familyAnnualParentSupport(c) * NEED.protectYears;
-    expect(E.grossLifeNeed(c, c.needs[2])).toBeCloseTo(NEED.funeral + parents + E.eduTotal(c), 6);
+    expect(E.grossLifeNeed(c, c.needs[2])).toBeCloseTo(NEED.funeral + E.eduTotal(c), 6);
   });
 });
 
@@ -119,6 +129,7 @@ describe("找不到成員時維持改版前的行為", () => {
       const nd = { ...NEED, member: name };
       expect(E.needCoversDebt(c, nd)).toBe(true);
       expect(E.needCoversEdu(c, nd)).toBe(true);
+      expect(E.needCoversParents(c, nd)).toBe(true);
     },
   );
 
@@ -160,6 +171,8 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   it("needCoversDebt / needCoversEdu / grossLifeNeed 兩邊逐字一致", () => {
     expect(HTML).toContain("function needCoversDebt(c,nd){");
     expect(HTML).toContain("function needCoversEdu(c,nd){");
+    expect(HTML).toContain("function needCoversParents(c,nd){");
+    expect(HTML).toContain("  +(needCoversParents(c,nd)?familyAnnualParentSupport(c)*n(nd.protectYears):0)");
     expect(HTML).toContain(" if(typeof (nd&&nd.payDebt)==='boolean')return nd.payDebt;");
     expect(HTML).toContain("  +(needCoversEdu(c,nd)?eduTotal(c):0)+n(nd.funeral)+n(nd.estateTax)");
   });
@@ -174,6 +187,7 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     const c = family();
     c.needs[2].payDebt = true;
     c.needs[0].fundEdu = false;
+    c.needs[2].supportParents = true;
     for (const i of [0, 2]) {
       expect(w.grossLifeNeed(JSON.parse(JSON.stringify(c)), c.needs[i]))
         .toBeCloseTo(E.grossLifeNeed(c, c.needs[i]), 6);
@@ -181,7 +195,7 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
   });
 
   it("需求卡的『自動帶入的責任』與明細框都跟著開關走（不然表上寫 920 萬、需求裡沒有它）", () => {
-    expect(HTML).toContain(" var coversDebt=needCoversDebt(c,nd),coversEdu=needCoversEdu(c,nd);");
+    expect(HTML).toContain(" var coversDebt=needCoversDebt(c,nd),coversEdu=needCoversEdu(c,nd),coversParents=needCoversParents(c,nd);");
     expect(HTML).toContain("(coversDebt?'負債表餘額合計':offWhy)");
     expect(HTML).toContain(" var liabN=needCoversDebt(c,nd)?liab:0,eduN=needCoversEdu(c,nd)?edu:0;");
   });

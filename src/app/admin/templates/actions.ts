@@ -5,7 +5,8 @@ import { ensureCoach, isAdmin } from "@/lib/coach";
 import {
   addTemplatePlan,
   createTemplate,
-  deleteTemplate,
+  purgeTemplate,
+  setTemplateArchived,
   reorderTemplates,
   updateTemplate,
   updateTemplatePlan,
@@ -80,10 +81,25 @@ export async function updateTemplateAction(
   }
 }
 
-export async function deleteTemplateAction(id: string): Promise<ActionResult> {
+/** 上架／下架。下架只是隱藏，內容一個字都不會少（見 lib/templates.ts）。 */
+export async function setTemplateArchivedAction(id: string, archived: boolean): Promise<ActionResult> {
   try {
     await guard();
-    await deleteTemplate(id);
+    await setTemplateArchived(id, archived);
+    touch();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * 永久刪除。⚠️ 資料層只准刪「已下架」的那一列，所以按到這顆的人一定先經過下架那一步。
+ */
+export async function purgeTemplateAction(id: string): Promise<ActionResult> {
+  try {
+    await guard();
+    await purgeTemplate(id);
     touch();
     return { ok: true };
   } catch (e) {

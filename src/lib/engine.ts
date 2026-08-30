@@ -718,9 +718,17 @@ function needCoversEdu(c,nd){
  var r=needRoleOf(c,nd&&nd.member);
  return r===null?true:isEarnerRole(r);
 }
+// 父母奉養（孝親）同一條規則。它跟前兩項的差別是：孝親本來就有資料層的解法
+// （保障年數填 0 就沒了），所以改版前不算「沒有出口」；但語意上是同一件事——
+// 孩子走了，家裡不會因此少一筆給阿嬤的錢。
+function needCoversParents(c,nd){
+ if(typeof (nd&&nd.supportParents)==='boolean')return nd.supportParents;
+ var r=needRoleOf(c,nd&&nd.member);
+ return r===null?true:isEarnerRole(r);
+}
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
  return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd)
-  +familyAnnualParentSupport(c)*n(nd.protectYears)
+  +(needCoversParents(c,nd)?familyAnnualParentSupport(c)*n(nd.protectYears):0)
   +(needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0)
   +(needCoversEdu(c,nd)?eduTotal(c):0)+n(nd.funeral)+n(nd.estateTax)
   +guaranteeFor(c,nd.member);}
@@ -2547,6 +2555,7 @@ export {
   grossLifeNeed,
   needCoversDebt,
   needCoversEdu,
+  needCoversParents,
   indepDeps,
   protectYearsEff,
   growingAnnuityPV,

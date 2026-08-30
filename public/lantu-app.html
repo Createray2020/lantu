@@ -2112,9 +2112,17 @@ function needCoversEdu(c,nd){
  var r=needRoleOf(c,nd&&nd.member);
  return r===null?true:isEarnerRole(r);
 }
+// 父母奉養（孝親）同一條規則。它跟前兩項的差別是：孝親本來就有資料層的解法
+// （保障年數填 0 就沒了），所以改版前不算「沒有出口」；但語意上是同一件事——
+// 孩子走了，家裡不會因此少一筆給阿嬤的錢。
+function needCoversParents(c,nd){
+ if(typeof (nd&&nd.supportParents)==='boolean')return nd.supportParents;
+ var r=needRoleOf(c,nd&&nd.member);
+ return r===null?true:isEarnerRole(r);
+}
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
  return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd)
-  +familyAnnualParentSupport(c)*n(nd.protectYears)
+  +(needCoversParents(c,nd)?familyAnnualParentSupport(c)*n(nd.protectYears):0)
   +(needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0)
   +(needCoversEdu(c,nd)?eduTotal(c):0)+n(nd.funeral)+n(nd.estateTax)
   +guaranteeFor(c,nd.member);}
@@ -2293,7 +2301,7 @@ function lifeNeedDetailHTML(c){var nds=c.needs||[];if(!nds.length)return '';var 
    // ⚠️ 家庭生活費那一列吃的是 protectYearsEff()（財務獨立歲的責任遞減），
    //    不是原始的 protectYears——否則這張明細的合計不會等於 grossLifeNeed()。
    var pyEff=protectYearsEff(c,nd);
-   var living=depR*famLiving*pyEff,parents=parentAnnual*py,gtee=guaranteeFor(c,nd.member);
+   var living=depR*famLiving*pyEff,parents=needCoversParents(c,nd)?parentAnnual*py:0,gtee=guaranteeFor(c,nd.member);
    var indepN=indepDeps(c,nd.member).filter(function(d){return n(d.age)<n(d.indepAge);});
    var pyLabel=(Math.abs(pyEff-py)>0.005)
     ?('保障 '+py+' 年（'+indepN.map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立';}).join('、')+'後責任遞減，等效 '+pyEff.toFixed(2)+' 年）')
@@ -2304,7 +2312,7 @@ function lifeNeedDetailHTML(c){var nds=c.needs||[];if(!nds.length)return '';var 
    //    「＝ 壽險毛需求」就不會等於 grossLifeNeed(c,nd)，這張明細的全部價值就沒了。
    var liabN=needCoversDebt(c,nd)?liab:0,eduN=needCoversEdu(c,nd)?edu:0;
    var offTag='（'+esc(nd.member||'這位')+'不是家庭收入來源，不列入）';
-   var rows=[['家庭年生活費 '+fmt(famLiving)+' × 扶養比 '+(depR*100)+'% × '+pyLabel,Math.round(living)],['父母奉養費 '+fmt(parentAnnual)+' × 保障 '+py+' 年',Math.round(parents)],['負債餘額'+(liabN?'':offTag),Math.round(liabN)],['教育金總需求'+(eduN?'':offTag),Math.round(eduN)],['生命禮儀費',n(nd.funeral)],['遺產稅預留',n(nd.estateTax)],['個人連帶保證',Math.round(gtee)],['＝ 壽險毛需求',Math.round(gross),'var(--amber2)'],['− 已備壽險',Math.round(existing)],['− 可動用流動資產',Math.round(liq)],['＝ 壽險淨缺口',Math.round(Math.max(0,gross-existing-liq)),'var(--warn)']];
+   var rows=[['家庭年生活費 '+fmt(famLiving)+' × 扶養比 '+(depR*100)+'% × '+pyLabel,Math.round(living)],['父母奉養費 '+fmt(parentAnnual)+' × 保障 '+py+' 年'+(needCoversParents(c,nd)?'':offTag),Math.round(parents)],['負債餘額'+(liabN?'':offTag),Math.round(liabN)],['教育金總需求'+(eduN?'':offTag),Math.round(eduN)],['生命禮儀費',n(nd.funeral)],['遺產稅預留',n(nd.estateTax)],['個人連帶保證',Math.round(gtee)],['＝ 壽險毛需求',Math.round(gross),'var(--amber2)'],['− 已備壽險',Math.round(existing)],['− 可動用流動資產',Math.round(liq)],['＝ 壽險淨缺口',Math.round(Math.max(0,gross-existing-liq)),'var(--warn)']];
    return '<div style="margin-bottom:8px"><div class="hint">'+esc(nd.member)+'</div>'+kvTbl(rows)+'</div>';}).join('');
  return detailBox('保障需求反推明細',blocks);}
 // 社會保險老年給付 / 勞退計算明細
@@ -9903,11 +9911,13 @@ function needCard(c,nd,i){
  var pyEff=protectYearsEff(c,nd);
  var living=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*familyAnnualLiving(c)*pyEff;
  var indepList=indepDeps(c,nd.member);
- var parents=familyAnnualParentSupport(c)*py;
- // ⚠️ 這兩項要不要算給這個人，由 needCoversDebt()／needCoversEdu() 決定（預設依角色）。
- //    這張表是 grossLifeNeed() 的**逐項拆解**，公式那邊不算的，這裡就必須顯示 0——
+ // ⚠️ 這三項要不要算給這個人，由 needCoversDebt()／needCoversEdu()／needCoversParents() 決定
+ //    （預設依角色）。這張表是 grossLifeNeed() 的**逐項拆解**，公式那邊不算的，這裡就必須顯示 0——
  //    表上寫著 920 萬、需求數字裡卻沒有它，是最糟的一種「兩個數字對不起來」。
- var coversDebt=needCoversDebt(c,nd),coversEdu=needCoversEdu(c,nd);
+ // ⚠️ 這三個一定要宣告在下面三行「用到它們」之前：var 會提升但值是 undefined，
+ //    金額會靜靜變成 0 而旁邊的說明文字卻寫著「已列入」——兩個數字在同一列裡打架。
+ var coversDebt=needCoversDebt(c,nd),coversEdu=needCoversEdu(c,nd),coversParents=needCoversParents(c,nd);
+ var parents=coversParents?familyAnnualParentSupport(c)*py:0;
  var ndRole=needRoleOf(c,nd.member);
  var offWhy='不列入 — '+esc(nd.member||'這位')+(ndRole?'（'+esc(ndRole)+'）':'')+'不是家庭收入來源；他身故家庭收入沒有減少，房貸不會需要立刻清償、學費也不會變成缺口。要列入請在上方勾選。';
  var loans=coversDebt?sum(c.liabilities,function(l){return lBal(l)}):0;
@@ -9915,7 +9925,7 @@ function needCard(c,nd,i){
  auto='<table class="rtable" style="margin:6px 0 10px"><tr><th>自動帶入的責任</th><th>金額</th><th>來源</th></tr>'+
   '<tr><td class="k">家庭生活費</td><td class="calc">'+fmt(living)+'</td><td class="muted" style="font-size:11.5px">家計負擔 '+n(memberDep(c,nd.member))+'% × 家庭年生活費 × '+py+' 年'+
    (Math.abs(pyEff-py)>0.005?'<br>\u2705 責任遞減：'+indepList.map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立（支出比例 '+n(d.expRatio)+'%）';}).join('、')+'，等效 '+pyEff.toFixed(2)+' 年':'')+'</td></tr>'+
-  '<tr><td class="k">父母奉養費</td><td class="calc">'+fmt(parents)+'</td><td class="muted" style="font-size:11.5px">支出表「孝親」年額 × '+py+' 年</td></tr>'+
+  '<tr><td class="k">父母奉養費</td><td class="calc">'+fmt(parents)+'</td><td class="muted" style="font-size:11.5px">'+(coversParents?'支出表「孝親」年額 × '+py+' 年':offWhy)+'</td></tr>'+
   '<tr><td class="k">貸款</td><td class="calc">'+fmt(loans)+'</td><td class="muted" style="font-size:11.5px">'+(coversDebt?'負債表餘額合計':offWhy)+'</td></tr>'+
   '<tr><td class="k">子女教育費</td><td class="calc">'+fmt(edu)+'</td><td class="muted" style="font-size:11.5px">'+(coversEdu?'教育規劃分頁（終值）':offWhy)+'</td></tr>'+
   '</table>';
@@ -9940,7 +9950,8 @@ function needCard(c,nd,i){
  var memSel='<div class="subhd">被保人</div><div class="fgrid">'+fFld(sb('member'),'被保人',nd.member,null,memOpts)+
   fFld(sb('depRatioOverride','num'),'家計負擔覆寫%（留空＝用成員卡的值）',nd.depRatioOverride,'num')+
   ndCk('payDebt','身故要清償家庭負債',coversDebt,'預設依角色：本人／配偶列入，子女／父母不列入')+
-  ndCk('fundEdu','身故要備妥子女教育金',coversEdu,'預設依角色，同上')+'</div>';
+  ndCk('fundEdu','身故要備妥子女教育金',coversEdu,'預設依角色，同上')+
+  ndCk('supportParents','身故要接續父母奉養',coversParents,'預設依角色，同上')+'</div>';
  return '<div class="pcard">'+hd+'<div class="pbody">'+memSel+blocks+'</div></div>';
 }
 function needsSec(c){

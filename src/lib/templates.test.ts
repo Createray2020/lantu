@@ -264,6 +264,49 @@ describe("讀取端：全體教練看到同一份，而且明確唯讀", () => {
     expect(rows.some((r) => r.id === MINE)).toBe(false);
   });
 
+  // ── 下架＝可回復的隱藏（2026/08/30 Ray 拍板）─────────────────────
+  it("下架之後教練端的清單就看不到它了", async () => {
+    const { setTemplateArchived, listTemplates } = await import("./templates");
+    state.admin = true;
+    await setTemplateArchived(T1, true);
+    expect((await listTemplates()).map((r) => r.id), "已下架的還留在教練端清單上").toEqual([T2]);
+  });
+
+  it("後台帶 includeArchived 才看得到已下架的（不然沒有路徑可以重新上架）", async () => {
+    const { setTemplateArchived, listTemplates } = await import("./templates");
+    state.admin = true;
+    await setTemplateArchived(T1, true);
+    const all = await listTemplates({ includeArchived: true });
+    expect(all.map((r) => r.id)).toEqual([T2, T1]);
+    expect(all.find((r) => r.id === T1)?.status).toBe("archived");
+  });
+
+  it("重新上架就回來了——內容一個字都沒少（沒有任何 delete）", async () => {
+    const { setTemplateArchived, listTemplates } = await import("./templates");
+    state.admin = true;
+    await setTemplateArchived(T1, true);
+    await setTemplateArchived(T1, false);
+    expect((await listTemplates()).map((r) => r.id)).toEqual([T2, T1]);
+    expect(h.calls.deletes, "下架／上架都不該碰 delete").toEqual([]);
+    expect(h.store.plans.filter((p: any) => p.clientId === T1)).toHaveLength(1);
+  });
+
+  it("⚠️ 永久刪除只准對「已下架」的那一列動手——還在上架的什麼都不會發生", async () => {
+    const { purgeTemplate } = await import("./templates");
+    state.admin = true;
+    await purgeTemplate(T1);                       // T1 還是 active
+    expect(h.calls.deletes[0].matched, "上架中的範本被一鍵刪掉了").toBe(0);
+    expect(h.store.clients.some((c: any) => c.id === T1)).toBe(true);
+  });
+
+  it("先下架、再永久刪除，才真的刪得掉", async () => {
+    const { setTemplateArchived, purgeTemplate } = await import("./templates");
+    state.admin = true;
+    await setTemplateArchived(T1, true);
+    await purgeTemplate(T1);
+    expect(h.store.clients.some((c: any) => c.id === T1)).toBe(false);
+  });
+
   it("getTemplateForRead 回 readOnly:true 與規劃內容", async () => {
     const { getTemplateForRead } = await import("./templates");
     const t = await getTemplateForRead(T1);
@@ -281,12 +324,13 @@ describe("讀取端：全體教練看到同一份，而且明確唯讀", () => {
 });
 
 describe("管理端：每一支自己驗 admin", () => {
-  it("非 admin 呼叫四支都被擋，而且什麼都沒寫", async () => {
+  it("非 admin 呼叫五支都被擋，而且什麼都沒寫", async () => {
     const T = await import("./templates");
     state.admin = false;
     await expect(T.createTemplate({ name: "偷加的" })).rejects.toThrow("forbidden");
     await expect(T.updateTemplate(T1, { name: "偷改的" })).rejects.toThrow("forbidden");
-    await expect(T.deleteTemplate(T1)).rejects.toThrow("forbidden");
+    await expect(T.setTemplateArchived(T1, true)).rejects.toThrow("forbidden");
+    await expect(T.purgeTemplate(T1)).rejects.toThrow("forbidden");
     await expect(T.reorderTemplates([T1, T2])).rejects.toThrow("forbidden");
     expect(h.calls.inserts).toEqual([]);
     expect(h.calls.updates).toEqual([]);
@@ -296,8 +340,8 @@ describe("管理端：每一支自己驗 admin", () => {
 
   it("沒登入（ensureCoach 回 null）一樣被擋", async () => {
     state.me = null; state.admin = true;
-    const { deleteTemplate } = await import("./templates");
-    await expect(deleteTemplate(T1)).rejects.toThrow("forbidden");
+    const { purgeTemplate } = await import("./templates");
+    await expect(purgeTemplate(T1)).rejects.toThrow("forbidden");
     expect(h.calls.deletes).toEqual([]);
   });
 
@@ -315,10 +359,12 @@ describe("管理端：每一支自己驗 admin", () => {
 
   it("管理端寫入帶著 is_template 護欄：拿一般客戶的 id 打進來改不到／刪不掉", async () => {
     state.admin = true;
-    const { updateTemplate, deleteTemplate } = await import("./templates");
+    const { updateTemplate, setTemplateArchived, purgeTemplate } = await import("./templates");
     await updateTemplate(MINE, { name: "被範本 API 改掉的真客戶" });
     expect(h.calls.updates[0].matched, "範本 API 改到了一位真實客戶").toBe(0);
-    await deleteTemplate(MINE);
+    await setTemplateArchived(MINE, true);
+    expect(h.calls.updates[1].matched, "範本 API 封存了一位真實客戶").toBe(0);
+    await purgeTemplate(MINE);
     expect(h.calls.deletes[0].matched, "範本 API 刪掉了一位真實客戶連同他的規劃").toBe(0);
     expect(h.store.clients.find((c: any) => c.id === MINE).name).toBe("王大明");
   });
@@ -434,7 +480,9 @@ describe("後台填範本內容", () => {
     const body = src.slice(src.indexOf("export async function updateTemplatePlan"));
     const fn = body.slice(0, body.indexOf("\n}\n") + 2);
     // 拿一般客戶的 planId 打進來時什麼都改不到——這是這支函式最重要的一行。
-    expect(fn).toContain("templateClient()");
+    // ⚠️ 這裡刻意驗「逐字寫 is_template」而不是「呼叫第四把尺」：那把尺是跨租戶的
+    //    可見範圍，clientScope.drift.test.ts 要求它一次都不准出現在寫入路徑上。
+    expect(fn).toContain("eq(clients.isTemplate, true)");
     expect(fn).toContain("inArray(");
     expect(fn).toContain("assertAdmin()");
   });

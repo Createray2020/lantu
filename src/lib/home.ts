@@ -1,6 +1,12 @@
 // 首頁彙總層：依角色（教練／主管／核心成員）把各卡片要的數字算出來。
 // 有真實資料源的（客戶／待辦／約訪、組織樹、成員名冊）直接接；
-// 業績／活動量／增員／公告等由 member_metrics / recruits / announcements 承載（可編輯的模擬資料）。
+// 業績／活動量／增員／公告由 member_metrics / recruits / announcements 承載
+// ——那些是**真的資料表**，由後台填，只是上線初期還沒有人填。
+//
+// ⚠️⚠️ hasMetrics（2026/08/30 Ray 拍板）：沒有任何 member_metrics 列時，
+//    收益、達成率、留存率、組織健康度這些數字全部會算成 0／0%。
+//    畫面上的「0 分」跟假數字一樣糟——它看起來是一個結論，實際上只是「沒人填」。
+//    所以這裡把「有沒有資料」跟「資料是 0」分開，讓 HomeView 有辦法說實話。
 import { and, inArray, eq, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { memberMetrics, recruits, announcements, coaches, clients, reviews } from "@/Shared/db/schema";
@@ -58,6 +64,8 @@ async function listAnnouncements(): Promise<Announcement[]> {
 // ---------- 教練（member）----------
 export type MemberHome = {
   coach: { name: string; title: string | null };
+  /** 本期有沒有 member_metrics 那一列。false ＝畫面要說「尚未有資料」而不是 0。 */
+  hasMetrics: boolean;
   kpis: { income: number; incomeGoal: number; deals: number; dealsGoal: number; newClients: number; openItems: number; todayAppts: number };
   progressPct: number;
   todos: { time: string; title: string; sub: string; tag: string; tagKind: string }[];
@@ -93,6 +101,7 @@ export async function getMemberHome(coach: CoachRow, period: string): Promise<Me
 
   return {
     coach: { name: coach.name ?? "教練", title: coach.title },
+    hasMetrics: !!m,
     kpis: {
       income, incomeGoal: m?.incomeGoal ?? 0,
       deals: m?.deals ?? 0, dealsGoal: m?.dealsGoal ?? 0,
@@ -117,6 +126,8 @@ export async function getMemberHome(coach: CoachRow, period: string): Promise<Me
 export type ManagerHome = {
   teamName: string;
   memberCount: number;
+  /** 這個團隊本期有沒有任何一位填了 member_metrics。false ＝畫面要說「尚未有資料」而不是 0。 */
+  hasMetrics: boolean;
   kpis: { teamIncome: number; teamGoal: number; achievePct: number; activity: number; recruitsActive: number; pending: number };
   leaderboard: { name: string; income: number }[];
   activity: { visits: number; calls: number; proposals: number; closes: number };
@@ -194,6 +205,7 @@ export async function getManagerHome(manager: CoachRow, all: CoachRow[], period:
   return {
     teamName: manager.title || `${manager.name ?? ""}的團隊`,
     memberCount: memberIds.length,
+    hasMetrics: metrics.size > 0,
     kpis: {
       teamIncome, teamGoal,
       achievePct: teamGoal ? Math.round((teamIncome / teamGoal) * 100) : 0,
@@ -211,6 +223,8 @@ export async function getManagerHome(manager: CoachRow, all: CoachRow[], period:
 
 // ---------- 核心成員（owner）----------
 export type OwnerHome = {
+  /** 全組織本期有沒有任何一位填了 member_metrics。 */
+  hasMetrics: boolean;
   kpis: { income: number; growthPct: number; headcount: number; retention: number; activity: number };
   healthScore: number;
   health: { label: string; pct: number; color: string }[];
@@ -282,6 +296,7 @@ export async function getOwnerHome(owner: CoachRow, all: CoachRow[], period: str
     .sort((a, b) => b.income - a.income).slice(0, 5);
 
   return {
+    hasMetrics: cur.size > 0,
     kpis: { income, growthPct: prevIncome ? Math.round(((income - prevIncome) / prevIncome) * 100) : 0, headcount: all.length, retention, activity },
     healthScore, health,
     funnel: [

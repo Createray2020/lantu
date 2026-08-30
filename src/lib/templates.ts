@@ -14,7 +14,7 @@
 //     這裡只管「範圍」——而範圍就是「全體 active 教練都一樣」。
 //     ⚠️ 客戶端 /portal 不得呼叫這裡任何一支（範本只是教練的展示素材，
 //        對客戶而言那是別人的財務資料）。
-//   管理端（createTemplate / updateTemplate / deleteTemplate / reorderTemplates）
+//   管理端（createTemplate / updateTemplate / setTemplateArchived / purgeTemplate / reorderTemplates）
 //     **每一支都自己驗 isAdmin()**，不相信呼叫端。理由同 lib/guard.ts：
 //     「每個 action 各自記得擋」在加第二個入口時必然漏掉一個，而漏掉的那個
 //     就是「任何教練都改得動全公司展示素材」。
@@ -76,6 +76,8 @@ export type TemplateListItem = {
   templateLabel: string | null;
   lifeStage: string | null;
   templateOrder: number;
+  /** 'active'＝上架中（教練看得到）／'archived'＝已下架（只有後台看得到）。 */
+  status: string;
   /** 摘要：取教練軌最新一份 plan 的快照。沒有 plan 就是 null。 */
   healthGrade: string | null;
   netWorth: number | null;
@@ -88,7 +90,15 @@ export type TemplateListItem = {
  * 依更新時間排會讓「剛剛修了一個錯字」的那份跳到最前面。
  * templateOrder 相同時才用 updated_at 當次要鍵（穩定輸出，避免每次查順序都不一樣）。
  */
-export async function listTemplates(): Promise<TemplateListItem[]> {
+export async function listTemplates(opts?: { includeArchived?: boolean }): Promise<TemplateListItem[]> {
+  // ⚠️ 預設只回「上架中」。教練端呼叫時一律不帶參數——已下架的範本不該還留在
+  //    每位教練的清單上，而「下架」如果只是後台清單上的一個灰字，它就沒有作用。
+  //    後台才帶 includeArchived 看全部（它需要看得到才能重新上架或永久刪除）。
+  // ⚠️ 刻意**不把狀態塞進 templateClient()**：那把尺是租戶邊界（「這一列是不是範本」），
+  //    上下架是可見性，兩件事混在一起之後，任何一個寫入路徑要判斷邊界都得先想「它上架了嗎」。
+  const where = opts?.includeArchived
+    ? templateClient()
+    : and(templateClient(), eq(clients.status, TEMPLATE_LIVE));
   const rows = await db
     .select({
       id: clients.id,
@@ -96,9 +106,10 @@ export async function listTemplates(): Promise<TemplateListItem[]> {
       templateLabel: clients.templateLabel,
       lifeStage: clients.lifeStage,
       templateOrder: clients.templateOrder,
+      status: clients.status,
     })
     .from(clients)
-    .where(templateClient())
+    .where(where)
     .orderBy(asc(clients.templateOrder), desc(clients.updatedAt));
   if (rows.length === 0) return [];
 
@@ -262,16 +273,40 @@ export async function updateTemplate(id: string, patch: Partial<TemplateInput>):
 }
 
 /**
- * 下架一份範本。
+ * 上架／下架一份範本（2026/08/30 Ray 拍板：下架要可回復）。
  *
- * ⚠️ 這是真的刪除，plans 會跟著 CASCADE。這在範本上是對的（它沒有歷史價值，
- *    也沒有任何真實客戶掛在上面），但正因為如此，WHERE 少一個 is_template
- *    就會變成「後台可以刪掉任何一位真實客戶連同他所有規劃」。
- *    已經複製出去的客戶不受影響——那些是各自獨立的列，跟這一列沒有任何外鍵關係。
+ * 下架＝status 改成 'archived'：教練端的清單看不到它（listTemplates 預設只回上架中），
+ * 後台還在、內容一個字都沒少，隨時可以再上架。
+ *
+ * ⚠️ 為什麼不是真刪：後台按錯一顆按鈕就沒了整份範本與它所有年度版本，而範本是
+ *    「花了時間編出來、全公司在用」的東西。真刪保留在 purgeTemplate()，
+ *    而且只准對已下架的那一列動手（見那一支）。
+ * ⚠️ WHERE 仍然帶 is_template：拿一般客戶的 id 打進來時什麼都改不到——
+ *    否則這支會變成「後台可以把任何一位真實客戶封存掉」。
  */
-export async function deleteTemplate(id: string): Promise<void> {
+export const TEMPLATE_LIVE = "active";
+export const TEMPLATE_ARCHIVED = "archived";
+
+export async function setTemplateArchived(id: string, archived: boolean): Promise<void> {
   await assertAdmin();
-  await db.delete(clients).where(templateRow(id));
+  await db
+    .update(clients)
+    .set({ status: archived ? TEMPLATE_ARCHIVED : TEMPLATE_LIVE, updatedAt: new Date() })
+    .where(templateRow(id));
+}
+
+/**
+ * 永久刪除一份範本，plans 跟著 CASCADE。救不回來。
+ *
+ * ⚠️⚠️ 只准刪**已經下架**的那一列。這道門檻是刻意的：要刪掉一份範本，得先經過
+ *    「下架 → 確認教練端真的沒人在用 → 再刪」這個順序，而不是在清單上一鍵消失。
+ *    WHERE 同時帶 is_template 與 status='archived'，兩個條件都不成立就什麼都不會發生。
+ * ⚠️ 已經被教練「複製一份給自己」的客戶不受影響——那些是各自獨立的列，
+ *    跟這一列沒有任何外鍵關係。
+ */
+export async function purgeTemplate(id: string): Promise<void> {
+  await assertAdmin();
+  await db.delete(clients).where(and(templateRow(id), eq(clients.status, TEMPLATE_ARCHIVED)));
 }
 
 /**
@@ -305,9 +340,15 @@ export async function updateTemplatePlan(planId: string, data: unknown): Promise
       and(
         eq(plans.id, planId),
         // 只有掛在範本底下的 plan 才寫得到。
+        // ⚠️ 這裡逐字寫 eq(clients.isTemplate, true)，**刻意不呼叫第四把尺**——
+        //    理由與上面 templateRow() 那一段完全相同：那把尺的定義是「全體教練的可見範圍」，
+        //    它一旦出現在任何寫入路徑上，「沒有寫入路徑吃第四把尺」這條唯一的邊界
+        //    就不再是逐字可驗的了（clientScope.drift.test.ts 掃的就是這件事，
+        //    連註解裡提到那個名字都會讓它紅——這是刻意的）。
+        //    這裡要的是形狀護欄，不是授權——授權已經由 assertAdmin() 完成。
         inArray(
           plans.clientId,
-          db.select({ id: clients.id }).from(clients).where(templateClient()),
+          db.select({ id: clients.id }).from(clients).where(eq(clients.isTemplate, true)),
         ),
       ),
     );

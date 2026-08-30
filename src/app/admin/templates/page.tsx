@@ -19,7 +19,8 @@ export default async function TemplatesAdminPage() {
   if (!me) redirect("/dashboard");
   if (!(await isAdmin(me))) redirect("/dashboard");
 
-  const [templates, brand] = await Promise.all([listTemplates(), getBrand()]);
+  // 後台要看得到已下架的那幾份（才能重新上架或永久刪除）；教練端不帶這個參數。
+  const [templates, brand] = await Promise.all([listTemplates({ includeArchived: true }), getBrand()]);
 
   return (
     <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
