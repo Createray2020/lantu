@@ -197,6 +197,27 @@ export async function createActionItemAction(clientId: string, input: Reviews.Ac
   }
 }
 
+/**
+ * 把規劃器「待補齊清單」勾起來的項目一次送進客戶的待辦。
+ * 客戶端 /portal 首頁讀的就是同一張 action_items，所以送出後那邊也要 revalidate。
+ */
+export async function createActionItemsAction(
+  clientId: string,
+  titles: string[],
+): Promise<{ ok: true; added: number; skipped: number } | { ok: false; error: string }> {
+  try {
+    const cid = await coachId();
+    const r = await Reviews.createActionItems(cid, clientId, titles);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/dashboard/overview");
+    revalidatePath("/portal");
+    return { ok: true, ...r };
+  } catch (e) {
+    const f = fail(e);
+    return { ok: false, error: f.ok ? "操作失敗，請重試" : f.error };
+  }
+}
+
 export async function setActionItemDoneAction(clientId: string, itemId: string, done: boolean): Promise<ActionResult> {
   try {
     const cid = await coachId();

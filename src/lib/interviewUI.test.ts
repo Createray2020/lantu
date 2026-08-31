@@ -29,6 +29,8 @@ const fresh = () => {
   return w.app.cases[0];
 };
 const go = (tab: string) => { w.app.activeTab = "data"; w.app.dataTab = tab; w.render(); };
+// 2026/08/31：訪談檢核清單改成右下角常駐浮層，內容仍是同一支 interviewSec()。
+const openIv = () => { w.IVP.open(); return w.document.querySelector(".ivdbody") as Element; };
 
 describe("分頁順序＝問卷順序", () => {
   it("②未來的需求 排在 ③現在的狀況 之前（先講夢想，最後才問錢）", () => {
@@ -210,15 +212,26 @@ describe("訪談檢核清單", () => {
   it("清單畫得出來，而且每一段都有提示（提示才是不會漏問的關鍵）", () => {
     fresh();
     go("intent");
-    expect(w.document.querySelectorAll("#app .ivrow").length).toBe(20);
-    const hints = [...w.document.querySelectorAll("#app .ivhint")].map((e: Element) => e.textContent!.trim());
+    openIv();
+    expect(w.document.querySelectorAll(".ivdbody .ivrow").length).toBe(20);
+    const hints = [...w.document.querySelectorAll(".ivdbody .ivhint")].map((e: Element) => e.textContent!.trim());
     expect(hints.filter((t: string) => t.length > 4).length).toBe(20);
+  });
+
+  it("點清單裡的「前往」＝要去填資料，浮層自己讓開", () => {
+    fresh();
+    go("intent");
+    openIv();
+    expect(w.IVP.isOpen()).toBe(true);
+    w.jumpTab("family");
+    expect(w.IVP.isOpen()).toBe(false);
+    expect(w.app.dataTab).toBe("family");
   });
 
   it("休閒與奢侈品的分類直接列在提示裡（不塞進下拉把層級打平）", () => {
     fresh();
     go("intent");
-    const html = w.document.querySelector("#app").innerHTML as string;
+    const html = openIv().innerHTML as string;
     expect(html).toMatch(/體能／收藏／思考/);
     expect(html).toMatch(/豪宅／珠寶/);
   });

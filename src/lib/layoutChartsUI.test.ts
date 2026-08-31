@@ -44,6 +44,10 @@ function useSample(role: "coach" | "client", tab: string, dataTab?: string): any
   return c;
 }
 const pane = () => w.document.querySelector("#app").innerHTML as string;
+// 訪談檢核清單 2026/08/31 起改成右下角常駐浮層（不再插在意圖分頁上方），
+// 內容仍然是同一支 interviewSec()——所以斷言改看抽屜，其餘一個字不動。
+const openIv = () => { w.IVP.open(); return w.document.querySelector(".ivdrawer") as Element; };
+const ivHTML = () => (w.document.querySelector(".ivdbody") as Element).innerHTML as string;
 const $ = (sel: string) => w.document.querySelector(sel);
 const $$ = (sel: string) => [...w.document.querySelectorAll(sel)];
 
@@ -294,15 +298,35 @@ describe("⑥ 訪談檢核清單：依分頁分群，題號不動", () => {
 
   it("實際是 9 群 · 8 次切換，畫面上照實寫", () => {
     useSample("coach", "data", "intent");
-    const grps = $$("#app .ivgrp");
+    openIv();
+    const grps = $$(".ivdbody .ivgrp");
     expect(grps.length).toBe(9);
-    expect(pane()).toContain("<b>9 段 · 8 次切換</b>");
-    expect($$("#app .ivrow").length, "題目一題都不能少").toBe(20);
+    expect(ivHTML()).toContain("<b>9 段 · 8 次切換</b>");
+    expect($$(".ivdbody .ivrow").length, "題目一題都不能少").toBe(20);
+  });
+
+  it("⚠️ 清單不再插在意圖分頁的輸入欄位上方（它是導航，不是要填的東西）", () => {
+    useSample("coach", "data", "intent");
+    expect($$("#app .ivgrp").length).toBe(0);
+    // 但那顆常駐按鈕要在，而且帶著進度
+    const fab = $(".ivfab");
+    expect(fab).toBeTruthy();
+    expect(fab.className).toContain("on");
+    expect(fab.textContent).toContain("訪談檢核清單");
+    expect(fab.textContent).toMatch(/\/ 20 段有內容/);
+  });
+
+  it("⚠️ 客戶端與分析區都不掛這顆按鈕", () => {
+    useSample("client", "analysis");
+    expect($(".ivfab").className).not.toContain("on");
+    useSample("coach", "analysis");
+    expect($(".ivfab").className).not.toContain("on");
   });
 
   it("群內維持原始題號：意圖那一群就是 1. 3. 6. 13. 20.", () => {
     useSample("coach", "data", "intent");
-    const first = $("#app .ivgrp");
+    openIv();
+    const first = $(".ivdbody .ivgrp");
     expect(first.querySelector(".ivgrphd b").textContent).toBe("意圖 / 生涯");
     expect([...first.querySelectorAll(".ivno")].map((e: Element) => e.textContent))
       .toEqual(["1", "3", "6", "13", "20"]);
@@ -311,7 +335,8 @@ describe("⑥ 訪談檢核清單：依分頁分群，題號不動", () => {
 
   it("每一群一顆「前往這一段 ›」，走既有的 jumpTab", () => {
     useSample("coach", "data", "intent");
-    const btns = $$("#app .ivgrphd .tbtn");
+    openIv();
+    const btns = $$(".ivdbody .ivgrphd .tbtn");
     expect(btns.length).toBe(9);
     expect(btns.every((b: Element) => /^jumpTab\('\w+'\)$/.test(b.getAttribute("onclick")!))).toBe(true);
   });

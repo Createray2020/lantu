@@ -36,7 +36,9 @@ const nodeFor = (key: string) => w.document.querySelector('[data-calc="' + key +
 describe("C1：setMeta / setObj 補上 syncDerived()", () => {
   it("兩支尾巴都呼叫 syncDerived()", () => {
     expect(HTML).toContain("function setMeta(grp,k,v,type){var c=activeCase();c[grp][k]=(type==='num')?n(v):v;save();if(app.role==='client')render();syncDerived();}");
-    expect(HTML).toContain("function setObj(obj,k,v,type){var c=activeCase();c[obj]=c[obj]||{};c[obj][k]=(type==='num')?n(v):v;save();if(app.role==='client')render();syncDerived()}");
+    // ⚠️ setObj 中間多了一段 career 的分支（職涯/創業會產生 goals 的列），尾巴那一行不變。
+    expect(HTML).toContain("function setObj(obj,k,v,type){var c=activeCase();c[obj]=c[obj]||{};c[obj][k]=(type==='num')?n(v):v;");
+    expect(HTML).toContain(" save();if(app.role==='client')render();syncDerived()}");
   });
 
   it("安全感預備金：改了門檻，落差那一句當場跟著變", () => {

@@ -114,6 +114,34 @@ export async function createActionItem(coachId: string, clientId: string, input:
   return row.id;
 }
 
+/**
+ * 一次建立多筆動作項目（「待補齊清單 → 客戶待辦」用）。
+ *
+ * ⚠️ 同一個標題不重複建：教練會反覆按「送到客戶待辦」，每按一次多一份就沒人想用了。
+ *    只比對「還沒完成」的那些——已經完成又再度缺件是真的要再提醒一次。
+ * ⚠️ 回傳實際新增的筆數，畫面才講得出「新增 3 筆、4 筆已經在清單上」。
+ */
+export async function createActionItems(
+  coachId: string,
+  clientId: string,
+  titles: string[],
+  owner: string | null = "客戶",
+): Promise<{ added: number; skipped: number }> {
+  await assertClientOwned(coachId, clientId);
+  const want = Array.from(new Set(titles.map((t) => String(t ?? "").trim()).filter(Boolean))).slice(0, 50);
+  if (!want.length) return { added: 0, skipped: 0 };
+  const existing = await db
+    .select({ title: actionItems.title })
+    .from(actionItems)
+    .where(and(eq(actionItems.clientId, clientId), eq(actionItems.done, false)));
+  const have = new Set(existing.map((r) => r.title));
+  const fresh = want.filter((t) => !have.has(t));
+  if (fresh.length) {
+    await db.insert(actionItems).values(fresh.map((title) => ({ clientId, title, owner })));
+  }
+  return { added: fresh.length, skipped: want.length - fresh.length };
+}
+
 async function itemOwned(coachId: string, itemId: string): Promise<boolean> {
   const [row] = await db
     .select({ id: actionItems.id })

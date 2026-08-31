@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
 import { listClientCases } from "@/lib/comp/survey";
-import { getClientOwnPlan, getClientSetup } from "@/lib/clientPlan";
+import { getClientOwnPlan, getClientPlanCase, getClientSetup } from "@/lib/clientPlan";
+import { listClientTodos } from "@/lib/clientTodos";
+import Todos from "./Todos";
 import { normalizeIntent } from "@/lib/intent";
 import UiScaleToggle from "@/components/UiScaleToggle";
 import { computePassport, wan, ntfmt } from "@/lib/passport";
@@ -30,6 +32,10 @@ export default async function Portal() {
   const setup = await getClientSetup(client.id);
   // 待填回饋問卷：制度上問卷回收才算結案，所以這是客戶端的主動提示而不是被動等通知。
   const pendingSurveys = (await listClientCases(client.id)).filter((c) => !c.surveyAt).length;
+  // 待辦清單：教練在規劃器把「待補齊」的項目送過來的，就是這一張 action_items。
+  // ⚠️ 客戶還沒被教練建成 clients 的一列時沒有待辦，這一段就整塊不出現（Todos 自己回 null）。
+  const planCase = await getClientPlanCase(client.id);
+  const todos = planCase ? await listClientTodos(planCase.clientId) : [];
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
   // 教練↔客戶是雙棲的：教練也會用客戶介面做自己的規劃。
   // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。
@@ -113,6 +119,7 @@ export default async function Portal() {
             </Link>
           </div>
         )}
+        <Todos items={todos} />
         {r ? (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-8">

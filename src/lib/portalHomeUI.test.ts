@@ -19,8 +19,17 @@ vi.mock("@/lib/clientUser", () => ({
   ensureClientUser: async () => ({ id: "cu_1", name: "王大明", email: "a@b.c" }),
 }));
 vi.mock("@/lib/comp/survey", () => ({ listClientCases: async () => [] }));
+// 待辦清單（教練從規劃器的「待補齊清單」送過來的 action_items）。
+vi.mock("@/lib/clientTodos", () => ({
+  listClientTodos: async () => [
+    { id: "t1", title: "提供勞保投保薪資", owner: "客戶", dueDate: null, done: false },
+    { id: "t2", title: "提供人壽險保單", owner: "客戶", dueDate: "2026-09-30", done: false },
+    { id: "t3", title: "提供最近三個月薪資單", owner: "客戶", dueDate: null, done: true },
+  ],
+}));
 vi.mock("@/lib/clientPlan", () => ({
   getClientOwnPlan: async () => ({ clientId: "c1", planId: "p1", passport: PASSPORT, result: null }),
+  getClientPlanCase: async () => ({ clientId: "c1", planId: "p1", data: {}, code: "L-0001" }),
   getClientSetup: async () => ({
     basics: null, cross: null, code: "L-0001",
     intent: { mustHave: ["退休生活規劃", "購屋規劃"], purposes: [], targets: [] },
@@ -48,6 +57,24 @@ beforeAll(async () => {
 });
 
 const $$ = (sel: string) => [...doc.querySelectorAll(sel)];
+
+describe("我的待辦（教練的「待補齊清單」送過來的）", () => {
+  it("未完成的直接列出來，已完成的收進 details", () => {
+    expect(html).toContain("我的待辦");
+    expect(html).toContain("還有 2 項待補");
+    expect(html).toContain("提供勞保投保薪資");
+    expect(html).toContain("已完成 1 項");
+  });
+
+  it("⚠️ 說清楚「不必等全部補齊才開始」——這正是 Ray 要它取代文件檢核表的理由", () => {
+    expect(html).toContain("不必等全部補齊才開始");
+  });
+
+  it("到期日與負責人有填就顯示", () => {
+    expect(html).toContain("2026-09-30 前");
+    expect(html).toContain("由 客戶 處理");
+  });
+});
 
 describe("五列數字換成一張水平堆疊條", () => {
   it("五段都在，寬度加起來 100%，段間 2px", () => {
@@ -125,7 +152,9 @@ describe("大數字保留、其餘收合、CTA 一主三次", () => {
   });
 
   it("必達目標與下一步收進 details", () => {
-    const det = doc.querySelector("details")!;
+    // ⚠️ 頁面上不只一個 details（待辦的「已完成 N 項」也是），要指名找。
+    const det = [...doc.querySelectorAll("details")]
+      .find((d) => d.querySelector("summary")?.textContent?.includes("必達目標優先序與下一步"))!;
     expect(det).toBeTruthy();
     expect(det.querySelector("summary")!.textContent).toContain("必達目標優先序與下一步");
     expect(det.textContent).toContain("退休生活規劃");

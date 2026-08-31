@@ -5,11 +5,12 @@
 // track 條件寫在 ownedPlan / ownedPlanLite / ownedTrackedRows 裡面而不是交給呼叫端加，
 // 因為「忘記加 where」正是這個模型出過事的地方——邊界要守在資料層，不是守在每個呼叫點。
 const COACH_TRACK = "coach";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, plans } from "@/Shared/db/schema";
 import { newCaseData, planMetrics, planSnapshot, type PlanMetrics } from "./snapshot";
 import { ownedClient, readableClient } from "./clientScope";
+import { caseBirthDate } from "./birthSync";
 
 export type Plan = typeof plans.$inferSelect;
 
@@ -94,12 +95,27 @@ export async function updatePlanData(coachId: string, planId: string, data: unkn
   const plan = await ownedPlanLite(coachId, planId);
   if (!plan) throw new Error("forbidden");
   const snap = planSnapshot(data);
-  await db
+  const write = db
     .update(plans)
     .set({ data, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })
     .where(eq(plans.id, planId));
+  // 生日有兩個家：clients.birth_date（客戶主檔）與 plans.data.profile.birth（規劃內容）。
+  // 教練在規劃器的家庭成員改了生日，主檔要跟上——否則下一份年度版本又是空的、又要重打一次。
+  // ⚠️ 只在「主檔還沒有」或「跟規劃不一樣」時才寫，避免每次存檔都多打一次 DB。
+  // ⚠️ neon-http 沒有交易，用 db.batch() 讓兩句一起送。
+  const birth = caseBirthDate(data);
+  if (birth) {
+    const syncBirth = db
+      .update(clients)
+      .set({ birthDate: birth })
+      .where(and(eq(clients.id, plan.clientId), or(isNull(clients.birthDate), ne(clients.birthDate, birth))));
+    await db.batch([write, syncBirth]);
+  } else {
+    await write;
+  }
   return snap;
 }
+
 
 export type PlanMetaPatch = {
   label?: string | null;

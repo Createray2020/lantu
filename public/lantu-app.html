@@ -833,6 +833,15 @@ var NHI_RATE=0.0517;
 var NHI_SALARY_MIN=29500;
 var NHI_SALARY_MAX=313000;
 var NHI_SALARY_GRADES=58;
+// 投保金額分級表全 58 級（115.01.01 生效，衛福部中央健保署）。給「選級距」下拉與級距對照表用。
+var NHI_SALARY_TABLE=[
+ 29500,30300,31800,33300,34800,36300,38200,40100,42000,43900,
+ 45800,48200,50600,53000,55400,57800,60800,63800,66800,69800,
+ 72800,76500,80200,83900,87600,92100,96600,101100,105600,110100,
+ 115500,120900,126300,131700,137100,142500,147900,150000,156400,162800,
+ 169200,175600,182000,189500,197000,204500,212000,219500,228200,236900,
+ 245600,254300,263000,273000,283000,293000,303000,313000,
+];
 var NHI_DEP_CAP=3;
 // 投保類別 → 被保險人自付比率(%)。⚠️ 前 8 個字串是改版前就在用的選項，一個字都不能改
 // （既有資料的 members[].nhiCat 存的就是這些字）。第一類刻意拆出「雇主/自營」＝100%，
@@ -945,7 +954,9 @@ function applyBizTax(payload){
 //    退休缺口會憑空消失。整合式個人資產負債表一律由 ownerBalanceSheet() 現算。
 var _cidSeq=0;
 function cid(){return 'co'+(++_cidSeq)+'_'+Math.random().toString(36).slice(2,7)}
-function defaultCompany(){return {name:'',taxId:'',industry:'',role:'負責人',sharePct:100,annualRevenue:0,netProfit:0,ownerLoan:0,note:''};}
+// ⚠️ owner＝這家公司的負責人是哪一位家庭成員（存姓名，與 assets/liabilities 的 owner 同一套）。
+//    2026/08/31 起它是「這個家庭有沒有企業主」的唯一真相：設了就自動把那位成員的工作類別帶成企業主。
+function defaultCompany(){return {name:'',taxId:'',industry:'',owner:'',role:'負責人',sharePct:100,annualRevenue:0,netProfit:0,ownerLoan:0,note:''};}
 // 第一批只要五個數字（年營收/稅後淨利/總資產/總負債/持股%）就能產出整合式個人資產負債表。
 function newCompany(){var o=defaultCompany();
  o.cid=cid();o.org='有限公司';o.setupYear='';o.totalAsset=0;o.totalDebt=0;
@@ -993,6 +1004,44 @@ var JOB_TEXT_FIELDS=[['jobCompany','公司名稱','可留空'],['jobTitle','職�
 function ensureJobText(o){if(!o)return o;if(o.jobCompany==null)o.jobCompany='';if(o.jobTitle==null)o.jobTitle='';if(o.jobNote==null)o.jobNote='';return o;}
 function ensureJobFields(c){if(!c.profile)c.profile={};if(!c.profile.jobType)c.profile.jobType='一般就業者';if(c.profile.jobTypeOther==null)c.profile.jobTypeOther='';if(c.profile.birth==null)c.profile.birth='';if(c.profile.monthlySalary==null)c.profile.monthlySalary='';if(!c.company)c.company=defaultCompany();ensureJobText(c.profile);return c;}
 function primaryMember(c){return (c.members||[]).filter(function(m){return m.role==='本人'})[0]||(c.members||[])[0];}
+// ===== 企業主身分：以「公司的負責人是哪一位成員」為唯一真相 =====
+// ⚠️ 以前有兩個各自獨立的真相：規劃主體 intent.entities.company（勾選）與
+//    家庭成員的 jobType==='企業主'（工作類別）。兩邊不一致完全不噴錯，代價卻很實在：
+//    本人的健保投保類別會從「第一類 雇主（自付 100%）」掉回「第一類 受雇者（30%）」——差 3.3 倍，
+//    而且 applyInsFromSalary() 會用月薪把手填的勞保級距自動覆蓋掉。
+// 現在 companies[].owner 設了誰，誰的工作類別就被帶成企業主；bizOwnerIssue() 只負責把還沒對上的講出來。
+function primaryName(c){var pm=primaryMember(c);return (pm&&pm.name)||((c.profile||{}).name)||'本人';}
+function bizOwnerNames(c){
+ var out=[];
+ if(((c.profile||{}).jobType)==='企業主')out.push(primaryName(c));
+ (c.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&m.jobType==='企業主')out.push(m.name||'成員')});
+ return out;
+}
+function applyCompanyOwner(c){
+ var co=mainCompany(c);if(!co||!co.owner)return;
+ if(co.owner===primaryName(c)){ensureJobFields(c);c.profile.jobType='企業主';return;}
+ (c.members||[]).forEach(function(m){if(m&&m.name===co.owner){ensureMemberJob(m);m.jobType='企業主';}});
+}
+function bizOwnerIssue(c){
+ if(!entityOn(c,'company')&&!companiesOf(c).length)return null;
+ if(bizOwnerNames(c).length)return null;
+ var co=mainCompany(c);
+ return '規劃主體已開啟「企業」'+((co&&co.name)?('（'+esc(co.name)+'）'):'')+
+  '，但家庭成員裡沒有任何一位的工作類別是「企業主」。這樣健保會用<b>受僱者 30%</b> 計費（雇主是 <b>100%</b>，差 3.3 倍），'+
+  '勞保級距也會被月薪自動覆蓋掉手填值。';
+}
+function bizOwnerWarnHTML(c){
+ var msg=bizOwnerIssue(c);if(!msg)return '';
+ return '<div class="sec" style="border-color:rgba(224,150,120,.55)"><h4 style="color:var(--warn)">⚠ 企業主身分沒有對上</h4>'+
+  '<div class="hint" style="display:block;margin-left:0">'+msg+'</div>'+
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">'+
+  '<button class="tbtn amber" onclick="fixBizOwner()">把「'+esc(primaryName(c))+'」設為企業主</button>'+
+  '<button class="tbtn" onclick="jumpTab(\'company\')">去公司概況指定負責人 →</button></div></div>';
+}
+function fixBizOwner(){var c=activeCase();if(!c)return;ensureJobFields(c);
+ c.profile.jobType='企業主';
+ var co=mainCompany(c);if(co&&!co.owner)co.owner=primaryName(c);
+ migrateCompanies(c);save();render();}
 // 就業者/業務：以月薪帶入「本人」成員的投保類型與月投保薪資（企業主投保自行維持）。
 function applyInsFromSalary(c){if(c.profile.jobType==='企業主')return;var pm=primaryMember(c);if(!pm)return;pm.insType=jobInsType(c.profile.jobType);
  pm.insSalary=isNoEmployerJob(c.profile.jobType)?NP_INSURED_MONTHLY:laborInsSalary(c.profile.monthlySalary);}
@@ -1177,6 +1226,14 @@ function migrateCompanies(c){
  var isBiz=(c.profile||{}).jobType==='企業主'||mems.some(function(m){return m&&m.jobType==='企業主'});
  if(isBiz&&!c.companies.length)c.companies.push(newCompany());
  c.companies.forEach(function(co){if(co&&!co.cid)co.cid=cid();});
+ // 舊資料沒有 owner：本人已經是企業主就補成本人，否則留空（由警示引導教練指定）。
+ var _mc=c.companies[0];
+ if(_mc&&!_mc.owner){
+  if(((c.profile||{}).jobType)==='企業主')_mc.owner=primaryName(c);
+  else{var _bo=(c.members||[]).filter(function(m){return m&&m.role!=='本人'&&m.jobType==='企業主'})[0];
+       if(_bo)_mc.owner=_bo.name||'';}
+ }
+ applyCompanyOwner(c);
  // 有公司列＝企業主體開啟（既有企業主客戶不用再手動開一次）
  if(c.companies.length){
   c.intent=c.intent||{purposes:[],targets:[],mustHave:[],entities:{}};
@@ -1187,6 +1244,7 @@ function migrateCompanies(c){
  ensureRowIds(c);
  migrateActionRefs(c);
  reapBirthOrphans(c);
+ applyCareerPlan(c);
  syncPremium(c);
  // 健保費那一列（可關掉；沒有任何成員填健保投保薪資時不產生，既有個案一位不動）。
  syncNHI(c);
@@ -3977,8 +4035,16 @@ function setMemberSalary(i,v){var c=activeCase();var m=c.members[i];if(!m)return
 function setMemberCompany(i,k,v,type){var c=activeCase();var m=c.members[i];if(!m)return;ensureMemberJob(m);m.company[k]=(type==='num')?n(v):v;save();if(app.role==='client')render();}
 function setMemberRole(i,v){var c=activeCase();var m=c.members[i];if(!m)return;m.role=v;if(v==='本人'||v==='配偶')ensureMemberJob(m);save();render();}
 // 生日 → 年齡：填了生日就自動換算足歲寫回 age（age 仍是全系統唯一的運算來源；年齡欄仍可直接改）。
-function setBirth(v){var c=activeCase();ensureJobFields(c);c.profile.birth=v;var a=ageFromBirth(v);if(a!=null)c.profile.age=a;save();render();}
-function setMemberBirth(i,v){var c=activeCase();var m=c.members[i];if(!m)return;m.birth=v;var a=ageFromBirth(v);if(a!=null)m.age=a;save();render();}
+// ⚠️ 出生日期不可以在 onchange 就 render()：<input type=date> 三段填滿之後，
+//    年份每按一個數字就送一次 change（0001→0019→0198→1985 都是「完整日期」），
+//    整頁重畫會把游標踢掉——Ray 回報的「年份按不完四個數字」就是這個。
+//    正解：oninput 只寫值＋鏡射年齡欄（不 render），onblur 才整頁重畫。
+function setBirthLive(v){var c=activeCase();ensureJobFields(c);c.profile.birth=v;var a=ageFromBirth(v);if(a!=null)c.profile.age=a;save();mirrorAge('self',a);syncDerived();}
+function setBirth(v){setBirthLive(v);render();}
+function setMemberBirthLive(i,v){var c=activeCase();var m=c.members[i];if(!m)return;m.birth=v;var a=ageFromBirth(v);if(a!=null)m.age=a;save();mirrorAge('m'+i,a);syncDerived();}
+function setMemberBirth(i,v){setMemberBirthLive(i,v);render();}
+// 年齡欄跟著生日走（不 render 的情況下也要看得到），作法同 setCreditScore 的雙寫鏡射。
+function mirrorAge(key,a){if(a==null)return;try{var el=document.querySelector('[data-ageof="'+key+'"]');if(el&&document.activeElement!==el)el.value=a;}catch(e){}}
 function setJobTypeOther(v){var c=activeCase();ensureJobFields(c);c.profile.jobTypeOther=v;save();if(app.role==='client')render();}
 // 工作三欄的存檔：跟 setJobTypeOther 一樣不整頁 render——這些是自由輸入欄，
 // 每敲一個字就重繪會把游標踢掉（v12 的欄位是整頁重畫出來的）。
@@ -4151,7 +4217,7 @@ function dataPane(c){
  else if(app.dataTab==='liabilities')body=liabilitiesSec(c);
  else if(app.dataTab==='retire')body=(targetOn(c,'退休生活規劃')?goalHead(c,'退休生活規劃')+retireSec(c):foldedGoal(c,'退休生活規劃',tabFilled(c,'retire')?'（先前已填的退休參數保留、仍列入模擬）':''));
  else if(app.dataTab==='education')body=(targetOn(c,'子女教養規劃')?goalHead(c,'子女教養規劃')+eduSec(c):foldedGoal(c,'子女教養規劃',tabFilled(c,'education')?'（先前已填的教育金資料保留、仍列入模擬）':''));
- else if(app.dataTab==='goals')body=goalsTabHead(c)+tableSec('目標 / 置產 / 願望','goals',c.goals,[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']])+houseCalcSec(c);
+ else if(app.dataTab==='goals')body=goalsTabHead(c)+tableSec('目標 / 置產 / 願望','goals',c.goals,[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']])+houseCalcSec(c);
  else if(app.dataTab==='lifestyle')body=lifestyleSec(c);
  else if(app.dataTab==='needs')body=needsSec(c);
  else if(app.dataTab==='coverages')body='<div class="sec"><h4 style="color:var(--mut)">簡易保障輸入 <span class="hint">若已於「現有保單」逐張登錄，此處通常留空；系統會自動彙總。員工團體保險也可登錄於此（計入已備）。</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外傷殘,住院醫療,醫療雜費,薪資補償（日）,薪資補償（月）,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','money'],['social','已備社會','money']]);
@@ -4202,6 +4268,29 @@ function nhiCatNames(){return NHI_CATS.map(function(x){return x[0];});}
 function nhiCatOptions(cur){return nhiCatNames().map(function(k){
  var r=nhiSelfRatio(k);
  return '<option value="'+esc(k)+'" '+(cur===k?'selected':'')+'>'+esc(k)+'（自付 '+r+'%）</option>';}).join('');}
+// 健保月投保薪資的「選級距」下拉（與勞保 insSalaryField 同一套作法）。
+// ⚠️ 健保分級表跟勞保投保薪資分級表是兩張表：勞保上限 45,800、健保上限 313,000。
+//    企業主自付 100%，選錯級距的代價是受僱者的 3.3 倍——所以這裡一定要能對表。
+function nhiGradeOptions(cur){
+ var v=n(cur),hit=NHI_SALARY_TABLE.indexOf(v)>=0;
+ return '<option value="">未設定</option>'+NHI_SALARY_TABLE.map(function(g,i){
+   return '<option value="'+g+'" '+(v===g?'selected':'')+'>第 '+(i+1)+' 級\u3000'+fmt(g)+'</option>';
+  }).join('')+'<option value="__other" '+((!hit&&v>0)?'selected':'')+'>其他（右欄手填）</option>';
+}
+function setNhiGrade(i,v){var c=activeCase();var m=c.members[i];if(!m)return;if(v==='__other')return;m.nhiSalary=n(v);save();render();}
+// 級距對照表（可展開，自動高亮目前這一級）——作法同聯徵評分級距。
+function nhiBandBox(cur){
+ var v=n(cur);
+ var rows=NHI_SALARY_TABLE.map(function(g,i){
+  var on=(v===g);
+  return '<tr'+(on?' style="background:rgba(201,154,91,.16)"':'')+'><td class="k">第 '+(i+1)+' 級</td><td>'+fmt(g)+'</td>'+
+   '<td class="muted" style="font-size:12px">'+(on?'目前這一級':'')+'</td></tr>';
+ }).join('');
+ return '<details style="margin-top:8px"><summary style="cursor:pointer;color:var(--amber2);font-weight:700;font-size:13px">📊 健保投保金額分級表（'+NHI_YEAR+' 年 · '+NHI_SALARY_GRADES+' 級，點開）</summary>'+
+  '<div class="tw" style="max-height:300px;overflow:auto;margin-top:6px"><table class="rtable"><tr><th>級距</th><th>月投保金額</th><th></th></tr>'+rows+'</table></div>'+
+  '<div class="hint" style="margin-top:6px">來源：衛福部中央健保署「投保金額分級表」（115.01.01 生效）。'+
+  '⚠️ 這張表與勞保投保薪資分級表（上限 '+fmt(45800)+'）、勞退提繳分級表（上限 '+fmt(150000)+'）是三張不同的表，不要互相套用。</div></details>';
+}
 function nhiBlock(m,idx){
  var c=activeCase();
  var mb=function(k,ty){return 'onchange="set(\'members:'+idx+'\',\''+k+'\',this.value'+(ty==='num'?',\'num\'':'')+')"';};
@@ -4210,10 +4299,11 @@ function nhiBlock(m,idx){
  var fields='<div class="fgrid">'+
   '<div class="f"><label>健保投保類別</label><select '+mb('nhiCat')+'>'+nhiCatOptions(cur)+'</select>'+
    (m.nhiCat?'':'<div class="hint" style="margin-top:3px">未選 → 依工作類別「'+esc(m.jobType||(c&&c.profile&&c.profile.jobType)||'一般就業者')+'」預設為上列</div>')+'</div>'+
+  '<div class="f"><label>健保月投保薪資（選級距）</label><select onchange="setNhiGrade('+idx+',this.value)">'+nhiGradeOptions(m.nhiSalary)+'</select></div>'+
   '<div class="f"><label>健保月投保薪資</label>'+moneyCell(mbm('nhiSalary'),m.nhiSalary)+
    '<div class="hint" style="margin-top:3px">分級表第 1 級 '+fmt(NHI_SALARY_MIN)+'、最高第 '+NHI_SALARY_GRADES+' 級 '+fmt(NHI_SALARY_MAX)+'（'+NHI_YEAR+' 年適用）</div></div>'+
   fFld(mb('nhiDeps','num'),'負擔眷屬人數',m.nhiDeps,'num')+
-  '</div>';
+  '</div>'+nhiBandBox(m.nhiSalary);
  return '<div class="subhd">健保</div>'+fields+
   '<div data-calc="nhi:'+idx+'">'+nhiMemberCalcHTML(c,idx)+'</div>';
 }
@@ -4258,8 +4348,8 @@ function seniorityBlock(m,idx,isLabor){
  var fields=ymField('勞保起保年月',m.insStart,'onchange="setInsStart('+idx+',this.value)"','填了會自動換算成下面的已投保年資')+
   '<div class="f"><label>已投保年資（年）</label><input type="number" step="0.1" value="'+esc(m.worked==null?'':m.worked)+'" '+mb('worked','num')+'></div>';
  if(isLabor){
-  fields+=ymField('勞退新制提繳起始年月',m.pensionStart,'onchange="setPensionStart('+idx+',this.value)"','民國 94 年 7 月新制上路；更早的年資屬舊制，不在新制專戶裡')+
-   '<div class="f"><label>勞退專戶現有累積</label>'+moneyCell(mb('pensionBalance','num')+' placeholder="勞保局 App 可查"',m.pensionBalance)+'</div>';
+  fields+=ymField('勞退新制（6%）提繳起始年月',m.pensionStart,'onchange="setPensionStart('+idx+',this.value)"','民國 94 年 7 月新制上路；更早的年資屬舊制，不在新制專戶裡')+
+   '<div class="f"><label>勞退新制（6%）專戶現有累積</label>'+moneyCell(mb('pensionBalance','num')+' placeholder="勞保局 App 可查"',m.pensionBalance)+'</div>';
  }
  var hint='<div class="hint" style="margin-top:6px">保險年資＝<b>已投保年資 ＋ 到退休還會投保的年數</b>，直接決定老年年金月領金額'+
   (isLabor?'（未滿 '+LABOR_ANNUITY_MIN_YEARS+' 年只能領老年一次金）':'')+'。'+
@@ -4270,10 +4360,10 @@ function seniorityBlock(m,idx,isLabor){
 function birthField(v,attr){
  return '<div class="f"><label>出生日期</label><input type="date" value="'+esc(v||'')+'" '+attr+'></div>';
 }
-function ageField(age,birth,attr,label){
+function ageField(age,birth,attr,label,key){
  var auto=ageFromBirth(birth);
  var note=(auto!=null)?'<div class="hint" style="margin-top:3px">由出生日期自動計算（'+auto+' 歲）'+((n(age)!==auto)?'，目前手動覆寫為 '+n(age)+' 歲':'')+'</div>':'<div class="hint" style="margin-top:3px">可直接填年齡，或改填上方出生日期自動換算</div>';
- return '<div class="f"><label>'+(label||'目前年齡')+'</label><input type="number" value="'+esc(age==null?'':age)+'" '+attr+'>'+note+'</div>';
+ return '<div class="f"><label>'+(label||'目前年齡')+'</label><input type="number" data-ageof="'+esc(key||'')+'" value="'+esc(age==null?'':age)+'" '+attr+'>'+note+'</div>';
 }
 // ── 月投保薪資：下拉選公告級距 ＋ 仍可手填 ──
 function insLabelOf(insType){return insType==='國民年金'?'月投保金額':'月投保薪資';}
@@ -4315,6 +4405,15 @@ function fFld(bindAttr,label,val,type,opts){
  return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(val==null?'':val)+'" '+bindAttr+'></div>';
 }
 // 家庭/參數頁不再內嵌公司欄位——同一份資料兩個編輯口會打架。這裡只給摘要＋跳頁。
+// 家庭＝個人財務的範疇，公司資料一律住在第 ④ 群「企業」。
+// 這裡只留一行指路（Ray 2026/08/31：「家庭的環節比較偏向是個人財務的範疇，可以把公司資料移開」）。
+function bizOwnerNoteHTML(c,who){
+ var co=mainCompany(c);
+ return '<div class="hint" style="margin-top:6px;display:block">🏢 '+esc(who)+'是企業主'+
+  ((co&&co.name)?('，主體公司為 <b>'+esc(co.name)+'</b>'):'')+
+  '。公司的財務資料（股權、股東往來、連帶保證、財報）一律在「企業 · 公司概況」維護，這裡不重複登錄。'+
+  '<button class="tbtn" style="margin-left:8px" onclick="jumpTab(\'company\')">公司概況 →</button></div>';
+}
 function companyLinkHTML(c){
  var co=mainCompany(c);
  var body=co
@@ -4464,8 +4563,8 @@ function personCard(c,m,idx,isPrimary){
  if(isPrimary){
   idFields=fFld('oninput="setMeta(\'profile\',\'name\',this.value)"','姓名',p.name)+
    fFld('onchange="setMeta(\'profile\',\'gender\',this.value)"','性別',p.gender,null,['男','女'])+
-   birthField(p.birth,'onchange="setBirth(this.value)"')+
-   ageField(p.age,p.birth,'oninput="setMeta(\'profile\',\'age\',this.value,\'num\')"')+
+   birthField(p.birth,'oninput="setBirthLive(this.value)" onblur="setBirth(this.value)"')+
+   ageField(p.age,p.birth,'oninput="setMeta(\'profile\',\'age\',this.value,\'num\')"',null,'self')+
    fFld('oninput="setMeta(\'profile\',\'retireAge\',this.value,\'num\')"','預計退休年齡',p.retireAge,'num')+
    fFld('oninput="setLifeExp(this.value)"','預估壽命',p.lifeExp,'num')+
    '<div class="f"><label>聯徵信用評分(200-800)</label><input type="number" data-creditinput value="'+esc(creditScoreOf(c)||'')+'" oninput="setCreditScore(this.value)"></div>';
@@ -4477,8 +4576,8 @@ function personCard(c,m,idx,isPrimary){
     (eduAgeKnown(m)?('<b>'+eduDueIn(m,c)+'</b> 年後'):'<span class="muted">填了歲數就會算出來</span>')+'</div></div>';
  }else{
   idFields=fFld(mb('name'),'姓名',m.name)+fFld(mb('gender'),'性別',m.gender,null,['男','女'])+
-   birthField(m.birth,'onchange="setMemberBirth('+idx+',this.value)"')+
-   ageField(m.age,m.birth,mb('age','num'),'年齡');
+   birthField(m.birth,'oninput="setMemberBirthLive('+idx+',this.value)" onblur="setMemberBirth('+idx+',this.value)"')+
+   ageField(m.age,m.birth,mb('age','num'),'年齡','m'+idx);
  }
  var idBlock='<div class="subhd">身分資料</div><div class="fgrid">'+idFields+'</div>'+(isPrimary?creditBandBox(creditScoreOf(c)):'');
  // 工作與投保
@@ -4487,10 +4586,10 @@ function personCard(c,m,idx,isPrimary){
   var jobSelAttr,salAttr,coHTML,sal;
   if(isPrimary){
    jobSelAttr='onchange="setJobType(this.value)"';salAttr='onchange="setMonthlySalary(this.value)"';sal=p.monthlySalary;
-   coHTML=(jt==='企業主')?companyLinkHTML(c):'';
+   coHTML=(jt==='企業主')?bizOwnerNoteHTML(c,'本人'):'';
   }else{
    jobSelAttr='onchange="setMemberJobType('+idx+',this.value)"';salAttr='onchange="setMemberSalary('+idx+',this.value)"';sal=m.monthlySalary;
-   coHTML=(jt==='企業主')?companyLinkHTML(c):'';
+   coHTML=(jt==='企業主')?bizOwnerNoteHTML(c,(m.name||'這位成員')):'';
   }
   var otherAttr=isPrimary?'oninput="setJobTypeOther(this.value)"':'oninput="setMemberJobTypeOther('+idx+',this.value)"';
   var jtOther=isPrimary?(p.jobTypeOther||''):(m.jobTypeOther||'');
@@ -4592,7 +4691,7 @@ function peopleSec(c){
  var cards=personCard(c,primary,pi,true);
  members.forEach(function(m,i){if(i===pi)return;cards+=personCard(c,m,i,false);});
  var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'members\')">＋ 新增家庭成員</button></div>';
- return familyTreeSec(c)+'<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+
+ return bizOwnerWarnHTML(c)+familyTreeSec(c)+'<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+
   '<div data-calc="nhiSummary">'+nhiSummaryHTML(c)+'</div>'+paramsSec(c);
 }
 // 全家健保費彙總＋支出表同步狀態。⚠️ data-calc 容器內不可以有輸入框，
@@ -7120,7 +7219,10 @@ function toggleEntity(k){var c=activeCase();var it=normalizeIntent(c);
  it.entities=it.entities||{};
  if(on){it.entities[k]=false;it.purposes=it.purposes.filter(function(p){return PURPOSE_TO_ENTITY[p]!==k});}
  else it.entities[k]=true;
- save();render()}
+ save();
+ // 開啟企業主體＝後段規劃要做到公司，第一件事就是公司概況；不用先回頭記錄別的。
+ if(!on&&k==='company')app.dataTab='company';
+ render()}
 
 // 舊值遷移對照（2026-08-16 三區塊整併前的資料）
 var PURPOSE_TO_TARGETS={'想買車、買房，進行置產':['購車規劃','購屋規劃']};
@@ -7273,7 +7375,27 @@ function boolish(v,dflt){
  return !(t==='false'||t==='0'||t===''||t==='否');
 }
 // ⚠️ 同 setMeta：ofld() 產生的所有欄位（傳承／職涯／婚姻／理財模式／信用／海外）都走這裡。
-function setObj(obj,k,v,type){var c=activeCase();c[obj]=c[obj]||{};c[obj][k]=(type==='num')?n(v):v;save();if(app.role==='client')render();syncDerived()}
+function setObj(obj,k,v,type){var c=activeCase();c[obj]=c[obj]||{};c[obj][k]=(type==='num')?n(v):v;
+ // 職涯/創業的四個欄位會產生 goals 的列，改了要當場重算並重畫（ofld 是 onchange，不會打斷打字）。
+ if(obj==='career'){applyCareerPlan(c);save();render();return;}
+ save();if(app.role==='client')render();syncDerived()}
+// 複選 chips 勾了「其他」之後的自填欄：可以再加第二、第三個。
+// 存 intent.<field>Other = [字串,…]；沒勾「其他」就不顯示，也不清掉已填的內容。
+function chipOthers(it,field){var a=(it||{})[field+'Other'];return Array.isArray(a)?a:[];}
+function chipsOther(field,it){
+ if(((it||{})[field]||[]).indexOf('其他')<0)return '';
+ var list=chipOthers(it,field);if(!list.length)list=[''];
+ var rows=list.map(function(v,i){
+  return '<div class="f"><label>其他 '+(i+1)+'</label><div style="display:flex;gap:6px">'+
+   '<input style="flex:1;min-width:0" value="'+esc(v||'')+'" placeholder="自行填寫，例：私募基金、藝術品、境外保單" onchange="setChipOther(\''+field+'\','+i+',this.value)">'+
+   (list.length>1?'<button class="tbtn" onclick="delChipOther(\''+field+'\','+i+')">刪</button>':'')+'</div></div>';
+ }).join('');
+ return '<div class="fgrid" style="margin-top:8px">'+rows+'</div>'+
+  '<button class="tbtn" style="margin-top:6px" onclick="addChipOther(\''+field+'\')">＋ 再加一個「其他」</button>';
+}
+function setChipOther(field,i,v){var c=activeCase();var it=c.intent=c.intent||{};var a=chipOthers(it,field).slice();while(a.length<=i)a.push('');a[i]=v;it[field+'Other']=a;save();syncDerived();}
+function addChipOther(field){var c=activeCase();var it=c.intent=c.intent||{};var a=chipOthers(it,field).slice();if(!a.length)a.push('');a.push('');it[field+'Other']=a;save();render();}
+function delChipOther(field,i){var c=activeCase();var it=c.intent=c.intent||{};var a=chipOthers(it,field).slice();a.splice(i,1);it[field+'Other']=a;save();render();}
 function chips(field,opts,sel,handler){return '<div style="display:flex;flex-wrap:wrap;gap:8px">'+opts.map(function(o){var on=(sel||[]).indexOf(o)>=0;
  var call=handler?handler+'(\''+o.replace(/'/g,"")+'\')':'toggleIntent(\''+field+'\',\''+o.replace(/'/g,"")+'\')';
  return '<button onclick="'+call+'" style="background:'+(on?'var(--amber)':'var(--card)')+';color:'+(on?'#08202a':'var(--mut)')+';border:1px solid '+(on?'var(--amber)':'var(--line)')+';border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer">'+(on?'✓ ':'')+o+'</button>'}).join('')+'</div>'}
@@ -7317,7 +7439,52 @@ function entitySec(c){
  return '<div class="sec"><h4>規劃主體 '+badge+' <span class="hint">家庭主體永遠存在；企業是可選的第二主體</span></h4>'+
   '<div style="font-size:13.5px;color:var(--mut);line-height:1.8">企業主的資產通常有 60～90% 是自家公司股權——不流通、不可分割、估值困難，而且高度依賴他本人。'+
   '更麻煩的是收入與資產同源：公司出事，收入和資產會同時消失。<b>不把公司拉進來看，算出來的個人資產負債表就是假的。</b></div>'+
-  body+'</div>';
+  body+bizOwnerWarnHTML(c)+'</div>';
+}
+/* ══════════════════════════════════════════════════════════════════════
+   職涯 / 創業規劃 → 真的進現金流（2026/08/31 Ray 拍板）
+   ══════════════════════════════════════════════════════════════════════
+   ⚠️⚠️ 在此之前 c.career 整組（switchAge / switchFund / startupType / startupBudget）
+      是**死欄位**：engine.ts 一個字都沒讀，只有報告書把它印出來。
+      「職涯規劃」被勾成必須達成時，它的錢從來沒進過現金流——缺口一律低估。
+
+   兩筆錢是不同的事（這正是 Ray 問的「差在哪裡」）：
+   · 轉換期預備金 switchFund   ＝ 沒有薪水的那幾個月要活下去的現金（收入暫停）
+   · 創業投入本金 startupBudget ＝ 一次投進事業的錢（本金支出）
+   考慮轉職只有前者；考慮創業通常兩者都有——開店那段期間一樣沒有薪水。
+
+   落點沿用生育規劃的作法：由 career 產生 goals 的列（帶 careerAuto 回指），
+   而不是在 projection 另開一條路——goals 已經全線接好（現金流、缺口、時間軸、報告書）。
+   ⚠️ careerAuto 讓「重填是更新不是複製」；金額／歲數改回 0 或清空計畫，該列就自己收掉。
+   ══════════════════════════════════════════════════════════════════════ */
+var CAREER_ROWS=[['switch','轉換期預備金','職涯轉換','switchFund'],
+                 ['startup','創業投入本金','創業','startupBudget']];
+function careerAge(c){var a=n((c.career||{}).switchAge);return a>0?a:null;}
+function applyCareerPlan(c){
+ if(!c)return;
+ if(!Array.isArray(c.goals))c.goals=[];
+ var ca=c.career||{},age=careerAge(c),plan=ca.plan||'無';
+ CAREER_ROWS.forEach(function(r){
+  var key=r[0],amt=n(ca[r[3]]);
+  var want=(age!=null)&&amt>0&&(key==='switch'?(plan==='考慮轉職'||plan==='考慮創業'):(plan==='考慮創業'));
+  var idx=-1;
+  for(var i=0;i<c.goals.length;i++){if(c.goals[i]&&c.goals[i].careerAuto===key){idx=i;break;}}
+  if(!want){if(idx>=0)c.goals.splice(idx,1);return;}
+  var g=(idx>=0)?c.goals[idx]:{on:true,careerAuto:key,growth:'固定',freq:0,prepared:0,loanRatio:0,appreciation:0};
+  g.name=r[1];g.type=r[2];g.present=amt;g.start=age;g.end=age;g.imp=n(ca.importance)||3;
+  if(idx<0)c.goals.push(g);
+ });
+}
+// 職涯欄位旁邊的即時換算：填完馬上看得到它變成現金流的哪一筆。
+function careerCalcHTML(c){
+ var ca=c.career||{},age=careerAge(c),plan=ca.plan||'無';
+ if(plan==='無')return '<div class="hint" style="margin-top:8px">選了「考慮轉職」或「考慮創業」之後，下面兩筆錢會自動變成「目標 / 置產」裡的一次性支出，並進入現金流與缺口計算。</div>';
+ if(age==null)return '<div class="hint" style="margin-top:8px;color:var(--amber2)">還沒填「預計幾歲轉換」——沒有年齡就落不到時間軸上，這兩筆錢暫時不進計算。</div>';
+ var rows=(c.goals||[]).filter(function(g){return g&&g.careerAuto});
+ if(!rows.length)return '<div class="hint" style="margin-top:8px;color:var(--amber2)">兩筆金額都還是 0，目前沒有任何一筆進入現金流。</div>';
+ return '<div class="hint" style="margin-top:8px">已在「目標 / 置產」自動產生 '+rows.length+' 筆，落在 <b>'+age+' 歲</b>：'+
+  rows.map(function(g){return esc(g.name)+' '+fmt(g.present)+' 元';}).join('、')+
+  '。這兩筆已經進入現金流與缺口計算，可以到那張表微調金額或最低標準。</div>';
 }
 function goalsSec(c){
  return '<div class="sec"><h4>人生目標與優先序 <span class="hint">選了＝必須達成，沒選＝不列入規劃、對應欄位收合；順序＝資源不足時的取捨依據</span></h4>'+
@@ -7479,6 +7646,152 @@ function valuesWheelSVG(c,theme){var gs=(c.lifeGoals||[]).filter(function(g){ret
     '<span><b style="color:'+txt+'">'+esc(g.name)+'</b>'+(g.importance?'（重要度 '+n(g.importance)+'）':'')+(g.value?'<br>'+esc(g.value):'')+'</span></div>';
   }).join('')+'</div>';
  return '<div>'+svg+legend+'</div>';}
+
+/* ══════════════════════════════════════════════════════════════════════
+   待補齊清單（取代原本的「資料檢核表」）— 2026/08/31 Ray 拍板
+   ══════════════════════════════════════════════════════════════════════
+   Ray：「資料檢核表的目的是什麼？基本上我們應該會有一個待補齊的清單就可以了，
+        然後這個清單內容要在客戶那邊的待辦清單裡面出現。
+        我們也不會一開始先收集完文件才開始。」
+
+   原本那張是九項**寫死的文件清單**（填數量與備註），而且全站沒有任何一支讀 c.docCheck
+   ——填了也不會影響任何結果，等於純登錄。
+
+   改成三件事：
+   ① 自動偵測「哪些欄位還空著、缺了會影響哪一個結果」——教練不用自己維護。
+   ② 教練可以再加自訂項目（要文件、要對帳單…），常見文件有一鍵加入。
+   ③ 勾起來的項目按一顆鈕就送進客戶的待辦清單（action_items），
+      客戶在 /portal 首頁的「我的待辦」看得到、也能自己勾完成。
+
+   ⚠️ 這份清單刻意**不擋任何事**：缺件不代表不能開始規劃，缺的那一塊只是先用預估值。
+   ⚠️ 舊的 c.docCheck 資料不刪也不再顯示（留在 jsonb 裡，需要時還查得到）。
+   ══════════════════════════════════════════════════════════════════════ */
+function anyFilled(arr,f){return (arr||[]).some(function(x){return x&&f(x)})}
+var GAP_CHECKS=[
+ {id:'birth',tab:'family',name:'本人的出生日期或年齡',
+  why:'年齡是所有試算的起點——沒有它，退休、教育、保障全部推不動',
+  ask:'提供本人的出生年月日',
+  test:function(c){var p=c.profile||{};return !p.birth&&!n(p.age)}},
+ {id:'retireLiving',tab:'retire',name:'退休後的生活費水準',
+  why:'退休需求整段是 0 的話，缺口會被誇大到沒有參考價值',
+  ask:'想像一下退休後每個月大概要花多少（現在的物價就好）',
+  test:function(c){var r=c.retire||{};
+   return !n(r.monthLiving)&&!anyFilled(c.retireExpenses,function(x){return n(x.amount)>0})}},
+ {id:'income',tab:'finance',name:'收入明細',
+  why:'收入表是空的，現金流從第一年就開始是負的',
+  ask:'提供家庭的收入來源與金額（薪資單或年度所得清單都可以）',
+  test:function(c){return !anyFilled(c.incomes,function(x){return n(x.amount)>0})}},
+ {id:'expense',tab:'finance',name:'支出明細',
+  why:'支出表是空的，結餘會被高估、財務階段也會失真',
+  ask:'提供每月的固定支出（房租房貸、生活費、保費、學費…）',
+  test:function(c){return !anyFilled(c.expenses,function(x){return n(x.amount)>0})}},
+ {id:'asset',tab:'finance',name:'資產明細',
+  why:'沒有資產就沒有起始本金，所有累積都是從 0 開始算',
+  ask:'提供銀行存款、投資部位與不動產的大致金額',
+  test:function(c){return !anyFilled(c.assets,function(x){return n(x.value)>0})}},
+ {id:'insSalary',tab:'family',name:'勞保月投保薪資',
+  why:'勞保老年年金與勞退新制（6%）都靠它推算，缺了退休已備會少一大塊',
+  ask:'提供勞保投保薪資（勞保局 e 化服務或勞保局 App 查得到）',
+  test:function(c){return !anyFilled(c.members,function(m){return n(m.insSalary)>0})}},
+ {id:'nhiSalary',tab:'family',name:'健保月投保薪資',
+  why:'缺了就不會試算健保費，支出表也不會有那一列',
+  ask:'提供健保投保金額（薪資單上的健保投保級距）',
+  test:function(c){return !anyFilled(c.members,function(m){return n(m.nhiSalary)>0})}},
+ {id:'pension',tab:'retire',name:'已備退休金（勞保／勞退／商業年金）',
+  why:'已備是 0 的話，退休缺口會被誇大',
+  ask:'提供勞退專戶現有累積金額（勞保局 App 可查）',
+  test:function(c){return !anyFilled(((c.retire||{}).prepared),function(x){return n(x.amount)>0})}},
+ {id:'policy',tab:'coverage',name:'現有保單',
+  why:'一張都沒登錄的話，保障缺口等於把既有保障全部當成 0',
+  ask:'提供人壽／醫療／意外險的保單（保單首頁或保障內容表即可）',
+  test:function(c){return !(c.policies||[]).length&&!anyFilled(c.coverages,function(x){return n(x.comm)>0||n(x.social)>0})}},
+ {id:'credit',tab:'credit',name:'聯徵信用評分',
+  why:'財務健康度的信用那一項會用預設值代替',
+  ask:'提供聯徵中心的信用評分（每年有免費查詢額度）',
+  test:function(c){return !n(creditScoreOf(c))}},
+ {id:'edu',tab:'education',name:'子女教育規劃',
+  why:'有子女成員但沒有任何一段教育金，教育支出會整段消失',
+  ask:'確認子女目前的就讀階段與預計就讀的學校型態',
+  test:function(c){return (c.members||[]).some(function(m){return m&&m.role==='子女'})&&!anyFilled(c.education,function(x){return n(x.annual)>0})}},
+ {id:'risk',tab:'risk',name:'投資風險屬性測驗（12 題）',
+  why:'沒做完就沒有建議報酬率與波動度，蒙地卡羅只能用預設值',
+  ask:'花五分鐘完成投資風險屬性測驗',
+  test:function(c){return !riskProfile(c)}},
+ {id:'biz',tab:'company',name:'公司概況的第一批五個數字',
+  why:'整合式個人資產負債表算不出來，企業主的財務全貌就是空的',
+  ask:'提供公司的年營收、稅後淨利、總資產、總負債與持股比例',
+  test:function(c){if(!entityOn(c,'company'))return false;var co=mainCompany(c);
+   return !co||!(n(co.annualRevenue)||n(co.netProfit)||n(co.totalAsset)||n(co.totalDebt))}}
+];
+// 常見文件：原本「資料檢核表」那九項，改成一鍵加進自訂清單（不再是一張要填數量的表）。
+var DOC_QUICK=['人壽險保單','產險保單(車險/住宅火險)','薪資單','支出明細表','銀行對帳單(車貸/房貸)','股票投資對帳單','基金投資對帳單','信用卡分期帳單','財產清冊/國稅局'];
+function pendingItems(c){
+ var out=[];
+ GAP_CHECKS.forEach(function(g){var bad=false;try{bad=!!g.test(c)}catch(e){bad=false}
+  if(bad)out.push({id:g.id,name:g.name,why:g.why,tab:g.tab,ask:g.ask});});
+ (c.pendingCustom||[]).forEach(function(x,i){
+  if(x&&x.text)out.push({id:'cus:'+i,name:x.text,why:'教練自訂',tab:null,ask:x.text,cus:i});});
+ return out;
+}
+function askMap(c){return (c.askClient&&typeof c.askClient==='object')?c.askClient:{}}
+function toggleAsk(id){var c=activeCase();c.askClient=askMap(c);c.askClient[id]=!c.askClient[id];save();render();}
+function addPendingCustom(v){var c=activeCase();var t=String(v||'').trim();if(!t)return;
+ c.pendingCustom=Array.isArray(c.pendingCustom)?c.pendingCustom:[];
+ if(!c.pendingCustom.some(function(x){return x&&x.text===t}))c.pendingCustom.push({text:t});
+ save();render();}
+function addPendingFromInput(){var el=document.getElementById('pendNew');if(!el)return;addPendingCustom(el.value);}
+function delPendingCustom(i){var c=activeCase();if(!Array.isArray(c.pendingCustom))return;
+ c.pendingCustom.splice(i,1);save();render();}
+// 送到客戶待辦：embed 模式下由父層寫 DB（window.LANTU_SEND_TODOS 在 embed 區塊掛上）。
+function sendPendingToClient(){
+ var c=activeCase();var ask=askMap(c);
+ var titles=pendingItems(c).filter(function(g){return ask[g.id]}).map(function(g){return g.ask||g.name});
+ var st=document.getElementById('pendMsg');
+ function say(t,col){if(st){st.innerHTML='<span style="color:'+(col||'var(--mut)')+'">'+t+'</span>';}}
+ if(!titles.length){say('先勾選要請客戶補的項目。','var(--amber2)');return;}
+ if(typeof window.LANTU_SEND_TODOS!=='function'){say('這裡是單機預覽，沒有連到客戶帳號——請在教練工作台的規劃器裡操作。','var(--amber2)');return;}
+ say('送出中…');
+ window.LANTU_SEND_TODOS(titles);
+}
+function pendingSec(c){
+ var items=pendingItems(c),ask=askMap(c);
+ var auto=items.filter(function(x){return x.cus==null}).length;
+ var head='<h4>待補齊清單 <span class="hint">系統自動偵測 · 缺件不擋規劃，只是那一塊會先用預估值</span></h4>';
+ if(!items.length){
+  return '<div class="sec" data-ivanchor="doc">'+head+
+   '<div class="hint" style="color:var(--ok)">目前偵測不到缺件，也沒有自訂項目。</div>'+pendingAddHTML()+'</div>';
+ }
+ var rows=items.map(function(g){
+  return '<tr><td style="width:34px;text-align:center"><input type="checkbox" '+(ask[g.id]?'checked':'')+
+    ' onchange="toggleAsk(\''+g.id+'\')" style="width:16px;height:16px;accent-color:var(--amber)"></td>'+
+   '<td class="k">'+esc(g.name)+'<div class="muted" style="font-size:12px;margin-top:2px">'+esc(g.why)+'</div></td>'+
+   '<td style="white-space:nowrap">'+
+    (g.tab?'<button class="tbtn" onclick="jumpTab(\''+g.tab+'\')">前往 ›</button>':
+           '<button class="tbtn" onclick="delPendingCustom('+g.cus+')">刪</button>')+
+   '</td></tr>';
+ }).join('');
+ var n_=items.filter(function(g){return ask[g.id]}).length;
+ return '<div class="sec" data-ivanchor="doc">'+head+
+  '<div class="hint" style="display:block;margin:2px 0 8px">目前偵測到 <b>'+auto+'</b> 項缺件'+
+   (items.length>auto?('，另有 '+(items.length-auto)+' 項自訂'):'')+
+   '。勾起來的會送進客戶的待辦清單，客戶在自己的首頁看得到、也能勾完成。</div>'+
+  '<div class="tw"><table class="rtable"><tr><th>請客戶補</th><th>項目 / 缺了會影響什麼</th><th></th></tr>'+rows+'</table></div>'+
+  '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:9px">'+
+   '<button class="tbtn amber" onclick="sendPendingToClient()">送 '+n_+' 項到客戶待辦 →</button>'+
+   '<span id="pendMsg" class="hint"></span></div>'+
+  pendingAddHTML()+'</div>';
+}
+function pendingAddHTML(){
+ return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
+  '<div class="hint" style="margin-bottom:6px;display:block">自訂項目（要文件、要對帳單、要客戶去查的東西）</div>'+
+  '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+   '<input id="pendNew" style="flex:1;min-width:220px" placeholder="例：提供 114 年度綜所稅申報書" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addPendingFromInput();}">'+
+   '<button class="tbtn" onclick="addPendingFromInput()">＋ 加入</button></div>'+
+  '<div class="hint" style="margin-top:8px;margin-bottom:4px;display:block">常見文件（點一下加入）</div>'+
+  '<div style="display:flex;flex-wrap:wrap;gap:6px">'+DOC_QUICK.map(function(d){
+    return '<button class="tbtn" onclick="addPendingCustom(\''+d.replace(/'/g,'')+'\')">'+d+'</button>';
+   }).join('')+'</div></div>';
+}
 function docChecklistHTML(c){var d=c.docCheck||{};
  var rows=DOC_LIST.map(function(name){return '<tr><td class="k">'+name+'</td>'+
    '<td><input type="number" style="width:70px" value="'+esc(d[name+'_n']==null?'':d[name+'_n'])+'" onchange="setObj(\'docCheck\',\''+name+'_n\',this.value,\'num\')"></td>'+
@@ -7627,7 +7940,7 @@ function interviewSec(c){
 function intentSec(c){var it=c.intent||{};
  var lifeTbl=tableSec('人生財務目標清單','lifeGoals',c.lifeGoals||[],[['name','目標','text'],['priority','優先序','num'],['value','價值觀 / 重要原因','text'],['importance','重要程度（5最高）','imp'],['linkModule','對應模組','sel:退休,教育,置產,購車,傳承,婚姻,創業,其他'],['note','備註','text']],
   '自由填寫客戶「最在意的事」與背後的價值觀；對應模組做軟連結，於報告呈現。這張清單捕捉「為什麼」，下方的人生目標捕捉「做什麼」，實際運算仍由各模組（退休/教育/置產…）負責。');
- return interviewSec(c)+'<div class="lgwrap">'+lifeTbl+
+ return '<div class="lgwrap">'+lifeTbl+
   '<div class="sec"><h4>人生價值環 <span class="hint">由左側清單的價值觀與重要度即時生成</span></h4><div id="valuesWheel">'+valuesWheelSVG(c)+'</div></div></div>'+
   '<div class="sec" data-ivanchor="purpose"><h4>關注議題 <span class="owner">客戶填寫 · 教練可代填</span> <span class="hint">客戶於人生護照選的「這次想解決什麼」，不含有時間軸的人生目標；勾「人生模擬」＝目標全選</span></h4>'+chips('purposes',PURPOSES,it.purposes,'togglePurpose')+'</div>'+
   entitySec(c)+
@@ -7636,27 +7949,33 @@ function intentSec(c){var it=c.intent||{};
    ?'<div class="sec" data-goalanchor="傳承規劃"><h4>傳承規劃 '+mustBadge(c,'傳承規劃')+'</h4><div class="fgrid">'+ofld('legacy','on','納入本次規劃','bool')+ofld('legacy','heirs','繼承人數','num')+ofld('legacy','perHeirCash','每人現金傳承','money')+ofld('legacy','perHeirNote','每人其他(如一間房)')+ofld('legacy','feedEstate','納入遺產稅考量','bool')+'</div><div class="hint" style="margin-top:6px">傳承總需求(現金)＝繼承人數 × 每人現金傳承，會列入建議與缺口總表。<br>傳承是願景的一部分，客戶若決定這次不處理，把「納入本次規劃」設為 false 即可，資料仍會保留。</div></div>'
    :foldedGoal(c,'傳承規劃',n((c.legacy||{}).heirs)>0?'（先前已填 '+n(c.legacy.heirs)+' 位繼承人，資料保留、仍列入模擬）':''))+
   (targetOn(c,'職涯規劃')
-   ?'<div class="sec" data-goalanchor="職涯規劃"><h4>職涯 / 創業規劃 '+mustBadge(c,'職涯規劃')+'</h4><div class="fgrid">'+ofld('career','plan','是否轉換或創業','sel:無,考慮轉職,考慮創業')+ofld('career','switchAge','預計幾歲轉換','num')+ofld('career','switchFund','轉換預備資金','money')+ofld('career','startupType','創業類別')+ofld('career','startupBudget','創業預算','money')+ofld('career','importance','重要度（5最高）','imp')+'</div></div>'
+   ?'<div class="sec" data-goalanchor="職涯規劃"><h4>職涯 / 創業規劃 '+mustBadge(c,'職涯規劃')+'</h4><div class="fgrid">'+ofld('career','plan','是否轉換或創業','sel:無,考慮轉職,考慮創業')+ofld('career','switchAge','預計幾歲轉換','num')+ofld('career','switchFund','轉換期預備金（空窗期生活費）','money')+ofld('career','startupType','創業類別')+ofld('career','startupBudget','創業投入本金（一次性）','money')+ofld('career','importance','重要度（5最高）','imp')+'</div>'+
+      '<div class="hint" style="margin-top:6px;display:block"><b>兩筆錢不是同一件事</b>：<b>轉換期預備金</b>是沒有薪水的那幾個月要活下去的現金（收入暫停）；<b>創業投入本金</b>是一次投進事業的錢（本金支出）。考慮轉職只會有前者，考慮創業通常兩者都有——開店那段期間一樣沒有薪水。</div>'+
+      '<div data-calc="career">'+careerCalcHTML(c)+'</div></div>'
    :foldedGoal(c,'職涯規劃',(c.career||{}).plan&&c.career.plan!=='無'?'（先前已填「'+esc(c.career.plan)+'」，資料保留、仍列入模擬）':''))+
   (targetOn(c,'婚姻規劃')
    ?'<div class="sec" data-goalanchor="婚姻規劃"><h4>婚姻規劃 '+mustBadge(c,'婚姻規劃')+'</h4><div class="fgrid">'+ofld('marriage','plan','是否結婚','sel:否,是')+ofld('marriage','age','理想結婚年齡','num')+ofld('marriage','budget','婚禮預算(理想)','money')+ofld('marriage','minBudget','婚禮預算(最低)','money')+ofld('marriage','importance','重要度（5最高）','imp')+'</div><div class="hint" style="margin-top:8px">旅遊/休閒/奢侈品/傳承 於「目標/置產」分頁以對應類型新增，並可填理想與最低雙檔。</div></div>'
    :foldedGoal(c,'婚姻規劃',(c.marriage||{}).plan==='是'?'（先前已填婚姻規劃，資料保留、仍列入模擬）':''))+
   '<div class="sec"><h4>理財模式評估 <span class="hint">記帳、儲蓄與投資經驗，判讀理財習慣</span></h4><div class="fgrid">'+ofld('moneyStyle','bookkeep','記帳經驗','sel:無,曾記帳但中斷,持續記帳中')+ofld('moneyStyle','budgeting','收支管理','sel:未管理,有記錄無計劃,有計劃管理')+ofld('moneyStyle','emergency','緊急預備金','sel:尚未準備,已準備')+ofld('moneyStyle','emergencyAmt','預備金金額','money')+'</div>'+
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">儲蓄經驗（可複選）</div>'+chips('savingExp',SAVING_EXP,it.savingExp)+'</div>'+
-   '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">投資經驗（可複選）</div>'+chips('investExp',INVEST_EXP,it.investExp)+'</div></div>'+
-  '<div class="sec" data-ivanchor="doc"><h4>資料檢核表 <span class="hint">諮詢前需收集的文件；填數量與備註</span></h4>'+docChecklistHTML(c)+'</div>';
+   '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">投資經驗（可複選）</div>'+chips('investExp',INVEST_EXP,it.investExp)+chipsOther('investExp',it)+'</div></div>'+
+  pendingSec(c);
 }
+// ⚠️⚠️ 2026/08/31 Ray 回報：第 2 題起有五題把「您現在有一筆錢要投資」當成前提，
+//    但客戶並沒有說他現在要投資——測驗會問不下去。
+//    改法是**只改題幹的前提**（改成「如果要做長期配置」），選項字串與配分一個字都不動，
+//    所以既有客戶已經作答的 riskQuiz.ans 分數與等級完全不變（riskQuiz.test.ts 釘住這件事）。
 var RISK_Q=[
  {q:'您目前的年齡層是？',o:[['70歲以上',1],['60–69歲',2],['50–59歲',3],['40–49歲',4],['39歲以下',5]]},
- {q:'這筆可投資資金占您整體資產的比例？',o:[['80%以上（幾乎是全部）',1],['約60–80%',2],['約40–60%',3],['約20–40%',4],['20%以下（僅一小部分）',5]]},
- {q:'您這筆資金主要的投資目的是？',o:[['保本，絕不能虧損',1],['略高於定存即可',2],['穩健累積，兼顧風險',3],['追求資產明顯成長',4],['積極追求高報酬',5]]},
- {q:'您預計這筆資金可以不動用多久？',o:[['1年以內',1],['1–3年',2],['3–5年',3],['5–10年',4],['10年以上',5]]},
+ {q:'如果要做長期配置，您能撥出來的資金大約占整體資產多少？',hint:'問的是「能撥出來」的比例，不是現在就要投出去。',o:[['80%以上（幾乎是全部）',1],['約60–80%',2],['約40–60%',3],['約20–40%',4],['20%以下（僅一小部分）',5]]},
+ {q:'這一筆長期配置的資金，您希望它做到什麼？',o:[['保本，絕不能虧損',1],['略高於定存即可',2],['穩健累積，兼顧風險',3],['追求資產明顯成長',4],['積極追求高報酬',5]]},
+ {q:'這一筆資金，您預計可以多久不動用？',o:[['1年以內',1],['1–3年',2],['3–5年',3],['5–10年',4],['10年以上',5]]},
  {q:'您目前的收入來源穩定度？',o:[['已無主動收入（退休/待業）',1],['不穩定、起伏大',2],['尚可，普通穩定',3],['穩定的薪資收入',4],['穩定且有多重來源',5]]},
  {q:'未來3–5年您的收入預期？',o:[['可能明顯減少',1],['可能略減',2],['大致持平',3],['可能成長',4],['可望大幅成長',5]]},
  {q:'您對投資理財商品的了解與經驗？（可複選）',multi:true,hint:'請勾選所有接觸過的類型；計分以最高者為準。',o:[['完全沒有',1],['僅定存/儲蓄險',2],['買過基金/ETF',3],['熟悉股票/債券操作',4],['熟悉衍生性/槓桿商品',5]]},
  {q:'您實際投資過（或目前持有）的商品有哪些？（可複選）',multi:true,hint:'請勾選所有持有過的商品；計分以風險最高者為準。',o:[['定存、儲蓄險',1],['債券、貨幣型基金',2],['平衡型基金、績優股',3],['個股、股票型基金',4],['期權、外匯、加密貨幣等',5]]},
- {q:'若投資一年內下跌20%，您會？',o:[['立刻全部贖回、不再投資',1],['贖回大部分',2],['觀望、暫不動作',3],['續抱等待回升',4],['視為機會、加碼買進',5]]},
- {q:'您能接受這筆資金最大的本金虧損幅度？',o:[['不能接受任何虧損',1],['5%以內',2],['約10–15%',3],['約20–30%',4],['30%以上也可承受',5]]},
+ {q:'假設您持有的部位一年內下跌 20%，您會？',hint:'假設情境，不代表您現在持有任何部位。',o:[['立刻全部贖回、不再投資',1],['贖回大部分',2],['觀望、暫不動作',3],['續抱等待回升',4],['視為機會、加碼買進',5]]},
+ {q:'這一筆資金，您能接受的最大本金虧損幅度是？',o:[['不能接受任何虧損',1],['5%以內',2],['約10–15%',3],['約20–30%',4],['30%以上也可承受',5]]},
  {q:'下列報酬/風險組合，您偏好哪一種？',o:[['報酬2%，幾乎不虧',1],['報酬4%，最差-5%',2],['報酬6%，最差-15%',3],['報酬9%，最差-25%',4],['報酬12%，最差-40%',5]]},
  // ⚠️ 2026/08/28 改版：原本問「臨時需要動用這筆資金的可能性」，改問緊急預備金。
  //    題號與 ans 的索引刻意不動（ans 是用題目索引當 key，改順序會靜默對到錯的題目），
@@ -7744,7 +8063,7 @@ function riskSec(c){
  } else {
   result='<div class="sec" style="border-left:4px solid var(--mut2)"><div style="font-weight:700">尚未完成測驗</div><p style="color:var(--mut);margin:6px 0 0">已作答 '+rs.answered+' / '+rs.total+' 題（尚缺第 '+rs.unanswered.map(function(i){return i+1}).join('、')+' 題），全部作答後即產生風險屬性與建議報酬率。</p></div>';
  }
- return '<div class="sec"><h4>投資風險屬性測驗（KYC）</h4><div class="hint" style="display:block;margin-left:0">依 12 題結果評定風險承受度，作為建議投資報酬率與蒙地卡羅波動度的依據。可一鍵套用至規劃參數。複選題以所選項中風險最高者計分，滿分維持 60 分。</div></div>'+
+ return '<div class="sec"><h4>投資風險屬性測驗（KYC）</h4><div class="hint" style="display:block;margin-left:0">依 12 題結果評定風險承受度，作為建議投資報酬率與蒙地卡羅波動度的依據。可一鍵套用至規劃參數。複選題以所選項中風險最高者計分，滿分維持 60 分。<br><b style="color:var(--amber2)">這份測驗量的是「風險承受度」本身，不預設客戶現在就要投入一筆錢</b>——題目裡的「這一筆資金」是假設情境（如果要做長期配置的話），還沒有任何投資計畫的客戶一樣可以完整作答。</div></div>'+
   progress+conflictBox+result+qs+conflictBox+result;
 }
 /* ===================== 第 ④ 群：企業 =====================
@@ -7960,6 +8279,9 @@ function vatReconcileHTML(c){
 
 function setCo(k,v,type){var c=activeCase();var co=mainCompany(c);if(!co)return;
  co[k]=(type==='num')?n(v):v;save();render();}
+// 負責人＝企業主身分的唯一入口：設了就把那位成員的工作類別帶成企業主（不用再去家庭成員勾一次）。
+function setCoOwner(v){var c=activeCase();var co=mainCompany(c);if(!co)return;
+ co.owner=v;applyCompanyOwner(c);migrateCompanies(c);save();render();}
 function coF(co,k,label,type,opts){
  if(opts){var o=opts.split(',').map(function(x){return '<option '+(co[k]===x?'selected':'')+'>'+x+'</option>'}).join('');
   return '<div class="f"><label>'+label+'</label><select onchange="setCo(\''+k+'\',this.value)">'+o+'</select></div>';}
@@ -7989,7 +8311,10 @@ function companySec(c){
   coF(co,'name','公司名稱')+coF(co,'taxId','統一編號')+
   '<div class="f"><label>行業別</label><input list="industryList" value="'+esc(co.industry==null?'':co.industry)+'" onchange="setCo(\'industry\',this.value)"><datalist id="industryList"><option value="批發/零售"></option><option value="餐飲/住宿"></option><option value="製造"></option><option value="營建/工程"></option><option value="資訊/科技"></option><option value="金融/保險"></option><option value="醫療/生技"></option><option value="教育/文創"></option><option value="農林漁牧"></option><option value="專業服務(法律/會計/顧問)"></option></datalist></div>'+
   coF(co,'org','組織型態','','有限公司,股份有限公司,閉鎖性股份有限公司,獨資,合夥,行號')+
-  coF(co,'setupYear','設立年度','num')+coF(co,'role','本人擔任角色')+
+  coF(co,'setupYear','設立年度','num')+
+  '<div class="f"><label>負責人（家庭成員）</label><select onchange="setCoOwner(this.value)">'+memSelOpts(c,co.owner||'')+'</select>'+
+   '<div class="hint" style="margin-top:3px">指定誰是企業主。選了之後那位成員的<b>工作類別會自動帶成「企業主」</b>——健保、勞保與連帶保證都吃這個身分。</div></div>'+
+  coF(co,'role','擔任角色')+
   coF(co,'bookkeep','營所稅申報方式','','查帳,書審,擴大書審,所得額標準,會計師簽證')+
   coF(co,'accountant','記帳士 / 會計師')+'</div>'+
   '<div class="hint" style="margin-top:6px">申報方式每年五月前值得重新試算一次：實際純益率低於書審標準時用書審，等於多繳稅。這是完全合法、卻最常被沿用去年的一塊。</div></div>';
@@ -8014,7 +8339,7 @@ function companySec(c){
   '401 是兩個月一筆、已經送進國稅局的真實營收趨勢線，可信度高於任何自製報表。欄 115 累積留抵長期偏高＝有一筆公司現金卡在國稅局，值得和記帳士確認能否轉為退稅。<br>107 與 108 是<b>選填</b>，填了才驗得動「銷項 ＝ 應稅銷售額 × 5%」與「111 ＝ 107 − 108」。');
  return '<div class="folded" style="border-style:solid;border-color:rgba(143,192,163,.32);color:var(--mut);display:block">'+
    '企業主體 · 公司概況<span>資料分三批索取，隨信任度推進：第一批五個數字就能產出交付物，後兩批是漸進解鎖，不用一次問完。</span></div>'+
-  bizAuditHTML(c)+batch1+basic+equity+batch2+oversea+years+vat+vatReconcileHTML(c);
+  batch1+basic+equity+batch2+oversea+years+vat+vatReconcileHTML(c)+bizAuditHTML(c);
 }
 
 // ── E2 公私勾稽：整合式個人資產負債表的原料 ──
@@ -11890,9 +12215,9 @@ function rOtherAspects(c){
   out.push(rSub('職涯規劃')+'<table>'+
    '<tr><td>方向</td><td>'+esc(ca.plan)+'</td></tr>'+
    (ca.switchAge?'<tr><td>預計轉換年齡</td><td>'+esc(ca.switchAge)+' 歲</td></tr>':'')+
-   (n(ca.switchFund)?'<tr><td>轉換期需準備</td><td>'+fmt(ca.switchFund)+' 元</td></tr>':'')+
+   (n(ca.switchFund)?'<tr><td>轉換期預備金（空窗期生活費）</td><td>'+fmt(ca.switchFund)+' 元</td></tr>':'')+
    (ca.startupType?'<tr><td>創業型態</td><td>'+esc(ca.startupType)+'</td></tr>':'')+
-   (n(ca.startupBudget)?'<tr><td>創業預算</td><td>'+fmt(ca.startupBudget)+' 元</td></tr>':'')+
+   (n(ca.startupBudget)?'<tr><td>創業投入本金（一次性）</td><td>'+fmt(ca.startupBudget)+' 元</td></tr>':'')+
    '</table>'+rNote('轉職與創業都會讓收入中斷一段時間，這筆準備金要與緊急預備金分開放——兩者被同一筆錢覆蓋，等於兩件事都沒準備。'));
  }
  // 婚姻
@@ -12193,6 +12518,8 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
   function toParent(msg){try{parent.postMessage(msg,PARENT_ORIGIN);}catch(e){}}
   // embed：save() 不寫 localStorage，改把「目前正在編輯的那一筆」回傳父層（父層存回 DB）；客戶唯讀不回存。
   save=function(){try{var cur=activeCase();if(!CLIENT&&cur)toParent({type:'lantu:save',data:cur});}catch(e){}};
+  // 待補齊清單 → 客戶待辦：iframe 不查也不寫 DB，跟註記一樣交給父層（它才有 clientId 與租戶條件）。
+  window.LANTU_SEND_TODOS=function(titles){try{toParent({type:'lantu:todos',titles:titles});}catch(e){}};
   var inited=false;
   // 介面縮放（老花友善）。這份是 px 寫死的版面，rem 縮放對它無效，
   // 用 zoom 才會字與版面一起等比放大（Chrome/Safari/Edge/Firefox 126+ 都支援）。
@@ -12229,6 +12556,13 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
     if(e.origin&&PARENT_ORIGIN&&e.origin!==PARENT_ORIGIN)return;
     var m=e.data;if(!m)return;
     if(m.type==='lantu:uiscale'){applyScale(m.scale);return;}
+    if(m.type==='lantu:todosdone'){
+      var _pm=document.getElementById('pendMsg');
+      if(_pm)_pm.innerHTML=m.error
+        ?'<span style="color:var(--warn)">送出失敗：'+esc(String(m.error))+'</span>'
+        :'<span style="color:var(--ok)">已送出：新增 '+n(m.added)+' 項'+(n(m.skipped)?('，'+n(m.skipped)+' 項本來就在清單上'):'')+'。客戶在自己的首頁看得到。</span>';
+      return;
+    }
     if(m.type!=='lantu:init')return;
     if(m.uiScale)applyScale(m.uiScale);
     applyReadOnly(m.readOnly,m.readOnlyNote);
@@ -12237,6 +12571,15 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
        之後改名／改號就會有兩份真相。*/
     window.LANTU_CLIENT_CODE=m.clientCode||null;
     var c=migrateCase(m.data||{});
+    /* 生日有兩個家：clients.birth_date（新增客戶時填的主檔）與 plans.data.profile.birth（規劃內容）。
+       以前完全沒接，所以教練建完客戶、進到家庭成員還要把同一個生日再打一次（Ray 2026/08/31 回報）。
+       ⚠️ 只在規劃裡還空著時帶入，絕不覆蓋教練已經改過的值。
+       ⚠️ 反向（規劃改了 → 回寫主檔）在 server 端的 updatePlanData 做，不走 postMessage。 */
+    if(m.birthDate&&c.profile&&!c.profile.birth){
+      c.profile.birth=String(m.birthDate).slice(0,10);
+      var _bage=ageFromBirth(c.profile.birth);
+      if(_bage!=null)c.profile.age=_bage;
+    }
     app.cases=[c];app.activeId=c.id;app.role=CLIENT?'client':'coach';app.activeTab=CLIENT?'analysis':'data';
     inited=true;render();
   });
@@ -12703,6 +13046,7 @@ function barHTML(key){
     ? '<label class="lnchk"><input type="checkbox" '+(st.visible?'checked':'')+' onchange="LN.vis(\''+key+'\',this.checked)"> 客戶可見<span class="lnhint">（預設關）</span></label>'
     : '<label class="lnchk lock" title="'+(LN.role==='viewer'?'唯讀協作教練的註記不會流到客戶端':'客戶寫的註記不會印進報告書')+'"><input type="checkbox" disabled> 客戶可見<span class="lnhint">（'+(LN.role==='viewer'?'協作教練不可勾':'客戶不可勾')+'）</span></label>';
    body+='<div class="lntags">'+tags+'</div>'+
+     '<div class="lnkhint"><b>依據</b>＝這個數字／假設從哪來（客戶說的、對帳單、法規級距）　<b>決定</b>＝談完拍板怎麼做（金額、年齡、要不要納入）　<b>待辦</b>＝下次之前誰要去補什麼（會進客戶的待辦清單）</div>'+
      (pre?'<div class="lnpre">💬 '+pre+'</div>':'')+
      '<textarea class="lnta" id="lnta_'+key+'" placeholder="'+(LN.role==='client'?'補充說明…':'接著寫…')+'" oninput="LN.typing(\''+key+'\',this.value)">'+esc2(st.text)+'</textarea>'+
      '<div class="lnrow">'+vis+'<span class="lnsp"></span>'+
@@ -13287,6 +13631,8 @@ body{padding-bottom:52px}
  font-size:12.5px;line-height:1.75;color:#3a3a3a;margin:0 0 6px}
 .lnrpn b{color:#8a6a3c}
 .lnrph{font-size:12.5px;font-weight:800;color:#8a6a3c;margin:4px 0 4px}
+.lnkhint{font-size:11.5px;line-height:1.7;color:var(--mut2,#8aa0b3);margin:2px 0 6px}
+.lnkhint b{color:var(--amber2,#e0bd8b);font-weight:700}
 .lnrpo{margin:0;padding-left:20px;font-size:12.5px;line-height:1.85;color:#3a3a3a}
 @media print{.lnbar,.lntoast{display:none!important}.lnmask{position:static;background:none;display:block}
  .lnmodal{max-height:none;border:none}}
@@ -13340,5 +13686,132 @@ else boot();
 })();
 
 </script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   訪談檢核清單：右下角常駐浮層（2026/08/31 Ray 回饋）
+   ══════════════════════════════════════════════════════════════════════
+   原本它插在「意圖 / 生涯」分頁最上面，跟輸入欄位混在同一頁。
+   Ray：「它跟輸入資料的邏輯不一樣，輸入資料之後才會有這個結果。」
+   → 清單本來就是導航而不是要填的東西，所以改成任何分頁都叫得出來的浮層，
+     不再佔輸入版面。內容仍然是同一支 interviewSec(c)，一份真相。
+
+   ⚠️ 零侵入：不改任何 Sec 函式，只 wrap render() 與 jumpTab/ivGoto。
+   ⚠️ 只在教練端的「資料」區出現；客戶端與分析/報告區不掛。
+   ⚠️ .lnbar（註記列）是 z-index 60 的全寬底列，所以按鈕要墊高 74px 才不會被壓住。
+   ══════════════════════════════════════════════════════════════════════ */
+(function(){
+var CSS=`
+.ivfab{position:fixed;right:18px;bottom:74px;z-index:58;display:none;align-items:center;gap:8px;
+ background:linear-gradient(180deg,#17456b,#0f3350);color:#e9d3ae;border:1px solid rgba(201,154,91,.55);
+ border-radius:999px;padding:10px 16px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;
+ box-shadow:0 8px 22px rgba(0,0,0,.38)}
+.ivfab:hover{border-color:var(--amber,#c99a5b)}
+.ivfab .ivfp{font-weight:700;font-size:12px;color:#a7bacb}
+.ivfab.on{display:inline-flex}
+.ivmask{position:fixed;inset:0;background:rgba(4,14,24,.6);z-index:110;display:none}
+.ivmask.on{display:block}
+.ivdrawer{position:fixed;top:0;right:0;bottom:0;width:min(620px,94vw);z-index:111;
+ background:#0a2137;border-left:1px solid rgba(201,154,91,.35);box-shadow:-14px 0 40px rgba(0,0,0,.45);
+ display:none;flex-direction:column}
+.ivdrawer.on{display:flex}
+.ivdhd{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+.ivdhd b{font-size:14.5px;color:#e9d3ae}
+.ivdhd .sub{font-size:11.5px;color:#a7bacb}
+/* 抽屜自己已經有標題了，區塊裡那一行 h4 就不要再講一次。 */
+.ivdbody > .sec > h4{display:none}
+.ivdhd .sp{flex:1}
+.ivdx{background:none;border:1px solid rgba(255,255,255,.2);color:#a7bacb;border-radius:8px;
+ padding:5px 11px;font-size:12.5px;font-family:inherit;cursor:pointer}
+.ivdbody{flex:1;overflow:auto;padding:12px 14px 28px}
+.ivdbody .sec{margin:0}
+@media print{.ivfab,.ivmask,.ivdrawer{display:none!important}}
+`;
+var fab,mask,drawer,body,open=false;
+function coachData(){
+ try{ return window.app && app.role==='coach' && app.activeTab==='data' && !!activeCase(); }catch(e){ return false; }
+}
+function fill(){
+ if(!body)return;
+ try{ body.innerHTML=interviewSec(activeCase()); }catch(e){ body.innerHTML=''; }
+}
+function sync(){
+ if(!fab)return;
+ var ok=coachData();
+ fab.classList.toggle('on',ok);
+ if(!ok&&open)close();
+ if(ok){
+  try{ var pr=ivProgress(activeCase());
+   fab.innerHTML='<span>📋 訪談檢核清單</span><span class="ivfp">'+pr.done+' / '+pr.total+' 段有內容</span>';
+  }catch(e){ fab.innerHTML='<span>📋 訪談檢核清單</span>'; }
+ }
+ if(open)fill();
+}
+function show(){ open=true;fill();mask.classList.add('on');drawer.classList.add('on'); }
+function close(){ open=false;mask.classList.remove('on');drawer.classList.remove('on'); }
+function boot(){
+ var st=document.createElement('style');st.id='ivpCSS';st.textContent=CSS;document.head.appendChild(st);
+ fab=document.createElement('button');fab.className='ivfab';fab.onclick=show;
+ mask=document.createElement('div');mask.className='ivmask';mask.onclick=close;
+ drawer=document.createElement('div');drawer.className='ivdrawer';
+ drawer.innerHTML='<div class="ivdhd"><b>訪談檢核清單</b>'+
+  '<span class="sub">照著走就不會漏 · 題號＝教練實際在用的問卷順序（沒有動）</span>'+
+  '<span class="sp"></span><button class="ivdx">關閉 ✕</button></div><div class="ivdbody"></div>';
+ drawer.querySelector('.ivdx').onclick=close;
+ body=drawer.querySelector('.ivdbody');
+ document.body.appendChild(fab);document.body.appendChild(mask);document.body.appendChild(drawer);
+ // 點清單裡的「前往」＝要去填資料，浮層自己讓開。
+ ['jumpTab','ivGoto','gotoGoal','gotoDataTab'].forEach(function(fn){
+  if(typeof window[fn]!=='function')return;
+  var orig=window[fn];
+  window[fn]=function(){ close(); return orig.apply(this,arguments); };
+ });
+ if(typeof window.render==='function'){
+  var r=window.render;
+  window.render=function(){ var out=r.apply(this,arguments); try{ sync(); }catch(e){ console.error('[IVP]',e); } return out; };
+ }
+ document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&open)close(); });
+ window.IVP={open:show,close:close,sync:sync,isOpen:function(){return open}};
+ sync();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
+else boot();
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   數字欄位：聚焦即全選（2026/08/31 Ray 回饋）
+   ══════════════════════════════════════════════════════════════════════
+   Ray：「很多資料原本是零，如果要鍵入資料的話，可以直接把整個格子都重新輸入，
+        不要又夾雜那個零。」
+   金額欄（.amtin）與 <input type=number> 的初值多半是 0，游標落進去之後
+   打字會變成 "0500000"——要先手動刪掉那個 0。改成聚焦就全選，打第一個字
+   直接取代整格。
+
+   ⚠️ 用 document 上的委派監聽：render() 每次都重畫 innerHTML，
+      綁在元素上的 handler 會跟著消失。
+   ⚠️ 滑鼠點擊會在 focus 之後把選取收成一個插入點，所以要在該次 mouseup
+      擋掉預設行為（只擋這一次，之後拖曳選字照常）。
+   ══════════════════════════════════════════════════════════════════════ */
+(function(){
+var pending=null;
+function isNumField(el){
+ if(!el||el.tagName!=='INPUT'||el.readOnly||el.disabled)return false;
+ return el.classList.contains('amtin')||el.type==='number';
+}
+document.addEventListener('focusin',function(e){
+ var el=e.target;
+ if(!isNumField(el))return;
+ pending=el;
+ setTimeout(function(){ if(document.activeElement===el){ try{ el.select(); }catch(err){} } },0);
+});
+document.addEventListener('mouseup',function(e){
+ if(pending&&e.target===pending){ e.preventDefault(); }
+ pending=null;
+},true);
+document.addEventListener('focusout',function(){ pending=null; });
+})();
+</script>
+
 </body>
 </html>

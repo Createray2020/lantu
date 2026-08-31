@@ -379,12 +379,27 @@ describe("分頁渲染", () => {
     expect(renderTab("linkage")).toContain("扣繳義務人是公司負責人");
   });
 
-  it("公司概況只在企業分頁編輯：家庭/參數頁只給摘要與跳頁鈕", () => {
+  it("公司資料完全不在家庭/參數頁：只留一行指路（2026/08/31 Ray：家庭是個人財務的範疇）", () => {
     const c = bizCase();
     c.profile.jobType = "企業主";
     const h = renderTab("family");
-    expect(h).toContain("前往「公司概況」");
+    expect(h).toContain("公司概況 →");
+    expect(h).toContain("這裡不重複登錄");
     expect(h).not.toContain("負責人往來(股東往來/借貸)");   // 舊的內嵌欄位已移除
+    // 連唯讀摘要都不留：年營收/稅後淨利/股權估值那一排以前會在這裡再印一次
+    expect(h).not.toContain("於「企業 · 公司概況」分頁維護");
+  });
+
+  it("企業主身分的唯一真相＝公司的負責人；規劃主體開了卻沒人是企業主要出警示", () => {
+    const c = bizCase();
+    c.profile.jobType = "一般就業者";
+    c.companies[0].owner = "";
+    const h = renderTab("family");
+    expect(h, "健保會從雇主 100% 掉回受僱者 30%，差 3.3 倍——這一定要講出來").toContain("企業主身分沒有對上");
+    // 指定負責人＝那位成員的工作類別自動變成企業主，警示自己消失
+    w.setCoOwner(w.primaryName(c));
+    expect(w.activeCase().profile.jobType).toBe("企業主");
+    expect(renderTab("family")).not.toContain("企業主身分沒有對上");
   });
 
   it("分析頁掛上企業主診斷；主體沒開的客戶完全看不到", () => {

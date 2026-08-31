@@ -100,8 +100,8 @@ describe("欄位宣告：這些欄位必須是 money，不能被改回 num", () 
     "fld('planInit','計劃儲蓄期初','money')",
     "fld('planYearly','計劃儲蓄年投入','money')",
     "ofld('legacy','perHeirCash','每人現金傳承','money')",
-    "ofld('career','switchFund','轉換預備資金','money')",
-    "ofld('career','startupBudget','創業預算','money')",
+    "ofld('career','switchFund','轉換期預備金（空窗期生活費）','money')",
+    "ofld('career','startupBudget','創業投入本金（一次性）','money')",
     "ofld('moneyStyle','emergencyAmt','預備金金額','money')",
   ];
   it.each(MUST_BE_MONEY)("%s", (decl) => {

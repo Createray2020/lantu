@@ -87,7 +87,7 @@ describe("三類目標搬家：生活願望是唯一真相", () => {
 
   it("目標類型下拉不再有這三項（教練不會再誤選回去）", () => {
     const html = readFileSync(new URL("../../public/lantu-app.html", import.meta.url), "utf8");
-    expect(html).toContain("sel:購屋,置產,購車,婚姻,生育,孝親,傳承,其他");
+    expect(html).toContain("sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他");
   });
 
   it("三張表都掛得到錨點（檢核清單與「填細節 →」要捲得過去）", () => {

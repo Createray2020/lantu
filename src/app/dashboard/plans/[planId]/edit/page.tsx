@@ -21,6 +21,7 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
   const plan = await getPlanForRead(coach.id, planId);
   if (!plan) notFound();
   // 客戶編號：三份可交付文件的表頭要印它，隨 lantu:init 一起送進 iframe。
+  // 生日同車：規劃裡還空著時由 iframe 帶入 profile.birth，教練不必再打一次（反向回寫在 updatePlanData）。
   const [client, access] = await Promise.all([
     getClientForRead(coach.id, plan.clientId),
     clientAccess(coach.id, plan.clientId),
@@ -38,6 +39,7 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
       readOnly={licenseState(coach).expired || !isOwner}
       readOnlyReason={!isOwner ? "collab" : "license"}
       clientCode={client?.code ?? null}
+      birthDate={client?.birthDate ?? null}
     />
   );
 }

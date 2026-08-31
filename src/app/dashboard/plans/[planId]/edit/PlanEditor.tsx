@@ -15,6 +15,7 @@ import {
   openSessionAction,
   listSessionsAction,
   restoreToSessionAction,
+  createActionItemsAction,
 } from "../../../actions";
 import type { NoteRow, NoteInput } from "@/lib/notes";
 import type { SessionRow, EndInput } from "@/lib/consultSession";
@@ -80,6 +81,7 @@ export default function PlanEditor({
   readOnly = false,
   readOnlyReason = "license",
   clientCode = null,
+  birthDate = null,
 }: {
   planId: string;
   clientId: string;
@@ -92,6 +94,11 @@ export default function PlanEditor({
   readOnlyReason?: "license" | "collab";
   /** 客戶編號：報告書／方案書／診斷書的表頭要印它。 */
   clientCode?: string | null;
+  /**
+   * 客戶主檔的生日（clients.birth_date）。規劃裡的 profile.birth 還空著時由 iframe 帶入，
+   * 教練不必在家庭成員那裡把同一個生日再打一次。⚠️ 只帶不覆蓋；反向回寫在 updatePlanData。
+   */
+  birthDate?: string | null;
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -161,6 +168,7 @@ export default function PlanEditor({
           readOnly,
           readOnlyNote: RO_NOTE[readOnlyReason],
           clientCode: clientCode ?? null,
+          birthDate: birthDate ?? null,
           notes: notesRef.current,
           session: sessionRef.current,
           past: pastRef.current,
@@ -271,6 +279,29 @@ export default function PlanEditor({
         postInit();
       } else if (msg.type === "lantu:note" || msg.type === "lantu:session") {
         void onNoteMsg(msg as unknown as NoteMsg);
+      } else if (msg.type === "lantu:todos") {
+        // 規劃器的「待補齊清單」勾了幾項，按下送出 → 寫進 action_items，
+        // 客戶在 /portal 首頁的「我的待辦」就看得到（同一張表，不另開新的）。
+        if (readOnly) {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: "lantu:todosdone", error: "這份規劃目前是唯讀的，沒辦法新增客戶待辦。" },
+            window.location.origin,
+          );
+          return;
+        }
+        const raw = (msg as unknown as { titles?: unknown }).titles;
+        const titles = Array.isArray(raw) ? raw.map((x) => String(x)) : [];
+        if (!titles.length) return;
+        void (async () => {
+          const r = await createActionItemsAction(clientId, titles);
+          iframeRef.current?.contentWindow?.postMessage(
+            r.ok
+              ? { type: "lantu:todosdone", added: r.added, skipped: r.skipped }
+              : { type: "lantu:todosdone", error: r.error },
+            window.location.origin,
+          );
+          if (r.ok) router.refresh();
+        })();
       } else if (msg.type === "lantu:save") {
         if (readOnly) return; // 到期唯讀：不寫回（server action 也會擋，這裡只是不要一直跳「儲存失敗」）
         latest.current = msg.data;
@@ -285,7 +316,7 @@ export default function PlanEditor({
       window.removeEventListener("message", onMessage);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [planId, clientId, data, uiScale, readOnly, readOnlyReason, clientCode, noteAccess, router, doSave]);
+  }, [planId, clientId, data, uiScale, readOnly, readOnlyReason, clientCode, birthDate, noteAccess, router, doSave]);
 
   // 還沒存完就離站＝這一段編輯直接消失。瀏覽器只給得起一句制式警告，但那一句就夠救回東西了。
   useEffect(() => {
@@ -424,7 +455,7 @@ export default function PlanEditor({
         className="flex-1 w-full border-0"
         onLoad={() =>
           iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null },
+            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null },
             window.location.origin,
           )
         }
