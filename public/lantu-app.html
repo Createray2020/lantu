@@ -526,6 +526,13 @@ details.antools .anbar,details.antools .sec{margin-bottom:8px}
  white-space:nowrap;text-decoration:none;font-weight:700}
 .pqNo:hover{background:rgba(224,138,104,.14)}
 .pqNote{width:100%;color:var(--mut2);font-size:11.5px}
+/* 頂列的儲存狀態：資料本來就每次輸入就自動存，這一區是把「存到了沒」講出來
+   （教練端 iframe 內看不到父層工具列那條 12px 灰字）。 */
+.savebtn{background:rgba(201,154,91,.16);border-color:rgba(201,154,91,.55);color:#f0d99a;font-weight:700}
+.savebtn:hover{background:rgba(201,154,91,.28)}
+.savestate{font-size:12px;color:var(--mut2);min-width:88px;white-space:nowrap}
+.savestate.ok{color:#7bbf6a}
+.savestate.bad{color:#ff9d9f;font-weight:700}
 </style>
 </head>
 <body>
@@ -544,6 +551,8 @@ details.antools .anbar,details.antools .sec{margin-bottom:8px}
   </a>
   <div class="roleSw" id="roleSw"><button data-r="coach" class="on">教練端</button><button data-r="client">客戶端</button></div>
   <div class="spacer"></div>
+  <button class="tbtn savebtn" id="saveBtn" onclick="saveNow()" title="立即儲存目前這份規劃">儲存</button>
+  <span class="savestate" id="saveState"></span>
   <button class="tbtn" onclick="exportJSON()">匯出</button>
   <button class="tbtn" onclick="document.getElementById('imp').click()">匯入</button>
   <input type="file" id="imp" accept=".json" style="display:none" onchange="importJSON(event)">
@@ -1342,7 +1351,33 @@ function syncPremium(c){
 }
 function migrateCases(arr){return (Array.isArray(arr)?arr:[]).map(migrateCase);}
 
-function save(){try{localStorage.setItem('fps_data_v2',JSON.stringify(app.cases))}catch(e){}}
+function save(){try{localStorage.setItem('fps_data_v2',JSON.stringify(app.cases))}catch(e){}markSavedSoon();}
+/* ── 頂列的「儲存」與存檔狀態 ─────────────────────────────────────────────
+   Ray 0831：「稱呼套上去之後沒有特別儲存的動作，不確定是不是有存到。」
+   資料其實每一次輸入就自動存了（local＝localStorage／embed＝postMessage 給父層寫 DB），
+   缺的是「存到了」這件事看不見——父層 PlanEditor 那條狀態字在 iframe 外面，捲進規劃裡就沒了。
+   ⚠️ 這一顆按鈕不是把自動存檔換掉，是把結果講出來，外加一個「現在就送出」的明確動作。
+   ⚠️ embed 模式的狀態一律以父層回報的 lantu:savestate 為準——iframe 這一端只知道
+      「訊息送出去了」，不知道 DB 寫進去沒有；自己報「已儲存」等於說謊。 */
+var LANTU_EMBED=false,_savedT=null;
+function hhmm(){var t=new Date();return ('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);}
+function setSaveState(kind,txt){
+ var el=document.getElementById('saveState');if(!el)return;
+ el.className='savestate'+(kind==='saved'?' ok':(kind==='error'?' bad':''));
+ el.textContent=txt||(kind==='saved'?('已儲存 '+hhmm()):kind==='saving'?'儲存中…':kind==='error'?'儲存失敗':'');
+}
+// local 模式：寫進 localStorage 就是真的存好了，只是打字時每個字都報一次太吵 → 收斂 400ms。
+function markSavedSoon(){
+ if(LANTU_EMBED)return;
+ if(_savedT)clearTimeout(_savedT);
+ _savedT=setTimeout(function(){_savedT=null;setSaveState('saved');},400);
+}
+function saveNow(){
+ if(typeof save!=='function')return;
+ if(LANTU_EMBED)setSaveState('saving');
+ save();
+ if(!LANTU_EMBED){if(_savedT)clearTimeout(_savedT);_savedT=null;setSaveState('saved');}
+}
 function load(){try{var d=localStorage.getItem('fps_data_v2');if(d)app.cases=JSON.parse(d)}catch(e){}
  if(!app.cases||!app.cases.length)app.cases=[sampleCase()];
  app.cases=migrateCases(app.cases);app.activeId=app.cases[0].id}
@@ -4636,7 +4671,15 @@ function personCard(c,m,idx,isPrimary){
    +'<br>留空＝不設財務獨立歲，全程都算進責任。</div>'
   :'';
  var ratioBlock='<div class="subhd">家庭分攤'+(!isEarner?' · 財務獨立':'')+'</div><div class="fgrid">'+ratioFields+'</div>'+ratioHint;
- return '<div class="pcard '+cls+'">'+hd+'<div class="pbody">'+idBlock+workBlock+ratioBlock+kinBlock(c,m,idx,isPrimary)+bgBlock(c,m,idx,isPrimary)+'</div></div>';
+ // ⚠️ 角色沒選＝這個人不存在於任何計算裡，而且完全不噴錯。
+ //    Ray 0831 實測：家庭分頁加了四位小孩、三位的角色留空，子女教育分頁只帶得出一位，
+ //    看起來就是「明明加過了卻沒有」，於是在教育分頁又新增一次＝重複的人。
+ //    新增成員時角色留空是刻意的（見 addRow 的註解），所以補在這裡講清楚代價。
+ var roleWarn=(!isPrimary&&!role)
+  ?'<div class="note" style="border-color:rgba(224,138,104,.5);color:var(--warn)">⚠️ 還沒指定<b>角色</b>（卡片標題右邊的下拉）。'
+   +'未指定角色的成員<b>不會列入子女教育、保障需求與健保計算</b>——選了角色才會開始算。</div>'
+  :'';
+ return '<div class="pcard '+cls+'">'+hd+'<div class="pbody">'+roleWarn+idBlock+workBlock+ratioBlock+kinBlock(c,m,idx,isPrimary)+bgBlock(c,m,idx,isPrimary)+'</div></div>';
 }
 // 背景補充：這些沒有欄位可以放，但它們是判斷「這個人接下來會怎麼決定」的脈絡。
 // 一個換過三次產業的業務、跟一個待了二十年的公務員，同樣的數字要給的建議完全不同。
@@ -5558,6 +5601,46 @@ function eduChildCard(c,m,mi){
   '</div>'+
   '<div style="margin-top:8px"><button class="del" onclick="disableEduAuto('+mi+')" title="改回手動填寫，會移除這位子女的自動列">改回手動填寫</button></div></div>';
 }
+/* ── 「已經加過的人」挑進子女教育（2026/08/31 Ray 回饋）───────────────────
+   分工是：「家庭」分頁只管把人頭抓進來，「子女教育」這一頁做細節（費用、生育）。
+   卡在中間的是角色欄——eduChildren() 只認 role==='子女'，家庭分頁新增成員時角色卻留空
+   （那是刻意的，見 addRow：一按就長出 0 歲子女會當場生出幼兒園到大學的整套教育金）。
+   結果角色沒選的人在這一頁完全看不見，教練只好再新增一次 ＝ 同一個小孩兩份資料。
+   ⚠️ 修法不是「把所有成員都當子女帶進來」（配偶、父母也會被拖進教育金），
+      而是把「還沒指定角色」的人列出來，按一下就地設為子女。 */
+function eduPickable(c){
+ ensureMemberIds(c);
+ var pi=primaryIdx(c);
+ return (c.members||[]).map(function(m,i){return {m:m,i:i}}).filter(function(x){
+  if(x.i===pi)return false;
+  var r=(x.m.role||'');
+  return r===''||r==='其他';
+ });
+}
+function eduPickSec(c){
+ var cand=eduPickable(c);
+ if(!cand.length)return '';
+ var rows=cand.map(function(x){
+  var m=x.m,nm=m.name||('成員 '+(x.i+1));
+  var ageTxt=(m.age===''||m.age==null)?'年齡未填':(n(m.age)+' 歲');
+  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)">'+
+   '<b>'+esc(nm)+'</b><span class="muted" style="font-size:12px">'+ageTxt+(m.role?(' · 目前角色：'+esc(m.role)):' · 未指定角色')+'</span>'+
+   '<div style="flex:1"></div>'+
+   '<button class="add" onclick="markAsChild('+x.i+')">設為子女</button></div>';
+ }).join('');
+ return '<div class="sec"><h4>「家庭」分頁裡還有這幾位 <span class="hint">角色還沒指定，所以還沒進到教育金</span></h4>'+
+  '<div class="hint" style="margin-bottom:2px">在家庭分頁加進來的人，角色要是<b>子女</b>才會在這一頁長出教育金卡片。'+
+  '按一下就設定好——<b>不要再新增一次</b>，那會變成同一個小孩兩份資料。</div>'+rows+'</div>';
+}
+// 就地把一位既有成員設為子女：只補「不設就不會動」的幾個欄位，其餘一律不碰。
+function markAsChild(i){
+ var c=activeCase();if(!c)return;
+ var m=(c.members||[])[i];if(!m)return;
+ m.role='子女';
+ if(m.eduAuto===undefined)m.eduAuto=true;              // 自動推算學段（跟 addEduChild 一致）
+ if(m.indepAge===''||m.indepAge==null)m.indepAge=26;   // 財務獨立歲：沒填過才給預設
+ ensureMemberIds(c);save();render();
+}
 function eduSec(c){
  syncEduAll(c);
  var kids=eduChildren(c);
@@ -5567,14 +5650,17 @@ function eduSec(c){
  // 要人先切走再切回來是最不直觀的一段。就地加、就地填。
  var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addEduChild()">＋ 新增子女</button>'+
   '<button class="add" style="margin-left:8px" onclick="addEduChild(1)">＋ 新增未出生子女</button>'+
-  '<div class="hint" style="margin-top:6px">會在「家庭」分頁同步建立一位角色為子女的成員；完整的投保、獨立歲等欄位在那裡補。'+
+  '<div class="hint" style="margin-top:6px"><b>已經在「家庭」分頁加過的小孩不要按這裡</b>——用上面那一段把他設為子女就好。'+
+  '<br>會在「家庭」分頁同步建立一位角色為子女的成員；完整的投保、獨立歲等欄位在那裡補。'+
   '<br>「未出生」填的是<b>預計在本人幾歲時出生</b>，整條就學時間軸會自動往後推。要一次排好幾胎、連生產與育兒費用一起算，用上方的<b>生育規劃</b>。</div></div>';
- var empty=kids.length?'':'<div class="sec"><div class="hint">還沒有角色為<b>子女</b>的成員。按下方「＋ 新增子女」就地加一位，填上出生日期或年齡之後，這裡會自動推算他目前的就學階段、剩餘年數，並帶入官方公告的各階段學雜費。<br>如果小孩還沒出生，用上方的<b>生育規劃</b>填「預計本人幾歲時生」——教育金、生產與月子、0–2 歲育兒費用會一起算出來。</div></div>';
+ var empty=kids.length?'':'<div class="sec"><div class="hint">還沒有角色為<b>子女</b>的成員。'+
+  (eduPickable(c).length?'已經在「家庭」分頁加過的人，用上面那一段按「設為子女」即可；':'按下方「＋ 新增子女」就地加一位，')+
+  '填上出生日期或年齡之後，這裡會自動推算他目前的就學階段、剩餘年數，並帶入官方公告的各階段學雜費。<br>還要再生的（含尚未出生的），用上方的<b>生育規劃</b>填「預計本人幾歲時生」——教育金、生產與月子、0–2 歲育兒費用會一起算出來。</div></div>';
  var manualTbl=manual.length
   ?tableSec('手動列（舊資料）','education',c.education,[['child','子女','text'],['stage','階段','sel:'+eduStageDefs().map(function(s){return s.stage}).join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','money'],['years','供給年數','num'],['startIn','幾年後開始','num']],'自動產生的列請在上方各子女卡片調整；這張表保留手動／舊資料列。')
   :'';
  return '<div class="sec"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
-  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+birthPlanSec(c)+empty+cards+addBtn+manualTbl+childFundSec(c);
+  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+eduPickSec(c)+birthPlanSec(c)+empty+cards+addBtn+manualTbl+childFundSec(c);
 }
 
 /* ── 生育規劃（2026/08/26）─────────────────────────────────────────────
@@ -7709,6 +7795,10 @@ var GAP_CHECKS=[
   why:'財務健康度的信用那一項會用預設值代替',
   ask:'提供聯徵中心的信用評分（每年有免費查詢額度）',
   test:function(c){return !n(creditScoreOf(c))}},
+ {id:'memrole',tab:'family',name:'家庭成員的角色',
+  why:'角色空著的成員不會列入子女教育、保障需求與健保計算，等於白填一場',
+  ask:'確認每位家庭成員與本人的關係（配偶／父／母／子女／長輩）',
+  test:function(c){var pi=primaryIdx(c);return (c.members||[]).some(function(m,i){return i!==pi&&m&&!(m.role||'')})}},
  {id:'edu',tab:'education',name:'子女教育規劃',
   why:'有子女成員但沒有任何一段教育金，教育支出會整段消失',
   ask:'確認子女目前的就讀階段與預計就讀的學校型態',
@@ -12500,8 +12590,11 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
   }
   // role=client → 客戶端唯讀檢視（財務儀表／規劃報告）；否則教練端編輯。
   var CLIENT=/[?&]role=client/.test(location.search);
+  LANTU_EMBED=true;
   document.documentElement.classList.add('embed');
   if(CLIENT){var _rs=document.getElementById('roleSw');if(_rs)_rs.style.display='none';}
+  // 客戶端是唯讀檢視，沒有東西可存；留著一顆按不出反應的「儲存」比沒有更糟。
+  if(CLIENT)['saveBtn','saveState'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
   document.querySelectorAll('.top .tbtn').forEach(function(b){if(/匯出|匯入/.test(b.textContent||''))b.style.display='none';});
   // embed 模式＝單一年度版本編輯器，只該有一筆 case；把側欄的新增/切換客戶關掉，
   // 否則 save() 推的與畫面上正在編的會是不同筆，使用者的輸入會被靜默覆蓋掉。
@@ -12540,6 +12633,9 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
   var RO_NOTE_DEFAULT='唯讀模式：使用期限已到期，這份規劃目前的修改不會被儲存。請聯繫管理員延長期限。';
   function applyReadOnly(on,note){
     READONLY=!!on;
+    // 唯讀時 save() 直接 return，按鈕按了不會有任何事發生 → 收起來，狀態也清掉。
+    var sb=document.getElementById('saveBtn');if(sb)sb.style.display=READONLY?'none':'';
+    if(READONLY)setSaveState('','');
     var bar=document.getElementById('lantuRoBar');
     var text=note||RO_NOTE_DEFAULT;
     if(READONLY&&!bar){
@@ -12556,6 +12652,13 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
     if(e.origin&&PARENT_ORIGIN&&e.origin!==PARENT_ORIGIN)return;
     var m=e.data;if(!m)return;
     if(m.type==='lantu:uiscale'){applyScale(m.scale);return;}
+    // 父層（PlanEditor / TemplateFrame）每次存檔狀態改變都會回報一則，這才是「真的寫進 DB 了」。
+    if(m.type==='lantu:savestate'){
+      var st=m.state;
+      setSaveState(st==='saved'?'saved':st==='error'?'error':st==='saving'?'saving':'',
+                   st==='dirty'?'未儲存':'');
+      return;
+    }
     if(m.type==='lantu:todosdone'){
       var _pm=document.getElementById('pendMsg');
       if(_pm)_pm.innerHTML=m.error

@@ -145,6 +145,20 @@ export default function TemplateFrame({
     };
   }, [data, uiScale, readOnly, note, doSave]);
 
+  /**
+   * 存檔狀態回報給 iframe（v12 App 的頂列會顯示「儲存中… / 已儲存 HH:MM / 儲存失敗」）。
+   *
+   * 為什麼要送：這條狀態字原本只在父層工具列上，教練一捲進規劃裡就看不到了——
+   * Ray 回報的「沒有特別儲存的動作，不確定有沒有存到」就是這個。
+   * ⚠️ iframe 自己不能宣稱「已儲存」：它只知道訊息送出去了，寫進 DB 的是這一層。
+   */
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "lantu:savestate", state },
+      window.location.origin,
+    );
+  }, [state]);
+
   // 還沒存完就離站＝這一段編輯直接消失。
   useEffect(() => {
     if (readOnly) return;

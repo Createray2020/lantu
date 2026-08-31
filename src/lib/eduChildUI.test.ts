@@ -157,3 +157,127 @@ describe("婚禮預算是金額欄", () => {
     expect(HTML).toContain("ofld('marriage','minBudget','婚禮預算(最低)','money')");
   });
 });
+
+/**
+ * 「家庭」分頁加過的人，要在「子女教育」這一頁看得到（2026/08/31 Ray 實測回報）。
+ *
+ * 實測資料：家庭分頁加了黃一 15、黃二 9、黃三 6、黃四 1，前三位的角色欄留空
+ * （新增成員時角色刻意留空，見 addRow）。eduChildren() 只認 role==='子女'，
+ * 所以子女教育分頁只帶得出黃四 —— 看起來就是「明明加過了卻沒有」，
+ * 於是在教育分頁又新增一次 ＝ 同一個小孩兩份資料。
+ *
+ * ⚠️ 修法不是把所有成員都當子女帶進來（配偶、父母會被拖進教育金），
+ *    而是把「還沒指定角色」的人列出來，一鍵設為子女。
+ */
+describe("家庭分頁加過的人要能在子女教育頁挑進來", () => {
+  function 加三個沒角色的人() {
+    const c = w.activeCase();
+    w.addRow("members"); c.members[1].name = "黃一"; c.members[1].age = 15;
+    w.addRow("members"); c.members[2].name = "黃二"; c.members[2].age = 9;
+    w.addRow("members"); c.members[3].name = "黃三"; c.members[3].age = 6;
+    w.ensureMemberIds(c);
+    return c;
+  }
+
+  it("角色空著的成員不會進 eduChildren，但會被列進可挑選名單", () => {
+    const c = 加三個沒角色的人();
+    expect(w.eduChildren(c)).toHaveLength(0);
+    expect(w.eduPickable(c).map((x: { m: { name: string } }) => x.m.name)).toEqual(["黃一", "黃二", "黃三"]);
+  });
+
+  it("本人與已經指定角色的人不會出現在挑選名單", () => {
+    const c = 加三個沒角色的人();
+    w.setMemberRole(1, "配偶");
+    w.setMemberRole(2, "子女");
+    expect(w.eduPickable(c).map((x: { m: { name: string } }) => x.m.name)).toEqual(["黃三"]);
+  });
+
+  it("「其他」也列出來——最常被誤選的就是它", () => {
+    const c = 加三個沒角色的人();
+    w.setMemberRole(1, "其他");
+    expect(w.eduPickable(c).map((x: { m: { name: string } }) => x.m.name)).toContain("黃一");
+  });
+
+  it("子女教育分頁會把這幾位列出來，並且叫人不要再新增一次", () => {
+    加三個沒角色的人();
+    const html = w.eduSec(w.activeCase());
+    expect(html).toContain("黃一");
+    expect(html).toContain("markAsChild(");
+    expect(html).toContain("不要再新增一次");
+  });
+
+  it("按「設為子女」就地變成子女、填了年齡就長出教育金（不是新增第二個人）", () => {
+    const c = 加三個沒角色的人();
+    const before = c.members.length;
+    w.markAsChild(3); // 黃三 6 歲
+    expect(c.members).toHaveLength(before); // ⚠️ 沒有多長出一個人
+    expect(c.members[3].role).toBe("子女");
+    expect(c.members[3].indepAge).toBe(26);
+    w.syncEduAll(c);
+    expect(w.eduChildren(c)).toHaveLength(1);
+    expect(auto().length).toBeGreaterThan(0);
+    expect(w.eduTotal(c)).toBeGreaterThan(0);
+  });
+
+  it("已經填過的財務獨立歲不會被預設值蓋掉", () => {
+    const c = 加三個沒角色的人();
+    c.members[1].indepAge = 22;
+    c.members[1].eduAuto = false;
+    w.markAsChild(1);
+    expect(c.members[1].indepAge).toBe(22);
+    expect(c.members[1].eduAuto).toBe(false);
+  });
+
+  it("沒有待指定角色的人時，這一段整個不出現", () => {
+    const c = w.activeCase();
+    w.addRow("members"); c.members[1].name = "小孩"; c.members[1].age = 6;
+    w.setMemberRole(1, "子女");
+    expect(w.eduPickSec(c)).toBe("");
+  });
+
+  it("成員卡片會警告「未指定角色不會列入計算」", () => {
+    加三個沒角色的人();
+    const html = w.personCard(w.activeCase(), w.activeCase().members[1], 1, false);
+    expect(html).toContain("不會列入子女教育");
+    // 已指定角色的就不該再警告
+    w.setMemberRole(1, "子女");
+    expect(w.personCard(w.activeCase(), w.activeCase().members[1], 1, false)).not.toContain("不會列入子女教育");
+  });
+
+  it("待補齊清單會把「角色沒指定」列出來，指向家庭分頁", () => {
+    加三個沒角色的人();
+    const hit = w.pendingItems(w.activeCase()).filter((x: { id: string }) => x.id === "memrole");
+    expect(hit).toHaveLength(1);
+    expect(hit[0].tab).toBe("family");
+    w.setMemberRole(1, "子女"); w.setMemberRole(2, "子女"); w.setMemberRole(3, "子女");
+    expect(w.pendingItems(w.activeCase()).filter((x: { id: string }) => x.id === "memrole")).toHaveLength(0);
+  });
+});
+
+/**
+ * 頂列的「儲存」與存檔狀態（2026/08/31 Ray：「沒有特別儲存的動作，不確定是不是有存到」）。
+ * ⚠️ embed（教練端規劃編輯器）模式下，iframe 這一端只知道訊息送出去了，
+ *    寫進 DB 的是父層 —— 所以狀態一律以父層回報的 lantu:savestate 為準，自己不准報「已儲存」。
+ */
+describe("頂列儲存鍵", () => {
+  it("按鈕與狀態列都在頂列上", () => {
+    expect(w.document.getElementById("saveBtn")).toBeTruthy();
+    expect(w.document.getElementById("saveState")).toBeTruthy();
+  });
+
+  it("按下去會存檔並顯示已儲存的時間", () => {
+    w.saveNow();
+    const el = w.document.getElementById("saveState");
+    expect(el.textContent).toMatch(/^已儲存 \d{2}:\d{2}$/);
+    expect(el.className).toContain("ok");
+  });
+
+  it("父層回報的狀態會顯示出來（儲存中／失敗）", () => {
+    w.setSaveState("saving");
+    expect(w.document.getElementById("saveState").textContent).toBe("儲存中…");
+    w.setSaveState("error");
+    const el = w.document.getElementById("saveState");
+    expect(el.textContent).toBe("儲存失敗");
+    expect(el.className).toContain("bad");
+  });
+});
