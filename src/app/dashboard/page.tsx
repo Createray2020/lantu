@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { ensureCoach } from "@/lib/coach";
 import { getHome } from "@/lib/home";
+import { getApplication } from "@/lib/coachApplyStore";
 import DashboardHeader from "./DashboardHeader";
 import { headerProps } from "./headerProps";
 import ReadOnlyBanner from "./ReadOnlyBanner";
@@ -27,7 +28,24 @@ export default async function Dashboard({
     redirect(userId ? "/portal" : "/sign-in");
   }
   if (coach.status !== "active") {
-    return <PendingNotice email={coach.email} status={coach.status} />;
+    // 待審者看得到自己的報聘進度（卡在介紹人還是卡在審核）。舊帳號沒有申請表就只有原本那句話。
+    const app = await getApplication(coach.id);
+    return (
+      <PendingNotice
+        email={coach.email}
+        status={coach.status}
+        progress={
+          app
+            ? {
+                route: app.route,
+                introducerState: app.introducerState,
+                introducerName: app.introducerName,
+                introducerNote: app.introducerNote,
+              }
+            : null
+        }
+      />
+    );
   }
   const sp = await searchParams;
   const data = await getHome(coach, { as: sp.as, focus: sp.focus });

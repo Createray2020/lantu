@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { ensureCoach } from "@/lib/coach";
+import { getApplySettings } from "@/lib/coachApplyStore";
 import ApplyForm from "./ApplyForm";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +17,15 @@ export default async function ApplyPage() {
   const coach = await ensureCoach();
   if (coach) redirect("/dashboard");
 
+  // 必填欄位與檢核規則是後台設定的一部分，表單與 server action 吃同一份。
+  const settings = await getApplySettings();
+
   return (
     <main className="flex-1 grid place-items-center bg-[#081a2b] text-[#eef2f7] px-6 py-12">
       <ApplyForm
         email={user.primaryEmailAddress?.emailAddress ?? null}
         defaultName={[user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || ""}
+        settings={settings}
       />
     </main>
   );

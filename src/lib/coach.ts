@@ -136,7 +136,10 @@ export type CoachApplication = {
   name?: string | null;
   phone?: string | null;
   currentJob?: string | null;
+  /** 介紹人的教練編號（2026/08/31 起「推薦人」對外一律稱介紹人，欄位仍是 sponsor_id）。 */
   sponsorCode?: string | null;
+  /** 報聘路線：referral 介紹人推薦 / direct 直接申請。詳細申請資料在 coach_applications。 */
+  route?: string | null;
 };
 
 const APPLY_FIELD_MAX = 60;
@@ -145,10 +148,11 @@ const clip = (v: string | null | undefined, max = APPLY_FIELD_MAX) => (v ?? "").
 /** 把申請資料組成後台看得懂的一行。查無推薦人編號也照樣留字串（是線索，不是錯誤）。 */
 function applyNote(input: CoachApplication, sponsorName: string | null): string {
   const parts = [
+    input.route === "direct" ? "路線：直接申請" : input.route === "referral" ? "路線：介紹人推薦" : "",
     clip(input.phone) ? `手機：${clip(input.phone)}` : "",
     clip(input.currentJob) ? `現職：${clip(input.currentJob)}` : "",
     clip(input.sponsorCode)
-      ? `推薦人：${normalizeCode(clip(input.sponsorCode))}${sponsorName ? `（${sponsorName}）` : "（查無此編號）"}`
+      ? `介紹人：${normalizeCode(clip(input.sponsorCode))}${sponsorName ? `（${sponsorName}）` : "（查無此編號）"}`
       : "",
   ].filter(Boolean);
   return parts.length ? `申請資料｜${parts.join("｜")}` : "";

@@ -10,8 +10,16 @@ vi.mock("@/lib/coach", () => ({
   setCoachOrg: vi.fn(),
   setCoachStatus: vi.fn(),
 }));
+// 2026/08/31：核准不再是 setCoachStatus(id,'active')，而是走報聘閘門＋一次寫齊
+// （職級／上線／期限）。那一支的行為由 coachApplyStore.test.ts 守著，這裡只驗接線與錯誤轉譯。
+vi.mock("@/lib/coachApplyStore", () => ({
+  approveApplication: vi.fn(),
+  saveApplySettings: vi.fn(),
+  saveReviewChecks: vi.fn(),
+}));
 
 import { ensureCoach, isAdmin, setCoachOrg, setCoachStatus } from "@/lib/coach";
+import { approveApplication } from "@/lib/coachApplyStore";
 import { updateOrg, approveCoach, suspendCoach } from "./actions";
 
 const asMock = (f: unknown) => f as unknown as ReturnType<typeof vi.fn>;
@@ -23,6 +31,7 @@ beforeEach(() => {
   // setCoachOrg 現在會回 { ok } —— 上線鏈的環狀檢查失敗時要讓 updateOrg 轉成畫面看得到的錯誤。
   asMock(setCoachOrg).mockResolvedValue({ ok: true });
   asMock(setCoachStatus).mockResolvedValue(undefined);
+  asMock(approveApplication).mockResolvedValue({ ok: true, applied: { rankCode: "C1", uplineId: null, licenseUntil: null } });
 });
 
 describe("updateOrg", () => {
@@ -69,9 +78,15 @@ describe("updateOrg", () => {
 });
 
 describe("帳號狀態動作", () => {
-  it("核准開通寫 active", async () => {
+  it("核准開通走報聘核准（不是只寫 status）", async () => {
     expect(await approveCoach("c1")).toEqual({ ok: true });
-    expect(setCoachStatus).toHaveBeenCalledWith("c1", "active");
+    expect(approveApplication).toHaveBeenCalledWith("c1", "admin1");
+    expect(setCoachStatus).not.toHaveBeenCalled();
+  });
+
+  it("⚠️ 檢核表沒過就核准不了，理由要原文傳到畫面上", () => {
+    asMock(approveApplication).mockResolvedValue({ ok: false, error: "介紹人尚未確認" });
+    return expect(approveCoach("c1")).resolves.toEqual({ ok: false, error: "介紹人尚未確認" });
   });
 
   it("停權失敗會回傳錯誤", async () => {

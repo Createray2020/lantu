@@ -6,6 +6,8 @@ import {
   doublePrecision, index, uniqueIndex,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+// 報聘申請的 jsonb 形狀住在純函式層（client component 也要 import，不能把 drizzle 拖進 bundle）。
+import type { ApplyLicense, ChecklistItem } from '@/lib/coachApply';
 
 // ⚠️ 索引一律宣告在這裡再跑 db:generate。
 //    直接用 psql 手建的索引不在 schema 快照裡，之後任何人跑 `npm run db:push`
@@ -1016,5 +1018,75 @@ export const anModuleDefaults = pgTable('an_module_defaults', {
   key: text('key').primaryKey(),
   sortOrder: integer('sort_order').notNull(),
   hidden: boolean('hidden').default(false).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ── 報聘（教練申請）─────────────────────────────────────────────
+//
+// 2026/08/31 之前，申請表填的手機／現職／推薦人是被壓成一行字串塞進 `coaches.note` 的
+// （`applyNote()`），核准時也完全不碰職級／上線／期限 —— 所以名冊上會長期累積
+// 「開通了卻沒定級、沒設期限」的半成品帳號。這張表把申請資料從身分表拆出來：
+//
+//   · coaches  = 這個人是誰、能不能用（身分與權限，長期存在）
+//   · 這張表   = 他當初怎麼進來的（路線、介紹人、自述、聲明、審核紀錄，一次性）
+//
+// ⚠️ 介紹人**同時**寫在兩個地方：這裡的 `introducerId` 是申請當下的事實（永遠不動），
+//    `coaches.sponsorId` 是現在的推薦人（業績歸屬吃它，後台可改）。兩者刻意不合併。
+// ⚠️ 一位教練只有一列（PK 就是 coachId）：重新送出申請是覆寫同一列，不是開新的一件。
+export const coachApplications = pgTable('coach_applications', {
+  coachId: text('coach_id').primaryKey().references(() => coaches.id, { onDelete: 'cascade' }),
+
+  // referral＝介紹人推薦（要介紹人先確認）/ direct＝直接申請（直接進審核佇列）。
+  route: text('route').default('referral').notNull(),
+
+  // 介紹人解得到教練列就有 id；查無編號不擋送出（可能只是打錯），原字串一定留著給後台判斷。
+  introducerId: text('introducer_id').references((): AnyPgColumn => coaches.id, { onDelete: 'set null' }),
+  introducerCode: text('introducer_code'),
+
+  phone: text('phone'),
+  currentJob: text('current_job'),
+  motive: text('motive'),              // 報聘動機
+  experience: text('experience'),      // 相關經歷與可投入時間
+
+  // 證照／資歷：結構化欄位，不收上傳檔（專案沒有檔案儲存服務）。
+  licenses: jsonb('licenses').$type<ApplyLicense[]>().default([]).notNull(),
+  // 勾選式聲明：key → 勾選當下的 ISO 時間戳。存 true 等於沒留證據，所以存時間。
+  consents: jsonb('consents').$type<Record<string, string>>().default({}).notNull(),
+
+  // pending / confirmed / declined / skipped（direct 路線一律 skipped）
+  introducerState: text('introducer_state').default('pending').notNull(),
+  introducerNote: text('introducer_note'),
+  introducerActedAt: timestamp('introducer_acted_at', { withTimezone: true }),
+
+  // 審核者逐項打勾：檢核項 key → 勾選當下的 ISO 時間戳。項目本身住 coach_apply_settings。
+  reviewChecks: jsonb('review_checks').$type<Record<string, string>>().default({}).notNull(),
+  reviewNote: text('review_note'),
+  reviewerId: text('reviewer_id').references((): AnyPgColumn => coaches.id, { onDelete: 'set null' }),
+
+  submittedAt: timestamp('submitted_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 介紹人的待確認清單（/dashboard/requests）走這條。
+  index('coach_applications_introducer_id_idx').on(t.introducerId),
+  index('coach_applications_state_idx').on(t.introducerState),
+]);
+
+// 報聘的全平台設定（單列，id 固定 'default'）。
+//
+// 「審核者的判斷可以設定」＝這一列：核准時自動帶什麼（職級／上線／期限），
+// 以及放行前一定要打勾的檢核表。與 an_module_defaults 一樣是「後台定一份、現場照著跑」。
+//
+// ⚠️ 沒有這一列時一律 fallback 到 DEFAULT_APPLY_SETTINGS（程式端常數），
+//    所以 seed 沒跑過也不會讓報聘流程停擺。
+export const coachApplySettings = pgTable('coach_apply_settings', {
+  id: text('id').primaryKey(),                                   // 固定 'default'
+  defaultRankCode: text('default_rank_code').default('C1'),      // null＝核准後維持未定級
+  bindUplineToIntroducer: boolean('bind_upline_to_introducer').default(true).notNull(),
+  requireIntroducerConfirm: boolean('require_introducer_confirm').default(true).notNull(),
+  licenseOn: boolean('license_on').default(true).notNull(),      // 核准時要不要一併開通期限
+  licenseUnit: text('license_unit').default('year').notNull(),   // month / year
+  licenseQty: integer('license_qty').default(1).notNull(),
+  requiredFields: jsonb('required_fields').$type<string[]>().default([]).notNull(),
+  checklist: jsonb('checklist').$type<ChecklistItem[]>().default([]).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

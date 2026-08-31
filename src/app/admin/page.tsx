@@ -9,6 +9,8 @@ import RemoveCoach from "./RemoveCoach";
 import AdminNav from "./AdminNav";
 import LicenseCell from "./LicenseCell";
 import CoachRoster, { type RosterRow } from "./CoachRoster";
+import ReviewPanel from "./ReviewPanel";
+import { getApplySettings, listApplications } from "@/lib/coachApplyStore";
 import { rankCaps } from "@/lib/quota";
 import { clientCapOf, licenseState, RANK_ORDER } from "@/lib/license";
 
@@ -39,6 +41,8 @@ export default async function Admin() {
   const workloads = await coachWorkloads();
   // 使用期限那一格要的兩樣：各級別的客戶上限（生效版本的職級表），以及可選的級別清單。
   const caps = await rankCaps();
+  // 報聘申請表與全平台設定：檢核表要用，逐列查就是 N+1。
+  const [applications, applySettings] = await Promise.all([listApplications(), getApplySettings()]);
   // 四個級別一律選得到：生效中的制度版本是加入「實習教練」之前建的，職級表裡沒有那一列，
   // 而「載入 V4 辦法數值」只在職級表完全空白時才帶入 —— 只讀 DB 的話實習教練永遠選不到。
   const rankCodes = [...RANK_ORDER, ...Object.keys(caps).filter((c) => !RANK_ORDER.includes(c as never))];
@@ -98,6 +102,7 @@ export default async function Admin() {
                 const s = STATUS[c.status] ?? { label: c.status, color: "#a9bccf" };
                 const admin = c.role === "admin";
                 const lic = licenseState({ licenseUntil: c.licenseUntil, status: c.status });
+                const app = applications[c.id];
                 return {
                   key: c.id,
                   unranked: !c.rankCode,
@@ -121,7 +126,30 @@ export default async function Admin() {
                           印在這裡才不用為了看一行字點進別的頁。 */}
                       {c.note && <div className="text-[#8fa8bd] text-[11px] mt-1 whitespace-pre-wrap">{c.note}</div>}
                       {c.sponsorId && (
-                        <div className="text-[#6f869c] text-[11px]">推薦人：{nameById.get(c.sponsorId) ?? c.sponsorId}</div>
+                        <div className="text-[#6f869c] text-[11px]">介紹人：{nameById.get(c.sponsorId) ?? c.sponsorId}</div>
+                      )}
+                      {/* 2026/08/31 起申請自述住 coach_applications；舊帳號沒有這一列，只印上面那行 note。 */}
+                      {app && (
+                        <ReviewPanel
+                          id={c.id}
+                          status={c.status}
+                          settings={applySettings}
+                          app={{
+                            route: app.route,
+                            introducerName: app.introducerName,
+                            introducerCode: app.introducerCode,
+                            introducerState: app.introducerState,
+                            introducerNote: app.introducerNote,
+                            phone: app.phone,
+                            currentJob: app.currentJob,
+                            motive: app.motive,
+                            experience: app.experience,
+                            licenses: app.licenses ?? [],
+                            consents: app.consents ?? {},
+                            reviewChecks: app.reviewChecks ?? {},
+                            reviewNote: app.reviewNote,
+                          }}
+                        />
                       )}
                     </td>
                     <td className="px-3 py-2">

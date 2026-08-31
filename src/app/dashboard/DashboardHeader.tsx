@@ -84,7 +84,7 @@ export default function DashboardHeader({
         <Link href="/dashboard/clients" className={tab(onClients)}>客戶</Link>
         <Link href="/dashboard/overview" className={tab(onOverview)}>儀表板</Link>
         <Link href="/dashboard/requests" className={`${tab(onRequests)} relative`}>
-          客戶連結
+          待確認
           {pendingErr ? (
             <span
               title="待處理數暫時讀不到，請重新整理"

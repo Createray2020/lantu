@@ -3,11 +3,13 @@ import { auth } from "@clerk/nextjs/server";
 import { ensureCoach } from "@/lib/coach";
 import { listPendingRequestsForCoach } from "@/lib/coachLink";
 import { listPendingInvitesForCoach } from "@/lib/clientCollab";
+import { listPendingIntroductions } from "@/lib/coachApplyStore";
 import DashboardHeader from "../DashboardHeader";
 import { headerProps } from "../headerProps";
 import ReadOnlyBanner from "../ReadOnlyBanner";
 import RequestList from "./RequestList";
 import CollabInviteList from "./CollabInviteList";
+import IntroductionList from "./IntroductionList";
 import InviteBox from "./InviteBox";
 
 export const dynamic = "force-dynamic";
@@ -20,9 +22,10 @@ export default async function RequestsPage() {
     redirect(userId ? "/portal" : "/sign-in");
   }
   if (coach.status !== "active") redirect("/dashboard");
-  const [requests, collabInvites] = await Promise.all([
+  const [requests, collabInvites, intros] = await Promise.all([
     listPendingRequestsForCoach(coach.id),
     listPendingInvitesForCoach(coach.id),
+    listPendingIntroductions(coach.id),
   ]);
 
   const hp = await headerProps(coach);
@@ -40,6 +43,21 @@ export default async function RequestsPage() {
           <p className="text-[#a7bacb] text-sm mb-4">其他教練邀你一起看某位客戶。接受後你會在「客戶」頁看到那位客戶，內容全部唯讀。</p>
           <CollabInviteList
             invites={collabInvites.map((i) => ({ id: i.id, clientName: i.clientName, clientCode: i.clientCode, ownerName: i.ownerName }))}
+          />
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-white/10">
+          <h2 className="font-serif text-xl mb-1">報聘確認</h2>
+          <p className="text-[#a7bacb] text-sm mb-4">有人填了你的教練編號申請成為嵐途教練。你確認推薦之後，才會進入嵐途審核。</p>
+          <IntroductionList
+            intros={intros.map((i) => ({
+              coachId: i.coachId,
+              applicantName: i.applicantName,
+              applicantEmail: i.applicantEmail,
+              phone: i.phone,
+              currentJob: i.currentJob,
+              motive: i.motive,
+            }))}
           />
         </div>
 

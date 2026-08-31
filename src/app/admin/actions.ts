@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg, transferClients, removeCoach } from "@/lib/coach";
 import { saveBrand } from "@/lib/brand";
+import { approveApplication, saveApplySettings, saveReviewChecks } from "@/lib/coachApplyStore";
+import type { ApplySettings } from "@/lib/coachApply";
 
 // 後台動作的統一回傳型別：讓 client 端能顯示「已儲存 / 失敗原因」，
 // 而不是丟出例外後在畫面上靜默失敗。
@@ -74,8 +76,54 @@ async function setStatus(
   }
 }
 
-export async function approveCoach(id: string) {
-  return setStatus(id, "active");
+/**
+ * 核准報聘。
+ *
+ * 2026/08/31 起這裡不再只是 `status='active'`：先過檢核表閘門（介紹人確認、逐項打勾），
+ * 通過才開通，而且開通當下一次帶齊職級（預設 C1）、上線（介紹人）、使用期限（預設一年）。
+ * 沒有申請表的舊帳號一律直接放行 —— 見 approvalGate 的 hasApplication。
+ */
+export async function approveCoach(id: string): Promise<ActionResult> {
+  try {
+    const me = await guard();
+    const r = await approveApplication(id, me.id);
+    if (!r.ok) return { ok: false, error: r.error };
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 審核者逐項打勾（勾了才放行）。存的是時間戳：誰在什麼時候確認過這一項。 */
+export async function saveReviewChecksAction(
+  id: string,
+  checked: string[],
+  note: string,
+): Promise<ActionResult> {
+  try {
+    const me = await guard();
+    await saveReviewChecks(id, checked ?? [], me.id, note ?? "");
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 報聘的全平台設定（核准預設值＋檢核表）。 */
+export async function saveApplySettingsAction(input: ApplySettings): Promise<ActionResult> {
+  try {
+    await guard();
+    await saveApplySettings(input);
+    revalidatePath("/admin");
+    revalidatePath("/admin/apply");
+    revalidatePath("/dashboard/apply");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function suspendCoach(id: string) {
