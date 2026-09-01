@@ -7940,24 +7940,110 @@ function goalsTabHead(c){
 // ── 報告書／缺口總表：吃必達優先序 ──
 function orderedMustText(c){var must=((c.intent||{}).mustHave||[]);
  return must.map(function(t,i){return (i+1)+'. '+t}).join(' · ')}
-// 缺口列依必達順位排序；沒被選為必達的目標，缺口仍列出但排在後面並標「未列為必達」
+
+/* 逐筆目標的「自有資金終值」。回傳 {goals 的索引: 終值合計}。
+   ⚠️⚠️ 成長規則與 projection() 的 goalOut **逐字相同**（通膨／薪資／房產增值），
+      否則缺口總表的數字和現金流投影會是兩套口徑。
+   ⚠️ 有貸款計畫的那幾筆只算頭期款（走 goalLoans）——貸款那一段已經在負債與現金流裡，
+      在這裡再算一次就是把同一棟房子算兩遍。
+   週期性目標（freq>0）依實際發生次數逐次累加，起訖同樣看 inSpan。*/
+function goalSelfFundFV(c){
+ var a0=n(((c||{}).profile||{}).age),infl=n(((c||{}).params||{}).inflation)/100;
+ var sg=n(((c||{}).params||{}).salaryGrowth)/100,le=effHorizon(c);
+ var gLoans=goalLoans(c),out={};
+ ((c||{}).goals||[]).forEach(function(g,gi){
+  if(!g||!visionOn(g))return;
+  var gl=null;for(var li=0;li<gLoans.length;li++)if(gLoans[li].idx===gi)gl=gLoans[li];
+  var gr=g.growth==='通膨'?infl:(g.growth==='薪資'?sg:(g.type==='購屋'?n(g.appreciation)/100:0));
+  var s=0,freq=n(g.freq);
+  for(var age=a0;age<=le;age++){
+   if(!inSpan(g,age))continue;
+   var hit=(freq<=0)?(age===n(g.start)):(((age-n(g.start))%freq)===0);
+   if(!hit)continue;
+   if(gl){if(age===gl.buyAge)s+=gl.down;continue;}
+   s+=n(g.present)*Math.pow(1+gr,Math.max(0,age-a0));
+  }
+  out[gi]=s;
+ });
+ return out;
+}
+
+/* 必達目標 → 缺口總表那一列的取數來源。
+   ⚠️ TARGET_META 有 14 個可選目標，舊版只硬寫了退休／教育／傳承三列，
+      其餘目標被列為必達也不會有列 → 順位 1、2、5、10 這樣跳號，表尾的優先序
+      卻老實列 1..n，上下兩段自己打自己。這張對照表就是那個 bug 的根治。 */
+var GAP_SOURCE={
+ '職涯規劃':{pick:function(g){return !!g.careerAuto},note:'轉換期預備金與創業投入本金（終值）'},
+ '購屋規劃':{types:['購屋','置產'],note:'自備款（終值）− 已備；貸款走負債，不重複計算'},
+ '購車規劃':{types:['購車'],note:'車價（終值）− 已備'},
+ '婚姻規劃':{types:['婚姻'],note:'婚禮各項費用（終值）− 已備'},
+ '孝親規劃':{types:['孝親'],note:'奉養與醫療（終值加總）− 已備'},
+ '子女教養規劃':{fn:function(c){return {need:eduTotal(c)}},note:'教育金總需求（終值）'},
+ '退休生活規劃':{fn:function(c,ctx){return {need:ctx.rn.total,have:ctx.rn.prepared}},note:'退休總需求 − 已備'},
+ '傳承規劃':{fn:function(c){return {need:legacyNeed(c)}},note:'繼承人數 × 每人現金傳承'},
+ '旅遊規劃':{wish:'travel'},'休閒興趣規劃':{wish:'hobby'},'奢侈品購買規劃':{wish:'luxury'},
+ '報酬結構優化':{biz:true},'企業風險保障':{biz:true},'事業退場規劃':{biz:true}
+};
+// 生活願望三類：本質是「未來的年度支出」不是一次性缺口，所以給一生累計、且用現值，
+// 並且一定要在列上註明口徑——不註明就會被當成跟上面幾列同一種數字讀。
+function wishLifetimeCost(c,key){
+ var a0=n((c.profile||{}).age),le=effHorizon(c),s=0,rows=0;
+ ((c||{})[key]||[]).forEach(function(it){
+  if(!visionOn(it))return;
+  rows++;
+  for(var age=a0;age<=le;age++)if(inSpan(it,age))s+=n(it.amount)*(n(it.freq)||1);
+ });
+ return {sum:s,rows:rows};
+}
+function gapMissHTML(c,t){
+ var txt='尚未填細節';
+ if((typeof app==='undefined')||app.role!=='coach')return '<span class="muted">'+txt+'</span>';
+ return '<a href="javascript:void 0" onclick="gotoGoal(\''+t+'\')" style="color:var(--amber2)">'+txt+' →</a>';
+}
+/* 一個必達目標 → {name, note, v}。
+   ⚠️ 三種收場刻意分開，因為它們對教練的意思完全不同：
+      需求與已備都是 0  → v=null，畫成「尚未填細節 →」（這一項根本還沒問到）
+      已備 ≥ 需求        → 「已備足」（問過了，而且不缺——不是 0 元）
+      其餘              → 缺口金額 */
+function targetGapRow(c,t,ctx){
+ var src=GAP_SOURCE[t]||{},out={name:t.replace('規劃',''),note:src.note||'',v:null};
+ if(src.biz){out.note='走企業主診斷，不併入個人缺口';out.v='<span class="muted">見企業主診斷</span>';return out}
+ var need=0,have=0;
+ if(src.wish){out.note='一生累計支出（現值）';need=wishLifetimeCost(c,src.wish).sum;}
+ else if(src.fn){var r=src.fn(c,ctx)||{};need=n(r.need);have=n(r.have);}
+ else{
+  var hit=src.pick||function(g){return (src.types||[]).indexOf(g.type)>=0};
+  ((c||{}).goals||[]).forEach(function(g,gi){
+   if(!g||!visionOn(g)||!hit(g))return;
+   need+=n(ctx.fv[gi]||0);have+=n(g.prepared);
+  });
+ }
+ if(need<=0&&have<=0)return out;
+ var gap=Math.max(0,need-have);
+ out.v=gap>0?(fmt(gap)+' 元'):'<span class="muted">已備足</span>';
+ return out;
+}
+/* 缺口總表：**逐項依必達順位生成**，順位永遠連號。
+   ⚠️ 只列必達目標——normalizeIntent 讓 targets≡mustHave，沒被選就是不在這份規劃裡；
+      舊版無條件印「傳承需求 4,000 萬 · 未列為必達」等於替客戶決定他沒要的事。
+   ⚠️ 順位是獨立一欄，不是名稱後面的徽章：徽章在窄欄寬會被折成兩行（Ray 0901 回報的破圖）。*/
 function gapRowsByPriority(c,rn,m){
  var must=((c.intent||{}).mustHave||[]);
+ var ctx={rn:rn,m:m,fv:goalSelfFundFV(c)};
+ var out=must.map(function(t,i){
+  var r=targetGapRow(c,t,ctx);
+  return '<tr><td class="k" style="text-align:center;white-space:nowrap;color:var(--amber2)">'+(i+1)+'</td>'+
+   '<td class="k">'+esc(r.name)+(r.note?'<span class="hint" style="display:block;font-weight:400;margin-top:2px">'+r.note+'</span>':'')+'</td>'+
+   '<td>'+(r.v===null?gapMissHTML(c,t):r.v)+'</td></tr>';
+ });
  // 保障缺口分兩列：一次性給付（元）與定期給付（元/日・元/月），刻意不相加。
  var _gtp=gapTotalsText(c);
- var rows=[
-  {t:'退休生活規劃',k:'退休缺口',v:fmt(rn.gap)+' 元'},
-  {t:'子女教養規劃',k:'教育金需求(終值)',v:fmt(eduTotal(c))+' 元'},
-  {t:'傳承規劃',k:'傳承需求(現金)',v:fmt(legacyNeed(c))+' 元'},
-  {t:null,k:'保障缺口（一次性給付）',v:_gtp.lumpText},
-  {t:null,k:'保障缺口（定期給付）',v:_gtp.periodText},
-  {t:null,k:'房產/車輛年稅',v:fmt(propertyTax(c).total)+' 元'}];
- var rank=function(r){var i=r.t?must.indexOf(r.t):-1;return i<0?999:i};
- rows.sort(function(a,b){return rank(a)-rank(b)});
- return rows.map(function(r){var i=r.t?must.indexOf(r.t):-1;
-  var tag=r.t?(i>=0?'<span class="tagMust" style="margin-left:6px">第 '+(i+1)+' 順位</span>':'<span class="tagOff" style="margin-left:6px">未列為必達</span>'):'';
-  return '<tr><td class="k">'+r.k+tag+'</td><td>'+r.v+'</td></tr>';
- }).join('')}
+ [['保障缺口（一次性給付）',_gtp.lumpText],
+  ['保障缺口（定期給付）',_gtp.periodText],
+  ['房產/車輛年稅',fmt(propertyTax(c).total)+' 元']].forEach(function(x){
+  out.push('<tr><td class="k" style="text-align:center;color:var(--mut)">—</td><td class="k">'+x[0]+'</td><td>'+x[1]+'</td></tr>');
+ });
+ return out.join('')}
 
 // ── 全域資料完整度（地基層固定＋已選目標帶出的分頁）──
 function tabFilled(c,tab){
@@ -11824,9 +11910,11 @@ function adviceModules(c){
     return '<div class="muted">計畫(Plan) → 行動(Do) → 確認(Check) → 調整(Act)，每年至少檢視一次。<br>下次檢視日期：<b style="color:var(--amber2)">'+(esc(c.nextReview)||'尚未設定')+'</b></div>';}},
   {k:'gaptable',t:'缺口總表',hint:'依「必須達成」優先序排列，順位在前的先滿足',
    html:function(){
-    return '<table class="rtable">'+gapRowsByPriority(c,rn(),m())+
-     '<tr><td class="k">必須達成 · 優先序</td><td>'+(orderedMustText(c)||'—')+'</td></tr>'+
-     '<tr><td class="k">資產轉負年齡</td><td>'+(m().proj.turnNeg?m().proj.turnNeg+' 歲':'無')+'</td></tr></table>';}}
+    // ⚠️ 表尾原本還有一列「必須達成 · 優先序」——整張表現在**就是**那個順序，
+    //    留著只會和上面的順位再打一次架（0901 破圖的另一半）。報告書那兩處仍在用 orderedMustText。
+    return '<table class="rtable"><tr><th style="width:58px;text-align:center">順位</th><th>項目</th><th>還要準備</th></tr>'+
+     gapRowsByPriority(c,rn(),m())+
+     '<tr><td class="k" style="text-align:center;color:var(--mut)">—</td><td class="k">資產轉負年齡</td><td>'+(m().proj.turnNeg?m().proj.turnNeg+' 歲':'無')+'</td></tr></table>';}}
  ].filter(function(x){return x.when===undefined||x.when});
 }
 function advicePane(c){
