@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect, beforeAll } from "vitest";
 import { JSDOM } from "jsdom";
-import { CLIENT_DASH_MODULES, CLIENT_DASH_KEYS, normalizeDashPrefs, dashVisible } from "./clientDashModules";
+import { CLIENT_DASH_KEYS, dashModulesOf, normalizeDashPrefs, dashVisible } from "./clientDashModules";
 import { mergeClientDash, builtinClientDash, prefsFromPayload } from "./clientDashStore";
 
 /**
@@ -282,9 +282,11 @@ describe("⑦ 資產的被動收入要在收入面板看得到", () => {
 });
 
 describe("⑧ 客戶財務儀表板：後台勾哪幾塊", () => {
-  it("兩邊的模組清單逐字一致", () => {
-    expect(w.CLIENT_DASH_MODULES.length).toBe(CLIENT_DASH_MODULES.length);
-    CLIENT_DASH_MODULES.forEach((m, i) => {
+  // 分析／建議兩群的對拍在 clientDashModules.drift.test.ts；這一支只守總覽那六塊。
+  it("總覽那幾塊兩邊逐字一致", () => {
+    const overview = dashModulesOf("總覽");
+    expect(w.CLIENT_DASH_MODULES.length).toBe(overview.length);
+    overview.forEach((m, i) => {
       expect(w.CLIENT_DASH_MODULES[i].k, `第 ${i + 1} 個模組鍵`).toBe(m.k);
       expect(w.CLIENT_DASH_MODULES[i].t, `第 ${i + 1} 個模組名`).toBe(m.t);
     });

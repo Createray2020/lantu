@@ -39,11 +39,12 @@ export default async function ClientViewPage() {
         <div className="mb-4">
           <h1 className="text-xl font-bold">客戶財務儀表板 · 顯示哪些模組</h1>
           <p className="text-sm text-[#a9bccf] mt-1 leading-relaxed">
-            客戶登入之後看到的那一頁要放什麼。取消勾選的模組，
-            <b className="text-[#e0bd8b]">全公司的客戶都不會看到</b>——這一層是公司對外的一致性，
-            教練不能為個別客戶再調。
+            客戶登入之後看到的那一頁要放什麼。除了原本的總覽六塊，
+            教練端「<b className="text-[#e0bd8b]">分析</b>」與「<b className="text-[#e0bd8b]">建議</b>」
+            兩個分頁的模組現在<b className="text-[#e0bd8b]">全部都在這裡</b>，想給哪塊就開哪塊。
             <br />
-            沒設定過＝全部顯示；之後系統新增模組也預設顯示，要關再回來取消勾選。
+            取消勾選的模組，<b className="text-[#e0bd8b]">全公司的客戶都不會看到</b>——這一層是公司對外的一致性，
+            教練不能為個別客戶再調。沒設定過＝全部顯示；之後系統新增模組也預設顯示。
           </p>
         </div>
         <ClientViewBoard hidden={payload.hidden} />

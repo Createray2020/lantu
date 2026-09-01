@@ -11801,17 +11801,41 @@ function bizAdviceHTML(c){
    '<div class="hint" style="margin-top:8px">八大面向全部服務同一個核心命題：把集中、不流動、與人身綁定的資產，逐步轉換成分散、流動、與人身脫鉤的資產。'+
    '<br>治理與制度基礎是<b>所有規劃的前提</b>——客戶的帳務不透明，前面七項全部做不紮實。能指出「你要先做 A 才能做 B」的教練，比急著賣 B 的教練更值得信任。</div></div>';
 }
-function advicePane(c){var list=advice(c),h=health(c),m=metrics(c),rn=retireNeed(c),acts=actionList(c);
- var cards=list.map(function(a,i){return '<div class="advcard"><h4>'+(i+1)+'. '+a[0]+'</h4><p>'+a[1]+'</p></div>'}).join('');
- var actRows=acts.map(function(a){return '<tr><td class="k" style="text-align:center;color:var(--amber2)">'+a.axis+'</td><td class="k">'+esc(a.title)+'</td><td>'+esc(a.detail)+'</td></tr>'}).join('');
- return bizAdviceHTML(c)+
-  '<div class="sec"><h4>規劃建議（'+stageName(h.grade)+' · '+stageTask(h.grade)+'）</h4>'+cards+'</div>'+
-  '<div class="sec"><h4>執行行動清單（依軸線 A/B/C/D）</h4><table class="rtable"><tr><th>軸線</th><th>動作</th><th>說明</th></tr>'+actRows+'</table></div>'+
-  '<div class="sec"><h4>動態調整（PDCA）</h4><div class="muted">計畫(Plan) → 行動(Do) → 確認(Check) → 調整(Act)，每年至少檢視一次。<br>下次檢視日期：<b style="color:var(--amber2)">'+(esc(c.nextReview)||'尚未設定')+'</b></div></div>'+
-  '<div class="sec"><h4>缺口總表 <span class="hint">依「必須達成」優先序排列，順位在前的先滿足</span></h4><table class="rtable">'+
-  gapRowsByPriority(c,rn,m)+
-  '<tr><td class="k">必須達成 · 優先序</td><td>'+(orderedMustText(c)||'—')+'</td></tr>'+
-  '<tr><td class="k">資產轉負年齡</td><td>'+(m.proj.turnNeg?m.proj.turnNeg+' 歲':'無')+'</td></tr></table></div>';
+/* 建議分頁的模組清單（2026/09/01 拆出來）。
+   ⚠️ 拆的理由是「客戶財務儀表板要能逐塊開關」——後台勾的是這裡的 k（加 `ad:` 前綴）。
+   ⚠️ 教練端的輸出跟拆之前**一模一樣**：advicePane() 就是把這幾塊依序接起來。
+   ⚠️ 形狀刻意與 analysisModules() 一致（k/t/hint/when/html），客戶端才能用同一套渲染。 */
+function adviceModules(c){
+ var h=anMemo(function(){return health(c)});
+ var m=anMemo(function(){return metrics(c)});
+ var rn=anMemo(function(){return retireNeed(c)});
+ return [
+  {k:'biz',t:'企業主診斷建議',hint:'公私財務界線與合規面',when:entityOn(c,'company'),
+   html:function(){return bizAdviceHTML(c)}},
+  {k:'cards',t:'規劃建議',hint:function(){return stageName(h().grade)+' · '+stageTask(h().grade)},
+   html:function(){
+    return advice(c).map(function(a,i){return '<div class="advcard"><h4>'+(i+1)+'. '+a[0]+'</h4><p>'+a[1]+'</p></div>'}).join('');}},
+  {k:'actions',t:'執行行動清單',hint:'依軸線 A/B/C/D',
+   html:function(){
+    var rows=actionList(c).map(function(a){return '<tr><td class="k" style="text-align:center;color:var(--amber2)">'+a.axis+'</td><td class="k">'+esc(a.title)+'</td><td>'+esc(a.detail)+'</td></tr>'}).join('');
+    return '<table class="rtable"><tr><th>軸線</th><th>動作</th><th>說明</th></tr>'+rows+'</table>';}},
+  {k:'pdca',t:'動態調整（PDCA）',hint:'每年至少檢視一次',
+   html:function(){
+    return '<div class="muted">計畫(Plan) → 行動(Do) → 確認(Check) → 調整(Act)，每年至少檢視一次。<br>下次檢視日期：<b style="color:var(--amber2)">'+(esc(c.nextReview)||'尚未設定')+'</b></div>';}},
+  {k:'gaptable',t:'缺口總表',hint:'依「必須達成」優先序排列，順位在前的先滿足',
+   html:function(){
+    return '<table class="rtable">'+gapRowsByPriority(c,rn(),m())+
+     '<tr><td class="k">必須達成 · 優先序</td><td>'+(orderedMustText(c)||'—')+'</td></tr>'+
+     '<tr><td class="k">資產轉負年齡</td><td>'+(m().proj.turnNeg?m().proj.turnNeg+' 歲':'無')+'</td></tr></table>';}}
+ ].filter(function(x){return x.when===undefined||x.when});
+}
+function advicePane(c){
+ // ⚠️ 企業主診斷建議刻意不包 .sec（bizAdviceHTML 自己就是完整區塊），維持拆之前的版面。
+ return adviceModules(c).map(function(x){
+  if(x.k==='biz')return x.html();
+  var hint=typeof x.hint==='function'?x.hint():x.hint;
+  return '<div class="sec"><h4>'+x.t+(hint?' <span class="hint">'+hint+'</span>':'')+'</h4>'+x.html()+'</div>';
+ }).join('');
 }
 function toolsPane(c){var L=app.tools.loan,R=app.tools.ret;
  var months=n(L.years)*12,mp=pmt(n(L.amt),n(L.rate),months),totalPay=mp*months,totalInt=totalPay-n(L.amt);
@@ -12991,15 +13015,42 @@ var CLIENT_DASH_MODULES=[
  {k:'ratios',t:'財務指標明細'},
  {k:'report',t:'規劃報告書分頁'}
 ];
+/* 分析與建議那兩群的鍵＝前綴＋模組自己的鍵。
+   ⚠️ 前綴是必要的：分析與建議都有 `biz`（企業主診斷 / 企業主診斷建議），
+      不加前綴會撞在一起，後台勾一個等於勾兩個。 */
+var AN_DASH_PREFIX='an:',AD_DASH_PREFIX='ad:';
 function dashOn(k){
  var d=window.LANTU_DASH;
  if(!d||!Array.isArray(d.hidden))return true;
  return d.hidden.indexOf(k)<0;
 }
+/* 客戶端的「分析 / 建議」區塊。
+   ⚠️ 用跟教練端一模一樣的 .anmod 收合卡＋AN_VIEW 延遲渲染——32 個模組全部即時算完會很慢，
+      而 details 展開才 anFill() 是現成的機制。
+   ⚠️ 客戶端**不吃教練的 localStorage 偏好**（那是教練個人、逐台電腦的視角），
+      只吃後台的全平台開關；展開狀態也不記，所以用 cdToggled 而不是 anToggled。
+   ⚠️ AN_VIEW 是全域的 k → html 對照，這裡要把兩群都塞進去（鍵帶前綴避免撞號）。 */
+function clientModCards(c,title,mods,prefix){
+ var vis=mods.filter(function(x){return dashOn(prefix+x.k)});
+ if(!vis.length)return '';
+ AN_VIEW=AN_VIEW||{map:{},order:[]};
+ vis.forEach(function(x){AN_VIEW.map[prefix+x.k]=x.html;});
+ var cards=vis.map(function(x){
+  var hint=typeof x.hint==='function'?x.hint():x.hint;
+  return '<details class="anmod" data-k="'+prefix+x.k+'" ontoggle="cdToggled(this)">'+
+   '<summary><span class="ant">'+esc(x.t)+'</span>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</summary>'+
+   '<div class="anbody" id="anbody_'+prefix+x.k+'"></div></details>';
+ }).join('');
+ return '<div class="sec" style="padding-bottom:6px"><h4>'+title+' <span class="hint">點開看細節</span></h4></div>'+cards;
+}
+function cdToggled(el){if(el.open)anFill(el.getAttribute('data-k'));}
 function clientView(){var c=activeCase();if(!c)return '<div style="padding:60px;text-align:center;color:var(--mut)">尚無資料</div>';
  var m=metrics(c),h=health(c),r=ratios(c),proj=m.proj,rn=retireNeed(c);
  // 報告書分頁被後台關掉時，連分頁鈕都不出現（也不能靠改網址進去）。
  var showReport=dashOn('report');
+ // ⚠️ 每次重畫先清掉 AN_VIEW：那裡面的 html 是綁著上一份 case 的 closure，
+ //    留著的話切換客戶時展開會畫出上一位的數字。
+ AN_VIEW={map:{},order:[]};
  var view=(app.activeTab==='report'&&showReport)?'report':'analysis';
  var tabDefs=showReport?[['analysis','我的財務儀表'],['report','我的規劃報告']]:[['analysis','我的財務儀表']];
  var tb=tabDefs.map(function(t){return '<button data-tab="'+t[0]+'" class="'+(view===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('');
@@ -13021,7 +13072,10 @@ function clientView(){var c=activeCase();if(!c)return '<div style="padding:60px;
    (dashOn('gauges')?('<div class="sec"><h4>財務健康度</h4><div class="gauges">'+gau+'</div></div>'):'')+
    // 25 項協會標準是診斷用的細項，客戶不用一進來就面對——收進 details。
    (dashOn('ratios')?foldHTML('我的財務指標（協會標準 '+Object.keys(r).length+' 項 · 診斷用的細項）',
-    '<table class="rtable">'+rt+'</table>'):'');
+    '<table class="rtable">'+rt+'</table>'):'')+
+   // 教練端「分析」與「建議」那兩個分頁的模組，後台勾了哪幾塊就給客戶看哪幾塊。
+   clientModCards(c,'我的財務分析',analysisModules(c),AN_DASH_PREFIX)+
+   clientModCards(c,'我的規劃建議',adviceModules(c),AD_DASH_PREFIX);
   // 全部被關掉時不要留一片空白——說清楚是設定的結果，不是壞掉。
   if(!body)body='<div class="sec"><div class="hint">你的教練目前沒有開放線上檢視的內容，規劃結果會在諮詢時當面說明。</div></div>';}
  var picker=app.cases.length>1?'<div style="margin-bottom:14px">檢視對象：<select onchange="app.activeId=this.value;render()" style="background:#0a1a20;color:#e9f0f2;border:1px solid var(--line);border-radius:8px;padding:6px 10px">'+
