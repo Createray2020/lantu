@@ -5,7 +5,9 @@ import { ensureClientUser } from "@/lib/clientUser";
 import { listClientCases } from "@/lib/comp/survey";
 import { getClientOwnPlan, getClientPlanCase, getClientSetup } from "@/lib/clientPlan";
 import { listClientTodos } from "@/lib/clientTodos";
+import { pendingInvite } from "@/lib/clientRiskQuiz";
 import Todos from "./Todos";
+import RiskQuizGate from "./RiskQuizGate";
 import { normalizeIntent } from "@/lib/intent";
 import UiScaleToggle from "@/components/UiScaleToggle";
 import { computePassport, wan, ntfmt } from "@/lib/passport";
@@ -36,6 +38,8 @@ export default async function Portal() {
   // ⚠️ 客戶還沒被教練建成 clients 的一列時沒有待辦，這一段就整塊不出現（Todos 自己回 null）。
   const planCase = await getClientPlanCase(client.id);
   const todos = planCase ? await listClientTodos(planCase.clientId) : [];
+  // 教練按了「邀請客戶填寫」而客戶還沒送出 → 一進首頁就跳浮動框（關掉還能從橫幅再開）。
+  const quizInvited = planCase ? await pendingInvite(planCase.clientId) : false;
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
   // 教練↔客戶是雙棲的：教練也會用客戶介面做自己的規劃。
   // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。
@@ -119,6 +123,7 @@ export default async function Portal() {
             </Link>
           </div>
         )}
+        <RiskQuizGate invited={quizInvited} />
         <Todos items={todos} />
         {r ? (
           <div className="max-w-2xl mx-auto">

@@ -3,6 +3,7 @@ import { ensureCoach } from "@/lib/coach";
 import { getPlanForRead } from "@/lib/plans";
 import { getClientForRead } from "@/lib/clients";
 import { clientAccess } from "@/lib/clientScope";
+import { getClientQuiz } from "@/lib/clientRiskQuiz";
 import { licenseState } from "@/lib/license";
 import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
 import PlanEditor from "./PlanEditor";
@@ -22,9 +23,11 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
   if (!plan) notFound();
   // 客戶編號：三份可交付文件的表頭要印它，隨 lantu:init 一起送進 iframe。
   // 生日同車：規劃裡還空著時由 iframe 帶入 profile.birth，教練不必再打一次（反向回寫在 updatePlanData）。
-  const [client, access] = await Promise.all([
+  const [client, access, quiz] = await Promise.all([
     getClientForRead(coach.id, plan.clientId),
     clientAccess(coach.id, plan.clientId),
+    // 客戶自己填的風險屬性測驗：教練端要看得到結果，也要能一鍵套用進這份規劃。
+    getClientQuiz(plan.clientId),
   ]);
   const isOwner = access === "owner";
 
@@ -40,6 +43,7 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
       readOnlyReason={!isOwner ? "collab" : "license"}
       clientCode={client?.code ?? null}
       birthDate={client?.birthDate ?? null}
+      clientQuiz={quiz ? { score: quiz.score, tier: quiz.tier, answers: quiz.answers, submittedAt: quiz.submittedAt, invitedAt: quiz.invitedAt } : null}
     />
   );
 }

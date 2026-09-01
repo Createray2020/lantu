@@ -12,6 +12,7 @@ import { getBirthCostPayload } from "@/lib/birthCosts";
 import { getBizTaxPayload } from "@/lib/bizTaxParams";
 import { getInsProductPayload } from "@/lib/insProducts";
 import { getAnDefaultPayload } from "@/lib/anDefaults";
+import { getClientDashPayload } from "@/lib/clientDashStore";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,13 @@ export async function GET() {
   // an＝分析頁模組的全平台預設順序（後台 /admin/analysis 維護）。
   // 搭這班車而不是另開一支 API：iframe 本來就在載入時抓這一包、抓到再 render()，
   // 多開一支等於多一次往返，還要多維護一條公開路由。
-  const [cats, edu, biz, ins, an, birth] = await Promise.all([
+  // dash＝客戶財務儀表板的顯示開關（後台 /admin/client-view 維護）。同上，搭同一班車。
+  const [cats, edu, biz, ins, an, birth, dash] = await Promise.all([
     getCategoryPayload(), getEduCosts(), getBizTaxPayload(), getInsProductPayload(), getAnDefaultPayload(),
-    getBirthCostPayload(),
+    getBirthCostPayload(), getClientDashPayload(),
   ]);
   return Response.json(
-    { cats, edu, biz, ins, an, birth },
+    { cats, edu, biz, ins, an, birth, dash },
     { headers: { "cache-control": "public, max-age=60, stale-while-revalidate=3600" } },
   );
 }

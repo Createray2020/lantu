@@ -157,28 +157,53 @@ describe("applyBirthPlan：三種產物落在三個地方", () => {
     expect(C().education.some((e: { auto?: boolean }) => e.auto !== true)).toBe(false);
   });
 
-  it("② 金額＝產檢＋生產＋月子×月數＋新生兒用品，剖腹產比自然產貴", () => {
+  // 2026/09/01 起項目從 7 項補到 14 項（Ray：「相關費用還不夠完整資訊」），
+  // 組成改由 BIRTH_ITEMS 的 when 決定，所以斷言改成「該算的都算了、不該算的一項都沒有」。
+  const cost = (key: string) => BIRTH_COST_DEFAULTS.find((x) => x.key === key)!.amount;
+  const ALWAYS = ["PRENATAL_VISIT_FEE", "PRENATAL_SELF", "MATERNITY_KIT", "POSTPARTUM_RECOVERY",
+    "NEWBORN_GEAR", "NEWBORN_SCREEN", "INFANT_VACCINE", "BREASTFEED_GEAR"];
+  const alwaysSum = () => ALWAYS.reduce((a, k) => a + cost(k), 0);
+
+  it("② 金額＝一律計的那幾項＋生產方式＋月子安排×月數，剖腹產比自然產貴", () => {
     const k = plan(43);
     k.delivery = "自然產"; k.care = "月子中心"; k.careMonths = 1;
     w.applyBirthPlan(true);
     const natural = C().goals.find((x: { type: string }) => x.type === "生育").present;
-    const cost = (key: string) => BIRTH_COST_DEFAULTS.find((x) => x.key === key)!.amount;
-    expect(natural).toBe(
-      cost("PRENATAL_SELF") + cost("DELIVERY_NATURAL") + cost("POSTPARTUM_CENTER_MONTH") + cost("NEWBORN_GEAR"),
-    );
+    expect(natural).toBe(alwaysSum() + cost("DELIVERY_NATURAL") + cost("POSTPARTUM_CENTER_MONTH"));
     k.delivery = "剖腹產";
     w.applyBirthPlan(true);
-    expect(C().goals.find((x: { type: string }) => x.type === "生育").present).toBeGreaterThan(natural);
+    expect(C().goals.find((x: { type: string }) => x.type === "生育").present)
+      .toBe(alwaysSum() + cost("DELIVERY_CSECTION") + cost("POSTPARTUM_CENTER_MONTH"));
   });
 
-  it("② 月子選「家人照顧」就不算月子錢，月數也不乘進去", () => {
+  it("② 月子月數只乘進「那一種安排」的單價，不會三種都乘", () => {
+    const k = plan(43);
+    k.delivery = "自然產"; k.care = "到宅月嫂"; k.careMonths = 2;
+    w.applyBirthPlan(true);
+    expect(C().goals.find((x: { type: string }) => x.type === "生育").present)
+      .toBe(alwaysSum() + cost("DELIVERY_NATURAL") + cost("POSTPARTUM_NANNY_MONTH") * 2);
+  });
+
+  it("② 月子選「家人照顧」不算月子中心也不算月嫂，只單獨算月子餐", () => {
     const k = plan(43);
     k.care = "家人照顧（不另計）"; k.careMonths = 3;
     w.applyBirthPlan(true);
-    const cost = (key: string) => BIRTH_COST_DEFAULTS.find((x) => x.key === key)!.amount;
-    expect(C().goals.find((x: { type: string }) => x.type === "生育").present).toBe(
-      cost("PRENATAL_SELF") + cost("DELIVERY_NATURAL") + cost("NEWBORN_GEAR"),
-    );
+    expect(C().goals.find((x: { type: string }) => x.type === "生育").present)
+      .toBe(alwaysSum() + cost("DELIVERY_NATURAL") + cost("POSTPARTUM_MEAL_MONTH") * 3);
+  });
+
+  it("這一份規劃自己填的單價會蓋掉後台，留空就回去跟著後台", () => {
+    const k = plan(43);
+    k.delivery = "自然產"; k.care = "月子中心"; k.careMonths = 1;
+    w.applyBirthPlan(true);
+    const before = C().goals.find((x: { type: string }) => x.type === "生育").present;
+    w.setBirthCostOverride("POSTPARTUM_CENTER_MONTH", 260000);
+    expect(w.birthOneOffCost(C().birthPlan[0], C()))
+      .toBe(before - cost("POSTPARTUM_CENTER_MONTH") + 260_000);
+    // ⚠️ 留空＝跟著後台走，不是 0
+    w.setBirthCostOverride("POSTPARTUM_CENTER_MONTH", "");
+    expect(w.birthOneOffCost(C().birthPlan[0], C())).toBe(before);
+    expect(C().birthCostOverride.POSTPARTUM_CENTER_MONTH).toBeUndefined();
   });
 
   it("③ 支出：0–2 歲育兒費用逐年，共 3 年，補上幼兒園之前的真空", () => {

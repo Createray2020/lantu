@@ -9,6 +9,8 @@ import * as Reviews from "@/lib/reviews";
 import { logRevision, restoreRevision } from "@/lib/revisions";
 import * as Notes from "@/lib/notes";
 import * as Session from "@/lib/consultSession";
+import * as ClientQuiz from "@/lib/clientRiskQuiz";
+import { RISK_QUIZ_TODO } from "@/lib/riskQuizTodo";
 
 // 這裡是教練端「所有寫入」的唯一身分入口 —— 期限到期的唯讀鎖定就掛在 requireWritableCoach()，
 // 不要繞過它直接取教練身分，否則那條路徑會變成到期後仍可寫的破口。
@@ -212,6 +214,28 @@ export async function createActionItemsAction(
     revalidatePath("/dashboard/overview");
     revalidatePath("/portal");
     return { ok: true, ...r };
+  } catch (e) {
+    const f = fail(e);
+    return { ok: false, error: f.ok ? "操作失敗，請重試" : f.error };
+  }
+}
+
+// ── 投資風險屬性測驗：邀請客戶自己填 ───────────────────────────
+//
+// ⚠️ 客戶填的答案住 client_risk_quiz，不寫進 plans.data——教練看到之後自己決定要不要
+//    「套用到這份規劃」。跟區塊註記同一條線（客戶端對 plans 的 save 永遠是 noop）。
+export async function inviteRiskQuizAction(
+  clientId: string,
+): Promise<{ ok: true; invitedAt: string | null } | { ok: false; error: string }> {
+  try {
+    const cid = await coachId();
+    // 借 createActionItems 的租戶檢查（assertClientOwned）＋順手把它變成一則客戶待辦，
+    // 客戶就算關掉浮動框，之後也還找得到入口。
+    await Reviews.createActionItems(cid, clientId, [RISK_QUIZ_TODO]);
+    const row = await ClientQuiz.inviteClientQuiz(clientId);
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/portal");
+    return { ok: true, invitedAt: row.invitedAt };
   } catch (e) {
     const f = fail(e);
     return { ok: false, error: f.ok ? "操作失敗，請重試" : f.error };

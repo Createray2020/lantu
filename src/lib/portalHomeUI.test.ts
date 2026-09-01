@@ -37,6 +37,8 @@ vi.mock("@/lib/clientPlan", () => ({
 }));
 vi.mock("@/Shared/db", () => ({ db: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } }));
 vi.mock("@/Shared/db/schema", () => ({ coaches: { id: "id" } }));
+// 風險屬性測驗的邀請狀態：mock 在模組邊界，不用讓假 schema 認識 client_risk_quiz。
+vi.mock("@/lib/clientRiskQuiz", () => ({ pendingInvite: async () => false }));
 vi.mock("@clerk/nextjs", () => ({
   SignOutButton: ({ children }: { children: unknown }) => children,
 }));

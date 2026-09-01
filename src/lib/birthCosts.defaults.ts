@@ -50,6 +50,34 @@ export const BIRTH_COST_DEFAULTS: readonly BirthCostSeed[] = [
     note: "嬰兒床、汽座、推車、消毒鍋、寢具衣物等一次性採購；市場行情推估",
   },
   {
+    key: "PRENATAL_VISIT_FEE", label: "產檢掛號與部分負擔（整個孕期）", grp: "孕產", unit: "次", amount: 6000,
+    note: "公費 14 次產檢仍要付掛號費與部分負擔，另有孕婦衛教與抽血項目的自付；市場行情推估",
+  },
+  {
+    key: "MATERNITY_KIT", label: "待產包與孕期用品（一次性）", grp: "孕產", unit: "次", amount: 15000,
+    note: "托腹帶、孕婦裝、待產包、產褥墊與哺乳內衣等；市場行情推估",
+  },
+  {
+    key: "POSTPARTUM_MEAL_MONTH", label: "月子餐外送（每月·家人照顧時）", grp: "月子", unit: "月", amount: 30000,
+    note: "住月子中心或請月嫂時月子餐已含在內，只有「家人照顧」才會單獨叫餐；市場行情推估",
+  },
+  {
+    key: "POSTPARTUM_RECOVERY", label: "產後修復／體態調理（一次性）", grp: "月子", unit: "次", amount: 30000,
+    note: "骨盆與腹直肌修復、中醫調理等療程；市場行情推估",
+  },
+  {
+    key: "NEWBORN_SCREEN", label: "新生兒自費篩檢（一次性）", grp: "育兒", unit: "次", amount: 12000,
+    note: "公費 21 項新生兒篩檢之外的自費擴充項目與聽力／心臟超音波等；市場行情推估",
+  },
+  {
+    key: "INFANT_VACCINE", label: "0–2 歲自費疫苗（一次性合計）", grp: "育兒", unit: "次", amount: 30000,
+    note: "公費之外常打的輪狀病毒、腸病毒 71 型、流感等自費疫苗合計；市場行情推估",
+  },
+  {
+    key: "BREASTFEED_GEAR", label: "哺乳與擠乳用品（一次性）", grp: "育兒", unit: "次", amount: 10000,
+    note: "擠乳器、儲乳設備、奶瓶消毒與哺乳枕等；市場行情推估",
+  },
+  {
     key: "INFANT_CARE_ANNUAL", label: "0–2 歲育兒費用（每年·已扣補助）", grp: "育兒", unit: "年", amount: 180000,
     note: "托育自付（準公共托嬰 22,000／月 − 補助 13,000；居家保母 15,000–18,000／月）＋尿布奶粉衣物醫療；已扣掉托育補助／育兒津貼",
   },

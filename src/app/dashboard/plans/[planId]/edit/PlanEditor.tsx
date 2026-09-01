@@ -16,6 +16,7 @@ import {
   listSessionsAction,
   restoreToSessionAction,
   createActionItemsAction,
+  inviteRiskQuizAction,
 } from "../../../actions";
 import type { NoteRow, NoteInput } from "@/lib/notes";
 import type { SessionRow, EndInput } from "@/lib/consultSession";
@@ -82,6 +83,7 @@ export default function PlanEditor({
   readOnlyReason = "license",
   clientCode = null,
   birthDate = null,
+  clientQuiz = null,
 }: {
   planId: string;
   clientId: string;
@@ -99,6 +101,11 @@ export default function PlanEditor({
    * 教練不必在家庭成員那裡把同一個生日再打一次。⚠️ 只帶不覆蓋；反向回寫在 updatePlanData。
    */
   birthDate?: string | null;
+  /**
+   * 客戶自己填的投資風險屬性測驗（client_risk_quiz）。
+   * ⚠️ 只是送進去給教練看與「套用」，不是規劃內容——客戶端永遠不直接寫 plans.data。
+   */
+  clientQuiz?: { score: number | null; tier: string | null; answers: Record<string, number | number[]>; submittedAt: string | null; invitedAt: string | null } | null;
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -169,6 +176,7 @@ export default function PlanEditor({
           readOnlyNote: RO_NOTE[readOnlyReason],
           clientCode: clientCode ?? null,
           birthDate: birthDate ?? null,
+          clientQuiz,
           notes: notesRef.current,
           session: sessionRef.current,
           past: pastRef.current,
@@ -279,6 +287,24 @@ export default function PlanEditor({
         postInit();
       } else if (msg.type === "lantu:note" || msg.type === "lantu:session") {
         void onNoteMsg(msg as unknown as NoteMsg);
+      } else if (msg.type === "lantu:riskinvite") {
+        // 教練按「邀請客戶填寫」→ 建一則客戶待辦＋把 client_risk_quiz 的邀請時間戳上去。
+        // 客戶填完的答案住他自己的表，教練回來按「套用」才會進 plans.data。
+        if (readOnly) {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: "lantu:riskinvited", error: "這份規劃目前是唯讀的，沒辦法發出邀請。" },
+            window.location.origin,
+          );
+          return;
+        }
+        void (async () => {
+          const r = await inviteRiskQuizAction(clientId);
+          iframeRef.current?.contentWindow?.postMessage(
+            r.ok ? { type: "lantu:riskinvited", invitedAt: r.invitedAt } : { type: "lantu:riskinvited", error: r.error },
+            window.location.origin,
+          );
+          if (r.ok) router.refresh();
+        })();
       } else if (msg.type === "lantu:todos") {
         // 規劃器的「待補齊清單」勾了幾項，按下送出 → 寫進 action_items，
         // 客戶在 /portal 首頁的「我的待辦」就看得到（同一張表，不另開新的）。
@@ -316,7 +342,7 @@ export default function PlanEditor({
       window.removeEventListener("message", onMessage);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [planId, clientId, data, uiScale, readOnly, readOnlyReason, clientCode, birthDate, noteAccess, router, doSave]);
+  }, [planId, clientId, data, uiScale, readOnly, readOnlyReason, clientCode, birthDate, clientQuiz, noteAccess, router, doSave]);
 
   /**
    * 存檔狀態回報給 iframe（v12 App 的頂列會顯示「儲存中… / 已儲存 HH:MM / 儲存失敗」）。
@@ -469,7 +495,7 @@ export default function PlanEditor({
         className="flex-1 w-full border-0"
         onLoad={() =>
           iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null },
+            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz },
             window.location.origin,
           )
         }

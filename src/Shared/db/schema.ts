@@ -1090,3 +1090,41 @@ export const coachApplySettings = pgTable('coach_apply_settings', {
   checklist: jsonb('checklist').$type<ChecklistItem[]>().default([]).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ── 客戶財務儀表板：全平台顯示開關（2026/09/01）────────────────────
+//
+// Ray：「客戶的財務儀表板要顯示什麼，可以開放後台勾選哪些模塊可以顯示在客戶那邊。」
+//
+// ⚠️ 這一層刻意**只有全平台**（Ray 拍板），沒有「教練逐客戶再調」那一層——
+//    跟分析頁模組順序（後台預設 → 教練 localStorage → 當下畫面）三層語意不同。
+//    理由是這一塊決定「客戶看得到什麼」，那是公司對外一致性的事，不是個人偏好。
+// ⚠️ 沒有列＝顯示。只有明確 hidden=true 的模組才會被關掉，
+//    所以之後新增模組不會因為後台沒設定就整塊消失。
+// key 對應 src/lib/clientDashModules.ts 的 CLIENT_DASH_MODULES。
+export const clientDashDefaults = pgTable('client_dash_defaults', {
+  key: text('key').primaryKey(),
+  hidden: boolean('hidden').default(false).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ── 客戶自己填的投資風險屬性測驗（2026/09/01）──────────────────────
+//
+// Ray：「投資屬性問卷勾選給客戶可以填，有『邀請客戶填寫』的按鈕然後送出，
+//       客戶端用跳出浮動框。」
+//
+// ⚠️⚠️ 客戶**不直接寫教練那份 plan**——跟區塊註記同一條線：客戶寫的東西住自己的表，
+//    教練看到之後決定要不要「套用到這份規劃」（寫進 plans.data 的 riskQuiz）。
+//    這一條界線是整個雙邊平台的地基：客戶端 save() 對 plans 永遠是 noop。
+// ⚠️ 分數與等級一律由**伺服器**用 src/lib/riskQuiz.ts 重算後才寫進來，
+//    前端送上來的只有選項索引；信任客戶端算的分數等於讓他自己決定風險等級。
+// ⚠️ 一位客戶只有一列（PK 就是 client_id）：重新邀請＝同一列把 submitted_at 清掉重來，
+//    不留歷史——教練要的是「他現在的屬性」，不是一份作答歷程。
+export const clientRiskQuiz = pgTable('client_risk_quiz', {
+  clientId: uuid('client_id').primaryKey().references(() => clients.id, { onDelete: 'cascade' }),
+  answers: jsonb('answers').$type<Record<string, number | number[]>>().default({}).notNull(),
+  score: integer('score'),
+  tier: text('tier'),
+  invitedAt: timestamp('invited_at', { withTimezone: true }),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
