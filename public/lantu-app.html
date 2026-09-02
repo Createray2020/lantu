@@ -1318,6 +1318,10 @@ function migrateCompanies(c){
  syncNHI(c);
  ensureRowIds(c);   // syncPremium／syncNHI 會 push 新的支出列，補發它們的 eid
  ensurePolicyRiders(c);
+ // 「填了卻沒進計算」的四條同步（月薪／保單現金價值／婚姻預算／勞保勞退概算）。
+ // 放在最後：它要看得到 syncPremium 之後的支出表與 ensureRowIds 之後的 id。
+ syncAutoRows(c);
+ ensureRowIds(c);
  return c;
 }
 
@@ -1408,6 +1412,136 @@ function syncPremium(c){
   row.amount=amt[k];row.period='年';row.infl=false;
  });
 }
+/* ══ 「填了卻沒進計算」的四條同步 ═══════════════════════════════════
+   Ray 2026/09/01 資料勾稽盤點：437 個欄位裡有一批教練填得進去、卻不影響任何
+   總數。「我不想要有一堆數據，做了半天的，根本沒有算進去。」
+   ⚠️ 每一條都比照既有的 syncPremium / syncNHI / applyCareerPlan：
+      帶穩定標記 → 重填是**更新**不是複製；源頭清空，那一列自己收掉。
+   ⚠️⚠️ 每一條都先擋重複：教練若已經手打了同一筆錢（收入表已有工作收入、
+      資產表已有保單、已備裡已有勞保勞退），就**不自動加**，改在畫面上把
+      「這格目前沒進計算」講出來並給一顆一鍵接上。
+      寧可讓他多按一下，也不能把同一筆錢默默算兩次。 */
+
+// ── 共用：判斷某張表裡有沒有「疑似手打的同一筆」──────────────────
+function manualWorkIncome(c){
+ return (c.incomes||[]).filter(function(i){return i&&!i.salaryAuto&&i.type==='工作'&&n(i.amount)>0;});
+}
+function manualPolicyAsset(c){
+ return (c.assets||[]).filter(function(a){return a&&!a.polAuto&&/保單|壽險|儲蓄險|還本/.test(a.name||'');});
+}
+function manualLaborPrepared(c){
+ var r=(c.retire||{}).prepared||[];
+ return r.filter(function(p){return p&&!p.laborAuto&&/勞保|勞退|國民年金|國保/.test(p.item||'');});
+}
+
+// ── ① 本人月薪 → 收入表的一列 ───────────────────────────────────
+// profile.monthlySalary 是「工作類別」那裡填的月薪，過去只拿來試算勞健保級距，
+// 從來沒有變成收入——收入表空著的案子，整份規劃的工作收入是 0。
+function syncSalaryIncome(c){
+ if(!c||!Array.isArray(c.incomes))return;
+ var m=n((c.profile||{}).monthlySalary),ra=n((c.profile||{}).retireAge)||65,a0=n((c.profile||{}).age)||40;
+ var idx=-1;for(var i=0;i<c.incomes.length;i++){if(c.incomes[i]&&c.incomes[i].salaryAuto){idx=i;break;}}
+ var want=m>0&&(c.autoOff||{}).salary!==true&&manualWorkIncome(c).length===0;
+ if(!want){if(idx>=0)c.incomes.splice(idx,1);return;}
+ var row=(idx>=0)?c.incomes[idx]:{salaryAuto:true,growth:0};
+ row.salaryAuto=true;row.name='本人薪資';row.owner=primaryName(c);row.type='工作';row.subType='薪資';
+ row.period='年';row.amount=m*12;row.start=a0;row.end=ra;
+ if(idx<0)c.incomes.push(row);
+}
+
+// ── ② 保單現金價值 → 資產表的一列 ───────────────────────────────
+// 保額有進保障缺口、保費有進支出（syncPremium），但現金價值從來沒進資產。
+function policyCashTotal(c){
+ return sum(c.policies,function(p){return policyActive(p)?n(p.cashValue):0;});
+}
+function syncPolicyAsset(c){
+ if(!c||!Array.isArray(c.assets))return;
+ var tot=policyCashTotal(c);
+ var idx=-1;for(var i=0;i<c.assets.length;i++){if(c.assets[i]&&c.assets[i].polAuto){idx=i;break;}}
+ var want=tot>0&&(c.autoOff||{}).policyAsset!==true&&manualPolicyAsset(c).length===0;
+ if(!want){if(idx>=0)c.assets.splice(idx,1);return;}
+ var row=(idx>=0)?c.assets[idx]:{polAuto:true,mainCat:'可投資資產',type:'其他',cls:'固定',
+   region:'台灣',currency:'台幣',fxRate:1,cost:0,ret:0,income:'',movable:true};
+ row.polAuto=true;row.name='保單現金價值(合計)';row.owner=primaryName(c);row.value=Math.round(tot);
+ if(idx<0)c.assets.push(row);
+}
+
+// ── ③ 婚姻預算 → 目標表的一列 ───────────────────────────────────
+// c.marriage 過去是完整的死欄位：預算填 200 萬，所有總數都不變。
+// ⚠️ 已經展開「婚禮費用明細」時不生成——那張表才是逐項的真相，兩邊都算等於算兩次。
+function weddingDetailRows(c){
+ return (c.goals||[]).filter(function(g){return g&&g.tag==='wedding';});
+}
+function applyMarriagePlan(c){
+ if(!c)return;
+ if(!Array.isArray(c.goals))c.goals=[];
+ var mr=c.marriage||{},age=n(mr.age),budget=n(mr.budget);
+ var idx=-1;for(var i=0;i<c.goals.length;i++){if(c.goals[i]&&c.goals[i].marriageAuto){idx=i;break;}}
+ var want=(mr.plan==='是')&&budget>0&&age>0&&weddingDetailRows(c).length===0;
+ if(!want){if(idx>=0)c.goals.splice(idx,1);return;}
+ var g=(idx>=0)?c.goals[idx]:{on:true,marriageAuto:true,growth:'通膨',freq:0,prepared:0,loanRatio:0,appreciation:0};
+ g.marriageAuto=true;g.name='結婚（預算）';g.type='婚姻';g.present=budget;g.minPresent=n(mr.minBudget);
+ g.start=age;g.end=age;g.imp=n(mr.importance)||3;
+ if(idx<0)c.goals.push(g);
+}
+
+// ── ④ 勞保／勞退／國保概算 → 已準備退休金 ───────────────────────
+// 投保薪資、年資、勞退帳戶餘額填得再完整，不按那顆「一鍵帶入」就對退休已備零貢獻。
+// ⚠️ 概算不是精算，所以列名保留「(概算)」，而且可以整組關掉（autoOff.labor）。
+var LABOR_AUTO_ITEMS={lp:'勞保老年年金(概算)',fund:'勞退新制(概算)',np:'國民年金老年年金(概算)'};
+function syncLaborPrepared(c){
+ if(!c)return;
+ c.retire=c.retire||{};
+ if(!Array.isArray(c.retire.prepared))c.retire.prepared=[];
+ var list=c.retire.prepared;
+ // 舊版那顆按鈕加的列沒有標記，補上標記接管，免得跟自動列並存變兩份。
+ list.forEach(function(p){
+  if(p&&!p.laborAuto){
+   for(var k in LABOR_AUTO_ITEMS)if(LABOR_AUTO_ITEMS[k]===p.item)p.laborAuto=k;
+  }
+ });
+ var e=(typeof estimateLaborPension==='function')?estimateLaborPension(c):{total:0};
+ var ra=n((c.profile||{}).retireAge);
+ var want={};
+ if(e&&e.total>0&&(c.autoOff||{}).labor!==true&&manualLaborPrepared(c).length===0){
+  if(e.kind==='np')want.np=Math.round(e.lump);
+  else{want.lp=Math.round(e.lump);if(n(e.fund)>0)want.fund=Math.round(e.fund);}
+ }
+ c.retire.prepared=list.filter(function(p){return !p.laborAuto||want[p.laborAuto]!==undefined;});
+ Object.keys(want).forEach(function(k){
+  var row=null,arr=c.retire.prepared;
+  for(var i=0;i<arr.length;i++)if(arr[i].laborAuto===k){row=arr[i];break;}
+  if(!row){row={laborAuto:k,method:'一次領'};arr.push(row);}
+  row.item=LABOR_AUTO_ITEMS[k];row.age=ra;row.amount=want[k];row.method='一次領';
+ });
+}
+
+/** 四條一起跑。冪等，掛在 migrateCase 尾端，所以舊案匯入、直接改資料都會同步。 */
+function syncAutoRows(c){
+ syncSalaryIncome(c);
+ syncPolicyAsset(c);
+ applyMarriagePlan(c);
+ syncLaborPrepared(c);
+}
+/** 教練關掉／打開某一條自動同步。 */
+function toggleAutoRow(k){
+ var c=activeCase();if(!c)return;
+ c.autoOff=c.autoOff||{};
+ c.autoOff[k]=!c.autoOff[k];
+ migrateCase(c);save();render();
+}
+/** 擋重複時的提示：把「這格目前沒進計算」講出來，並給一顆一鍵接上。 */
+function autoBlockedHTML(c,k){
+ var msg={
+  salary:['本人月薪','收入表已經有手打的工作收入列，所以月薪那一格目前不進計算（避免同一筆薪水算兩次）。'],
+  policyAsset:['保單現金價值','資產表已經有名稱含「保單／壽險／儲蓄險」的列，所以保單現金價值目前不進資產（避免算兩次）。'],
+  labor:['勞保／勞退概算','已準備退休金裡已經有勞保／勞退相關的手打列，所以概算目前不自動帶入（避免算兩次）。']
+ }[k];
+ if(!msg)return '';
+ return '<div class="hint" style="display:block;margin-top:6px;color:var(--warn)">⚠ <b>'+msg[0]+'</b>：'+msg[1]+
+  ' 若那幾列其實是別的錢，請改名或刪掉，這一列就會自動接上。</div>';
+}
+
 function migrateCases(arr){return (Array.isArray(arr)?arr:[]).map(migrateCase);}
 
 function save(){try{localStorage.setItem('fps_data_v2',JSON.stringify(app.cases))}catch(e){}markSavedSoon();}
@@ -4052,7 +4186,12 @@ function set(id,field,val,type){var c=activeCase();var t=id.split(':'),arr=t[0],
  if(i==null)c[arr][field]=v;else listOf(c,arr)[i][field]=v;stampNeeds(c,arr);
  if(oldName&&typeof oldName==='string'&&oldName&&v)renameMemberRefs(c,oldName,v);
  // 動了保單就把支出表的兩列人身保費同步過去（它們是保單表的投影，不是獨立資料）。
- if(arr==='policies')syncPremium(c);
+ if(arr==='policies'){syncPremium(c);syncPolicyAsset(c);}
+ // 來源一改，自動列當場跟上（不用等下一次 migrateCase）。
+ if(arr==='profile'||arr==='incomes')syncSalaryIncome(c);
+ if(arr==='marriage'||arr==='goals')applyMarriagePlan(c);
+ if(arr==='members'||arr==='profile'||arr==='prepared')syncLaborPrepared(c);
+ if(arr==='assets')syncPolicyAsset(c);
  // 健保費那一列吃「成員的投保薪資/眷口/類別」與「收入列的所得細類」，兩邊動了都要重算。
  if(arr==='members'||arr==='incomes'||arr==='profile')syncNHI(c);
  save();
@@ -5317,7 +5456,7 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
   '</div>'+
   foldHTML('退休時點 · 各成員退休順序與混合期權重',retirePhaseHTML(c))+
   (retireMode(c)==='detail'?retireExpSec(c):foldHTML('退休期支出明細（目前未採用）',retireExpSec(c)))+
-  foldHTML('勞保 / 勞退 / 國民年金 概算（可一鍵帶入已備）',laborPensionBox(c)+laborDetailHTML(c))+
+  foldHTML('勞保 / 勞退 / 國民年金 概算（自動計入已備）',laborPensionBox(c)+laborDetailHTML(c))+autoBlockedHTML(c,'labor')+
   prep+'<div data-calc="preparedConv">'+preparedConvHTML(c)+'</div>';
 }
 // ===== C5：已準備退休金「領取方式」的換算說明 =====
@@ -5450,7 +5589,7 @@ function laborPensionBox(c){var lp=estimateSocialPension(c);
  return '<div class="sec"><h4>'+head+'</h4>'+
   '<div class="big3">'+cells+
   '<div class="b"><div class="l">合計可帶入已備</div><div class="v" style="color:var(--ok)">'+fmt(lp.total)+'</div></div></div>'+
-  '<div style="margin-top:10px"><button class="add" onclick="addLaborPensionPrepared()">＋ 一鍵帶入已準備退休金</button><a href="https://www.bli.gov.tw/" target="_blank" rel="noopener" style="color:var(--amber2);font-size:12.5px;margin-left:10px">開啟勞保局試算 ↗</a></div>'+
+  '<div style="margin-top:10px">'+(((c.autoOff||{}).labor===true||manualLaborPrepared(c).length)?'<button class="add" onclick="addLaborPensionPrepared()">＋ 手動帶入已準備退休金</button>':'<span class="rowmk" title="已自動計入「已準備退休金」，要關掉請到那張表">已自動計入已備</span>')+'<a href="https://www.bli.gov.tw/" target="_blank" rel="noopener" style="color:var(--amber2);font-size:12.5px;margin-left:10px">開啟勞保局試算 ↗</a></div>'+
   '<div class="hint" style="margin-top:6px">'+note+'</div></div>';
 }
 // 教育分頁的衍生顯示（總需求＋明細）抽成獨立函式，供 data-calc 即時重算。
@@ -9498,6 +9637,13 @@ function groupedTable(c,title,arr,list,cols,ownerKey,valFn,hint){
  var ncol=cols.length+1;
  var body=order.map(function(o){var sub=0;
   var rows=idxList.filter(function(p){return (p[0][ownerKey]||'(未指定)')===o}).map(function(p){var x=p[0],idx=p[1];sub+=n(valFn(x));
+   // 自動列（保單現金價值）鎖住不可手改：要改請回源頭那張表。
+   if(x.polAuto)return '<tr class="autorow">'+cols.map(function(cl){
+     var v=x[cl[0]];
+     var txt=(cl[2]==='money')?fmt(n(v)):(cl[2]==='bool'?(v?'✓':'—'):esc(v==null||v===''?'—':v));
+     return '<td>'+txt+(cl[0]==='name'?'<span class="rowmk" title="金額＝保障中心所有有效保單的現金價值合計，要改請到保單表">來自保單表</span>':'')+'</td>';
+    }).join('')+'<td class="acts"><button class="tbtn" style="padding:1px 7px;font-size:11px" onclick="jumpTab(\'coverage\')">去保單表</button>'+
+    '<button class="tbtn" style="padding:1px 7px;font-size:11px" onclick="toggleAutoRow(\'policyAsset\')">關閉</button></td></tr>';
    return '<tr>'+cols.map(function(cl){return cellInput(arr,idx,cl,x,c)}).join('')+'<td><button class="del" onclick="delRow(\''+arr+'\','+idx+')">✕</button></td></tr>';
   }).join('');
   return '<tr><td colspan="'+ncol+'" style="background:#0a1a20;color:var(--amber2);font-weight:700">'+esc(o)+' <span class="muted" style="font-weight:400">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
@@ -9509,7 +9655,7 @@ function assetsSec(c){
  var tot=sum(c.assets,function(a){return aVal(a)}),liq=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
  var pnl=sum(c.assets,function(a){return (n(a.value)-n(a.cost))*(n(a.fxRate)||1)});
  var pas=assetPassive(c);
- return '<div class="sec"><h4>資產總覽（換算台幣）</h4><div class="big3"><div class="b"><div class="l">資產總額</div><div class="v">'+fmt(tot)+'</div></div><div class="b"><div class="l">流動(可投資)</div><div class="v">'+fmt(liq)+'</div></div><div class="b"><div class="l">被動現金流(年)</div><div class="v">'+fmt(pas)+'</div></div><div class="b"><div class="l">未實現損益</div><div class="v" style="color:'+(pnl>=0?'var(--ok)':'var(--warn)')+'">'+fmt(pnl)+'</div></div></div><div class="hint" style="margin-top:8px">現值、購入價、被動現金流以「原幣」輸入，系統依匯率換算台幣統計。</div></div>'+tbl;
+ return '<div class="sec"><h4>資產總覽（換算台幣）</h4><div class="big3"><div class="b"><div class="l">資產總額</div><div class="v">'+fmt(tot)+'</div></div><div class="b"><div class="l">流動(可投資)</div><div class="v">'+fmt(liq)+'</div></div><div class="b"><div class="l">被動現金流(年)</div><div class="v">'+fmt(pas)+'</div></div><div class="b"><div class="l">未實現損益</div><div class="v" style="color:'+(pnl>=0?'var(--ok)':'var(--warn)')+'">'+fmt(pnl)+'</div></div></div><div class="hint" style="margin-top:8px">現值、購入價、被動現金流以「原幣」輸入，系統依匯率換算台幣統計。</div>'+autoBlockedHTML(c,'policyAsset')+'</div>'+tbl;
 }
 // months<=0 時分母 (1+i)^0−1 = 0 → Infinity，會原字串印到畫面（「月繳 Infinity」）。
 function pmt(bal,rate,months){months=n(months);if(!(months>0))return 0;var i=n(rate)/12/100;if(i<=0)return n(bal)/months;return n(bal)*i*Math.pow(1+i,months)/(Math.pow(1+i,months)-1)}
@@ -9724,6 +9870,7 @@ function finIncTable(c){
  var head='<tr><th></th><th>項目</th><th>持有人</th><th>類別</th><th>子類別</th><th>週期</th><th>金額</th><th>年化</th><th>起</th><th>訖</th><th></th></tr>';
  var body=order.map(function(o){var sub=0;
   var rows=idx.filter(function(p){return (p[0].owner||'(未指定)')===o}).map(function(p){var x=p[0],i=p[1];sub+=n(x.amount);var per=x.period||'年';
+   if(x.salaryAuto)return autoIncRowHTML(c,x,i);   // 本人月薪投影過來的那一列，鎖住不可手改
    var open=!!finOpenMap('incomes')[i];
    var tSel=['工作','理財','其他'].map(function(t){return '<option '+((x.type||'工作')===t?'selected':'')+'>'+t+'</option>'}).join('');
    var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
@@ -9751,6 +9898,19 @@ function finIncTable(c){
  return '<table>'+head+(body||'<tr><td colspan="11" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
 }
 
+// 本人月薪投影過來的收入列。與 premRowHTML／nhiRowHTML 同一套：鎖住、標來源、給一顆關閉。
+function autoIncRowHTML(c,x,i){
+ void i;
+ return '<tr class="autorow">'+
+  '<td class="dhcell"></td>'+
+  '<td>'+esc(x.name)+'<span class="rowmk" title="金額＝家庭/參數分頁「工作類別」填的本人月薪 ×12，要改請到那裡">來自月薪欄</span></td>'+
+  '<td>'+esc(x.owner)+'</td><td>工作</td><td>薪資</td><td>年</td>'+
+  '<td class="calc">'+fmt(n(x.amount))+'</td>'+
+  '<td class="calc">'+fmt(n(x.amount))+'</td>'+
+  '<td>'+esc(x.start===''||x.start==null?'—':x.start)+'</td><td>'+esc(x.end===''||x.end==null?'—':x.end)+'</td>'+
+  '<td class="acts"><button class="tbtn" style="padding:1px 7px;font-size:11px" onclick="jumpTab(\'family\')">去月薪欄</button>'+
+  '<button class="tbtn" style="padding:1px 7px;font-size:11px" onclick="toggleAutoRow(\'salary\')">關閉</button></td></tr>';
+}
 function finExpTable(c){
  var CATS=CAT_PARENTS.expense;
  // 通膨、可刪減%、一次性、備註搬進進階欄。⚠️ 可刪減% 是訪談必問的一項，
@@ -10066,7 +10226,7 @@ function financeSec(c){
  '</div>';
  var expNote=(app.ownerView&&app.ownerView!=='全家')?'<div class="finfoot" style="border:0;padding-top:0;color:var(--amber2)">＊ 支出屬家庭層級、不分持有人，仍顯示全部。</div>':'';
  var quad='<div class="finquad">'+
-  '<div class="finpanel inc"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div>'+sortBtn('incomes','income')+'<button class="add" onclick="addRow(\'incomes\')">＋ 新增</button></div><div class="fintbl">'+finIncTable(c)+'</div>'+assetIncomeMirrorHTML(c)+'</div>'+
+  '<div class="finpanel inc"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div>'+sortBtn('incomes','income')+'<button class="add" onclick="addRow(\'incomes\')">＋ 新增</button></div><div class="fintbl">'+finIncTable(c)+'</div>'+autoBlockedHTML(c,'salary')+assetIncomeMirrorHTML(c)+'</div>'+
   '<div class="finpanel exp"><div class="finph"><div class="ic" style="background:rgba(224,138,104,.16);color:var(--warn)">支</div><h4>支出</h4><div class="sub"><div class="sl">年化小計</div><div class="sv neg" id="finSub_exp">'+fmt(t.exp)+'</div></div>'+sortBtn('expenses','expense')+'<button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></div><div class="fintbl">'+finExpTable(c)+'</div>'+expNote+'</div>'+
   '<div class="finpanel ast"><div class="finph"><div class="ic" style="background:rgba(169,188,207,.16);color:var(--teal)">資</div><h4>資產 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">現值合計</div><div class="sv" style="color:var(--teal)" id="finSub_ast">'+fmt(t.ast)+'</div></div>'+sortBtn('assets','asset')+'<button class="add" onclick="addRow(\'assets\')">＋ 新增</button></div><div class="fintbl">'+finAstTable(c)+'</div><div class="finfoot"><span>原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
   '<div class="finpanel lia"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">債</div><h4>負債 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">餘額合計</div><div class="sv" style="color:var(--amber2)" id="finSub_lia">'+fmt(t.lia)+'</div></div>'+sortBtn('liabilities','liability')+'<button class="add" onclick="addRow(\'liabilities\')">＋ 新增</button></div><div class="fintbl">'+finLiaTable(c)+'</div><div class="finfoot"><span>餘額原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
