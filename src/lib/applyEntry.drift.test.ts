@@ -49,6 +49,37 @@ describe("申請入口的每一段都要接得上", () => {
   it("申請頁未登入時導向 /login（/sign-in 是沒有入口的孤兒頁）", () => {
     expect(R("src/app/dashboard/apply/page.tsx")).toContain("/login?redirect_url=/dashboard/apply");
   });
+
+  it("⚠️⚠️ 客戶端首頁要有報聘入口（登入之後唯一走得到的那條路）", () => {
+    // 2026/09/02 Ray 回報：「教練要報聘但是沒有路徑，只能一直被登記為客戶登入。」
+    // 真因不是表單壞了——/dashboard/apply 對只有客戶身分的帳號一直是通的。
+    // 真因是**指向它的連結全在登入前的官網**（LandingView 的「加入我們」、/login 頁腳兩行小字），
+    // 而 `/` 對已登入的人直接 redirect 到 /portal，客戶介面裡一條都沒有。
+    // 想報聘的人一註冊就落在客戶身分，然後永遠找不到入口。上面那些測試一條都不會紅。
+    const portal = R("src/app/portal/page.tsx");
+    expect(portal, "客戶端首頁要引入報聘入口區塊").toContain("CoachEntry");
+    const entry = R("src/app/portal/CoachEntry.tsx");
+    expect(entry, "報聘入口要真的連到申請頁").toMatch(/href="\/dashboard\/apply"/);
+    // 頁首那顆按鈕也要在（首屏就看得到，不用捲到底）。
+    expect(portal).toMatch(/href="\/dashboard\/apply"/);
+  });
+
+  it("⚠️ 待審中的人在客戶端不可以被標成「教練工作台」", () => {
+    // status !== 'active' 的人進 /dashboard 只會撞到 PendingNotice。
+    // 標成「工作台」等於給一顆進不去的門，使用者只會以為系統壞了。
+    const portal = R("src/app/portal/page.tsx");
+    expect(portal).toContain('coachState === "active"');
+    expect(portal).toContain("報聘審核中");
+    expect(portal).not.toMatch(/const isCoach\b/);
+  });
+
+  it("⚠️ 報聘三段進度只有一份實作（教練端與客戶端吃同一支純函式）", () => {
+    // 兩邊各抄一份的話，「直接申請沒有介紹人那一關」這個條件漏掉一邊就會出現
+    // 永遠灰著的「等待介紹人確認」——而畫面上完全看不出是 bug。
+    expect(R("src/lib/coachApply.ts")).toContain("export function applySteps");
+    expect(R("src/app/dashboard/PendingNotice.tsx")).toContain("applySteps");
+    expect(R("src/app/portal/CoachEntry.tsx")).toContain("applySteps");
+  });
 });
 
 describe("申請表單收得到後台審核要用的資料", () => {

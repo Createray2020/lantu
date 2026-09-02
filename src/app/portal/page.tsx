@@ -8,6 +8,8 @@ import { listClientTodos } from "@/lib/clientTodos";
 import { pendingInvite } from "@/lib/clientRiskQuiz";
 import Todos from "./Todos";
 import RiskQuizGate from "./RiskQuizGate";
+import CoachEntry from "./CoachEntry";
+import { getApplication } from "@/lib/coachApplyStore";
 import { normalizeIntent } from "@/lib/intent";
 import UiScaleToggle from "@/components/UiScaleToggle";
 import { computePassport, wan, ntfmt } from "@/lib/passport";
@@ -44,7 +46,33 @@ export default async function Portal() {
   // 教練↔客戶是雙棲的：教練也會用客戶介面做自己的規劃。
   // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。
   // 教練端頁首早就有「我的規劃」指過來，這條是把單向補成雙向。
-  const isCoach = (await db.select({ id: coaches.id }).from(coaches).where(eq(coaches.id, client.id)).limit(1)).length > 0;
+  //
+  // ⚠️ 這裡要的不是「是不是教練」的布林，是**三態**：
+  //    · 已開通（active）→ 頁首給「教練工作台」。
+  //    · 送出報聘但還沒開通（pending）→ 頁首給「報聘審核中」，內容區直接顯示三段進度。
+  //      status !== 'active' 的人進 /dashboard 只會看到 PendingNotice，所以標成「工作台」是騙人的。
+  //    · 根本沒有 coaches 列 → 頁首與內容區給「申請成為教練」的入口。
+  //      這一態原本畫面上什麼都沒有，報聘的路就是斷在這裡（見 CoachEntry 的註解）。
+  const coachRow = (
+    await db.select({ id: coaches.id, status: coaches.status }).from(coaches).where(eq(coaches.id, client.id)).limit(1)
+  )[0];
+  const coachState: "active" | "pending" | "suspended" | "none" = !coachRow
+    ? "none"
+    : coachRow.status === "active"
+      ? "active"
+      : coachRow.status === "suspended"
+        ? "suspended"
+        : "pending";
+  // 審核中才需要進度（舊帳號沒有申請表就回 null，CoachEntry 自己會只畫那句話）。
+  const applyRow = coachState === "pending" ? await getApplication(client.id) : null;
+  const applyProgress = applyRow
+    ? {
+        route: applyRow.route,
+        introducerState: applyRow.introducerState,
+        introducerName: applyRow.introducerName,
+        introducerNote: applyRow.introducerNote,
+      }
+    : null;
 
   // 五個面向的顏色。刻意**不動用** #ef6f6f（缺口）與 #f0c34e（可投資資產本金）這兩個
   // 全站既有的語意色——這裡的五段只是身分類別，沒有好壞。
@@ -97,12 +125,28 @@ export default async function Portal() {
         </Link>
         <div className="flex items-center gap-2">
           <UiScaleToggle compact />
-          {isCoach && (
+          {coachState === "active" && (
             <Link
               href="/dashboard"
               className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
             >
               教練工作台
+            </Link>
+          )}
+          {coachState === "pending" && (
+            <Link
+              href="/dashboard"
+              className="text-[13px] sm:text-sm text-[#e0bd8b] hover:text-white border border-[#c99a5b]/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              報聘審核中
+            </Link>
+          )}
+          {coachState === "none" && (
+            <Link
+              href="/dashboard/apply"
+              className="text-[13px] sm:text-sm text-[#e0bd8b] hover:text-white border border-[#c99a5b]/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              申請成為教練
             </Link>
           )}
           <SignOutButton redirectUrl="/">
@@ -226,6 +270,9 @@ export default async function Portal() {
             </Link>
           </div>
         )}
+
+        {/* 報聘入口：常駐、與有沒有做過人生護照無關。已開通的教練不畫（頁首已經有工作台）。 */}
+        {coachState !== "active" && <CoachEntry state={coachState} progress={applyProgress} />}
       </main>
     </div>
   );

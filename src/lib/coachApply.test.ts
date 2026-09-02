@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   APPLY_CONSENTS,
+  applySteps,
   DEFAULT_APPLY_SETTINGS,
   approvalGate,
   canSubmit,
@@ -137,5 +138,43 @@ describe("核准閘門", () => {
     expect(checklistFor(s, "referral")).toHaveLength(1);
     expect(approvalGate({ route: "direct", introducerState: "skipped", checked: [], hasApplication: true }, s).ok).toBe(true);
     expect(approvalGate({ route: "referral", introducerState: "confirmed", checked: [], hasApplication: true }, s).ok).toBe(false);
+  });
+});
+
+// 報聘進度：教練端的待開通頁與客戶端首頁畫的是同一份，所以規則釘在這裡。
+describe("applySteps：三段進度", () => {
+  it("推薦路線有介紹人那一關，直接申請沒有", () => {
+    const referral = applySteps({ route: "referral", introducerState: "pending", introducerName: null });
+    const direct = applySteps({ route: "direct", introducerState: "skipped", introducerName: null });
+    expect(referral).toHaveLength(3);
+    expect(direct).toHaveLength(2);
+    // ⚠️ 直接申請不是「跳過這一關」而是「這條路線沒有這一關」——
+    //    畫出一段永遠灰著的「等待介紹人確認」，使用者只會以為自己卡住了。
+    expect(direct.map((s) => s.label).join()).not.toContain("介紹人");
+  });
+
+  it("介紹人的名字有就帶上", () => {
+    const [, intro] = applySteps({ route: "referral", introducerState: "confirmed", introducerName: "邱浩軍" });
+    expect(intro.label).toBe("介紹人已確認（邱浩軍）");
+    expect(intro.done).toBe(true);
+    expect(intro.bad).toBe(false);
+  });
+
+  it("介紹人未確認標成 bad，不是「還沒到」", () => {
+    const [, intro] = applySteps({ route: "referral", introducerState: "declined", introducerName: null });
+    expect(intro.bad).toBe(true);
+    expect(intro.done).toBe(false);
+  });
+
+  it("審核那一關永遠是未完成（走到這裡就代表還沒開通）", () => {
+    for (const route of ["referral", "direct"]) {
+      const steps = applySteps({ route, introducerState: "confirmed", introducerName: null });
+      expect(steps[0].done).toBe(true);
+      expect(steps[steps.length - 1].done).toBe(false);
+    }
+  });
+
+  it("route 是 null（很舊的資料）也不會炸，落回預設路線", () => {
+    expect(() => applySteps({ route: null, introducerState: null, introducerName: null })).not.toThrow();
   });
 });

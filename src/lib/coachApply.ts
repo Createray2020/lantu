@@ -48,6 +48,39 @@ export const INTRODUCER_STATE_LABEL: Record<IntroducerState, string> = {
   skipped: "無需介紹人確認",
 };
 
+// ── 報聘進度（唯一真相）──────────────────────────────────────
+// 「已送出 → 介紹人確認 → 嵐途審核」這三段，教練端的待開通頁與客戶端首頁都要畫。
+// ⚠️ 兩邊各寫一份就是第二份實作：介紹人那一關是**只有推薦路線才存在**的（不是「跳過」而是
+//    「這條路線沒有這一關」），任何一邊漏掉這個條件，直接申請的人就會永遠看到一段停在灰色的
+//    「等待介紹人確認」——而畫面上完全看不出是 bug。所以抽到純函式層，兩邊吃同一支。
+export type ApplyProgressInput = {
+  route: string | null | undefined;
+  introducerState: string | null | undefined;
+  introducerName: string | null | undefined;
+};
+
+export type ApplyStep = { label: string; done: boolean; bad: boolean };
+
+export function applySteps(p: ApplyProgressInput): ApplyStep[] {
+  const st = (p.introducerState ?? "skipped") as IntroducerState;
+  const needsIntro = routeMeta(p.route).needsIntroducer;
+  return [
+    { label: "已送出報聘申請", done: true, bad: false },
+    ...(needsIntro
+      ? [
+          {
+            label: p.introducerName
+              ? `${INTRODUCER_STATE_LABEL[st]}（${p.introducerName}）`
+              : INTRODUCER_STATE_LABEL[st],
+            done: st === "confirmed",
+            bad: st === "declined",
+          },
+        ]
+      : []),
+    { label: "嵐途審核（含費用確認）", done: false, bad: false },
+  ];
+}
+
 // ── 說明欄（自述）────────────────────────────────────────────
 // 後台的「必填欄位」設定就是用這幾個 key。姓名與手機永遠必填，不進這份清單。
 export const APPLY_TEXT_FIELDS = [

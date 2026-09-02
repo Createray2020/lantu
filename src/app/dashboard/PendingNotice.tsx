@@ -1,7 +1,8 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { INTRODUCER_STATE_LABEL, routeMeta, type IntroducerState } from "@/lib/coachApply";
+import { applySteps, routeMeta } from "@/lib/coachApply";
+import ApplyStepList from "@/components/ApplyStepList";
 
 export type ApplyProgress = {
   route: string;
@@ -25,26 +26,9 @@ export default function PendingNotice({
   progress?: ApplyProgress | null;
 }) {
   const suspended = status === "suspended";
-  const st = (progress?.introducerState ?? "skipped") as IntroducerState;
-  const needsIntro = routeMeta(progress?.route).needsIntroducer;
-  const declined = st === "declined";
-
   // 三段：已送出 → 介紹人確認（只有推薦路線有）→ 嵐途審核。
-  const steps = [
-    { label: "已送出報聘申請", done: true },
-    ...(needsIntro
-      ? [
-          {
-            label: progress?.introducerName
-              ? `${INTRODUCER_STATE_LABEL[st]}（${progress.introducerName}）`
-              : INTRODUCER_STATE_LABEL[st],
-            done: st === "confirmed",
-            bad: declined,
-          },
-        ]
-      : []),
-    { label: "嵐途審核（含費用確認）", done: false },
-  ];
+  // ⚠️ 步驟本身走 lib/coachApply.ts 的 applySteps()——客戶端首頁畫的是同一份。
+  const steps = progress ? applySteps(progress) : [];
 
   return (
     <main className="flex-1 grid place-items-center bg-[#081a2b] text-[#eef2f7] px-6">
@@ -67,24 +51,7 @@ export default function PendingNotice({
         {!suspended && progress && (
           <div className="mt-5 mb-5 text-left border border-white/10 rounded-lg p-4 bg-[#0a1a2b]">
             <div className="text-[11px] text-[#6f869c] mb-2">報聘路線：{routeMeta(progress.route).label}</div>
-            <ol className="grid gap-2">
-              {steps.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 text-[12px]">
-                  <span
-                    className="mt-[2px] w-4 h-4 rounded-full grid place-items-center text-[9px] font-bold shrink-0"
-                    style={{
-                      background: s.bad ? "#e0a25b22" : s.done ? "#7fd1a822" : "#ffffff10",
-                      color: s.bad ? "#e0a25b" : s.done ? "#7fd1a8" : "#6f869c",
-                    }}
-                  >
-                    {s.bad ? "!" : s.done ? "✓" : i + 1}
-                  </span>
-                  <span className={s.done ? "text-[#a9bccf]" : s.bad ? "text-[#e0a25b]" : "text-[#6f869c]"}>
-                    {s.label}
-                  </span>
-                </li>
-              ))}
-            </ol>
+            <ApplyStepList steps={steps} />
             {progress.introducerNote && (
               <p className="mt-3 pt-3 border-t border-white/10 text-[11px] text-[#a9bccf] whitespace-pre-wrap">
                 介紹人留言：{progress.introducerNote}
