@@ -151,6 +151,12 @@ td.calc{white-space:nowrap}
 .gau .t{color:var(--mut);font-size:13px}.arc{width:150px;height:82px;margin:8px auto 2px}.gau .sc{font-size:26px;font-weight:800}
 .gradebox{display:inline-flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 20px}
 .gradebox .g{font-size:26px;font-weight:800;line-height:1.25;letter-spacing:.04em}
+.rmodebox{margin:6px 0 0}.rmodebtns{display:flex;gap:8px;flex-wrap:wrap}
+.rmode{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;color:var(--mut);font:inherit}
+.rmode b{font-size:13.5px;color:var(--tx)}.rmode span{font-size:11.5px;color:var(--mut)}
+.rmode.on{border-color:var(--amber);background:rgba(201,154,91,.12)}.rmode.on b{color:var(--amber2)}
+.romoney{padding:7px 10px;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-weight:700}
+.romoney .hint{font-weight:400}
 .rtable td.k{color:var(--tx);font-weight:700}.rtable code{color:var(--teal);font-family:ui-monospace,monospace;font-size:12px}
 .bad{color:var(--warn);font-weight:800}.good{color:var(--ok);font-weight:800}
 .bar{height:8px;background:#0a1a20;border-radius:5px;overflow:hidden;margin-top:5px}.bar>i{display:block;height:100%;background:var(--teal)}
@@ -781,7 +787,7 @@ function sampleCase(){return {
   {name:'自住房',owner:'王大明',mainCat:'自用資產',type:'不動產',cls:'固定',region:'台灣',currency:'台幣',fxRate:1,cost:14000000,value:15000000,ret:0,income:0,movable:false}
  ],
  liabilities:[{name:'房貸',owner:'王大明',mainCat:'房貸',currency:'台幣',fxRate:1,balance:10000000,rate:2,repay:'本息攤還',pay:42000,months:300,grace:0,startAge:38}],
- retire:{monthLiving:55000,replaceRate:75,retireReturn:4,retireInflation:1.5,prepared:[{item:'勞退',age:65,amount:3000000,method:'一次領'}]},
+ retire:{monthLiving:55000,mode:'detail',replaceRate:75,retireReturn:4,retireInflation:1.5,prepared:[{item:'勞退',age:65,amount:3000000,method:'一次領'}]},
  // 退休期支出＝「賺薪成員都退休後」的家庭年支出；每列可各自設起訖歲。
  retireExpenses:[
   {name:'退休生活費',cat:'生活',subCat:'餐食',period:'年',amount:480000,infl:true,startAge:'',endAge:''},
@@ -845,7 +851,7 @@ function sampleCase(){return {
   {name:'生活預備金',pct:6,ret:1,benefit:'流動安全網'}
  ]}
 };}
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['birthPlan','actions','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['birthPlan','actions','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,mode:'',retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
  c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={on:true,heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.profile.jobCompany='';c.profile.jobTitle='';c.profile.jobNote='';c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
 
 // ===== 工作類別 / 投保級距 =====
@@ -1304,6 +1310,9 @@ function migrateCompanies(c){
  migrateActionRefs(c);
  reapBirthOrphans(c);
  applyCareerPlan(c);
+ // 退休口徑：舊案沒有 mode，依現況判定——有明細列就是逐項，沒有就是簡易。
+ // 判定結果與改版前的隱式行為完全等價，所以既有客戶的退休需求一位不動。
+ if(c.retire.mode!=='simple'&&c.retire.mode!=='detail')c.retire.mode=((c.retireExpenses||[]).length?'detail':'simple');
  syncPremium(c);
  // 健保費那一列（可關掉；沒有任何成員填健保投保薪資時不產生，既有個案一位不動）。
  syncNHI(c);
@@ -1716,10 +1725,22 @@ function retiredWeight(c,age){
 // 退休期支出（＝賺薪成員都退休後的家庭年支出）。
 // c.retireExpenses[] 有列就逐列算（可各自設起訖歲：照護費 80 歲後才上來、旅遊前十年高），
 // 沒有就退回舊的 retire.monthLiving×12——既有客戶的數字不變。
+/* 退休需求的口徑：simple＝上面那格「期望退休月生活費」，detail＝下面那張逐項明細表。
+   ⚠️ 這兩個講的是同一件事（退休後的家庭年支出），不是「基本＋額外」，所以是二選一。
+   ⚠️ 舊版靠「明細表有沒有列」隱式判斷，結果是：教練把月生活費從 5.5 萬改到 16.5 萬，
+      退休總需求一位數都不動，而那格還開著、看起來還能填（Ray 0901 回報）。
+      改成明確的 mode 之後，migrateCase 依現況判定（有列→detail），既有客戶數字一位不動。
+   ⚠️ detail 但表被清空時退回 simple——否則刪光明細會讓退休需求瞬間變 0。 */
+function retireMode(c){
+ var m=((c||{}).retire||{}).mode;
+ var hasList=!!(((c||{}).retireExpenses||[]).length);
+ if(m!=='simple'&&m!=='detail')m=hasList?'detail':'simple';
+ return (m==='detail'&&!hasList)?'simple':m;
+}
 function retireAnnual(c,age,inflFactor){
  var list=(c||{}).retireExpenses||[];
  var ra=n((c.profile||{}).retireAge),le=n((c.profile||{}).lifeExp)||n((c.params||{}).horizon)||999;
- if(!list.length)return n(c.retire&&c.retire.monthLiving)*12*inflFactor;
+ if(retireMode(c)!=='detail')return n(c.retire&&c.retire.monthLiving)*12*inflFactor;
  var s=0;
  list.forEach(function(e){
   var st=n(e.startAge)||ra, en=n(e.endAge)||le;
@@ -1797,8 +1818,10 @@ function retireNeed(c){
  var r=c.retire||{},age=n(c.profile.age),ra=n(c.profile.retireAge),le=n(c.profile.lifeExp);
  var infl=n(c.params.inflation)/100, g=n(r.retireInflation)/100, rr=n(r.retireReturn)/100;
  var years=Math.max(0,ra-age), m=Math.max(0,le-ra);
- // 分子改吃「退休期支出表」：退休當年的家庭年支出（終值）。沒填明細表就退回 monthLiving。
- var hasList=!!((c.retireExpenses||[]).length);
+ // 分子改吃「退休期支出表」：退休當年的家庭年支出（終值）。簡易口徑就退回 monthLiving。
+ // ⚠️ 這裡的判斷必須與 retireAnnual() 走同一個 retireMode()，否則會出現
+ //    「分子用明細表、逐年迴圈卻拿到 monthLiving」的混血算法。
+ var hasList=retireMode(c)==='detail';
  var annualFV=hasList?retireAnnual(c,ra,Math.pow(1+infl,years)):n(r.monthLiving)*12*Math.pow(1+infl,years);
  var monthFV=annualFV/12;
  var total;
@@ -3460,6 +3483,20 @@ function allocInvest(c){
  });
  return own.concat(fromAct);
 }
+/* 這張表到底影響什麼——講清楚，不然教練填了半天不知道有沒有算進去。
+   ⚠️ 「本金／每年投入」**永遠不進現金流投影**：這張表回答的是「錢放哪、加權報酬多少」，
+      要讓一筆投入進現金流，得用「調整方案 → 調整動作」那張表（走分離池）。
+   ⚠️ 加權報酬也要 plan.useAllocReturn 打開才會被試算採用，預設是關的。 */
+function allocInvestReachHTML(c){
+ var own=allocInvestOwn(c);
+ if(!own.length)return '';
+ var on=!!((c.plan||{}).useAllocReturn);
+ var col=on?'var(--ok)':'var(--warn)';
+ return '<div class="hint" style="display:block;margin-top:8px;color:'+col+'">'+
+  (on?'✓ ':'⚠ ')+'這張表的<b>本金與每年投入不會進現金流投影</b>，它只決定配置比重與加權報酬。'+
+  (on?'加權報酬目前已被試算採用。':'而且下方「讓試算直接跟著配置的加權報酬走」<b>沒有勾</b>——所以這張表目前不影響任何數字。')+
+  '<br>要讓一筆投入真的改變缺口，請到<b>「調整方案 → 調整動作」</b>登錄（定期定額／單筆投入），那張表才會進現金流。</div>';
+}
 function allocInvestOwn(c){return ((c.plan||{}).invest)||[]}
 function allocProtect(c){return ((c.plan||{}).protect)||[]}
 
@@ -5080,6 +5117,7 @@ function fillRetireFromWork(){
   return {name:e.name||'',cat:e.cat,subCat:e.subCat||'',period:'年',
    amount:Math.round(n(e.amount)*rate/100),infl:e.infl!==false,startAge:'',endAge:''};
  });
+ c.retire=c.retire||{};c.retire.mode='detail';   // 帶入了就是要逐項算，不用再多按一次
  save();render();
 }
 function retireExpSec(c){
@@ -5224,15 +5262,45 @@ function retireAgeBoxHTML(c){
  return '<div class="sec"><h4>想幾歲退休 <span class="hint">每位賺薪成員各有自己的退休時點，家庭生活消費依「已退休的人」的支出比例逐步換到退休期</span></h4>'+
   '<div class="fgrid">'+rows.join('')+'</div>'+warn+'</div>';
 }
+/* 退休口徑的二選一。兩個選項講的是同一件事，所以永遠只有一邊在算，
+   而且畫面要直接寫出「現在採用的是哪一套、合計多少」——不能只在提示裡帶一句。 */
+function retireExpTotal(c){return sum(c.retireExpenses,function(x){return n(x.amount)})}
+function setRetireMode(m){
+ var c=activeCase();if(!c)return;
+ c.retire=c.retire||{};
+ if(m==='detail'&&!((c.retireExpenses||[]).length)){
+  addRow('retireExpenses');            // addRow 自己會 save+render
+  c=activeCase();c.retire.mode='detail';save();render();return;
+ }
+ c.retire.mode=m;save();render();
+}
+function retireModeBox(c){
+ var mode=retireMode(c),nRow=(c.retireExpenses||[]).length,tot=retireExpTotal(c);
+ var btn=function(k,t,d){
+  var on=mode===k;
+  return '<button class="rmode'+(on?' on':'')+'" onclick="setRetireMode(\''+k+'\')" aria-pressed="'+on+'">'+
+   '<b>'+t+'</b><span>'+d+'</span></button>';
+ };
+ var now=mode==='detail'
+  ? '目前採用：<b>退休期支出明細</b>（'+nRow+' 列，合計 '+fmt(tot)+' 元/年，現值）'
+  : '目前採用：<b>期望退休月生活費</b>（'+fmt(n((c.retire||{}).monthLiving))+' 元/月 → '+fmt(n((c.retire||{}).monthLiving)*12)+' 元/年）';
+ return '<div class="rmodebox"><div class="rmodebtns">'+
+  btn('simple','簡易估算','一個月生活費數字，初談時先抓個量級')+
+  btn('detail','逐項明細','醫療、照護、旅遊各自的金額與起訖歲')+
+  '</div><div class="hint" style="margin:8px 0 0">'+now+
+  '。<b style="color:var(--amber2)">另一邊的資料會保留，但不列入計算</b>——這兩個講的是同一件事（退休後的家庭年支出），不相加。</div></div>';
+}
 function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
  var hasList=!!((c.retireExpenses||[]).length);
+ var detail=retireMode(c)==='detail';
  var pf=[['monthLiving','期望退休月生活費(現值)','money'],['retireReturn','退休後報酬率%','num'],['retireInflation','退休後通膨%','num']]
   .map(function(x){var bind='onchange="setRetire(\''+x[0]+'\',this.value,\'num\');render()"';
-   var box=(x[2]==='money')?moneyCell(bind,r[x[0]]):'<input type="number" value="'+esc(r[x[0]])+'" '+bind+'>';
+   // ⚠️ 逐項模式下這一格不參與計算，就不要讓它看起來還能填——這正是 Ray 回報的問題。
+   var box=(x[0]==='monthLiving'&&detail)
+    ? '<div class="romoney" title="目前採用逐項明細表，這一格不列入計算">'+fmt(n(r.monthLiving))+' <span class="hint">元/月 · 未採用</span></div>'
+    : ((x[2]==='money')?moneyCell(bind,r[x[0]]):'<input type="number" value="'+esc(r[x[0]])+'" '+bind+'>');
    return '<div class="f"><label>'+x[1]+'</label>'+box+'</div>';}).join('');
- var srcNote=hasList
-  ? '<div class="hint" style="margin:6px 0 0;color:var(--ok)">退休需求已改吃下方的「退休期支出明細」（'+(c.retireExpenses||[]).length+' 列）；上面的「期望退休月生活費」只在明細表清空時才會被用到。</div>'
-  : '<div class="hint" style="margin:6px 0 0">目前用「期望退休月生活費」單一數字估算。到下方填退休期支出明細，就能分項規劃（醫療、照護、旅遊各自的起訖歲）。</div>';
+ var srcNote=retireModeBox(c);
  // ⚠️ 「方式」補上「自提」（庫內 6 筆在用，之前靠 selOpts 的舊值相容才沒被靜靜改掉）。
  //    「確認為月額」是給 preparedSuspect 的活路：金額大到不可能是月額時引擎不換算，勾了才換算。
  var prep=tableSec('已準備退休金','prepared',r.prepared||[],[['item','項目','text'],['age','領取年齡','num'],['amount','金額','money'],['method','方式','sel:一次領,月領,自提'],['monthlyOk','確認為月額','bool']]);
@@ -5248,7 +5316,7 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
    '<div style="margin-top:12px"><div data-calc="retireHero">'+retireHeroHTML(c)+'</div></div>'+
   '</div>'+
   foldHTML('退休時點 · 各成員退休順序與混合期權重',retirePhaseHTML(c))+
-  retireExpSec(c)+
+  (retireMode(c)==='detail'?retireExpSec(c):foldHTML('退休期支出明細（目前未採用）',retireExpSec(c)))+
   foldHTML('勞保 / 勞退 / 國民年金 概算（可一鍵帶入已備）',laborPensionBox(c)+laborDetailHTML(c))+
   prep+'<div data-calc="preparedConv">'+preparedConvHTML(c)+'</div>';
 }
@@ -6815,7 +6883,8 @@ function allocSecHTML(c){
    ['years','投入年數(空=到退休)','num'],
    ['ret','預期報酬%','num'],
    ['note','備註 / 條件','text']],
-   '「新增投入」才算補缺口；「既有轉入」是把現有可投資資產換個地方放，只影響加權報酬率。年投入不會被當成支出（那是把消費轉成投資，不是花掉）。');
+   '「新增投入」才算補缺口；「既有轉入」是把現有可投資資產換個地方放，只影響加權報酬率。年投入不會被當成支出（那是把消費轉成投資，不是花掉）。')+
+  allocInvestReachHTML(c);
  var proTbl=tableSec('保障型配置','planProtect',allocProtect(c),[
    ['gapKey','對應缺口','sel:'+gapOpts],
    ['name','險種 / 結構（可留空）','text'],

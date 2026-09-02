@@ -86,7 +86,7 @@ function sampleCase(){return {
   {name:'自住房',owner:'王大明',mainCat:'自用資產',type:'不動產',cls:'固定',region:'台灣',currency:'台幣',fxRate:1,cost:14000000,value:15000000,ret:0,income:0,movable:false}
  ],
  liabilities:[{name:'房貸',owner:'王大明',mainCat:'房貸',currency:'台幣',fxRate:1,balance:10000000,rate:2,repay:'本息攤還',pay:42000,months:300,grace:0,startAge:38}],
- retire:{monthLiving:55000,replaceRate:75,retireReturn:4,retireInflation:1.5,prepared:[{item:'勞退',age:65,amount:3000000,method:'一次領'}]},
+ retire:{monthLiving:55000,mode:'detail',replaceRate:75,retireReturn:4,retireInflation:1.5,prepared:[{item:'勞退',age:65,amount:3000000,method:'一次領'}]},
  // 退休期支出＝「賺薪成員都退休後」的家庭年支出；每列可各自設起訖歲。
  retireExpenses:[
   {name:'退休生活費',cat:'生活',subCat:'餐食',period:'年',amount:480000,infl:true,startAge:'',endAge:''},
@@ -147,7 +147,7 @@ function sampleCase(){return {
 
 function defaultCompany(){return {name:'',taxId:'',industry:'',role:'負責人',sharePct:100,annualRevenue:0,netProfit:0,ownerLoan:0,note:''};}
 
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0,estateDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,mode:'',retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0,estateDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
  // profile.credit 是信用評分的舊欄位（與 credit.score 雙寫）。sampleCase 帶 700 分，
  // 這裡若不一併清掉，新客戶會憑空拿到示範資料的評分並白送約 12.5 分財務安全度。
  c.profile.credit='';
@@ -410,12 +410,20 @@ function retiredWeight(c,age){
  return done/tot;
 }
 // 退休期支出（＝賺薪成員都退休後的家庭年支出）。
-// c.retireExpenses[] 有列就逐列算（可各自設起訖歲：照護費 80 歲後才上來、旅遊前十年高），
-// 沒有就退回舊的 retire.monthLiving×12——既有客戶的數字不變。
+// 口徑二選一：simple＝retire.monthLiving×12，detail＝retireExpenses 逐列（可各自設起訖歲）。
+// ⚠️ 2026/09/01 起改吃明確的 retire.mode，不再用「表有沒有列」隱式判斷；
+//    migrateCase 依現況補判定（有列→detail），既有客戶的數字一位不動。
+// ⚠️ detail 但表被清空時退回 simple——否則刪光明細會讓退休需求瞬間變 0。
+function retireMode(c){
+ var m=((c||{}).retire||{}).mode;
+ var hasList=!!(((c||{}).retireExpenses||[]).length);
+ if(m!=='simple'&&m!=='detail')m=hasList?'detail':'simple';
+ return (m==='detail'&&!hasList)?'simple':m;
+}
 function retireAnnual(c,age,inflFactor){
  var list=(c||{}).retireExpenses||[];
  var ra=n((c.profile||{}).retireAge),le=n((c.profile||{}).lifeExp)||n((c.params||{}).horizon)||999;
- if(!list.length)return n(c.retire&&c.retire.monthLiving)*12*inflFactor;
+ if(retireMode(c)!=='detail')return n(c.retire&&c.retire.monthLiving)*12*inflFactor;
  var s=0;
  list.forEach(function(e){
   var st=n(e.startAge)||ra, en=n(e.endAge)||le;
@@ -494,8 +502,10 @@ function retireNeed(c){
  var r=c.retire||{},age=n(c.profile.age),ra=n(c.profile.retireAge),le=n(c.profile.lifeExp);
  var infl=n(c.params.inflation)/100, g=n(r.retireInflation)/100, rr=n(r.retireReturn)/100;
  var years=Math.max(0,ra-age), m=Math.max(0,le-ra);
- // 分子改吃「退休期支出表」：退休當年的家庭年支出（終值）。沒填明細表就退回 monthLiving。
- var hasList=!!((c.retireExpenses||[]).length);
+ // 分子改吃「退休期支出表」：退休當年的家庭年支出（終值）。簡易口徑就退回 monthLiving。
+ // ⚠️ 這裡的判斷必須與 retireAnnual() 走同一個 retireMode()，否則會出現
+ //    「分子用明細表、逐年迴圈卻拿到 monthLiving」的混血算法。
+ var hasList=retireMode(c)==='detail';
  var annualFV=hasList?retireAnnual(c,ra,Math.pow(1+infl,years)):n(r.monthLiving)*12*Math.pow(1+infl,years);
  var monthFV=annualFV/12;
  var total;
@@ -2707,6 +2717,7 @@ export {
   DEFAULT_RETIRE_AGE,
   retiredWeight,
   retireAnnual,
+  retireMode,
   workPhaseExpense,
   inSpan,
   nowAge,

@@ -356,11 +356,30 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(HTML).not.toContain("age>n(c.profile.retireAge))? n(c.retire&&c.retire.monthLiving)*12");
   });
 
-  it("退休期支出明細表空著時，退回舊的 monthLiving×12", () => {
-    expect(HTML).toContain("if(!list.length)return n(c.retire&&c.retire.monthLiving)*12*inflFactor;");
+  // 2026/09/01：口徑從「表有沒有列」的隱式判斷，改成明確的 retire.mode（simple / detail）。
+  // Ray 回報：月生活費那格改了數字完全不動，畫面卻還讓人填。判定結果與舊行為等價。
+  it("簡易口徑時退回 monthLiving×12", () => {
+    expect(HTML).toContain("if(retireMode(c)!=='detail')return n(c.retire&&c.retire.monthLiving)*12*inflFactor;");
     const c = E.sampleCase();
     c.retireExpenses = [];
+    c.retire.mode = "";
     expect(E.retireAnnual(c, 70, 1)).toBe(E.n(c.retire.monthLiving) * 12);
+  });
+
+  it("⚠️ mode 是 detail 但明細表被清空時退回簡易，不會算成 0", () => {
+    const c = E.sampleCase();
+    c.retireExpenses = [];
+    c.retire.mode = "detail";
+    expect(E.retireMode(c)).toBe("simple");
+    expect(E.retireAnnual(c, 70, 1)).toBe(E.n(c.retire.monthLiving) * 12);
+  });
+
+  it("⚠️ retireNeed 與 retireAnnual 必須走同一個 retireMode（不能一個看表、一個看 mode）", () => {
+    expect(HTML).toContain("var hasList=retireMode(c)==='detail';");
+    const c = E.sampleCase();
+    c.retire.mode = "simple";
+    // 明細表還在，但口徑是簡易 → 分子必須是 monthLiving，不是明細合計
+    expect(E.retireAnnual(c, E.n(c.profile.retireAge), 1)).toBe(E.n(c.retire.monthLiving) * 12);
   });
 
   it("retireNeed：有明細表走逐年折現、沒有走封閉式年金，兩邊一致", () => {
