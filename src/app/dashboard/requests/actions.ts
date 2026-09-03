@@ -44,7 +44,7 @@ export async function respondCollabInviteAction(inviteId: string, accept: boolea
   return { ok: true as const };
 }
 
-// 介紹人確認／婉拒一件報聘申請。
+// 推薦人確認／婉拒一件報聘申請。
 //
 // 刻意**不擋使用期限**：確認推薦寫的不是自己的規劃資料，而是「這個人我認得」這件事實；
 // 到期鎖定的語意是「能看不能改自己的案子」，沒有理由連替公司確認一位新人都不行

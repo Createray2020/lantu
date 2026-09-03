@@ -34,7 +34,7 @@ export default async function AdvisorsPage() {
     .map((c) => {
       const ov = buildOverview(
         {
-          id: c.id, name: c.name, rankCode: c.rankCode, uplineId: c.uplineId, sponsorId: c.sponsorId,
+          id: c.id, name: c.name, rankCode: c.rankCode, uplineId: c.uplineId,
           hireDate: c.hireDate, entryType: c.entryType,
           tenureRankCode: c.tenureRankCode, tenureUntil: c.tenureUntil,
           initialCases: c.initialCases, initialFees: c.initialFees,
@@ -51,7 +51,6 @@ export default async function AdvisorsPage() {
         status: c.status,
         rankCode: c.rankCode,
         uplineName: c.uplineId ? (nameById.get(c.uplineId) ?? "—") : "—",
-        sponsorId: c.sponsorId,
         entryType: c.entryType,
         hireDate: c.hireDate,
         tenureRankCode: c.tenureRankCode,

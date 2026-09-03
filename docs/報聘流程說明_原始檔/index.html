@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>嵐途報聘流程說明</title>
+<style>
+  :root{
+    --navy:#0d2438;
+    --navy-2:#12334f;
+    --gold:#c99a5b;
+    --gold-lt:#e0bd8b;
+    --ink:#1d2b38;
+    --muted:#5d7183;
+    --line:#d9e0e7;
+    --wash:#f4f7fa;
+  }
+  @page{ size:A4; margin:18mm 16mm 16mm 16mm; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:"Noto Sans CJK TC","Noto Sans CJK HK",sans-serif;
+    color:var(--ink);
+    font-size:10.2pt;
+    line-height:1.85;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .page{ page-break-after:always; }
+  .page:last-child{ page-break-after:auto; }
+
+  /* ── 封面 ───────────────────────────── */
+  .cover{
+    background:var(--navy);
+    color:#eef2f7;
+    padding:26mm 18mm 16mm 18mm;
+    height:245mm;
+    display:flex;
+    flex-direction:column;
+  }
+  .mark{
+    width:16mm;height:16mm;border:1.2pt solid var(--gold);border-radius:4mm;
+    display:flex;align-items:center;justify-content:center;margin-bottom:14mm;
+  }
+  .mark svg{ display:block; }
+  .kicker{
+    color:var(--gold); font-size:8pt; letter-spacing:.42em; margin-bottom:6mm;
+  }
+  .cover h1{
+    font-family:"Noto Serif CJK TC",serif;
+    font-weight:500; font-size:27pt; line-height:1.35; margin:0 0 8mm 0;
+    letter-spacing:.04em;
+  }
+  .cover .lede{ color:#a9bccf; font-size:10.5pt; line-height:1.95; max-width:118mm; }
+  .cover .site{
+    margin-top:12mm; border:0.8pt solid rgba(255,255,255,.18); border-radius:3mm;
+    padding:7mm 8mm; color:#8fa8bd; font-size:9pt;
+  }
+  .cover .site .url{ color:var(--gold-lt); font-size:11pt; letter-spacing:.06em; margin-top:3mm; }
+  .cover .toc{
+    margin-top:auto; border-top:0.8pt solid rgba(255,255,255,.16); padding-top:7mm;
+    display:flex; gap:14mm;
+  }
+  .cover .toc b{ color:var(--gold); font-size:8.5pt; letter-spacing:.2em; display:block; margin-bottom:2mm; font-weight:700; }
+  .cover .toc span{ color:#a9bccf; font-size:9.5pt; }
+  .cover .meta{
+    margin-top:9mm; display:flex; justify-content:space-between;
+    color:#6f869c; font-size:8.5pt; letter-spacing:.08em;
+  }
+
+  /* ── 內頁 ───────────────────────────── */
+  .chap{ color:var(--gold); font-size:8.5pt; letter-spacing:.34em; font-weight:700; margin-bottom:3mm; }
+  h2{
+    font-family:"Noto Serif CJK TC",serif; font-weight:500;
+    font-size:20pt; margin:0 0 3mm 0; color:var(--navy); letter-spacing:.03em;
+  }
+  h3{ font-size:11.5pt; margin:9mm 0 3mm 0; color:var(--navy); letter-spacing:.02em; }
+  h4{ font-size:10.5pt; margin:6mm 0 2mm 0; color:var(--navy); }
+  p{ margin:0 0 3.5mm 0; }
+  .sub{ color:var(--muted); font-size:9.5pt; margin-bottom:6mm; }
+  .small{ font-size:9pt; color:var(--muted); }
+  strong{ font-weight:700; }
+  em{ font-style:normal; color:var(--gold); font-weight:700; }
+
+  hr{ border:0; border-top:0.8pt solid var(--line); margin:7mm 0; }
+
+  /* 步驟列 */
+  .steps{ display:flex; align-items:stretch; gap:3mm; margin:5mm 0 7mm 0; }
+  .steps .box{
+    flex:1; border:0.8pt solid var(--line); border-radius:2.5mm; padding:4mm 4mm;
+    background:var(--wash);
+  }
+  .steps .box b{
+    display:block; color:var(--gold); font-size:7.6pt; letter-spacing:.18em; margin-bottom:2mm;
+  }
+  .steps .box span{ font-size:9pt; line-height:1.7; display:block; }
+  .steps .arr{ align-self:center; color:var(--gold); font-size:11pt; }
+
+  /* 三件事 / 一般表格 */
+  table{ width:100%; border-collapse:collapse; margin:3mm 0 5mm 0; font-size:9.4pt; }
+  th{
+    background:var(--wash); color:var(--navy); text-align:left; font-weight:700;
+    padding:2.6mm 3mm; border-top:0.8pt solid var(--line); border-bottom:0.8pt solid var(--line);
+  }
+  td{ padding:2.6mm 3mm; border-bottom:0.6pt solid var(--line); vertical-align:top; line-height:1.75; }
+  td:first-child, th:first-child{ width:34mm; }
+  table.wide td:first-child, table.wide th:first-child{ width:26mm; }
+  table.rules td:first-child, table.rules th:first-child{ width:28mm; font-weight:700; }
+
+  /* 說明框 */
+  .note{
+    background:var(--wash); border-left:1.6pt solid var(--gold);
+    padding:4mm 5mm; margin:5mm 0; font-size:9.2pt; line-height:1.85; color:#33465a;
+  }
+  .note b{ color:var(--navy); }
+
+  /* 步驟編號 */
+  .step{ margin:0 0 4mm 0; }
+  .step .hd{ display:flex; gap:3mm; align-items:baseline; }
+  .step .no{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:5.4mm; height:5.4mm; border-radius:50%; background:var(--navy); color:#fff;
+    font-size:8pt; font-weight:700; flex:0 0 auto;
+  }
+  .step .ttl{ font-weight:700; font-size:10.6pt; color:var(--navy); }
+  .step .body{ padding-left:8.4mm; margin-top:1.5mm; }
+
+  figure{ margin:4mm 0 3mm 0; }
+  figure img{ width:100%; display:block; border:0.8pt solid var(--line); border-radius:2mm; }
+  figcaption{ margin-top:2.2mm; font-size:8.4pt; color:var(--muted); line-height:1.7; }
+
+  ul{ margin:0 0 3.5mm 0; padding-left:5mm; }
+  li{ margin-bottom:1.4mm; }
+  ul.tick{ list-style:none; padding-left:0; }
+  ul.tick li{ padding-left:5mm; position:relative; }
+  ul.tick li::before{ content:"▪"; position:absolute; left:0; color:var(--gold); }
+
+  .faq{ margin-bottom:4.5mm; }
+  .faq .q{ font-weight:700; color:var(--navy); font-size:10pt; margin-bottom:1mm; }
+  .faq .q .mk{ color:var(--gold); margin-right:2mm; }
+  .faq .a{ font-size:9.4pt; color:#33465a; line-height:1.85; }
+
+  ol.consents{ padding-left:6mm; font-size:9.4pt; }
+  ol.consents li{ margin-bottom:2.4mm; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 封面 ═══════════ -->
+<section class="page">
+  <div class="cover">
+    <div class="mark">
+      <svg width="26" height="26" viewBox="0 0 48 48" fill="none">
+        <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="kicker">嵐途 LAN TU · FINANCIAL PLANNING</div>
+    <h1>報聘流程說明<br>從登入到送出</h1>
+    <div class="lede">
+      想成為嵐途財務教練，該從哪裡登入、申請的入口在哪、要填什麼、送出之後會發生什麼——這份文件用實際畫面一步一步走完。
+    </div>
+    <div class="site">
+      嵐途官網
+      <div class="url">＿＿＿＿＿＿＿＿＿＿＿＿＿＿</div>
+    </div>
+    <div class="toc">
+      <div><b>第一章</b><span>給想報聘的人</span></div>
+      <div><b>第二章</b><span>給現職教練（推薦人）</span></div>
+      <div><b>附錄</b><span>規則速查</span></div>
+    </div>
+    <div class="meta"><span>嵐途 LAN TU 內部文件</span><span>2026 年 9 月</span></div>
+  </div>
+</section>
+
+<!-- ═══════════ 第一章首頁 ═══════════ -->
+<section class="page">
+  <div class="chap">CHAPTER 1</div>
+  <h2>給想報聘的人</h2>
+  <p class="sub">申請人可自行完成整個報聘申請流程，不需要任何人代辦。</p>
+
+  <p>線上報聘申請只有六個步驟，大約十分鐘即可完成：登入 → 註冊帳號 → 在客戶首頁按「申請成為教練」→ 填申請表 → 送出 → 等待審核。</p>
+
+  <div class="steps">
+    <div class="box"><b>STEP 1–3</b><span>從官網登入，<br>辦一組帳號</span></div>
+    <div class="arr">→</div>
+    <div class="box"><b>STEP 4</b><span>在客戶首頁找到<br>「申請成為教練」</span></div>
+    <div class="arr">→</div>
+    <div class="box"><b>STEP 5–6</b><span>填四段申請表<br>並送出</span></div>
+    <div class="arr">→</div>
+    <div class="box"><b>審核</b><span>推薦人確認<br>＋嵐途審核</span></div>
+  </div>
+
+  <h3>開始之前，三件事先知道</h3>
+
+  <h4>一、教練與客戶是同一組帳號</h4>
+  <p>嵐途只有一個登入入口。你先辦的是一組一般帳號（系統裡屬於「客戶」身分），報聘核准之後，同一組帳號就同時具備教練身分——不必再辦第二組，原本的個人財務規劃也都還在。所以第一次登入看到的是客戶畫面，這是正常的，不是走錯地方。</p>
+
+  <h4>二、報聘有兩條路線，選一條就好</h4>
+  <table>
+    <tr><th>路線</th><th>說明</th></tr>
+    <tr><td>教練推薦</td><td>由現職嵐途教練推薦申請。填入推薦人的教練編號，送出後由推薦人確認，再進入嵐途審核。</td></tr>
+    <tr><td>直接申請</td><td>沒有推薦人也可以。不需要任何人先確認，直接送出、由嵐途直接審核。</td></tr>
+  </table>
+
+  <h4>三、不用準備任何檔案</h4>
+  <p>證照與資歷是用選單和欄位填的，系統不收上傳檔，也不用先掃描證書。沒有證照一樣可以申請。</p>
+
+  <div class="note">
+    嵐途的收費與業務界線，在申請表最後一段會請你逐條確認：嵐途是一般顧問公司（非金融特許事業），<b>透過嵐途所取得之收入為顧問服務收入，不來自金融商品佣金</b>；也不得以嵐途名義從事投資顧問或保險招攬。三條聲明全部勾選才送得出去——這不是形式，是報聘進來的第一件事就要對齊的前提。
+  </div>
+</section>
+
+<!-- ═══════════ STEP 1 ═══════════ -->
+<section class="page">
+  <h3 style="margin-top:0">第一段：進到嵐途、辦一組帳號</h3>
+
+  <div class="step">
+    <div class="hd"><span class="no">1</span><span class="ttl">打開嵐途官網，按右上角「登入」</span></div>
+    <div class="body">
+      <p>官網首頁右上角固定有一顆「登入」。首頁最下面另外有一張「你是財務從業人員嗎？」的卡片，想先了解教練在做什麼，可以從那裡進去看。</p>
+      <figure>
+        <img src="img/01-landing.png" alt="嵐途官網首頁">
+        <figcaption>① 右上角「登入」是所有人的入口（教練與客戶共用）。　② 首頁最下方的招募卡，可先了解教練工作。</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ STEP 2 ═══════════ -->
+<section class="page">
+  <div class="step">
+    <div class="hd"><span class="no">2</span><span class="ttl">在登入頁選你的狀況</span></div>
+    <div class="body">
+      <p>登入頁下方有兩條路：還沒有帳號，先按「免費申請」辦一組；已經有嵐途帳號（例如你本來就是客戶），直接按最下面那行的「直接申請」，會帶你到報聘申請表。</p>
+      <figure>
+        <img src="img/02-login.png" alt="登入頁">
+        <figcaption>① 第一次來 → 免費申請，先辦帳號。　② 已經有帳號 → 直接申請，一步到申請表。</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="hd"><span class="no">3</span><span class="ttl">註冊帳號</span></div>
+    <div class="body">
+      <p>用 Google 帳號一鍵註冊最快，也可以用 email＋密碼。註冊完成會自動登入。</p>
+      <div class="note">提醒：請用你長期會用的 email。這組帳號之後就是你的教練帳號，審核通知與後續登入都走它。</div>
+      <figure>
+        <img src="img/03-signup.png" alt="註冊頁">
+        <figcaption>① 兩種註冊方式都可以，擇一即可。</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ STEP 4 ═══════════ -->
+<section class="page">
+  <div class="step">
+    <div class="hd"><span class="no">4</span><span class="ttl">登入後，在自己的首頁按「申請成為教練」</span></div>
+    <div class="body">
+      <p>登入後會落在你自己的首頁（客戶介面）。報聘入口有兩個，按哪一個都一樣：頁首右上角的「申請成為教練」，或首頁下方那張說明卡裡的金色按鈕。</p>
+      <figure>
+        <img src="img/04-portal.png" alt="客戶首頁的報聘入口">
+        <figcaption>① 頁首常駐，在客戶介面的任何一頁都回得來。　② 首頁下方的說明卡，按金色鈕直接進申請表。</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ STEP 5 ═══════════ -->
+<section class="page">
+  <h3 style="margin-top:0">第二段：填申請表（四段，約五分鐘）</h3>
+  <div class="step">
+    <div class="hd"><span class="no">5</span><span class="ttl">① 報聘路線　② 基本資料</span></div>
+    <div class="body">
+      <p>先選路線，下面的欄位會跟著變——選「教練推薦」才會出現推薦人教練編號那一欄。編號填對之後，畫面會當場顯示推薦人的姓名，可以確認有沒有打錯。</p>
+      <p>必填只有三個：</p>
+      <ul class="tick">
+        <li>姓名、手機</li>
+        <li>報聘動機</li>
+        <li>推薦人教練編號（只有「教練推薦」路線需要）</li>
+      </ul>
+      <p>「目前工作／現況」與「相關經歷與可投入時間」是選填，但這兩欄是審核者最主要的判斷依據，建議填寫。</p>
+      <figure>
+        <img src="img/05-form-basic.png" alt="申請表前兩段">
+        <figcaption>① 兩張路線卡，選中的會亮起金色框。　② 編號填對會即時顯示推薦人姓名；查無編號仍可送出，只是改由嵐途人工確認。</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ STEP 6 ═══════════ -->
+<section class="page">
+  <div class="step">
+    <div class="hd"><span class="no">6</span><span class="ttl">③ 證照與資歷　④ 聲明 → 送出</span></div>
+    <div class="body">
+      <p>證照這一段是選填，最多可以填八項；每一項選類別，再補「取得年月」與「證書字號」。完整填寫有助於後續審核，但沒有證照不影響你能不能申請。</p>
+      <p>聲明三條都要勾，少勾一條送出鈕不會亮。按鈕下方會直接寫出你還缺哪一欄，照著補完就能送。</p>
+      <figure>
+        <img src="img/06-form-consent.png" alt="申請表後兩段">
+        <figcaption>③ 證照選填，不需要上傳任何檔案。　④ 三條聲明全勾才送得出去。　⑤ 走教練推薦路線時，按鈕會寫「送出報聘申請（通知推薦人確認）」。</figcaption>
+      </figure>
+      <div class="note">可以重送。一個人只會有一份申請表，重新送出是覆蓋原本那份、不會變成兩件，所以填錯了不用緊張。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 送出之後 ═══════════ -->
+<section class="page">
+  <h3 style="margin-top:0">第三段：送出之後會發生什麼</h3>
+  <p>送出後回到你的首頁，頁首會從「申請成為教練」變成「報聘審核中」，首頁上也會出現一張進度卡——卡在哪一關，你自己看得到，不用回頭問人。</p>
+  <figure>
+    <img src="img/07-progress.png" alt="報聘進度卡">
+    <figcaption>① 送出後頁首變成「報聘審核中」。　② 三段進度：已送出 → 推薦人確認 → 嵐途審核。走「直接申請」路線的人不會有中間那一關。推薦人如果有留言，也會顯示在這裡。</figcaption>
+  </figure>
+
+  <table class="wide">
+    <tr><th>關卡</th><th>誰在動</th><th>你要做什麼</th></tr>
+    <tr><td>已送出</td><td>系統收件（送出當下就完成）</td><td>不用做事</td></tr>
+    <tr><td>推薦人確認</td><td>你填的那位教練在他的後台按「確認推薦」</td><td>可以提醒他一聲</td></tr>
+    <tr><td>嵐途審核</td><td>嵐途核對證照／資歷，並確認費用收款</td><td>配合完成收款</td></tr>
+  </table>
+
+  <div class="note">
+    <b>審核時間：</b>資料完整並完成推薦人確認後，原則上於 <b>1～3 個工作日</b>內完成審核。
+  </div>
+
+  <h4>核准之後你會拿到什麼</h4>
+  <ul class="tick">
+    <li>教練職級：預設 C1（原本已有職級的不會被改動）</li>
+    <li>推薦關係：申請時填的那位教練，自動成為你在組織上的推薦人</li>
+    <li>使用期限：預設開通一年</li>
+    <li>教練工作台：頁首的「報聘審核中」會變成「教練工作台」，點進去就是完整系統</li>
+  </ul>
+  <div class="note">審核期間你仍然可以正常使用客戶介面——人生護照、自己的財務規劃都不受影響。報聘只是在同一組帳號上加一個身分。</div>
+</section>
+
+<!-- ═══════════ FAQ ═══════════ -->
+<section class="page">
+  <h3 style="margin-top:0">常見問題</h3>
+
+  <div class="faq">
+    <div class="q"><span class="mk">Q</span>我登入之後看到的是「我的人生護照」，是不是走錯了？</div>
+    <div class="a">沒有走錯。嵐途只有一個登入入口，新帳號一律先落在客戶介面。報聘入口就在這一頁的右上角與下方卡片。</div>
+  </div>
+
+  <div class="faq">
+    <div class="q"><span class="mk">Q</span>我不知道推薦人的教練編號怎麼辦？</div>
+    <div class="a">直接向推薦你的教練索取（格式類似 FC2608012），他在自己的「個人資料」頁就看得到。真的問不到，改走「直接申請」路線一樣送得出去。</div>
+  </div>
+
+  <div class="faq">
+    <div class="q"><span class="mk">Q</span>編號打錯了會怎樣？</div>
+    <div class="a">系統查不到編號時會提示，但仍然可以送出，改由嵐途人工確認推薦人是誰。不會因為打錯字就卡住。</div>
+  </div>
+
+  <div class="faq">
+    <div class="q"><span class="mk">Q</span>沒有任何金融證照，可以報聘嗎？</div>
+    <div class="a">可以。金融證照並非報聘的必要條件，嵐途會綜合評估申請人的背景、服務理念、相關經歷與未來投入方式。</div>
+  </div>
+
+  <div class="faq">
+    <div class="q"><span class="mk">Q</span>要準備證書掃描檔嗎？</div>
+    <div class="a">不用。系統不收上傳檔，證照是用選單與欄位填寫，正本查驗在審核階段由嵐途處理。</div>
+  </div>
+
+  <div class="faq">
+    <div class="q"><span class="mk">Q</span>送出鈕按不下去。</div>
+    <div class="a">按鈕下方會寫出原因——不是還缺某個必填欄位，就是三條聲明沒有全部勾選。照著補完就會亮起來。</div>
+  </div>
+
+  <div class="faq">
+    <div class="q"><span class="mk">Q</span>送出之後想改內容？</div>
+    <div class="a">回到申請表重填再送一次即可。一個人只有一份申請表，重送是覆蓋而不是新增。</div>
+  </div>
+
+  <div class="faq">
+    <div class="q"><span class="mk">Q</span>審核要多久？</div>
+    <div class="a">資料完整並完成推薦人確認後，原則上於 1～3 個工作日內完成審核。走教練推薦路線的，時間主要花在推薦人按確認那一步；之後嵐途會核對證照／資歷並確認費用收款，兩項完成就能開通。進度隨時可以在自己的首頁上看。</div>
+  </div>
+</section>
+
+<!-- ═══════════ 第二章 ═══════════ -->
+<section class="page">
+  <div class="chap">CHAPTER 2</div>
+  <h2>給現職教練（推薦人）</h2>
+  <p class="sub">你在這條流程裡只做三件事，其餘由申請人自行完成。</p>
+
+  <div class="steps">
+    <div class="box"><b>1</b><span>把你的<br>教練編號給他</span></div>
+    <div class="arr">→</div>
+    <div class="box"><b>2</b><span>等他送出，<br>你的後台出現紅點</span></div>
+    <div class="arr">→</div>
+    <div class="box"><b>3</b><span>進「待確認」<br>按確認推薦</span></div>
+  </div>
+
+  <h4>一、你的教練編號在哪裡</h4>
+  <p>登入教練工作台後，到「個人資料」頁，最上方就是「我的教練編號」（例如 FC2608012）。這組編號同時也是客戶指定你的編號，直接複製給申請人即可。</p>
+
+  <h4>二、他送出之後，你會在「待確認」看到</h4>
+  <p>申請人填了你的編號並送出後，教練工作台頁首的「待確認」分頁會出現紅點。這個分頁現在有三種待辦：客戶連結申請、共同執案邀請，以及報聘確認。</p>
+  <figure>
+    <img src="img/08-requests.png" alt="待確認分頁的報聘確認">
+    <figcaption>① 有人填了你的編號，「待確認」會出現紅點。　② 讀完他的現況與報聘動機，按「確認推薦」；不認識這個人就按「不是我推薦的」。</figcaption>
+  </figure>
+</section>
+
+<!-- ═══════════ 第二章 續 ═══════════ -->
+<section class="page">
+  <h4 style="margin-top:0">三、按確認之前，先看清楚這幾件事</h4>
+  <p>畫面上會直接攤開申請人的姓名、email、手機、目前現況、報聘動機。</p>
+  <div class="note">
+    按下<b>「確認推薦」</b>代表：<b>此申請人確實由你推薦，並同意其進入後續嵐途審核流程。</b>
+  </div>
+  <p>下方那個輸入框是給審核者看的一句話（選填）：你怎麼認識他、為什麼推薦。這段話會一起送進審核，也會顯示在申請人自己的進度卡上。</p>
+  <div class="note">
+    兩顆按鈕的意思不一樣：<b>「確認推薦」</b>＝這件申請往下進入嵐途審核；<b>「不是我推薦的」</b>＝婉拒，申請人的進度卡上會顯示「推薦人未確認」。按錯不會刪掉他的申請，但請直接告訴嵐途處理。
+  </div>
+
+  <h4>四、核准之後，他會成為你的直屬夥伴</h4>
+  <p>嵐途核准時會自動把你設為他的推薦人（在他原本沒有推薦人的情況下），職級預設 C1、使用期限預設一年。你不需要另外做任何綁定動作。</p>
+  <div class="note">
+    走「直接申請」路線的申請人不需要你確認。如果有人說他報聘了、你的後台卻沒有出現任何待確認，多半是他選了直接申請路線，或是編號填錯了——請他到自己的首頁看進度卡上寫的路線是哪一條。
+  </div>
+
+  <h4>五、你自己也在用客戶介面時</h4>
+  <p>教練與客戶不互斥，你也會用客戶介面做自己的財務規劃。已經開通的教練在客戶首頁看到的是「教練工作台」而不是「申請成為教練」——兩邊隨時互相切換得回去。</p>
+</section>
+
+<!-- ═══════════ 附錄 ═══════════ -->
+<section class="page">
+  <div class="chap">APPENDIX</div>
+  <h2>規則速查</h2>
+
+  <table class="rules">
+    <tr><th>項目</th><th>規則</th></tr>
+    <tr><td>登入入口</td><td>官網右上角「登入」。教練與客戶共用同一組帳號。</td></tr>
+    <tr><td>報聘入口</td><td>登入後，客戶首頁頁首「申請成為教練」，或首頁下方的說明卡。</td></tr>
+    <tr><td>報聘路線</td><td>教練推薦（需編號、需推薦人確認）／直接申請（不需任何人先確認）。</td></tr>
+    <tr><td>必填欄位</td><td>姓名、手機、報聘動機；走教練推薦路線再加推薦人教練編號。</td></tr>
+    <tr><td>選填欄位</td><td>目前工作／現況、相關經歷與可投入時間、證照與資歷（最多 8 項）。</td></tr>
+    <tr><td>證明文件</td><td>不收上傳檔。證照以結構化欄位填寫，正本由嵐途在審核階段查驗。</td></tr>
+    <tr><td>聲明</td><td>三條全部勾選才送得出去：顧問服務收入／非金融特許事業／資料屬實。</td></tr>
+    <tr><td>重送申請</td><td>一人一份申請表，重送＝覆蓋，不會產生第二件。</td></tr>
+    <tr><td>審核項目</td><td>證照／資歷已核對、已確認費用收款。走教練推薦路線者另需推薦人已確認。</td></tr>
+    <tr><td>審核時間</td><td>資料完整並完成推薦人確認後，原則上於 1～3 個工作日內完成審核。</td></tr>
+    <tr><td>核准帶入</td><td>職級 C1、推薦人＝申請時填的推薦人、使用期限一年（原本已有值的欄位不會被覆蓋）。</td></tr>
+    <tr><td>審核期間</td><td>客戶介面照常使用，個人財務規劃不受影響。</td></tr>
+  </table>
+
+  <h4>三條聲明的原文</h4>
+  <ol class="consents">
+    <li>我了解透過嵐途所取得之收入為顧問服務收入，不來自金融商品佣金，且收費依公司統一價目表。</li>
+    <li>我了解嵐途為一般顧問公司（非金融特許事業），不得以嵐途名義從事投資顧問或保險招攬。</li>
+    <li>我確認以上填寫的資料與證照資訊屬實，如有不實願接受停權處理。</li>
+  </ol>
+
+  <hr>
+  <p class="small">本文件畫面依 2026 年 9 月版本繪製。用語以系統畫面為準：申請人、推薦人、直屬夥伴。</p>
+</section>
+
+</body>
+</html>

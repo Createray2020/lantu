@@ -179,14 +179,16 @@ describe("applyAsCoach：唯一會建立教練列的入口", () => {
     expect(v.note).toContain("手機：0912-345-678");
     expect(v.note).toContain("現職：壽險業務三年");
     expect(v.note).toContain("FC2608012");
-    expect(v.sponsorId).toBe("coach_s");
+    // ⚠️ 申請當下不寫任何組織欄位：填了誰是 coach_applications.introducer_id 的事，
+    //    upline_id 要等核准那一刻才綁（2026/09/03 合併掉 sponsor_id 之後只剩這一條路）。
+    expect(v.uplineId).toBeUndefined();
   });
 
   it("推薦人編號查無 → 不擋送出，只在備註留線索", async () => {
     signedInAs("newcoach@example.com");
     const c = await applyAsCoach({ name: "王小明", phone: "0912", sponsorCode: "FC9999999" });
     expect(c?.status).toBe("pending");
-    expect(h.state.inserts[0].sponsorId).toBeUndefined();
+    expect(h.state.inserts[0].uplineId).toBeUndefined();
     expect(h.state.inserts[0].note).toContain("查無此編號");
   });
 
@@ -196,7 +198,7 @@ describe("applyAsCoach：唯一會建立教練列的入口", () => {
     const v = h.state.inserts[0];
     expect(v.displayName).toBeUndefined();
     expect(v.note).toBeUndefined();
-    expect(v.sponsorId).toBeUndefined();
+    expect(v.uplineId).toBeUndefined();
   });
 
   it("已核准的教練誤觸申請頁，不會洗掉他的顯示名稱與備註", async () => {
@@ -336,7 +338,7 @@ describe("isAdmin：白名單 admin 與核心成員兩條來源", () => {
     expect(await isAdmin(c({ role: "admin", status: "suspended" }))).toBe(false);
   });
 
-  it("主管（manager）不會因為看得到下線就拿到後台", async () => {
+  it("主管（manager）不會因為看得到直屬夥伴就拿到後台", async () => {
     expect(await isAdmin(c({ orgRank: "manager" }))).toBe(false);
   });
 

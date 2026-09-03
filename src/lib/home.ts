@@ -194,7 +194,7 @@ export async function getManagerHome(manager: CoachRow, all: CoachRow[], period:
   const funnel = recruitFunnelFrom(recRows);
   const recruitsActive = recRows.filter((r) => r.stage !== "onboard").length;
 
-  // 待審核：下線中 status=pending 的教練 + 增員在「錄取」階段（待簽核）。
+  // 待審核：直屬夥伴中 status=pending 的教練 + 增員在「錄取」階段（待簽核）。
   const pendingCoaches = await db.select().from(coaches).where(eq(coaches.status, "pending"));
   const teamPending = pendingCoaches.filter((c) => c.uplineId && teamIds.includes(c.uplineId));
   const pending: ManagerHome["pending"] = [];

@@ -1,4 +1,4 @@
-// 報聘的資料層：申請表的讀寫、介紹人確認、後台設定、核准時一次寫齊。
+// 報聘的資料層：申請表的讀寫、推薦人確認、後台設定、核准時一次寫齊。
 //
 // 純規則（路線、必填、檢核表閘門）住在 `coachApply.ts`，那一支不碰 DB 也給 client component 用；
 // 這一支只負責「存在哪、怎麼合併預設值」。
@@ -95,7 +95,7 @@ export async function lookupCoachByCode(raw: string | null | undefined) {
  * ⚠️ 一位教練一列（PK 就是 coachId）：重送申請是覆寫，不是開新的一件 ——
  *    否則後台會看到同一個人的三張表，而且分不出哪張才是他現在講的話。
  * ⚠️ direct 路線的 introducerState 一律 skipped，不是 pending：
- *    pending 會讓這件申請永遠卡在「等待介紹人」而沒有任何人能確認它。
+ *    pending 會讓這件申請永遠卡在「等待推薦人」而沒有任何人能確認它。
  */
 export async function submitApplication(
   coachId: string,
@@ -119,7 +119,7 @@ export async function submitApplication(
     experience: clip(draft.experience),
     licenses: cleanLicenses(draft.licenses),
     consents,
-    // 介紹人查無編號時仍是 pending：那是後台要處理的線索，不是自動放行的理由。
+    // 推薦人查無編號時仍是 pending：那是後台要處理的線索，不是自動放行的理由。
     introducerState: (needsIntro ? "pending" : "skipped") as IntroducerState,
     introducerNote: null,
     introducerActedAt: null,
@@ -180,7 +180,7 @@ export type IntroductionRequest = {
   submittedAt: Date;
 };
 
-/** 介紹人端的待確認清單。只列還在 pending 的（確認過或婉拒過都不再出現）。 */
+/** 推薦人端的待確認清單。只列還在 pending 的（確認過或婉拒過都不再出現）。 */
 export async function listPendingIntroductions(introducerId: string): Promise<IntroductionRequest[]> {
   const rows = await db
     .select({
@@ -208,10 +208,10 @@ export async function countPendingIntroductions(introducerId: string): Promise<n
   return Number(rows[0]?.n ?? 0);
 }
 
-// ── 介紹人確認 ──────────────────────────────────────────────
+// ── 推薦人確認 ──────────────────────────────────────────────
 
 /**
- * 介紹人按下「確認推薦」／「婉拒」。
+ * 推薦人按下「確認推薦」／「婉拒」。
  *
  * ⚠️ where 一定要同時帶 introducerId：少了它，任何教練都能替別人的申請案按確認。
  *    這是這條動線唯一的租戶條件。
@@ -273,10 +273,10 @@ export type ApproveResult =
 /**
  * 核准報聘：閘門 → 一次寫齊。
  *
- * 2026/08/31 之前這裡只有 `status='active'` 一件事，職級／上線／期限全靠人事後補，
+ * 2026/08/31 之前這裡只有 `status='active'` 一件事，職級／推薦人／期限全靠人事後補，
  * 補漏的代價是「開通了卻不能被客戶指定、也沒有期限」的帳號默默累積。現在核准當下就帶：
  *   · 職級 ← 後台預設（C1）
- *   · 上線 ← 介紹人
+ *   · 推薦人（組織位置） ← 申請時填的推薦人
  *   · 期限 ← 後台預設（一年）
  *
  * ⚠️ 三項一律「原本是空的才寫」：後台已經手動設過的人不會被這裡蓋掉，
@@ -308,7 +308,7 @@ export async function approveApplication(coachId: string, reviewerId: string): P
   // 三項都只在「原本是空的」時才寫進 set，不是寫回同一個值 ——
   // 寫回去看起來無害，但那是一次真的 UPDATE，會蓋掉別人在這幾秒內剛改好的值。
   const newRank = coach.rankCode ? null : settings.defaultRankCode || null;
-  // 上線綁介紹人；介紹人不能是自己（自我推薦會做出一個指向自己的環）。
+  // 綁定推薦人；推薦人不能是自己（自我推薦會做出一個指向自己的環）。
   const introducer = app?.introducerId && app.introducerId !== coachId ? app.introducerId : null;
   const newUpline = coach.uplineId || !settings.bindUplineToIntroducer ? null : introducer;
   const rankCode = coach.rankCode ?? newRank;
@@ -329,8 +329,6 @@ export async function approveApplication(coachId: string, reviewerId: string): P
       approvedAt: new Date(),
       ...(newRank ? { rankCode: newRank } : {}),
       ...(newUpline ? { uplineId: newUpline } : {}),
-      // 介紹人同時是推薦人（業績歸屬）：申請時就寫過了，這裡只補「申請時查無編號、後台事後補上」的情形。
-      ...(coach.sponsorId ? {} : introducer ? { sponsorId: introducer } : {}),
       ...(license ?? {}),
     })
     .where(eq(coaches.id, coachId));

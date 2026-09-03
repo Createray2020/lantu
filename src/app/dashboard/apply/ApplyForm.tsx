@@ -27,7 +27,7 @@ const field =
 //
 // 2026/08/25 從一顆送出鈕加成四欄（後台審核時看得到手機與現況）。
 // 2026/08/31 改成完整的報聘表：先選路線 → 自述 → 證照 → 聲明。
-//   · 介紹人推薦：填介紹人教練編號，送出後由他確認推薦，再進審核。
+//   · 教練推薦：填推薦人教練編號，送出後由他確認推薦，再進審核。
 //   · 直接申請：不需要任何人先確認，直接送進審核佇列。
 //   · 必填規則與聲明由 lib/coachApply 那份純函式決定，與 server action 共用同一份。
 export default function ApplyForm({
@@ -74,7 +74,7 @@ export default function ApplyForm({
         <p className="text-[#6f869c] text-xs mb-7">登入帳號：{email || "（未提供 email）"}</p>
       </div>
 
-      {/* ① 報聘路線 —— 先選路線，後面的欄位跟著變（介紹人只在推薦路線出現）。 */}
+      {/* ① 報聘路線 —— 先選路線，後面的欄位跟著變（推薦人只在推薦路線出現）。 */}
       <h2 className="text-[13px] text-[#c99a5b] font-bold mb-2">① 報聘路線</h2>
       <div className="grid sm:grid-cols-2 gap-3 mb-6">
         {APPLY_ROUTES.map((r) => {
@@ -121,7 +121,7 @@ export default function ApplyForm({
         {meta.needsIntroducer && (
           <div>
             <label className="text-[11px] text-[#a9bccf]">
-              介紹人教練編號 <span className="text-[#c99a5b]">*</span>
+              推薦人教練編號 <span className="text-[#c99a5b]">*</span>
             </label>
             <input
               className={field}
@@ -134,9 +134,9 @@ export default function ApplyForm({
               onBlur={(e) => checkIntroducer(e.target.value)}
               placeholder="例 FC2608012"
             />
-            {introName && <p className="mt-1 text-[11px] text-[#7fd1a8]">介紹人：{introName}</p>}
+            {introName && <p className="mt-1 text-[11px] text-[#7fd1a8]">推薦人：{introName}</p>}
             {introBad && (
-              <p className="mt-1 text-[11px] text-[#e0a25b]">查無這個編號，仍可送出，但會由嵐途人工確認介紹人。</p>
+              <p className="mt-1 text-[11px] text-[#e0a25b]">查無這個編號，仍可送出，但會由嵐途人工確認推薦人。</p>
             )}
             <p className="mt-1 text-[11px] text-[#6f869c]">送出後會通知這位教練確認推薦，確認後才進入審核。</p>
           </div>
@@ -169,7 +169,7 @@ export default function ApplyForm({
 
       {/* ③ 證照／資歷 —— 結構化欄位，不收上傳檔（本站沒有檔案儲存服務）。 */}
       <h2 className="text-[13px] text-[#c99a5b] font-bold mb-1">③ 證照與資歷</h2>
-      <p className="text-[11px] text-[#6f869c] mb-2">沒有證照也可以申請，這一段是選填；填了審核會快一點。</p>
+      <p className="text-[11px] text-[#6f869c] mb-2">沒有證照也可以申請，這一段是選填；完整填寫有助於後續審核。</p>
       <div className="grid gap-2 mb-3">
         {d.licenses.map((r, i) => (
           <div key={i} className="grid sm:grid-cols-[1fr_auto] gap-2 items-start border border-white/10 rounded-md p-2">
@@ -257,7 +257,7 @@ export default function ApplyForm({
         disabled={busy || !ready}
         className="w-full font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {busy ? "送出中…" : meta.needsIntroducer ? "送出報聘申請（通知介紹人確認）" : "送出報聘申請"}
+        {busy ? "送出中…" : meta.needsIntroducer ? "送出報聘申請（通知推薦人確認）" : "送出報聘申請"}
       </button>
       {err && <p className="mt-2 text-center text-[11px] text-[#e0a25b]">{err}</p>}
       {!ready && (

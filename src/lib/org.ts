@@ -1,5 +1,5 @@
 // 組織樹與可見範圍（岔路 #2 的權限骨架）。
-// orgRank：member（教練，只看自己）/ manager（主管，看下線子樹）/ owner（核心成員，看全組織）。
+// orgRank：member（教練，只看自己）/ manager（主管，看團隊子樹）/ owner（核心成員，看全組織）。
 // uplineId：組織樹父節點（自參照）。可見範圍一律以「active 教練」為母體。
 import { eq, asc } from "drizzle-orm";
 import { db } from "@/Shared/db";
@@ -22,7 +22,7 @@ export async function listActiveCoaches(): Promise<CoachRow[]> {
   return rows.map((r) => ({ ...r, name: displayNameOf(r) }));
 }
 
-// 由完整名單建「上線 → 直屬下線」對照。
+// 由完整名單建「推薦人 → 直屬夥伴」對照。
 function childrenMap(all: CoachRow[]): Map<string | null, CoachRow[]> {
   const m = new Map<string | null, CoachRow[]>();
   for (const c of all) {
@@ -34,7 +34,7 @@ function childrenMap(all: CoachRow[]): Map<string | null, CoachRow[]> {
   return m;
 }
 
-// 某教練的下線子樹（含自己）。
+// 某教練的團隊子樹（含自己）。
 export function downlineIds(rootId: string, all: CoachRow[]): string[] {
   const kids = childrenMap(all);
   const out: string[] = [];
@@ -52,7 +52,7 @@ export function downlineIds(rootId: string, all: CoachRow[]): string[] {
 
 // 依角色回傳「可見的教練 id」集合。
 // - owner：全部 active。
-// - manager：自己 + 下線子樹。
+// - manager：自己 + 團隊子樹。
 // - member：只有自己。
 export function visibleCoachIds(me: CoachRow, all: CoachRow[]): string[] {
   const rank = rankOf(me);
@@ -61,7 +61,7 @@ export function visibleCoachIds(me: CoachRow, all: CoachRow[]): string[] {
   return [me.id];
 }
 
-// 團隊分組：以「owner 的直屬下線」為各團隊隊長（manager），各自帶下線子樹。
+// 團隊分組：以「owner 的直屬夥伴」為各團隊隊長（manager），各自帶團隊子樹。
 // 回傳 [{ manager, memberIds }]，供核心成員視角做各團隊對比。
 export type Team = { manager: CoachRow; memberIds: string[] };
 export function teamsUnder(ownerId: string, all: CoachRow[]): Team[] {
@@ -69,7 +69,7 @@ export function teamsUnder(ownerId: string, all: CoachRow[]): Team[] {
   const leaders = kids.get(ownerId) ?? [];
   return leaders.map((mgr) => ({
     manager: mgr,
-    // 團隊成員 = 隊長子樹去掉隊長自己（呈現「下線」）。
+    // 團隊成員 = 隊長子樹去掉隊長自己（呈現「直屬夥伴」）。
     memberIds: downlineIds(mgr.id, all).filter((id) => id !== mgr.id),
   }));
 }

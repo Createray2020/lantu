@@ -2,10 +2,11 @@
 // 不碰 DB、不 import drizzle —— client component（申請表單、後台面板）要直接 import 這一支。
 //
 // 2026/08/31 Ray 拍板的形狀：
-//   · 報聘有**兩條路線**：介紹人推薦（referral）與直接申請（direct）。
-//     直接申請就是「直接送出、不需要任何人先確認」；介紹人推薦要先讓介紹人按確認。
-//   · 介紹人就是原本的「推薦人」（同一個人、同一個 sponsor_id），核准時自動當上線。
-//   · 核准時一次帶齊：職級預設 C1、上線＝介紹人、使用期限預設一年。
+//   · 報聘有**兩條路線**：教練推薦（referral）與直接申請（direct）。
+//     直接申請就是「直接送出、不需要任何人先確認」；教練推薦要先讓推薦人按確認。
+//   · 申請時填的推薦人存在 coach_applications.introducerId（申請當下的事實），
+//     核准那一刻寫進 coaches.uplineId（現在的推薦人＝組織位置），全站只有這一個欄位。
+//   · 核准時一次帶齊：職級預設 C1、推薦人（組織位置）＝申請時填的推薦人、使用期限預設一年。
 //   · 審核者的判斷做成後台可設定的一組預設值＋檢核表，逐項打勾才放行。
 //
 // ⚠️ 專案沒有檔案儲存服務（學習區的教材一律外部連結、logo 是 dataURL 特例），
@@ -14,14 +15,14 @@
 export const APPLY_ROUTES = [
   {
     key: "referral",
-    label: "介紹人推薦",
-    desc: "由現職嵐途教練介紹。填入介紹人的教練編號，送出後由他確認推薦，再進入審核。",
+    label: "教練推薦",
+    desc: "由現職嵐途教練推薦。填入推薦人的教練編號，送出後由推薦人確認，再進入嵐途審核。",
     needsIntroducer: true,
   },
   {
     key: "direct",
     label: "直接申請",
-    desc: "沒有介紹人也可以。直接送出申請，由嵐途直接審核。",
+    desc: "沒有推薦人也可以。直接送出申請，由嵐途直接審核。",
     needsIntroducer: false,
   },
 ] as const;
@@ -38,21 +39,21 @@ export function routeMeta(route: string | null | undefined) {
   return APPLY_ROUTES.find((r) => r.key === route) ?? APPLY_ROUTES[0];
 }
 
-/** 介紹人確認的狀態機。direct 路線一律 skipped（不是「跳過確認」，是這條路線本來就沒有這一關）。 */
+/** 推薦人確認的狀態機。direct 路線一律 skipped（不是「跳過確認」，是這條路線本來就沒有這一關）。 */
 export type IntroducerState = "pending" | "confirmed" | "declined" | "skipped";
 
 export const INTRODUCER_STATE_LABEL: Record<IntroducerState, string> = {
-  pending: "等待介紹人確認",
-  confirmed: "介紹人已確認",
-  declined: "介紹人未確認",
-  skipped: "無需介紹人確認",
+  pending: "等待推薦人確認",
+  confirmed: "推薦人已確認",
+  declined: "推薦人未確認",
+  skipped: "無需推薦人確認",
 };
 
 // ── 報聘進度（唯一真相）──────────────────────────────────────
-// 「已送出 → 介紹人確認 → 嵐途審核」這三段，教練端的待開通頁與客戶端首頁都要畫。
-// ⚠️ 兩邊各寫一份就是第二份實作：介紹人那一關是**只有推薦路線才存在**的（不是「跳過」而是
+// 「已送出 → 推薦人確認 → 嵐途審核」這三段，教練端的待開通頁與客戶端首頁都要畫。
+// ⚠️ 兩邊各寫一份就是第二份實作：推薦人那一關是**只有推薦路線才存在**的（不是「跳過」而是
 //    「這條路線沒有這一關」），任何一邊漏掉這個條件，直接申請的人就會永遠看到一段停在灰色的
-//    「等待介紹人確認」——而畫面上完全看不出是 bug。所以抽到純函式層，兩邊吃同一支。
+//    「等待推薦人確認」——而畫面上完全看不出是 bug。所以抽到純函式層，兩邊吃同一支。
 export type ApplyProgressInput = {
   route: string | null | undefined;
   introducerState: string | null | undefined;
@@ -138,12 +139,12 @@ export function cleanLicenses(rows: ApplyLicense[] | null | undefined): ApplyLic
 
 // ── 勾選式聲明 ──────────────────────────────────────────────
 // ⚠️ 這三條不是形式：嵐途的法人身分是一般顧問公司（無金融特許），
-//    教練收的是純顧問費、不碰商品佣金（Ray 2026/08/20 拍板）。
+//    透過嵐途取得的是顧問服務收入、不碰商品佣金（Ray 2026/08/20 拍板）。
 //    報聘進來的人多半來自保險或銀行通路，這一關就是把界線在入口講清楚。
 export const APPLY_CONSENTS = [
   {
     key: "fee",
-    label: "我了解嵐途教練的收入為純顧問費，不來自金融商品佣金，且收費依公司統一價目表。",
+    label: "我了解透過嵐途所取得之收入為顧問服務收入，不來自金融商品佣金，且收費依公司統一價目表。",
   },
   {
     key: "scope",
@@ -179,9 +180,9 @@ export const DEFAULT_CHECKLIST: ChecklistItem[] = [
 export type ApplySettings = {
   /** 核准時要帶的職級。null＝不帶（維持未定級）。 */
   defaultRankCode: string | null;
-  /** 核准時把上線設成介紹人（原本沒有上線才寫）。 */
+  /** 核准時自動綁定推薦人（原本沒有推薦人才寫）。 */
   bindUplineToIntroducer: boolean;
-  /** 介紹人推薦路線是否一定要介紹人先確認才給核准。 */
+  /** 教練推薦路線是否一定要推薦人先確認才給核准。 */
   requireIntroducerConfirm: boolean;
   /** 核准時要不要一併開通使用期限。 */
   licenseOn: boolean;
@@ -239,7 +240,7 @@ export function emptyDraft(defaultName = ""): ApplyDraft {
 const FIELD_LABEL: Record<string, string> = {
   name: "姓名",
   phone: "手機",
-  introducerCode: "介紹人教練編號",
+  introducerCode: "推薦人教練編號",
   ...Object.fromEntries(APPLY_TEXT_FIELDS.map((f) => [f.key, f.label])),
 };
 
@@ -296,7 +297,7 @@ export function approvalGate(input: ApprovalInput, settings: ApplySettings): App
   const reasons: string[] = [];
   const needsIntro = routeMeta(input.route).needsIntroducer;
   if (needsIntro && settings.requireIntroducerConfirm && input.introducerState !== "confirmed") {
-    reasons.push(input.introducerState === "declined" ? "介紹人未確認推薦" : "介紹人尚未確認");
+    reasons.push(input.introducerState === "declined" ? "推薦人未確認" : "推薦人尚未確認");
   }
   for (const it of checklistFor(settings, input.route)) {
     if (it.required && !input.checked.includes(it.key)) reasons.push(`未勾選：${it.label}`);

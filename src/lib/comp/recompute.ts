@@ -45,7 +45,7 @@ export async function recomputeAll(
    * ⚠️ 職級改了就要同步回記憶體裡的 advisors。
    *
    * advisors 是迴圈**開始前**算好的一份快照，而 buildOverview() 每一輪都拿它去解輔導鏈、
-   * 判斷上線夠不夠格帶人。少了這一句，同一次執行中已經晉升的人，對後面每一位的計算
+   * 判斷推薦人夠不夠格帶人。少了這一句，同一次執行中已經晉升的人，對後面每一位的計算
    * 而言都還停在舊職級 —— 結果會隨著 coaches.created_at 的排序而變，
    * 而且要再跑第二次才收斂（「手動跑跟排程跑結果不一樣」正是從這裡長出來的）。
    */
@@ -80,7 +80,7 @@ export async function recomputeAll(
     const name = c.name || c.email || c.id;
     const ov = buildOverview(
       {
-        id: c.id, name: c.name, rankCode: c.rankCode, uplineId: c.uplineId, sponsorId: c.sponsorId,
+        id: c.id, name: c.name, rankCode: c.rankCode, uplineId: c.uplineId,
         hireDate: c.hireDate, entryType: c.entryType,
         tenureRankCode: c.tenureRankCode, tenureUntil: c.tenureUntil,
         initialCases: c.initialCases, initialFees: c.initialFees,

@@ -23,7 +23,6 @@ export type AdvisorView = {
   status: string;
   rankCode: string | null;
   uplineName: string;
-  sponsorId: string | null;
   entryType: string | null;
   hireDate: string | null;
   tenureRankCode: string | null;
@@ -123,7 +122,7 @@ export default function AdvisorsBoard({
             <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
               <th className="px-3 py-2">教練</th>
               <th className="px-3 py-2">職級</th>
-              <th className="px-3 py-2">直屬主管</th>
+              <th className="px-3 py-2">推薦人</th>
               <th className="px-3 py-2">真除</th>
               <th className="px-3 py-2 text-right">終身案數</th>
               <th className="px-3 py-2 text-right">終身顧問費</th>
@@ -184,7 +183,7 @@ export default function AdvisorsBoard({
                 {open === a.id && (
                   <tr className="bg-[#0a2138]">
                     <td colSpan={12} className="px-4 py-4">
-                      <AdvisorDetail a={a} rankCodes={rankCodes} peers={advisors} pending={pending} run={run} />
+                      <AdvisorDetail a={a} rankCodes={rankCodes} pending={pending} run={run} />
                     </td>
                   </tr>
                 )}
@@ -218,18 +217,16 @@ function TrackCell({ t }: { t: TrackView }) {
 }
 
 function AdvisorDetail({
-  a, rankCodes, peers, pending, run,
+  a, rankCodes, pending, run,
 }: {
   a: AdvisorView;
   rankCodes: string[];
-  peers: AdvisorView[];
   pending: boolean;
   run: (fn: () => Promise<{ ok: boolean; error?: string; note?: string }>, okText: string) => void;
 }) {
   const [f, setF] = useState({
     entryType: a.entryType ?? "",
     hireDate: a.hireDate ?? "",
-    sponsorId: a.sponsorId ?? "",
     tenureRankCode: a.tenureRankCode ?? "",
     tenureUntil: a.tenureUntil ?? "",
     initialCases: String(a.initialCases ?? 0),
@@ -307,15 +304,6 @@ function AdvisorDetail({
             <input type="date" value={f.hireDate} onChange={(e) => setF({ ...f, hireDate: e.target.value })}
               className={`${cls(f.hireDate)} w-full mt-0.5`} />
           </label>
-          <label className="text-xs text-[#a9bccf]">推薦人
-            <select value={f.sponsorId} onChange={(e) => setF({ ...f, sponsorId: e.target.value })}
-              className={`${cls(f.sponsorId)} w-full mt-0.5`}>
-              <option value="">未設定</option>
-              {peers.filter((p) => p.id !== a.id).map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </label>
           <label className="text-xs text-[#a9bccf]">真除核定職級
             <select value={f.tenureRankCode} onChange={(e) => setF({ ...f, tenureRankCode: e.target.value })}
               className={`${cls(f.tenureRankCode)} w-full mt-0.5`}>
@@ -360,7 +348,6 @@ function AdvisorDetail({
           onClick={() => run(() => saveAdvisorAction(a.id, {
             entryType: f.entryType || null,
             hireDate: f.hireDate || null,
-            sponsorId: f.sponsorId || null,
             tenureRankCode: f.tenureRankCode || null,
             tenureUntil: f.tenureUntil || null,
             initialCases: Number(f.initialCases) || 0,

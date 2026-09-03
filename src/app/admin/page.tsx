@@ -46,9 +46,7 @@ export default async function Admin() {
   // 四個級別一律選得到：生效中的制度版本是加入「實習教練」之前建的，職級表裡沒有那一列，
   // 而「載入 V4 辦法數值」只在職級表完全空白時才帶入 —— 只讀 DB 的話實習教練永遠選不到。
   const rankCodes = [...RANK_ORDER, ...Object.keys(caps).filter((c) => !RANK_ORDER.includes(c as never))];
-  // 接手候選人只列已開通的教練，且不能是自己。
-  // 申請表單填的推薦人存的是 id，名冊要印得出名字。listCoaches() 本來就 select *，不必多查一次。
-  const nameById = new Map(coaches.map((c) => [c.id, c.name || c.email || c.id]));
+  // 接手人選只列已開通的教練，且不能是自己。
   const activePeers = coaches
     .filter((c) => c.status === "active")
     .map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
@@ -90,7 +88,7 @@ export default async function Admin() {
                 <th className="px-3 py-2 font-semibold">姓名 / Email</th>
                 <th className="px-3 py-2 font-semibold">角色</th>
                 <th className="px-3 py-2 font-semibold">狀態</th>
-                <th className="px-3 py-2 font-semibold">組織（職級 / 上線）</th>
+                <th className="px-3 py-2 font-semibold">組織（職級 / 推薦人）</th>
                 <th className="px-3 py-2 font-semibold">級別 · 使用期限</th>
                 <th className="px-3 py-2 font-semibold">申請日</th>
                 <th className="px-3 py-2 font-semibold">開通日</th>
@@ -125,9 +123,6 @@ export default async function Admin() {
                       {/* 申請表單填的手機／現職（存在 note）與推薦人。核准前就是靠這幾行判斷，
                           印在這裡才不用為了看一行字點進別的頁。 */}
                       {c.note && <div className="text-[#8fa8bd] text-[11px] mt-1 whitespace-pre-wrap">{c.note}</div>}
-                      {c.sponsorId && (
-                        <div className="text-[#6f869c] text-[11px]">介紹人：{nameById.get(c.sponsorId) ?? c.sponsorId}</div>
-                      )}
                       {/* 2026/08/31 起申請自述住 coach_applications；舊帳號沒有這一列，只印上面那行 note。 */}
                       {app && (
                         <ReviewPanel

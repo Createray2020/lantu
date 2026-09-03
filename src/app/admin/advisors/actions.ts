@@ -38,7 +38,6 @@ export async function saveAdvisorAction(
   patch: {
     entryType?: string | null;
     hireDate?: string | null;
-    sponsorId?: string | null;
     tenureRankCode?: string | null;
     tenureUntil?: string | null;
     initialCases?: number | null;
@@ -52,7 +51,6 @@ export async function saveAdvisorAction(
     await db.update(coaches).set({
       entryType: patch.entryType ?? null,
       hireDate: patch.hireDate || null,
-      sponsorId: patch.sponsorId || null,
       tenureRankCode: patch.tenureRankCode || null,
       tenureUntil: patch.tenureUntil || null,
       initialCases: patch.initialCases ?? 0,

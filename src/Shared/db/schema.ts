@@ -17,8 +17,8 @@ import type { ApplyLicense, ChecklistItem } from '@/lib/coachApply';
 // role: coach（一般教練）/ admin（管理員，可進後台）
 // status: pending（待審核）/ active（已開通）/ suspended（停權）
 // orgRank（組織職級，決定首頁視角與可見範圍）：
-//   member（教練，只看自己）/ manager（主管，看下線子樹）/ owner（核心成員，看全組織）
-// uplineId：上線教練（自參照），組織樹的父節點；null＝頂點。
+//   member（教練，只看自己）/ manager（主管，看團隊子樹）/ owner（核心成員，看全組織）
+// uplineId：推薦人教練（自參照），組織樹的父節點；null＝頂點。
 export const coaches = pgTable('coaches', {
   id: text('id').primaryKey(), // Clerk userId
   email: text('email'),
@@ -47,7 +47,6 @@ export const coaches = pgTable('coaches', {
   rankCode: text('rank_code'),
   entryType: text('entry_type'),              // training（培訓認證）/ recruit（同業招募）/ rejoin（回任）
   hireDate: date('hire_date'),                // 到職日：真除倒數與首年豁免的起點
-  sponsorId: text('sponsor_id').references((): AnyPgColumn => coaches.id, { onDelete: 'set null' }),
   tenureRankCode: text('tenure_rank_code'),   // 真除中的核定職級（null＝非真除狀態）
   tenureUntil: date('tenure_until'),
   initialCases: integer('initial_cases').default(0).notNull(),   // 同業招募帶入的既往實績
@@ -82,8 +81,6 @@ export const coaches = pgTable('coaches', {
   index('coaches_upline_id_idx').on(t.uplineId),
   // listActiveCoaches / getOrgOwnerId 的熱路徑。
   index('coaches_status_idx').on(t.status),
-  // 推薦人也是自參照 FK（代管移轉與同業招募業績歸屬都要沿它查）。
-  index('coaches_sponsor_id_idx').on(t.sponsorId),
   // 客戶輸入編號指定教練時的查詢路徑，同時也是「同一個號不可能發兩次」的最後一道保險：
   // 配號本身已由 code_counters 的單語句 upsert 保證原子性，這條是防手動改資料改出重號。
   // Postgres 的 UNIQUE 視 NULL 互異 → 待審教練（code 為 null）不受影響。
@@ -1024,22 +1021,24 @@ export const anModuleDefaults = pgTable('an_module_defaults', {
 // ── 報聘（教練申請）─────────────────────────────────────────────
 //
 // 2026/08/31 之前，申請表填的手機／現職／推薦人是被壓成一行字串塞進 `coaches.note` 的
-// （`applyNote()`），核准時也完全不碰職級／上線／期限 —— 所以名冊上會長期累積
+// （`applyNote()`），核准時也完全不碰職級／推薦人／期限 —— 所以名冊上會長期累積
 // 「開通了卻沒定級、沒設期限」的半成品帳號。這張表把申請資料從身分表拆出來：
 //
 //   · coaches  = 這個人是誰、能不能用（身分與權限，長期存在）
-//   · 這張表   = 他當初怎麼進來的（路線、介紹人、自述、聲明、審核紀錄，一次性）
+//   · 這張表   = 他當初怎麼進來的（路線、推薦人、自述、聲明、審核紀錄，一次性）
 //
-// ⚠️ 介紹人**同時**寫在兩個地方：這裡的 `introducerId` 是申請當下的事實（永遠不動），
-//    `coaches.sponsorId` 是現在的推薦人（業績歸屬吃它，後台可改）。兩者刻意不合併。
+// ⚠️ 推薦人有兩層，刻意不合併：這裡的 `introducerId` 是**申請當下填了誰**（事實，永遠不動），
+//    `coaches.uplineId` 是**現在的推薦人**（組織位置，後台可改）。
+//    2026/09/03 之前還有第三份 `coaches.sponsorId`（號稱業績歸屬），但全站沒有任何計算讀它
+//    —— 分潤鏈 resolveChain() 只沿 uplineId 爬，連代管都是跳層做的 —— 已隨 0035 移除。
 // ⚠️ 一位教練只有一列（PK 就是 coachId）：重新送出申請是覆寫同一列，不是開新的一件。
 export const coachApplications = pgTable('coach_applications', {
   coachId: text('coach_id').primaryKey().references(() => coaches.id, { onDelete: 'cascade' }),
 
-  // referral＝介紹人推薦（要介紹人先確認）/ direct＝直接申請（直接進審核佇列）。
+  // referral＝教練推薦（要推薦人先確認）/ direct＝直接申請（直接進審核佇列）。
   route: text('route').default('referral').notNull(),
 
-  // 介紹人解得到教練列就有 id；查無編號不擋送出（可能只是打錯），原字串一定留著給後台判斷。
+  // 推薦人解得到教練列就有 id；查無編號不擋送出（可能只是打錯），原字串一定留著給後台判斷。
   introducerId: text('introducer_id').references((): AnyPgColumn => coaches.id, { onDelete: 'set null' }),
   introducerCode: text('introducer_code'),
 
@@ -1066,14 +1065,14 @@ export const coachApplications = pgTable('coach_applications', {
   submittedAt: timestamp('submitted_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  // 介紹人的待確認清單（/dashboard/requests）走這條。
+  // 推薦人的待確認清單（/dashboard/requests）走這條。
   index('coach_applications_introducer_id_idx').on(t.introducerId),
   index('coach_applications_state_idx').on(t.introducerState),
 ]);
 
 // 報聘的全平台設定（單列，id 固定 'default'）。
 //
-// 「審核者的判斷可以設定」＝這一列：核准時自動帶什麼（職級／上線／期限），
+// 「審核者的判斷可以設定」＝這一列：核准時自動帶什麼（職級／推薦人／期限），
 // 以及放行前一定要打勾的檢核表。與 an_module_defaults 一樣是「後台定一份、現場照著跑」。
 //
 // ⚠️ 沒有這一列時一律 fallback 到 DEFAULT_APPLY_SETTINGS（程式端常數），

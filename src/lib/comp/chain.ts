@@ -16,7 +16,6 @@ export type AdvisorRow = {
   name?: string | null;
   rankCode?: string | null;
   uplineId?: string | null;
-  sponsorId?: string | null;
   status?: string | null;
 };
 

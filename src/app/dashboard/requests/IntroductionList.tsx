@@ -12,7 +12,7 @@ export type Intro = {
   motive: string | null;
 };
 
-// 介紹人端：有人填了你的教練編號報聘，你在這裡確認推薦或婉拒。
+// 推薦人端：有人填了你的教練編號報聘，你在這裡確認推薦或婉拒。
 //
 // ⚠️ 這一關不是形式：確認過的申請才進得了審核（後台可設定是否強制）。
 //    所以畫面上要把「他為什麼想來、現在在做什麼」直接攤開，不能只有一個名字。
@@ -49,6 +49,9 @@ export default function IntroductionList({ intros }: { intros: Intro[] }) {
           {it.motive && (
             <div className="text-[#a7bacb] text-sm mt-1 whitespace-pre-wrap">報聘動機：{it.motive}</div>
           )}
+          <p className="mt-3 text-[11px] text-[#6f869c] leading-relaxed">
+            按「確認推薦」代表：此申請人確實由你推薦，並同意其進入後續嵐途審核流程。
+          </p>
           <textarea
             className="mt-3 w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7] placeholder:text-[#4f6478]"
             rows={2}

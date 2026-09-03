@@ -27,14 +27,14 @@ const draft = (over: Partial<ReturnType<typeof emptyDraft>> = {}) => ({
 });
 
 describe("報聘路線", () => {
-  it("介紹人推薦要介紹人編號，直接申請不要", () => {
+  it("教練推薦要推薦人編號，直接申請不要", () => {
     expect(routeMeta("referral").needsIntroducer).toBe(true);
     expect(routeMeta("direct").needsIntroducer).toBe(false);
-    // 認不得的字串一律當成 referral（預設路線），不會變成「不需要介紹人」的漏洞。
+    // 認不得的字串一律當成 referral（預設路線），不會變成「不需要推薦人」的漏洞。
     expect(routeMeta("???").needsIntroducer).toBe(true);
   });
 
-  it("沒填介紹人編號的推薦路線送不出去；同一張表換成直接申請就送得出去", () => {
+  it("沒填推薦人編號的推薦路線送不出去；同一張表換成直接申請就送得出去", () => {
     const d = draft({ route: "referral" });
     expect(missingFields(d, DEFAULT_APPLY_SETTINGS)).toContain("introducerCode");
     expect(canSubmit({ ...d, route: "direct" }, DEFAULT_APPLY_SETTINGS)).toBe(true);
@@ -88,22 +88,22 @@ describe("核准閘門", () => {
     expect(g.ok).toBe(true);
   });
 
-  it("介紹人還沒確認就不給核准", () => {
+  it("推薦人還沒確認就不給核准", () => {
     const g = approvalGate(
       { route: "referral", introducerState: "pending", checked, hasApplication: true },
       DEFAULT_APPLY_SETTINGS,
     );
     expect(g.ok).toBe(false);
-    expect(g.reasons.join()).toContain("介紹人");
+    expect(g.reasons.join()).toContain("推薦人");
   });
 
-  it("後台關掉「要介紹人先確認」之後就不擋", () => {
+  it("後台關掉「要推薦人先確認」之後就不擋", () => {
     const s: ApplySettings = { ...DEFAULT_APPLY_SETTINGS, requireIntroducerConfirm: false };
     const g = approvalGate({ route: "referral", introducerState: "pending", checked, hasApplication: true }, s);
     expect(g.ok).toBe(true);
   });
 
-  it("直接申請路線完全不看介紹人狀態", () => {
+  it("直接申請路線完全不看推薦人狀態", () => {
     const g = approvalGate(
       { route: "direct", introducerState: "skipped", checked, hasApplication: true },
       DEFAULT_APPLY_SETTINGS,
@@ -143,24 +143,24 @@ describe("核准閘門", () => {
 
 // 報聘進度：教練端的待開通頁與客戶端首頁畫的是同一份，所以規則釘在這裡。
 describe("applySteps：三段進度", () => {
-  it("推薦路線有介紹人那一關，直接申請沒有", () => {
+  it("推薦路線有推薦人那一關，直接申請沒有", () => {
     const referral = applySteps({ route: "referral", introducerState: "pending", introducerName: null });
     const direct = applySteps({ route: "direct", introducerState: "skipped", introducerName: null });
     expect(referral).toHaveLength(3);
     expect(direct).toHaveLength(2);
     // ⚠️ 直接申請不是「跳過這一關」而是「這條路線沒有這一關」——
-    //    畫出一段永遠灰著的「等待介紹人確認」，使用者只會以為自己卡住了。
-    expect(direct.map((s) => s.label).join()).not.toContain("介紹人");
+    //    畫出一段永遠灰著的「等待推薦人確認」，使用者只會以為自己卡住了。
+    expect(direct.map((s) => s.label).join()).not.toContain("推薦人");
   });
 
-  it("介紹人的名字有就帶上", () => {
+  it("推薦人的名字有就帶上", () => {
     const [, intro] = applySteps({ route: "referral", introducerState: "confirmed", introducerName: "邱浩軍" });
-    expect(intro.label).toBe("介紹人已確認（邱浩軍）");
+    expect(intro.label).toBe("推薦人已確認（邱浩軍）");
     expect(intro.done).toBe(true);
     expect(intro.bad).toBe(false);
   });
 
-  it("介紹人未確認標成 bad，不是「還沒到」", () => {
+  it("推薦人未確認標成 bad，不是「還沒到」", () => {
     const [, intro] = applySteps({ route: "referral", introducerState: "declined", introducerName: null });
     expect(intro.bad).toBe(true);
     expect(intro.done).toBe(false);

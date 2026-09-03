@@ -1,6 +1,6 @@
 "use client";
 
-// 後台「組織（職級／上線）」編輯格。
+// 後台「組織（職級／推薦人）」編輯格。
 //
 // 為什麼是 client component：原本用 Server Component 內嵌 <form> ＋ <select defaultValue>，
 // defaultValue 只在 mount 生效——Server Action 存檔後 revalidate 回傳新 RSC，
@@ -88,13 +88,13 @@ export default function OrgCell({
           ))}
         </select>
         <select
-          aria-label="上線"
+          aria-label="推薦人"
           value={upline}
           disabled={pending}
           onChange={(e) => setUpline(e.target.value)}
           className={`${sel} max-w-[120px]`}
         >
-          <option value="">（無上線）</option>
+          <option value="">（無推薦人）</option>
           {peers
             .filter((o) => o.id !== id)
             .map((o) => (

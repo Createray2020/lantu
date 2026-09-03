@@ -130,15 +130,16 @@ async function withCode(row: CoachRow): Promise<CoachRow> {
  *   `ensureCoach()` 下一次導頁就用 Clerk 的 firstName+lastName 蓋回去（見檔頭那段）。
  * · 手機＋現職 → `note`（後台備註欄）。`title` 是「制度職稱」會被印到內部畫面上，
  *   拿它裝「現職：OO人壽業務」等於讓申請人的舊頭銜變成嵐途的頭銜。
- * · 推薦人編號 → 解成 `sponsor_id`（既有的推薦人欄位，同業招募的業績歸屬就吃它）。
+ * · 推薦人編號 → 只解成名字寫進 `note`。**申請當下不寫任何組織欄位**：申請填了誰是
+ *   `coach_applications.introducer_id` 的事，組織位置（`upline_id`）在核准那一刻才綁。
  */
 export type CoachApplication = {
   name?: string | null;
   phone?: string | null;
   currentJob?: string | null;
-  /** 介紹人的教練編號（2026/08/31 起「推薦人」對外一律稱介紹人，欄位仍是 sponsor_id）。 */
+  /** 推薦人的教練編號。只用來解出姓名寫進 note，不寫任何組織欄位。 */
   sponsorCode?: string | null;
-  /** 報聘路線：referral 介紹人推薦 / direct 直接申請。詳細申請資料在 coach_applications。 */
+  /** 報聘路線：referral 教練推薦 / direct 直接申請。詳細申請資料在 coach_applications。 */
   route?: string | null;
 };
 
@@ -148,11 +149,11 @@ const clip = (v: string | null | undefined, max = APPLY_FIELD_MAX) => (v ?? "").
 /** 把申請資料組成後台看得懂的一行。查無推薦人編號也照樣留字串（是線索，不是錯誤）。 */
 function applyNote(input: CoachApplication, sponsorName: string | null): string {
   const parts = [
-    input.route === "direct" ? "路線：直接申請" : input.route === "referral" ? "路線：介紹人推薦" : "",
+    input.route === "direct" ? "路線：直接申請" : input.route === "referral" ? "路線：教練推薦" : "",
     clip(input.phone) ? `手機：${clip(input.phone)}` : "",
     clip(input.currentJob) ? `現職：${clip(input.currentJob)}` : "",
     clip(input.sponsorCode)
-      ? `介紹人：${normalizeCode(clip(input.sponsorCode))}${sponsorName ? `（${sponsorName}）` : "（查無此編號）"}`
+      ? `推薦人：${normalizeCode(clip(input.sponsorCode))}${sponsorName ? `（${sponsorName}）` : "（查無此編號）"}`
       : "",
   ].filter(Boolean);
   return parts.length ? `申請資料｜${parts.join("｜")}` : "";
@@ -168,8 +169,8 @@ export async function applyAsCoach(input: CoachApplication = {}): Promise<Coach 
   if (!user) return null;
   const { email, name, isAdmin } = identity(user);
 
-  // 推薦人：用教練編號解人。查無不擋送出（可能只是打錯或對方還沒發號），留在 note 給後台判斷。
-  let sponsorId: string | null = null;
+  // 推薦人：用教練編號解人，只為了把名字寫進 note。
+  // 查無不擋送出（可能只是打錯或對方還沒發號），原字串留在 note 給後台判斷。
   let sponsorName: string | null = null;
   const rawSponsor = normalizeCode(clip(input.sponsorCode, 20));
   if (rawSponsor) {
@@ -179,7 +180,6 @@ export async function applyAsCoach(input: CoachApplication = {}): Promise<Coach 
       .where(eq(coaches.code, rawSponsor))
       .limit(1);
     if (found[0]) {
-      sponsorId = found[0].id;
       sponsorName = displayNameOf(found[0]);
     }
   }
@@ -196,7 +196,6 @@ export async function applyAsCoach(input: CoachApplication = {}): Promise<Coach 
       ? {
           ...(selfName ? { displayName: selfName } : {}),
           ...(note ? { note } : {}),
-          ...(sponsorId ? { sponsorId } : {}),
         }
       : {};
 
@@ -272,18 +271,18 @@ export async function ensureCoachCode(id: string): Promise<string | null> {
   return code;
 }
 
-// 設定組織職級與上線（後台維護組織樹）。
-// uplineId 會先做「整條上線鏈」的環狀檢查：A→B→A 這種多層環雖然不會讓 downlineIds 無限迴圈
+// 設定組織職級與推薦人（後台維護組織樹）。
+// uplineId 會先做「整條推薦人鏈」的環狀檢查：A→B→A 這種多層環雖然不會讓 downlineIds 無限迴圈
 // （有 seen Set），但會讓兩位主管互看對方團隊，且該子樹在核心成員視角整段消失。
 export async function setCoachOrg(id: string, orgRank: string, uplineId: string | null) {
   if (uplineId) {
-    if (uplineId === id) return { ok: false as const, error: "上線不能是自己" };
+    if (uplineId === id) return { ok: false as const, error: "推薦人不能是自己" };
     const all = await db.select({ id: coaches.id, uplineId: coaches.uplineId }).from(coaches);
     const parent = new Map(all.map((c) => [c.id, c.uplineId]));
     let cur: string | null | undefined = uplineId;
     const seen = new Set<string>();
     while (cur) {
-      if (cur === id) return { ok: false as const, error: "會形成組織環（該教練已在你的下線）" };
+      if (cur === id) return { ok: false as const, error: "會形成組織環（該教練已在你的團隊之下）" };
       if (seen.has(cur)) break;
       seen.add(cur);
       cur = parent.get(cur) ?? null;
@@ -308,7 +307,7 @@ export async function setCoachOrg(id: string, orgRank: string, uplineId: string 
  * 而他推廣過的每一筆案件的 promoter_id 全部靜靜變成 null。下一次重算分潤時
  * 那些案件會被當成「沒有推廣者」，推廣端的整段分潤憑空消失，帳上也沒有任何一列說明為什麼。
  *
- * `downlines` / `sponsored` 不擋人（upline_id / sponsor_id 都是 SET NULL，刪掉不會失敗），
+ * `downlines` 不擋人（upline_id 是 SET NULL，刪掉不會失敗），
  * 但要回給管理端：組織樹斷掉是不可逆的，刪之前總得先讓人看見會斷掉誰。
  */
 export type CoachWorkload = {
@@ -317,23 +316,20 @@ export type CoachWorkload = {
   cases: number;
   /** 以推廣人身分掛著的案件（SET NULL，會被靜靜清空，所以也要擋）。 */
   promoterCases: number;
-  /** 直屬下線（upline_id 指向他的人）。 */
+  /** 直屬夥伴（upline_id 指向他的人，也就是由他推薦進來的人）。 */
   downlines: number;
-  /** 由他推薦入職的人（sponsor_id 指向他的人）。 */
-  sponsored: number;
 };
 
-const EMPTY_WORKLOAD: CoachWorkload = { clients: 0, cases: 0, promoterCases: 0, downlines: 0, sponsored: 0 };
+const EMPTY_WORKLOAD: CoachWorkload = { clients: 0, cases: 0, promoterCases: 0, downlines: 0 };
 
-// 一次算出所有教練的「名下客戶數 / 分潤案件數 / 推廣案件數 / 下線數」，給 /admin 列表用。
+// 一次算出所有教練的「名下客戶數 / 分潤案件數 / 推廣案件數 / 直屬夥伴數」，給 /admin 列表用。
 // 不逐列查：教練數會長，逐列查就是 N+1。
 export async function coachWorkloads(): Promise<Record<string, CoachWorkload>> {
-  const [cl, cs, pr, up, sp] = await Promise.all([
+  const [cl, cs, pr, up] = await Promise.all([
     db.select({ id: clients.coachId, n: count() }).from(clients).groupBy(clients.coachId),
     db.select({ id: compCases.executorId, n: count() }).from(compCases).groupBy(compCases.executorId),
     db.select({ id: compCases.promoterId, n: count() }).from(compCases).groupBy(compCases.promoterId),
     db.select({ id: coaches.uplineId, n: count() }).from(coaches).groupBy(coaches.uplineId),
-    db.select({ id: coaches.sponsorId, n: count() }).from(coaches).groupBy(coaches.sponsorId),
   ]);
   const out: Record<string, CoachWorkload> = {};
   const put = (id: string | null, key: keyof CoachWorkload, n: number) => {
@@ -344,25 +340,22 @@ export async function coachWorkloads(): Promise<Record<string, CoachWorkload>> {
   for (const r of cs) put(r.id, "cases", Number(r.n));
   for (const r of pr) put(r.id, "promoterCases", Number(r.n));
   for (const r of up) put(r.id, "downlines", Number(r.n));
-  for (const r of sp) put(r.id, "sponsored", Number(r.n));
   return out;
 }
 
 export async function coachWorkload(coachId: string): Promise<CoachWorkload> {
-  // 五個 count 都走既有索引（comp_cases_promoter_id_idx 早就在了），成本為零。
-  const [cl, cs, pr, up, sp] = await Promise.all([
+  // 四個 count 都走既有索引（comp_cases_promoter_id_idx 早就在了），成本為零。
+  const [cl, cs, pr, up] = await Promise.all([
     db.select({ n: count() }).from(clients).where(eq(clients.coachId, coachId)),
     db.select({ n: count() }).from(compCases).where(eq(compCases.executorId, coachId)),
     db.select({ n: count() }).from(compCases).where(eq(compCases.promoterId, coachId)),
     db.select({ n: count() }).from(coaches).where(eq(coaches.uplineId, coachId)),
-    db.select({ n: count() }).from(coaches).where(eq(coaches.sponsorId, coachId)),
   ]);
   return {
     clients: Number(cl[0]?.n ?? 0),
     cases: Number(cs[0]?.n ?? 0),
     promoterCases: Number(pr[0]?.n ?? 0),
     downlines: Number(up[0]?.n ?? 0),
-    sponsored: Number(sp[0]?.n ?? 0),
   };
 }
 
@@ -409,7 +402,7 @@ export async function removeCoach(
     return { ok: false, error: `名下還有 ${w.clients} 位客戶，請先轉移給接手教練` };
   }
 
-  // 下線的 upline_id 是 SET NULL，會自己斷開；其餘 CASCADE 的都是這位教練自己的資料。
+  // 直屬夥伴的 upline_id 是 SET NULL，會自己斷開；其餘 CASCADE 的都是這位教練自己的資料。
   await db.delete(coaches).where(eq(coaches.id, id));
   return { ok: true };
 }

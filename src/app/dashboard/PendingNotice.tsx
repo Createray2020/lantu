@@ -14,7 +14,7 @@ export type ApplyProgress = {
 // 帳號尚未開通 / 已停權時顯示；使用者進不了 App。
 //
 // 2026/08/31 加上報聘進度：舊版只有一句「已收到您的使用申請」，
-// 走介紹人推薦路線的人完全看不出來卡在哪一關（等介紹人？還是等審核？），
+// 走教練推薦路線的人完全看不出來卡在哪一關（等推薦人？還是等審核？），
 // 只能回頭私訊問。三段進度條就是把那句話拆開。
 export default function PendingNotice({
   email,
@@ -26,7 +26,7 @@ export default function PendingNotice({
   progress?: ApplyProgress | null;
 }) {
   const suspended = status === "suspended";
-  // 三段：已送出 → 介紹人確認（只有推薦路線有）→ 嵐途審核。
+  // 三段：已送出 → 推薦人確認（只有推薦路線有）→ 嵐途審核。
   // ⚠️ 步驟本身走 lib/coachApply.ts 的 applySteps()——客戶端首頁畫的是同一份。
   const steps = progress ? applySteps(progress) : [];
 
@@ -54,12 +54,17 @@ export default function PendingNotice({
             <ApplyStepList steps={steps} />
             {progress.introducerNote && (
               <p className="mt-3 pt-3 border-t border-white/10 text-[11px] text-[#a9bccf] whitespace-pre-wrap">
-                介紹人留言：{progress.introducerNote}
+                推薦人留言：{progress.introducerNote}
               </p>
             )}
           </div>
         )}
 
+        {!suspended && (
+          <p className="text-[#6f869c] text-[11px] leading-relaxed mb-5">
+            資料完整並完成推薦人確認後，原則上於 1～3 個工作日內完成審核。
+          </p>
+        )}
         <p className="text-[#6f869c] text-xs mb-8">登入帳號：{email || "（未提供 email）"}</p>
         <div className="flex items-center justify-center gap-3">
           <UserButton />

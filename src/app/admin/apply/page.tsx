@@ -41,7 +41,7 @@ export default async function ApplySettingsPage() {
         <div className="mb-4">
           <h1 className="text-xl font-bold">報聘 · 核准預設值與審核檢核表</h1>
           <p className="text-sm text-[#a9bccf] mt-1 leading-relaxed">
-            決定新教練<b className="text-[#e0bd8b]">核准開通那一刻</b>自動帶什麼（職級、上線、使用期限），
+            決定新教練<b className="text-[#e0bd8b]">核准開通那一刻</b>自動帶什麼（職級、推薦人、使用期限），
             以及審核者按下核准之前一定要打的勾。這裡改了不會回頭動已經開通的帳號。
           </p>
         </div>

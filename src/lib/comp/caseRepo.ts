@@ -28,7 +28,7 @@ export async function listAdvisors(): Promise<CoachRow[]> {
 export function toAdvisorRows(rows: CoachRow[]): AdvisorRow[] {
   return rows.map((c) => ({
     id: c.id, name: c.name || c.email || c.id,
-    rankCode: c.rankCode, uplineId: c.uplineId, sponsorId: c.sponsorId, status: c.status,
+    rankCode: c.rankCode, uplineId: c.uplineId, status: c.status,
   }));
 }
 

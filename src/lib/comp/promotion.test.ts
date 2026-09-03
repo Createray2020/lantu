@@ -33,7 +33,7 @@ function cs(o: Partial<CaseRow> & { id: string; executorId: string }): CaseRow {
 }
 
 describe("resolveChain：代管（§9）", () => {
-  it("一般情形＝直接沿上線串到頂", () => {
+  it("一般情形＝直接沿推薦人串到頂", () => {
     const r = resolveChain("c1a", ORG, P)!;
     expect(r.chain.map((n) => n.id)).toEqual(["s2", "chief"]);
     expect(r.skipped).toHaveLength(0);
@@ -132,12 +132,12 @@ describe("團隊輔導業績（§13）", () => {
     cs({ id: "4", executorId: "s3peer", clientId: "cl4" }),
   ];
 
-  it("鏈上逐層計入：s2 得下線兩案，chief 得全部四案", () => {
+  it("鏈上逐層計入：s2 得直屬夥伴兩案，chief 得全部四案", () => {
     expect(teamStats(cases, "s2", ORG, P).cases).toBe(2);
     expect(teamStats(cases, "chief", ORG, P).cases).toBe(4);
   });
 
-  it("平階下線的案件照樣計入直屬主管（§8-1）", () => {
+  it("平階直屬夥伴的案件照樣計入直屬主管（§8-1）", () => {
     expect(teamStats(cases, "s3", ORG, P).cases).toBe(1);
   });
 

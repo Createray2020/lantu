@@ -39,7 +39,7 @@ const STATE_COLOR: Record<IntroducerState, string> = {
 
 // 後台名冊裡的報聘詳情＋審核檢核表。
 //
-// 為什麼檢核表放在這裡而不是另開一頁：審核者要看的東西（自述、證照、介紹人說了什麼）
+// 為什麼檢核表放在這裡而不是另開一頁：審核者要看的東西（自述、證照、推薦人說了什麼）
 // 與要打的勾是同一件事，拆兩頁就會變成「先在 A 頁看完、再到 B 頁憑印象打勾」。
 // 打勾即存（存的是時間戳），核准鈕仍在右邊那一欄 —— 沒勾完按下去會回一句缺什麼。
 export default function ReviewPanel({
@@ -99,7 +99,7 @@ export default function ReviewPanel({
       {open && (
         <div className="px-2 pb-2 grid gap-2 text-[11px]">
           <div className="text-[#a9bccf]">
-            介紹人：
+            推薦人：
             {app.introducerName
               ? `${app.introducerName}${app.introducerCode ? `（${app.introducerCode}）` : ""}`
               : app.introducerCode
@@ -107,7 +107,7 @@ export default function ReviewPanel({
                 : "—"}
           </div>
           {app.introducerNote && (
-            <div className="text-[#8fa8bd] whitespace-pre-wrap">介紹人留言：{app.introducerNote}</div>
+            <div className="text-[#8fa8bd] whitespace-pre-wrap">推薦人留言：{app.introducerNote}</div>
           )}
           {app.currentJob && <div className="text-[#8fa8bd]">現況：{app.currentJob}</div>}
           {app.motive && <div className="text-[#8fa8bd] whitespace-pre-wrap">動機：{app.motive}</div>}

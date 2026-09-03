@@ -39,6 +39,7 @@ export default function CoachEntry({
         <h2 className="font-serif text-lg mb-1.5">你的報聘申請審核中</h2>
         <p className="text-[13px] text-[#a7bacb] leading-relaxed mb-4">
           開通需經審核（含費用確認）。開通後這裡會變成教練工作台的入口。
+          資料完整並完成推薦人確認後，原則上於 1～3 個工作日內完成審核。
         </p>
         {progress && (
           <div className="rounded-lg border border-white/10 bg-[#0a1a2b] p-4">
@@ -46,7 +47,7 @@ export default function CoachEntry({
             <ApplyStepList steps={applySteps(progress)} />
             {progress.introducerNote && (
               <p className="mt-3 pt-3 border-t border-white/10 text-[11px] text-[#a9bccf] whitespace-pre-wrap">
-                介紹人留言：{progress.introducerNote}
+                推薦人留言：{progress.introducerNote}
               </p>
             )}
           </div>
@@ -61,7 +62,7 @@ export default function CoachEntry({
       <h2 className="font-serif text-lg mb-1.5">想成為嵐途財務教練？</h2>
       <p className="text-[13px] text-[#a7bacb] leading-relaxed mb-4">
         你現在的帳號是客戶身分。教練與客戶並不互斥——同一組帳號可以兩邊都用，
-        報聘核准後你仍然保有這裡的個人規劃。有介紹人可填教練編號，沒有也能直接申請。
+        報聘核准後你仍然保有這裡的個人規劃。有推薦人可填教練編號，沒有也能直接申請。
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <Link

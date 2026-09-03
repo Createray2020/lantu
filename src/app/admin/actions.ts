@@ -42,7 +42,7 @@ function validPng(v: FormDataEntryValue | null): string | null {
 
 const RANKS = ["member", "manager", "owner"] as const;
 
-// 設定組織樹：職級（member/manager/owner）＋上線。
+// 設定組織樹：職級（member/manager/owner）＋推薦人。
 export async function updateOrg(
   id: string,
   input: { orgRank: string; uplineId: string },
@@ -79,8 +79,8 @@ async function setStatus(
 /**
  * 核准報聘。
  *
- * 2026/08/31 起這裡不再只是 `status='active'`：先過檢核表閘門（介紹人確認、逐項打勾），
- * 通過才開通，而且開通當下一次帶齊職級（預設 C1）、上線（介紹人）、使用期限（預設一年）。
+ * 2026/08/31 起這裡不再只是 `status='active'`：先過檢核表閘門（推薦人確認、逐項打勾），
+ * 通過才開通，而且開通當下一次帶齊職級（預設 C1）、推薦人（推薦人）、使用期限（預設一年）。
  * 沒有申請表的舊帳號一律直接放行 —— 見 approvalGate 的 hasApplication。
  */
 export async function approveCoach(id: string): Promise<ActionResult> {

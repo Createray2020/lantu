@@ -28,7 +28,7 @@ export default async function Dashboard({
     redirect(userId ? "/portal" : "/sign-in");
   }
   if (coach.status !== "active") {
-    // 待審者看得到自己的報聘進度（卡在介紹人還是卡在審核）。舊帳號沒有申請表就只有原本那句話。
+    // 待審者看得到自己的報聘進度（卡在推薦人還是卡在審核）。舊帳號沒有申請表就只有原本那句話。
     const app = await getApplication(coach.id);
     return (
       <PendingNotice

@@ -74,8 +74,8 @@ describe("申請入口的每一段都要接得上", () => {
   });
 
   it("⚠️ 報聘三段進度只有一份實作（教練端與客戶端吃同一支純函式）", () => {
-    // 兩邊各抄一份的話，「直接申請沒有介紹人那一關」這個條件漏掉一邊就會出現
-    // 永遠灰著的「等待介紹人確認」——而畫面上完全看不出是 bug。
+    // 兩邊各抄一份的話，「直接申請沒有推薦人那一關」這個條件漏掉一邊就會出現
+    // 永遠灰著的「等待推薦人確認」——而畫面上完全看不出是 bug。
     expect(R("src/lib/coachApply.ts")).toContain("export function applySteps");
     expect(R("src/app/dashboard/PendingNotice.tsx")).toContain("applySteps");
     expect(R("src/app/portal/CoachEntry.tsx")).toContain("applySteps");
@@ -98,7 +98,7 @@ describe("申請表單收得到後台審核要用的資料", () => {
     expect(form).toContain("APPLY_TEXT_FIELDS");
   });
 
-  it("報聘路線是表單的第一段（選了路線才知道要不要填介紹人）", () => {
+  it("報聘路線是表單的第一段（選了路線才知道要不要填推薦人）", () => {
     expect(form).toContain("APPLY_ROUTES");
     expect(form).toContain("needsIntroducer");
   });
@@ -110,14 +110,14 @@ describe("申請表單收得到後台審核要用的資料", () => {
     expect(R("src/app/dashboard/apply/actions.ts")).toContain("canSubmit");
   });
 
-  it("介紹人推薦的申請要有人確認得了（介紹人端的入口）", () => {
+  it("教練推薦的申請要有人確認得了（推薦人端的入口）", () => {
     const page = R("src/app/dashboard/requests/page.tsx");
     expect(page).toContain("listPendingIntroductions");
     expect(page).toContain("報聘確認");
   });
 
   it("⚠️ 核准報聘一律走閘門，不是直接 status='active'", () => {
-    // 舊版 approveCoach 只做 setStatus(id,'active')，職級／上線／期限全靠人事後補。
+    // 舊版 approveCoach 只做 setStatus(id,'active')，職級／推薦人／期限全靠人事後補。
     const actions = R("src/app/admin/actions.ts");
     expect(actions).toContain("approveApplication");
     expect(actions).not.toMatch(/export async function approveCoach[\s\S]{0,120}setStatus\(id, "active"\)/);
@@ -131,10 +131,18 @@ describe("申請表單收得到後台審核要用的資料", () => {
     expect(coach).not.toMatch(/name: selfName/);
   });
 
-  it("後台名冊印得出申請資料與介紹人", () => {
+  it("後台名冊印得出申請資料與推薦人", () => {
     const admin = R("src/app/admin/page.tsx");
     expect(admin).toContain("c.note");       // 舊帳號的申請資料還壓在 note 裡
-    expect(admin).toContain("c.sponsorId");
-    expect(admin).toContain("ReviewPanel");  // 新帳號的完整報聘表＋檢核表
+    expect(admin).toContain("ReviewPanel");  // 新帳號的完整報聘表＋檢核表（推薦人印在裡面）
+  });
+
+  it("⚠️ 推薦人只有一個欄位（2026/09/03 合併）", () => {
+    // 合併前 coaches 有兩欄：uplineId（組織位置）與 sponsorId（號稱業績歸屬）。
+    // 後者全站沒有任何計算讀它 —— 分潤鏈 resolveChain() 只沿 uplineId 爬，連代管都是跳層做的 ——
+    // 但後台有兩個獨立的編輯入口，改錯一個不會有任何提示，只會讓兩份「推薦人」默默分岔。
+    // 再長出第二個欄位就是同一個坑，所以在這裡釘死。
+    expect(R("src/Shared/db/schema.ts")).not.toContain("sponsor_id");
+    expect(R("src/lib/comp/chain.ts")).not.toContain("sponsorId");
   });
 });

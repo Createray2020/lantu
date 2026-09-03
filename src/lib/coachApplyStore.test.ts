@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 /**
  * 「核准報聘那一刻要一次寫齊」的測試。
  *
- * 2026/08/31 之前核准只做 `status='active'`，職級／上線／期限全靠人事後補 ——
+ * 2026/08/31 之前核准只做 `status='active'`，職級／推薦人／期限全靠人事後補 ——
  * 補漏的代價是「開通了卻沒定級、沒設期限」的帳號默默累積（上線前盤點時 15 位裡有 8 位未定級）。
  * 這裡釘住三件事：閘門擋得住、該帶的有帶、不該蓋的沒蓋。
  */
@@ -84,7 +84,6 @@ const coachRow = (over: any = {}) => ({
   status: "pending",
   rankCode: null,
   uplineId: null,
-  sponsorId: null,
   licenseUntil: null,
   ...over,
 });
@@ -101,7 +100,7 @@ const appRow = (over: any = {}) => ({
 const coachUpdate = () => S.updates.find((u: any) => u.table === "coaches");
 
 describe("核准報聘", () => {
-  it("介紹人還沒確認就核准不了，而且一個字都沒寫進 DB", async () => {
+  it("推薦人還沒確認就核准不了，而且一個字都沒寫進 DB", async () => {
     S.coaches = [coachRow()];
     S.apps = [appRow({ introducerState: "pending" })];
     const r = await approveApplication("u1", "admin1");
@@ -118,7 +117,7 @@ describe("核准報聘", () => {
     expect(S.updates).toHaveLength(0);
   });
 
-  it("通過閘門就一次帶齊：C1、上線＝介紹人、期限一年，並發編號", async () => {
+  it("通過閘門就一次帶齊：C1、推薦人（組織位置）＝申請時填的推薦人、期限一年，並發編號", async () => {
     S.coaches = [coachRow()];
     S.apps = [appRow()];
     const r = await approveApplication("u1", "admin1");
@@ -127,13 +126,12 @@ describe("核准報聘", () => {
     expect(u.status).toBe("active");
     expect(u.rankCode).toBe("C1");
     expect(u.uplineId).toBe("up1");
-    expect(u.sponsorId).toBe("up1");
     expect(u.licenseUntil).toBe(addPeriod(todayISO(), "year", 1));
     expect(ensureCoachCode).toHaveBeenCalledWith("u1");
   });
 
-  it("⚠️ 已經設過的職級／上線／期限不會被蓋掉（停權後再核准也不會被降回 C1）", async () => {
-    S.coaches = [coachRow({ rankCode: "S2", uplineId: "boss", sponsorId: "boss", licenseUntil: "2030-01-01" })];
+  it("⚠️ 已經設過的職級／推薦人／期限不會被蓋掉（停權後再核准也不會被降回 C1）", async () => {
+    S.coaches = [coachRow({ rankCode: "S2", uplineId: "boss", licenseUntil: "2030-01-01" })];
     S.apps = [appRow()];
     const r = await approveApplication("u1", "admin1");
     const u = coachUpdate();
@@ -146,13 +144,12 @@ describe("核准報聘", () => {
     expect(r.ok && r.applied.rankCode).toBe("S2");
   });
 
-  it("⚠️ 自我推薦不會做出指向自己的上線環", async () => {
+  it("⚠️ 自我推薦不會做出指向自己的推薦人環", async () => {
     S.coaches = [coachRow()];
     S.apps = [appRow({ introducerId: "u1" })];
     await approveApplication("u1", "admin1");
     const u = coachUpdate();
     expect(u.uplineId).toBeUndefined();
-    expect(u.sponsorId).toBeUndefined();
   });
 
   it("⚠️ 沒有申請表的舊帳號照樣核准得了（檢核表不回頭套用在他們身上）", async () => {
@@ -161,7 +158,7 @@ describe("核准報聘", () => {
     const r = await approveApplication("u1", "admin1");
     expect(r.ok).toBe(true);
     expect(coachUpdate().status).toBe("active");
-    // 沒有介紹人可綁，但職級與期限的預設值照樣補上（這正是舊帳號會漏掉的兩件事）。
+    // 沒有推薦人可綁，但職級與期限的預設值照樣補上（這正是舊帳號會漏掉的兩件事）。
     expect(coachUpdate().rankCode).toBe("C1");
   });
 

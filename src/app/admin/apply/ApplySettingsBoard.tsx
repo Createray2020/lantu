@@ -76,14 +76,14 @@ export default function ApplySettingsBoard({
           </label>
 
           <label className="flex items-center gap-3">
-            <span className="w-28 text-[#a9bccf] text-[12px]">上線</span>
+            <span className="w-28 text-[#a9bccf] text-[12px]">推薦人</span>
             <input
               type="checkbox"
               className="accent-[#c99a5b]"
               checked={s.bindUplineToIntroducer}
               onChange={(e) => patch({ bindUplineToIntroducer: e.target.checked })}
             />
-            <span className="text-[12px]">核准時把上線設成介紹人</span>
+            <span className="text-[12px]">核准時自動綁定推薦人</span>
           </label>
 
           <div className="flex items-center gap-3">
@@ -121,7 +121,7 @@ export default function ApplySettingsBoard({
       {/* ② 申請表的必填欄位 */}
       <section className="border border-white/10 rounded-lg p-4">
         <h2 className="font-bold mb-1">申請表必填欄位</h2>
-        <p className="text-[11px] text-[#6f869c] mb-3">姓名與手機永遠必填；介紹人推薦路線的介紹人編號也永遠必填。</p>
+        <p className="text-[11px] text-[#6f869c] mb-3">姓名與手機永遠必填；教練推薦路線的推薦人編號也永遠必填。</p>
         <div className="grid gap-2 text-sm">
           {APPLY_TEXT_FIELDS.map((f) => {
             const on = s.requiredFields.includes(f.key);
@@ -160,7 +160,7 @@ export default function ApplySettingsBoard({
             checked={s.requireIntroducerConfirm}
             onChange={(e) => patch({ requireIntroducerConfirm: e.target.checked })}
           />
-          <span className="text-[13px]">介紹人推薦路線：介紹人確認過才給核准</span>
+          <span className="text-[13px]">教練推薦路線：推薦人確認過才給核准</span>
         </label>
 
         <div className="grid gap-2">

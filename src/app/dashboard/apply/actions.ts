@@ -35,7 +35,7 @@ export async function applyAsCoachAction(draft: ApplyDraft) {
   redirect("/dashboard");
 }
 
-/** 申請表單即時驗介紹人編號：填對了當場把名字顯示出來，不用送出才知道打錯。 */
+/** 申請表單即時驗推薦人編號：填對了當場把名字顯示出來，不用送出才知道打錯。 */
 export async function lookupIntroducerAction(code: string) {
   const found = await lookupCoachByCode(code);
   if (!found || found.status !== "active") return { ok: false as const };

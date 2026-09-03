@@ -34,7 +34,7 @@ export default async function MyBusinessPage() {
 
   const ov = buildOverview(
     {
-      id: me.id, name: me.name, rankCode: me.rankCode, uplineId: me.uplineId, sponsorId: me.sponsorId,
+      id: me.id, name: me.name, rankCode: me.rankCode, uplineId: me.uplineId,
       hireDate: me.hireDate, entryType: me.entryType,
       tenureRankCode: me.tenureRankCode, tenureUntil: me.tenureUntil,
       initialCases: me.initialCases, initialFees: me.initialFees,

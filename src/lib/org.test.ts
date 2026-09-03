@@ -37,7 +37,7 @@ describe("visibleCoachIds", () => {
   it("owner 看全部", () => {
     expect(visibleCoachIds(c("o", "owner", null), all).sort()).toEqual(all.map((x) => x.id).sort());
   });
-  it("manager 看自己＋下線子樹", () => {
+  it("manager 看自己＋團隊子樹", () => {
     expect(visibleCoachIds(c("mgrA", "manager", "o"), all).sort()).toEqual(["m1", "m1a", "m2", "mgrA"]);
   });
   it("member 只看自己", () => {
@@ -46,7 +46,7 @@ describe("visibleCoachIds", () => {
 });
 
 describe("teamsUnder", () => {
-  it("以 owner 直屬下線為隊長，成員為其下線（不含隊長）", () => {
+  it("以 owner 直屬夥伴為隊長，成員為其直屬夥伴（不含隊長）", () => {
     const teams = teamsUnder("o", all);
     expect(teams.map((t) => t.manager.id).sort()).toEqual(["mgrA", "mgrB"]);
     const a = teams.find((t) => t.manager.id === "mgrA")!;
