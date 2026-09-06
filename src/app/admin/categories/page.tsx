@@ -33,7 +33,7 @@ export default async function CategoriesPage() {
       <AdminHeader label="類別與參數設定" />
       <AdminNav />
 
-      <section className="p-6 max-w-6xl">
+      <section className="w-full px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">收支資債類別・教育與生育費用參數</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">

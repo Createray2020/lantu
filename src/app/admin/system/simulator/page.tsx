@@ -30,7 +30,7 @@ export default async function SimulatorPage({
       <AdminHeader label="分潤試算器" />
       <AdminNav />
 
-      <section className="p-6 max-w-5xl">
+      <section className="max-w-5xl mx-auto px-5 py-6">
         <div className="mb-4 flex flex-wrap items-baseline gap-3">
           <h1 className="text-xl font-bold">分潤試算</h1>
           <span className="text-sm text-tx2">

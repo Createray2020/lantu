@@ -62,7 +62,7 @@ export default async function AdminLearnPage() {
       <AdminHeader label="學習區管理" />
       <AdminNav />
 
-      <section className="p-6 max-w-5xl">
+      <section className="max-w-5xl mx-auto px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">學習區 · 課程與教材</h1>
           <p className="text-sm text-tx2 mt-1">

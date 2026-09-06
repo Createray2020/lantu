@@ -54,7 +54,7 @@ export default async function TrainingPage() {
       <AdminHeader label="訓練時數" />
       <AdminNav />
 
-      <section className="p-6 max-w-6xl">
+      <section className="w-full px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">訓練時數與研討會</h1>
           <p className="text-sm text-tx2 mt-1">

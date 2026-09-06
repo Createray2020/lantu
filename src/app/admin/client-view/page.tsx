@@ -23,7 +23,7 @@ export default async function ClientViewPage() {
       <AdminHeader label="客戶端顯示" />
       <AdminNav />
 
-      <section className="p-6 max-w-3xl">
+      <section className="max-w-3xl mx-auto px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">客戶財務儀表板 · 顯示哪些模組</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">

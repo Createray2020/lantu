@@ -20,7 +20,7 @@ export default async function AnalysisDefaultsPage() {
       <AdminHeader label="分析模組預設" />
       <AdminNav />
 
-      <section className="p-6 max-w-4xl">
+      <section className="max-w-4xl mx-auto px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">客戶分析頁 · 模組預設順序</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">

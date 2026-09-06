@@ -53,7 +53,7 @@ export default async function Admin() {
       <AdminHeader label="教練管理後台" />
       <AdminNav />
 
-      <section className="p-6 max-w-4xl">
+      <section className="w-full px-5 py-6">
 
         <div className="flex items-center gap-4 mb-3">
           <h1 className="text-xl font-bold">教練帳號</h1>
@@ -69,12 +69,12 @@ export default async function Admin() {
             <thead>
               <tr className="bg-panel2 text-tx2 text-left">
                 <th className="px-3 py-2 font-semibold">姓名 / Email</th>
-                <th className="px-3 py-2 font-semibold">角色</th>
-                <th className="px-3 py-2 font-semibold">狀態</th>
+                <th className="px-3 py-2 font-semibold whitespace-nowrap">角色</th>
+                <th className="px-3 py-2 font-semibold whitespace-nowrap">狀態</th>
                 <th className="px-3 py-2 font-semibold">組織（職級 / 推薦人）</th>
-                <th className="px-3 py-2 font-semibold">級別 · 使用期限</th>
-                <th className="px-3 py-2 font-semibold">申請日</th>
-                <th className="px-3 py-2 font-semibold">開通日</th>
+                <th className="px-3 py-2 font-semibold whitespace-nowrap">級別 · 使用期限</th>
+                <th className="px-3 py-2 font-semibold whitespace-nowrap">申請日</th>
+                <th className="px-3 py-2 font-semibold whitespace-nowrap">開通日</th>
                 <th className="px-3 py-2 font-semibold text-right">動作</th>
               </tr>
             </thead>
@@ -130,12 +130,12 @@ export default async function Admin() {
                         />
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <span className={admin ? "text-brand2 font-bold" : "text-tx2"}>
                         {admin ? "管理員" : "教練"}
                       </span>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <span
                         className="inline-block px-2 py-0.5 rounded-md text-xs font-bold"
                         style={{ background: s.color + "22", color: s.color }}
@@ -166,8 +166,8 @@ export default async function Admin() {
                         usedClients={workloads[c.id]?.clients ?? 0}
                       />
                     </td>
-                    <td className="px-3 py-2 text-tx2">{fmtDate(c.createdAt)}</td>
-                    <td className="px-3 py-2 text-tx2">{fmtDate(c.approvedAt)}</td>
+                    <td className="px-3 py-2 text-tx2 whitespace-nowrap">{fmtDate(c.createdAt)}</td>
+                    <td className="px-3 py-2 text-tx2 whitespace-nowrap">{fmtDate(c.approvedAt)}</td>
                     <td className="px-3 py-2">
                       {c.id === me.id ? (
                         // 只擋「對自己動手」，避免把自己鎖在門外。

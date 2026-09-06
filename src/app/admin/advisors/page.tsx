@@ -89,7 +89,7 @@ export default async function AdvisorsPage() {
       <AdminHeader label="教練職級與晉升" />
       <AdminNav />
 
-      <section className="p-6 max-w-7xl">
+      <section className="w-full px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">教練職級與晉升追蹤</h1>
           <p className="text-sm text-tx2 mt-1">

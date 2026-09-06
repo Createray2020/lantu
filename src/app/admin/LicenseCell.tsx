@@ -78,7 +78,7 @@ export default function LicenseCell({
   }
 
   return (
-    <div className="text-xs leading-relaxed">
+    <div className="text-xs leading-relaxed whitespace-nowrap">
       <div className="font-bold text-brand2">
         {rankCode ? (RANK_GROUP_LABEL[rankCode] ?? rankCode) : <span className="text-tx3 font-normal">未定級</span>}
       </div>
@@ -104,7 +104,7 @@ export default function LicenseCell({
       </button>
 
       {open && (
-        <div className="mt-2 p-2 rounded-lg bg-panel border border-line space-y-2 min-w-[250px] shadow-e1">
+        <div className="mt-2 p-2 rounded-lg bg-panel border border-line space-y-2 min-w-[250px] shadow-e1 whitespace-normal">
           <label className="block">
             <span className="text-tx3">級別</span>
             <select

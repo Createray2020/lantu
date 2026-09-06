@@ -24,7 +24,7 @@ export default async function ApplySettingsPage() {
       <AdminHeader label="報聘設定" />
       <AdminNav />
 
-      <section className="p-6 max-w-3xl">
+      <section className="max-w-3xl mx-auto px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">報聘 · 核准預設值與審核檢核表</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">

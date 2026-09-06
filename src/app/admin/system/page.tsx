@@ -28,7 +28,7 @@ export default async function SystemPage({
       <AdminHeader label="業務制度" />
       <AdminNav />
 
-      <section className="p-6 max-w-6xl">
+      <section className="max-w-6xl mx-auto px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">財務教練業務制度</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">

@@ -80,7 +80,7 @@ export default async function CasesPage() {
       <AdminHeader label="案件與分潤" />
       <AdminNav />
 
-      <section className="p-6 max-w-6xl">
+      <section className="w-full px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">案件與分潤</h1>
           <p className="text-sm text-tx2 mt-1">

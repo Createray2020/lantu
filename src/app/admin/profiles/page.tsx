@@ -31,7 +31,7 @@ export default async function ProfilesPage() {
       <AdminHeader label="教練公開檔案" />
       <AdminNav />
 
-      <section className="p-6 max-w-6xl">
+      <section className="w-full px-5 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">教練公開檔案</h1>
           <p className="text-sm text-tx2 mt-1">

@@ -20,7 +20,7 @@ export default async function BrandPage() {
     <main className="flex-1 bg-canvas text-tx min-h-screen">
       <AdminHeader label="教練管理後台" />
       <AdminNav />
-      <section className="p-6 max-w-4xl">
+      <section className="max-w-4xl mx-auto px-5 py-6">
         <h1 className="text-xl font-bold mb-1">品牌設定</h1>
         <p className="text-tx2 text-sm mb-5">Logo 會套用到系統頂欄、報告書封面、瀏覽器分頁圖示與 PWA 圖示。</p>
         <BrandSettings currentLogo={brand.logoUrl} />
