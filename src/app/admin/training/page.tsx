@@ -1,12 +1,10 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { getBrand } from "@/lib/brand";
 import { listAdvisors, listTrainingRecords, listTrainingSessions } from "@/lib/comp/caseRepo";
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import { trainingHours } from "@/lib/comp/stats";
 import TrainingBoard, { type ExternalView, type HoursRow, type SessionView } from "./TrainingBoard";
+import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
@@ -51,29 +49,15 @@ export default async function TrainingPage() {
     };
   });
 
-  const brand = await getBrand();
-
   return (
-    <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
-      <header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]">
-        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          {brand.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
-          )}
-          <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
-        </Link>
-        <span className="text-[#a9bccf] text-xs">訓練時數</span>
-        <div className="flex-1" />
-        
-        <UserButton />
-      </header>
+    <main className="flex-1 bg-canvas text-tx min-h-screen">
+      <AdminHeader label="訓練時數" />
       <AdminNav />
 
       <section className="p-6 max-w-6xl">
         <div className="mb-4">
           <h1 className="text-xl font-bold">訓練時數與研討會</h1>
-          <p className="text-sm text-[#a9bccf] mt-1">
+          <p className="text-sm text-tx2 mt-1">
             維持資格的訓練門檻（辦法第十六條第二項）就靠這一頁的資料。
           </p>
         </div>

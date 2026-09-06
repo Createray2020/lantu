@@ -56,9 +56,9 @@ export default function VersionWatcher() {
         justifyContent: "center",
         gap: 14,
         padding: "9px 16px",
-        background: "linear-gradient(90deg,#0d2b45,#12334f)",
-        color: "#eef2f7",
-        borderBottom: "1px solid #c99a5b",
+        background: "linear-gradient(90deg,var(--panel),var(--panel2))",
+        color: "var(--tx)",
+        borderBottom: "1px solid var(--brand)",
         fontSize: 13.5,
         fontWeight: 600,
         boxShadow: "0 2px 12px rgba(0,0,0,.35)",
@@ -68,8 +68,8 @@ export default function VersionWatcher() {
       <button
         onClick={() => window.location.reload()}
         style={{
-          background: "#c99a5b",
-          color: "#08202a",
+          background: "var(--brand)",
+          color: "var(--onbrand)",
           border: "none",
           borderRadius: 8,
           padding: "6px 16px",

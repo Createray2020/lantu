@@ -31,24 +31,24 @@ export default async function RequestsPage() {
   const hp = await headerProps(coach);
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
+    <div className="min-h-screen bg-canvas text-tx">
       <DashboardHeader {...hp} />
       <ReadOnlyBanner license={hp.license} />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
         <h1 className="font-serif text-2xl mb-1">客戶連結申請</h1>
-        <p className="text-[#a7bacb] text-sm mb-5">客戶從人生護照送出的連結邀請；接受後對方就掛到你名下、可一起規劃。</p>
+        <p className="text-tx2 text-sm mb-5">客戶從人生護照送出的連結邀請；接受後對方就掛到你名下、可一起規劃。</p>
         <RequestList requests={requests.map((r) => ({ id: r.id, clientId: r.clientId, clientName: r.clientName, note: r.note }))} />
-        <div className="mt-8 pt-6 border-t border-white/10">
+        <div className="mt-8 pt-6 border-t border-line">
           <h2 className="font-serif text-xl mb-1">共同執案邀請</h2>
-          <p className="text-[#a7bacb] text-sm mb-4">其他教練邀你一起看某位客戶。接受後你會在「客戶」頁看到那位客戶，內容全部唯讀。</p>
+          <p className="text-tx2 text-sm mb-4">其他教練邀你一起看某位客戶。接受後你會在「客戶」頁看到那位客戶，內容全部唯讀。</p>
           <CollabInviteList
             invites={collabInvites.map((i) => ({ id: i.id, clientName: i.clientName, clientCode: i.clientCode, ownerName: i.ownerName }))}
           />
         </div>
 
-        <div className="mt-8 pt-6 border-t border-white/10">
+        <div className="mt-8 pt-6 border-t border-line">
           <h2 className="font-serif text-xl mb-1">報聘確認</h2>
-          <p className="text-[#a7bacb] text-sm mb-4">有人填了你的教練編號申請成為嵐途教練。你確認推薦之後，才會進入嵐途審核。</p>
+          <p className="text-tx2 text-sm mb-4">有人填了你的教練編號申請成為嵐途教練。你確認推薦之後，才會進入嵐途審核。</p>
           <IntroductionList
             intros={intros.map((i) => ({
               coachId: i.coachId,
@@ -61,7 +61,7 @@ export default async function RequestsPage() {
           />
         </div>
 
-        <div className="mt-8 pt-6 border-t border-white/10">
+        <div className="mt-8 pt-6 border-t border-line">
           <InviteBox />
         </div>
       </div>

@@ -1,10 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { getBrand } from "@/lib/brand";
 import { getClientDashPayload } from "@/lib/clientDashStore";
 import ClientViewBoard from "./ClientViewBoard";
+import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
@@ -17,33 +15,23 @@ export default async function ClientViewPage() {
   if (!me) redirect("/dashboard");
   if (!(await isAdmin(me))) redirect("/dashboard");
 
-  const [payload, brand] = await Promise.all([getClientDashPayload(), getBrand()]);
+  const [payload] = await Promise.all([getClientDashPayload()
+  ]);
 
   return (
-    <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
-      <header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]">
-        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          {brand.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
-          )}
-          <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
-        </Link>
-        <span className="text-[#a9bccf] text-xs">客戶端顯示</span>
-        <div className="flex-1" />
-        <UserButton />
-      </header>
+    <main className="flex-1 bg-canvas text-tx min-h-screen">
+      <AdminHeader label="客戶端顯示" />
       <AdminNav />
 
       <section className="p-6 max-w-3xl">
         <div className="mb-4">
           <h1 className="text-xl font-bold">客戶財務儀表板 · 顯示哪些模組</h1>
-          <p className="text-sm text-[#a9bccf] mt-1 leading-relaxed">
+          <p className="text-sm text-tx2 mt-1 leading-relaxed">
             客戶登入之後看到的那一頁要放什麼。除了原本的總覽六塊，
-            教練端「<b className="text-[#e0bd8b]">分析</b>」與「<b className="text-[#e0bd8b]">建議</b>」
-            兩個分頁的模組現在<b className="text-[#e0bd8b]">全部都在這裡</b>，想給哪塊就開哪塊。
+            教練端「<b className="text-brand2">分析</b>」與「<b className="text-brand2">建議</b>」
+            兩個分頁的模組現在<b className="text-brand2">全部都在這裡</b>，想給哪塊就開哪塊。
             <br />
-            取消勾選的模組，<b className="text-[#e0bd8b]">全公司的客戶都不會看到</b>——這一層是公司對外的一致性，
+            取消勾選的模組，<b className="text-brand2">全公司的客戶都不會看到</b>——這一層是公司對外的一致性，
             教練不能為個別客戶再調。沒設定過＝全部顯示；之後系統新增模組也預設顯示。
           </p>
         </div>

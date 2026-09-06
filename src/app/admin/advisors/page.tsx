@@ -1,14 +1,12 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { getBrand } from "@/lib/brand";
 import {
   listAdvisors, listCases, listRankEvents, listTrainingRecords, toAdvisorRows, toCaseRows,
 } from "@/lib/comp/caseRepo";
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import { buildOverview } from "@/lib/comp/view";
 import AdvisorsBoard, { type AdvisorView, type TrackView } from "./AdvisorsBoard";
+import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
@@ -86,33 +84,19 @@ export default async function AdvisorsPage() {
       };
     });
 
-  const brand = await getBrand();
-
   return (
-    <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
-      <header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]">
-        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          {brand.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
-          )}
-          <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
-        </Link>
-        <span className="text-[#a9bccf] text-xs">教練職級與晉升</span>
-        <div className="flex-1" />
-        
-        <UserButton />
-      </header>
+    <main className="flex-1 bg-canvas text-tx min-h-screen">
+      <AdminHeader label="教練職級與晉升" />
       <AdminNav />
 
       <section className="p-6 max-w-7xl">
         <div className="mb-4">
           <h1 className="text-xl font-bold">教練職級與晉升追蹤</h1>
-          <p className="text-sm text-[#a9bccf] mt-1">
+          <p className="text-sm text-tx2 mt-1">
             累計指標由案件即時推導（唯讀），職級異動一律留紀錄。制度版本：
-            <b className="text-[#e0bd8b] ml-1">{version.version}</b>
+            <b className="text-brand2 ml-1">{version.version}</b>
             {params.ranks.length === 0 && (
-              <span className="text-[#e08b7a] ml-2">職級表尚未設定，晉升判定不會啟動</span>
+              <span className="text-danger ml-2">職級表尚未設定，晉升判定不會啟動</span>
             )}
           </p>
         </div>

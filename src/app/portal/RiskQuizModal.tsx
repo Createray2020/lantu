@@ -64,18 +64,18 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-auto bg-[rgba(4,14,24,.72)] p-4 sm:p-8">
-      <div className="w-full max-w-[680px] rounded-2xl border border-white/12 bg-[#0a2137] shadow-[0_18px_50px_rgba(0,0,0,.5)]">
-        <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-auto bg-scrim/70 p-4 sm:p-8">
+      <div className="w-full max-w-[680px] rounded-2xl border border-line bg-field shadow-[0_18px_50px_rgba(0,0,0,.5)]">
+        <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <div className="flex-1">
-            <div className="text-[15px] font-bold text-[#e0bd8b]">投資風險屬性測驗</div>
-            <div className="text-[11.5px] text-[#a7bacb]">
+            <div className="text-[15px] font-bold text-brand2">投資風險屬性測驗</div>
+            <div className="text-[11.5px] text-tx2">
               {done ? "已完成" : `${all} 題 · 約 5 分鐘 · 已作答 ${answered}／${all}`}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg border border-white/20 px-3 py-1.5 text-[12.5px] text-[#a7bacb] hover:text-white"
+            className="rounded-lg border border-line2 px-3 py-1.5 text-[12.5px] text-tx2 hover:text-tx"
           >
             {done ? "關閉" : "稍後再填"}
           </button>
@@ -83,29 +83,29 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
 
         {done ? (
           <div className="px-6 py-8 text-center">
-            <div className="text-[13px] text-[#a7bacb]">你的風險屬性是</div>
-            <div className="my-2 font-serif text-3xl text-[#e0bd8b]">{done.tier}</div>
-            <div className="text-[12.5px] text-[#a7bacb]">{done.score} / 60 分</div>
-            <p className="mx-auto mt-4 max-w-[440px] text-[12.5px] leading-relaxed text-[#6f869c]">
+            <div className="text-[13px] text-tx2">你的風險屬性是</div>
+            <div className="my-2 font-serif text-3xl text-brand2">{done.tier}</div>
+            <div className="text-[12.5px] text-tx2">{done.score} / 60 分</div>
+            <p className="mx-auto mt-4 max-w-[440px] text-[12.5px] leading-relaxed text-tx3">
               這份結果會提供給你的教練，作為討論投資報酬率假設與資產配置方向的依據。
-              <b className="text-[#a7bacb]">屬性沒有好壞</b>——它只是說明你能睡得著的波動有多大。
+              <b className="text-tx2">屬性沒有好壞</b>——它只是說明你能睡得著的波動有多大。
             </p>
           </div>
         ) : (
           <>
             <div className="max-h-[62vh] overflow-auto px-5 py-4">
-              <p className="mb-4 rounded-lg bg-white/5 px-3 py-2.5 text-[12px] leading-relaxed text-[#a7bacb]">
-                題目裡的「這一筆資金」是<b className="text-[#e0bd8b]">假設情境</b>——
+              <p className="mb-4 rounded-lg bg-tx/5 px-3 py-2.5 text-[12px] leading-relaxed text-tx2">
+                題目裡的「這一筆資金」是<b className="text-brand2">假設情境</b>——
                 問的是「如果要做長期配置，你會怎麼選」，不代表你現在要投入任何一筆錢。
                 沒有投資經驗也可以完整作答。
               </p>
               {RISK_QUESTIONS.map((q, qi) => (
                 <div key={qi} className="mb-5">
-                  <div className="mb-1 text-[13.5px] font-bold text-[#cdd9e5]">
-                    <span className="mr-1.5 text-[#e0bd8b]">{qi + 1}.</span>
+                  <div className="mb-1 text-[13.5px] font-bold text-tx">
+                    <span className="mr-1.5 text-brand2">{qi + 1}.</span>
                     {q.q}
                   </div>
-                  {q.hint && <div className="mb-2 text-[11.5px] text-[#6f869c]">{q.hint}</div>}
+                  {q.hint && <div className="mb-2 text-[11.5px] text-tx3">{q.hint}</div>}
                   <div className="flex flex-wrap gap-2">
                     {q.o.map((o, oi) => (
                       <button
@@ -114,8 +114,8 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
                         className={
                           "rounded-full border px-3 py-1.5 text-[12.5px] font-bold " +
                           (isOn(qi, oi)
-                            ? "border-[#c99a5b] bg-[#c99a5b] text-[#08202a]"
-                            : "border-white/15 bg-white/[.04] text-[#a7bacb] hover:border-[#c99a5b]/60")
+                            ? "border-brand bg-brand text-onbrand"
+                            : "border-line2 bg-white/[.04] text-tx2 hover:border-brand/60")
                         }
                       >
                         {isOn(qi, oi) ? "✓ " : ""}
@@ -126,16 +126,16 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-3 border-t border-white/10 px-5 py-4">
-              {err && <span className="text-[12.5px] text-[#ff9b9b]">⚠ {err}</span>}
+            <div className="flex flex-wrap items-center gap-3 border-t border-line px-5 py-4">
+              {err && <span className="text-[12.5px] text-danger">⚠ {err}</span>}
               <span className="flex-1" />
-              <span className="text-[12px] text-[#6f869c]">
+              <span className="text-[12px] text-tx3">
                 {answered < all ? `還有 ${all - answered} 題` : "全部答完了"}
               </span>
               <button
                 disabled={busy || answered < all}
                 onClick={send}
-                className="rounded-lg bg-[#c99a5b] px-5 py-2 text-sm font-bold text-[#08202a] disabled:cursor-not-allowed disabled:opacity-40 hover:bg-[#e0bd8b]"
+                className="rounded-lg bg-brand px-5 py-2 text-sm font-bold text-onbrand disabled:cursor-not-allowed disabled:opacity-40 hover:bg-brand2"
               >
                 {busy ? "送出中…" : "送出"}
               </button>

@@ -8,7 +8,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const sp = await searchParams;
   const back = sp.redirect_url && sp.redirect_url.startsWith("/") ? sp.redirect_url : undefined;
   return (
-    <main className="flex-1 grid place-items-center bg-[#081a2b] px-6 py-12">
+    <main className="flex-1 grid place-items-center bg-canvas px-6 py-12">
       <SignIn
         routing="hash"
         signUpUrl={back ? `/client/sign-up?redirect_url=${encodeURIComponent(back)}` : "/client/sign-up"}

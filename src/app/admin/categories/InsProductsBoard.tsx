@@ -16,9 +16,9 @@ import { INS_PRODUCT_KINDS } from "@/lib/insProducts.defaults";
 // 商品是幾千筆，不可能一列一列敲 → CSV 匯入才是主要入口，手動新增只用於補一兩筆。
 
 const inputCls =
-  "w-full rounded border border-white/15 bg-[#0b2136] px-2 py-1 text-sm text-[#eef2f7] outline-none focus:border-[#c99a5b]";
+  "w-full rounded border border-line2 bg-field px-2 py-1 text-sm text-tx outline-none focus:border-brand";
 const btnCls =
-  "rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
+  "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
 
 type Draft = { company: string; code: string; name: string; kind: string; mainRider: string; onSale: boolean; bigCat: string };
 const EMPTY: Draft = { company: "", code: "", name: "", kind: "", mainRider: "主約", onSale: true, bigCat: "人身" };
@@ -54,36 +54,36 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
   );
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-5 mt-6">
+    <div className="rounded-xl border border-line bg-panel p-5 mt-6 shadow-e1">
       <div className="flex items-baseline gap-3 flex-wrap mb-1">
-        <h2 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2">保險商品主檔（輸入輔助）</h2>
-        <span className="text-xs text-[#6f869c]">{companies.length} 家公司・{rows.filter((r) => r.code || r.name).length} 個商品</span>
+        <h2 className="text-sm font-bold border-l-[3px] border-brand2 pl-2">保險商品主檔（輸入輔助）</h2>
+        <span className="text-xs text-tx3">{companies.length} 家公司・{rows.filter((r) => r.code || r.name).length} 個商品</span>
       </div>
-      <p className="text-xs text-[#6f869c] mb-4 leading-relaxed">
-        這張表只是保單登錄時的<b className="text-[#a9bccf]">建議清單</b>——教練仍然可以自由輸入沒收錄的商品。
-        <b className="text-[#e0bd8b]">刻意不存給付公式、費率、各年保障</b>：嵐途不做商品比較或推薦，
+      <p className="text-xs text-tx3 mb-4 leading-relaxed">
+        這張表只是保單登錄時的<b className="text-tx2">建議清單</b>——教練仍然可以自由輸入沒收錄的商品。
+        <b className="text-brand2">刻意不存給付公式、費率、各年保障</b>：嵐途不做商品比較或推薦，
         這裡記的是「客戶已經買了什麼」的名稱與代號，好讓跨客戶的統計對得起來。
       </p>
 
       {(msg || err) && (
-        <div className={`mb-3 rounded-lg px-3 py-2 text-xs ${err ? "bg-[#4a2020] text-[#f0b8b8]" : "bg-[#1d3a2a] text-[#a7dcbb]"}`}>
+        <div className={`mb-3 rounded-lg px-3 py-2 text-xs ${err ? "bg-danger-solid/25 text-danger" : "bg-ok-solid/20 text-ok"}`}>
           {err ?? msg}
         </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-[220px_1fr]">
         <div>
-          <div className="text-xs text-[#6f869c] mb-1">保險公司</div>
-          <div className="max-h-[320px] overflow-y-auto rounded border border-white/10">
+          <div className="text-xs text-tx3 mb-1">保險公司</div>
+          <div className="max-h-[320px] overflow-y-auto rounded border border-line">
             {companies.map((co) => (
               <button
                 key={co.name}
                 onClick={() => { setPick(co.name); setDraft({ ...EMPTY, company: co.name, bigCat: co.cat }); }}
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${pick === co.name ? "bg-[#17406a] text-[#eef2f7]" : "text-[#a9bccf] hover:bg-[#123553]"}`}
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${pick === co.name ? "bg-panel3 text-tx" : "text-tx2 hover:bg-panel2"}`}
               >
                 <span className="flex-1">{co.name}</span>
-                <span className="text-[10px] text-[#6f869c]">{co.cat}</span>
-                <span className="text-[10px] text-[#6f869c]">{co.n || ""}</span>
+                <span className="text-[10px] text-tx3">{co.cat}</span>
+                <span className="text-[10px] text-tx3">{co.n || ""}</span>
               </button>
             ))}
           </div>
@@ -91,12 +91,12 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
 
         <div>
           {!pick ? (
-            <div className="text-sm text-[#6f869c] py-8 text-center">先從左邊選一家保險公司。</div>
+            <div className="text-sm text-tx3 py-8 text-center">先從左邊選一家保險公司。</div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded border border-white/10">
+              <div className="overflow-x-auto rounded border border-line">
                 <table className="w-full text-sm">
-                  <thead className="bg-[#0b2136] text-xs text-[#6f869c]">
+                  <thead className="bg-field text-xs text-tx3">
                     <tr>
                       <th className="px-2 py-1.5 text-left">代號</th>
                       <th className="px-2 py-1.5 text-left">商品名稱</th>
@@ -108,18 +108,18 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
                   </thead>
                   <tbody>
                     {products.length === 0 && (
-                      <tr><td colSpan={6} className="px-3 py-4 text-center text-xs text-[#6f869c]">這家還沒有商品，用下方的 CSV 匯入最快。</td></tr>
+                      <tr><td colSpan={6} className="px-3 py-4 text-center text-xs text-tx3">這家還沒有商品，用下方的 CSV 匯入最快。</td></tr>
                     )}
                     {products.map((p) => (
-                      <tr key={p.id} className="border-t border-white/5">
+                      <tr key={p.id} className="border-t border-line">
                         <td className="px-2 py-1.5 font-mono text-xs">{p.code || "—"}</td>
                         <td className="px-2 py-1.5">{p.name || "—"}</td>
-                        <td className="px-2 py-1.5 text-xs text-[#a9bccf]">{p.kind || "—"}</td>
-                        <td className="px-2 py-1.5 text-xs text-[#a9bccf]">{p.mainRider || "—"}</td>
+                        <td className="px-2 py-1.5 text-xs text-tx2">{p.kind || "—"}</td>
+                        <td className="px-2 py-1.5 text-xs text-tx2">{p.mainRider || "—"}</td>
                         <td className="px-2 py-1.5 text-xs">{p.onSale ? "現售" : "停售"}</td>
                         <td className="px-2 py-1.5 text-right">
                           <button
-                            className="text-xs text-[#e08a68] hover:underline disabled:opacity-40"
+                            className="text-xs text-danger hover:underline disabled:opacity-40"
                             disabled={pending}
                             onClick={() => run(() => deleteInsProductAction(p.id!), "已刪除")}
                           >刪除</button>
@@ -131,19 +131,19 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
               </div>
 
               <div className="mt-3 grid gap-2 md:grid-cols-6 items-end">
-                <label className="text-xs text-[#6f869c]">代號
+                <label className="text-xs text-tx3">代號
                   <input className={inputCls} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
                 </label>
-                <label className="text-xs text-[#6f869c] md:col-span-2">商品名稱
+                <label className="text-xs text-tx3 md:col-span-2">商品名稱
                   <input className={inputCls} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
                 </label>
-                <label className="text-xs text-[#6f869c]">總類
+                <label className="text-xs text-tx3">總類
                   <select className={inputCls} value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value })}>
                     <option value="">—</option>
                     {INS_PRODUCT_KINDS.map((k) => <option key={k}>{k}</option>)}
                   </select>
                 </label>
-                <label className="text-xs text-[#6f869c]">主/附
+                <label className="text-xs text-tx3">主/附
                   <select className={inputCls} value={draft.mainRider} onChange={(e) => setDraft({ ...draft, mainRider: e.target.value })}>
                     <option>主約</option><option>附約</option>
                   </select>
@@ -159,10 +159,10 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
         </div>
       </div>
 
-      <div className="mt-5 border-t border-white/10 pt-4">
-        <div className="text-xs text-[#a9bccf] mb-1 font-bold">CSV 批次匯入</div>
-        <p className="text-xs text-[#6f869c] mb-2">
-          每列 <code className="text-[#e0bd8b]">公司,代號,商品名稱,總類,主約或附約,現售(1/0),人身或產物</code>；
+      <div className="mt-5 border-t border-line pt-4">
+        <div className="text-xs text-tx2 mb-1 font-bold">CSV 批次匯入</div>
+        <p className="text-xs text-tx3 mb-2">
+          每列 <code className="text-brand2">公司,代號,商品名稱,總類,主約或附約,現售(1/0),人身或產物</code>；
           第一列可以是表頭。同一家公司的同一個代號已存在就跳過，重跑安全。
         </p>
         <textarea

@@ -50,8 +50,8 @@ export default async function TemplateViewPage({
             className={
               "text-[11px] rounded px-1.5 py-0.5 border " +
               (p.id === plan.id
-                ? "border-[#c99a5b] text-[#e0bd8b] bg-[#c99a5b]/10 font-bold"
-                : "border-white/15 text-[#a9bccf] hover:bg-[#17406a]")
+                ? "border-brand text-brand2 bg-brand/10 font-bold"
+                : "border-line2 text-tx2 hover:bg-panel3")
             }
           >
             {p.year}

@@ -1,13 +1,11 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { getBrand } from "@/lib/brand";
 import { listBatches, listCases, listAdvisors, listPayouts } from "@/lib/comp/caseRepo";
 import { isReversalKey } from "@/lib/comp/reversal";
 import { ensureActiveVersion, listVersions, loadParams } from "@/lib/comp/repo";
 import { listSurveys, questionsOf } from "@/lib/comp/survey";
 import CasesBoard, { type CaseView, type ModuleOption, type PayoutView } from "./CasesBoard";
+import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
 
 export const dynamic = "force-dynamic";
@@ -75,41 +73,27 @@ export default async function CasesPage() {
       countPromotion: m.countPromotion !== false,
       countMaintenance: m.countMaintenance !== false,
     }));
-
-  const brand = await getBrand();
   const { period, payoutDate } = nextMonthPayout(params.settings.payoutDay);
 
   return (
-    <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
-      <header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]">
-        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          {brand.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
-          )}
-          <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
-        </Link>
-        <span className="text-[#a9bccf] text-xs">案件與分潤</span>
-        <div className="flex-1" />
-        
-        <UserButton />
-      </header>
+    <main className="flex-1 bg-canvas text-tx min-h-screen">
+      <AdminHeader label="案件與分潤" />
       <AdminNav />
 
       <section className="p-6 max-w-6xl">
         <div className="mb-4">
           <h1 className="text-xl font-bold">案件與分潤</h1>
-          <p className="text-sm text-[#a9bccf] mt-1">
+          <p className="text-sm text-tx2 mt-1">
             登錄案件後系統立刻依「簽約當下的制度版本」算出逐層分潤；問卷回收才算結案並計入晉升指標，
             實際收訖才會進發放批次。
           </p>
         </div>
         {peers.length === 0 ? (
-          <div className="rounded-lg border border-[#e0bd8b]/40 bg-[#e0bd8b]/10 px-4 py-3 text-sm text-[#e0bd8b]">
+          <div className="rounded-lg border border-brand2/40 bg-brand2/10 px-4 py-3 text-sm text-brand2">
             還沒有已開通的教練，無法登錄案件。
           </div>
         ) : moduleOptions.length === 0 ? (
-          <div className="rounded-lg border border-[#e0bd8b]/40 bg-[#e0bd8b]/10 px-4 py-3 text-sm text-[#e0bd8b]">
+          <div className="rounded-lg border border-brand2/40 bg-brand2/10 px-4 py-3 text-sm text-brand2">
             還沒有服務模塊。請先到「業務制度 › 服務模塊與分潤架構」新增，或按「載入 V4 辦法數值」。
           </div>
         ) : (

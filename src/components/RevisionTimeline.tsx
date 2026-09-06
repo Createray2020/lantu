@@ -47,12 +47,12 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
   }
 
   if (items.length === 0) {
-    return <p className="text-[#a7bacb] text-sm">尚無版本紀錄。存檔一次就會留下一版。</p>;
+    return <p className="text-tx2 text-sm">尚無版本紀錄。存檔一次就會留下一版。</p>;
   }
 
   return (
     <div>
-      {err && <div className="mb-3 rounded-lg border border-[#ff9b9b]/40 bg-[#ff9b9b]/10 px-4 py-2.5 text-sm text-[#ff9b9b]">⚠ {err}</div>}
+      {err && <div className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm text-danger">⚠ {err}</div>}
       <ul className="space-y-2">
         {items.map((it, i) => {
           const isLatest = i === 0;
@@ -62,8 +62,8 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
               key={it.id}
               className={`rounded-xl border px-4 py-3 ${
                 it.track === "client"
-                  ? "bg-[#12334f] border-[#2fb0a8]/30"
-                  : "bg-[#0d2b45] border-white/10"
+                  ? "bg-panel2 border-teal/30"
+                  : "bg-panel border-line"
               }`}
             >
               <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -72,20 +72,20 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                     <span
                       className={`text-[10.5px] px-2 py-0.5 rounded border ${
                         it.track === "client"
-                          ? "border-[#2fb0a8]/50 text-[#2fb0a8]"
-                          : "border-[#c99a5b]/50 text-[#c99a5b]"
+                          ? "border-teal/50 text-teal"
+                          : "border-brand/50 text-brand"
                       }`}
                     >
                       {trackLabel(it.track)}
                     </span>
                     {it.track === "coach" && (
-                      <span className="text-[11px] text-[#6f869c]">{it.planLabel || `${it.planYear} 版`}</span>
+                      <span className="text-[11px] text-tx3">{it.planLabel || `${it.planYear} 版`}</span>
                     )}
                     {isLatest && (
-                      <span className="text-[10.5px] px-2 py-0.5 rounded bg-[#c99a5b] text-[#08202a] font-bold">目前版本</span>
+                      <span className="text-[10.5px] px-2 py-0.5 rounded bg-brand text-onbrand font-bold">目前版本</span>
                     )}
                   </div>
-                  <div className="text-[12.5px] text-[#a7bacb] mt-1">
+                  <div className="text-[12.5px] text-tx2 mt-1">
                     {mine ? "我" : it.editorType === "client" ? "客戶" : "教練"}
                     {it.editorName ? `．${it.editorName}` : ""}
                     ．{new Date(it.createdAt).toLocaleString("zh-TW", { hour12: false })}
@@ -99,14 +99,14 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                       <button
                         onClick={() => setConfirming(null)}
                         disabled={busy === it.id}
-                        className="text-[12.5px] text-[#a7bacb] hover:text-white px-3 py-1.5 rounded-lg border border-white/15"
+                        className="text-[12.5px] text-tx2 hover:text-tx px-3 py-1.5 rounded-lg border border-line2"
                       >
                         取消
                       </button>
                       <button
                         onClick={() => doRestore(it)}
                         disabled={busy === it.id}
-                        className="text-[12.5px] font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] disabled:opacity-60 px-3 py-1.5 rounded-lg"
+                        className="text-[12.5px] font-bold text-onbrand bg-brand hover:bg-brand2 disabled:opacity-60 px-3 py-1.5 rounded-lg"
                       >
                         {busy === it.id ? "回復中…" : "確定回復"}
                       </button>
@@ -114,7 +114,7 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                   ) : (
                     <button
                       onClick={() => { setConfirming(it.id); setErr(null); }}
-                      className="shrink-0 text-[12.5px] text-[#a7bacb] hover:text-white px-3 py-1.5 rounded-lg border border-white/15"
+                      className="shrink-0 text-[12.5px] text-tx2 hover:text-tx px-3 py-1.5 rounded-lg border border-line2"
                     >
                       回復這一版
                     </button>
@@ -122,7 +122,7 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                 )}
               </div>
               {confirming === it.id && (
-                <p className="mt-2 text-[11.5px] text-[#6f869c]">
+                <p className="mt-2 text-[11.5px] text-tx3">
                   會把這一版的內容變成目前版本。中間的版本不會消失，回復本身也會留一筆紀錄，隨時能再回來。
                 </p>
               )}

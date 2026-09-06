@@ -35,7 +35,7 @@ function Slider({
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-1.5">
-        <span className="text-[12px] text-[#a7bacb]">{label}</span>
+        <span className="text-[12px] text-tx2">{label}</span>
         <span className="flex items-baseline gap-1 shrink-0">
           <input
             type="number"
@@ -56,17 +56,17 @@ function Slider({
               onChange(Number.isFinite(v) ? clamp(v) : value);
               setDraft(null);
             }}
-            className="w-[96px] rounded-md border border-white/15 bg-[#0f2740] px-2 py-1 text-right text-[15px] font-bold text-[#e0bd8b] focus:border-[#c99a5b] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="w-[96px] rounded-md border border-line2 bg-field px-2 py-1 text-right text-[15px] font-bold text-brand2 focus:border-brand focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
-          {unit && <span className="w-4 text-[11px] text-[#a7bacb]">{unit}</span>}
+          {unit && <span className="w-4 text-[11px] text-tx2">{unit}</span>}
         </span>
       </div>
       <input
         type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => { setDraft(null); onChange(parseFloat(e.target.value)); }}
-        className="w-full accent-[#2f8f8f] h-1.5"
+        className="w-full accent-teal h-1.5"
       />
-      <div className="flex justify-between text-[10px] text-[#6f869c] mt-0.5">
+      <div className="flex justify-between text-[10px] text-tx3 mt-0.5">
         <span>{minLabel ?? min}</span>
         <span>{maxLabel ?? max}</span>
       </div>
@@ -81,13 +81,13 @@ function Donut({ loan, down }: { loan: number; down: number }) {
     <div className="flex flex-col items-center gap-3">
       <div
         className="w-32 h-32 rounded-full grid place-items-center"
-        style={{ background: `conic-gradient(#2f8f8f 0 ${loanPct}%, #9fd3d0 ${loanPct}% 100%)` }}
+        style={{ background: `conic-gradient(var(--teal2) 0 ${loanPct}%, var(--teal) ${loanPct}% 100%)` }}
       >
-        <div className="w-20 h-20 rounded-full bg-[#12334f] grid place-items-center text-2xl">🏠</div>
+        <div className="w-20 h-20 rounded-full bg-panel2 grid place-items-center text-2xl">🏠</div>
       </div>
-      <div className="flex gap-4 text-[11px] text-[#a7bacb]">
-        <span className="flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm inline-block bg-[#2f8f8f]" />貸款</span>
-        <span className="flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm inline-block bg-[#9fd3d0]" />自備款</span>
+      <div className="flex gap-4 text-[11px] text-tx2">
+        <span className="flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm inline-block bg-teal" />貸款</span>
+        <span className="flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm inline-block bg-teal" />自備款</span>
       </div>
     </div>
   );
@@ -98,19 +98,19 @@ function LoanCard({ title, icon, r, rate }: { title: string; icon: string; r: Lo
     <div className="grid sm:grid-cols-[auto_1fr] gap-6 items-center">
       <Donut loan={r.loan} down={r.down} />
       <div>
-        <div className="text-[#a7bacb] text-sm mb-1">
+        <div className="text-tx2 text-sm mb-1">
           {icon} 可購買的{title}（{r.targetYear} 年）
         </div>
-        <div className="font-serif text-3xl text-[#e0bd8b] mb-3">{wan(r.price)} 萬</div>
-        <div className="text-[#cdd9e5] text-sm leading-relaxed">
+        <div className="font-serif text-3xl text-brand2 mb-3">{wan(r.price)} 萬</div>
+        <div className="text-tx text-sm leading-relaxed">
           自備 {wan(r.down)} 萬（月存 {ntfmt(r.monthly * 10000)}）<br />
           貸款 {wan(r.loan)} 萬
         </div>
-        <div className="text-[#cdd9e5] text-sm mt-2">
+        <div className="text-tx text-sm mt-2">
           {r.graceMonths > 0 && <>▶ 1-{r.graceMonths} 月還 {ntfmt(r.graceMonthly)}（寬限期）<br /></>}
           ▶ {r.graceMonths + 1}-{r.graceMonths + r.amortMonths} 月還 {ntfmt(r.amortMonthly)}
         </div>
-        <div className="text-[11px] text-[#6f869c] mt-2">
+        <div className="text-[11px] text-tx3 mt-2">
           {Math.round((r.graceMonths + r.amortMonths) / 12)} 年貸款 / 本息均攤 / 單一利率({rate}%)
         </div>
       </div>
@@ -123,10 +123,10 @@ function Bar({ label, value, total, color }: { label: string; value: number; tot
   return (
     <div className="mb-2">
       <div className="flex justify-between text-[12px] mb-0.5">
-        <span className="text-[#cdd9e5]">{label}</span>
-        <span className="text-[#eef2f7] font-semibold">月領 {ntfmt(value)}</span>
+        <span className="text-tx">{label}</span>
+        <span className="text-tx font-semibold">月領 {ntfmt(value)}</span>
       </div>
-      <div className="h-2 rounded bg-white/8 overflow-hidden">
+      <div className="h-2 rounded bg-tx/8 overflow-hidden">
         <div className="h-full rounded" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
@@ -140,19 +140,19 @@ function Face({
   icon: string; label: string; monthly: number; children: React.ReactNode; result: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl bg-[#12334f] border border-white/8 overflow-hidden">
-      <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/8">
+    <section className="rounded-2xl bg-panel2 border border-line overflow-hidden shadow-e1">
+      <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-line">
         <div className="flex items-center gap-2 font-serif text-lg">
           <span>{icon}</span><span>{label}能力分析</span>
         </div>
         <div className="text-right">
-          <div className="text-[10px] tracking-[0.2em] text-[#6f869c]">月存</div>
-          <div className="font-bold text-[#2fb0a8]">{monthly} 萬</div>
+          <div className="text-[10px] tracking-[0.2em] text-tx3">月存</div>
+          <div className="font-bold text-teal">{monthly} 萬</div>
         </div>
       </div>
       <div className="grid lg:grid-cols-2 gap-6 p-5 sm:p-6">
         <div className="grid grid-cols-2 gap-x-5 gap-y-4 content-start">{children}</div>
-        <div className="rounded-xl bg-[#0d2b45] border border-white/8 p-5 grid place-items-center">{result}</div>
+        <div className="rounded-xl bg-panel border border-line p-5 grid place-items-center shadow-e1">{result}</div>
       </div>
     </section>
   );
@@ -262,12 +262,12 @@ export default function PassportWizard({
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-32">
       {/* 標頭＋每月應存彙總 */}
-      <div className="rounded-2xl bg-gradient-to-br from-[#0d2b45] to-[#12334f] border border-[#c99a5b]/30 p-6 mb-6 text-center">
-        <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-1">MY LIFE PASSPORT · {by} 年度</div>
+      <div className="rounded-2xl bg-gradient-to-br from-panel to-panel2 border border-brand/30 p-6 mb-6 text-center">
+        <div className="text-brand text-xs tracking-[0.3em] mb-1">MY LIFE PASSPORT · {by} 年度</div>
         <h1 className="font-serif text-2xl mb-2">{mode === "public" ? "人生護照 · 免費試算" : "我的人生護照"}</h1>
-        <div className="text-[#a7bacb] text-sm mb-1">每月應存合計</div>
-        <div className="font-serif text-4xl text-[#e0bd8b]">{m.totalMonthlyWan.toFixed(1)} 萬</div>
-        <p className="text-[11px] text-[#6f869c] mt-2">拉動下方條件，即時看你每月存這些錢能達成什麼。</p>
+        <div className="text-tx2 text-sm mb-1">每月應存合計</div>
+        <div className="font-serif text-4xl text-brand2">{m.totalMonthlyWan.toFixed(1)} 萬</div>
+        <p className="text-[11px] text-tx3 mt-2">拉動下方條件，即時看你每月存這些錢能達成什麼。</p>
         {/* ⚠️ 護照的年份存在資料裡，跨年不會自己走；「目前年齡」是客戶自己拉的，也不會自己長一歲。
             **兩半必須一起前進**——只改年齡不改年份（或反過來）算出來的目標歲數反而更錯：
             2026 年做的護照、購屋填 2036，客戶 30 歲 → 40 歲。
@@ -275,40 +275,40 @@ export default function PassportWizard({
             所以做成一顆「一起前進一年」的按鈕，而不是一句提醒；也刻意不自動跑，
             默默改掉客戶看過的數字比讓他自己按一下糟糕得多。 */}
         {stale && (
-          <div className="mt-3 mx-auto max-w-lg rounded-lg border border-[#c99a5b]/40 bg-[#c99a5b]/10 px-3 py-2.5 text-[12px] leading-relaxed text-[#e0bd8b]">
+          <div className="mt-3 mx-auto max-w-lg rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-[12px] leading-relaxed text-brand2">
             這份護照是 <b>{by}</b> 年做的，現在是 <b>{baseYear}</b> 年。
             各項目標填的是<b>西元年份</b>，所以它們沒有跑掉——但你的<b>目前年齡</b>還停在 {p.retire.curAge} 歲。
             <button
               type="button"
               onClick={rollForward}
-              className="ml-2 rounded-md border border-[#c99a5b] px-2.5 py-1 text-[12px] font-semibold text-[#e0bd8b] hover:bg-[#c99a5b] hover:text-[#081a2b]"
+              className="ml-2 rounded-md border border-brand px-2.5 py-1 text-[12px] font-semibold text-brand2 hover:bg-brand hover:text-canvas"
             >
               更新到 {baseYear} 年（年齡 {p.retire.curAge} → {rolledAge} 歲）
             </button>
-            <span className="block mt-1 text-[11px] text-[#c9a97a]">按了之後記得再存一次檔。</span>
+            <span className="block mt-1 text-[11px] text-brand2">按了之後記得再存一次檔。</span>
           </div>
         )}
         <button
           type="button"
           onClick={() => setShowAssume((v) => !v)}
-          className="mt-3 text-[11px] text-[#a7bacb] hover:text-white underline underline-offset-4"
+          className="mt-3 text-[11px] text-tx2 hover:text-tx underline underline-offset-4"
         >
           {showAssume ? "收合" : "本試算採用的假設"}
         </button>
         {showAssume && (
-          <div className="mt-3 text-left rounded-xl bg-[#081a2b]/70 border border-white/10 p-4 text-[11.5px] leading-relaxed text-[#a7bacb]">
+          <div className="mt-3 text-left rounded-xl bg-canvas/70 border border-line p-4 text-[11.5px] leading-relaxed text-tx2">
             <ul className="space-y-1 list-disc pl-4">
-              <li>各面向的年報酬、貸款利率、學費上漲率皆為<b className="text-[#cdd9e5]">情境假設</b>，由你自行設定，非預期或保證之報酬。</li>
+              <li>各面向的年報酬、貸款利率、學費上漲率皆為<b className="text-tx">情境假設</b>，由你自行設定，非預期或保證之報酬。</li>
               <li>退休：預估壽命 {p.retire.lifeExp} 歲、勞退提繳率 {p.retire.contribRate}%、勞保年金採平均月投保薪資 × 年資 × 1.55% 概算，現值以通膨 1.5% 折現。</li>
               <li>年資若由退休年齡推算，假設 {ASSUMED_WORK_START_AGE} 歲開始工作。</li>
-              <li>本試算為一般性財務規劃之數學推算，<b className="text-[#cdd9e5]">僅供參考，不構成任何投資建議或收益保證</b>；實際結果受市場、稅制、個人狀況影響而不同。</li>
+              <li>本試算為一般性財務規劃之數學推算，<b className="text-tx">僅供參考，不構成任何投資建議或收益保證</b>；實際結果受市場、稅制、個人狀況影響而不同。</li>
             </ul>
           </div>
         )}
       </div>
 
       {fromDraft && status !== "success" && (
-        <div className="rounded-xl border border-[#c99a5b]/40 bg-[#c99a5b]/10 px-5 py-3 mb-4 text-sm text-[#e0bd8b]">
+        <div className="rounded-xl border border-brand/40 bg-brand/10 px-5 py-3 mb-4 text-sm text-brand2">
           已帶回你剛才在官網填的試算內容，確認後按下方存檔即可建立你的規劃。
         </div>
       )}
@@ -340,12 +340,12 @@ export default function PassportWizard({
         <Face icon="🌴" label="退休" monthly={p.retire.monthly}
           result={
             <div className="w-full">
-              <div className="text-[#a7bacb] text-sm mb-1">🌴 {p.retire.retireAge} 歲退休可支應生活費</div>
-              <div className="font-serif text-3xl text-[#e0bd8b] mb-1">總計 {ntfmt(m.retire.totalMonthly)} /月</div>
-              <div className="text-[11px] text-[#6f869c] mb-4">（現值約 {ntfmt(m.retire.presentMonthly)}）</div>
-              <Bar label="自行準備" value={m.retire.selfMonthly} total={m.retire.totalMonthly} color="#9fd3d0" />
-              <Bar label="企業提撥（勞退）" value={m.retire.laborPensionMonthly} total={m.retire.totalMonthly} color="#2fb0a8" />
-              <Bar label="社會保險（勞保）" value={m.retire.laborInsMonthly} total={m.retire.totalMonthly} color="#1f6f6b" />
+              <div className="text-tx2 text-sm mb-1">🌴 {p.retire.retireAge} 歲退休可支應生活費</div>
+              <div className="font-serif text-3xl text-brand2 mb-1">總計 {ntfmt(m.retire.totalMonthly)} /月</div>
+              <div className="text-[11px] text-tx3 mb-4">（現值約 {ntfmt(m.retire.presentMonthly)}）</div>
+              <Bar label="自行準備" value={m.retire.selfMonthly} total={m.retire.totalMonthly} color="var(--teal)" />
+              <Bar label="企業提撥（勞退）" value={m.retire.laborPensionMonthly} total={m.retire.totalMonthly} color="var(--teal)" />
+              <Bar label="社會保險（勞保）" value={m.retire.laborInsMonthly} total={m.retire.totalMonthly} color="var(--teal2)" />
             </div>
           }>
           <Slider label="目前年齡" value={p.retire.curAge} min={20} max={100} onChange={(v) => set("retire", "curAge", v)} fmt={(v) => `${v} 歲`} minLabel="20 歲" maxLabel="100 歲" />
@@ -361,13 +361,13 @@ export default function PassportWizard({
           result={
             <div className="text-center">
               <div className="text-5xl mb-2">👨‍👩‍👧</div>
-              <div className="text-[#a7bacb] text-sm">可扶養約</div>
-              <div className="font-serif text-4xl text-[#e0bd8b] my-1">{m.support.kids.toFixed(2)} 位小孩</div>
-              <div className="text-[#cdd9e5] text-sm mt-2">
-                折算至出生時共約存 <b className="text-[#e0bd8b]">{wan(m.support.savedAtBirth)} 萬</b><br />
-                每位小孩共約花 <b className="text-[#e0bd8b]">{wan(m.support.perChildCost)} 萬</b>
+              <div className="text-tx2 text-sm">可扶養約</div>
+              <div className="font-serif text-4xl text-brand2 my-1">{m.support.kids.toFixed(2)} 位小孩</div>
+              <div className="text-tx text-sm mt-2">
+                折算至出生時共約存 <b className="text-brand2">{wan(m.support.savedAtBirth)} 萬</b><br />
+                每位小孩共約花 <b className="text-brand2">{wan(m.support.perChildCost)} 萬</b>
               </div>
-              <div className="text-[11px] text-[#6f869c] mt-2">扶養至 {m.support.raiseToAge} 歲 / 學費上漲率 {p.support.tuitionGrowth}%</div>
+              <div className="text-[11px] text-tx3 mt-2">扶養至 {m.support.raiseToAge} 歲 / 學費上漲率 {p.support.tuitionGrowth}%</div>
             </div>
           }>
           <Slider label="預計出生年份" value={p.support.birthYear} min={by} max={by + 30} onChange={(v) => set("support", "birthYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 30} 年`} />
@@ -382,9 +382,9 @@ export default function PassportWizard({
           result={
             <div className="text-center">
               <div className="text-5xl mb-2">✈️</div>
-              <div className="text-[#a7bacb] text-sm">{m.travel.travelYear} 年旅遊基金</div>
-              <div className="font-serif text-4xl text-[#e0bd8b] my-1">{ntfmt(m.travel.fund)} 元</div>
-              <div className="text-[11px] text-[#6f869c] mt-2">月存 {ntfmt(m.travel.monthly * 10000)} 元 / 年報酬 {p.travel.annualReturn}%</div>
+              <div className="text-tx2 text-sm">{m.travel.travelYear} 年旅遊基金</div>
+              <div className="font-serif text-4xl text-brand2 my-1">{ntfmt(m.travel.fund)} 元</div>
+              <div className="text-[11px] text-tx3 mt-2">月存 {ntfmt(m.travel.monthly * 10000)} 元 / 年報酬 {p.travel.annualReturn}%</div>
             </div>
           }>
           <Slider label="旅遊時間" value={p.travel.travelYear} min={by} max={by + 15} onChange={(v) => set("travel", "travelYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 15} 年`} />
@@ -396,62 +396,62 @@ export default function PassportWizard({
 
       <div className="mt-5 text-center">
         {mode === "public" ? (
-          <Link href="/coaches" className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">
+          <Link href="/coaches" className="text-sm text-tx2 hover:text-tx underline underline-offset-4">
             先看看有哪些教練 →
           </Link>
         ) : (
-          <Link href="/portal" className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">回客戶首頁</Link>
+          <Link href="/portal" className="text-sm text-tx2 hover:text-tx underline underline-offset-4">回客戶首頁</Link>
         )}
       </div>
 
       {/* 底部合計＋存檔 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#0b2036]/95 backdrop-blur border-t border-white/10">
+      <div className="fixed bottom-0 left-0 right-0 bg-field/95 backdrop-blur border-t border-line">
         {/* 儲存中的進度指示條（不確定式） */}
         {status === "saving" && (
-          <div className="absolute -top-0.5 left-0 right-0 h-1 overflow-hidden bg-white/5">
+          <div className="absolute -top-0.5 left-0 right-0 h-1 overflow-hidden bg-tx/5">
             <style>{`@keyframes pwslide{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}`}</style>
-            <div className="h-full w-1/4 bg-[#c99a5b]" style={{ animation: "pwslide 1.1s ease-in-out infinite" }} />
+            <div className="h-full w-1/4 bg-brand" style={{ animation: "pwslide 1.1s ease-in-out infinite" }} />
           </div>
         )}
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-8 py-4 flex items-center justify-between gap-4">
           <div className="min-w-0">
             {status === "confirm" ? (
               <div className="text-sm">
-                <div className="text-[#e0bd8b] font-semibold">你已經有一份規劃了</div>
-                <div className="text-[#a7bacb] text-[12px]">
+                <div className="text-brand2 font-semibold">你已經有一份規劃了</div>
+                <div className="text-tx2 text-[12px]">
                   最後更新：{existingAt ? new Date(existingAt).toLocaleString("zh-TW", { hour12: false }) : "—"}
                   ．覆蓋後舊內容仍留在版本紀錄裡，可以回復。
                 </div>
               </div>
             ) : status === "error" ? (
-              <div className="text-[#ff9b9b] text-sm">⚠ {errMsg}</div>
+              <div className="text-danger text-sm">⚠ {errMsg}</div>
             ) : status === "saving" ? (
-              <div className="text-[#e0bd8b] text-sm">儲存中，請稍候…</div>
+              <div className="text-brand2 text-sm">儲存中，請稍候…</div>
             ) : status === "success" ? (
-              <div className="text-[#7bd88f] text-sm">已儲存，正在開啟你的規劃…</div>
+              <div className="text-ok text-sm">已儲存，正在開啟你的規劃…</div>
             ) : (
               <>
-                <div className="text-[11px] tracking-[0.2em] text-[#6f869c]">合計 每月應存</div>
-                <div className="font-serif text-2xl text-[#e0bd8b]">{m.totalMonthlyWan.toFixed(1)} 萬</div>
+                <div className="text-[11px] tracking-[0.2em] text-tx3">合計 每月應存</div>
+                <div className="font-serif text-2xl text-brand2">{m.totalMonthlyWan.toFixed(1)} 萬</div>
               </>
             )}
           </div>
           {status === "confirm" ? (
             <div className="shrink-0 flex items-center gap-2">
               <button onClick={() => { setStatus("idle"); setExistingAt(null); }}
-                className="text-sm text-[#a7bacb] hover:text-white px-4 py-3 rounded-lg border border-white/15">
+                className="text-sm text-tx2 hover:text-tx px-4 py-3 rounded-lg border border-line2">
                 取消
               </button>
               <button onClick={() => onSave(true)}
-                className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-3 rounded-lg">
+                className="font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-3 rounded-lg">
                 覆蓋舊的規劃
               </button>
             </div>
           ) : (
             <button onClick={() => onSave()} disabled={status === "saving"}
-              className="shrink-0 font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] disabled:opacity-60 px-7 py-3 rounded-lg inline-flex items-center gap-2">
+              className="shrink-0 font-bold text-onbrand bg-brand hover:bg-brand2 disabled:opacity-60 px-7 py-3 rounded-lg inline-flex items-center gap-2">
               {status === "saving" && (
-                <span className="w-4 h-4 border-2 border-[#08202a]/40 border-t-[#08202a] rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-onbrand/40 border-t-onbrand rounded-full animate-spin" />
               )}
               {mode === "public"
                 ? (signedIn ? "存下我的規劃" : "免費註冊，存下我的規劃")

@@ -17,7 +17,7 @@ import { reorder } from "@/lib/anDefaults";
 export type BoardRow = { k: string; t: string; cond?: string; hidden: boolean };
 
 const btn =
-  "rounded-lg border border-white/15 px-2.5 py-1 text-sm text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-30 disabled:hover:bg-transparent";
+  "rounded-lg border border-line2 px-2.5 py-1 text-sm text-tx2 hover:bg-panel3 disabled:opacity-30 disabled:hover:bg-transparent";
 
 export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow[]; builtin: string[] }) {
   const [list, setList] = useState<BoardRow[]>(rows);
@@ -72,23 +72,23 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
   const hiddenCount = list.filter((r) => r.hidden).length;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-5">
+    <div className="rounded-xl border border-line bg-panel p-5 shadow-e1">
       <div className="flex items-baseline gap-3 flex-wrap mb-1">
-        <h2 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2">分析模組 · 預設順序</h2>
-        <span className="text-xs text-[#6f869c]">
+        <h2 className="text-sm font-bold border-l-[3px] border-brand2 pl-2">分析模組 · 預設順序</h2>
+        <span className="text-xs text-tx3">
           共 {list.length} 個模組{hiddenCount > 0 ? `，其中 ${hiddenCount} 個預設收起` : ""}
         </span>
       </div>
-      <p className="text-xs text-[#6f869c] mb-4 leading-relaxed">
-        這是全平台教練<b className="text-[#a9bccf]">打開任何客戶分析頁時的起手順序</b>。
-        <b className="text-[#a9bccf]">整列可以直接拖曳</b>，要差一格再用右邊的 ↑↓。
+      <p className="text-xs text-tx3 mb-4 leading-relaxed">
+        這是全平台教練<b className="text-tx2">打開任何客戶分析頁時的起手順序</b>。
+        <b className="text-tx2">整列可以直接拖曳</b>，要差一格再用右邊的 ↑↓。
         教練現場仍可自己拖曳、隱藏——那份偏好記在他自己的電腦、逐客戶各自記憶，
-        <b className="text-[#e0bd8b]">這裡改了不會回頭覆蓋他已經調過的客戶</b>；
+        <b className="text-brand2">這裡改了不會回頭覆蓋他已經調過的客戶</b>；
         他按分析頁上的「恢復預設」，才會重新吃這一份。
         「預設收起」只是不顯示在畫面上，教練按 ＋ 隨時能把它叫回來。
       </p>
 
-      {(msg || err) && <p className={`text-sm mb-3 ${err ? "text-[#ff9b9b]" : "text-[#8fc0a3]"}`}>{err ?? msg}</p>}
+      {(msg || err) && <p className={`text-sm mb-3 ${err ? "text-danger" : "text-ok"}`}>{err ?? msg}</p>}
 
       <ol className="mb-4">
         {list.map((r, i) => {
@@ -96,8 +96,8 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
           const marker =
             over === i && from !== null && from !== i
               ? from > i
-                ? "border-t-2 border-t-[#c99a5b]"
-                : "border-b-2 border-b-[#c99a5b]"
+                ? "border-t-2 border-t-brand"
+                : "border-b-2 border-b-brand"
               : "";
           return (
             <li
@@ -116,18 +116,18 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
               onDrop={(e) => { e.preventDefault(); drop(i); }}
               onDragEnd={() => { setFrom(null); setOver(null); }}
               className={
-                "flex items-center gap-3 px-3 py-2 border-b border-white/8 cursor-grab active:cursor-grabbing " +
+                "flex items-center gap-3 px-3 py-2 border-b border-line cursor-grab active:cursor-grabbing " +
                 (r.hidden ? "opacity-45 " : "") +
-                (from === i ? "bg-[#17406a] " : "") +
+                (from === i ? "bg-panel3 " : "") +
                 marker
               }
             >
-              <span className="text-[#4d6480] select-none" aria-hidden title="拖曳可調整順序">⋮⋮</span>
-              <span className="w-6 text-right text-xs text-[#6f869c] tabular-nums">{i + 1}</span>
+              <span className="text-tx3 select-none" aria-hidden title="拖曳可調整順序">⋮⋮</span>
+              <span className="w-6 text-right text-xs text-tx3 tabular-nums">{i + 1}</span>
               <span className="flex-1 min-w-0">
                 <span className="text-sm">{r.t}</span>
-                {r.cond && <span className="ml-2 text-[11px] text-[#6f869c]">（{r.cond}）</span>}
-                {r.hidden && <span className="ml-2 text-[11px] text-[#e0bd8b]">預設收起</span>}
+                {r.cond && <span className="ml-2 text-[11px] text-tx3">（{r.cond}）</span>}
+                {r.hidden && <span className="ml-2 text-[11px] text-brand2">預設收起</span>}
               </span>
               <button className={btn} onClick={() => move(i, -1)} disabled={i === 0 || pending} title="往上一格">↑</button>
               <button className={btn} onClick={() => move(i, 1)} disabled={i === list.length - 1 || pending} title="往下一格">↓</button>
@@ -146,14 +146,14 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
 
       <div className="flex items-center gap-3 flex-wrap">
         <button
-          className="rounded-lg bg-[#c99a5b] px-4 py-2 text-sm font-bold text-[#08202a] disabled:opacity-40"
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-onbrand disabled:opacity-40"
           onClick={save}
           disabled={pending || !dirty}
         >
           {pending ? "存檔中…" : dirty ? "儲存預設順序" : "已是最新"}
         </button>
         <button className={btn} onClick={resetAll} disabled={pending}>回復系統內建順序</button>
-        {dirty && <span className="text-xs text-[#e0bd8b]">有未存檔的變更</span>}
+        {dirty && <span className="text-xs text-brand2">有未存檔的變更</span>}
       </div>
     </div>
   );

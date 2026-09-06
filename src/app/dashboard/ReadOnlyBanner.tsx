@@ -6,8 +6,8 @@ import { LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 export default function ReadOnlyBanner({ license }: { license: LicenseState }) {
   if (!license.expired) return null;
   return (
-    <div className="bg-[#e5484d]/15 border-b border-[#e5484d]/40 text-[#ffd7d8] px-4 sm:px-6 py-2 text-sm">
-      <b className="text-[#ff9d9f]">唯讀模式</b>
+    <div className="bg-danger-solid/15 border-b border-danger-solid/40 text-danger px-4 sm:px-6 py-2 text-sm">
+      <b className="text-danger">唯讀模式</b>
       <span className="ml-2">{LICENSE_LOCKED_MESSAGE}</span>
     </div>
   );

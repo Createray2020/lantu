@@ -3,16 +3,17 @@ import { Noto_Sans_TC, Noto_Serif_TC } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import VersionWatcher from "./VersionWatcher";
 import { UI_SCALE_BOOT_SCRIPT } from "@/lib/uiScale";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const sans = Noto_Sans_TC({
-  variable: "--font-sans",
+  variable: "--font-sans-loaded",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
 });
 
 const serif = Noto_Serif_TC({
-  variable: "--font-serif",
+  variable: "--font-serif-loaded",
   subsets: ["latin"],
   weight: ["500", "700"],
 });
@@ -45,6 +46,8 @@ export default function RootLayout({
         <head>
           {/* 介面縮放：首次繪製前就把上次選的字級套上，否則放大字的人每次導頁都會看到一下閃動。 */}
           <script dangerouslySetInnerHTML={{ __html: UI_SCALE_BOOT_SCRIPT }} />
+          {/* 主題：同理，首次繪製前就套上，否則選淺色的人每次導頁都會先閃一片深藍。 */}
+          <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         </head>
         <body className="min-h-full flex flex-col">
           <VersionWatcher />

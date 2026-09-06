@@ -1,6 +1,7 @@
 import Link from "next/link";
 import HeroCalc from "./HeroCalc";
 import UiScaleToggle from "./UiScaleToggle";
+import ThemeToggle from "./ThemeToggle";
 import { getLandingStats } from "@/lib/landing";
 import { listPublicCoaches } from "@/lib/coachProfile";
 
@@ -18,29 +19,30 @@ export default async function LandingView() {
   const faces = coaches.slice(0, 6);
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
+    <div className="min-h-screen bg-canvas text-tx">
       {/* 頂欄：4 項以內。主 CTA 是「免費試算」而不是「客戶登入」—— */}
       {/* 登入是給老客戶的，第一次來的人按不下去。 */}
-      <header className="sticky top-0 z-30 backdrop-blur bg-[#081a2b]/85 border-b border-white/10">
+      <header className="sticky top-0 z-30 backdrop-blur bg-canvas/85 border-b border-line">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
           <Link href="/home" className="flex items-center gap-2.5 sm:gap-3 min-w-0" title="回官網首頁">
-            <span className="grid place-items-center w-9 h-9 rounded-xl border border-[#c99a5b]">
+            <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
               <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-                <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" />
+                <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
               </svg>
             </span>
             <span className="flex flex-col leading-tight min-w-0">
               <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[15px] whitespace-nowrap">嵐途 LAN TU</span>
-              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-[#c99a5b]">FINANCIAL PLANNING</span>
+              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* 字級切換：官網也放，看不清楚字的人在第一屏就要能放大，不必先登入 */}
+            <ThemeToggle compact />
             <UiScaleToggle compact />
-            <Link href="/coaches" className="hidden sm:inline text-sm text-[#a7bacb] hover:text-white px-3 py-2 rounded-lg whitespace-nowrap">認識教練</Link>
-            <Link href="/login" className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-white/15 whitespace-nowrap">登入</Link>
-            <Link href="/passport" className="text-[13px] sm:text-sm font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-3.5 sm:px-4 py-2 rounded-lg whitespace-nowrap">免費試算</Link>
+            <Link href="/coaches" className="hidden sm:inline text-sm text-tx2 hover:text-tx px-3 py-2 rounded-lg whitespace-nowrap">認識教練</Link>
+            <Link href="/login" className="text-[13px] sm:text-sm text-tx2 hover:text-tx px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-line2 whitespace-nowrap">登入</Link>
+            <Link href="/passport" className="text-[13px] sm:text-sm font-bold text-onbrand bg-brand hover:bg-brand2 px-3.5 sm:px-4 py-2 rounded-lg whitespace-nowrap">免費試算</Link>
           </div>
         </div>
       </header>
@@ -51,18 +53,18 @@ export default async function LandingView() {
         <div className="relative max-w-6xl mx-auto px-5 sm:px-8 pt-14 sm:pt-20 pb-14">
           <div className="grid lg:grid-cols-[1fr_minmax(0,520px)] gap-10 lg:gap-12 items-center">
             <div className="text-center lg:text-left">
-              <div className="text-[#c99a5b] text-xs tracking-[0.34em] mb-5">理解自己 · 做出選擇 · 走向未來</div>
+              <div className="text-brand text-xs tracking-[0.34em] mb-5">理解自己 · 做出選擇 · 走向未來</div>
               <h1 className="font-serif text-[32px] sm:text-5xl leading-[1.3] tracking-[0.02em] mb-5">
                 你不是不會理財，<br />
-                是<span className="text-[#e0bd8b]">沒人幫你把數字算完</span>
+                是<span className="text-brand2">沒人幫你把數字算完</span>
               </h1>
-              <p className="text-[#a7bacb] text-base sm:text-lg leading-relaxed mb-6">
+              <p className="text-tx2 text-base sm:text-lg leading-relaxed mb-6">
                 退休要準備多少、房子什麼時候買得起、小孩養不養得起——
                 這些問題都有答案，只是要有人把它算出來。填四個數字，馬上看到你的第一個答案。
               </p>
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 text-[12.5px]">
                 {["不用註冊", "不賣金融商品", "3 分鐘看到結果"].map((t) => (
-                  <span key={t} className="rounded-full border border-[#c99a5b]/40 text-[#e0bd8b] px-3 py-1">{t}</span>
+                  <span key={t} className="rounded-full border border-brand/40 text-brand2 px-3 py-1">{t}</span>
                 ))}
               </div>
             </div>
@@ -72,7 +74,7 @@ export default async function LandingView() {
       </section>
 
       {/* 信任數字：全部取自實際資料，並標明截止月份 */}
-      <section className="border-y border-white/10 bg-[#0b2036]">
+      <section className="border-y border-line bg-field">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-7 grid grid-cols-3 gap-4 text-center">
           {[
             [stats.coaches, "位認證教練"],
@@ -80,12 +82,12 @@ export default async function LandingView() {
             [stats.specialties, "個專長領域"],
           ].map(([n, label]) => (
             <div key={label as string}>
-              <div className="font-serif text-2xl sm:text-3xl text-[#e0bd8b]">{n as number}</div>
-              <div className="text-[11.5px] sm:text-[13px] text-[#a7bacb] mt-1">{label as string}</div>
+              <div className="font-serif text-2xl sm:text-3xl text-brand2">{n as number}</div>
+              <div className="text-[11.5px] sm:text-[13px] text-tx2 mt-1">{label as string}</div>
             </div>
           ))}
         </div>
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 pb-5 text-center text-[10.5px] text-[#6f869c]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 pb-5 text-center text-[10.5px] text-tx3">
           截至 {stats.asOf}
         </div>
       </section>
@@ -93,7 +95,7 @@ export default async function LandingView() {
       {/* 服務網格：用客戶會問的問題當標題，不是我們的功能名 */}
       <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16">
         <div className="text-center mb-10">
-          <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-2">我們幫你算清楚</div>
+          <div className="text-brand text-xs tracking-[0.3em] mb-2">我們幫你算清楚</div>
           <h2 className="font-serif text-2xl sm:text-3xl">這些問題，一份規劃全部回答</h2>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -105,19 +107,19 @@ export default async function LandingView() {
             ["我的保障夠不夠？", "壽險需求、責任遞減、既有保單盤點，缺口與重複一起看。"],
             ["我現在的財務算健康嗎？", "淨資產、財務階段、24 項財務比率體檢，附完整計算明細。"],
           ].map(([q, a]) => (
-            <div key={q} className="rounded-xl bg-[#0d2b45] border border-white/8 p-5">
-              <div className="font-serif text-[17px] mb-2 text-[#e0bd8b]">{q}</div>
-              <p className="text-[#a7bacb] text-sm leading-relaxed">{a}</p>
+            <div key={q} className="rounded-xl bg-panel border border-line p-5 shadow-e1">
+              <div className="font-serif text-[17px] mb-2 text-brand2">{q}</div>
+              <p className="text-tx2 text-sm leading-relaxed">{a}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* 流程：每一步標「要花你多久」——同業幾乎沒人標，這是降低不確定感最便宜的做法 */}
-      <section className="border-t border-white/10 bg-[#0b2036]">
+      <section className="border-t border-line bg-field">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16">
           <div className="text-center mb-10">
-            <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-2">HOW IT WORKS</div>
+            <div className="text-brand text-xs tracking-[0.3em] mb-2">HOW IT WORKS</div>
             <h2 className="font-serif text-2xl sm:text-3xl">從一個念頭，到一份規劃</h2>
           </div>
           <div className="grid sm:grid-cols-3 gap-6">
@@ -127,10 +129,10 @@ export default async function LandingView() {
               ["03", "找教練一起看", "首次面談約 1 小時", "需要專業時，授權你信任的教練一起檢視、優化、陪你執行。"],
             ].map(([n, t, dur, d]) => (
               <div key={n} className="text-center px-4">
-                <div className="font-serif text-3xl text-[#c99a5b] mb-3">{n}</div>
+                <div className="font-serif text-3xl text-brand mb-3">{n}</div>
                 <div className="font-semibold mb-1">{t}</div>
-                <div className="text-[11px] text-[#c99a5b] mb-2">{dur}</div>
-                <p className="text-[#a7bacb] text-sm leading-relaxed">{d}</p>
+                <div className="text-[11px] text-brand mb-2">{dur}</div>
+                <p className="text-tx2 text-sm leading-relaxed">{d}</p>
               </div>
             ))}
           </div>
@@ -141,9 +143,9 @@ export default async function LandingView() {
       {faces.length > 0 && (
         <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16">
           <div className="text-center mb-9">
-            <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-2">MEET THE COACHES</div>
+            <div className="text-brand text-xs tracking-[0.3em] mb-2">MEET THE COACHES</div>
             <h2 className="font-serif text-2xl sm:text-3xl mb-2">陪你走的人</h2>
-            <p className="text-[#a7bacb] text-sm">每位教練都有自己寫的完整檔案，可以先看過再決定。</p>
+            <p className="text-tx2 text-sm">每位教練都有自己寫的完整檔案，可以先看過再決定。</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {faces.map((c) => (
@@ -155,20 +157,20 @@ export default async function LandingView() {
                     alt={c.name}
                     loading="lazy"
                     decoding="async"
-                    className="w-full aspect-square rounded-xl object-cover border border-white/15 group-hover:border-[#c99a5b] transition"
+                    className="w-full aspect-square rounded-xl object-cover border border-line2 group-hover:border-brand transition"
                   />
                 ) : (
-                  <div className="w-full aspect-square rounded-xl bg-[#12334f] border border-white/10 grid place-items-center text-3xl text-[#c99a5b]">
+                  <div className="w-full aspect-square rounded-xl bg-panel2 border border-line grid place-items-center text-3xl text-brand shadow-e1">
                     {c.name.slice(0, 1)}
                   </div>
                 )}
-                <div className="text-sm mt-2 group-hover:text-[#e0bd8b]">{c.name}</div>
-                {c.specialties[0] && <div className="text-[11px] text-[#6f869c] truncate">{c.specialties[0]}</div>}
+                <div className="text-sm mt-2 group-hover:text-brand2">{c.name}</div>
+                {c.specialties[0] && <div className="text-[11px] text-tx3 truncate">{c.specialties[0]}</div>}
               </Link>
             ))}
           </div>
           <div className="text-center mt-8">
-            <Link href="/coaches" className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">
+            <Link href="/coaches" className="text-sm text-tx2 hover:text-tx underline underline-offset-4">
               看全部教練與專長 →
             </Link>
           </div>
@@ -176,15 +178,15 @@ export default async function LandingView() {
       )}
 
       {/* 結尾：一顆 CTA。原本三顆並排等於零顆。 */}
-      <section className="border-t border-white/10 bg-[#0b2036]">
+      <section className="border-t border-line bg-field">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20 text-center">
           <h2 className="font-serif text-2xl sm:text-3xl mb-3">先看到數字，再決定要不要找人</h2>
-          <p className="text-[#a7bacb] mb-8">不用留電話、不用註冊，三分鐘就有結果。</p>
-          <Link href="/passport" className="inline-block font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-8 py-3.5 rounded-lg text-[15px]">
+          <p className="text-tx2 mb-8">不用留電話、不用註冊，三分鐘就有結果。</p>
+          <Link href="/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-8 py-3.5 rounded-lg text-[15px]">
             免費試算我的人生護照
           </Link>
           <div className="mt-5 text-sm">
-            <a href={LINE_URL} target="_blank" rel="noopener noreferrer" className="text-[#a7bacb] hover:text-white underline underline-offset-4">
+            <a href={LINE_URL} target="_blank" rel="noopener noreferrer" className="text-tx2 hover:text-tx underline underline-offset-4">
               或加 LINE 直接問我們（{LINE_ID}）
             </a>
           </div>
@@ -193,14 +195,14 @@ export default async function LandingView() {
 
       {/* 企業主分流卡：客單價最高的客群，入口與人生護照對等但不搶首頁主動線 */}
       <section className="max-w-6xl mx-auto px-5 sm:px-8 pt-10">
-        <div className="rounded-2xl border border-white/10 bg-[#0d2b45] px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="rounded-2xl border border-line bg-panel px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-e1">
           <div className="text-center sm:text-left">
-            <div className="font-serif text-lg text-[#e0bd8b]">你是企業主嗎？</div>
-            <p className="text-[#a7bacb] text-sm mt-1">
+            <div className="font-serif text-lg text-brand2">你是企業主嗎？</div>
+            <p className="text-tx2 text-sm mt-1">
               十個問題、兩分鐘，看清楚你的公司與個人財務界線在哪裡。同樣不用註冊。
             </p>
           </div>
-          <Link href="/bizcheck" className="shrink-0 text-sm font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg">
+          <Link href="/bizcheck" className="shrink-0 text-sm font-bold text-tx bg-tx/10 hover:bg-tx/15 border border-line2 px-6 py-2.5 rounded-lg">
             企業主財務自我檢核 →
           </Link>
         </div>
@@ -208,32 +210,32 @@ export default async function LandingView() {
 
       {/* 頁尾招募分流卡：接住剛好逛進來的同業，但不佔首頁版位 */}
       <section className="max-w-6xl mx-auto px-5 sm:px-8 py-10">
-        <div className="rounded-2xl border border-white/10 bg-[#0d2b45] px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="rounded-2xl border border-line bg-panel px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-e1">
           <div className="text-center sm:text-left">
-            <div className="font-serif text-lg text-[#e0bd8b]">你是財務從業人員嗎？</div>
-            <p className="text-[#a7bacb] text-sm mt-1">嵐途在找想用客觀、全面的方式解決客戶財務問題的人。</p>
+            <div className="font-serif text-lg text-brand2">你是財務從業人員嗎？</div>
+            <p className="text-tx2 text-sm mt-1">嵐途在找想用客觀、全面的方式解決客戶財務問題的人。</p>
           </div>
-          <Link href="/join" className="shrink-0 text-sm font-bold text-white bg-white/10 hover:bg-white/15 border border-white/15 px-6 py-2.5 rounded-lg">
+          <Link href="/join" className="shrink-0 text-sm font-bold text-tx bg-tx/10 hover:bg-tx/15 border border-line2 px-6 py-2.5 rounded-lg">
             了解加入嵐途 →
           </Link>
         </div>
       </section>
 
-      <footer className="border-t border-white/10 pb-24 sm:pb-8">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-[#6f869c]">
+      <footer className="border-t border-line pb-24 sm:pb-8">
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-tx3">
           <span className="font-serif tracking-[0.14em]">嵐途 LAN TU</span>
           <div className="flex items-center gap-4">
-            <Link href="/coaches" className="hover:text-[#a7bacb]">認識教練</Link>
-            <Link href="/passport" className="hover:text-[#a7bacb]">免費試算</Link>
-            <Link href="/join" className="hover:text-[#a7bacb]">加入我們</Link>
+            <Link href="/coaches" className="hover:text-tx2">認識教練</Link>
+            <Link href="/passport" className="hover:text-tx2">免費試算</Link>
+            <Link href="/join" className="hover:text-tx2">加入我們</Link>
           </div>
           <span>理解自己・做出選擇・走向未來</span>
         </div>
       </footer>
 
       {/* 手機底部固定 CTA：行動流量近六成，且多數是單手拇指操作 */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0b2036]/95 backdrop-blur border-t border-[#c99a5b]/40 px-4 py-3">
-        <Link href="/passport" className="block text-center font-bold text-[#08202a] bg-[#c99a5b] px-6 py-3 rounded-lg">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-field/95 backdrop-blur border-t border-brand/40 px-4 py-3">
+        <Link href="/passport" className="block text-center font-bold text-onbrand bg-brand px-6 py-3 rounded-lg">
           免費試算我的人生護照
         </Link>
       </div>

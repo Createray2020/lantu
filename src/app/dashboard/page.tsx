@@ -53,7 +53,7 @@ export default async function Dashboard({
   const hp = await headerProps(coach);
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
+    <div className="min-h-screen bg-canvas text-tx">
       <DashboardHeader {...hp} />
       <ReadOnlyBanner license={hp.license} />
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-6">

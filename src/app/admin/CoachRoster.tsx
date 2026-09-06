@@ -68,8 +68,8 @@ export default function CoachRoster({
       className={
         "rounded-md px-2 py-0.5 border transition " +
         (filter === k
-          ? "bg-[#c99a5b] text-[#08202a] border-[#c99a5b] font-bold"
-          : "border-white/12 hover:bg-[#17406a] hover:text-white")
+          ? "bg-brand text-onbrand border-brand font-bold"
+          : "border-line hover:bg-panel3 hover:text-tx")
       }
       title={filter === k ? "再按一次取消篩選" : `只看${LABEL[k]}的帳號`}
     >
@@ -79,35 +79,35 @@ export default function CoachRoster({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 mb-3 text-sm text-[#a9bccf]">
+      <div className="flex flex-wrap items-center gap-2 mb-3 text-sm text-tx2">
         <span>共 {total} 位</span>
-        <span className="text-[#6b7d8f]">·</span>
+        <span className="text-tx3">·</span>
         <span>
-          待審核 <b className="text-[#e0bd8b]">{pending}</b> 位
+          待審核 <b className="text-brand2">{pending}</b> 位
         </span>
-        <span className="text-[#6b7d8f]">·</span>
-        {chip("unranked", "text-[#e0bd8b]")}
-        {chip("noLicense", "text-[#e0bd8b]")}
-        {chip("expiring", "text-[#ff9d9f]")}
+        <span className="text-tx3">·</span>
+        {chip("unranked", "text-brand2")}
+        {chip("noLicense", "text-brand2")}
+        {chip("expiring", "text-danger")}
         {filter !== "all" && (
           <button
             type="button"
             onClick={() => setFilter("all")}
-            className="text-xs text-[#a9bccf] underline underline-offset-2 hover:text-white"
+            className="text-xs text-tx2 underline underline-offset-2 hover:text-tx"
           >
             顯示全部
           </button>
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-white/10">
+      <div className="overflow-x-auto rounded-xl border border-line">
         <table className="w-full text-sm">
           {head}
           <tbody>
             {shown.map((r) => r.node)}
             {shown.length === 0 && (
               <tr>
-                <td colSpan={colSpan} className="px-3 py-8 text-center text-[#6f869c]">
+                <td colSpan={colSpan} className="px-3 py-8 text-center text-tx3">
                   {rows.length === 0 ? "尚無教練註冊。" : `沒有${LABEL[filter as Exclude<Filter, "all">]}的帳號。`}
                 </td>
               </tr>

@@ -22,7 +22,7 @@ export type Row = {
   updatedAt: string | null;
 };
 
-const BTN = "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
+const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
 
 export default function ProfilesBoard({ rows }: { rows: Row[] }) {
   const router = useRouter();
@@ -43,29 +43,29 @@ export default function ProfilesBoard({ rows }: { rows: Row[] }) {
     });
   }
 
-  const td = "px-3 py-2 border-t border-white/8";
+  const td = "px-3 py-2 border-t border-line";
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="text-[#a9bccf]">官網上架中 <b className="text-[#e0bd8b]">{live}</b> 位</span>
+        <span className="text-tx2">官網上架中 <b className="text-brand2">{live}</b> 位</span>
         {missing.length > 0 && (
-          <span className="text-[#c99a5b]">
+          <span className="text-brand">
             {missing.length} 位已開通但尚未填檔案（不會出現在官網）
           </span>
         )}
         <div className="flex-1" />
         <Link href="/coaches" className={BTN}>看官網教練頁 →</Link>
         {msg && (
-          <span className={`text-sm ${msg.ok ? "text-[#7fb894]" : "text-[#e08b7a]"}`}>
+          <span className={`text-sm ${msg.ok ? "text-ok" : "text-danger"}`}>
             {msg.ok ? `${msg.text} ✓` : `失敗：${msg.text}`}
           </span>
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-white/10">
+      <div className="overflow-x-auto rounded-xl border border-line">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+            <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-3 py-2">教練</th>
               <th className="px-3 py-2">標語</th>
               <th className="px-3 py-2">專長</th>
@@ -80,25 +80,25 @@ export default function ProfilesBoard({ rows }: { rows: Row[] }) {
               <tr key={r.id}>
                 <td className={td}>
                   <div className="font-semibold">{r.name}</div>
-                  <div className="text-[11px] text-[#6f869c]">{r.email}</div>
+                  <div className="text-[11px] text-tx3">{r.email}</div>
                 </td>
-                <td className={`${td} text-[#a9bccf] max-w-[260px] truncate`}>
-                  {r.headline ?? <span className="text-[#6f869c]">—</span>}
+                <td className={`${td} text-tx2 max-w-[260px] truncate`}>
+                  {r.headline ?? <span className="text-tx3">—</span>}
                 </td>
-                <td className={`${td} text-[11px] text-[#a9bccf]`}>
+                <td className={`${td} text-[11px] text-tx2`}>
                   {r.specialties.length ? r.specialties.join("、") : "—"}
                 </td>
                 <td className={td}>{r.hasPhoto ? "✓" : "—"}</td>
-                <td className={`${td} text-[11px] text-[#6f869c]`}>{r.updatedAt ?? "—"}</td>
+                <td className={`${td} text-[11px] text-tx3`}>{r.updatedAt ?? "—"}</td>
                 <td className={td}>
                   {r.status !== "active" ? (
-                    <span className="text-[#6f869c] text-xs">帳號未開通</span>
+                    <span className="text-tx3 text-xs">帳號未開通</span>
                   ) : !r.hasProfile ? (
-                    <span className="text-[#c99a5b] text-xs">尚未填寫</span>
+                    <span className="text-brand text-xs">尚未填寫</span>
                   ) : r.published ? (
-                    <span className="text-[#7fb894] text-xs">官網顯示中</span>
+                    <span className="text-ok text-xs">官網顯示中</span>
                   ) : (
-                    <span className="text-[#e08b7a] text-xs">已下架</span>
+                    <span className="text-danger text-xs">已下架</span>
                   )}
                 </td>
                 <td className={`${td} text-right`}>
@@ -111,7 +111,7 @@ export default function ProfilesBoard({ rows }: { rows: Row[] }) {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-[#6f869c]">尚無教練。</td></tr>
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-tx3">尚無教練。</td></tr>
             )}
           </tbody>
         </table>

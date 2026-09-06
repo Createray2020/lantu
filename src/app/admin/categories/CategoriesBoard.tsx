@@ -33,9 +33,9 @@ const KIND_HINT: Record<CatKind, string> = {
 };
 
 const inputCls =
-  "w-full rounded border border-white/15 bg-[#0b2136] px-2 py-1 text-sm text-[#eef2f7] outline-none focus:border-[#c99a5b]";
+  "w-full rounded border border-line2 bg-field px-2 py-1 text-sm text-tx outline-none focus:border-brand";
 const btnCls =
-  "rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
+  "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
 
 type Draft = {
   parent: string;
@@ -97,7 +97,7 @@ export default function CategoriesBoard({
             key={k}
             onClick={() => setTab(k)}
             className={`rounded-lg px-3 py-1.5 text-sm ${
-              tab === k ? "bg-[#c99a5b] text-[#081a2b] font-semibold" : "border border-white/15 text-[#a9bccf] hover:bg-[#17406a]"
+              tab === k ? "bg-brand text-canvas font-semibold" : "border border-line2 text-tx2 hover:bg-panel3"
             }`}
           >
             {CAT_KIND_LABEL[k]}
@@ -107,14 +107,14 @@ export default function CategoriesBoard({
         <button
           onClick={() => setTab("edu")}
           className={`rounded-lg px-3 py-1.5 text-sm ${
-            tab === "edu" ? "bg-[#c99a5b] text-[#081a2b] font-semibold" : "border border-white/15 text-[#a9bccf] hover:bg-[#17406a]"
+            tab === "edu" ? "bg-brand text-canvas font-semibold" : "border border-line2 text-tx2 hover:bg-panel3"
           }`}
         >
           教育費用參數
         </button>
         <div className="flex-1" />
         {msg && (
-          <span className={`text-sm ${msg.ok ? "text-[#6f8f74]" : "text-[#e08a7a]"}`}>{msg.text}</span>
+          <span className={`text-sm ${msg.ok ? "text-ok-solid" : "text-danger"}`}>{msg.text}</span>
         )}
       </div>
 
@@ -174,17 +174,17 @@ function CatTable({
 
   return (
     <div>
-      <p className="mb-3 rounded-lg border border-white/10 bg-[#0b2136] px-3 py-2 text-xs leading-relaxed text-[#a9bccf]">
-        <b className="text-[#e0bd8b]">大類是引擎在算的鍵，不開放新增</b>；這裡只管細類，每個細類要指定它預設落在哪個大類。
+      <p className="mb-3 rounded-lg border border-line bg-field px-3 py-2 text-xs leading-relaxed text-tx2">
+        <b className="text-brand2">大類是引擎在算的鍵，不開放新增</b>；這裡只管細類，每個細類要指定它預設落在哪個大類。
         <br />
         {KIND_HINT[kind]}
         <br />
         系統預設的細類<b>不可刪除</b>（既有客戶資料還指著這些名稱），要拿掉請按「停用」——選單不再出現，舊資料照樣顯示。
       </p>
 
-      <div className="overflow-x-auto rounded-lg border border-white/10">
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-sm">
-          <thead className="bg-[#0d2b45] text-[#a9bccf]">
+          <thead className="bg-panel text-tx2">
             <tr>
               <th className="px-2 py-2 text-left font-medium">排序</th>
               <th className="px-2 py-2 text-left font-medium">所屬大類</th>
@@ -201,7 +201,7 @@ function CatTable({
             {rows.map((r) => {
               const isEdit = editing === r.id && draft;
               return (
-                <tr key={r.id} className={`border-t border-white/10 ${r.active ? "" : "opacity-45"}`}>
+                <tr key={r.id} className={`border-t border-line ${r.active ? "" : "opacity-45"}`}>
                   <td className="px-2 py-1.5 w-16">
                     {isEdit ? (
                       <input
@@ -211,7 +211,7 @@ function CatTable({
                         onChange={(e) => patch({ sortOrder: Number(e.target.value) })}
                       />
                     ) : (
-                      <span className="text-[#a9bccf]">{r.sortOrder}</span>
+                      <span className="text-tx2">{r.sortOrder}</span>
                     )}
                   </td>
                   <td className="px-2 py-1.5 w-32">
@@ -275,11 +275,11 @@ function CatTable({
                   </td>
                   <td className="px-2 py-1.5 w-24">
                     {r.active ? (
-                      <span className="text-[#6f8f74]">啟用中</span>
+                      <span className="text-ok-solid">啟用中</span>
                     ) : (
-                      <span className="text-[#a9bccf]">已停用</span>
+                      <span className="text-tx2">已停用</span>
                     )}
-                    {r.isSystem && <span className="ml-1 text-[10px] text-[#c99a5b]">系統</span>}
+                    {r.isSystem && <span className="ml-1 text-[10px] text-brand">系統</span>}
                   </td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap">
                     {isEdit ? (
@@ -346,7 +346,7 @@ function CatTable({
             })}
             {!rows.length && (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-[#a9bccf]">
+                <td colSpan={9} className="px-3 py-6 text-center text-tx2">
                   尚無類別。按下方「載入官方預設類別」一鍵帶入。
                 </td>
               </tr>
@@ -355,10 +355,10 @@ function CatTable({
         </table>
       </div>
 
-      <div className="mt-4 rounded-lg border border-white/10 bg-[#0b2136] p-3">
+      <div className="mt-4 rounded-lg border border-line bg-field p-3">
         <div className="mb-2 text-sm font-medium">新增細類</div>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="text-xs text-[#a9bccf]">
+          <label className="text-xs text-tx2">
             所屬大類
             <select className={inputCls + " mt-1 min-w-[8rem]"} value={nw.parent} onChange={(e) => setNw({ ...nw, parent: e.target.value })}>
               {parents.map((p) => (
@@ -366,7 +366,7 @@ function CatTable({
               ))}
             </select>
           </label>
-          <label className="text-xs text-[#a9bccf]">
+          <label className="text-xs text-tx2">
             細類名稱
             <input
               className={inputCls + " mt-1 min-w-[12rem]"}
@@ -375,7 +375,7 @@ function CatTable({
               onChange={(e) => setNw({ ...nw, label: e.target.value })}
             />
           </label>
-          <label className="text-xs text-[#a9bccf]">
+          <label className="text-xs text-tx2">
             排序
             <input
               type="number"
@@ -386,11 +386,11 @@ function CatTable({
           </label>
           {kind === "asset" && (
             <>
-              <label className="flex items-center gap-1 text-xs text-[#a9bccf]">
+              <label className="flex items-center gap-1 text-xs text-tx2">
                 <input type="checkbox" checked={nw.riskAsset} onChange={(e) => setNw({ ...nw, riskAsset: e.target.checked })} />
                 計入風險性資產
               </label>
-              <label className="text-xs text-[#a9bccf]">
+              <label className="text-xs text-tx2">
                 流動性
                 <select className={inputCls + " mt-1 w-24"} value={nw.liquidity} onChange={(e) => setNw({ ...nw, liquidity: e.target.value })}>
                   <option value="">（不指定）</option>
@@ -401,12 +401,12 @@ function CatTable({
             </>
           )}
           {kind === "liability" && (
-            <label className="flex items-center gap-1 text-xs text-[#a9bccf]">
+            <label className="flex items-center gap-1 text-xs text-tx2">
               <input type="checkbox" checked={nw.consumer} onChange={(e) => setNw({ ...nw, consumer: e.target.checked })} />
               算消費性負債
             </label>
           )}
-          <label className="flex items-center gap-1 text-xs text-[#a9bccf]">
+          <label className="flex items-center gap-1 text-xs text-tx2">
             <input type="checkbox" checked={nw.needsNote} onChange={(e) => setNw({ ...nw, needsNote: e.target.checked })} />
             提示補明細
           </label>
@@ -467,17 +467,17 @@ function EduTable({
 
   return (
     <div>
-      <p className="mb-3 rounded-lg border border-white/10 bg-[#0b2136] px-3 py-2 text-xs leading-relaxed text-[#a9bccf]">
-        金額一律「<b className="text-[#e0bd8b]">每學年（1 年）新台幣元</b>」，且是<b className="text-[#e0bd8b]">今日現值</b>——
+      <p className="mb-3 rounded-lg border border-line bg-field px-3 py-2 text-xs leading-relaxed text-tx2">
+        金額一律「<b className="text-brand2">每學年（1 年）新台幣元</b>」，且是<b className="text-brand2">今日現值</b>——
         學費上漲率由客戶端的「學費上漲率」參數另外套，這裡不要先加通膨。
         客戶端會依孩子年齡推出所在學段、自動帶入這些數字，教練仍可逐格覆寫。
         <br />
         政策前提：高中職 112 學年第 2 學期起<b>學費全免</b>（雜費／代辦／餐費仍自付）；私立大專每年補助 3.5 萬，
         <b>碩博士與延修生不適用</b>；公立大專<b>沒有</b>普及性減免。
       </p>
-      <div className="overflow-x-auto rounded-lg border border-white/10">
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-sm">
-          <thead className="bg-[#0d2b45] text-[#a9bccf]">
+          <thead className="bg-panel text-tx2">
             <tr>
               <th className="px-2 py-2 text-left font-medium">學段</th>
               <th className="px-2 py-2 text-left font-medium">起始年齡</th>
@@ -492,11 +492,11 @@ function EduTable({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.stage} className="border-t border-white/10 align-top">
+              <tr key={r.stage} className="border-t border-line align-top">
                 <td className="px-2 py-1.5 font-medium whitespace-nowrap">
                   {r.stage}
                   {r.source && (
-                    <div className="mt-0.5 max-w-[16rem] text-[10px] leading-snug text-[#7d93a8]">{r.source}</div>
+                    <div className="mt-0.5 max-w-[16rem] text-[10px] leading-snug text-tx2">{r.source}</div>
                   )}
                 </td>
                 <td className="px-2 py-1.5">{num(r, "startAge")}</td>

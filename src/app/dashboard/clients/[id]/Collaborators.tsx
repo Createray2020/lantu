@@ -63,24 +63,24 @@ export default function Collaborators({
   const active = collaborators.length;
 
   return (
-    <section className="mt-3 bg-[#0c2135] border border-white/10 rounded-xl">
+    <section className="mt-3 bg-panel border border-line rounded-xl shadow-e1">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-2 px-4 py-2.5 text-left"
       >
-        <span className="text-sm font-bold text-[#eef2f7]">共同執案</span>
-        <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#0d2b45] text-[#a9bccf] border border-white/10">
+        <span className="text-sm font-bold text-tx">共同執案</span>
+        <span className="text-[11px] px-2 py-0.5 rounded-full bg-panel text-tx2 border border-line shadow-e1">
           {active === 0 ? "未邀請" : `${active} 位協作教練`}
         </span>
         <div className="flex-1" />
-        <span className="text-[#6b7d8f] text-xs">{open ? "收合 ▲" : "展開 ▼"}</span>
+        <span className="text-tx3 text-xs">{open ? "收合 ▲" : "展開 ▼"}</span>
       </button>
 
       {open && (
-        <div className="px-4 pb-4 grid gap-3 border-t border-white/10 pt-3">
-          <p className="text-[12px] text-[#a7bacb]">
+        <div className="px-4 pb-4 grid gap-3 border-t border-line pt-3">
+          <p className="text-[12px] text-tx2">
             輸入對方的教練編號邀請他一起看這位客戶。協作教練看得到客戶資料、諮詢紀錄與所有報告書，
-            但<b className="text-[#e0bd8b]">只能看不能改</b>；你隨時可以移除。
+            但<b className="text-brand2">只能看不能改</b>；你隨時可以移除。
           </p>
 
           <div className="flex flex-wrap gap-2">
@@ -89,35 +89,35 @@ export default function Collaborators({
               onChange={(e) => setCode(e.target.value)}
               placeholder="教練編號（例 FC2608012）"
               disabled={readOnly || pending}
-              className="flex-1 min-w-[180px] bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7] disabled:opacity-50"
+              className="flex-1 min-w-[180px] bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx disabled:opacity-50"
             />
             <button
               onClick={invite}
               disabled={readOnly || pending || !code.trim()}
-              className="px-3 py-1.5 text-sm font-bold rounded-md bg-[#c99a5b] text-[#08202a] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-sm font-bold rounded-md bg-brand text-onbrand disabled:opacity-40 disabled:cursor-not-allowed"
             >
               邀請
             </button>
           </div>
 
           {msg && (
-            <div className={"text-sm " + (msg.ok ? "text-[#7bbf6a]" : "text-[#d9773f]")}>{msg.text}</div>
+            <div className={"text-sm " + (msg.ok ? "text-ok" : "text-danger")}>{msg.text}</div>
           )}
 
           {collaborators.length === 0 ? (
-            <p className="text-[12px] text-[#6b7d8f]">目前沒有協作教練。</p>
+            <p className="text-[12px] text-tx3">目前沒有協作教練。</p>
           ) : (
             <ul className="grid gap-1.5">
               {collaborators.map((c) => (
-                <li key={c.id} className="flex flex-wrap items-center gap-2 border-t border-white/5 pt-2">
-                  <span className="text-sm text-[#eef2f7]">{c.coachName ?? "（未命名教練）"}</span>
-                  {c.coachCode && <span className="text-[11px] text-[#6b7d8f] tabular-nums">{c.coachCode}</span>}
+                <li key={c.id} className="flex flex-wrap items-center gap-2 border-t border-line pt-2">
+                  <span className="text-sm text-tx">{c.coachName ?? "（未命名教練）"}</span>
+                  {c.coachCode && <span className="text-[11px] text-tx3 tabular-nums">{c.coachCode}</span>}
                   <span
                     className={
                       "text-[10px] px-1.5 py-0.5 rounded border " +
                       (c.status === "accepted"
-                        ? "border-[#7bbf6a]/50 text-[#7bbf6a] bg-[#7bbf6a]/10"
-                        : "border-[#c99a5b]/50 text-[#e0bd8b] bg-[#c99a5b]/10")
+                        ? "border-ok/50 text-ok bg-ok/10"
+                        : "border-brand/50 text-brand2 bg-brand/10")
                     }
                   >
                     {STATUS_LABEL[c.status] ?? c.status}
@@ -126,7 +126,7 @@ export default function Collaborators({
                   <button
                     onClick={() => revoke(c.id, c.coachName)}
                     disabled={pending}
-                    className="text-[#6b7d8f] hover:text-[#d9773f] text-xs disabled:opacity-50"
+                    className="text-tx3 hover:text-danger text-xs disabled:opacity-50"
                   >
                     移除
                   </button>

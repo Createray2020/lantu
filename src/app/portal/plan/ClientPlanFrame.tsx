@@ -4,6 +4,18 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
 import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
+import { THEME_KEY, DEFAULT_THEME, normalizeTheme } from "@/lib/theme";
+
+// 規劃器是獨立文件，拿不到父層的 <html data-theme>，所以 init 時要一起灌進去。
+// 讀本機而不是讀 props：教練可能在別的分頁剛切過主題，本機才是最新的。
+function currentTheme() {
+  try {
+    return normalizeTheme(localStorage.getItem(THEME_KEY) ?? DEFAULT_THEME);
+  } catch {
+    return DEFAULT_THEME; // 無痕模式讀 localStorage 會丟例外
+  }
+}
+
 import { addMyNoteAction, deleteMyNoteAction, listMyNotesAction } from "./actions";
 import type { NoteRow, NoteInput } from "@/lib/notes";
 
@@ -51,7 +63,7 @@ export default function ClientPlanFrame({
         {
           type: "lantu:init",
           data,
-          uiScale: readScale(),
+          uiScale: readScale(), theme: currentTheme(),
           clientCode: clientCode ?? null,
           notes: notesRef.current,
           session: null,
@@ -125,18 +137,18 @@ export default function ClientPlanFrame({
         : "我的財務藍圖";
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#081a2b]">
-      <div className="px-4 py-2 bg-[#0d2b45] border-b border-white/10 text-[#eef2f7]">
+    <div className="fixed inset-0 flex flex-col bg-canvas">
+      <div className="px-4 py-2 bg-panel border-b border-line text-tx">
         <div className="flex items-center gap-3">
-          <Link href="/portal" className="text-sm text-[#a9bccf] hover:text-[#eef2f7] shrink-0">← 回我的首頁</Link>
+          <Link href="/portal" className="text-sm text-tx2 hover:text-tx shrink-0">← 回我的首頁</Link>
           <span className="text-sm font-bold min-w-0 truncate">{title}</span>
           <div className="flex-1" />
           <SignOutButton redirectUrl="/">
-            <button className="text-xs text-[#a7bacb] hover:text-white border border-white/15 rounded px-2 py-1 shrink-0">登出</button>
+            <button className="text-xs text-tx2 hover:text-tx border border-line2 rounded px-2 py-1 shrink-0">登出</button>
           </SignOutButton>
         </div>
         {track === "client" && (
-          <p className="text-[11px] text-[#6f869c] mt-0.5">這份是你自己填的；教練接手後會有更完整的一份。</p>
+          <p className="text-[11px] text-tx3 mt-0.5">這份是你自己填的；教練接手後會有更完整的一份。</p>
         )}
       </div>
       <iframe
@@ -146,7 +158,7 @@ export default function ClientPlanFrame({
         className="flex-1 w-full border-0"
         onLoad={() =>
           iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:init", data, uiScale: readScale(), clientCode: clientCode ?? null },
+            { type: "lantu:init", data, uiScale: readScale(), theme: currentTheme(), clientCode: clientCode ?? null },
             window.location.origin,
           )
         }

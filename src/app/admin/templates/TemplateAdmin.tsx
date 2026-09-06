@@ -13,7 +13,7 @@ import {
   updateTemplateAction,
 } from "./actions";
 
-const field = "w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7]";
+const field = "w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx";
 
 /** 已下架＝status 不是 active。舊資料沒有這個欄位時視為上架中。 */
 const archivedOf = (t: TemplateListItem) => t.status === "archived";
@@ -70,25 +70,25 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
   return (
     <div>
       <div className="flex items-center gap-3 mb-3">
-        <span className="text-[#6b7d8f] text-sm">{order.length} 份</span>
+        <span className="text-tx3 text-sm">{order.length} 份</span>
         <div className="flex-1" />
         <button
           onClick={() => setShowNew(true)}
           disabled={pending}
-          className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold text-sm px-3.5 py-1.5 disabled:opacity-40"
+          className="rounded-md bg-brand text-onbrand font-bold text-sm px-3.5 py-1.5 disabled:opacity-40"
         >
           ＋ 新增範本
         </button>
       </div>
 
       {err && (
-        <div role="alert" className="mb-3 text-sm text-[#ffd7d8] bg-[#e5484d]/15 border border-[#e5484d]/40 rounded-lg px-3 py-2">
+        <div role="alert" className="mb-3 text-sm text-danger bg-danger-solid/15 border border-danger-solid/40 rounded-lg px-3 py-2">
           {err}
         </div>
       )}
 
       {order.length === 0 ? (
-        <div className="text-center py-16 text-[#6b7d8f] border border-dashed border-white/10 rounded-xl">
+        <div className="text-center py-16 text-tx3 border border-dashed border-line rounded-xl">
           <div className="text-3xl mb-2">📁</div>
           還沒有任何示範範本。點右上角建立第一份——建好之後再進去把內容填滿。
         </div>
@@ -101,35 +101,35 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
               key={t.id}
               className={
                 "grid grid-cols-1 md:grid-cols-[1.7fr_1fr_1fr_auto] gap-3 items-center rounded-lg px-3 py-3 border " +
-                (archivedOf(t) ? "bg-[#0a1a2b] border-white/8 opacity-70" : "bg-[#0c2135] border-white/10")
+                (archivedOf(t) ? "bg-field border-line opacity-70" : "bg-panel border-line")
               }
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-[#6b7d8f] w-5 text-right">{i + 1}</span>
-                  <Link href={`/admin/templates/${t.id}`} className="font-bold hover:text-[#e0bd8b] truncate">
+                  <span className="text-[10px] font-mono text-tx3 w-5 text-right">{i + 1}</span>
+                  <Link href={`/admin/templates/${t.id}`} className="font-bold hover:text-brand2 truncate">
                     {t.name}
                   </Link>
                   {archivedOf(t) && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/20 text-[#6b7d8f]">已下架</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-line2 text-tx3">已下架</span>
                   )}
                 </div>
                 {t.templateLabel && (
-                  <div className="ml-7 mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] border border-white/10">
+                  <div className="ml-7 mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-panel text-tx2 border border-line">
                     {t.templateLabel}
                   </div>
                 )}
               </div>
               <div className="text-[12px] font-bold" style={{ color: stageColor(t.healthGrade) }}>
-                {t.healthGrade ? stageName(t.healthGrade) : <span className="text-[#6b7d8f]">尚未填內容</span>}
+                {t.healthGrade ? stageName(t.healthGrade) : <span className="text-tx3">尚未填內容</span>}
               </div>
-              <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(t.netWorth ?? null)}</div>
+              <div className="text-sm tabular-nums text-tx">{fmtMoney(t.netWorth ?? null)}</div>
               <div className="flex items-center gap-1 justify-end">
                 <button
                   onClick={() => move(i, -1)}
                   disabled={pending || i === 0}
                   title="上移"
-                  className="w-7 h-7 rounded border border-white/12 text-[#a9bccf] disabled:opacity-25 hover:bg-[#17406a]"
+                  className="w-7 h-7 rounded border border-line text-tx2 disabled:opacity-25 hover:bg-panel3"
                 >
                   ↑
                 </button>
@@ -137,20 +137,20 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
                   onClick={() => move(i, 1)}
                   disabled={pending || i === order.length - 1}
                   title="下移"
-                  className="w-7 h-7 rounded border border-white/12 text-[#a9bccf] disabled:opacity-25 hover:bg-[#17406a]"
+                  className="w-7 h-7 rounded border border-line text-tx2 disabled:opacity-25 hover:bg-panel3"
                 >
                   ↓
                 </button>
                 <Link
                   href={`/admin/templates/${t.id}`}
-                  className="ml-2 text-xs rounded-md border border-[#c99a5b]/50 text-[#e0bd8b] px-2.5 py-1.5 hover:bg-[#c99a5b]/10"
+                  className="ml-2 text-xs rounded-md border border-brand/50 text-brand2 px-2.5 py-1.5 hover:bg-brand/10"
                 >
                   編輯內容
                 </Link>
                 <button
                   onClick={() => { setEditing(t); setConfirmDel(null); }}
                   disabled={pending}
-                  className="text-xs rounded-md border border-white/15 text-[#a9bccf] px-2.5 py-1.5 hover:bg-[#17406a] disabled:opacity-40"
+                  className="text-xs rounded-md border border-line2 text-tx2 px-2.5 py-1.5 hover:bg-panel3 disabled:opacity-40"
                 >
                   改名稱
                 </button>
@@ -159,7 +159,7 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
                     <button
                       onClick={() => run(() => setTemplateArchivedAction(t.id, false))}
                       disabled={pending}
-                      className="text-xs font-bold rounded-md border border-[#7bbf6a]/50 text-[#8fd07e] px-2.5 py-1.5 hover:bg-[#7bbf6a]/10 disabled:opacity-40"
+                      className="text-xs font-bold rounded-md border border-ok/50 text-ok px-2.5 py-1.5 hover:bg-ok/10 disabled:opacity-40"
                     >
                       重新上架
                     </button>
@@ -168,17 +168,17 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
                         <button
                           onClick={() => { setConfirmDel(null); run(() => purgeTemplateAction(t.id)); }}
                           disabled={pending}
-                          className="text-xs font-bold rounded-md bg-[#e5484d] text-white px-2.5 py-1.5 disabled:opacity-40"
+                          className="text-xs font-bold rounded-md bg-danger-solid text-onsolid px-2.5 py-1.5 disabled:opacity-40"
                         >
                           確定永久刪除
                         </button>
-                        <button onClick={() => setConfirmDel(null)} className="text-xs text-[#a9bccf] px-1.5">取消</button>
+                        <button onClick={() => setConfirmDel(null)} className="text-xs text-tx2 px-1.5">取消</button>
                       </>
                     ) : (
                       <button
                         onClick={() => setConfirmDel(t.id)}
                         disabled={pending}
-                        className="text-xs rounded-md border border-[#e5484d]/40 text-[#ff9d9f] px-2.5 py-1.5 hover:bg-[#e5484d]/10 disabled:opacity-40"
+                        className="text-xs rounded-md border border-danger-solid/40 text-danger px-2.5 py-1.5 hover:bg-danger-solid/10 disabled:opacity-40"
                       >
                         永久刪除
                       </button>
@@ -189,19 +189,19 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
                     onClick={() => { setConfirmDel(null); run(() => setTemplateArchivedAction(t.id, true)); }}
                     disabled={pending}
                     title="教練端就看不到了；內容一個字都不會少，隨時可以再上架"
-                    className="text-xs rounded-md border border-white/15 text-[#a9bccf] px-2.5 py-1.5 hover:bg-[#17406a] disabled:opacity-40"
+                    className="text-xs rounded-md border border-line2 text-tx2 px-2.5 py-1.5 hover:bg-panel3 disabled:opacity-40"
                   >
                     下架
                   </button>
                 )}
               </div>
               {archived && confirmDel !== t.id && (
-                <p className="md:col-span-4 text-[12px] text-[#a9bccf] bg-[#0d2b45]/60 border border-white/10 rounded-md px-3 py-2">
+                <p className="md:col-span-4 text-[12px] text-tx2 bg-panel/60 border border-line rounded-md px-3 py-2 shadow-e1">
                   已下架：教練端的清單看不到這一份，內容完整保留著。要真的刪掉才按「永久刪除」。
                 </p>
               )}
               {confirmDel === t.id && (
-                <p className="md:col-span-4 text-[12px] text-[#ffb9ba] bg-[#5b1f22]/40 border border-[#e5484d]/30 rounded-md px-3 py-2">
+                <p className="md:col-span-4 text-[12px] text-danger bg-danger-solid/25/40 border border-danger-solid/30 rounded-md px-3 py-2">
                   永久刪除會把這份範本連同它所有年度版本一起刪掉，<b>救不回來</b>。
                   已經有教練「複製一份給自己」的那些客戶不受影響——那些是各自獨立的資料。
                 </p>
@@ -273,23 +273,23 @@ function TemplateDialog({
   const [local, setLocal] = useState("");
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
-      <div className="w-full max-w-md bg-[#0c2135] border border-white/15 rounded-xl p-5" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-scrim/60 px-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-panel border border-line2 rounded-xl p-5 shadow-e3" onClick={(e) => e.stopPropagation()}>
         <h2 className="font-serif text-lg mb-1">{title}</h2>
-        <p className="text-[11px] text-[#6b7d8f] mb-4">這兩個欄位是教練在清單上看到的，取名時想著「他要怎麼跟客戶介紹這一份」。</p>
+        <p className="text-[11px] text-tx3 mb-4">這兩個欄位是教練在清單上看到的，取名時想著「他要怎麼跟客戶介紹這一份」。</p>
         <div className="grid gap-3">
           <div>
-            <label className="text-xs text-[#a9bccf]">範本名稱 *</label>
+            <label className="text-xs text-tx2">範本名稱 *</label>
             <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="雙薪育兒家庭" autoFocus />
           </div>
           <div>
-            <label className="text-xs text-[#a9bccf]">客群標籤</label>
+            <label className="text-xs text-tx2">客群標籤</label>
             <input className={field} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="35 歲、兩個小孩、房貸 800 萬" />
           </div>
-          {local && <div className="text-[#d9773f] text-sm">{local}</div>}
+          {local && <div className="text-danger text-sm">{local}</div>}
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm text-[#a9bccf]">取消</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-tx2">取消</button>
           <button
             onClick={() => {
               if (!name.trim()) { setLocal("請填範本名稱"); return; }
@@ -297,7 +297,7 @@ function TemplateDialog({
               onSubmit({ name: name.trim(), templateLabel: label.trim() || null });
             }}
             disabled={pending}
-            className="px-4 py-1.5 text-sm font-bold rounded-md bg-[#c99a5b] text-[#08202a] disabled:opacity-60"
+            className="px-4 py-1.5 text-sm font-bold rounded-md bg-brand text-onbrand disabled:opacity-60"
           >
             {pending ? "處理中…" : submitLabel}
           </button>

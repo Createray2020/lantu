@@ -36,28 +36,28 @@ export default async function SurveyPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] flex flex-col">
-      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-white/10">
+    <div className="min-h-screen bg-canvas text-tx flex flex-col">
+      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-line">
         <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          <span className="grid place-items-center w-9 h-9 rounded-xl border border-[#c99a5b]">
+          <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
             <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-              <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
             </svg>
           </span>
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
         <div className="flex items-center gap-3">
-          <Link href="/portal" className="text-sm text-[#a7bacb] hover:text-white">← 回首頁</Link>
+          <Link href="/portal" className="text-sm text-tx2 hover:text-tx">← 回首頁</Link>
           <SignOutButton redirectUrl="/">
-            <button className="text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-3 py-1.5">登出</button>
+            <button className="text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-3 py-1.5">登出</button>
           </SignOutButton>
         </div>
       </header>
 
       <main className="flex-1 px-5 sm:px-8 py-6 max-w-2xl w-full mx-auto">
         <h1 className="text-xl font-bold mb-1">服務回饋</h1>
-        <p className="text-sm text-[#a7bacb] mb-6">
+        <p className="text-sm text-tx2 mb-6">
           你的回饋是教練改進服務的依據，也是這份服務正式結案的一步。
         </p>
         <SurveyForm

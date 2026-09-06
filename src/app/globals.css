@@ -1,32 +1,264 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================================
+   嵐途設計 token
+   ----------------------------------------------------------------------------
+   ⚠️ 這裡是全站唯一定義顏色的地方。任何 tsx 都不要再寫 bg-[#0d2b45] 這種色碼，
+      一律用語意類名（bg-panel / text-tx2 / border-line）。
+      原因：改版前全站有 2,565 處手打色碼、81 個不同 hex，同一個「次要文字」
+      同時存在 #a9bccf 與 #a7bacb、同一個「輸入框底色」同時存在 #0a1a2b 與
+      #0a1a28——差一個字元、肉眼分不出來，但淺色版就是被這些漂移擋住的。
 
+   兩套主題怎麼運作：
+     1. :root 定深色（預設，也是舊有外觀）
+     2. :root[data-theme="light"] 覆寫成淺色
+     3. @theme inline 把它們接成 Tailwind 工具類；inline 的意思是「產出
+        var(--panel) 而不是把值烤進去」，所以切換 data-theme 就會即時變色。
+     ⚠️ 不要把顏色只定義在 [data-theme] 區塊裡——沒有 data-theme 屬性時
+        （首次繪製、或 boot script 沒跑到）那個顏色就不存在。一律先在 :root 定。
+
+   色階怎麼分（改任何一個之前先看懂這層）：
+     canvas  頁面最底             panel  卡片／面板        panel2 巢狀卡片／表頭
+     panel3  再上一階／hover      field  輸入框底
+     line    細分隔線（卡片、表格）  line2  輸入框／強調邊框
+     tx      主要文字             tx2    次要說明            tx3    三級／meta
+     brand   品牌金（主鈕、選取）   brand2 金色高亮          onbrand 金底上的字
+     ok/warn/danger/info          文字與邊框用的色調（在底色上讀得到）
+     *-solid                      實心填底用的色調（配 text-white）
+   ========================================================================== */
+
+:root {
   /* 介面縮放（老花友善）。1 / 1.15 / 1.3，由頂欄的字級切換寫入，跟著教練帳號走。
      Tailwind v4 的字級與間距全是 rem，所以只動根字級，字與版面會等比放大而不爆版。
      ⚠️ 不要寫成 calc(1rem * …)：rem 就是根字級本身，那會變成遞迴定義。 */
   --ui-scale: 1;
   font-size: calc(16px * var(--ui-scale));
+
+  /* 讓瀏覽器自己畫的東西（捲軸、原生 select 下拉、日期選擇器、勾選框）跟著走。
+     少了這行，淺色版會出現深色捲軸配白色頁面。 */
+  color-scheme: dark;
+
+  /* — 底色 — */
+  --canvas: #081a2b;
+  --panel: #0d2b45;
+  --panel2: #12334f;
+  --panel3: #17406a;
+  --field: #0a1a2b;
+
+  /* — 線 —
+     舊版所有邊框都是 rgba(255,255,255,.11) 這類半透明白，換到淺底會整片消失，
+     所以改成實色 token。 */
+  --line: #1c3a58;
+  --line2: #2a4d73;
+
+  /* — 文字 —
+     ⚠️ tx3 刻意比舊值 #6f869c 亮：舊值在 #0d2b45 上對比只有 3.83:1，
+        而它幾乎都搭配 11–12px 小字，未達 WCAG AA 的 4.5:1。 */
+  --tx: #eef2f7;
+  --tx2: #a9bccf;
+  --tx3: #8296ab;
+
+  /* — 品牌 — */
+  --brand: #c99a5b;
+  --brand2: #e0bd8b;
+  --onbrand: #08202a;
+
+  /* — 狀態 —
+     每個狀態兩個 token：一般版給文字／邊框／淡底（要在面板上讀得到），
+     solid 版給實心填底（要能襯白字）。舊版把兩者混用，所以同一個紅色
+     同時代表「額度已滿（危險）」和「授權過期（狀態）」。 */
+  --ok: #8fc0a3;
+  --ok-solid: #4f8a68;
+  --warn: #e0a45c;
+  --warn-solid: #a8681a;
+  --danger: #ff9d9f;
+  --danger-solid: #c0433f;
+  --info: #8fb8ff;
+  --info-solid: #1d5c8a;
+  --teal: #9fd3d0;
+  --teal2: #1f6f6b;
+  --onsolid: #ffffff;
+
+  /* — 彈窗遮罩（舊版有四種黑，合併成一個） — */
+  --scrim: #040c14;
+
+  /* — 層次 —
+     改版前全站 118 支 tsx 只出現 3 次 shadow，卻用了 448 處 border-white/10：
+     卡片、清單列、統計磚、彈窗全靠同一條 1px 線分開，所以什麼都停在同一個平面上。
+     深色版靠「底色差一階＋極淡陰影」，淺色版靠「白面板＋真陰影」——兩邊都不再只靠線。 */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .28);
+  --sh-2: 0 4px 14px rgba(0, 0, 0, .34);
+  --sh-3: 0 18px 50px rgba(0, 0, 0, .5);
+
+  /* — 圖表分類色盤 —
+     舊版每個圖表函式各自複製一份色碼陣列（規劃器裡就有五份），
+     所以同一種資料在不同圖上是不同顏色。 */
+  --c1: #5b93d6;
+  --c2: #5cc08a;
+  --c3: #f0c34e;
+  --c4: #ef6f6f;
+  --c5: #b7c6b0;
+  --c6: #e79ec4;
+
+  /* — 財務階段 D→A（整裝／啟程／前行／遠行） — */
+  --grade-d: #8fa6b8;
+  --grade-c: #7fa8a0;
+  --grade-b: #c9a86b;
+  --grade-a: #e0c88b;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* 白面板浮在極淡藍灰底上——和深色版共用同一組藍調色相，
+     換過去不會覺得是另一個產品。 */
+  --canvas: #f4f6f8;
+  --panel: #ffffff;
+  --panel2: #eaeef3;
+  --panel3: #dfe6ee;
+  --field: #fbfcfd;
+
+  --line: #e3e8ee;
+  --line2: #c9d2dc;
+
+  --tx: #14212e;
+  --tx2: #4a5c6e;
+  --tx3: #75838f;
+
+  /* ⚠️ 金色是唯一兩套主題不能共用亮度的地方：#c99a5b 在白底上只有 2.4:1，
+     必須壓深到 #9a6f22 才有 4.5:1。 */
+  --brand: #9a6f22;
+  --brand2: #c08f3c;
+  --onbrand: #ffffff;
+
+  --ok: #2f7d57;
+  --ok-solid: #2f7d57;
+  --warn: #a8681a;
+  --warn-solid: #a8681a;
+  --danger: #c0362f;
+  --danger-solid: #c0362f;
+  --info: #2c6fb5;
+  --info-solid: #2c6fb5;
+  --teal: #1f7a76;
+  --teal2: #17605d;
+  --onsolid: #ffffff;
+
+  --scrim: #14212e;
+
+  --sh-1: 0 1px 2px rgba(24, 45, 70, .07);
+  --sh-2: 0 4px 14px rgba(24, 45, 70, .10);
+  --sh-3: 0 18px 50px rgba(24, 45, 70, .22);
+
+  --c1: #2e6db4;
+  --c2: #2c8c5f;
+  --c3: #a8760c;
+  --c4: #c2453e;
+  --c5: #5f7a63;
+  --c6: #a8497e;
+
+  --grade-d: #566d80;
+  --grade-c: #46756e;
+  --grade-b: #8a6a2c;
+  --grade-a: #6f5620;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+  --color-panel3: var(--panel3);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-tx: var(--tx);
+  --color-tx2: var(--tx2);
+  --color-tx3: var(--tx3);
+  --color-brand: var(--brand);
+  --color-brand2: var(--brand2);
+  --color-onbrand: var(--onbrand);
+  --color-ok: var(--ok);
+  --color-ok-solid: var(--ok-solid);
+  --color-warn: var(--warn);
+  --color-warn-solid: var(--warn-solid);
+  --color-danger: var(--danger);
+  --color-danger-solid: var(--danger-solid);
+  --color-info: var(--info);
+  --color-info-solid: var(--info-solid);
+  --color-teal: var(--teal);
+  --color-teal2: var(--teal2);
+  --color-onsolid: var(--onsolid);
+  --color-scrim: var(--scrim);
+  --color-c1: var(--c1);
+  --color-c2: var(--c2);
+  --color-c3: var(--c3);
+  --color-c4: var(--c4);
+  --color-c5: var(--c5);
+  --color-c6: var(--c6);
+  --color-grade-d: var(--grade-d);
+  --color-grade-c: var(--grade-c);
+  --color-grade-b: var(--grade-b);
+  --color-grade-a: var(--grade-a);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --shadow-e1: var(--sh-1);
+  --shadow-e2: var(--sh-2);
+  --shadow-e3: var(--sh-3);
+
+  /* ⚠️ 舊版寫的是 var(--font-geist-sans)，那個變數根本不存在（create-next-app
+     的殘留），而 body 又寫死 font-family:Arial —— 結果整站正文從來沒套到
+     layout.tsx 載入的 Noto Sans TC，一直在用系統備援字體。 */
+  --font-sans: var(--font-sans-loaded), -apple-system, "PingFang TC",
+    "Microsoft JhengHei", system-ui, sans-serif;
+  --font-serif: var(--font-serif-loaded), "Songti TC", Georgia, serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--tx);
+  font-family: var(--font-sans-loaded), -apple-system, "PingFang TC",
+    "Microsoft JhengHei", system-ui, sans-serif;
+}
+
+/* 全站鍵盤焦點。舊版有 10 支檔案用 outline-none 把外框關掉，其中 4 支
+   （案件登錄、顧問編輯、培訓登錄、模擬器）完全沒補回來，Tab 過去看不到自己在哪。
+   放在最後、用 :focus-visible，滑鼠點擊不會觸發。 */
+:focus-visible {
+  outline: 2px solid var(--brand2);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* 表單驗證。舊版全站沒有任何 error/invalid 樣式。 */
+[aria-invalid="true"] {
+  border-color: var(--danger) !important;
+}
+
+/* 導頁過場的進度條。放在這裡而不是元件內：Tailwind 的 arbitrary animation
+   需要 keyframes 真的存在，寫在元件的 style 屬性裡不會被 @keyframes 認得。 */
+@keyframes lantuSlide {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(320%); }
+}
+
+/* 會動的東西一律尊重系統的「減少動態效果」設定。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ── 資料表：分行的第二種線索 ──────────────────────────────────────────────
+   改版前全站沒有任何一張表有 hover 或斑馬紋（grep odd:/even:/tr:hover 零命中），
+   在一列 9–10 欄的後台表格上，眼睛只能靠那條 1px 線對行。
+   放成全域規則而不是逐表加 class：漏掉的那幾張就是最需要的那幾張。 */
+tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--tx) 2.5%, transparent);
+}
+tbody tr:hover {
+  background: color-mix(in srgb, var(--tx) 6%, transparent);
+}
+/* 數字欄一律等寬對齊，金額才比得出位數。 */
+.tabular-nums, td:has(> .tabular-nums) {
+  font-variant-numeric: tabular-nums;
 }

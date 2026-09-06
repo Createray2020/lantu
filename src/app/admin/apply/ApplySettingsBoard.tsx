@@ -7,7 +7,7 @@ import { APPLY_ROUTES, APPLY_TEXT_FIELDS, type ApplySettings, type ChecklistItem
 import { RANK_GROUP_LABEL } from "@/lib/license";
 
 const field =
-  "bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-2 py-1.5 text-[#eef2f7] placeholder:text-[#4f6478]";
+  "bg-field border border-line2 rounded-md text-sm px-2 py-1.5 text-tx placeholder:text-tx3";
 
 // 後台的報聘設定面板。
 //
@@ -51,15 +51,15 @@ export default function ApplySettingsBoard({
   return (
     <div className="grid gap-6">
       {/* ① 核准時自動帶什麼 */}
-      <section className="border border-white/10 rounded-lg p-4">
+      <section className="border border-line rounded-lg p-4">
         <h2 className="font-bold mb-1">核准時自動帶入</h2>
-        <p className="text-[11px] text-[#6f869c] mb-3">
+        <p className="text-[11px] text-tx3 mb-3">
           三項都是「這位教練原本沒有值才寫」——後台已經手動設過的人不會被蓋掉，停權後再核准也不會被降級。
         </p>
 
         <div className="grid gap-3 text-sm">
           <label className="flex items-center gap-3">
-            <span className="w-28 text-[#a9bccf] text-[12px]">預設職級</span>
+            <span className="w-28 text-tx2 text-[12px]">預設職級</span>
             <select
               className={field}
               value={s.defaultRankCode ?? ""}
@@ -72,14 +72,14 @@ export default function ApplySettingsBoard({
                 </option>
               ))}
             </select>
-            <span className="text-[11px] text-[#6f869c]">未定級的教練在官網不可被客戶直接指定。</span>
+            <span className="text-[11px] text-tx3">未定級的教練在官網不可被客戶直接指定。</span>
           </label>
 
           <label className="flex items-center gap-3">
-            <span className="w-28 text-[#a9bccf] text-[12px]">推薦人</span>
+            <span className="w-28 text-tx2 text-[12px]">推薦人</span>
             <input
               type="checkbox"
-              className="accent-[#c99a5b]"
+              className="accent-brand"
               checked={s.bindUplineToIntroducer}
               onChange={(e) => patch({ bindUplineToIntroducer: e.target.checked })}
             />
@@ -87,10 +87,10 @@ export default function ApplySettingsBoard({
           </label>
 
           <div className="flex items-center gap-3">
-            <span className="w-28 text-[#a9bccf] text-[12px]">使用期限</span>
+            <span className="w-28 text-tx2 text-[12px]">使用期限</span>
             <input
               type="checkbox"
-              className="accent-[#c99a5b]"
+              className="accent-brand"
               checked={s.licenseOn}
               onChange={(e) => patch({ licenseOn: e.target.checked })}
             />
@@ -113,15 +113,15 @@ export default function ApplySettingsBoard({
               <option value="year">年</option>
               <option value="month">個月</option>
             </select>
-            <span className="text-[11px] text-[#6f869c]">實習教練固定半年，不受這裡影響。</span>
+            <span className="text-[11px] text-tx3">實習教練固定半年，不受這裡影響。</span>
           </div>
         </div>
       </section>
 
       {/* ② 申請表的必填欄位 */}
-      <section className="border border-white/10 rounded-lg p-4">
+      <section className="border border-line rounded-lg p-4">
         <h2 className="font-bold mb-1">申請表必填欄位</h2>
-        <p className="text-[11px] text-[#6f869c] mb-3">姓名與手機永遠必填；教練推薦路線的推薦人編號也永遠必填。</p>
+        <p className="text-[11px] text-tx3 mb-3">姓名與手機永遠必填；教練推薦路線的推薦人編號也永遠必填。</p>
         <div className="grid gap-2 text-sm">
           {APPLY_TEXT_FIELDS.map((f) => {
             const on = s.requiredFields.includes(f.key);
@@ -129,7 +129,7 @@ export default function ApplySettingsBoard({
               <label key={f.key} className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className="accent-[#c99a5b]"
+                  className="accent-brand"
                   checked={on}
                   onChange={() =>
                     patch({
@@ -147,16 +147,16 @@ export default function ApplySettingsBoard({
       </section>
 
       {/* ③ 審核檢核表 */}
-      <section className="border border-white/10 rounded-lg p-4">
+      <section className="border border-line rounded-lg p-4">
         <h2 className="font-bold mb-1">審核檢核表</h2>
-        <p className="text-[11px] text-[#6f869c] mb-3">
+        <p className="text-[11px] text-tx3 mb-3">
           審核者在教練帳號頁逐項打勾，標了「必勾」的沒勾完就按不下核准。只在某條路線出現的項目可以限定路線。
         </p>
 
         <label className="flex items-center gap-2 mb-3 text-sm">
           <input
             type="checkbox"
-            className="accent-[#c99a5b]"
+            className="accent-brand"
             checked={s.requireIntroducerConfirm}
             onChange={(e) => patch({ requireIntroducerConfirm: e.target.checked })}
           />
@@ -165,17 +165,17 @@ export default function ApplySettingsBoard({
 
         <div className="grid gap-2">
           {s.checklist.map((it, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2 border border-white/10 rounded-md p-2">
+            <div key={i} className="flex flex-wrap items-center gap-2 border border-line rounded-md p-2">
               <input
                 className={`${field} flex-1 min-w-[180px]`}
                 value={it.label}
                 onChange={(e) => setItem(i, { label: e.target.value })}
                 placeholder="檢核項目"
               />
-              <label className="flex items-center gap-1 text-[12px] text-[#a9bccf]">
+              <label className="flex items-center gap-1 text-[12px] text-tx2">
                 <input
                   type="checkbox"
-                  className="accent-[#c99a5b]"
+                  className="accent-brand"
                   checked={it.required}
                   onChange={(e) => setItem(i, { required: e.target.checked })}
                 />
@@ -198,7 +198,7 @@ export default function ApplySettingsBoard({
               <button
                 type="button"
                 onClick={() => patch({ checklist: s.checklist.filter((_, j) => j !== i) })}
-                className="text-[#a9bccf] hover:text-white text-xs px-2"
+                className="text-tx2 hover:text-tx text-xs px-2"
               >
                 移除
               </button>
@@ -212,7 +212,7 @@ export default function ApplySettingsBoard({
               checklist: [...s.checklist, { key: `chk${Date.now().toString(36)}`, label: "", required: true }],
             })
           }
-          className="mt-2 text-xs text-[#c99a5b] hover:text-[#e0bd8b]"
+          className="mt-2 text-xs text-brand hover:text-brand2"
         >
           ＋ 新增檢核項目
         </button>
@@ -223,12 +223,12 @@ export default function ApplySettingsBoard({
           type="button"
           onClick={save}
           disabled={busy}
-          className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold px-4 py-2 text-sm disabled:opacity-50"
+          className="rounded-md bg-brand text-onbrand font-bold px-4 py-2 text-sm disabled:opacity-50"
         >
           {busy ? "儲存中…" : "儲存設定"}
         </button>
-        {msg && <span className="text-[#7fd1a8] text-xs">{msg}</span>}
-        {err && <span className="text-[#e08b7a] text-xs">失敗：{err}</span>}
+        {msg && <span className="text-ok text-xs">{msg}</span>}
+        {err && <span className="text-danger text-xs">失敗：{err}</span>}
       </div>
     </div>
   );

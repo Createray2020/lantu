@@ -28,13 +28,13 @@ export default function HomeSwitcher({
 
   return (
     <div className="flex items-center gap-3 flex-wrap mb-4">
-      <div className="inline-flex bg-[#12334f] border border-white/10 rounded-full p-1">
+      <div className="inline-flex bg-panel2 border border-line rounded-full p-1 shadow-e1">
         {views.map((v) => (
           <button
             key={v}
             onClick={() => go(v)}
             className={`px-4 py-1.5 rounded-full text-[13px] font-bold transition ${
-              rank === v ? "bg-[#c99a5b] text-[#08202a]" : "text-[#a7bacb] hover:text-[#eef2f7]"
+              rank === v ? "bg-brand text-onbrand" : "text-tx2 hover:text-tx"
             }`}
           >
             {LABEL[v]}
@@ -46,7 +46,7 @@ export default function HomeSwitcher({
         <select
           value={focusId}
           onChange={(e) => go("manager", e.target.value)}
-          className="bg-[#12334f] border border-white/10 text-[#eef2f7] text-[13px] rounded-lg px-3 py-1.5"
+          className="bg-panel2 border border-line text-tx text-[13px] rounded-lg px-3 py-1.5 shadow-e1"
         >
           {teamOptions.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
         </select>
@@ -55,12 +55,12 @@ export default function HomeSwitcher({
         <select
           value={focusId}
           onChange={(e) => go("member", e.target.value)}
-          className="bg-[#12334f] border border-white/10 text-[#eef2f7] text-[13px] rounded-lg px-3 py-1.5"
+          className="bg-panel2 border border-line text-tx text-[13px] rounded-lg px-3 py-1.5 shadow-e1"
         >
           {memberOptions.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
         </select>
       )}
-      <span className="text-[11px] text-[#6f869c]">預覽視角 · 業績/活動/增員為可編輯模擬資料</span>
+      <span className="text-[11px] text-tx3">預覽視角 · 業績/活動/增員為可編輯模擬資料</span>
     </div>
   );
 }

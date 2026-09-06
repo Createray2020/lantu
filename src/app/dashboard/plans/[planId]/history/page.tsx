@@ -31,11 +31,11 @@ export default async function HistoryPage({ params }: { params: Promise<{ planId
   }));
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
+    <div className="min-h-screen bg-canvas text-tx">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
-        <Link href={`/dashboard/plans/${planId}/edit`} className="text-sm text-[#a9bccf] hover:text-[#eef2f7]">← 返回編輯</Link>
+        <Link href={`/dashboard/plans/${planId}/edit`} className="text-sm text-tx2 hover:text-tx">← 返回編輯</Link>
         <h1 className="font-serif text-2xl my-4">版本紀錄</h1>
-        <p className="text-[#a7bacb] text-sm mb-5">
+        <p className="text-tx2 text-sm mb-5">
           年度版與客戶自己的人生護照是兩條並行的紀錄，這裡依時間合併呈現。
           {isOwner
             ? "你可以回復年度版的任何一版；客戶的人生護照只有客戶本人能回復。"

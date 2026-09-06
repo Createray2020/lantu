@@ -57,7 +57,7 @@ export default function RemoveCoach({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[10px] text-[#6f869c] hover:text-[#e08b7a] underline underline-offset-2"
+        className="text-[10px] text-tx3 hover:text-danger underline underline-offset-2"
       >
         移除帳號…
       </button>
@@ -65,31 +65,31 @@ export default function RemoveCoach({
   }
 
   return (
-    <div className="mt-2 w-[300px] rounded-lg border border-[#b05a4a]/40 bg-[#1a1013]/60 p-3 text-left">
+    <div className="mt-2 w-[300px] rounded-lg border border-danger-solid/40 bg-danger-solid/25/60 p-3 text-left">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs font-bold text-[#e08b7a]">移除「{name}」</span>
+        <span className="text-xs font-bold text-danger">移除「{name}」</span>
         <div className="flex-1" />
         <button type="button" onClick={() => { setOpen(false); setConfirming(false); setError(null); setMsg(null); }}
-          className="text-[10px] text-[#6f869c] hover:text-white">收起</button>
+          className="text-[10px] text-tx3 hover:text-tx">收起</button>
       </div>
 
-      <div className="text-[11px] text-[#a9bccf] mb-2">
-        名下客戶 <b className="text-[#eef2f7]">{clientCount}</b> 位 · 分潤案件 <b className="text-[#eef2f7]">{caseCount}</b> 筆
+      <div className="text-[11px] text-tx2 mb-2">
+        名下客戶 <b className="text-tx">{clientCount}</b> 位 · 分潤案件 <b className="text-tx">{caseCount}</b> 筆
       </div>
 
       {blockedByCases ? (
-        <p className="text-[11px] text-[#e0bd8b] leading-relaxed">
+        <p className="text-[11px] text-brand2 leading-relaxed">
           此教練有 {caseCount} 筆案件分潤紀錄，依稽核不可移除。<br />要停止他的存取請用「停權」。
         </p>
       ) : blockedByClients ? (
         <>
-          <p className="text-[11px] text-[#a9bccf] mb-2 leading-relaxed">
+          <p className="text-[11px] text-tx2 mb-2 leading-relaxed">
             移除前要先把 {clientCount} 位客戶轉給接手教練（客戶與規劃會完整保留）。
           </p>
           <select
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="w-full bg-[#0a1a28] border border-white/12 rounded-md px-2 py-1.5 text-xs text-[#eef2f7] mb-2"
+            className="w-full bg-field border border-line rounded-md px-2 py-1.5 text-xs text-tx mb-2"
           >
             <option value="">選擇接手教練…</option>
             {candidates.map((c) => (
@@ -98,37 +98,37 @@ export default function RemoveCoach({
           </select>
           <button
             type="button" disabled={pending} onClick={doTransfer}
-            className="w-full rounded-md bg-[#c99a5b] text-[#08202a] font-bold px-3 py-1.5 text-xs disabled:opacity-50"
+            className="w-full rounded-md bg-brand text-onbrand font-bold px-3 py-1.5 text-xs disabled:opacity-50"
           >
             {pending ? "轉移中…" : `轉移 ${clientCount} 位客戶`}
           </button>
         </>
       ) : confirming ? (
         <>
-          <p className="text-[11px] text-[#e08b7a] mb-2 leading-relaxed">
+          <p className="text-[11px] text-danger mb-2 leading-relaxed">
             確定要永久移除這個帳號？此動作無法復原。
           </p>
           <div className="flex gap-2">
             <button type="button" disabled={pending} onClick={doRemove}
-              className="flex-1 rounded-md bg-[#b05a4a] text-white font-bold px-3 py-1.5 text-xs disabled:opacity-50">
+              className="flex-1 rounded-md bg-danger-solid text-onsolid font-bold px-3 py-1.5 text-xs disabled:opacity-50">
               {pending ? "移除中…" : "確定移除"}
             </button>
             <button type="button" onClick={() => setConfirming(false)}
-              className="rounded-md border border-white/20 text-[#a9bccf] px-3 py-1.5 text-xs">取消</button>
+              className="rounded-md border border-line2 text-tx2 px-3 py-1.5 text-xs">取消</button>
           </div>
         </>
       ) : (
         <>
-          <p className="text-[11px] text-[#a9bccf] mb-2">沒有客戶也沒有分潤紀錄，可以移除。</p>
+          <p className="text-[11px] text-tx2 mb-2">沒有客戶也沒有分潤紀錄，可以移除。</p>
           <button type="button" onClick={() => setConfirming(true)}
-            className="w-full rounded-md border border-[#b05a4a] text-[#e08b7a] font-bold px-3 py-1.5 text-xs">
+            className="w-full rounded-md border border-danger-solid text-danger font-bold px-3 py-1.5 text-xs">
             移除帳號
           </button>
         </>
       )}
 
-      {msg && <div className="mt-2 text-[10px] text-[#8fb79a]">{msg}</div>}
-      {error && <div className="mt-2 text-[10px] text-[#e08b7a]">失敗：{error}</div>}
+      {msg && <div className="mt-2 text-[10px] text-ok">{msg}</div>}
+      {error && <div className="mt-2 text-[10px] text-danger">失敗：{error}</div>}
     </div>
   );
 }

@@ -129,25 +129,25 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
   }
 
   return (
-    <section className="mt-8 rounded-xl border border-white/10 bg-[#0d2b45]/40 p-5 max-w-4xl">
+    <section className="mt-8 rounded-xl border border-line bg-panel/40 p-5 max-w-4xl shadow-e1">
       <div className="flex items-center gap-3 mb-1">
         <h2 className="text-lg font-bold">品牌 Logo</h2>
-        <span className="text-xs text-[#a9bccf]">全組織共用 · 套用到頂欄、報告書、分頁 icon 與 PWA 安裝圖示</span>
+        <span className="text-xs text-tx2">全組織共用 · 套用到頂欄、報告書、分頁 icon 與 PWA 安裝圖示</span>
       </div>
-      <p className="text-xs text-[#6f869c] mb-4">
+      <p className="text-xs text-tx3 mb-4">
         上傳後即時替換所有人看到的 Logo；未上傳時顯示嵐途預設標記。建議用去背 PNG，寬高比不限（系統自動產出橫式與方形兩種）。
       </p>
 
       <div className="flex flex-wrap items-start gap-6">
         {/* 目前 */}
         <div className="flex flex-col gap-2">
-          <span className="text-xs text-[#a9bccf]">目前</span>
-          <div className="w-40 h-20 rounded-lg border border-white/10 bg-gradient-to-r from-[#081a2b] to-[#0d2b45] flex items-center justify-center overflow-hidden">
+          <span className="text-xs text-tx2">目前</span>
+          <div className="w-40 h-20 rounded-lg border border-line bg-gradient-to-r from-canvas to-panel flex items-center justify-center overflow-hidden">
             {currentLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={currentLogo} alt="目前 Logo" className="max-h-14 max-w-[140px] object-contain" />
             ) : (
-              <span className="text-[#6f869c] text-xs">嵐途預設標記</span>
+              <span className="text-tx3 text-xs">嵐途預設標記</span>
             )}
           </div>
         </div>
@@ -155,22 +155,22 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
         {/* 預覽新的 */}
         {logoUrl && (
           <div className="flex flex-col gap-2">
-            <span className="text-xs text-[#e0bd8b]">預覽（新）</span>
+            <span className="text-xs text-brand2">預覽（新）</span>
             <div className="flex items-center gap-3">
-              <div className="w-40 h-20 rounded-lg border border-[#c99a5b]/40 bg-gradient-to-r from-[#081a2b] to-[#0d2b45] flex items-center justify-center overflow-hidden">
+              <div className="w-40 h-20 rounded-lg border border-brand/40 bg-gradient-to-r from-canvas to-panel flex items-center justify-center overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={logoUrl} alt="新 Logo 預覽" className="max-h-14 max-w-[140px] object-contain" />
               </div>
               {iconUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={iconUrl} alt="icon 預覽" className="w-14 h-14 rounded-lg border border-[#c99a5b]/40" title="分頁 / PWA icon" />
+                <img src={iconUrl} alt="icon 預覽" className="w-14 h-14 rounded-lg border border-brand/40" title="分頁 / PWA icon" />
               )}
             </div>
           </div>
         )}
       </div>
 
-      {err && <p className="mt-3 text-xs text-[#e08a68]">{err}</p>}
+      {err && <p className="mt-3 text-xs text-danger">{err}</p>}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <input
@@ -179,9 +179,9 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
           accept={ACCEPT.join(",")}
           onChange={onPick}
           disabled={busy}
-          className="text-xs text-[#a9bccf] file:mr-3 file:rounded-md file:border-0 file:bg-[#12334f] file:px-3 file:py-1.5 file:text-[#e0bd8b] file:font-bold file:cursor-pointer"
+          className="text-xs text-tx2 file:mr-3 file:rounded-md file:border-0 file:bg-panel2 file:px-3 file:py-1.5 file:text-brand2 file:font-bold file:cursor-pointer shadow-e1"
         />
-        {busy && <span className="text-xs text-[#a9bccf]">處理中…</span>}
+        {busy && <span className="text-xs text-tx2">處理中…</span>}
 
         <button
           type="button"
@@ -192,7 +192,7 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
             fd.set("iconUrl", iconUrl ?? "");
             run(() => saveBrandLogo(fd), "已儲存", reset);
           }}
-          className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold px-4 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          className="rounded-md bg-brand text-onbrand font-bold px-4 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {pending ? "儲存中…" : "儲存並替換"}
         </button>
@@ -202,7 +202,7 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
             type="button"
             onClick={reset}
             disabled={pending}
-            className="rounded-md border border-white/20 text-[#a9bccf] px-3 py-1.5 text-sm disabled:opacity-40"
+            className="rounded-md border border-line2 text-tx2 px-3 py-1.5 text-sm disabled:opacity-40"
           >
             取消
           </button>
@@ -218,14 +218,14 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
                 run(() => removeBrandLogo(), "已移除，已還原成嵐途預設標記");
               }
             }}
-            className="rounded-md border border-[#b05a4a]/60 text-[#e08a68] px-3 py-1.5 text-sm disabled:opacity-40"
+            className="rounded-md border border-danger-solid/60 text-danger px-3 py-1.5 text-sm disabled:opacity-40"
           >
             移除，還原預設
           </button>
         )}
 
         {msg && (
-          <span className={`text-sm ${msg.ok ? "text-[#6f8f74]" : "text-[#e08a7a]"}`}>
+          <span className={`text-sm ${msg.ok ? "text-ok-solid" : "text-danger"}`}>
             {msg.ok ? `${msg.text} ✓` : `儲存失敗：${msg.text}`}
           </span>
         )}

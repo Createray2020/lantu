@@ -265,11 +265,11 @@ export async function getOwnerHome(owner: CoachRow, all: CoachRow[], period: str
   const mAchieve = incomeGoal ? Math.round((income / incomeGoal) * 100) : 0;
   const mActivity = activityGoal ? Math.min(100, Math.round((activity / activityGoal) * 100)) : 0;
   const health = [
-    { label: "業績達成", pct: mAchieve, color: "#c99a5b" },
-    { label: "活動量", pct: mActivity, color: "#8fc0a3" },
-    { label: "增員動能", pct: recruitMomentum, color: "#e08a68" },
-    { label: "客戶留存", pct: retention, color: "#8fc0a3" },
-    { label: "教練留存", pct: advisorRetention, color: "#a9bccf" },
+    { label: "業績達成", pct: mAchieve, color: "var(--brand)" },
+    { label: "活動量", pct: mActivity, color: "var(--ok)" },
+    { label: "增員動能", pct: recruitMomentum, color: "var(--danger)" },
+    { label: "客戶留存", pct: retention, color: "var(--ok)" },
+    { label: "教練留存", pct: advisorRetention, color: "var(--tx2)" },
   ];
   const healthScore = Math.round(health.reduce((a, h) => a + h.pct, 0) / health.length);
 

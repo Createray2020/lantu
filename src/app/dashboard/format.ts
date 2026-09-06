@@ -66,11 +66,11 @@ export function stageDesc(g: string | null | undefined): string {
 
 export function stageColor(g: string | null | undefined): string {
   switch (g) {
-    case "D": return "#8fa6b8";
-    case "C": return "#7fa8a0";
-    case "B": return "#c9a86b";
-    case "A": return "#e0c88b";
-    default: return "#6b7d8f";
+    case "D": return "var(--grade-d)";
+    case "C": return "var(--grade-c)";
+    case "B": return "var(--grade-b)";
+    case "A": return "var(--grade-a)";
+    default: return "var(--tx3)";
   }
 }
 

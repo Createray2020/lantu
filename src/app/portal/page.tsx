@@ -12,6 +12,7 @@ import CoachEntry from "./CoachEntry";
 import { getApplication } from "@/lib/coachApplyStore";
 import { normalizeIntent } from "@/lib/intent";
 import UiScaleToggle from "@/components/UiScaleToggle";
+import ThemeToggle from "@/components/ThemeToggle";
 import { computePassport, wan, ntfmt } from "@/lib/passport";
 import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
@@ -77,7 +78,7 @@ export default async function Portal() {
   // 五個面向的顏色。刻意**不動用** #ef6f6f（缺口）與 #f0c34e（可投資資產本金）這兩個
   // 全站既有的語意色——這裡的五段只是身分類別，沒有好壞。
   // （dataviz 驗證器 --mode dark --surface #12334f：CVD / 常視 / 對比三項 PASS。）
-  const FACE_COLORS = ["#5b93d6", "#5cc08a", "#b07d3d", "#7fb0e6", "#e0bd8b"];
+  const FACE_COLORS = ["var(--c1)", "var(--c2)", "var(--warn-solid)", "var(--info)", "var(--brand2)"];
 
   const rows = r
     ? [
@@ -112,23 +113,24 @@ export default async function Portal() {
   });
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] flex flex-col">
-      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-white/10">
+    <div className="min-h-screen bg-canvas text-tx flex flex-col">
+      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-line">
         <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          <span className="grid place-items-center w-9 h-9 rounded-xl border border-[#c99a5b]">
+          <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
             <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-              <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
             </svg>
           </span>
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
         <div className="flex items-center gap-2">
+          <ThemeToggle compact />
           <UiScaleToggle compact />
           {coachState === "active" && (
             <Link
               href="/dashboard"
-              className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+              className="text-[13px] sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
             >
               教練工作台
             </Link>
@@ -136,7 +138,7 @@ export default async function Portal() {
           {coachState === "pending" && (
             <Link
               href="/dashboard"
-              className="text-[13px] sm:text-sm text-[#e0bd8b] hover:text-white border border-[#c99a5b]/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+              className="text-[13px] sm:text-sm text-brand2 hover:text-tx border border-brand/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
             >
               報聘審核中
             </Link>
@@ -144,25 +146,25 @@ export default async function Portal() {
           {coachState === "none" && (
             <Link
               href="/dashboard/apply"
-              className="text-[13px] sm:text-sm text-[#e0bd8b] hover:text-white border border-[#c99a5b]/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+              className="text-[13px] sm:text-sm text-brand2 hover:text-tx border border-brand/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
             >
               申請成為教練
             </Link>
           )}
           <SignOutButton redirectUrl="/">
-            <button className="text-[13px] sm:text-sm text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-2.5 sm:px-3 py-1.5">登出</button>
+            <button className="text-[13px] sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5">登出</button>
           </SignOutButton>
         </div>
       </header>
 
       <main className="flex-1 px-6 py-12">
         {pendingSurveys > 0 && (
-          <div className="max-w-2xl mx-auto mb-6 rounded-xl border border-[#c99a5b]/40 bg-[#c99a5b]/10 px-5 py-4 flex flex-wrap items-center gap-3">
-            <span className="text-sm text-[#e0bd8b] flex-1">
+          <div className="max-w-2xl mx-auto mb-6 rounded-xl border border-brand/40 bg-brand/10 px-5 py-4 flex flex-wrap items-center gap-3">
+            <span className="text-sm text-brand2 flex-1">
               有 <b>{pendingSurveys}</b> 份服務回饋等你填寫，大約兩分鐘。
             </span>
             <Link href="/portal/survey"
-              className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-4 py-2 rounded-lg text-sm">
+              className="font-bold text-onbrand bg-brand hover:bg-brand2 px-4 py-2 rounded-lg text-sm">
               前往填寫
             </Link>
           </div>
@@ -172,27 +174,27 @@ export default async function Portal() {
         {r ? (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-8">
-              <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-2">MY LIFE PASSPORT</div>
+              <div className="text-brand text-xs tracking-[0.3em] mb-2">MY LIFE PASSPORT</div>
               <h1 className="font-serif text-3xl mb-2">{name}，你的人生護照</h1>
               {setup.code && (
-                <div className="font-mono text-[11px] tracking-[0.2em] text-[#6f869c] mb-2" title="你的客戶編號">
+                <div className="font-mono text-[11px] tracking-[0.2em] text-tx3 mb-2" title="你的客戶編號">
                   客戶編號 {setup.code}
                 </div>
               )}
-              <p className="text-[#a7bacb] text-sm">依你目前的存錢規劃，每月應存合計</p>
-              <div className="font-serif text-4xl text-[#e0bd8b] mt-2">{r.totalMonthlyWan.toFixed(1)} 萬</div>
+              <p className="text-tx2 text-sm">依你目前的存錢規劃，每月應存合計</p>
+              <div className="font-serif text-4xl text-brand2 mt-2">{r.totalMonthlyWan.toFixed(1)} 萬</div>
             </div>
 
-            <div className="rounded-2xl bg-[#12334f] border border-white/8 p-5 mb-6">
-              <div className="text-[12.5px] text-[#a7bacb] mb-2">
+            <div className="rounded-2xl bg-panel2 border border-line p-5 mb-6 shadow-e1">
+              <div className="text-[12.5px] text-tx2 mb-2">
                 這 {r.totalMonthlyWan.toFixed(1)} 萬，五個面向各佔多少
               </div>
-              <div className="flex h-[26px] rounded-md overflow-hidden bg-white/5">
+              <div className="flex h-[26px] rounded-md overflow-hidden bg-tx/5">
                 {segments.map((seg) => (
                   <span
                     key={seg.label}
                     title={`${seg.label} 月存 ${seg.monthly} 萬`}
-                    className="flex items-center justify-center overflow-hidden text-[11px] font-extrabold text-[#08202a] whitespace-nowrap"
+                    className="flex items-center justify-center overflow-hidden text-[11px] font-extrabold text-onbrand whitespace-nowrap"
                     style={{ width: `calc(${seg.pct.toFixed(1)}% - 2px)`, marginRight: 2, background: seg.color }}
                   >
                     <span className="sm:hidden">{seg.innerNarrow}</span>
@@ -203,11 +205,11 @@ export default async function Portal() {
               {/* 圖例是完整的——條上塞不下標籤的那幾段，答案在這裡。 */}
               <div className="grid gap-y-1.5 gap-x-4 mt-3 sm:grid-cols-2">
                 {segments.map((seg) => (
-                  <div key={seg.label} className="flex items-center gap-2 text-[12px] text-[#a7bacb]">
+                  <div key={seg.label} className="flex items-center gap-2 text-[12px] text-tx2">
                     <span className="w-[11px] h-[11px] rounded-[3px] shrink-0" style={{ background: seg.color }} />
-                    <b className="text-[#cdd9e5] font-bold">{seg.label}</b>
+                    <b className="text-tx font-bold">{seg.label}</b>
                     <span>{seg.head}</span>
-                    <span className="ml-auto text-[#6f869c] tabular-nums">月存 {seg.monthly} 萬</span>
+                    <span className="ml-auto text-tx3 tabular-nums">月存 {seg.monthly} 萬</span>
                   </div>
                 ))}
               </div>
@@ -215,42 +217,42 @@ export default async function Portal() {
 
             {/* 四顆同權重的 CTA 等於沒有 CTA——降成一主三次，主行動只留「看完整藍圖」。 */}
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 mb-8">
-              <Link href="/portal/plan" className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg text-sm">
+              <Link href="/portal/plan" className="font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg text-sm">
                 查看我的完整財務藍圖
               </Link>
-              <Link href="/portal/setup" className="text-[12.5px] text-[#a7bacb] hover:text-white underline underline-offset-[3px]">
+              <Link href="/portal/setup" className="text-[12.5px] text-tx2 hover:text-tx underline underline-offset-[3px]">
                 補資料 · 看缺口 · 選教練
               </Link>
-              <Link href="/portal/passport" className="text-[12.5px] text-[#a7bacb] hover:text-white underline underline-offset-[3px]">
+              <Link href="/portal/passport" className="text-[12.5px] text-tx2 hover:text-tx underline underline-offset-[3px]">
                 重新調整人生護照
               </Link>
-              <Link href="/portal/history" className="text-[12.5px] text-[#a7bacb] hover:text-white underline underline-offset-[3px]">
+              <Link href="/portal/history" className="text-[12.5px] text-tx2 hover:text-tx underline underline-offset-[3px]">
                 版本紀錄
               </Link>
             </div>
 
             {/* 必達目標與下一步都是「還可以再看」的內容，收起來讓大數字與那條帶子先講完話。 */}
-            <details className="rounded-xl border border-white/8 bg-[#12334f] overflow-hidden">
-              <summary className="cursor-pointer px-5 py-3 text-[13px] font-bold text-[#e0bd8b] list-none">
+            <details className="rounded-xl border border-line bg-panel2 overflow-hidden shadow-e1">
+              <summary className="cursor-pointer px-5 py-3 text-[13px] font-bold text-brand2 list-none">
                 必達目標優先序與下一步
               </summary>
               <div className="px-5 pb-5">
                 {mustHave.length > 0 ? (
                   <>
-                    <p className="text-[11px] text-[#6f869c] mb-3">錢不夠時，我們會從順位在後的開始調整。可到「補資料」頁重新排。</p>
+                    <p className="text-[11px] text-tx3 mb-3">錢不夠時，我們會從順位在後的開始調整。可到「補資料」頁重新排。</p>
                     <div className="flex flex-wrap gap-2">
                       {mustHave.map((t, i) => (
-                        <span key={t} className="inline-flex items-center gap-2 rounded-lg bg-[#0a2137] border border-white/10 px-3 py-1.5">
-                          <span className="font-serif text-[13px] font-extrabold text-[#e0bd8b]">{i + 1}</span>
-                          <span className="text-[13px] text-[#cdd9e5]">{t}</span>
+                        <span key={t} className="inline-flex items-center gap-2 rounded-lg bg-field border border-line px-3 py-1.5">
+                          <span className="font-serif text-[13px] font-extrabold text-brand2">{i + 1}</span>
+                          <span className="text-[13px] text-tx">{t}</span>
                         </span>
                       ))}
                     </div>
                   </>
                 ) : (
-                  <p className="text-[13px] text-[#6f869c]">尚未設定必達目標。到「補資料」頁就能排。</p>
+                  <p className="text-[13px] text-tx3">尚未設定必達目標。到「補資料」頁就能排。</p>
                 )}
-                <p className="text-[#a7bacb] text-[13px] leading-relaxed mt-4">
+                <p className="text-tx2 text-[13px] leading-relaxed mt-4">
                   下一步：補完現況、選一位教練——填上基本資料與財務現況，看你的缺口與願景達成率；
                   再選一位教練送出連結邀請，對方接受後就能一起把規劃做深。
                 </p>
@@ -259,13 +261,13 @@ export default async function Portal() {
           </div>
         ) : (
           <div className="max-w-lg mx-auto text-center pt-6">
-            <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-3">MY FINANCIAL PLAN</div>
+            <div className="text-brand text-xs tracking-[0.3em] mb-3">MY FINANCIAL PLAN</div>
             <h1 className="font-serif text-3xl mb-4">{name}，歡迎回來</h1>
-            <p className="text-[#a7bacb] leading-relaxed mb-8">
+            <p className="text-tx2 leading-relaxed mb-8">
               你的專屬財務規劃，從「人生護照」開始——用購房、購車、退休、扶養、旅遊
               五個面向，設定你每月能存多少，即時算出你能達成什麼，完成後就成為你的第一份規劃基礎。
             </p>
-            <Link href="/portal/passport" className="inline-block font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-8 py-3 rounded-lg">
+            <Link href="/portal/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-8 py-3 rounded-lg">
               開始我的人生護照
             </Link>
           </div>

@@ -8,10 +8,10 @@ import { recomputeAllAction, saveAdvisorAction, setRankAction } from "./actions"
 import { fmtMoney } from "@/lib/money";
 import MoneyInput from "@/components/MoneyInput";
 
-const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1 text-sm text-[#eef2f7] outline-none";
-const EMPTY = "bg-[#0d2b45] border border-dashed border-[#3d5b78] rounded px-2 py-1 text-sm text-[#8fa6ba] outline-none";
-const BTN = "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
-const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-[#1d5c8a] border border-[#2b7cb5] text-white hover:bg-[#226ba0] disabled:opacity-40";
+const INPUT = "bg-panel border border-line2 rounded px-2 py-1 text-sm text-tx outline-none";
+const EMPTY = "bg-panel border border-dashed border-line2 rounded px-2 py-1 text-sm text-tx2 outline-none";
+const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
+const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-info-solid border border-info-solid text-onsolid hover:brightness-110 disabled:opacity-40";
 
 export type GapView = { label: string; need: number; have: number; met: boolean; unit?: "money" | "count" };
 export type TrackView = { toCode: string; gaps: GapView[]; met: boolean } | null;
@@ -96,14 +96,14 @@ export default function AdvisorsBoard({
           .map(([v, l]) => (
             <button key={v} type="button" onClick={() => setTab(v)}
               className={`rounded-lg px-3 py-1.5 text-sm border ${
-                tab === v ? "bg-[#1d5c8a] border-[#2b7cb5] text-white" : "border-white/10 text-[#a9bccf] hover:bg-[#12334f]"
+                tab === v ? "bg-info-solid border-info-solid text-onsolid" : "border-line text-tx2 hover:bg-panel2"
               }`}>
               {l}
             </button>
           ))}
         <div className="flex-1" />
         {msg && (
-          <span className={`text-sm ${msg.ok ? "text-[#7fb894]" : "text-[#e08b7a]"}`}>
+          <span className={`text-sm ${msg.ok ? "text-ok" : "text-danger"}`}>
             {msg.ok ? `${msg.text} ✓` : `失敗：${msg.text}`}
           </span>
         )}
@@ -116,10 +116,10 @@ export default function AdvisorsBoard({
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-white/10">
+      <div className="overflow-x-auto rounded-xl border border-line">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+            <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-3 py-2">教練</th>
               <th className="px-3 py-2">職級</th>
               <th className="px-3 py-2">推薦人</th>
@@ -137,15 +137,15 @@ export default function AdvisorsBoard({
           <tbody>
             {shown.map((a) => (
               <Fragment key={a.id}>
-                <tr className="border-t border-white/8">
+                <tr className="border-t border-line">
                   <td className="px-3 py-2 font-semibold">{a.name}</td>
                   <td className="px-3 py-2">
-                    <span className="text-[#e0bd8b] font-bold">{a.rankCode ?? "—"}</span>
+                    <span className="text-brand2 font-bold">{a.rankCode ?? "—"}</span>
                   </td>
-                  <td className="px-3 py-2 text-[#a9bccf]">{a.uplineName}</td>
-                  <td className="px-3 py-2 text-[#a9bccf]">
+                  <td className="px-3 py-2 text-tx2">{a.uplineName}</td>
+                  <td className="px-3 py-2 text-tx2">
                     {a.tenureRankCode
-                      ? <span className={a.tenureExpired ? "text-[#e08b7a]" : ""}>
+                      ? <span className={a.tenureExpired ? "text-danger" : ""}>
                           {a.tenureRankCode}{a.tenureExpired ? "・期滿待轉正" : `・至 ${a.tenureUntil ?? "—"}`}
                         </span>
                       : "—"}
@@ -157,31 +157,31 @@ export default function AdvisorsBoard({
                   <td className="px-3 py-2"><TrackCell t={a.trackB} /></td>
                   <td className="px-3 py-2 text-xs">
                     {a.maintExempt ? (
-                      <span className="text-[#a9bccf]">豁免</span>
+                      <span className="text-tx2">豁免</span>
                     ) : (
-                      <span className={a.maintPass ? "text-[#7fb894]" : "text-[#c99a5b]"}>
+                      <span className={a.maintPass ? "text-ok" : "text-brand"}>
                         執案 {a.maintExecPass ? "✓" : `${a.maintExec}`}・訓練 {a.maintHours}h {a.maintTrainPass ? "✓" : ""}
                       </span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {a.canRecruit && a.canReceiveLeads ? (
-                      <span className="text-[#7fb894]">正常</span>
+                      <span className="text-ok">正常</span>
                     ) : (
-                      <span className="text-[#e08b7a]">
+                      <span className="text-danger">
                         {!a.canRecruit && "停招募"}{!a.canRecruit && !a.canReceiveLeads && "・"}{!a.canReceiveLeads && "停派案"}
                       </span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button type="button" className="text-xs text-[#a9bccf] underline"
+                    <button type="button" className="text-xs text-tx2 underline"
                       onClick={() => setOpen(open === a.id ? null : a.id)}>
                       {open === a.id ? "收合" : "個人頁"}
                     </button>
                   </td>
                 </tr>
                 {open === a.id && (
-                  <tr className="bg-[#0a2138]">
+                  <tr className="bg-field">
                     <td colSpan={12} className="px-4 py-4">
                       <AdvisorDetail a={a} rankCodes={rankCodes} pending={pending} run={run} />
                     </td>
@@ -190,7 +190,7 @@ export default function AdvisorsBoard({
               </Fragment>
             ))}
             {shown.length === 0 && (
-              <tr><td colSpan={12} className="px-3 py-8 text-center text-[#6f869c]">沒有符合的教練。</td></tr>
+              <tr><td colSpan={12} className="px-3 py-8 text-center text-tx3">沒有符合的教練。</td></tr>
             )}
           </tbody>
         </table>
@@ -206,11 +206,11 @@ function gapNum(g: GapView, which: "have" | "need" = "have"): string {
 }
 
 function TrackCell({ t }: { t: TrackView }) {
-  if (!t) return <span className="text-xs text-[#6f869c]">n/a</span>;
-  if (t.met) return <span className="text-xs text-[#7fb894]">✓ 達標 → {t.toCode}</span>;
+  if (!t) return <span className="text-xs text-tx3">n/a</span>;
+  if (t.met) return <span className="text-xs text-ok">✓ 達標 → {t.toCode}</span>;
   const worst = t.gaps.filter((g) => !g.met)[0];
   return (
-    <span className="text-xs text-[#a9bccf]">
+    <span className="text-xs text-tx2">
       {worst ? `${worst.label} ${gapNum(worst)}/${gapNum(worst, "need")}` : "未設門檻"}
     </span>
   );
@@ -244,33 +244,33 @@ function AdvisorDetail({
       {/* 雙軌進度 */}
       <div className="grid gap-3 md:grid-cols-2">
         {[["A 軌（個人）", a.trackA], ["B 軌（個人＋團隊）", a.trackB]].map(([title, t]) => (
-          <div key={title as string} className="rounded-lg border border-white/10 bg-[#0d2b45] p-3">
+          <div key={title as string} className="rounded-lg border border-line bg-panel p-3 shadow-e1">
             <div className="text-sm font-bold mb-2">{title as string}</div>
             {!t ? (
-              <p className="text-xs text-[#6f869c]">
+              <p className="text-xs text-tx3">
                 {a.blocked ?? "此職級未開放這一軌（門檻未設定或不適用）"}
               </p>
             ) : (
               <div className="space-y-2">
-                <div className="text-xs text-[#a9bccf]">目標職級 {(t as NonNullable<TrackView>).toCode}</div>
+                <div className="text-xs text-tx2">目標職級 {(t as NonNullable<TrackView>).toCode}</div>
                 {(t as NonNullable<TrackView>).gaps.map((g) => {
                   const pct = g.need > 0 ? Math.min(100, Math.round((g.have / g.need) * 100)) : 100;
                   return (
                     <div key={g.label}>
                       <div className="flex justify-between text-xs">
-                        <span className="text-[#cfdcea]">{g.label}</span>
-                        <span className={g.met ? "text-[#7fb894]" : "text-[#a9bccf]"}>
+                        <span className="text-tx">{g.label}</span>
+                        <span className={g.met ? "text-ok" : "text-tx2"}>
                           {gapNum(g)} / {gapNum(g, "need")}
                         </span>
                       </div>
-                      <div className="h-1.5 rounded bg-[#0a2138] overflow-hidden mt-0.5">
-                        <div className="h-full" style={{ width: `${pct}%`, background: g.met ? "#6f8f74" : "#2b7cb5" }} />
+                      <div className="h-1.5 rounded bg-field overflow-hidden mt-0.5">
+                        <div className="h-full" style={{ width: `${pct}%`, background: g.met ? "var(--ok-solid)" : "var(--info-solid)" }} />
                       </div>
                     </div>
                   );
                 })}
                 {(t as NonNullable<TrackView>).gaps.length === 0 && (
-                  <p className="text-xs text-[#6f869c]">門檻未設定 —— 這一軌目前不啟用。</p>
+                  <p className="text-xs text-tx3">門檻未設定 —— 這一軌目前不啟用。</p>
                 )}
               </div>
             )}
@@ -279,7 +279,7 @@ function AdvisorDetail({
       </div>
 
       {a.tenureRankCode && (
-        <div className="rounded-lg border border-[#e0bd8b]/30 bg-[#e0bd8b]/5 p-3 text-xs text-[#e0bd8b]">
+        <div className="rounded-lg border border-brand2/30 bg-brand2/5 p-3 text-xs text-brand2">
           真除中（核定 {a.tenureRankCode}，期限 {a.tenureUntil ?? "—"}）
           {a.tenureSettledCode && (
             <>：以目前進度期滿將轉正為 <b>{a.tenureSettledCode}</b>。{a.tenureNote}</>
@@ -288,10 +288,10 @@ function AdvisorDetail({
       )}
 
       {/* 可編欄位 */}
-      <div className="rounded-lg border border-white/10 bg-[#0d2b45] p-3">
+      <div className="rounded-lg border border-line bg-panel p-3 shadow-e1">
         <div className="text-sm font-bold mb-2">制度欄位</div>
         <div className="grid gap-2 md:grid-cols-3">
-          <label className="text-xs text-[#a9bccf]">進入方式
+          <label className="text-xs text-tx2">進入方式
             <select value={f.entryType} onChange={(e) => setF({ ...f, entryType: e.target.value })}
               className={`${cls(f.entryType)} w-full mt-0.5`}>
               <option value="">未設定</option>
@@ -300,33 +300,33 @@ function AdvisorDetail({
               <option value="rejoin">回任</option>
             </select>
           </label>
-          <label className="text-xs text-[#a9bccf]">到職日
+          <label className="text-xs text-tx2">到職日
             <input type="date" value={f.hireDate} onChange={(e) => setF({ ...f, hireDate: e.target.value })}
               className={`${cls(f.hireDate)} w-full mt-0.5`} />
           </label>
-          <label className="text-xs text-[#a9bccf]">真除核定職級
+          <label className="text-xs text-tx2">真除核定職級
             <select value={f.tenureRankCode} onChange={(e) => setF({ ...f, tenureRankCode: e.target.value })}
               className={`${cls(f.tenureRankCode)} w-full mt-0.5`}>
               <option value="">非真除</option>
               {rankCodes.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </label>
-          <label className="text-xs text-[#a9bccf]">真除期限
+          <label className="text-xs text-tx2">真除期限
             <input type="date" value={f.tenureUntil} onChange={(e) => setF({ ...f, tenureUntil: e.target.value })}
               className={`${cls(f.tenureUntil)} w-full mt-0.5`} />
           </label>
           <div />
-          <label className="text-xs text-[#a9bccf]">期初案數（同業帶入）
+          <label className="text-xs text-tx2">期初案數（同業帶入）
             <input type="number" value={f.initialCases} onChange={(e) => setF({ ...f, initialCases: e.target.value })}
               className={`${INPUT} w-full mt-0.5`} />
           </label>
-          <label className="text-xs text-[#a9bccf]">期初顧問費
+          <label className="text-xs text-tx2">期初顧問費
             <MoneyInput value={f.initialFees === "" ? null : Number(f.initialFees)} allowEmpty
               onChange={(v) => setF({ ...f, initialFees: v === null ? "" : String(v) })}
               className={`${INPUT} w-full mt-0.5`} />
           </label>
           <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs text-[#a9bccf]">招募資格
+            <label className="text-xs text-tx2">招募資格
               <select value={f.recruitAllowed} onChange={(e) => setF({ ...f, recruitAllowed: e.target.value })}
                 className={`${cls(f.recruitAllowed)} w-full mt-0.5`}>
                 <option value="">自動判定</option>
@@ -334,7 +334,7 @@ function AdvisorDetail({
                 <option value="false">強制停用</option>
               </select>
             </label>
-            <label className="text-xs text-[#a9bccf]">受派資格
+            <label className="text-xs text-tx2">受派資格
               <select value={f.leadAllowed} onChange={(e) => setF({ ...f, leadAllowed: e.target.value })}
                 className={`${cls(f.leadAllowed)} w-full mt-0.5`}>
                 <option value="">自動判定</option>
@@ -360,9 +360,9 @@ function AdvisorDetail({
       </div>
 
       {/* 職級調整 */}
-      <div className="rounded-lg border border-white/10 bg-[#0d2b45] p-3">
+      <div className="rounded-lg border border-line bg-panel p-3 shadow-e1">
         <div className="text-sm font-bold mb-2">職級調整</div>
-        <p className="text-xs text-[#7f9ab2] mb-2">
+        <p className="text-xs text-tx2 mb-2">
           手動調整一律要填原因，並寫進下方異動紀錄——職級直接影響分潤，改過什麼必須查得到。
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -380,18 +380,18 @@ function AdvisorDetail({
       </div>
 
       {/* 異動時間軸 */}
-      <div className="rounded-lg border border-white/10 bg-[#0d2b45] p-3">
+      <div className="rounded-lg border border-line bg-panel p-3 shadow-e1">
         <div className="text-sm font-bold mb-2">異動紀錄</div>
         {a.events.length === 0 ? (
-          <p className="text-xs text-[#6f869c]">尚無異動。</p>
+          <p className="text-xs text-tx3">尚無異動。</p>
         ) : (
-          <ul className="space-y-1 text-xs text-[#a9bccf]">
+          <ul className="space-y-1 text-xs text-tx2">
             {a.events.map((e) => (
               <li key={e.id}>
-                <span className="text-[#6f869c] mr-2">{e.effectiveAt ?? "—"}</span>
-                {e.fromCode ?? "—"} → <b className="text-[#e0bd8b]">{e.toCode ?? "—"}</b>
+                <span className="text-tx3 mr-2">{e.effectiveAt ?? "—"}</span>
+                {e.fromCode ?? "—"} → <b className="text-brand2">{e.toCode ?? "—"}</b>
                 <span className="ml-2">（{REASON[e.reason] ?? e.reason}）</span>
-                {e.note && <span className="ml-1 text-[#7f9ab2]">{e.note}</span>}
+                {e.note && <span className="ml-1 text-tx2">{e.note}</span>}
               </li>
             ))}
           </ul>

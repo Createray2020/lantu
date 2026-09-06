@@ -253,6 +253,13 @@
       "when": 1788432245850,
       "tag": "0035_round_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788664192812,
+      "tag": "0036_watery_exiles",
+      "breakpoints": true
     }
   ]
 }

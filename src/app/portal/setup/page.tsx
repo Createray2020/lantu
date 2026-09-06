@@ -17,7 +17,7 @@ export default async function SetupPage() {
   const link = await getClientLinkStatus(user.id);
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
+    <div className="min-h-screen bg-canvas text-tx">
       <SetupWizard
         monthlyNeedWan={own.result.totalMonthlyWan}
         defaultName={user.name ?? ""}

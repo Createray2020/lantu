@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { ensureCoach, isAdmin, listCoaches, coachWorkloads } from "@/lib/coach";
-import { getBrand } from "@/lib/brand";
 import OrgCell from "./OrgCell";
 import StatusActions from "./StatusActions";
 import RemoveCoach from "./RemoveCoach";
+import AdminHeader from "./AdminHeader";
 import AdminNav from "./AdminNav";
 import LicenseCell from "./LicenseCell";
 import CoachRoster, { type RosterRow } from "./CoachRoster";
@@ -17,9 +15,9 @@ import { clientCapOf, licenseState, RANK_ORDER } from "@/lib/license";
 export const dynamic = "force-dynamic";
 
 const STATUS: Record<string, { label: string; color: string }> = {
-  pending: { label: "待審核", color: "#c99a5b" },
-  active: { label: "已開通", color: "#6f8f74" },
-  suspended: { label: "已停權", color: "#b05a4a" },
+  pending: { label: "待審核", color: "var(--brand)" },
+  active: { label: "已開通", color: "var(--ok-solid)" },
+  suspended: { label: "已停權", color: "var(--danger-solid)" },
 };
 
 function fmtDate(d: Date | null) {
@@ -35,7 +33,6 @@ export default async function Admin() {
 
   const coaches = await listCoaches();
   const pending = coaches.filter((c) => c.status === "pending").length;
-  const brand = await getBrand();
   const peers = coaches.map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
   // 名下客戶／分潤案件數：一次撈完（逐列查就是 N+1）。移除帳號的兩道門檻都看它。
   const workloads = await coachWorkloads();
@@ -52,22 +49,8 @@ export default async function Admin() {
     .map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
 
   return (
-    <main className="flex-1 bg-[#081a2b] text-[#eef2f7] min-h-screen">
-      <header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]">
-        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          {brand.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
-          )}
-          <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
-        </Link>
-        <span className="text-[#a9bccf] text-xs">教練管理後台</span>
-        <div className="flex-1" />
-        <Link href="/dashboard" className="text-[#a9bccf] text-sm hover:text-white">
-          ← 回系統
-        </Link>
-        <UserButton />
-      </header>
+    <main className="flex-1 bg-canvas text-tx min-h-screen">
+      <AdminHeader label="教練管理後台" />
       <AdminNav />
 
       <section className="p-6 max-w-4xl">
@@ -84,7 +67,7 @@ export default async function Admin() {
           colSpan={8}
           head={
             <thead>
-              <tr className="bg-[#12334f] text-[#a9bccf] text-left">
+              <tr className="bg-panel2 text-tx2 text-left">
                 <th className="px-3 py-2 font-semibold">姓名 / Email</th>
                 <th className="px-3 py-2 font-semibold">角色</th>
                 <th className="px-3 py-2 font-semibold">狀態</th>
@@ -97,7 +80,7 @@ export default async function Admin() {
             </thead>
           }
           rows={coaches.map((c): RosterRow => {
-                const s = STATUS[c.status] ?? { label: c.status, color: "#a9bccf" };
+                const s = STATUS[c.status] ?? { label: c.status, color: "var(--tx2)" };
                 const admin = c.role === "admin";
                 const lic = licenseState({ licenseUntil: c.licenseUntil, status: c.status });
                 const app = applications[c.id];
@@ -107,22 +90,22 @@ export default async function Admin() {
                   noLicense: !lic.managed,
                   expiring: lic.managed && !lic.expired && (lic.daysLeft ?? 999) <= 30,
                   node: (
-                  <tr key={c.id} className="border-t border-white/8">
+                  <tr key={c.id} className="border-t border-line">
                     <td className="px-3 py-2">
                       <div className="font-semibold">{c.name || "（未命名）"}</div>
                       {/* 教練可以自己改顯示名稱，所以名冊要同時秀出登入帳號的真名，
                           否則對帳號時分不出「雷立揚」是哪一位。相同就不重複印。 */}
                       {c.clerkName && c.clerkName !== c.name && (
-                        <div className="text-[#6f869c] text-[11px]">登入姓名：{c.clerkName}</div>
+                        <div className="text-tx3 text-[11px]">登入姓名：{c.clerkName}</div>
                       )}
-                      <div className="text-[#6f869c] text-xs">{c.email}</div>
+                      <div className="text-tx3 text-xs">{c.email}</div>
                       {/* 教練編號：核准報聘時發，之後不變。待審帳號還沒有號。 */}
-                      <div className="text-[11px] font-mono tracking-wider text-[#c99a5b]">
+                      <div className="text-[11px] font-mono tracking-wider text-brand">
                         {c.code ?? "—"}
                       </div>
                       {/* 申請表單填的手機／現職（存在 note）與推薦人。核准前就是靠這幾行判斷，
                           印在這裡才不用為了看一行字點進別的頁。 */}
-                      {c.note && <div className="text-[#8fa8bd] text-[11px] mt-1 whitespace-pre-wrap">{c.note}</div>}
+                      {c.note && <div className="text-tx2 text-[11px] mt-1 whitespace-pre-wrap">{c.note}</div>}
                       {/* 2026/08/31 起申請自述住 coach_applications；舊帳號沒有這一列，只印上面那行 note。 */}
                       {app && (
                         <ReviewPanel
@@ -148,7 +131,7 @@ export default async function Admin() {
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <span className={admin ? "text-[#e0bd8b] font-bold" : "text-[#a9bccf]"}>
+                      <span className={admin ? "text-brand2 font-bold" : "text-tx2"}>
                         {admin ? "管理員" : "教練"}
                       </span>
                     </td>
@@ -183,13 +166,13 @@ export default async function Admin() {
                         usedClients={workloads[c.id]?.clients ?? 0}
                       />
                     </td>
-                    <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.createdAt)}</td>
-                    <td className="px-3 py-2 text-[#a9bccf]">{fmtDate(c.approvedAt)}</td>
+                    <td className="px-3 py-2 text-tx2">{fmtDate(c.createdAt)}</td>
+                    <td className="px-3 py-2 text-tx2">{fmtDate(c.approvedAt)}</td>
                     <td className="px-3 py-2">
                       {c.id === me.id ? (
                         // 只擋「對自己動手」，避免把自己鎖在門外。
                         // 舊版是所有 admin 都不給操作 → 一旦某人成為 admin 就再也停不了權。
-                        <span className="text-[#6f869c] text-xs block text-right">本人</span>
+                        <span className="text-tx3 text-xs block text-right">本人</span>
                       ) : (
                         <div className="flex flex-col items-end gap-1">
                           <StatusActions id={c.id} status={c.status} />
@@ -209,11 +192,11 @@ export default async function Admin() {
               })}
         />
 
-        <p className="mt-4 text-xs text-[#6f869c]">
+        <p className="mt-4 text-xs text-tx3">
           運作方式：教練用 Google／Email 註冊後為「待審核」，無法進入系統；你在此按「核准開通」（確認收款後）即可啟用。停權可隨時收回存取，且不動任何資料 —— 離職請用停權。
           「移除帳號」只給誤建的空帳號用：名下還有客戶要先轉移給接手教練，有過分潤案件的一律不可移除。
           <br />
-          使用期限：實習教練固定半年，其餘級別可按月或年開通。到期未延長會變成<b className="text-[#e0bd8b]">唯讀</b>——
+          使用期限：實習教練固定半年，其餘級別可按月或年開通。到期未延長會變成<b className="text-brand2">唯讀</b>——
           仍可登入檢視所有客戶與規劃，但不能新增或修改，延長後立即恢復。沒有設定期限的帳號不受限制。
           客戶數上限依級別（實習與 C1–C3 為 20 位、S1–S2 為 50 位、S3 與首席為 100 位），封存的客戶不計入。
         </p>

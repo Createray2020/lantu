@@ -22,6 +22,18 @@ import type { NoteRow, NoteInput } from "@/lib/notes";
 import type { SessionRow, EndInput } from "@/lib/consultSession";
 import ConsultRecordForm from "../../../ConsultRecordForm";
 import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
+import { THEME_KEY, DEFAULT_THEME, normalizeTheme } from "@/lib/theme";
+
+// 規劃器是獨立文件，拿不到父層的 <html data-theme>，所以 init 時要一起灌進去。
+// 讀本機而不是讀 props：教練可能在別的分頁剛切過主題，本機才是最新的。
+function currentTheme() {
+  try {
+    return normalizeTheme(localStorage.getItem(THEME_KEY) ?? DEFAULT_THEME);
+  } catch {
+    return DEFAULT_THEME; // 無痕模式讀 localStorage 會丟例外
+  }
+}
+
 import { LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 
 // 唯讀有兩種來源，提示文字必須分開：協作教練沒有「期限」問題，
@@ -172,6 +184,7 @@ export default function PlanEditor({
           type: "lantu:init",
           data,
           uiScale: currentScale(),
+          theme: currentTheme(),
           readOnly,
           readOnlyNote: RO_NOTE[readOnlyReason],
           clientCode: clientCode ?? null,
@@ -378,12 +391,12 @@ export default function PlanEditor({
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#081a2b]">
-      <div className="flex items-center gap-3 px-4 py-2 bg-[#0d2b45] border-b border-white/10 text-[#eef2f7]">
+    <div className="fixed inset-0 flex flex-col bg-canvas">
+      <div className="flex items-center gap-3 px-4 py-2 bg-panel border-b border-line text-tx">
         <Link
           href={`/dashboard/clients/${clientId}`}
           onClick={() => router.refresh()}
-          className="text-sm text-[#a9bccf] hover:text-[#eef2f7]"
+          className="text-sm text-tx2 hover:text-tx"
         >
           ← 返回客戶
         </Link>
@@ -393,8 +406,8 @@ export default function PlanEditor({
             className={
               "text-[11px] font-bold px-2 py-0.5 rounded border " +
               (readOnlyReason === "collab"
-                ? "border-[#3b82f6]/60 text-[#8fb8ff] bg-[#3b82f6]/10"
-                : "border-[#e5484d]/60 text-[#ff9d9f] bg-[#e5484d]/10")
+                ? "border-info/60 text-info bg-info/10"
+                : "border-danger-solid/60 text-danger bg-danger-solid/10")
             }
             title={RO_NOTE[readOnlyReason]}
           >
@@ -402,8 +415,8 @@ export default function PlanEditor({
           </span>
         )}
         <div className="flex-1" />
-        <Link href={`/dashboard/plans/${planId}/history`} className="text-xs text-[#a9bccf] hover:text-[#eef2f7] mr-3">版本紀錄</Link>
-        <span className={"text-xs " + (state === "saved" ? "text-[#7bbf6a]" : "text-[#6b7d8f]")}>
+        <Link href={`/dashboard/plans/${planId}/history`} className="text-xs text-tx2 hover:text-tx mr-3">版本紀錄</Link>
+        <span className={"text-xs " + (state === "saved" ? "text-ok" : "text-tx3")}>
           {state === "error" ? "" : statusText[state]}
         </span>
       </div>
@@ -412,17 +425,17 @@ export default function PlanEditor({
       {state === "error" && (
         <div
           role="alert"
-          className="sticky top-0 z-40 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-[#5b1f22] text-[#ffd7d8] border-b border-[#ff9d9f]/40"
+          className="sticky top-0 z-40 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-danger-solid/25 text-danger border-b border-danger/40"
         >
           <span className="text-[13px] font-bold">
             ⚠️ 儲存失敗——重試 4 次都沒成功，這一段修改<b className="underline">還沒進資料庫</b>。請不要關掉這個分頁。
           </span>
-          <span className="text-[12px] text-[#ffb9ba]">檢查一下網路，或按「立即重試」。</span>
+          <span className="text-[12px] text-danger">檢查一下網路，或按「立即重試」。</span>
           <div className="flex-1" />
           <button
             type="button"
             onClick={() => void doSave()}
-            className="text-[13px] font-bold rounded-md px-3 py-1 bg-[#ffd7d8] text-[#5b1f22] hover:bg-white"
+            className="text-[13px] font-bold rounded-md px-3 py-1 bg-danger text-danger-solid/25 hover:bg-white"
           >
             立即重試
           </button>
@@ -432,12 +445,12 @@ export default function PlanEditor({
           關掉也不會掉東西——草稿已經寫進 consult_sessions.draft_summary，
           客戶詳情頁會跳「摘要還沒存」。 */}
       {draft && (
-        <div className="fixed inset-0 z-50 bg-[#040c14]/75 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
+        <div className="fixed inset-0 z-50 bg-scrim/75 flex items-start justify-center overflow-y-auto p-4 sm:p-8">
           <div className="w-full max-w-[680px]">
             <div className="flex items-center gap-2 mb-2">
-              <h2 className="text-sm font-bold text-[#eef2f7]">這一場的諮詢紀錄</h2>
+              <h2 className="text-sm font-bold text-tx">這一場的諮詢紀錄</h2>
               <div className="flex-1" />
-              <button className="text-[#6b7d8f] text-lg leading-none px-2" title="稍後再存" onClick={() => { setDraft(null); setDraftErr(null); }}>✕</button>
+              <button className="text-tx3 text-lg leading-none px-2" title="稍後再存" onClick={() => { setDraft(null); setDraftErr(null); }}>✕</button>
             </div>
             <ConsultRecordForm
               plans={[{ id: planId, year }]}
@@ -495,7 +508,7 @@ export default function PlanEditor({
         className="flex-1 w-full border-0"
         onLoad={() =>
           iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz },
+            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), theme: currentTheme(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz },
             window.location.origin,
           )
         }

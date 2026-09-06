@@ -29,7 +29,7 @@ export default function StatusActions({ id, status }: { id: string; status: stri
             type="button"
             disabled={pending}
             onClick={() => run(approveCoach)}
-            className="rounded-md bg-[#6f8f74] text-[#08202a] font-bold px-3 py-1.5 text-xs disabled:opacity-50"
+            className="rounded-md bg-ok-solid text-onbrand font-bold px-3 py-1.5 text-xs disabled:opacity-50"
           >
             {pending ? "處理中…" : "核准開通"}
           </button>
@@ -39,7 +39,7 @@ export default function StatusActions({ id, status }: { id: string; status: stri
             type="button"
             disabled={pending}
             onClick={() => run(suspendCoach)}
-            className="rounded-md bg-[#b05a4a] text-white font-bold px-3 py-1.5 text-xs disabled:opacity-50"
+            className="rounded-md bg-danger-solid text-onsolid font-bold px-3 py-1.5 text-xs disabled:opacity-50"
           >
             {pending ? "處理中…" : "停權"}
           </button>
@@ -49,13 +49,13 @@ export default function StatusActions({ id, status }: { id: string; status: stri
             type="button"
             disabled={pending}
             onClick={() => run(resetCoach)}
-            className="rounded-md border border-white/20 text-[#a9bccf] px-3 py-1.5 text-xs disabled:opacity-50"
+            className="rounded-md border border-line2 text-tx2 px-3 py-1.5 text-xs disabled:opacity-50"
           >
             重設待審
           </button>
         )}
       </div>
-      {error && <span className="text-[10px] text-[#e08b7a]">失敗：{error}</span>}
+      {error && <span className="text-[10px] text-danger">失敗：{error}</span>}
     </div>
   );
 }

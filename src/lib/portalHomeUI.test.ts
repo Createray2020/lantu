@@ -168,7 +168,7 @@ describe("大數字保留、其餘收合、CTA 一主三次", () => {
   it("四顆同權重 CTA 降成一主三次：一顆填色按鈕 ＋ 三個文字連結", () => {
     const links = $$("a[href^='/portal']").filter((a) => /藍圖|補資料|重新調整|版本紀錄/.test(a.textContent!));
     expect(links.length).toBe(4);
-    const primary = links.filter((a) => /bg-\[#c99a5b\]/.test(a.className));
+    const primary = links.filter((a) => /\bbg-brand\b/.test(a.className));
     expect(primary.length, "主行動只能有一顆").toBe(1);
     expect(primary[0].getAttribute("href")).toBe("/portal/plan");
     expect(links.filter((a) => /underline/.test(a.className)).length).toBe(3);

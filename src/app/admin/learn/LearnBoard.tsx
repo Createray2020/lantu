@@ -25,8 +25,8 @@ export type CourseRow = {
   inProgress: { name: string; done: number }[];
 };
 
-const F = "w-full bg-[#081a2b] border border-white/15 rounded px-2 py-1.5 text-sm";
-const BTN = "rounded-md border border-white/20 text-[#a9bccf] text-xs px-2.5 py-1 hover:text-white";
+const F = "w-full bg-canvas border border-line2 rounded px-2 py-1.5 text-sm";
+const BTN = "rounded-md border border-line2 text-tx2 text-xs px-2.5 py-1 hover:text-tx";
 
 export default function LearnBoard({
   courses,
@@ -55,7 +55,7 @@ export default function LearnBoard({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <input
-          className="bg-[#0c2135] border border-white/15 rounded px-3 py-1.5 text-sm w-64"
+          className="bg-panel border border-line2 rounded px-3 py-1.5 text-sm w-64"
           placeholder="新課程名稱"
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
@@ -70,15 +70,15 @@ export default function LearnBoard({
               return r;
             })
           }
-          className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold text-sm px-3.5 py-1.5 disabled:opacity-40"
+          className="rounded-md bg-brand text-onbrand font-bold text-sm px-3.5 py-1.5 disabled:opacity-40"
         >
           ＋ 新增課程
         </button>
-        {msg && <span className="text-xs text-[#e0bd8b]">{msg}</span>}
+        {msg && <span className="text-xs text-brand2">{msg}</span>}
       </div>
 
       {courses.length === 0 && (
-        <div className="rounded-xl border border-white/10 bg-[#0c2135] px-5 py-10 text-center text-[#6f869c]">
+        <div className="rounded-xl border border-line bg-panel px-5 py-10 text-center text-tx3 shadow-e1">
           還沒有任何課程。先新增一門，再往裡面加單元。
         </div>
       )}
@@ -121,25 +121,25 @@ function CourseCard({
   const [newLesson, setNewLesson] = useState("");
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0c2135] overflow-hidden">
+    <div className="rounded-xl border border-line bg-panel overflow-hidden shadow-e1">
       <div className="px-4 py-3 flex flex-wrap items-center gap-3">
         <button type="button" onClick={onToggle} className="text-left flex-1 min-w-0">
           <span className="font-bold">{course.title}</span>
-          <span className="text-xs text-[#6f869c] ml-2">
+          <span className="text-xs text-tx3 ml-2">
             {course.lessons.length} 單元 · {course.category || "未分類"}
           </span>
         </button>
         <span
           className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
             course.published
-              ? "border-[#6f8f74]/60 text-[#9fd0a6] bg-[#6f8f74]/15"
-              : "border-white/20 text-[#6f869c]"
+              ? "border-ok-solid/60 text-ok bg-ok-solid/15"
+              : "border-line2 text-tx3"
           }`}
         >
           {course.published ? "已上架" : "未上架"}
         </span>
-        <span className="text-xs text-[#a9bccf]">
-          完課 <b className="text-[#e0bd8b]">{course.completedBy.length}</b> 人
+        <span className="text-xs text-tx2">
+          完課 <b className="text-brand2">{course.completedBy.length}</b> 人
         </span>
         <button type="button" onClick={onToggle} className={BTN}>
           {open ? "收合" : "編輯"}
@@ -147,26 +147,26 @@ function CourseCard({
       </div>
 
       {open && (
-        <div className="px-4 pb-4 space-y-4 border-t border-white/10 pt-4">
+        <div className="px-4 pb-4 space-y-4 border-t border-line pt-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">課程名稱</span>
+              <span className="text-xs text-tx2">課程名稱</span>
               <input className={F} value={p.title} onChange={(e) => setP({ ...p, title: e.target.value })} />
             </label>
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">分類（新人必修／保障／企業主…）</span>
+              <span className="text-xs text-tx2">分類（新人必修／保障／企業主…）</span>
               <input className={F} value={p.category} onChange={(e) => setP({ ...p, category: e.target.value })} />
             </label>
             <label className="block sm:col-span-2">
-              <span className="text-xs text-[#a9bccf]">簡介</span>
+              <span className="text-xs text-tx2">簡介</span>
               <textarea className={F} rows={2} value={p.summary ?? ""} onChange={(e) => setP({ ...p, summary: e.target.value })} />
             </label>
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">封面圖網址（選填）</span>
+              <span className="text-xs text-tx2">封面圖網址（選填）</span>
               <input className={F} value={p.coverUrl ?? ""} onChange={(e) => setP({ ...p, coverUrl: e.target.value })} />
             </label>
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">最低可見級別（留空＝全部教練）</span>
+              <span className="text-xs text-tx2">最低可見級別（留空＝全部教練）</span>
               <select
                 className={F}
                 value={p.minRankSeq ?? ""}
@@ -179,7 +179,7 @@ function CourseCard({
               </select>
             </label>
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">完課認列訓練時數（留空＝不認列）</span>
+              <span className="text-xs text-tx2">完課認列訓練時數（留空＝不認列）</span>
               <input
                 type="number" step="0.5" min="0" className={F}
                 value={p.trainingHours ?? ""}
@@ -187,7 +187,7 @@ function CourseCard({
               />
             </label>
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">排序（小的在前）</span>
+              <span className="text-xs text-tx2">排序（小的在前）</span>
               <input
                 type="number" className={F}
                 value={p.sortOrder}
@@ -210,7 +210,7 @@ function CourseCard({
               type="button"
               disabled={busy}
               onClick={() => run(() => saveCourseAction(course.id, p))}
-              className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold text-sm px-3.5 py-1.5 disabled:opacity-40"
+              className="rounded-md bg-brand text-onbrand font-bold text-sm px-3.5 py-1.5 disabled:opacity-40"
             >
               儲存課程
             </button>
@@ -226,15 +226,15 @@ function CourseCard({
                   run(() => deleteCourseAction(course.id));
                 }
               }}
-              className="rounded-md border border-[#e5484d]/50 text-[#ff9d9f] text-sm px-3 py-1.5 disabled:opacity-40"
+              className="rounded-md border border-danger-solid/50 text-danger text-sm px-3 py-1.5 disabled:opacity-40"
             >
               刪除課程
             </button>
           </div>
 
           {/* ── 單元 ── */}
-          <div className="border-t border-white/10 pt-4">
-            <h3 className="text-xs tracking-[0.2em] text-[#6b7d8f] mb-2">單元</h3>
+          <div className="border-t border-line pt-4">
+            <h3 className="text-xs tracking-[0.2em] text-tx3 mb-2">單元</h3>
             <div className="space-y-2">
               {course.lessons.map((l, i) => (
                 <LessonEditor
@@ -248,12 +248,12 @@ function CourseCard({
                 />
               ))}
               {course.lessons.length === 0 && (
-                <p className="text-sm text-[#6f869c]">還沒有單元。</p>
+                <p className="text-sm text-tx3">還沒有單元。</p>
               )}
             </div>
             <div className="flex gap-2 mt-3">
               <input
-                className="bg-[#081a2b] border border-white/15 rounded px-3 py-1.5 text-sm flex-1"
+                className="bg-canvas border border-line2 rounded px-3 py-1.5 text-sm flex-1"
                 placeholder="新單元名稱"
                 value={newLesson}
                 onChange={(e) => setNewLesson(e.target.value)}
@@ -276,13 +276,13 @@ function CourseCard({
           </div>
 
           {/* ── 完課名單 ── */}
-          <div className="border-t border-white/10 pt-4 text-xs">
-            <h3 className="tracking-[0.2em] text-[#6b7d8f] mb-2">完課紀錄</h3>
-            <p className="text-[#a9bccf]">
-              已完成：{course.completedBy.length ? course.completedBy.join("、") : <span className="text-[#6f869c]">尚無</span>}
+          <div className="border-t border-line pt-4 text-xs">
+            <h3 className="tracking-[0.2em] text-tx3 mb-2">完課紀錄</h3>
+            <p className="text-tx2">
+              已完成：{course.completedBy.length ? course.completedBy.join("、") : <span className="text-tx3">尚無</span>}
             </p>
             {course.inProgress.length > 0 && (
-              <p className="text-[#6f869c] mt-1">
+              <p className="text-tx3 mt-1">
                 進行中：{course.inProgress.map((x) => `${x.name}（${x.done}/${course.lessons.length}）`).join("、")}
               </p>
             )}
@@ -315,28 +315,28 @@ function LessonEditor({
   const kind = LESSON_KINDS.find((k) => k.value === p.kind);
 
   return (
-    <div className="rounded-lg border border-white/10 bg-[#081a2b]">
+    <div className="rounded-lg border border-line bg-canvas">
       <div className="px-3 py-2 flex items-center gap-2">
-        <span className="text-[#6f869c] text-xs w-5">{lesson.seq}</span>
+        <span className="text-tx3 text-xs w-5">{lesson.seq}</span>
         <button type="button" onClick={() => setOpen(!open)} className="flex-1 text-left text-sm">
           {lesson.title}
-          <span className="text-[#6f869c] text-xs ml-2">
+          <span className="text-tx3 text-xs ml-2">
             {LESSON_KINDS.find((k) => k.value === lesson.kind)?.label ?? lesson.kind}
           </span>
         </button>
-        <button type="button" disabled={busy || first} onClick={() => run(() => moveLessonAction(courseId, lesson.id, -1))} className="px-1 text-[#a9bccf] disabled:opacity-30">↑</button>
-        <button type="button" disabled={busy || last} onClick={() => run(() => moveLessonAction(courseId, lesson.id, 1))} className="px-1 text-[#a9bccf] disabled:opacity-30">↓</button>
+        <button type="button" disabled={busy || first} onClick={() => run(() => moveLessonAction(courseId, lesson.id, -1))} className="px-1 text-tx2 disabled:opacity-30">↑</button>
+        <button type="button" disabled={busy || last} onClick={() => run(() => moveLessonAction(courseId, lesson.id, 1))} className="px-1 text-tx2 disabled:opacity-30">↓</button>
         <button type="button" onClick={() => setOpen(!open)} className={BTN}>{open ? "收合" : "編輯"}</button>
       </div>
       {open && (
-        <div className="px-3 pb-3 space-y-2 border-t border-white/10 pt-3">
+        <div className="px-3 pb-3 space-y-2 border-t border-line pt-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">單元名稱</span>
+              <span className="text-xs text-tx2">單元名稱</span>
               <input className={F} value={p.title} onChange={(e) => setP({ ...p, title: e.target.value })} />
             </label>
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">型態</span>
+              <span className="text-xs text-tx2">型態</span>
               <select className={F} value={p.kind} onChange={(e) => setP({ ...p, kind: e.target.value })}>
                 {LESSON_KINDS.map((k) => (
                   <option key={k.value} value={k.value}>{k.label}</option>
@@ -344,22 +344,22 @@ function LessonEditor({
               </select>
             </label>
           </div>
-          {kind && <p className="text-[11px] text-[#6f869c]">{kind.hint}</p>}
+          {kind && <p className="text-[11px] text-tx3">{kind.hint}</p>}
           {p.kind !== "text" && (
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">連結網址</span>
+              <span className="text-xs text-tx2">連結網址</span>
               <input className={F} value={p.url ?? ""} placeholder="https://…" onChange={(e) => setP({ ...p, url: e.target.value })} />
             </label>
           )}
           {(p.kind === "text" || p.body) && (
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">講義內容</span>
+              <span className="text-xs text-tx2">講義內容</span>
               <textarea className={F} rows={5} value={p.body ?? ""} onChange={(e) => setP({ ...p, body: e.target.value })} />
             </label>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">時長（分鐘，選填）</span>
+              <span className="text-xs text-tx2">時長（分鐘，選填）</span>
               <input
                 type="number" min="0" className={F}
                 value={p.durationMin ?? ""}
@@ -367,7 +367,7 @@ function LessonEditor({
               />
             </label>
             <label className="block">
-              <span className="text-xs text-[#a9bccf]">備註（選填）</span>
+              <span className="text-xs text-tx2">備註（選填）</span>
               <input className={F} value={p.note ?? ""} onChange={(e) => setP({ ...p, note: e.target.value })} />
             </label>
           </div>
@@ -376,7 +376,7 @@ function LessonEditor({
               type="button"
               disabled={busy}
               onClick={() => run(() => saveLessonAction(lesson.id, p))}
-              className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold text-xs px-3 py-1.5 disabled:opacity-40"
+              className="rounded-md bg-brand text-onbrand font-bold text-xs px-3 py-1.5 disabled:opacity-40"
             >
               儲存單元
             </button>
@@ -388,7 +388,7 @@ function LessonEditor({
                   run(() => deleteLessonAction(lesson.id));
                 }
               }}
-              className="rounded-md border border-[#e5484d]/50 text-[#ff9d9f] text-xs px-3 py-1.5 disabled:opacity-40"
+              className="rounded-md border border-danger-solid/50 text-danger text-xs px-3 py-1.5 disabled:opacity-40"
             >
               刪除
             </button>

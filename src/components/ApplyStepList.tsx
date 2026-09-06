@@ -11,13 +11,13 @@ export default function ApplyStepList({ steps }: { steps: ApplyStep[] }) {
           <span
             className="mt-[2px] w-4 h-4 rounded-full grid place-items-center text-[9px] font-bold shrink-0"
             style={{
-              background: s.bad ? "#e0a25b22" : s.done ? "#7fd1a822" : "#ffffff10",
-              color: s.bad ? "#e0a25b" : s.done ? "#7fd1a8" : "#6f869c",
+              background: s.bad ? "color-mix(in srgb, var(--warn) 13%, transparent)" : s.done ? "color-mix(in srgb, var(--ok) 13%, transparent)" : "color-mix(in srgb, var(--tx) 6%, transparent)",
+              color: s.bad ? "var(--warn)" : s.done ? "var(--ok)" : "var(--tx3)",
             }}
           >
             {s.bad ? "!" : s.done ? "✓" : i + 1}
           </span>
-          <span className={s.done ? "text-[#a9bccf]" : s.bad ? "text-[#e0a25b]" : "text-[#6f869c]"}>
+          <span className={s.done ? "text-tx2" : s.bad ? "text-warn" : "text-tx3"}>
             {s.label}
           </span>
         </li>

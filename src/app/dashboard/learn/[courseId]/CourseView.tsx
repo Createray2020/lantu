@@ -58,7 +58,7 @@ export default function CourseView({
 
   if (!lessons.length) {
     return (
-      <div className="rounded-xl border border-white/10 bg-[#0c2135] px-5 py-10 text-center text-[#6f869c]">
+      <div className="rounded-xl border border-line bg-panel px-5 py-10 text-center text-tx3 shadow-e1">
         這門課還沒有加入任何單元。
       </div>
     );
@@ -66,9 +66,9 @@ export default function CourseView({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[280px_1fr] items-start">
-      <aside className="rounded-xl border border-white/10 bg-[#0c2135] overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-white/10 text-xs text-[#a9bccf]">
-          單元 <b className="text-[#e0bd8b]">{doneCount}</b> / {lessons.length} 已完成
+      <aside className="rounded-xl border border-line bg-panel overflow-hidden shadow-e1">
+        <div className="px-4 py-2.5 border-b border-line text-xs text-tx2">
+          單元 <b className="text-brand2">{doneCount}</b> / {lessons.length} 已完成
         </div>
         <ol>
           {lessons.map((l, i) => (
@@ -76,22 +76,23 @@ export default function CourseView({
               <button
                 type="button"
                 onClick={() => setCur(i)}
-                className={`w-full text-left px-4 py-2.5 flex items-start gap-2 border-b border-white/5 transition ${
-                  i === cur ? "bg-[#12334f]" : "hover:bg-white/5"
+                className={`w-full text-left px-4 py-2.5 flex items-start gap-2 border-b border-line transition ${
+                  i === cur ? "bg-panel2" : "hover:bg-tx/5"
                 }`}
               >
                 <span
                   className={`mt-0.5 w-4 h-4 shrink-0 rounded-full border grid place-items-center text-[9px] ${
                     l.done
-                      ? "bg-[#6f8f74] border-[#6f8f74] text-[#08202a]"
-                      : "border-white/25 text-transparent"
+                      ? "bg-ok-solid border-ok-solid text-onsolid"
+                      // 未完成留空心圓，不要把勾設成透明——色弱使用者分不出兩種狀態。
+                      : "border-line2 text-transparent"
                   }`}
                 >
                   ✓
                 </span>
                 <span className="min-w-0">
                   <span className="block text-sm">{l.title}</span>
-                  <span className="block text-[11px] text-[#6f869c]">
+                  <span className="block text-[11px] text-tx3">
                     {KIND_LABEL[l.kind] ?? l.kind}
                     {l.durationMin ? ` · ${l.durationMin} 分鐘` : ""}
                   </span>
@@ -102,8 +103,8 @@ export default function CourseView({
         </ol>
       </aside>
 
-      <section className="rounded-xl border border-white/10 bg-[#0c2135] overflow-hidden">
-        <div className="px-5 py-3 border-b border-white/10 flex flex-wrap items-center gap-3">
+      <section className="rounded-xl border border-line bg-panel overflow-hidden shadow-e1">
+        <div className="px-5 py-3 border-b border-line flex flex-wrap items-center gap-3">
           <h2 className="font-bold flex-1 min-w-0">{lesson.title}</h2>
           <button
             type="button"
@@ -111,8 +112,8 @@ export default function CourseView({
             disabled={busy}
             className={`text-sm font-bold rounded-md px-3 py-1.5 disabled:opacity-50 ${
               lesson.done
-                ? "border border-[#6f8f74]/60 text-[#9fd0a6] bg-[#6f8f74]/15"
-                : "bg-[#c99a5b] text-[#08202a]"
+                ? "border border-ok-solid/60 text-ok bg-ok-solid/15"
+                : "bg-brand text-onbrand"
             }`}
           >
             {lesson.done ? "已完成 · 取消標記" : "標記完成"}
@@ -120,10 +121,10 @@ export default function CourseView({
         </div>
 
         <div className="p-5 space-y-4">
-          {err && <p className="text-sm text-[#ff9d9f]">{err}</p>}
+          {err && <p className="text-sm text-danger">{err}</p>}
 
           {lesson.embed && (
-            <div className="relative w-full rounded-lg overflow-hidden bg-black" style={{ aspectRatio: "16 / 9" }}>
+            <div className="relative w-full rounded-lg overflow-hidden bg-scrim" style={{ aspectRatio: "16 / 9" }}>
               <iframe
                 src={lesson.embed}
                 title={lesson.title}
@@ -140,22 +141,22 @@ export default function CourseView({
               href={lesson.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-block rounded-md border border-[#c99a5b]/50 text-[#e0bd8b] font-bold text-sm px-4 py-2 hover:bg-[#c99a5b]/10"
+              className="inline-block rounded-md border border-brand/50 text-brand2 font-bold text-sm px-4 py-2 hover:bg-brand/10"
             >
               用新分頁開啟{KIND_LABEL[lesson.kind] ?? "內容"} ↗
             </a>
           )}
 
           {lesson.body && (
-            <div className="text-sm text-[#cfdae5] leading-relaxed whitespace-pre-wrap">{lesson.body}</div>
+            <div className="text-sm text-tx leading-relaxed whitespace-pre-wrap">{lesson.body}</div>
           )}
 
           {lesson.note && (
-            <p className="text-xs text-[#6f869c] border-t border-white/10 pt-3">{lesson.note}</p>
+            <p className="text-xs text-tx3 border-t border-line pt-3">{lesson.note}</p>
           )}
 
           {!lesson.embed && !lesson.url && !lesson.body && (
-            <p className="text-sm text-[#6f869c]">這個單元還沒有內容。</p>
+            <p className="text-sm text-tx3">這個單元還沒有內容。</p>
           )}
         </div>
       </section>

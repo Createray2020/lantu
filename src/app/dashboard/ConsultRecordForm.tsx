@@ -17,9 +17,9 @@
 import { useState } from "react";
 import { REVIEW_TYPES, REVIEW_TYPE_LABEL, REVIEW_TYPE_DESC } from "./format";
 
-const field = "w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7]";
+const field = "w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx";
 const btn = "px-3 py-1.5 text-sm font-bold rounded-md";
-const lab = "text-[11px] text-[#a9bccf]";
+const lab = "text-[11px] text-tx2";
 
 export type ConsultRecordValue = {
   date: string;
@@ -65,14 +65,14 @@ export default function ConsultRecordForm({
   const [nextAppt, setNextAppt] = useState(initial?.nextAppt ?? "");
 
   return (
-    <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
+    <div className="bg-panel border border-line rounded-xl p-3 grid gap-2.5 shadow-e1">
       {error && (
-        <div role="alert" className="text-[12.5px] font-bold text-[#ffd7d8] bg-[#5b1f22] border border-[#ff9d9f]/45 rounded-lg px-3 py-2">
+        <div role="alert" className="text-[12.5px] font-bold text-danger bg-danger-solid/25 border border-danger/45 rounded-lg px-3 py-2">
           ⚠️ {error}
         </div>
       )}
       {notice && (
-        <div className="text-[12px] text-[#e0bd8b] bg-[#c99a5b]/10 border border-[#c99a5b]/40 rounded-lg px-3 py-2">
+        <div className="text-[12px] text-brand2 bg-brand/10 border border-brand/40 rounded-lg px-3 py-2">
           {notice}
         </div>
       )}
@@ -81,14 +81,14 @@ export default function ConsultRecordForm({
         <div>
           <label className={lab}>日期</label>
           <input type="date" className={field} value={date} onChange={(e) => setDate(e.target.value)} />
-          <p className="text-[10.5px] text-[#6b7d8f] mt-0.5">補記過去的諮詢就把日期改成當天，時間軸會排到正確的位置。</p>
+          <p className="text-[10.5px] text-tx3 mt-0.5">補記過去的諮詢就把日期改成當天，時間軸會排到正確的位置。</p>
         </div>
         <div>
           <label className={lab}>類型</label>
           <select className={field} value={type} onChange={(e) => setType(e.target.value)}>
             {REVIEW_TYPES.map((t) => <option key={t} value={t}>{REVIEW_TYPE_LABEL[t]}</option>)}
           </select>
-          <p className="text-[10.5px] text-[#6b7d8f] mt-0.5">{REVIEW_TYPE_DESC[type] ?? ""}</p>
+          <p className="text-[10.5px] text-tx3 mt-0.5">{REVIEW_TYPE_DESC[type] ?? ""}</p>
         </div>
       </div>
 
@@ -122,17 +122,17 @@ export default function ConsultRecordForm({
       </div>
 
       {todos.length > 0 && (
-        <div className="text-[12px] text-[#a9bccf] bg-[#0d2b45] border border-white/10 rounded-lg px-3 py-2">
-          <b className="text-[#e0bd8b]">存檔後會有 {todos.length} 筆待辦進追蹤：</b>
+        <div className="text-[12px] text-tx2 bg-panel border border-line rounded-lg px-3 py-2 shadow-e1">
+          <b className="text-brand2">存檔後會有 {todos.length} 筆待辦進追蹤：</b>
           <ul className="mt-1 grid gap-0.5">
-            {todos.map((t, i) => <li key={i} className="text-[#6b7d8f]">· {t}</li>)}
+            {todos.map((t, i) => <li key={i} className="text-tx3">· {t}</li>)}
           </ul>
         </div>
       )}
 
       <div className="flex flex-wrap gap-2 items-center">
         <button
-          className={btn + " bg-[#c99a5b] text-[#08202a] disabled:opacity-60"}
+          className={btn + " bg-brand text-onbrand disabled:opacity-60"}
           disabled={pending || !date}
           onClick={() =>
             onSubmit({
@@ -148,13 +148,13 @@ export default function ConsultRecordForm({
           {submitLabel}
         </button>
         {onCancel && (
-          <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10"} onClick={onCancel} disabled={pending}>
+          <button className={btn + " bg-panel text-tx2 border border-line"} onClick={onCancel} disabled={pending}>
             取消
           </button>
         )}
         {onDiscard && (
           <button
-            className="text-[12px] text-[#6b7d8f] hover:text-[#e08a68] ml-auto"
+            className="text-[12px] text-tx3 hover:text-danger ml-auto"
             onClick={() => { if (confirm("這一場就不留紀錄了？\n\n草稿會丟掉，但諮詢場次與還原點都會保留。")) onDiscard(); }}
             disabled={pending}
           >

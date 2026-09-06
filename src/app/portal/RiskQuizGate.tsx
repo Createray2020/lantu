@@ -16,19 +16,19 @@ export default function RiskQuizGate({ invited }: { invited: boolean }) {
   return (
     <>
       {!open && !dismissed && (
-        <div className="mx-auto mb-6 flex max-w-2xl flex-wrap items-center gap-3 rounded-xl border border-[#c99a5b]/40 bg-[#c99a5b]/10 px-5 py-4">
-          <span className="flex-1 text-sm text-[#e0bd8b]">
+        <div className="mx-auto mb-6 flex max-w-2xl flex-wrap items-center gap-3 rounded-xl border border-brand/40 bg-brand/10 px-5 py-4">
+          <span className="flex-1 text-sm text-brand2">
             你的教練邀請你完成<b>投資風險屬性測驗</b>，12 題約 5 分鐘。
           </span>
           <button
             onClick={() => setOpen(true)}
-            className="rounded-lg bg-[#c99a5b] px-4 py-2 text-sm font-bold text-[#08202a] hover:bg-[#e0bd8b]"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-onbrand hover:bg-brand2"
           >
             開始填寫
           </button>
           <button
             onClick={() => setDismissed(true)}
-            className="text-[12.5px] text-[#a7bacb] underline underline-offset-[3px] hover:text-white"
+            className="text-[12.5px] text-tx2 underline underline-offset-[3px] hover:text-tx"
           >
             先不要
           </button>

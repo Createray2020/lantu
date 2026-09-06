@@ -68,45 +68,45 @@ export default function ClientViewBoard({ hidden }: { hidden: string[] }) {
         return (
           <section key={g} className="mb-5">
             <div className="flex flex-wrap items-center gap-3 mb-2">
-              <h2 className="text-[15px] font-bold text-[#e0bd8b]">{g}</h2>
-              <span className="text-[12px] text-[#8aa0b3]">
+              <h2 className="text-[15px] font-bold text-brand2">{g}</h2>
+              <span className="text-[12px] text-tx2">
                 {onN} / {mods.length} 塊顯示
               </span>
               <span className="flex-1" />
               <button
                 onClick={() => setGroup(g, true)}
-                className="text-[12px] text-[#a9bccf] border border-white/15 rounded-md px-2.5 py-1 hover:text-white"
+                className="text-[12px] text-tx2 border border-line2 rounded-md px-2.5 py-1 hover:text-tx"
               >
                 本群全開
               </button>
               <button
                 onClick={() => setGroup(g, false)}
-                className="text-[12px] text-[#a9bccf] border border-white/15 rounded-md px-2.5 py-1 hover:text-white"
+                className="text-[12px] text-tx2 border border-line2 rounded-md px-2.5 py-1 hover:text-tx"
               >
                 本群全關
               </button>
             </div>
-            <p className="text-[12px] text-[#8aa0b3] mb-2 leading-relaxed">{GROUP_NOTE[g]}</p>
-            <div className="rounded-xl border border-white/10 bg-[#0d2b45] overflow-hidden">
+            <p className="text-[12px] text-tx2 mb-2 leading-relaxed">{GROUP_NOTE[g]}</p>
+            <div className="rounded-xl border border-line bg-panel overflow-hidden shadow-e1">
               {mods.map((m) => (
                 <label
                   key={m.k}
-                  className="flex items-start gap-3 px-4 py-2.5 border-b border-white/8 last:border-b-0 cursor-pointer"
+                  className="flex items-start gap-3 px-4 py-2.5 border-b border-line last:border-b-0 cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={!off[m.k]}
                     onChange={() => toggle(m.k)}
-                    className="mt-[3px] w-[17px] h-[17px] accent-[#c99a5b] shrink-0"
+                    className="mt-[3px] w-[17px] h-[17px] accent-brand shrink-0"
                   />
                   <span className="flex-1 min-w-0">
-                    <span className={`text-[13.5px] font-bold ${off[m.k] ? "text-[#6b7d8f]" : "text-[#eef2f7]"}`}>
+                    <span className={`text-[13.5px] font-bold ${off[m.k] ? "text-tx3" : "text-tx"}`}>
                       {m.t}
                     </span>
-                    {m.cond && <span className="ml-2 text-[11px] text-[#c99a5b] align-middle">{m.cond}</span>}
-                    <span className="block text-[11.5px] text-[#8aa0b3] mt-0.5 leading-relaxed">{m.d}</span>
+                    {m.cond && <span className="ml-2 text-[11px] text-brand align-middle">{m.cond}</span>}
+                    <span className="block text-[11.5px] text-tx2 mt-0.5 leading-relaxed">{m.d}</span>
                   </span>
-                  <span className={`text-[11.5px] shrink-0 mt-[3px] ${off[m.k] ? "text-[#6b7d8f]" : "text-[#8ba888]"}`}>
+                  <span className={`text-[11.5px] shrink-0 mt-[3px] ${off[m.k] ? "text-tx3" : "text-ok"}`}>
                     {off[m.k] ? "不顯示" : "顯示"}
                   </span>
                 </label>
@@ -116,25 +116,25 @@ export default function ClientViewBoard({ hidden }: { hidden: string[] }) {
         );
       })}
 
-      <div className="flex flex-wrap items-center gap-3 sticky bottom-0 bg-[#081a2b] py-3 border-t border-white/10">
+      <div className="flex flex-wrap items-center gap-3 sticky bottom-0 bg-canvas py-3 border-t border-line">
         <button
           onClick={save}
           disabled={pending}
-          className="rounded-lg bg-[#c99a5b] px-5 py-2 text-sm font-bold text-[#08202a] disabled:opacity-50 hover:bg-[#e0bd8b]"
+          className="rounded-lg bg-brand px-5 py-2 text-sm font-bold text-onbrand disabled:opacity-50 hover:bg-brand2"
         >
           {pending ? "儲存中…" : "儲存"}
         </button>
         <button
           onClick={reset}
           disabled={pending}
-          className="rounded-lg border border-white/20 px-4 py-2 text-[13px] text-[#a9bccf] disabled:opacity-50 hover:text-white"
+          className="rounded-lg border border-line2 px-4 py-2 text-[13px] text-tx2 disabled:opacity-50 hover:text-tx"
         >
           回到系統內建（全部顯示）
         </button>
-        <span className="text-[12.5px] text-[#8aa0b3]">
+        <span className="text-[12.5px] text-tx2">
           目前 {onCount} / {CLIENT_DASH_MODULES.length} 塊會顯示給客戶
         </span>
-        {msg && <span className="text-[12.5px] text-[#e0bd8b]">{msg}</span>}
+        {msg && <span className="text-[12.5px] text-brand2">{msg}</span>}
       </div>
     </div>
   );

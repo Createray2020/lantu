@@ -28,18 +28,18 @@ export default async function CoachPage({ params }: { params: Promise<{ id: stri
   if (user) link = await getClientLinkStatus(user.id);
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] flex flex-col">
-      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-white/10">
+    <div className="min-h-screen bg-canvas text-tx flex flex-col">
+      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-line">
         <Link href="/home" className="flex items-center gap-3">
-          <span className="grid place-items-center w-9 h-9 rounded-xl border border-[#c99a5b]">
+          <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
             <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-              <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
             </svg>
           </span>
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
-        <Link href="/coaches" className="text-sm text-[#a7bacb] hover:text-white">← 所有教練</Link>
+        <Link href="/coaches" className="text-sm text-tx2 hover:text-tx">← 所有教練</Link>
       </header>
 
       <main className="flex-1 px-5 sm:px-8 py-10 max-w-2xl w-full mx-auto">
@@ -47,7 +47,7 @@ export default async function CoachPage({ params }: { params: Promise<{ id: stri
         <CoachList coaches={[coach]} link={link} />
       </main>
 
-      <footer className="border-t border-white/10 px-5 sm:px-8 py-6 text-center text-xs text-[#6f869c]">
+      <footer className="border-t border-line px-5 sm:px-8 py-6 text-center text-xs text-tx3">
         嵐途 LAN TU · 理解自己 · 做出選擇 · 走向未來
       </footer>
     </div>

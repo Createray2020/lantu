@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] grid place-items-center px-6">
+    <div className="min-h-screen bg-canvas text-tx grid place-items-center px-6">
       <div className="max-w-md text-center">{children}</div>
     </div>
   );
@@ -30,18 +30,18 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
         <h1 className="font-serif text-2xl mb-3">
           {inv?.coachName ? `${inv.coachName} 邀請你一起做財務規劃` : "教練邀請連結"}
         </h1>
-        <p className="text-[#a7bacb] mb-6">
-          建立你的<strong className="text-[#eef2f7]">客戶</strong>帳號後就會自動連結
+        <p className="text-tx2 mb-6">
+          建立你的<strong className="text-tx">客戶</strong>帳號後就會自動連結
           {inv?.coachName ? `教練 ${inv.coachName}` : "這位教練"}，可以一起規劃。
         </p>
         <Link
           href={`/client/sign-up?redirect_url=${back}`}
-          className="inline-block font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg"
+          className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg"
         >
           免費建立客戶帳號
         </Link>
         <div className="mt-4">
-          <Link href={`/client/sign-in?redirect_url=${back}`} className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">
+          <Link href={`/client/sign-in?redirect_url=${back}`} className="text-sm text-tx2 hover:text-tx underline underline-offset-4">
             已有客戶帳號，直接登入
           </Link>
         </div>
@@ -49,7 +49,7 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
     );
   }
   if (!code) {
-    return <Shell><p className="text-[#a7bacb]">邀請連結不完整。</p><div className="mt-4"><Link href="/portal" className="underline underline-offset-4">回我的首頁</Link></div></Shell>;
+    return <Shell><p className="text-tx2">邀請連結不完整。</p><div className="mt-4"><Link href="/portal" className="underline underline-offset-4">回我的首頁</Link></div></Shell>;
   }
 
   // 兌換可能被擋下（連結失效、教練停權、教練客戶數已滿…）。
@@ -66,16 +66,16 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
         <>
           <div className="text-5xl mb-3">🤝</div>
           <h1 className="font-serif text-2xl mb-2">連結成功</h1>
-          <p className="text-[#a7bacb] mb-6">你已連結教練{r.coachName ? `：${r.coachName}` : ""}，可以一起規劃了。</p>
-          <Link href="/portal/passport" className="inline-block font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-6 py-2.5 rounded-lg">開始填人生護照</Link>
+          <p className="text-tx2 mb-6">你已連結教練{r.coachName ? `：${r.coachName}` : ""}，可以一起規劃了。</p>
+          <Link href="/portal/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg">開始填人生護照</Link>
           <div className="mt-4">
-            <Link href="/portal" className="text-sm text-[#a7bacb] hover:text-white underline underline-offset-4">先回我的首頁</Link>
+            <Link href="/portal" className="text-sm text-tx2 hover:text-tx underline underline-offset-4">先回我的首頁</Link>
           </div>
         </>
       ) : (
         <>
           <h1 className="font-serif text-2xl mb-2">無法連結</h1>
-          <p className="text-[#ff9b9b] mb-6">⚠ {r.error || "這個邀請連結目前無法使用，請向教練確認。"}</p>
+          <p className="text-danger mb-6">⚠ {r.error || "這個邀請連結目前無法使用，請向教練確認。"}</p>
           <Link href="/portal" className="underline underline-offset-4">回我的首頁</Link>
         </>
       )}

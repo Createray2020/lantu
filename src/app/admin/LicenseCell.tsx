@@ -78,38 +78,38 @@ export default function LicenseCell({
 
   return (
     <div className="text-xs leading-relaxed">
-      <div className="font-bold text-[#e0bd8b]">
-        {rankCode ? (RANK_GROUP_LABEL[rankCode] ?? rankCode) : <span className="text-[#6f869c] font-normal">未定級</span>}
+      <div className="font-bold text-brand2">
+        {rankCode ? (RANK_GROUP_LABEL[rankCode] ?? rankCode) : <span className="text-tx3 font-normal">未定級</span>}
       </div>
-      <div className={st.expired ? "text-[#ff9d9f]" : st.warn ? "text-[#e0bd8b]" : "text-[#a9bccf]"}>
+      <div className={st.expired ? "text-danger" : st.warn ? "text-brand2" : "text-tx2"}>
         {!st.managed
           ? "未設定期限（不鎖）"
           : st.expired
             ? `已到期 ${licenseUntil}`
             : `至 ${licenseUntil}（剩 ${st.daysLeft} 天）`}
       </div>
-      <div className="text-[#6f869c]">
+      <div className="text-tx3">
         客戶 {usedClients}
         {cap效 == null ? " / 不限" : ` / ${cap效}`}
-        {clientCapOverride != null && <span className="text-[#c99a5b]">（個別覆寫）</span>}
+        {clientCapOverride != null && <span className="text-brand">（個別覆寫）</span>}
       </div>
 
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="mt-1 text-[#a9bccf] hover:text-white underline underline-offset-2"
+        className="mt-1 text-tx2 hover:text-tx underline underline-offset-2"
       >
         {open ? "收合" : "設定"}
       </button>
 
       {open && (
-        <div className="mt-2 p-2 rounded-lg bg-[#0c2135] border border-white/10 space-y-2 min-w-[250px]">
+        <div className="mt-2 p-2 rounded-lg bg-panel border border-line space-y-2 min-w-[250px] shadow-e1">
           <label className="block">
-            <span className="text-[#6f869c]">級別</span>
+            <span className="text-tx3">級別</span>
             <select
               value={rank}
               onChange={(e) => setRank(e.target.value)}
-              className="w-full mt-0.5 bg-[#081a2b] border border-white/15 rounded px-1.5 py-1"
+              className="w-full mt-0.5 bg-canvas border border-line2 rounded px-1.5 py-1"
             >
               <option value="">（未定級）</option>
               {rankCodes.map((c) => (
@@ -121,57 +121,57 @@ export default function LicenseCell({
           </label>
 
           <label className="block">
-            <span className="text-[#6f869c]">起算日</span>
+            <span className="text-tx3">起算日</span>
             <input
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="w-full mt-0.5 bg-[#081a2b] border border-white/15 rounded px-1.5 py-1"
+              className="w-full mt-0.5 bg-canvas border border-line2 rounded px-1.5 py-1"
             />
           </label>
 
           <div className="flex items-end gap-1.5">
             <label className="flex-1">
-              <span className="text-[#6f869c]">期間</span>
+              <span className="text-tx3">期間</span>
               <input
                 type="number"
                 min={1}
                 value={effQty}
                 disabled={isIntern}
                 onChange={(e) => setQty(Number(e.target.value))}
-                className="w-full mt-0.5 bg-[#081a2b] border border-white/15 rounded px-1.5 py-1 disabled:opacity-50"
+                className="w-full mt-0.5 bg-canvas border border-line2 rounded px-1.5 py-1 disabled:opacity-50"
               />
             </label>
             <select
               value={effUnit}
               disabled={isIntern}
               onChange={(e) => setUnit(e.target.value === "year" ? "year" : "month")}
-              className="bg-[#081a2b] border border-white/15 rounded px-1.5 py-1 disabled:opacity-50"
+              className="bg-canvas border border-line2 rounded px-1.5 py-1 disabled:opacity-50"
             >
               <option value="month">個月</option>
               <option value="year">年</option>
             </select>
           </div>
           {isIntern && (
-            <p className="text-[#6f869c]">實習教練固定 {INTERN_MONTHS} 個月學習期，不可調整。</p>
+            <p className="text-tx3">實習教練固定 {INTERN_MONTHS} 個月學習期，不可調整。</p>
           )}
-          <p className="text-[#a9bccf]">
-            到期日：<b className="text-[#e0bd8b]">{preview || "—"}</b>
-            <span className="text-[#6f869c]">（含當日）</span>
+          <p className="text-tx2">
+            到期日：<b className="text-brand2">{preview || "—"}</b>
+            <span className="text-tx3">（含當日）</span>
           </p>
 
           <button
             type="button"
             onClick={save}
             disabled={busy || !from}
-            className="w-full bg-[#c99a5b] text-[#08202a] font-bold rounded px-2 py-1 disabled:opacity-50"
+            className="w-full bg-brand text-onbrand font-bold rounded px-2 py-1 disabled:opacity-50"
           >
             {licenseUntil ? "延長 / 更新期限" : "開通期限"}
           </button>
 
-          <div className="pt-2 border-t border-white/10">
+          <div className="pt-2 border-t border-line">
             <label className="block">
-              <span className="text-[#6f869c]">客戶上限覆寫（留空＝依級別 {capFromRank ?? "不限"}）</span>
+              <span className="text-tx3">客戶上限覆寫（留空＝依級別 {capFromRank ?? "不限"}）</span>
               <div className="flex gap-1.5 mt-0.5">
                 <input
                   type="number"
@@ -179,13 +179,13 @@ export default function LicenseCell({
                   value={cap}
                   placeholder={capFromRank == null ? "不限" : String(capFromRank)}
                   onChange={(e) => setCap(e.target.value)}
-                  className="flex-1 bg-[#081a2b] border border-white/15 rounded px-1.5 py-1"
+                  className="flex-1 bg-canvas border border-line2 rounded px-1.5 py-1"
                 />
                 <button
                   type="button"
                   onClick={saveCap}
                   disabled={busy}
-                  className="border border-white/20 rounded px-2 disabled:opacity-50"
+                  className="border border-line2 rounded px-2 disabled:opacity-50"
                 >
                   儲存
                 </button>
@@ -193,10 +193,10 @@ export default function LicenseCell({
             </label>
           </div>
 
-          {msg && <p className="text-[#e0bd8b]">{msg}</p>}
+          {msg && <p className="text-brand2">{msg}</p>}
         </div>
       )}
-      {!open && msg && <p className="text-[#e0bd8b] mt-1">{msg}</p>}
+      {!open && msg && <p className="text-brand2 mt-1">{msg}</p>}
     </div>
   );
 }

@@ -21,7 +21,7 @@ export default async function ApplyPage() {
   const settings = await getApplySettings();
 
   return (
-    <main className="flex-1 grid place-items-center bg-[#081a2b] text-[#eef2f7] px-6 py-12">
+    <main className="flex-1 grid place-items-center bg-canvas text-tx px-6 py-12">
       <ApplyForm
         email={user.primaryEmailAddress?.emailAddress ?? null}
         defaultName={[user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || ""}

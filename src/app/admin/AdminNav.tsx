@@ -56,11 +56,11 @@ export default function AdminNav() {
   const isOn = (href: string) => href === active;
 
   return (
-    <nav className="border-b border-white/10 bg-[#0b2036]">
+    <nav className="border-b border-line bg-field">
       <div className="px-5 py-3 flex flex-wrap items-start gap-x-7 gap-y-3">
         {GROUPS.map((g) => (
           <div key={g.title} className="min-w-0">
-            <div className="text-[10px] tracking-[0.22em] text-[#6b7d8f] mb-1.5">{g.title}</div>
+            <div className="text-[10px] tracking-[0.22em] text-tx3 mb-1.5">{g.title}</div>
             <div className="flex flex-wrap gap-1.5">
               {g.items.map((it) => {
                 const on = isOn(it.href);
@@ -72,8 +72,8 @@ export default function AdminNav() {
                     className={
                       "rounded-lg px-2.5 py-1.5 text-[13px] whitespace-nowrap border transition " +
                       (on
-                        ? "bg-[#c99a5b] text-[#08202a] border-[#c99a5b] font-bold"
-                        : "text-[#a9bccf] border-white/12 hover:bg-[#17406a] hover:text-white")
+                        ? "bg-brand text-onbrand border-brand font-bold"
+                        : "text-tx2 border-line hover:bg-panel3 hover:text-tx")
                     }
                   >
                     {it.label}

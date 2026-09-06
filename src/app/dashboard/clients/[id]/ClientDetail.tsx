@@ -46,7 +46,7 @@ type ActionOutcome = { ok: true } | { ok: false; error: string };
 type IdOutcome = { ok: true; id: string } | { ok: false; error: string };
 const FALLBACK_ERR = "這個動作沒有完成。請重新整理頁面再試一次；若還是失敗請聯繫管理員。";
 
-const field = "w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7]";
+const field = "w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx";
 const btn = "px-3 py-1.5 text-sm font-bold rounded-md";
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -127,24 +127,24 @@ export default function ClientDetail({
 
   const tabBtn = (k: typeof tab) =>
     `px-4 py-2 text-sm font-bold border-b-2 transition ${
-      tab === k ? "border-[#c99a5b] text-[#eef2f7]" : "border-transparent text-[#6b7d8f] hover:text-[#a9bccf]"
+      tab === k ? "border-brand text-tx" : "border-transparent text-tx3 hover:text-tx2"
     }`;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
-      <div className="flex items-center gap-2 text-sm text-[#6b7d8f] mb-3">
-        <Link href="/dashboard/clients" className="hover:text-[#a9bccf]">客戶</Link>
+      <div className="flex items-center gap-2 text-sm text-tx3 mb-3">
+        <Link href="/dashboard/clients" className="hover:text-tx2">客戶</Link>
         <span>/</span>
-        <span className="text-[#a9bccf]">{client.name}</span>
+        <span className="text-tx2">{client.name}</span>
       </div>
 
       <ClientHeader client={client} onSave={(patch) => run(() => updateClientAction(client.id, patch))} onArchive={() => { if (confirm("確定封存這位客戶？")) run(() => archiveClientAction(client.id)); }} pending={pending} readOnly={readOnly} />
 
       {isOwner && <Collaborators clientId={client.id} collaborators={collaborators} readOnly={readOnly} />}
 
-      {err && <div className="mt-3 text-[#d9773f] text-sm">{err}</div>}
+      {err && <div className="mt-3 text-danger text-sm">{err}</div>}
 
-      <div className="flex gap-1 border-b border-white/10 mt-4 mb-5">
+      <div className="flex gap-1 border-b border-line mt-4 mb-5">
         <button className={tabBtn("overview")} onClick={() => setTab("overview")}>概況</button>
         <button className={tabBtn("plans")} onClick={() => setTab("plans")}>年度版本</button>
         <button className={tabBtn("reviews")} onClick={() => setTab("reviews")}>諮詢紀錄</button>
@@ -223,20 +223,20 @@ function ClientHeader({ client, onSave, onArchive, pending, readOnly = false }: 
 
   if (editing) {
     return (
-      <div className="bg-[#0c2135] border border-white/15 rounded-xl p-4 grid gap-3">
+      <div className="bg-panel border border-line2 rounded-xl p-4 grid gap-3 shadow-e1">
         <div className="grid sm:grid-cols-2 gap-3">
-          <div><label className="text-xs text-[#a9bccf]">姓名</label><input className={field} value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div><label className="text-xs text-[#a9bccf]">生日</label><input type="date" className={field} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></div>
-          <div><label className="text-xs text-[#a9bccf]">來源</label><select className={field} value={source} onChange={(e) => setSource(e.target.value)}><option value="">—</option>{CLIENT_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}</select>{source === "其他" && <input className={field + " mt-2"} value={sourceNote} onChange={(e) => setSourceNote(e.target.value)} placeholder="請說明其他來源（選填）" />}</div>
-          <div className="sm:col-span-2"><label className="text-xs text-[#a9bccf]">標籤（逗號分隔）</label><input className={field} value={tags} onChange={(e) => setTags(e.target.value)} /></div>
-          <div><label className="text-xs text-[#a9bccf]">電話</label><input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-          <div><label className="text-xs text-[#a9bccf]">Email</label><input className={field} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-          <div><label className="text-xs text-[#a9bccf]">LINE</label><input className={field} value={line} onChange={(e) => setLine(e.target.value)} /></div>
+          <div><label className="text-xs text-tx2">姓名</label><input className={field} value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div><label className="text-xs text-tx2">生日</label><input type="date" className={field} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></div>
+          <div><label className="text-xs text-tx2">來源</label><select className={field} value={source} onChange={(e) => setSource(e.target.value)}><option value="">—</option>{CLIENT_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}</select>{source === "其他" && <input className={field + " mt-2"} value={sourceNote} onChange={(e) => setSourceNote(e.target.value)} placeholder="請說明其他來源（選填）" />}</div>
+          <div className="sm:col-span-2"><label className="text-xs text-tx2">標籤（逗號分隔）</label><input className={field} value={tags} onChange={(e) => setTags(e.target.value)} /></div>
+          <div><label className="text-xs text-tx2">電話</label><input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+          <div><label className="text-xs text-tx2">Email</label><input className={field} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <div><label className="text-xs text-tx2">LINE</label><input className={field} value={line} onChange={(e) => setLine(e.target.value)} /></div>
         </div>
         <div className="flex justify-end gap-2">
-          <button className={btn + " text-[#a9bccf]"} onClick={() => setEditing(false)}>取消</button>
+          <button className={btn + " text-tx2"} onClick={() => setEditing(false)}>取消</button>
           <button
-            className={btn + " bg-[#c99a5b] text-[#08202a] disabled:opacity-60"}
+            className={btn + " bg-brand text-onbrand disabled:opacity-60"}
             disabled={pending}
             onClick={() => {
               onSave({
@@ -257,17 +257,17 @@ function ClientHeader({ client, onSave, onArchive, pending, readOnly = false }: 
   }
 
   return (
-    <div className="bg-[#0c2135] border border-white/10 rounded-xl p-4 flex flex-wrap items-start gap-3">
+    <div className="bg-panel border border-line rounded-xl p-4 flex flex-wrap items-start gap-3 shadow-e1">
       <div className="flex-1 min-w-[200px]">
         <div className="flex items-center gap-2">
           <h1 className="font-serif text-2xl">{client.name}</h1>
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#0d2b45] text-[#a9bccf] border border-white/10">{STATUS_LABEL[client.status] ?? client.status}</span>
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-panel text-tx2 border border-line shadow-e1">{STATUS_LABEL[client.status] ?? client.status}</span>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {client.source && <span className="text-[11px] text-[#6b7d8f]">來源 {client.source}</span>}
-          {(client.tags ?? []).map((t) => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] border border-white/10">{t}</span>)}
+          {client.source && <span className="text-[11px] text-tx3">來源 {client.source}</span>}
+          {(client.tags ?? []).map((t) => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-panel text-tx2 border border-line">{t}</span>)}
         </div>
-        <div className="text-[12px] text-[#6b7d8f] mt-2 flex flex-wrap gap-x-4">
+        <div className="text-[12px] text-tx3 mt-2 flex flex-wrap gap-x-4">
           {client.contact?.phone && <span>☎ {client.contact.phone}</span>}
           {client.contact?.email && <span>✉ {client.contact.email}</span>}
           {client.contact?.line && <span>LINE {client.contact.line}</span>}
@@ -276,8 +276,8 @@ function ClientHeader({ client, onSave, onArchive, pending, readOnly = false }: 
       </div>
       {!readOnly && (
         <div className="flex gap-2">
-          <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10"} onClick={() => setEditing(true)}>編輯</button>
-          {client.status !== "archived" && <button className={btn + " text-[#6b7d8f]"} onClick={onArchive}>封存</button>}
+          <button className={btn + " bg-panel text-tx2 border border-line"} onClick={() => setEditing(true)}>編輯</button>
+          {client.status !== "archived" && <button className={btn + " text-tx3"} onClick={onArchive}>封存</button>}
         </div>
       )}
     </div>
@@ -298,35 +298,35 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
           <div className="flex items-end gap-2">
             <span className="text-2xl font-extrabold leading-none tracking-wide" style={{ color: stageColor(latest?.healthGrade) }} title={stageTask(latest?.healthGrade)}>{latest ? stageName(latest.healthGrade) : "—"}</span>
             {latestCmp && (
-              <span className="text-[11px] text-[#6b7d8f] leading-tight">安 {latestCmp.safety ?? "—"}<br />由 {latestCmp.freedom ?? "—"} · 願 {latestCmp.vision ?? "—"}</span>
+              <span className="text-[11px] text-tx3 leading-tight">安 {latestCmp.safety ?? "—"}<br />由 {latestCmp.freedom ?? "—"} · 願 {latestCmp.vision ?? "—"}</span>
             )}
           </div>
           <button
             type="button"
             onClick={() => setShowStageGuide(true)}
-            className="mt-1.5 text-[11px] text-[#a9bccf] underline decoration-dotted underline-offset-4 hover:text-[#e0bd8b]"
+            className="mt-1.5 text-[11px] text-tx2 underline decoration-dotted underline-offset-4 hover:text-brand2"
           >
             這個階段是怎麼判定的 ⓘ
           </button>
         </Card>
         <Card label="淨值"><span className="text-2xl font-bold tabular-nums">{fmtMoney(latest?.netWorth ?? null)}</span></Card>
-        <Card label="年度版本"><span className="text-2xl font-bold">{planCount}<span className="text-sm text-[#6b7d8f]"> 版</span></span></Card>
-        <Card label="下次預約"><span className={"text-xl font-bold " + (nextAppt ? "text-[#e0bd8b]" : "text-[#6b7d8f]")}>{nextAppt ?? "—"}</span></Card>
+        <Card label="年度版本"><span className="text-2xl font-bold">{planCount}<span className="text-sm text-tx3"> 版</span></span></Card>
+        <Card label="下次預約"><span className={"text-xl font-bold " + (nextAppt ? "text-brand2" : "text-tx3")}>{nextAppt ?? "—"}</span></Card>
       </div>
 
       {passportPlan && (
-        <div className="rounded-xl border border-[#c99a5b]/30 bg-[#0d2b45] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-xl border border-brand/30 bg-panel px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-e1">
           <div className="min-w-0">
-            <div className="text-[11px] tracking-[0.18em] text-[#c99a5b] mb-0.5">客戶自己的規劃</div>
-            <div className="text-sm text-[#cdd9e5]">
-              這位客戶做過<b className="text-[#e0bd8b]"> 人生護照 </b>
-              {passportPlan.updatedAt && <span className="text-[#6b7d8f]">（最後更新 {passportPlan.updatedAt}）</span>}
+            <div className="text-[11px] tracking-[0.18em] text-brand mb-0.5">客戶自己的規劃</div>
+            <div className="text-sm text-tx">
+              這位客戶做過<b className="text-brand2"> 人生護照 </b>
+              {passportPlan.updatedAt && <span className="text-tx3">（最後更新 {passportPlan.updatedAt}）</span>}
             </div>
-            <div className="text-[11px] text-[#6b7d8f] mt-0.5">這份屬於客戶，你可以看、不能改。</div>
+            <div className="text-[11px] text-tx3 mt-0.5">這份屬於客戶，你可以看、不能改。</div>
           </div>
           <Link
             href={`/dashboard/plans/${passportPlan.id}/history`}
-            className="shrink-0 text-[13px] text-[#a9bccf] hover:text-white border border-white/15 rounded-lg px-3 py-1.5"
+            className="shrink-0 text-[13px] text-tx2 hover:text-tx border border-line2 rounded-lg px-3 py-1.5"
           >
             看版本紀錄 →
           </Link>
@@ -335,17 +335,17 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
 
       <div className="grid md:grid-cols-2 gap-5">
         <section>
-          <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">近期諮詢</h3>
+          <h3 className="text-xs uppercase tracking-wider text-tx3 mb-2">近期諮詢</h3>
           {reviews.length === 0 ? <Empty>尚無諮詢紀錄</Empty> : (
             <div className="grid gap-2">
               {reviews.slice(0, 5).map((r) => (
-                <div key={r.id} className="bg-[#0c2135] border border-white/10 rounded-lg px-3 py-2">
+                <div key={r.id} className="bg-panel border border-line rounded-lg px-3 py-2 shadow-e1">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-[#e0bd8b]">{r.date}</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf]">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
-                    {r.planId && planYear.get(r.planId) && <span className="text-[11px] text-[#6b7d8f]">對應 {planYear.get(r.planId)} 版</span>}
+                    <span className="text-brand2">{r.date}</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-panel text-tx2">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
+                    {r.planId && planYear.get(r.planId) && <span className="text-[11px] text-tx3">對應 {planYear.get(r.planId)} 版</span>}
                   </div>
-                  {r.summary && <div className="text-[13px] text-[#a9bccf] mt-1 whitespace-pre-wrap">{r.summary}</div>}
+                  {r.summary && <div className="text-[13px] text-tx2 mt-1 whitespace-pre-wrap">{r.summary}</div>}
                 </div>
               ))}
             </div>
@@ -353,15 +353,15 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
         </section>
 
         <section>
-          <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">待辦事項</h3>
+          <h3 className="text-xs uppercase tracking-wider text-tx3 mb-2">待辦事項</h3>
           {openItems.length === 0 ? <Empty>沒有待辦</Empty> : (
             <div className="grid gap-2">
               {openItems.map((i) => (
-                <label key={i.id} className="flex items-start gap-2 bg-[#0c2135] border border-white/10 rounded-lg px-3 py-2 cursor-pointer">
+                <label key={i.id} className="flex items-start gap-2 bg-panel border border-line rounded-lg px-3 py-2 cursor-pointer shadow-e1">
                   <input type="checkbox" checked={i.done} disabled={readOnly} onChange={() => onToggle(i.id, !i.done)} className="mt-1 disabled:opacity-50" />
                   <span className="flex-1 text-sm">
                     {i.title}
-                    <span className="block text-[11px] text-[#6b7d8f]">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
+                    <span className="block text-[11px] text-tx3">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
                   </span>
                 </label>
               ))}
@@ -396,28 +396,36 @@ function Plans({ plans, compare, pending, readOnly = false, onOpen, onClone, onN
   return (
     <div className="grid gap-5">
       <div className="flex items-center gap-2">
-        <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f]">年度版本</h3>
+        <h3 className="text-xs uppercase tracking-wider text-tx3">年度版本</h3>
         <div className="flex-1" />
-        {!readOnly && <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"} disabled={pending} onClick={onNew}>＋ 空白版本</button>}
+        {!readOnly && <button className={btn + " bg-panel text-tx2 border border-line disabled:opacity-60"} disabled={pending} onClick={onNew}>＋ 空白版本</button>}
       </div>
 
       <div className="grid gap-2">
+        {plans.length === 0 && (
+          // 舊版沒有這一支：新客戶點進「年度版本」只看到標題和一顆按鈕，
+          // 中間一片空白，容易被當成頁面壞掉。
+          <div className="rounded-lg border border-dashed border-line2 px-4 py-6 text-center">
+            <div className="text-sm text-tx2">還沒有年度版本</div>
+            <div className="text-[12px] text-tx3 mt-1">按上方「＋ 空白版本」建立第一份，或從人生護照帶進來。</div>
+          </div>
+        )}
         {plans.map((p, idx) => (
-          <div key={p.id} className="bg-[#0c2135] border border-white/10 rounded-lg px-3 py-3 flex flex-wrap items-center gap-3">
+          <div key={p.id} className="bg-panel border border-line rounded-lg px-3 py-3 flex flex-wrap items-center gap-3 shadow-e1">
             <div className="w-16">
               <div className="text-lg font-bold">{p.year}</div>
-              {idx === 0 && <div className="text-[10px] text-[#7bbf6a]">最新</div>}
+              {idx === 0 && <div className="text-[10px] text-ok">最新</div>}
             </div>
             <div className="text-[12px] font-bold w-16 text-center" style={{ color: stageColor(p.healthGrade) }}>{stageName(p.healthGrade)}</div>
             <div className="text-sm tabular-nums w-28">{fmtMoney(p.netWorth)}</div>
-            <div className="text-[11px] text-[#6b7d8f] flex-1 min-w-[120px]">{p.label} · 依據 {p.basedOnDate ?? "—"} · 更新 {p.updatedAt ?? "—"}</div>
-            <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} disabled={readOnly} className="bg-[#0a1a2b] border border-white/15 rounded-md text-xs px-2 py-1.5 text-[#a9bccf] disabled:opacity-60">
+            <div className="text-[11px] text-tx3 flex-1 min-w-[120px]">{p.label} · 依據 {p.basedOnDate ?? "—"} · 更新 {p.updatedAt ?? "—"}</div>
+            <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} disabled={readOnly} className="bg-field border border-line2 rounded-md text-xs px-2 py-1.5 text-tx2 disabled:opacity-60">
               {Object.entries(PLAN_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
             <div className="flex gap-1.5">
-              <button className={btn + " bg-[#c99a5b] text-[#08202a]"} onClick={() => onOpen(p.id)}>{readOnly ? "檢視" : "開啟"}</button>
-              {!readOnly && <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"} disabled={pending} onClick={() => onClone(p.id)} title="以此版複製為新的一年">複製為新年度</button>}
-              {!readOnly && <button className={btn + " text-[#6b7d8f]"} onClick={() => onDelete(p.id)}>刪除</button>}
+              <button className={btn + " bg-brand text-onbrand"} onClick={() => onOpen(p.id)}>{readOnly ? "檢視" : "開啟"}</button>
+              {!readOnly && <button className={btn + " bg-panel text-tx2 border border-line disabled:opacity-60"} disabled={pending} onClick={() => onClone(p.id)} title="以此版複製為新的一年">複製為新年度</button>}
+              {!readOnly && <button className={btn + " text-tx3"} onClick={() => onDelete(p.id)}>刪除</button>}
             </div>
           </div>
         ))}
@@ -425,21 +433,21 @@ function Plans({ plans, compare, pending, readOnly = false, onOpen, onClone, onN
 
       {compare.length >= 2 && (
         <section>
-          <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">版本比較（歷年對照）</h3>
+          <h3 className="text-xs uppercase tracking-wider text-tx3 mb-2">版本比較（歷年對照）</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left text-[#6b7d8f] font-normal px-3 py-2 sticky left-0 bg-[#081a2b]">指標</th>
+                  <th className="text-left text-tx3 font-normal px-3 py-2 sticky left-0 bg-canvas">指標</th>
                   {compare.map((c) => (
-                    <th key={c.id} className="text-right px-3 py-2 whitespace-nowrap">{c.year}<span className="block text-[10px] text-[#6b7d8f] font-normal">{PLAN_STATUS_LABEL[c.status] ?? c.status}</span></th>
+                    <th key={c.id} className="text-right px-3 py-2 whitespace-nowrap">{c.year}<span className="block text-[10px] text-tx3 font-normal">{PLAN_STATUS_LABEL[c.status] ?? c.status}</span></th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.key} className="border-t border-white/5">
-                    <td className="text-[#a9bccf] px-3 py-2 sticky left-0 bg-[#081a2b] whitespace-nowrap">{row.label}</td>
+                  <tr key={row.key} className="border-t border-line">
+                    <td className="text-tx2 px-3 py-2 sticky left-0 bg-canvas whitespace-nowrap">{row.label}</td>
                     {compare.map((c) => (
                       <td key={c.id} className="text-right px-3 py-2 tabular-nums" style={row.color ? { color: row.color(c), fontWeight: 700 } : undefined}>{row.fmt(c)}</td>
                     ))}
@@ -500,13 +508,13 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
     <div className="grid gap-5">
       {/* ── 草稿提醒：按了結束卻沒存，場次已封但紀錄還沒生出來 ── */}
       {draft && !readOnly && (
-        <div className="bg-[#c99a5b]/10 border border-[#c99a5b]/45 rounded-xl px-3.5 py-3 grid gap-2">
+        <div className="bg-brand/10 border border-brand/45 rounded-xl px-3.5 py-3 grid gap-2">
           <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
-            <span className="text-[#e0bd8b] font-bold">⚠️ {draft.endedAt ?? ""} 那一場的摘要還沒存</span>
-            <span className="text-[#6b7d8f] text-[12px]">結束諮詢時產了草稿，但沒有送出成正式紀錄。</span>
+            <span className="text-brand2 font-bold">⚠️ {draft.endedAt ?? ""} 那一場的摘要還沒存</span>
+            <span className="text-tx3 text-[12px]">結束諮詢時產了草稿，但沒有送出成正式紀錄。</span>
             <div className="flex-1" />
             {!draftOpen && (
-              <button className={btn + " bg-[#c99a5b] text-[#08202a]"} onClick={() => setDraftOpen(true)}>開啟草稿</button>
+              <button className={btn + " bg-brand text-onbrand"} onClick={() => setDraftOpen(true)}>開啟草稿</button>
             )}
           </div>
           {draftOpen && (
@@ -528,14 +536,14 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
       {/* ── 頂端：待辦提要 ＋ 新增入口 ── */}
       <div className="flex flex-wrap items-center gap-3">
         {!readOnly && !adding && (
-          <button className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10"} onClick={() => { setAdding(true); setEditing(null); }}>
+          <button className={btn + " bg-panel text-tx2 border border-line"} onClick={() => { setAdding(true); setEditing(null); }}>
             ＋ 新增諮詢
           </button>
         )}
-        <span className="text-[12px] text-[#6b7d8f]">補記過去的諮詢也走這裡，日期可以自己選。</span>
+        <span className="text-[12px] text-tx3">補記過去的諮詢也走這裡，日期可以自己選。</span>
         <div className="flex-1" />
         {openItems.length > 0 && (
-          <a href="#actionItems" className="text-[12px] text-[#e0bd8b] hover:underline">
+          <a href="#actionItems" className="text-[12px] text-brand2 hover:underline">
             未完成待辦 {openItems.length} 件 ↓
           </a>
         )}
@@ -553,7 +561,7 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
 
       {/* ── 諮詢時間軸（整寬，全部預設收合）── */}
       <section>
-        <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">諮詢時間軸</h3>
+        <h3 className="text-xs uppercase tracking-wider text-tx3 mb-2">諮詢時間軸</h3>
         {reviews.length === 0 ? <Empty>尚無諮詢紀錄</Empty> : (
           <div className="grid gap-2">
             {reviews.map((r) => (
@@ -568,26 +576,26 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
                   onCancel={() => setEditing(null)}
                 />
               ) : (
-                <details key={r.id} className="bg-[#0c2135] border border-white/10 rounded-lg open:border-[#c99a5b]/45">
+                <details key={r.id} className="bg-panel border border-line rounded-lg open:border-brand/45 shadow-e1">
                   <summary className="list-none cursor-pointer px-3 py-2.5 flex items-center gap-2.5">
-                    <span className="text-[#6b7d8f] text-[11px] shrink-0">▸</span>
-                    <span className="text-[#e0bd8b] font-bold tabular-nums shrink-0">{r.date}</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] shrink-0">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
-                    <span className="text-[12.5px] text-[#6b7d8f] truncate">{firstLine(r.summary)}</span>
+                    <span className="text-tx3 text-[11px] shrink-0">▸</span>
+                    <span className="text-brand2 font-bold tabular-nums shrink-0">{r.date}</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-panel text-tx2 shrink-0">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
+                    <span className="text-[12.5px] text-tx3 truncate">{firstLine(r.summary)}</span>
                   </summary>
-                  <div className="px-3 pb-3 pt-1 border-t border-white/5">
-                    <div className="text-[11.5px] text-[#6b7d8f] my-2">
+                  <div className="px-3 pb-3 pt-1 border-t border-line">
+                    <div className="text-[11.5px] text-tx3 my-2">
                       {r.attendees ? `出席：${r.attendees}` : "未填出席"}
                       {r.planId && planYear.get(r.planId) ? ` · 對應 ${planYear.get(r.planId)} 版` : ""}
                       {r.nextAppt ? ` · 下次預約 ${r.nextAppt}` : ""}
                     </div>
                     {r.summary
-                      ? <div className="text-[13px] text-[#a9bccf] whitespace-pre-wrap leading-relaxed">{r.summary}</div>
-                      : <div className="text-[12px] text-[#6b7d8f]">這一筆沒有內容。</div>}
+                      ? <div className="text-[13px] text-tx2 whitespace-pre-wrap leading-relaxed">{r.summary}</div>
+                      : <div className="text-[12px] text-tx3">這一筆沒有內容。</div>}
                     {!readOnly && (
                       <div className="flex gap-2 mt-3">
-                        <button className="text-[11.5px] px-2.5 py-1 rounded-md border border-white/10 text-[#a9bccf]" onClick={() => { setEditing(r.id); setAdding(false); }}>編輯</button>
-                        <button className="text-[11.5px] px-2.5 py-1 rounded-md border border-white/10 text-[#6b7d8f]" onClick={() => onDeleteReview(r.id)}>刪除</button>
+                        <button className="text-[11.5px] px-2.5 py-1 rounded-md border border-line text-tx2" onClick={() => { setEditing(r.id); setAdding(false); }}>編輯</button>
+                        <button className="text-[11.5px] px-2.5 py-1 rounded-md border border-line text-tx3" onClick={() => onDeleteReview(r.id)}>刪除</button>
                       </div>
                     )}
                   </div>
@@ -601,32 +609,44 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
       {/* ── 動作項目 ── */}
       <section id="actionItems" className="grid gap-3 md:grid-cols-2">
         <div>
-          <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">動作項目清單</h3>
-          <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
-            {actionItems.length === 0 && <p className="text-[12px] text-[#6b7d8f]">目前沒有動作項目。</p>}
+          <h3 className="text-xs uppercase tracking-wider text-tx3 mb-2">動作項目清單</h3>
+          <div className="bg-panel border border-line rounded-xl p-3 grid gap-2.5 shadow-e1">
+            {actionItems.length === 0 && <p className="text-[12px] text-tx3">目前沒有動作項目。</p>}
             {actionItems.map((i) => (
-              <label key={i.id} className="flex items-start gap-2 border-t border-white/5 pt-2 first:border-0 first:pt-0">
+              <label key={i.id} className="flex items-start gap-2 border-t border-line pt-2 first:border-0 first:pt-0">
                 <input type="checkbox" checked={i.done} disabled={readOnly} onChange={() => onToggleItem(i.id, !i.done)} className="mt-1 disabled:opacity-50" />
-                <span className={"flex-1 text-sm " + (i.done ? "line-through text-[#6b7d8f]" : "")}>
+                <span className={"flex-1 text-sm " + (i.done ? "line-through text-tx3" : "")}>
                   {i.title}
-                  <span className="block text-[11px] text-[#6b7d8f]">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
+                  <span className="block text-[11px] text-tx3">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
                 </span>
-                {!readOnly && <button className="text-[#6b7d8f] text-xs" onClick={() => onDeleteItem(i.id)}>刪</button>}
+                {!readOnly && (
+                  // 同一支檔案裡封存客戶、刪除年度版本、刪除諮詢紀錄都有二次確認，
+                  // 只有這顆沒有——而它一樣是不可逆的。
+                  <button
+                    className="text-tx3 hover:text-danger text-xs px-2 py-1 rounded"
+                    aria-label={`刪除待辦「${i.title}」`}
+                    onClick={() => {
+                      if (window.confirm(`刪除待辦「${i.title}」？這個動作無法復原。`)) onDeleteItem(i.id);
+                    }}
+                  >
+                    刪
+                  </button>
+                )}
               </label>
             ))}
           </div>
         </div>
         {!readOnly && (
           <div>
-            <h3 className="text-xs uppercase tracking-wider text-[#6b7d8f] mb-2">新增待辦</h3>
-            <div className="bg-[#0c2135] border border-white/10 rounded-xl p-3 grid gap-2.5">
+            <h3 className="text-xs uppercase tracking-wider text-tx3 mb-2">新增待辦</h3>
+            <div className="bg-panel border border-line rounded-xl p-3 grid gap-2.5 shadow-e1">
               <input className={field} value={itTitle} onChange={(e) => setItTitle(e.target.value)} placeholder="事項" />
               <div className="grid grid-cols-2 gap-2">
                 <input className={field} value={itOwner} onChange={(e) => setItOwner(e.target.value)} placeholder="負責人" />
                 <input type="date" className={field} value={itDue} onChange={(e) => setItDue(e.target.value)} />
               </div>
               <button
-                className={btn + " bg-[#0d2b45] text-[#a9bccf] border border-white/10 disabled:opacity-60"}
+                className={btn + " bg-panel text-tx2 border border-line disabled:opacity-60"}
                 disabled={pending || !itTitle.trim()}
                 onClick={() => { onAddItem({ title: itTitle.trim(), owner: itOwner || null, dueDate: itDue || null }); setItTitle(""); setItOwner(""); setItDue(""); }}
               >
@@ -642,12 +662,12 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
 
 function Card({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[#0c2135] border border-white/10 rounded-xl px-3.5 py-3">
-      <div className="text-[11px] uppercase tracking-wider text-[#6b7d8f] mb-1.5">{label}</div>
+    <div className="bg-panel border border-line rounded-xl px-3.5 py-3 shadow-e1">
+      <div className="text-[11px] uppercase tracking-wider text-tx3 mb-1.5">{label}</div>
       {children}
     </div>
   );
 }
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-[#6b7d8f] text-sm bg-[#0c2135] border border-white/10 rounded-lg px-3 py-6 text-center">{children}</div>;
+  return <div className="text-tx3 text-sm bg-panel border border-line rounded-lg px-3 py-6 text-center shadow-e1">{children}</div>;
 }

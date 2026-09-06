@@ -24,25 +24,25 @@ export default async function CoachesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7] flex flex-col">
-      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-white/10">
+    <div className="min-h-screen bg-canvas text-tx flex flex-col">
+      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-line">
         <Link href="/home" className="flex items-center gap-3">
-          <span className="grid place-items-center w-9 h-9 rounded-xl border border-[#c99a5b]">
+          <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
             <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-              <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
             </svg>
           </span>
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
         <nav className="flex items-center gap-4 text-sm">
-          <Link href="/home" className="text-[#a7bacb] hover:text-white">官網首頁</Link>
+          <Link href="/home" className="text-tx2 hover:text-tx">官網首頁</Link>
           {link.state === "guest" ? (
-            <Link href="/client/sign-in" className="text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-3 py-1.5">
+            <Link href="/client/sign-in" className="text-tx2 hover:text-tx border border-line2 rounded-lg px-3 py-1.5">
               客戶登入
             </Link>
           ) : (
-            <Link href="/portal" className="text-[#a7bacb] hover:text-white border border-white/15 rounded-lg px-3 py-1.5">
+            <Link href="/portal" className="text-tx2 hover:text-tx border border-line2 rounded-lg px-3 py-1.5">
               我的規劃
             </Link>
           )}
@@ -51,9 +51,9 @@ export default async function CoachesPage() {
 
       <main className="flex-1 px-5 sm:px-8 py-10 max-w-5xl w-full mx-auto">
         <div className="mb-8">
-          <div className="text-[#c99a5b] text-xs tracking-[0.3em] mb-2">OUR COACHES</div>
+          <div className="text-brand text-xs tracking-[0.3em] mb-2">OUR COACHES</div>
           <h1 className="font-serif text-3xl mb-3">認識我們的教練</h1>
-          <p className="text-[#a7bacb] text-sm leading-relaxed max-w-2xl">
+          <p className="text-tx2 text-sm leading-relaxed max-w-2xl">
             財務規劃是一段要走很久的關係，合不合得來跟專業一樣重要。
             這裡是每位教練自己寫的介紹——看看誰的說法讓你比較放心，再決定找誰談。
           </p>
@@ -62,7 +62,7 @@ export default async function CoachesPage() {
         <CoachList coaches={coaches} link={link} />
       </main>
 
-      <footer className="border-t border-white/10 px-5 sm:px-8 py-6 text-center text-xs text-[#6f869c]">
+      <footer className="border-t border-line px-5 sm:px-8 py-6 text-center text-xs text-tx3">
         嵐途 LAN TU · 理解自己 · 做出選擇 · 走向未來
       </footer>
     </div>

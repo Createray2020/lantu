@@ -16,9 +16,9 @@ import MoneyInput from "@/components/MoneyInput";
 // 「回復內建」＝把 DB 那一列刪掉，回到程式裡的 seed。
 
 const inputCls =
-  "w-full rounded border border-white/15 bg-[#0b2136] px-2 py-1 text-sm text-[#eef2f7] outline-none focus:border-[#c99a5b]";
+  "w-full rounded border border-line2 bg-field px-2 py-1 text-sm text-tx outline-none focus:border-brand";
 const btnCls =
-  "rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
+  "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
 
 const UNIT_HINT: Record<string, string> = {
   次: "一次性（整段孕期／整次生產）",
@@ -42,34 +42,34 @@ export default function BirthCostsBoard({ rows, basis }: { rows: BirthCostRow[];
   const groups = Array.from(new Set(rows.map((r) => r.grp)));
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-5 mt-6">
+    <div className="rounded-xl border border-line bg-panel p-5 mt-6 shadow-e1">
       <div className="flex items-baseline gap-3 flex-wrap mb-1">
-        <h2 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2">生育費用參數</h2>
-        <span className="text-xs text-[#6f869c]">目前對外顯示的資料基準：{basis}</span>
+        <h2 className="text-sm font-bold border-l-[3px] border-brand2 pl-2">生育費用參數</h2>
+        <span className="text-xs text-tx3">目前對外顯示的資料基準：{basis}</span>
       </div>
-      <p className="text-xs text-[#6f869c] mb-4 leading-relaxed">
+      <p className="text-xs text-tx3 mb-4 leading-relaxed">
         客戶端「子女教育 → 生育規劃」按下產生時，會用這些數字帶出每一胎的
-        <b className="text-[#a9bccf]">生產與月子一次性支出</b>（進「目標／置產」）與
-        <b className="text-[#a9bccf]">0–2 歲育兒費用</b>（進「支出」），教練仍可逐筆覆寫。
-        金額一律<b className="text-[#e0bd8b]">今日現值</b>，通膨由引擎另外套，這裡不要先加。
+        <b className="text-tx2">生產與月子一次性支出</b>（進「目標／置產」）與
+        <b className="text-tx2">0–2 歲育兒費用</b>（進「支出」），教練仍可逐筆覆寫。
+        金額一律<b className="text-brand2">今日現值</b>，通膨由引擎另外套，這裡不要先加。
         <br />
         政策前提：公費產檢 14 次＋3 次超音波（111/7 起），這裡填的是<b>公費之外的自費加購</b>；
         0–2 歲的金額是<b>已扣掉托育補助／育兒津貼後的自付額</b>，不要再扣一次。
       </p>
 
       {(msg || err) && (
-        <p className={`text-sm mb-3 ${err ? "text-[#ff9b9b]" : "text-[#8fc0a3]"}`}>{err ?? msg}</p>
+        <p className={`text-sm mb-3 ${err ? "text-danger" : "text-ok"}`}>{err ?? msg}</p>
       )}
 
       {groups.map((g) => (
         <div key={g} className="mb-5">
-          <h3 className="text-xs text-[#a9bccf] mb-2">{g}</h3>
+          <h3 className="text-xs text-tx2 mb-2">{g}</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse min-w-[820px]">
               <thead>
                 <tr>
                   {["項目", "目前值", "新值", "資料基準", "備註 / 來源", ""].map((h) => (
-                    <th key={h} className="px-3 py-2 font-semibold text-xs text-[#a9bccf] text-left whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-3 py-2 font-semibold text-xs text-tx2 text-left whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -80,28 +80,28 @@ export default function BirthCostsBoard({ rows, basis }: { rows: BirthCostRow[];
                     setDraft((prev) => ({ ...prev, [r.key]: { ...d, ...patch } }));
                   return (
                     <tr key={r.key}>
-                      <td className="px-3 py-2 border-t border-white/8 align-top">
-                        <div className="font-semibold text-[#eef2f7]">{r.label}</div>
-                        <code className="text-[11px] text-[#6f869c]">{r.key}</code>
+                      <td className="px-3 py-2 border-t border-line align-top">
+                        <div className="font-semibold text-tx">{r.label}</div>
+                        <code className="text-[11px] text-tx3">{r.key}</code>
                       </td>
-                      <td className="px-3 py-2 border-t border-white/8 align-top whitespace-nowrap">
-                        <span className="text-[#e0bd8b] font-bold">{fmtMoney(r.amount)}</span>
-                        <div className="text-[11px] text-[#6f869c]">{UNIT_HINT[r.unit] ?? r.unit}</div>
+                      <td className="px-3 py-2 border-t border-line align-top whitespace-nowrap">
+                        <span className="text-brand2 font-bold">{fmtMoney(r.amount)}</span>
+                        <div className="text-[11px] text-tx3">{UNIT_HINT[r.unit] ?? r.unit}</div>
                       </td>
-                      <td className="px-3 py-2 border-t border-white/8 align-top w-[130px]">
+                      <td className="px-3 py-2 border-t border-line align-top w-[130px]">
                         <MoneyInput className={inputCls} allowEmpty
                           value={d.amount === "" ? null : Number(d.amount)}
                           onChange={(v) => set({ amount: v === null ? "" : String(v) })} />
                       </td>
-                      <td className="px-3 py-2 border-t border-white/8 align-top w-[110px]">
+                      <td className="px-3 py-2 border-t border-line align-top w-[110px]">
                         <input className={inputCls} value={d.basis} placeholder="2026-08"
                           onChange={(e) => set({ basis: e.target.value })} />
                       </td>
-                      <td className="px-3 py-2 border-t border-white/8 align-top">
+                      <td className="px-3 py-2 border-t border-line align-top">
                         <input className={inputCls} value={d.note}
                           onChange={(e) => set({ note: e.target.value })} />
                       </td>
-                      <td className="px-3 py-2 border-t border-white/8 align-top whitespace-nowrap">
+                      <td className="px-3 py-2 border-t border-line align-top whitespace-nowrap">
                         <button disabled={pending} className={btnCls}
                           onClick={() => run(() => saveBirthCostAction({ key: r.key, amount: d.amount, basis: d.basis, note: d.note }), `已更新「${r.label}」`)}>
                           儲存
@@ -124,8 +124,8 @@ export default function BirthCostsBoard({ rows, basis }: { rows: BirthCostRow[];
         </div>
       ))}
 
-      <p className="text-xs text-[#6f869c] leading-relaxed">
-        月子中心與月嫂<b className="text-[#a9bccf]">擇一</b>：客戶端在生育規劃選了哪一種、住幾個月，就用對應的單價乘上月數。
+      <p className="text-xs text-tx3 leading-relaxed">
+        月子中心與月嫂<b className="text-tx2">擇一</b>：客戶端在生育規劃選了哪一種、住幾個月，就用對應的單價乘上月數。
       </p>
     </div>
   );

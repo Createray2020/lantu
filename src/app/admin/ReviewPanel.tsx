@@ -31,10 +31,10 @@ export type ApplicationBrief = {
 };
 
 const STATE_COLOR: Record<IntroducerState, string> = {
-  pending: "#c99a5b",
-  confirmed: "#7fd1a8",
-  declined: "#e08b7a",
-  skipped: "#6f869c",
+  pending: "var(--brand)",
+  confirmed: "var(--ok)",
+  declined: "var(--danger)",
+  skipped: "var(--tx3)",
 };
 
 // 後台名冊裡的報聘詳情＋審核檢核表。
@@ -79,18 +79,18 @@ export default function ReviewPanel({
   }
 
   return (
-    <div className="mt-2 border border-white/10 rounded-md">
+    <div className="mt-2 border border-line rounded-md">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-2 py-1 text-[11px] text-[#a9bccf] hover:text-white"
+        className="w-full flex items-center gap-2 px-2 py-1 text-[11px] text-tx2 hover:text-tx"
       >
         <span>{open ? "▾" : "▸"}</span>
         <span>報聘資料</span>
-        <span className="text-[#6f869c]">{routeMeta(app.route).label}</span>
-        <span style={{ color: STATE_COLOR[st] ?? "#6f869c" }}>{INTRODUCER_STATE_LABEL[st] ?? app.introducerState}</span>
+        <span className="text-tx3">{routeMeta(app.route).label}</span>
+        <span style={{ color: STATE_COLOR[st] ?? "var(--tx3)" }}>{INTRODUCER_STATE_LABEL[st] ?? app.introducerState}</span>
         {status === "pending" && (
-          <span className={gate.ok ? "ml-auto text-[#7fd1a8]" : "ml-auto text-[#c99a5b]"}>
+          <span className={gate.ok ? "ml-auto text-ok" : "ml-auto text-brand"}>
             {gate.ok ? "可核准" : `尚缺 ${gate.reasons.length} 項`}
           </span>
         )}
@@ -98,7 +98,7 @@ export default function ReviewPanel({
 
       {open && (
         <div className="px-2 pb-2 grid gap-2 text-[11px]">
-          <div className="text-[#a9bccf]">
+          <div className="text-tx2">
             推薦人：
             {app.introducerName
               ? `${app.introducerName}${app.introducerCode ? `（${app.introducerCode}）` : ""}`
@@ -107,13 +107,13 @@ export default function ReviewPanel({
                 : "—"}
           </div>
           {app.introducerNote && (
-            <div className="text-[#8fa8bd] whitespace-pre-wrap">推薦人留言：{app.introducerNote}</div>
+            <div className="text-tx2 whitespace-pre-wrap">推薦人留言：{app.introducerNote}</div>
           )}
-          {app.currentJob && <div className="text-[#8fa8bd]">現況：{app.currentJob}</div>}
-          {app.motive && <div className="text-[#8fa8bd] whitespace-pre-wrap">動機：{app.motive}</div>}
-          {app.experience && <div className="text-[#8fa8bd] whitespace-pre-wrap">經歷：{app.experience}</div>}
+          {app.currentJob && <div className="text-tx2">現況：{app.currentJob}</div>}
+          {app.motive && <div className="text-tx2 whitespace-pre-wrap">動機：{app.motive}</div>}
+          {app.experience && <div className="text-tx2 whitespace-pre-wrap">經歷：{app.experience}</div>}
 
-          <div className="text-[#a9bccf]">
+          <div className="text-tx2">
             證照：
             {app.licenses?.length
               ? app.licenses
@@ -122,7 +122,7 @@ export default function ReviewPanel({
               : "未填"}
           </div>
 
-          <div className="text-[#6f869c]">
+          <div className="text-tx3">
             聲明：
             {APPLY_CONSENTS.every((c) => app.consents?.[c.key])
               ? `全數勾選（${(app.consents[APPLY_CONSENTS[0].key] ?? "").slice(0, 10)}）`
@@ -130,30 +130,30 @@ export default function ReviewPanel({
           </div>
 
           {/* 檢核表：後台設定的那一份，逐項打勾才放行。 */}
-          <div className="border-t border-white/10 pt-2 grid gap-1">
+          <div className="border-t border-line pt-2 grid gap-1">
             {items.map((it) => {
               const on = checked.includes(it.key);
               return (
                 <label key={it.key} className="flex items-start gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="mt-[2px] accent-[#c99a5b]"
+                    className="mt-[2px] accent-brand"
                     checked={on}
                     disabled={busy}
                     onChange={() => save(on ? checked.filter((k) => k !== it.key) : [...checked, it.key], note)}
                   />
-                  <span className={on ? "text-[#a9bccf]" : "text-[#eef2f7]"}>
+                  <span className={on ? "text-tx2" : "text-tx"}>
                     {it.label}
-                    {it.required && <span className="text-[#c99a5b]"> *</span>}
+                    {it.required && <span className="text-brand"> *</span>}
                     {on && app.reviewChecks?.[it.key] && (
-                      <span className="text-[#6f869c]"> · {app.reviewChecks[it.key].slice(0, 10)}</span>
+                      <span className="text-tx3"> · {app.reviewChecks[it.key].slice(0, 10)}</span>
                     )}
                   </span>
                 </label>
               );
             })}
             <textarea
-              className="mt-1 w-full bg-[#0a1a2b] border border-white/15 rounded-md px-2 py-1 text-[11px] text-[#eef2f7] placeholder:text-[#4f6478]"
+              className="mt-1 w-full bg-field border border-line2 rounded-md px-2 py-1 text-[11px] text-tx placeholder:text-tx3"
               rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -161,9 +161,9 @@ export default function ReviewPanel({
               placeholder="審核備註（選填）"
             />
             {!gate.ok && status === "pending" && (
-              <div className="text-[#c99a5b]">核准前還要：{gate.reasons.join("、")}</div>
+              <div className="text-brand">核准前還要：{gate.reasons.join("、")}</div>
             )}
-            {err && <div className="text-[#e08b7a]">儲存失敗：{err}</div>}
+            {err && <div className="text-danger">儲存失敗：{err}</div>}
           </div>
         </div>
       )}

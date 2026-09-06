@@ -32,7 +32,7 @@ export default function TemplatePlanList({
     <div>
       <div className="flex items-center gap-3 mb-3">
         <h2 className="font-serif text-lg">年度版本</h2>
-        <span className="text-[#6b7d8f] text-sm">{plans.length}</span>
+        <span className="text-tx3 text-sm">{plans.length}</span>
         <div className="flex-1" />
         {adding ? (
           <div className="flex items-center gap-2">
@@ -40,7 +40,7 @@ export default function TemplatePlanList({
               value={year}
               onChange={(e) => setYear(e.target.value)}
               inputMode="numeric"
-              className="w-24 bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-2.5 py-1.5 text-[#eef2f7]"
+              className="w-24 bg-field border border-line2 rounded-md text-sm px-2.5 py-1.5 text-tx"
               placeholder="2026"
               autoFocus
             />
@@ -59,16 +59,16 @@ export default function TemplatePlanList({
                 });
               }}
               disabled={pending}
-              className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold text-sm px-3 py-1.5 disabled:opacity-40"
+              className="rounded-md bg-brand text-onbrand font-bold text-sm px-3 py-1.5 disabled:opacity-40"
             >
               {pending ? "建立中…" : "建立"}
             </button>
-            <button onClick={() => { setAdding(false); setErr(""); }} className="text-sm text-[#a9bccf] px-1.5">取消</button>
+            <button onClick={() => { setAdding(false); setErr(""); }} className="text-sm text-tx2 px-1.5">取消</button>
           </div>
         ) : (
           <button
             onClick={() => setAdding(true)}
-            className="rounded-md border border-[#c99a5b]/50 text-[#e0bd8b] text-sm px-3 py-1.5 hover:bg-[#c99a5b]/10"
+            className="rounded-md border border-brand/50 text-brand2 text-sm px-3 py-1.5 hover:bg-brand/10"
           >
             ＋ 新增年度版本
           </button>
@@ -76,13 +76,13 @@ export default function TemplatePlanList({
       </div>
 
       {err && (
-        <div role="alert" className="mb-3 text-sm text-[#ffd7d8] bg-[#e5484d]/15 border border-[#e5484d]/40 rounded-lg px-3 py-2">
+        <div role="alert" className="mb-3 text-sm text-danger bg-danger-solid/15 border border-danger-solid/40 rounded-lg px-3 py-2">
           {err}
         </div>
       )}
 
       {plans.length === 0 ? (
-        <div className="text-center py-14 text-[#6b7d8f] border border-dashed border-white/10 rounded-xl">
+        <div className="text-center py-14 text-tx3 border border-dashed border-line rounded-xl">
           這份範本還沒有任何年度版本。
         </div>
       ) : (
@@ -91,21 +91,21 @@ export default function TemplatePlanList({
             <Link
               key={p.id}
               href={`/admin/templates/${templateId}/plans/${p.id}`}
-              className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-center bg-[#0c2135] hover:bg-[#123049] border border-white/10 rounded-lg px-3 py-3 transition"
+              className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-center bg-panel hover:bg-panel2 border border-line rounded-lg px-3 py-3 transition shadow-e1"
             >
               <div className="font-bold">
                 {p.year}
-                {p.label && <span className="ml-2 text-[12px] font-normal text-[#a9bccf]">{p.label}</span>}
+                {p.label && <span className="ml-2 text-[12px] font-normal text-tx2">{p.label}</span>}
                 {/* 客戶軌（人生護照）示範也可以是範本的一部分，但它跟教練軌不是同一種東西，要標出來。 */}
                 {p.track !== "coach" && (
-                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded border border-white/15 text-[#a9bccf]">人生護照</span>
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded border border-line2 text-tx2">人生護照</span>
                 )}
               </div>
               <div className="text-[12px] font-bold" style={{ color: stageColor(p.healthGrade) }}>
                 {p.healthGrade ? stageName(p.healthGrade) : "—"}
               </div>
-              <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(p.netWorth ?? null)}</div>
-              <div className="text-xs text-[#e0bd8b]">編輯內容 →</div>
+              <div className="text-sm tabular-nums text-tx">{fmtMoney(p.netWorth ?? null)}</div>
+              <div className="text-xs text-brand2">編輯內容 →</div>
             </Link>
           ))}
         </div>

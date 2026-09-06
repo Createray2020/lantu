@@ -4,13 +4,15 @@
 import { isAdmin as checkAdmin, type Coach } from "@/lib/coach";
 import { licenseState, type LicenseState } from "@/lib/license";
 import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
+import { DEFAULT_THEME, normalizeTheme, type ThemeName } from "@/lib/theme";
 
-export type HeaderProps = { isAdmin: boolean; uiScale: number; license: LicenseState };
+export type HeaderProps = { isAdmin: boolean; uiScale: number; theme: ThemeName; license: LicenseState };
 
 export async function headerProps(coach: Coach): Promise<HeaderProps> {
   return {
     isAdmin: await checkAdmin(coach),
     uiScale: coach.uiScale ?? DEFAULT_UI_SCALE,
+    theme: normalizeTheme(coach.theme ?? DEFAULT_THEME),
     license: licenseState(coach),
   };
 }

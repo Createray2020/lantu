@@ -50,10 +50,10 @@ export type RiskTier = {
 };
 
 export const RISK_TIERS: readonly RiskTier[] = [
-  { min: 12, max: 23, name: "保守型", en: "Conservative", rr: 3, std: 6, desc: "以保本與穩定為優先，可承受的波動很低。", color: "#6f8f74", alloc: "現金/定存與債券為主（約 70–85%），少量配置平衡型或高評級收益商品。" },
-  { min: 24, max: 35, name: "穩健型", en: "Moderate", rr: 5, std: 10, desc: "願意承擔適度風險換取中等成長，重視風險與報酬的平衡。", color: "#7f97ac", alloc: "股債均衡（股 40–55%、債與現金 45–60%），核心配置搭配部分成長型標的。" },
-  { min: 36, max: 47, name: "積極型", en: "Aggressive", rr: 6.5, std: 14, desc: "以資產成長為主要目標，能承受明顯的短期波動。", color: "#c99a5b", alloc: "股票/股票型基金為主（約 60–75%），搭配少量債券與現金作為緩衝。" },
-  { min: 48, max: 60, name: "進取型", en: "Growth", rr: 8, std: 18, desc: "追求長期最大化報酬，可承受大幅波動與較高風險。", color: "#b07d3d", alloc: "高成長股票、產業/區域型與另類資產為主（80%以上），現金部位極低。" },
+  { min: 12, max: 23, name: "保守型", en: "Conservative", rr: 3, std: 6, desc: "以保本與穩定為優先，可承受的波動很低。", color: "var(--ok-solid)", alloc: "現金/定存與債券為主（約 70–85%），少量配置平衡型或高評級收益商品。" },
+  { min: 24, max: 35, name: "穩健型", en: "Moderate", rr: 5, std: 10, desc: "願意承擔適度風險換取中等成長，重視風險與報酬的平衡。", color: "var(--tx2)", alloc: "股債均衡（股 40–55%、債與現金 45–60%），核心配置搭配部分成長型標的。" },
+  { min: 36, max: 47, name: "積極型", en: "Aggressive", rr: 6.5, std: 14, desc: "以資產成長為主要目標，能承受明顯的短期波動。", color: "var(--brand)", alloc: "股票/股票型基金為主（約 60–75%），搭配少量債券與現金作為緩衝。" },
+  { min: 48, max: 60, name: "進取型", en: "Growth", rr: 8, std: 18, desc: "追求長期最大化報酬，可承受大幅波動與較高風險。", color: "var(--warn-solid)", alloc: "高成長股票、產業/區域型與另類資產為主（80%以上），現金部位極低。" },
 ];
 
 /** 作答：單選＝選項索引；複選＝索引陣列。key 是題目索引的字串。 */

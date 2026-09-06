@@ -97,13 +97,13 @@ export default function PhotoCropper({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="presentation">
-      <div className="w-full max-w-md rounded-xl border border-white/15 bg-[#0c2135] p-5 text-[#eef2f7]">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-scrim/70 p-4" role="presentation">
+      <div className="w-full max-w-md rounded-xl border border-line2 bg-panel p-5 text-tx shadow-e3">
         <div className="mb-1 font-serif text-lg tracking-[0.08em]">調整大頭照</div>
-        <p className="mb-3 text-[12px] text-[#8fa6ba]">拖曳移動、下方滑桿縮放；框內的範圍就是客戶會看到的樣子。</p>
+        <p className="mb-3 text-[12px] text-tx2">拖曳移動、下方滑桿縮放；框內的範圍就是客戶會看到的樣子。</p>
 
         <div
-          className="relative mx-auto overflow-hidden rounded-xl border border-white/15 bg-[#0d2b45] touch-none select-none cursor-grab active:cursor-grabbing"
+          className="relative mx-auto overflow-hidden rounded-xl border border-line2 bg-panel touch-none select-none cursor-grab active:cursor-grabbing shadow-e1"
           style={{ width: VIEW, height: VIEW }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -119,35 +119,35 @@ export default function PhotoCropper({
             style={{ width: dispW, height: dispH, left: off.x, top: off.y }}
           />
           {/* 安全框：提醒中間這塊一定在畫面內 */}
-          <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-white/20" />
-          <div className="pointer-events-none absolute inset-[12%] rounded-lg border border-dashed border-[#c99a5b]/50" />
+          <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-tx/20" />
+          <div className="pointer-events-none absolute inset-[12%] rounded-lg border border-dashed border-brand/50" />
         </div>
 
         <div className="mt-3 flex items-center gap-3">
-          <span className="text-[12px] text-[#a7bacb]">縮放</span>
+          <span className="text-[12px] text-tx2">縮放</span>
           <input
             type="range" min={1} max={MAX_ZOOM} step={0.01} value={zoom}
             onChange={(e) => setZoomAnchored(parseFloat(e.target.value))}
-            className="flex-1 accent-[#c99a5b]"
+            className="flex-1 accent-brand"
           />
-          <span className="w-10 text-right text-[12px] tabular-nums text-[#e0bd8b]">{zoom.toFixed(1)}×</span>
+          <span className="w-10 text-right text-[12px] tabular-nums text-brand2">{zoom.toFixed(1)}×</span>
         </div>
 
-        {err && <p className="mt-2 text-sm text-[#e08b7a]">{err}</p>}
+        {err && <p className="mt-2 text-sm text-danger">{err}</p>}
 
         <div className="mt-4 flex items-center gap-2">
           <button type="button"
             onClick={() => { setZoom(1); setOff(initial()); }}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]">
+            className="rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3">
             重設
           </button>
           <div className="flex-1" />
           <button type="button" onClick={onCancel}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm text-[#a9bccf] hover:bg-[#17406a]">
+            className="rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3">
             取消
           </button>
           <button type="button" onClick={confirm}
-            className="rounded-lg bg-[#c99a5b] px-4 py-2 text-sm font-bold text-[#08202a] hover:bg-[#e0bd8b]">
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-onbrand hover:bg-brand2">
             使用這個範圍
           </button>
         </div>

@@ -25,7 +25,7 @@ export default async function ClientsPage() {
   ]);
   const hp = await headerProps(coach);
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
+    <div className="min-h-screen bg-canvas text-tx">
       <DashboardHeader {...hp} />
       <ReadOnlyBanner license={hp.license} />
       <ClientList

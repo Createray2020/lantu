@@ -89,7 +89,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const readOnly = hp.license.expired || !isOwner;
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
+    <div className="min-h-screen bg-canvas text-tx">
       <DashboardHeader {...hp} />
       <ReadOnlyBanner license={hp.license} />
       {!isOwner && <CollabBanner />}

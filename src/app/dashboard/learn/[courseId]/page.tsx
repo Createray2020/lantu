@@ -40,17 +40,17 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
   }));
 
   return (
-    <div className="min-h-screen bg-[#081a2b] text-[#eef2f7]">
+    <div className="min-h-screen bg-canvas text-tx">
       <DashboardHeader {...hp} />
       <ReadOnlyBanner license={hp.license} />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-        <Link href="/dashboard/learn" className="text-sm text-[#a9bccf] hover:text-white">
+        <Link href="/dashboard/learn" className="text-sm text-tx2 hover:text-tx">
           ← 回學習區
         </Link>
         <h1 className="font-serif text-2xl mt-2">{course.title}</h1>
-        {course.summary && <p className="text-sm text-[#a9bccf] mt-1 mb-1">{course.summary}</p>}
+        {course.summary && <p className="text-sm text-tx2 mt-1 mb-1">{course.summary}</p>}
         {course.trainingHours != null && (
-          <p className="text-xs text-[#6f869c] mb-4">
+          <p className="text-xs text-tx3 mb-4">
             全部單元完成後自動認列 {course.trainingHours} 小時訓練時數。
           </p>
         )}

@@ -79,21 +79,22 @@ export default function ClientList({
     return r;
   }, [clients, q, status, tag, sort]);
 
-  const sel = "bg-[#0d2b45] border border-white/15 rounded-md text-sm px-2.5 py-1.5 text-[#eef2f7]";
+  // 輸入框一律 bg-field（比面板深/淺一階），跟卡片區分開；同檔案的 field 也是同一個 token。
+  const sel = "bg-field border border-line2 rounded-md text-sm px-2.5 py-1.5 text-tx";
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <h1 className="font-serif text-xl tracking-wide mr-1">客戶</h1>
-        <span className="text-[#6b7d8f] text-sm">{rows.length} / {clients.length}</span>
+        <span className="text-tx3 text-sm">{rows.length} / {clients.length}</span>
         {quota?.cap != null && (
           <span
             className={`text-xs font-bold px-2 py-1 rounded-md border ${
               quota.full
-                ? "border-[#e5484d]/60 text-[#ff9d9f] bg-[#e5484d]/10"
+                ? "border-danger-solid/60 text-danger bg-danger-solid/10"
                 : quota.left != null && quota.left <= 3
-                  ? "border-[#c99a5b]/60 text-[#e0bd8b] bg-[#c99a5b]/10"
-                  : "border-white/15 text-[#a9bccf]"
+                  ? "border-brand/60 text-brand2 bg-brand/10"
+                  : "border-line2 text-tx2"
             }`}
             title="客戶數上限依教練級別。封存的客戶不計入。"
           >
@@ -105,39 +106,45 @@ export default function ClientList({
           onClick={() => setShowNew(true)}
           disabled={readOnly || !!quota?.full}
           title={readOnly ? LICENSE_LOCKED_MESSAGE : quota?.full ? QUOTA_FULL_MESSAGE(quota.cap ?? 0) : ""}
-          className="rounded-md bg-[#c99a5b] text-[#08202a] font-bold text-sm px-3.5 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="rounded-md bg-brand text-onbrand font-bold text-sm px-3.5 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           ＋ 新增客戶
         </button>
       </div>
       {quota?.full && quota.cap != null && (
-        <p className="mb-4 text-xs text-[#e0bd8b] bg-[#c99a5b]/10 border border-[#c99a5b]/40 rounded-lg px-3 py-2">
+        <p className="mb-4 text-xs text-brand2 bg-brand/10 border border-brand/40 rounded-lg px-3 py-2">
           {QUOTA_FULL_MESSAGE(quota.cap)}
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      {/* 搜尋與三個下拉是兩件不同的事（找特定一個人／看某一群人），
+          舊版全部塞在同一條 gap-2 的 flex 裡、又沒有標籤，只能靠預設 option 的字辨認用途。
+          拆成一塊有底色的篩選區，中間用一條線隔開，下拉各自帶前綴標籤。 */}
+      <div className="flex flex-wrap items-center gap-3 mb-5 rounded-xl border border-line bg-panel px-3 py-2.5 shadow-e1">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="搜尋姓名／編號／標籤／來源"
-          className={sel + " flex-1 min-w-[180px]"}
+          aria-label="搜尋客戶"
+          className={sel + " flex-1 min-w-[200px]"}
         />
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={sel}>
+        <span className="hidden sm:block self-stretch w-px bg-line" aria-hidden="true" />
+        <span className="text-[11px] font-bold text-tx3 select-none">篩選</span>
+        <select aria-label="狀態" value={status} onChange={(e) => setStatus(e.target.value)} className={sel}>
           <option value="all">全部狀態</option>
           <option value="active">進行中</option>
           <option value="pending">待處理</option>
           <option value="archived">已封存</option>
         </select>
         {allTags.length > 0 && (
-          <select value={tag} onChange={(e) => setTag(e.target.value)} className={sel}>
+          <select aria-label="標籤" value={tag} onChange={(e) => setTag(e.target.value)} className={sel}>
             <option value="all">全部標籤</option>
             {allTags.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
         )}
-        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className={sel}>
+        <select aria-label="排序" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className={sel}>
           <option value="updated">最近更新</option>
           <option value="next">下次預約</option>
           <option value="net">淨值高→低</option>
@@ -146,23 +153,23 @@ export default function ClientList({
       </div>
 
       {rows.length === 0 ? (
-        <div className="text-center py-20 text-[#6b7d8f]">
+        <div className="text-center py-20 text-tx3">
           <div className="text-4xl mb-3">🗂️</div>
           {clients.length === 0 ? "還沒有客戶，點右上角新增第一位客戶。" : "沒有符合條件的客戶。"}
         </div>
       ) : (
         <div className="grid gap-2">
-          <div className="hidden md:grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-3 text-[11px] uppercase tracking-wider text-[#6b7d8f]">
+          <div className="hidden md:grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-3 text-[11px] uppercase tracking-wider text-tx3">
             <div>客戶</div>
             <div>最新版本</div>
             <div>
               <button
                 type="button"
                 onClick={() => setGuideFor(null)}
-                className="uppercase tracking-wider hover:text-[#e0bd8b]"
+                className="uppercase tracking-wider hover:text-brand2"
                 title="看四個階段的定義與判定標準"
               >
-                財務階段 <span className="text-[#c99a5b]">ⓘ</span>
+                財務階段 <span className="text-brand">ⓘ</span>
               </button>
             </div>
             <div>淨值</div>
@@ -173,28 +180,28 @@ export default function ClientList({
             <Link
               key={c.id}
               href={`/dashboard/clients/${c.id}`}
-              className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 items-center bg-[#0c2135] hover:bg-[#123049] border border-white/10 rounded-lg px-3 py-3 transition"
+              className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 items-center bg-panel hover:bg-panel2 border border-line rounded-lg px-3 py-3 transition shadow-e1"
             >
               <div className="col-span-2 md:col-span-1">
                 <div className="font-bold">{c.name}</div>
                 {c.code && (
-                  <div className="font-mono text-[10px] tracking-wider text-[#6b7d8f]">{c.code}</div>
+                  <div className="font-mono text-[10px] tracking-wider text-tx3">{c.code}</div>
                 )}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(c.tags ?? []).map((t) => (
-                    <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-[#0d2b45] text-[#a9bccf] border border-white/10">{t}</span>
+                    <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-panel text-tx2 border border-line">{t}</span>
                   ))}
                 </div>
               </div>
-              <div className="text-sm text-[#a9bccf]">
+              <div className="text-sm text-tx2">
                 {c.latestPlan ? (
                   <>
-                    <span className="text-[#eef2f7]">{c.latestPlan.year}</span>
-                    <span className="ml-1 text-[11px] text-[#6b7d8f]">{PLAN_STATUS_LABEL[c.latestPlan.status] ?? c.latestPlan.status}</span>
-                    {c.planCount > 1 && <span className="ml-1 text-[11px] text-[#6b7d8f]">·{c.planCount}版</span>}
+                    <span className="text-tx">{c.latestPlan.year}</span>
+                    <span className="ml-1 text-[11px] text-tx3">{PLAN_STATUS_LABEL[c.latestPlan.status] ?? c.latestPlan.status}</span>
+                    {c.planCount > 1 && <span className="ml-1 text-[11px] text-tx3">·{c.planCount}版</span>}
                   </>
                 ) : (
-                  <span className="text-[#6b7d8f]">—</span>
+                  <span className="text-tx3">—</span>
                 )}
               </div>
               <div className="text-[12px] font-bold">
@@ -220,51 +227,51 @@ export default function ClientList({
                   {c.latestPlan ? stageName(c.latestPlan.healthGrade) : "—"}
                 </span>
               </div>
-              <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(c.latestPlan?.netWorth ?? null)}</div>
-              <div className="text-[12px] text-[#a9bccf]">
+              <div className="text-sm tabular-nums text-tx">{fmtMoney(c.latestPlan?.netWorth ?? null)}</div>
+              <div className="text-[12px] text-tx2">
                 <div>上次 {c.lastReviewDate ?? "—"}</div>
-                <div className={c.nextAppt ? "text-[#e0bd8b]" : "text-[#6b7d8f]"}>下次 {c.nextAppt ?? "—"}</div>
+                <div className={c.nextAppt ? "text-brand2" : "text-tx3"}>下次 {c.nextAppt ?? "—"}</div>
               </div>
-              <div className="text-[12px] text-[#a9bccf]">{STATUS_LABEL[c.status] ?? c.status}</div>
+              <div className="text-[12px] text-tx2">{STATUS_LABEL[c.status] ?? c.status}</div>
             </Link>
           ))}
         </div>
       )}
 
       {shared.length > 0 && (
-        <section className="mt-8 pt-6 border-t border-white/10">
+        <section className="mt-8 pt-6 border-t border-line">
           <div className="flex items-center gap-2 mb-3">
             <h2 className="font-serif text-lg tracking-wide">共同執案</h2>
-            <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#3b82f6]/50 text-[#8fb8ff] bg-[#3b82f6]/10 font-bold">唯讀</span>
-            <span className="text-[#6b7d8f] text-sm">{shared.length}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-info/50 text-info bg-info/10 font-bold">唯讀</span>
+            <span className="text-tx3 text-sm">{shared.length}</span>
           </div>
-          <p className="text-[12px] text-[#6b7d8f] mb-3">其他教練邀請你一起看的客戶。你看得到全部資料與報告書，但不能修改，也不計入你的客戶數上限。</p>
+          <p className="text-[12px] text-tx3 mb-3">其他教練邀請你一起看的客戶。你看得到全部資料與報告書，但不能修改，也不計入你的客戶數上限。</p>
           <div className="grid gap-2">
             {shared.map((c) => (
               <Link
                 key={c.id}
                 href={`/dashboard/clients/${c.id}`}
-                className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 items-center bg-[#0c2135] hover:bg-[#123049] border border-[#3b82f6]/25 rounded-lg px-3 py-3 transition"
+                className="grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-3 items-center bg-panel hover:bg-panel2 border border-info/25 rounded-lg px-3 py-3 transition shadow-e1"
               >
                 <div className="col-span-2 md:col-span-1">
                   <div className="font-bold">{c.name}</div>
-                  {c.code && <div className="font-mono text-[10px] tracking-wider text-[#6b7d8f]">{c.code}</div>}
+                  {c.code && <div className="font-mono text-[10px] tracking-wider text-tx3">{c.code}</div>}
                 </div>
-                <div className="text-[12px] text-[#a9bccf]">主責 {c.ownerName ?? "—"}</div>
-                <div className="text-sm text-[#a9bccf]">
+                <div className="text-[12px] text-tx2">主責 {c.ownerName ?? "—"}</div>
+                <div className="text-sm text-tx2">
                   {c.latestPlan ? (
                     <>
-                      <span className="text-[#eef2f7]">{c.latestPlan.year}</span>
-                      {c.planCount > 1 && <span className="ml-1 text-[11px] text-[#6b7d8f]">·{c.planCount}版</span>}
+                      <span className="text-tx">{c.latestPlan.year}</span>
+                      {c.planCount > 1 && <span className="ml-1 text-[11px] text-tx3">·{c.planCount}版</span>}
                     </>
                   ) : (
-                    <span className="text-[#6b7d8f]">—</span>
+                    <span className="text-tx3">—</span>
                   )}
                 </div>
                 <div className="text-[12px] font-bold" style={{ color: stageColor(c.latestPlan?.healthGrade) }}>
                   {c.latestPlan ? stageName(c.latestPlan.healthGrade) : "—"}
                 </div>
-                <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(c.latestPlan?.netWorth ?? null)}</div>
+                <div className="text-sm tabular-nums text-tx">{fmtMoney(c.latestPlan?.netWorth ?? null)}</div>
               </Link>
             ))}
           </div>
@@ -292,7 +299,7 @@ export default function ClientList({
     const [err, setErr] = useState("");
     const [pending, start] = useTransition();
 
-    const field = "w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7]";
+    const field = "w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx";
 
     function submit() {
       if (!name.trim()) {
@@ -325,16 +332,16 @@ export default function ClientList({
     }
 
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" onClick={onClose}>
-        <div className="w-full max-w-md bg-[#0c2135] border border-white/15 rounded-xl p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 grid place-items-center bg-scrim/60 px-4" onClick={onClose}>
+        <div className="w-full max-w-md bg-panel border border-line2 rounded-xl p-5 shadow-e3" onClick={(e) => e.stopPropagation()}>
           <h2 className="font-serif text-lg mb-4">新增客戶</h2>
           <div className="grid gap-3">
             <div>
-              <label className="text-xs text-[#a9bccf]">姓名 *</label>
+              <label className="text-xs text-tx2">姓名 *</label>
               <input className={field} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
             </div>
             <div>
-              <label className="text-xs text-[#a9bccf]">來源</label>
+              <label className="text-xs text-tx2">來源</label>
               <select className={field} value={source} onChange={(e) => setSource(e.target.value)}>
                 <option value="">—</option>
                 {CLIENT_SOURCES.map((s) => (
@@ -352,24 +359,24 @@ export default function ClientList({
               )}
             </div>
             <div>
-              <label className="text-xs text-[#a9bccf]">標籤（逗號分隔）</label>
+              <label className="text-xs text-tx2">標籤（逗號分隔）</label>
               <input className={field} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="VIP, 轉介" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-[#a9bccf]">電話</label>
+                <label className="text-xs text-tx2">電話</label>
                 <input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
               <div>
-                <label className="text-xs text-[#a9bccf]">生日</label>
+                <label className="text-xs text-tx2">生日</label>
                 <input type="date" className={field} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
               </div>
             </div>
-            {err && <div className="text-[#d9773f] text-sm">{err}</div>}
+            {err && <div className="text-danger text-sm">{err}</div>}
           </div>
           <div className="flex justify-end gap-2 mt-5">
-            <button onClick={onClose} className="px-3 py-1.5 text-sm text-[#a9bccf]">取消</button>
-            <button onClick={submit} disabled={pending} className="px-4 py-1.5 text-sm font-bold rounded-md bg-[#c99a5b] text-[#08202a] disabled:opacity-60">
+            <button onClick={onClose} className="px-3 py-1.5 text-sm text-tx2">取消</button>
+            <button onClick={submit} disabled={pending} className="px-4 py-1.5 text-sm font-bold rounded-md bg-brand text-onbrand disabled:opacity-60">
               {pending ? "建立中…" : "建立並開始"}
             </button>
           </div>
@@ -409,21 +416,21 @@ function TemplateShelf({
       : "";
 
   return (
-    <section className="mt-8 pt-6 border-t border-white/10">
+    <section className="mt-8 pt-6 border-t border-line">
       <div className="flex items-center gap-2 mb-3">
         <h2 className="font-serif text-lg tracking-wide">示範範本</h2>
-        <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#c99a5b]/50 text-[#e0bd8b] bg-[#c99a5b]/10 font-bold">唯讀</span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/15 text-[#a9bccf] font-bold">不計入額度</span>
-        <span className="text-[#6b7d8f] text-sm">{templates.length}</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded border border-brand/50 text-brand2 bg-brand/10 font-bold">唯讀</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded border border-line2 text-tx2 font-bold">不計入額度</span>
+        <span className="text-tx3 text-sm">{templates.length}</span>
       </div>
-      <p className="text-[12px] text-[#6b7d8f] mb-3">
+      <p className="text-[12px] text-tx3 mb-3">
         坐在客戶旁邊翻給他看的示範個案，全公司教練共用同一份，誰都改不了。
         想拿某一份當起點做試算，按「複製一份給自己」——複製出來的那位就是你名下的一般客戶，
         可以隨意修改，並且會計入你的客戶數。
       </p>
 
       {err && (
-        <div role="alert" className="mb-3 text-sm text-[#ffd7d8] bg-[#e5484d]/15 border border-[#e5484d]/40 rounded-lg px-3 py-2">
+        <div role="alert" className="mb-3 text-sm text-danger bg-danger-solid/15 border border-danger-solid/40 rounded-lg px-3 py-2">
           {err}
         </div>
       )}
@@ -432,24 +439,24 @@ function TemplateShelf({
         {templates.map((t) => (
           <div
             key={t.id}
-            className="grid grid-cols-1 md:grid-cols-[1.8fr_1fr_1fr_auto] gap-3 items-center bg-[#0c2135] border border-[#c99a5b]/25 rounded-lg px-3 py-3"
+            className="grid grid-cols-1 md:grid-cols-[1.8fr_1fr_1fr_auto] gap-3 items-center bg-panel border border-brand/25 rounded-lg px-3 py-3 shadow-e1"
           >
             <div className="min-w-0">
-              <Link href={`/dashboard/templates/${t.id}`} className="font-bold hover:text-[#e0bd8b]">
+              <Link href={`/dashboard/templates/${t.id}`} className="font-bold hover:text-brand2">
                 {t.name}
               </Link>
               {t.templateLabel && (
-                <div className="text-[11px] text-[#a9bccf] mt-0.5">{t.templateLabel}</div>
+                <div className="text-[11px] text-tx2 mt-0.5">{t.templateLabel}</div>
               )}
             </div>
             <div className="text-[12px] font-bold" style={{ color: stageColor(t.healthGrade) }}>
               {t.healthGrade ? stageName(t.healthGrade) : "—"}
             </div>
-            <div className="text-sm tabular-nums text-[#eef2f7]">{fmtMoney(t.netWorth ?? null)}</div>
+            <div className="text-sm tabular-nums text-tx">{fmtMoney(t.netWorth ?? null)}</div>
             <div className="flex items-center gap-2 justify-end">
               <Link
                 href={`/dashboard/templates/${t.id}`}
-                className="text-xs rounded-md border border-white/15 text-[#a9bccf] px-2.5 py-1.5 hover:bg-[#17406a]"
+                className="text-xs rounded-md border border-line2 text-tx2 px-2.5 py-1.5 hover:bg-panel3"
               >
                 翻給客戶看
               </Link>
@@ -473,7 +480,7 @@ function TemplateShelf({
                     }
                   });
                 }}
-                className="text-xs font-bold rounded-md border border-[#c99a5b]/50 text-[#e0bd8b] px-2.5 py-1.5 hover:bg-[#c99a5b]/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="text-xs font-bold rounded-md border border-brand/50 text-brand2 px-2.5 py-1.5 hover:bg-brand/10 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {busy === t.id && pending ? "複製中…" : "複製一份給自己"}
               </button>

@@ -3,6 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
+import { THEME_KEY, DEFAULT_THEME, normalizeTheme } from "@/lib/theme";
+
+// 規劃器是獨立文件，拿不到父層的 <html data-theme>，所以 init 時要一起灌進去。
+// 讀本機而不是讀 props：教練可能在別的分頁剛切過主題，本機才是最新的。
+function currentTheme() {
+  try {
+    return normalizeTheme(localStorage.getItem(THEME_KEY) ?? DEFAULT_THEME);
+  } catch {
+    return DEFAULT_THEME; // 無痕模式讀 localStorage 會丟例外
+  }
+}
+
 
 // 示範範本的規劃畫面。同一個元件服務兩邊：
 //   後台（/admin/templates/…）  傳 save → 可編輯，自動存回。
@@ -97,6 +109,7 @@ export default function TemplateFrame({
         type: "lantu:init",
         data,
         uiScale: currentScale(),
+          theme: currentTheme(),
         readOnly,
         readOnlyNote: note,
         // 範本沒有客戶編號（createTemplate 刻意不發號），報告書表頭那一格留白。
@@ -179,17 +192,17 @@ export default function TemplateFrame({
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#081a2b]">
-      <div className="flex items-center gap-3 px-4 py-2 bg-[#0d2b45] border-b border-white/10 text-[#eef2f7]">
-        <Link href={backHref} className="text-sm text-[#a9bccf] hover:text-[#eef2f7]">← {backLabel}</Link>
+    <div className="fixed inset-0 flex flex-col bg-canvas">
+      <div className="flex items-center gap-3 px-4 py-2 bg-panel border-b border-line text-tx">
+        <Link href={backHref} className="text-sm text-tx2 hover:text-tx">← {backLabel}</Link>
         <span className="text-sm font-bold">{title}</span>
-        {subtitle && <span className="text-[12px] text-[#a9bccf]">{subtitle}</span>}
+        {subtitle && <span className="text-[12px] text-tx2">{subtitle}</span>}
         <span
           className={
             "text-[11px] font-bold px-2 py-0.5 rounded border " +
             (readOnly
-              ? "border-[#c99a5b]/60 text-[#e0bd8b] bg-[#c99a5b]/10"
-              : "border-[#3b82f6]/60 text-[#8fb8ff] bg-[#3b82f6]/10")
+              ? "border-brand/60 text-brand2 bg-brand/10"
+              : "border-info/60 text-info bg-info/10")
           }
           title={note}
         >
@@ -197,7 +210,7 @@ export default function TemplateFrame({
         </span>
         <div className="flex-1" />
         {!readOnly && (
-          <span className={"text-xs " + (state === "saved" ? "text-[#7bbf6a]" : "text-[#6b7d8f]")}>
+          <span className={"text-xs " + (state === "saved" ? "text-ok" : "text-tx3")}>
             {state === "error" ? "" : statusText[state]}
           </span>
         )}
@@ -206,7 +219,7 @@ export default function TemplateFrame({
       {state === "error" && !readOnly && (
         <div
           role="alert"
-          className="sticky top-0 z-40 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-[#5b1f22] text-[#ffd7d8] border-b border-[#ff9d9f]/40"
+          className="sticky top-0 z-40 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-danger-solid/25 text-danger border-b border-danger/40"
         >
           <span className="text-[13px] font-bold">
             ⚠️ 儲存失敗——這一段修改<b className="underline">還沒進資料庫</b>。請不要關掉這個分頁。
@@ -215,7 +228,7 @@ export default function TemplateFrame({
           <button
             type="button"
             onClick={() => void doSave()}
-            className="text-[13px] font-bold rounded-md px-3 py-1 bg-[#ffd7d8] text-[#5b1f22] hover:bg-white"
+            className="text-[13px] font-bold rounded-md px-3 py-1 bg-danger text-danger-solid/25 hover:bg-white"
           >
             立即重試
           </button>
@@ -232,7 +245,7 @@ export default function TemplateFrame({
             {
               type: "lantu:init",
               data,
-              uiScale: normalizeScale(uiScale),
+              uiScale: normalizeScale(uiScale), theme: currentTheme(),
               readOnly,
               readOnlyNote: note,
               clientCode: null,

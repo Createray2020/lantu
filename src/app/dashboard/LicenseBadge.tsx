@@ -11,10 +11,10 @@ export default function LicenseBadge({ license }: { license: LicenseState }) {
 
   const d = license.daysLeft;
   const tone = license.expired
-    ? "border-[#e5484d]/60 text-[#ff9d9f] bg-[#e5484d]/10"
+    ? "border-danger-solid/60 text-danger bg-danger-solid/10"
     : license.warn
-      ? "border-[#c99a5b]/60 text-[#e0bd8b] bg-[#c99a5b]/10"
-      : "border-white/15 text-[#a9bccf]";
+      ? "border-brand/60 text-brand2 bg-brand/10"
+      : "border-line2 text-tx2";
 
   const text = license.expired
     ? "使用期限已到期"

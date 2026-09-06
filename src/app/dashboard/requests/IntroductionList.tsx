@@ -34,26 +34,26 @@ export default function IntroductionList({ intros }: { intros: Intro[] }) {
     }
   }
 
-  if (!list.length) return <p className="text-[#a7bacb]">目前沒有待你確認的報聘申請。</p>;
+  if (!list.length) return <p className="text-tx2">目前沒有待你確認的報聘申請。</p>;
 
   return (
     <div className="space-y-3">
-      {err && <div className="text-[#ff9b9b] text-sm">⚠ {err}</div>}
+      {err && <div className="text-danger text-sm">⚠ {err}</div>}
       {list.map((it) => (
-        <div key={it.coachId} className="rounded-xl bg-[#12334f] border border-white/8 p-4">
-          <div className="text-[#eef2f7] font-semibold">{it.applicantName || "（未命名）"}</div>
-          <div className="text-[11px] text-[#6f869c]">
+        <div key={it.coachId} className="rounded-xl bg-panel2 border border-line p-4 shadow-e1">
+          <div className="text-tx font-semibold">{it.applicantName || "（未命名）"}</div>
+          <div className="text-[11px] text-tx3">
             {[it.applicantEmail, it.phone].filter(Boolean).join("｜") || "（未留聯絡方式）"}
           </div>
-          {it.currentJob && <div className="text-[#a7bacb] text-sm mt-2">現況：{it.currentJob}</div>}
+          {it.currentJob && <div className="text-tx2 text-sm mt-2">現況：{it.currentJob}</div>}
           {it.motive && (
-            <div className="text-[#a7bacb] text-sm mt-1 whitespace-pre-wrap">報聘動機：{it.motive}</div>
+            <div className="text-tx2 text-sm mt-1 whitespace-pre-wrap">報聘動機：{it.motive}</div>
           )}
-          <p className="mt-3 text-[11px] text-[#6f869c] leading-relaxed">
+          <p className="mt-3 text-[11px] text-tx3 leading-relaxed">
             按「確認推薦」代表：此申請人確實由你推薦，並同意其進入後續嵐途審核流程。
           </p>
           <textarea
-            className="mt-3 w-full bg-[#0a1a2b] border border-white/15 rounded-md text-sm px-3 py-2 text-[#eef2f7] placeholder:text-[#4f6478]"
+            className="mt-3 w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx placeholder:text-tx3"
             rows={2}
             value={note[it.coachId] ?? ""}
             onChange={(e) => setNote((n) => ({ ...n, [it.coachId]: e.target.value }))}
@@ -63,14 +63,14 @@ export default function IntroductionList({ intros }: { intros: Intro[] }) {
             <button
               onClick={() => respond(it.coachId, "confirm")}
               disabled={busy === it.coachId}
-              className="font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
+              className="font-bold text-onbrand bg-brand hover:bg-brand2 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
             >
               {busy === it.coachId ? "…" : "確認推薦"}
             </button>
             <button
               onClick={() => respond(it.coachId, "decline")}
               disabled={busy === it.coachId}
-              className="text-[#a7bacb] hover:text-white border border-white/15 px-4 py-2 rounded-lg text-sm"
+              className="text-tx2 hover:text-tx border border-line2 px-4 py-2 rounded-lg text-sm"
             >
               不是我推薦的
             </button>

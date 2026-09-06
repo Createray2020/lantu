@@ -55,13 +55,13 @@ export default function CoachList({
   return (
     <div className="space-y-6">
       {link.state === "linked" && (
-        <div className="rounded-xl border border-[#7bd88f]/30 bg-[#7bd88f]/10 px-4 py-3 text-sm text-[#7bd88f]">
+        <div className="rounded-xl border border-ok/30 bg-ok/10 px-4 py-3 text-sm text-ok">
           你已經連結教練{link.coachName ? `：${link.coachName}` : ""}。
           <Link href="/portal" className="underline underline-offset-4 ml-2">回我的規劃</Link>
         </div>
       )}
       {link.state === "pending" && (
-        <div className="rounded-xl border border-[#c99a5b]/40 bg-[#c99a5b]/10 px-4 py-3 text-sm text-[#e0bd8b]">
+        <div className="rounded-xl border border-brand/40 bg-brand/10 px-4 py-3 text-sm text-brand2">
           已送出連結申請{link.coachName ? `給 ${link.coachName}` : ""}，等待對方接受。
         </div>
       )}
@@ -70,16 +70,16 @@ export default function CoachList({
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => setFilter(null)}
             className={`rounded-full px-3 py-1.5 text-xs border ${
-              filter === null ? "bg-[#c99a5b] text-[#08202a] border-[#c99a5b] font-bold"
-                              : "border-white/15 text-[#a7bacb] hover:border-white/35"
+              filter === null ? "bg-brand text-onbrand border-brand font-bold"
+                              : "border-line2 text-tx2 hover:border-line2"
             }`}>
             全部（{coaches.length}）
           </button>
           {allSpecialties.map((s) => (
             <button key={s} type="button" onClick={() => setFilter(s === filter ? null : s)}
               className={`rounded-full px-3 py-1.5 text-xs border ${
-                filter === s ? "bg-[#c99a5b] text-[#08202a] border-[#c99a5b] font-bold"
-                             : "border-white/15 text-[#a7bacb] hover:border-white/35"
+                filter === s ? "bg-brand text-onbrand border-brand font-bold"
+                             : "border-line2 text-tx2 hover:border-line2"
               }`}>
               {s}
             </button>
@@ -88,13 +88,13 @@ export default function CoachList({
       )}
 
       {msg && (
-        <div className={`text-sm ${msg.ok ? "text-[#7fb894]" : "text-[#ff9b9b]"}`}>
+        <div className={`text-sm ${msg.ok ? "text-ok" : "text-danger"}`}>
           {msg.ok ? `${msg.text} ✓` : `⚠ ${msg.text}`}
         </div>
       )}
 
       {shown.length === 0 ? (
-        <p className="text-[#a7bacb] text-sm">
+        <p className="text-tx2 text-sm">
           {coaches.length === 0
             ? "教練們正在準備自我介紹，很快就會在這裡與你見面。"
             : "這個專長目前沒有教練，換一個看看。"}
@@ -106,29 +106,29 @@ export default function CoachList({
               <CoachCard {...c} compact />
               <div className="flex items-center gap-2 mt-2">
                 <Link href={`/coaches/${c.id}`}
-                  className="text-xs text-[#a7bacb] hover:text-white underline underline-offset-4">
+                  className="text-xs text-tx2 hover:text-tx underline underline-offset-4">
                   看完整介紹
                 </Link>
                 <div className="flex-1" />
                 {c.code && (
-                  <span className="font-mono text-[10px] tracking-wider text-[#6f869c]" title="教練編號">
+                  <span className="font-mono text-[10px] tracking-wider text-tx3" title="教練編號">
                     {c.code}
                   </span>
                 )}
                 {/* C 階教練照常呈現，只是不給直接指定的按鈕（見檔頭的派案規則）。 */}
                 {!c.pickable ? (
-                  <span className="text-[11px] text-[#6f869c] border border-white/10 rounded-lg px-2.5 py-1.5">
+                  <span className="text-[11px] text-tx3 border border-line rounded-lg px-2.5 py-1.5">
                     需教練編號指定
                   </span>
                 ) : link.state === "none" ? (
                   <button type="button" disabled={pending}
                     onClick={() => pick(c.id, c.name)}
-                    className="rounded-lg bg-[#c99a5b] text-[#08202a] font-bold px-3 py-1.5 text-xs hover:bg-[#e0bd8b] disabled:opacity-40">
+                    className="rounded-lg bg-brand text-onbrand font-bold px-3 py-1.5 text-xs hover:bg-brand2 disabled:opacity-40">
                     {pending ? "送出中…" : "選擇這位教練"}
                   </button>
                 ) : link.state === "guest" ? (
                   <Link href="/client/sign-up"
-                    className="rounded-lg bg-[#c99a5b] text-[#08202a] font-bold px-3 py-1.5 text-xs hover:bg-[#e0bd8b]">
+                    className="rounded-lg bg-brand text-onbrand font-bold px-3 py-1.5 text-xs hover:bg-brand2">
                     註冊後選擇
                   </Link>
                 ) : null}
@@ -179,16 +179,16 @@ function CodeEntry({ coaches, link }: { coaches: PublicCoach[]; link: LinkState 
   if (link.state === "linked" || link.state === "pending") return null;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+    <div className="rounded-xl border border-line bg-white/[0.03] px-4 py-4">
       <div className="text-sm font-bold mb-1">已經有指定的教練了？輸入教練編號</div>
-      <p className="text-[12px] text-[#8ea3b6] leading-relaxed mb-3">
-        每位嵐途教練都有一組專屬編號（格式如 <span className="font-mono text-[#c99a5b]">FC2609002</span>）。
+      <p className="text-[12px] text-tx2 leading-relaxed mb-3">
+        每位嵐途教練都有一組專屬編號（格式如 <span className="font-mono text-brand">FC2609002</span>）。
         向你的教練索取後輸入，就會直接把連結申請送給他。
       </p>
 
       {link.state === "guest" ? (
         <Link href="/client/sign-up"
-          className="inline-block rounded-lg bg-[#c99a5b] text-[#08202a] font-bold px-3 py-1.5 text-xs hover:bg-[#e0bd8b]">
+          className="inline-block rounded-lg bg-brand text-onbrand font-bold px-3 py-1.5 text-xs hover:bg-brand2">
           註冊後用編號指定
         </Link>
       ) : (
@@ -202,22 +202,22 @@ function CodeEntry({ coaches, link }: { coaches: PublicCoach[]; link: LinkState 
             placeholder="FC2609002"
             autoComplete="off"
             spellCheck={false}
-            className="font-mono tracking-wider rounded-lg bg-[#0c2135] border border-white/15 px-3 py-2 text-sm w-48 focus:border-[#c99a5b] outline-none"
+            className="font-mono tracking-wider rounded-lg bg-panel border border-line2 px-3 py-2 text-sm w-48 focus:border-brand outline-none shadow-e1"
           />
           <button type="submit" disabled={pending || !key}
-            className="rounded-lg bg-[#c99a5b] text-[#08202a] font-bold px-3 py-2 text-xs hover:bg-[#e0bd8b] disabled:opacity-40">
+            className="rounded-lg bg-brand text-onbrand font-bold px-3 py-2 text-xs hover:bg-brand2 disabled:opacity-40">
             {pending ? "送出中…" : "指定這位教練"}
           </button>
 
           {suggestions.length > 0 && (
-            <ul className="absolute top-full left-0 mt-1 z-10 w-64 rounded-lg border border-white/15 bg-[#0c2135] shadow-lg overflow-hidden">
+            <ul className="absolute top-full left-0 mt-1 z-10 w-64 rounded-lg border border-line2 bg-panel shadow-lg overflow-hidden">
               {suggestions.map((c) => (
                 <li key={c.id}>
                   <button type="button" onClick={() => setRaw(c.code!)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-[#123049] flex items-center gap-2">
-                    <span className="font-mono text-[#c99a5b]">{c.code}</span>
-                    <span className="text-[#eef2f7]">{c.name}</span>
-                    {c.rankLabel && <span className="text-[10px] text-[#6f869c]">{c.rankLabel}</span>}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-panel2 flex items-center gap-2">
+                    <span className="font-mono text-brand">{c.code}</span>
+                    <span className="text-tx">{c.name}</span>
+                    {c.rankLabel && <span className="text-[10px] text-tx3">{c.rankLabel}</span>}
                   </button>
                 </li>
               ))}
@@ -227,7 +227,7 @@ function CodeEntry({ coaches, link }: { coaches: PublicCoach[]; link: LinkState 
       )}
 
       {msg && (
-        <div className={`text-sm mt-2 ${msg.ok ? "text-[#7fb894]" : "text-[#ff9b9b]"}`}>
+        <div className={`text-sm mt-2 ${msg.ok ? "text-ok" : "text-danger"}`}>
           {msg.ok ? `${msg.text} ✓` : `⚠ ${msg.text}`}
         </div>
       )}

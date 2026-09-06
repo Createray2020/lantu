@@ -69,7 +69,7 @@ export default function OrgCell({
   }
 
   const sel =
-    "bg-[#0d2b45] border border-white/10 rounded px-1.5 py-1 text-xs text-[#eef2f7] disabled:opacity-50";
+    "bg-panel border border-line rounded px-1.5 py-1 text-xs text-tx disabled:opacity-50";
 
   return (
     <div className="flex flex-col gap-1">
@@ -107,13 +107,13 @@ export default function OrgCell({
           type="button"
           onClick={save}
           disabled={pending || !dirty}
-          className="rounded bg-[#12334f] border border-white/15 text-[#a9bccf] px-2 py-1 text-xs hover:bg-[#17406a] disabled:opacity-40 disabled:hover:bg-[#12334f]"
+          className="rounded bg-panel2 border border-line2 text-tx2 px-2 py-1 text-xs hover:bg-panel3 disabled:opacity-40 disabled:hover:bg-panel2"
         >
           {pending ? "存檔中…" : "存"}
         </button>
       </div>
-      {saved && <span className="text-[10px] text-[#6f8f74]">已儲存 ✓</span>}
-      {error && <span className="text-[10px] text-[#e08b7a]">儲存失敗：{error}</span>}
+      {saved && <span className="text-[10px] text-ok-solid">已儲存 ✓</span>}
+      {error && <span className="text-[10px] text-danger">儲存失敗：{error}</span>}
     </div>
   );
 }

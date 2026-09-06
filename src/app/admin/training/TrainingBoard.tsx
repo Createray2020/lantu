@@ -8,10 +8,10 @@ import {
   addExternalAction, createSessionAction, markAttendanceAction, reviewExternalAction,
 } from "./actions";
 
-const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1 text-sm text-[#eef2f7] outline-none";
-const EMPTY = "bg-[#0d2b45] border border-dashed border-[#3d5b78] rounded px-2 py-1 text-sm text-[#8fa6ba] outline-none";
-const BTN = "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
-const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-[#1d5c8a] border border-[#2b7cb5] text-white hover:bg-[#226ba0] disabled:opacity-40";
+const INPUT = "bg-panel border border-line2 rounded px-2 py-1 text-sm text-tx outline-none";
+const EMPTY = "bg-panel border border-dashed border-line2 rounded px-2 py-1 text-sm text-tx2 outline-none";
+const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
+const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-info-solid border border-info-solid text-onsolid hover:brightness-110 disabled:opacity-40";
 
 export type SessionView = {
   id: string; heldOn: string; topic: string; mode: string; hours: number | null;
@@ -57,40 +57,40 @@ export default function TrainingBoard({
   return (
     <div className="space-y-4">
       {msg && (
-        <div className={`text-sm ${msg.ok ? "text-[#7fb894]" : "text-[#e08b7a]"}`}>
+        <div className={`text-sm ${msg.ok ? "text-ok" : "text-danger"}`}>
           {msg.ok ? `${msg.text} ✓` : `失敗：${msg.text}`}
         </div>
       )}
 
       {/* 新增場次 */}
-      <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4">
-        <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-1">研討會場次</h3>
-        <p className="text-xs text-[#7f9ab2] mb-3">
+      <div className="rounded-xl border border-line bg-panel p-4 shadow-e1">
+        <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-1">研討會場次</h3>
+        <p className="text-xs text-tx2 mb-3">
           每場預設認列 {perSession ?? "（未設定）"} 小時，講師 ×{speakerMult ?? 1} 倍；
           外部課程年度上限 {cap ?? "不設限"} 小時。這些數字都在「業務制度 › 維持資格」設定。
         </p>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="text-xs text-[#a9bccf]">日期
+          <label className="text-xs text-tx2">日期
             <input type="date" value={form.heldOn} onChange={(e) => setForm({ ...form, heldOn: e.target.value })}
               className={`${form.heldOn ? INPUT : EMPTY} w-40 block mt-0.5`} />
           </label>
-          <label className="text-xs text-[#a9bccf] flex-1 min-w-[180px]">主題
+          <label className="text-xs text-tx2 flex-1 min-w-[180px]">主題
             <input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })}
               placeholder="例：高資產客戶稅務實務"
               className={`${form.topic ? INPUT : EMPTY} w-full block mt-0.5`} />
           </label>
-          <label className="text-xs text-[#a9bccf]">形式
+          <label className="text-xs text-tx2">形式
             <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}
               className={`${INPUT} w-28 block mt-0.5`}>
               <option value="onsite">實體</option><option value="online">線上</option><option value="hybrid">混合</option>
             </select>
           </label>
-          <label className="text-xs text-[#a9bccf]">認列時數
+          <label className="text-xs text-tx2">認列時數
             <input type="number" step="any" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })}
               placeholder={perSession != null ? String(perSession) : "未設定"}
               className={`${form.hours ? INPUT : EMPTY} w-24 block mt-0.5`} />
           </label>
-          <label className="text-xs text-[#a9bccf]">講師
+          <label className="text-xs text-tx2">講師
             <select value={form.speakerId} onChange={(e) => setForm({ ...form, speakerId: e.target.value })}
               className={`${form.speakerId ? INPUT : EMPTY} w-32 block mt-0.5`}>
               <option value="">（無）</option>
@@ -107,10 +107,10 @@ export default function TrainingBoard({
           </button>
         </div>
 
-        <div className="mt-3 overflow-x-auto rounded-lg border border-white/10">
+        <div className="mt-3 overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+              <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">日期</th><th className="px-3 py-2">主題</th>
                 <th className="px-3 py-2">形式</th><th className="px-3 py-2">講師</th>
                 <th className="px-3 py-2 text-right">出席</th><th className="px-3 py-2 text-right"></th>
@@ -119,23 +119,23 @@ export default function TrainingBoard({
             <tbody>
               {sessions.map((s) => (
                 <Fragment key={s.id}>
-                  <tr className="border-t border-white/8">
-                    <td className="px-3 py-2 text-[#a9bccf]">{s.heldOn}</td>
+                  <tr className="border-t border-line">
+                    <td className="px-3 py-2 text-tx2">{s.heldOn}</td>
                     <td className="px-3 py-2 font-semibold">{s.topic}</td>
-                    <td className="px-3 py-2 text-[#a9bccf]">
+                    <td className="px-3 py-2 text-tx2">
                       {s.mode === "online" ? "線上" : s.mode === "hybrid" ? "混合" : "實體"}
                     </td>
-                    <td className="px-3 py-2 text-[#a9bccf]">{s.speakerName}</td>
+                    <td className="px-3 py-2 text-tx2">{s.speakerName}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{s.attendees.length}</td>
                     <td className="px-3 py-2 text-right">
-                      <button type="button" className="text-xs text-[#a9bccf] underline"
+                      <button type="button" className="text-xs text-tx2 underline"
                         onClick={() => setOpenRoll(openRoll === s.id ? null : s.id)}>
                         {openRoll === s.id ? "收合" : "點名"}
                       </button>
                     </td>
                   </tr>
                   {openRoll === s.id && (
-                    <tr className="bg-[#0a2138]">
+                    <tr className="bg-field">
                       <td colSpan={6} className="px-4 py-3">
                         <RollCall session={s} peers={peers} pending={pending}
                           onSave={(ids) => run(() => markAttendanceAction(s.id, ids), "出席已更新")} />
@@ -145,7 +145,7 @@ export default function TrainingBoard({
                 </Fragment>
               ))}
               {sessions.length === 0 && (
-                <tr><td colSpan={6} className="px-3 py-6 text-center text-[#6f869c]">尚無場次。</td></tr>
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-tx3">尚無場次。</td></tr>
               )}
             </tbody>
           </table>
@@ -153,20 +153,20 @@ export default function TrainingBoard({
       </div>
 
       {/* 外部課程 */}
-      <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4">
-        <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-2">外部課程認列</h3>
+      <div className="rounded-xl border border-line bg-panel p-4 shadow-e1">
+        <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">外部課程認列</h3>
         <div className="flex flex-wrap items-end gap-2 mb-3">
-          <label className="text-xs text-[#a9bccf]">教練
+          <label className="text-xs text-tx2">教練
             <select value={ext.coachId} onChange={(e) => setExt({ ...ext, coachId: e.target.value })}
               className={`${INPUT} w-32 block mt-0.5`}>
               {peers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
-          <label className="text-xs text-[#a9bccf] flex-1 min-w-[180px]">課程
+          <label className="text-xs text-tx2 flex-1 min-w-[180px]">課程
             <input value={ext.title} onChange={(e) => setExt({ ...ext, title: e.target.value })}
               className={`${ext.title ? INPUT : EMPTY} w-full block mt-0.5`} />
           </label>
-          <label className="text-xs text-[#a9bccf]">時數
+          <label className="text-xs text-tx2">時數
             <input type="number" step="any" value={ext.hours} onChange={(e) => setExt({ ...ext, hours: e.target.value })}
               className={`${ext.hours ? INPUT : EMPTY} w-24 block mt-0.5`} />
           </label>
@@ -177,10 +177,10 @@ export default function TrainingBoard({
             建立申請
           </button>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-white/10">
+        <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+              <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">申請人</th><th className="px-3 py-2">課程</th>
                 <th className="px-3 py-2 text-right">時數</th><th className="px-3 py-2">狀態</th>
                 <th className="px-3 py-2 text-right">動作</th>
@@ -188,14 +188,14 @@ export default function TrainingBoard({
             </thead>
             <tbody>
               {externals.map((x) => (
-                <tr key={x.id} className="border-t border-white/8">
+                <tr key={x.id} className="border-t border-line">
                   <td className="px-3 py-2">{x.coachName}</td>
-                  <td className="px-3 py-2 text-[#a9bccf]">{x.title ?? "—"}</td>
+                  <td className="px-3 py-2 text-tx2">{x.title ?? "—"}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{x.hours}</td>
                   <td className="px-3 py-2 text-xs">
                     <span className={
-                      x.status === "approved" ? "text-[#7fb894]"
-                        : x.status === "rejected" ? "text-[#e08b7a]" : "text-[#e0bd8b]"
+                      x.status === "approved" ? "text-ok"
+                        : x.status === "rejected" ? "text-danger" : "text-brand2"
                     }>
                       {x.status === "approved" ? "已核准" : x.status === "rejected" ? "已退回" : "待審"}
                     </span>
@@ -213,7 +213,7 @@ export default function TrainingBoard({
                 </tr>
               ))}
               {externals.length === 0 && (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-[#6f869c]">尚無外部課程申請。</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-tx3">尚無外部課程申請。</td></tr>
               )}
             </tbody>
           </table>
@@ -221,12 +221,12 @@ export default function TrainingBoard({
       </div>
 
       {/* 年度總表 */}
-      <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4">
-        <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-2">{year} 年度訓練時數總表</h3>
-        <div className="overflow-x-auto rounded-lg border border-white/10">
+      <div className="rounded-xl border border-line bg-panel p-4 shadow-e1">
+        <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">{year} 年度訓練時數總表</h3>
+        <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+              <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">教練</th>
                 <th className="px-3 py-2 text-right">內部研討會</th>
                 <th className="px-3 py-2 text-right">講師加倍</th>
@@ -238,27 +238,27 @@ export default function TrainingBoard({
             </thead>
             <tbody>
               {hours.map((h) => (
-                <tr key={h.id} className="border-t border-white/8">
+                <tr key={h.id} className="border-t border-line">
                   <td className="px-3 py-2">{h.name}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{h.internal}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{h.speaker}</td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {h.external}
                     {h.externalRaw > h.external && (
-                      <span className="text-[11px] text-[#6f869c]"> / 申請 {h.externalRaw}</span>
+                      <span className="text-[11px] text-tx3"> / 申請 {h.externalRaw}</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold">{h.total}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-[#a9bccf]">{h.need ?? "未設定"}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-tx2">{h.need ?? "未設定"}</td>
                   <td className="px-3 py-2 text-xs">
-                    {h.need === null ? <span className="text-[#6f869c]">不檢查</span>
-                      : h.pass ? <span className="text-[#7fb894]">✓ 達標</span>
-                        : <span className="text-[#c99a5b]">差 {h.need - h.total}h</span>}
+                    {h.need === null ? <span className="text-tx3">不檢查</span>
+                      : h.pass ? <span className="text-ok">✓ 達標</span>
+                        : <span className="text-brand">差 {h.need - h.total}h</span>}
                   </td>
                 </tr>
               ))}
               {hours.length === 0 && (
-                <tr><td colSpan={7} className="px-3 py-6 text-center text-[#6f869c]">尚無教練。</td></tr>
+                <tr><td colSpan={7} className="px-3 py-6 text-center text-tx3">尚無教練。</td></tr>
               )}
             </tbody>
           </table>
@@ -280,10 +280,10 @@ function RollCall({
     <div>
       <div className="flex flex-wrap gap-2 mb-3">
         {peers.map((p) => (
-          <label key={p.id} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2 py-1 text-xs">
+          <label key={p.id} className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1 text-xs">
             <input type="checkbox" checked={sel.includes(p.id)} onChange={() => toggle(p.id)}
-              className="h-3.5 w-3.5 accent-[#2b7cb5]" />
-            <span className={p.id === session.speakerId ? "text-[#e0bd8b]" : "text-[#cfdcea]"}>
+              className="h-3.5 w-3.5 accent-info-solid" />
+            <span className={p.id === session.speakerId ? "text-brand2" : "text-tx"}>
               {p.name}{p.id === session.speakerId && "（講師）"}
             </span>
           </label>
@@ -292,7 +292,7 @@ function RollCall({
       <button type="button" disabled={pending} className={BTN_SOLID} onClick={() => onSave(sel)}>
         儲存出席
       </button>
-      <span className="ml-2 text-xs text-[#6f869c]">
+      <span className="ml-2 text-xs text-tx3">
         講師時數自動加倍，重複點名會更新而不是加倍。
       </span>
     </div>

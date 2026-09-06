@@ -5,8 +5,8 @@ export const COLLAB_READONLY_MESSAGE =
 
 export default function CollabBanner() {
   return (
-    <div className="bg-[#3b82f6]/12 border-b border-[#3b82f6]/40 text-[#cfe0ff] px-4 sm:px-6 py-2 text-sm">
-      <b className="text-[#8fb8ff]">共同執案 · 唯讀</b>
+    <div className="bg-info/12 border-b border-info/40 text-info px-4 sm:px-6 py-2 text-sm">
+      <b className="text-info">共同執案 · 唯讀</b>
       <span className="ml-2">{COLLAB_READONLY_MESSAGE}</span>
     </div>
   );

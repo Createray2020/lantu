@@ -114,8 +114,11 @@ describe("② 規劃前 / 後對照：成對水平長條", () => {
     const c = useSample("coach", "analysis");
     const h = w.beforeAfterHTML(c) as string;
     expect(h).toContain('class="baItem"');
-    expect(h).toContain("#8ea3b5"); // 規劃前（planChartColors.BASE）
-    expect(h).toContain("#f0c34e"); // 規劃後（planChartColors.AFT，全站既有語意色）
+    // 顏色改由主題色盤（TPAL）供應，不再寫死色碼——這樣切淺色版時圖表才會跟著翻。
+    // 這裡驗的是語意分工仍在：規劃前＝中性、規劃後＝強調，兩者必須不同色。
+    expect(h).toContain(w.TPAL.mut); // 規劃前（planChartColors.BASE）
+    expect(h).toContain(w.TPAL.c3); // 規劃後（planChartColors.AFT）
+    expect(w.TPAL.mut).not.toBe(w.TPAL.c3);
     expect(h).not.toMatch(/^<table/);
   });
 
@@ -143,8 +146,8 @@ describe("③ 保障缺口：每一列各自以自己的毛需求為滿刻度", 
     const c = useSample("coach", "analysis");
     const h = w.coverageGapBarsHTML(w.coverageGaps(c)) as string;
     expect(h).toContain('class="gpRow"');
-    expect(h).toContain("#ef6f6f");
-    expect(h).toContain("#8ea3b5");
+    expect(h).toContain(w.TPAL.gap); // 缺口
+    expect(h).toContain(w.TPAL.mut); // 已備（中性）
     expect(h).toMatch(/margin-left:2px/);
   });
 
@@ -226,7 +229,7 @@ describe("⑤ 退休金流與退休分頁首屏", () => {
     expect(h).toContain("<rect");
     expect(h).toContain("#5cc08a"); // 理財收入
     expect(h).toContain("#5b93d6"); // 工作收入
-    expect(h).toContain("#ef6f6f"); // 缺口
+    expect(h).toContain(w.TPAL.gap); // 缺口
     expect(h).toContain("當年家庭總需求");
     expect(h).toContain("退休 " + w.n(c.profile.retireAge) + " 歲");
     expect(h).toContain("逐年數字（原本的表）");
@@ -237,7 +240,7 @@ describe("⑤ 退休金流與退休分頁首屏", () => {
     useSample("coach", "data", "retire");
     const svg = $('svg[aria-label="退休期可投資資產曲線"]');
     expect(svg).toBeTruthy();
-    expect(svg.outerHTML).toContain("#f0c34e"); // 可投資資產本金（既有語意色）
+    expect(svg.outerHTML).toContain(w.TPAL.c3); // 可投資資產本金（既有語意色）
     expect(svg.outerHTML).toMatch(/歲轉負|退休 \d+ 歲/);
   });
 

@@ -30,15 +30,15 @@ type VersionLite = {
 };
 
 const INPUT =
-  "bg-[#0d2b45] rounded px-2 py-1 text-sm text-[#eef2f7] outline-none focus:border-[#e0bd8b]";
-const FILLED = `${INPUT} border border-white/15`;
+  "bg-panel rounded px-2 py-1 text-sm text-tx outline-none focus:border-brand2";
+const FILLED = `${INPUT} border border-line2`;
 import MoneyInput from "@/components/MoneyInput";
 
-const EMPTY = `${INPUT} border border-dashed border-[#3d5b78] text-[#8fa6ba]`;
+const EMPTY = `${INPUT} border border-dashed border-line2 text-tx2`;
 const BTN =
-  "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
+  "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
 const BTN_SOLID =
-  "rounded-lg px-3 py-1.5 text-sm bg-[#1d5c8a] border border-[#2b7cb5] text-white hover:bg-[#226ba0] disabled:opacity-40";
+  "rounded-lg px-3 py-1.5 text-sm bg-info-solid border border-info-solid text-onsolid hover:brightness-110 disabled:opacity-40";
 
 function fmtInt(n: number | null | undefined) {
   return n === null || n === undefined ? "" : String(n);
@@ -141,8 +141,8 @@ export default function SystemEditor({
   return (
     <div className="space-y-4">
       {/* 版本列 */}
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[#0d2b45] px-4 py-3">
-        <span className="text-xs text-[#a9bccf]">制度版本</span>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-panel px-4 py-3 shadow-e1">
+        <span className="text-xs text-tx2">制度版本</span>
         <select
           value={versionId}
           // 換版本＝整頁重載，state 裡沒存的東西全部消失。先問一句。
@@ -161,7 +161,7 @@ export default function SystemEditor({
           ))}
         </select>
         {!editable && (
-          <span className="text-xs text-[#e0bd8b]">已封存版本為唯讀 —— 它是舊案分潤的依據</span>
+          <span className="text-xs text-brand2">已封存版本為唯讀 —— 它是舊案分潤的依據</span>
         )}
         <div className="flex-1" />
         <Link href="/admin/system/simulator" className={BTN}>
@@ -198,8 +198,8 @@ export default function SystemEditor({
             onClick={() => setTab(t.id)}
             className={`rounded-lg px-3 py-1.5 text-sm border ${
               t.id === tab
-                ? "bg-[#1d5c8a] border-[#2b7cb5] text-white"
-                : "border-white/10 text-[#a9bccf] hover:bg-[#12334f]"
+                ? "bg-info-solid border-info-solid text-onsolid"
+                : "border-line text-tx2 hover:bg-panel2"
             }`}
           >
             <span className="opacity-60 mr-1">{i + 1}</span>
@@ -209,11 +209,11 @@ export default function SystemEditor({
       </div>
 
       {/* 內容 */}
-      <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-5">
+      <div className="rounded-xl border border-line bg-panel p-5 shadow-e1">
         <div className="mb-4">
           <h2 className="text-lg font-bold">{spec.label}</h2>
-          <p className="text-xs text-[#7f9ab2] mt-0.5">對應辦法{spec.law}</p>
-          {spec.intro && <p className="text-sm text-[#a9bccf] mt-2 leading-relaxed">{spec.intro}</p>}
+          <p className="text-xs text-tx2 mt-0.5">對應辦法{spec.law}</p>
+          {spec.intro && <p className="text-sm text-tx2 mt-2 leading-relaxed">{spec.intro}</p>}
         </div>
 
         {spec.custom === "modules" && (
@@ -222,7 +222,7 @@ export default function SystemEditor({
         {spec.custom === "ranks" && (
           <>
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-[#a9bccf]">正在編輯</span>
+              <span className="text-xs text-tx2">正在編輯</span>
               <select value={rankModule} onChange={(e) => setRankModule(e.target.value)}
                 className={FILLED}>
                 <option value="">預設表（所有模塊的 fallback）</option>
@@ -233,7 +233,7 @@ export default function SystemEditor({
                 ))}
               </select>
               {rankModule && rankRowsOfModule.length === 0 && (
-                <span className="text-xs text-[#e0bd8b]">
+                <span className="text-xs text-brand2">
                   這個模塊還沒有自訂表 —— 目前沿用預設表。按下方「複製預設表」再改。
                 </span>
               )}
@@ -302,10 +302,10 @@ export default function SystemEditor({
 
         {spec.sections.map((sec) => (
           <section key={sec.title} className="mt-6 first:mt-0">
-            <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-1">
+            <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-1">
               {sec.title}
             </h3>
-            {sec.note && <p className="text-xs text-[#7f9ab2] mb-2">{sec.note}</p>}
+            {sec.note && <p className="text-xs text-tx2 mb-2">{sec.note}</p>}
             <div className="grid gap-2 md:grid-cols-2">
               {sec.fields.map((f) => (
                 <FieldRow
@@ -322,7 +322,7 @@ export default function SystemEditor({
         ))}
 
         {/* 存檔列 */}
-        <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-4">
+        <div className="mt-6 flex items-center gap-3 border-t border-line pt-4">
           <button
             type="button"
             disabled={pending || !editable}
@@ -331,14 +331,14 @@ export default function SystemEditor({
           >
             {pending ? "存檔中…" : "儲存變更"}
           </button>
-          <span className="text-xs text-[#7f9ab2]">
+          <span className="text-xs text-tx2">
             一次存下全部分頁的改動（服務模塊、職級表、門檻、參數）。
           </span>
           {dirty && !msg && (
-            <span className="text-sm text-[#e0bd8b]">有未儲存的變更</span>
+            <span className="text-sm text-brand2">有未儲存的變更</span>
           )}
           {msg && (
-            <span className={`text-sm ${msg.ok ? "text-[#7fb894]" : "text-[#e08b7a]"}`}>
+            <span className={`text-sm ${msg.ok ? "text-ok" : "text-danger"}`}>
               {msg.ok ? `${msg.text} ✓` : `儲存失敗：${msg.text}`}
             </span>
           )}
@@ -380,7 +380,7 @@ function FieldRow({
             onChange={(v) => onChange(v === null ? undefined : v)}
             className={`${cls} w-28`}
           />
-          <span className="text-xs text-[#7f9ab2]">{unit}</span>
+          <span className="text-xs text-tx2">{unit}</span>
         </div>
       );
     }
@@ -398,16 +398,16 @@ function FieldRow({
           }}
           className={`${cls} w-28`}
         />
-        {unit && <span className="text-xs text-[#7f9ab2]">{unit}</span>}
+        {unit && <span className="text-xs text-tx2">{unit}</span>}
       </div>
     );
   }
 
   return (
-    <label className="flex items-start justify-between gap-3 rounded-lg bg-[#0a2138] border border-white/5 px-3 py-2">
-      <span className="text-sm text-[#cfdcea] leading-snug pt-1">
+    <label className="flex items-start justify-between gap-3 rounded-lg bg-field border border-line px-3 py-2">
+      <span className="text-sm text-tx leading-snug pt-1">
         {field.label}
-        {field.hint && <span className="block text-[11px] text-[#6f869c]">{field.hint}</span>}
+        {field.hint && <span className="block text-[11px] text-tx3">{field.hint}</span>}
       </span>
       <span className="shrink-0">
         {field.type === "bool" && (
@@ -416,7 +416,7 @@ function FieldRow({
             checked={value === true}
             disabled={disabled}
             onChange={(e) => onChange(e.target.checked ? true : false)}
-            className="mt-1.5 h-4 w-4 accent-[#2b7cb5]"
+            className="mt-1.5 h-4 w-4 accent-info-solid"
           />
         )}
         {(field.type === "num" || field.type === "pct" || field.type === "money") &&
@@ -499,14 +499,14 @@ function ModulesTable({
     setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...patch } : r)));
   }
   const numCls = (v: number | null | undefined) => `${v == null ? EMPTY : FILLED} w-20`;
-  const cell = "px-2 py-1.5 border-t border-white/8";
+  const cell = "px-2 py-1.5 border-t border-line";
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-white/10">
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+            <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">代號</th>
               <th className="px-2 py-2">服務名稱</th>
               <th className="px-2 py-2">分潤模式</th>
@@ -547,71 +547,71 @@ function ModulesTable({
                   <td className={cell}>
                     <input type="checkbox" checked={m.countPromotion !== false} disabled={disabled}
                       onChange={(e) => upd(i, { countPromotion: e.target.checked })}
-                      className="h-4 w-4 accent-[#2b7cb5]" />
+                      className="h-4 w-4 accent-info-solid" />
                   </td>
                   <td className={cell}>
                     <input type="checkbox" checked={m.countMaintenance !== false} disabled={disabled}
                       onChange={(e) => upd(i, { countMaintenance: e.target.checked })}
-                      className="h-4 w-4 accent-[#2b7cb5]" />
+                      className="h-4 w-4 accent-info-solid" />
                   </td>
                   <td className={cell}>
                     <input type="checkbox" checked={m.enabled !== false} disabled={disabled}
                       onChange={(e) => upd(i, { enabled: e.target.checked })}
-                      className="h-4 w-4 accent-[#2b7cb5]" />
+                      className="h-4 w-4 accent-info-solid" />
                   </td>
                   <td className={`${cell} text-right whitespace-nowrap`}>
-                    <button type="button" className="text-xs text-[#a9bccf] underline mr-2"
+                    <button type="button" className="text-xs text-tx2 underline mr-2"
                       onClick={() => setOpen(open === m.code ? null : m.code)}>
                       {open === m.code ? "收合" : "比例"}
                     </button>
                     <button type="button" disabled={disabled}
                       onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))}
-                      className="text-[#e08b7a] text-xs disabled:opacity-30">刪</button>
+                      className="text-danger text-xs disabled:opacity-30">刪</button>
                   </td>
                 </tr>
                 {open === m.code && (
-                  <tr className="bg-[#0a2138]">
+                  <tr className="bg-field">
                     <td colSpan={8} className="px-4 py-3">
                       {(m.splitMode ?? "chain") === "chain" ? (
                         <div className="flex flex-wrap items-end gap-3">
-                          <label className="text-xs text-[#a9bccf]">推廣端 %
+                          <label className="text-xs text-tx2">推廣端 %
                             <input type="number" step="any" value={fmtInt(m.splitPromoPct)} disabled={disabled}
                               placeholder="沿用全域"
                               onChange={(e) => upd(i, { splitPromoPct: e.target.value === "" ? null : Number(e.target.value) })}
                               className={`${numCls(m.splitPromoPct)} block mt-0.5`} />
                           </label>
-                          <label className="text-xs text-[#a9bccf]">執案端 %
+                          <label className="text-xs text-tx2">執案端 %
                             <input type="number" step="any" value={fmtInt(m.splitExecPct)} disabled={disabled}
                               placeholder="沿用全域"
                               onChange={(e) => upd(i, { splitExecPct: e.target.value === "" ? null : Number(e.target.value) })}
                               className={`${numCls(m.splitExecPct)} block mt-0.5`} />
                           </label>
-                          <p className="text-xs text-[#7f9ab2] flex-1 min-w-[240px]">
+                          <p className="text-xs text-tx2 flex-1 min-w-[240px]">
                             兩格都留空＝完全沿用全域預設。公司營運＝100 − 推廣 − 執案。
                             要讓這個模塊用不同的職級分潤率，到「職級與分潤率」分頁切到本模塊建自訂表。
                           </p>
                         </div>
                       ) : (
                         <div className="flex flex-wrap items-end gap-3">
-                          <label className="text-xs text-[#a9bccf]">執行者固定 %
+                          <label className="text-xs text-tx2">執行者固定 %
                             <input type="number" step="any" value={fmtInt(m.flatExecPct)} disabled={disabled}
                               placeholder="未設定"
                               onChange={(e) => upd(i, { flatExecPct: e.target.value === "" ? null : Number(e.target.value) })}
                               className={`${numCls(m.flatExecPct)} block mt-0.5`} />
                           </label>
-                          <label className="text-xs text-[#a9bccf]">推廣者固定 %
+                          <label className="text-xs text-tx2">推廣者固定 %
                             <input type="number" step="any" value={fmtInt(m.flatPromoPct)} disabled={disabled}
                               placeholder="未設定"
                               onChange={(e) => upd(i, { flatPromoPct: e.target.value === "" ? null : Number(e.target.value) })}
                               className={`${numCls(m.flatPromoPct)} block mt-0.5`} />
                           </label>
-                          <p className="text-xs text-[#7f9ab2] flex-1 min-w-[240px]">
+                          <p className="text-xs text-tx2 flex-1 min-w-[240px]">
                             固定比例模式不沿輔導鏈、不發平階獎金；自推自執時兩個 % 相加。
                             未分配的部分全歸公司。適合講座、課程這類沒有輔導鏈概念的收入。
                           </p>
                         </div>
                       )}
-                      <label className="mt-3 block text-xs text-[#a9bccf]">備註
+                      <label className="mt-3 block text-xs text-tx2">備註
                         <input value={m.note ?? ""} disabled={disabled}
                           onChange={(e) => upd(i, { note: e.target.value || null })}
                           className={`${m.note ? FILLED : EMPTY} w-full mt-0.5`} />
@@ -622,7 +622,7 @@ function ModulesTable({
               </Fragment>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-[#6f869c]">
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-tx3">
                 尚未設定服務模塊。按上方「載入 V4 辦法數值」可帶入「完整財務規劃服務」與「單點諮詢服務」兩個模塊。
               </td></tr>
             )}
@@ -637,7 +637,7 @@ function ModulesTable({
           }])}>
           ＋ 新增模塊
         </button>
-        <span className="text-xs text-[#6f869c]">
+        <span className="text-xs text-tx3">
           定價留空＝每案自行輸入實收（如完整財務規劃）；有填就在案件登錄時帶入當預設，仍可改。
         </span>
       </div>
@@ -678,13 +678,13 @@ function RanksTable({
     return a || b;
   });
 
-  const cell = "px-2 py-1.5 border-t border-white/8";
+  const cell = "px-2 py-1.5 border-t border-line";
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-white/10">
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+            <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">序</th>
               <th className="px-2 py-2">職級群組</th>
               <th className="px-2 py-2">階</th>
@@ -705,7 +705,7 @@ function RanksTable({
                 && r.execPct !== null && r.execPct !== undefined;
               return (
                 <tr key={i}>
-                  <td className={`${cell} text-[#7f9ab2]`}>{i + 1}</td>
+                  <td className={`${cell} text-tx2`}>{i + 1}</td>
                   <td className={cell}>
                     <input value={r.groupName ?? ""} disabled={disabled} placeholder="未設定"
                       onChange={(e) => upd(i, { groupName: e.target.value || null })}
@@ -731,7 +731,7 @@ function RanksTable({
                       onChange={(e) => upd(i, { execPct: e.target.value === "" ? null : Number(e.target.value) })}
                       className={`${r.execPct == null ? EMPTY : FILLED} w-20`} />
                   </td>
-                  <td className={`${cell} text-[#a9bccf]`}>{both ? `${total}%` : "—"}</td>
+                  <td className={`${cell} text-tx2`}>{both ? `${total}%` : "—"}</td>
                   {isDefault && (
                     <td className={cell}>
                       <input type="number" step="1" min="0" value={fmtInt(r.clientCap)} disabled={disabled} placeholder="不限"
@@ -754,17 +754,17 @@ function RanksTable({
                     </td>
                   )}
                   <td className={`${cell} text-right whitespace-nowrap`}>
-                    <button type="button" disabled={disabled} onClick={() => move(i, -1)} className="px-1 text-[#a9bccf] disabled:opacity-30">↑</button>
-                    <button type="button" disabled={disabled} onClick={() => move(i, 1)} className="px-1 text-[#a9bccf] disabled:opacity-30">↓</button>
+                    <button type="button" disabled={disabled} onClick={() => move(i, -1)} className="px-1 text-tx2 disabled:opacity-30">↑</button>
+                    <button type="button" disabled={disabled} onClick={() => move(i, 1)} className="px-1 text-tx2 disabled:opacity-30">↓</button>
                     <button type="button" disabled={disabled}
                       onClick={() => setRows((rs) => rs.filter((_, k) => k !== i).map((x, k) => ({ ...x, seq: k + 1 })))}
-                      className="px-1 text-[#e08b7a] disabled:opacity-30">刪</button>
+                      className="px-1 text-danger disabled:opacity-30">刪</button>
                   </td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={isDefault ? 11 : 8} className="px-3 py-8 text-center text-[#6f869c]">
+              <tr><td colSpan={isDefault ? 11 : 8} className="px-3 py-8 text-center text-tx3">
                 尚未設定任何職級。按上方「載入 V4 辦法數值」可帶入辦法的八個級別
                 （實習教練 · 認證教練 C1–C3 · 資深教練 S1–S3 · 首席教練）。
               </td></tr>
@@ -778,7 +778,7 @@ function RanksTable({
           ＋ 新增職級
         </button>
         {warn && (
-          <span className="text-xs text-[#e0bd8b]">
+          <span className="text-xs text-brand2">
             提醒：有職級的分潤率低於前一階，差％會出現無法向上續算的斷點。
           </span>
         )}
@@ -807,17 +807,17 @@ function ThresholdTable({
   function upd(idx: number, patch: Partial<ThresholdRow>) {
     setRows((rs) => rs.map((r, k) => (k === idx ? { ...r, ...patch } : r)));
   }
-  const cell = "px-2 py-1.5 border-t border-white/8";
+  const cell = "px-2 py-1.5 border-t border-line";
   const numCls = (v: number | null | undefined) => `${v == null ? EMPTY : FILLED} w-24`;
 
   return (
     <section className="mt-6 first:mt-0">
-      <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-1">{title}</h3>
-      {note && <p className="text-xs text-[#7f9ab2] mb-2">{note}</p>}
-      <div className="overflow-x-auto rounded-lg border border-white/10">
+      <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-1">{title}</h3>
+      {note && <p className="text-xs text-tx2 mb-2">{note}</p>}
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+            <tr className="bg-panel2 text-tx2 text-left text-xs">
               {showFrom && <th className="px-2 py-2">起始職級</th>}
               <th className="px-2 py-2">{showFrom ? "晉升至" : "核定職級"}</th>
               <th className="px-2 py-2">個案數</th>
@@ -872,31 +872,31 @@ function ThresholdTable({
                       <input type="number" value={fmtInt(r.mentorCount)} disabled={disabled} placeholder="—"
                         onChange={(e) => upd(idx, { mentorCount: e.target.value === "" ? null : Number(e.target.value) })}
                         className={`${r.mentorCount == null ? EMPTY : FILLED} w-14`} />
-                      <span className="text-xs text-[#7f9ab2]">位</span>
+                      <span className="text-xs text-tx2">位</span>
                       <select value={r.mentorRankCode ?? ""} disabled={disabled}
                         onChange={(e) => upd(idx, { mentorRankCode: e.target.value || null })}
                         className={`${r.mentorRankCode ? FILLED : EMPTY} w-20`}>
                         <option value="">—</option>
                         {codes.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
-                      <span className="text-xs text-[#7f9ab2]">以上</span>
+                      <span className="text-xs text-tx2">以上</span>
                     </div>
                   </td>
                 )}
                 <td className={cell}>
                   <input type="checkbox" checked={r.enabled !== false} disabled={disabled}
                     onChange={(e) => upd(idx, { enabled: e.target.checked })}
-                    className="h-4 w-4 accent-[#2b7cb5]" />
+                    className="h-4 w-4 accent-info-solid" />
                 </td>
                 <td className={`${cell} text-right`}>
                   <button type="button" disabled={disabled}
                     onClick={() => setRows((rs) => rs.filter((_, k) => k !== idx))}
-                    className="px-1 text-[#e08b7a] disabled:opacity-30">刪</button>
+                    className="px-1 text-danger disabled:opacity-30">刪</button>
                 </td>
               </tr>
             ))}
             {mine.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-6 text-center text-[#6f869c]">
+              <tr><td colSpan={8} className="px-3 py-6 text-center text-tx3">
                 尚未設定門檻 —— 這一軌目前不啟用（引擎會跳過，不會擋人）。
               </td></tr>
             )}
@@ -931,13 +931,13 @@ function VersionsPanel({
   const [diff, setDiff] = useState<{ changes: Change[]; unpaidCases: number } | null>(null);
   const [diffFor, setDiffFor] = useState<string | null>(null);
 
-  const cell = "px-2 py-1.5 border-t border-white/8";
+  const cell = "px-2 py-1.5 border-t border-line";
   return (
     <div className="space-y-5">
-      <div className="overflow-x-auto rounded-lg border border-white/10">
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#12334f] text-[#a9bccf] text-left text-xs">
+            <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">版本</th><th className="px-2 py-2">生效日</th>
               <th className="px-2 py-2">狀態</th><th className="px-2 py-2">修訂重點</th>
               <th className="px-2 py-2 text-right">操作</th>
@@ -945,15 +945,15 @@ function VersionsPanel({
           </thead>
           <tbody>
             {versions.map((v) => (
-              <tr key={v.id} className={v.id === versionId ? "bg-[#12334f]/40" : ""}>
+              <tr key={v.id} className={v.id === versionId ? "bg-panel2/40" : ""}>
                 <td className={`${cell} font-semibold`}>{v.version}</td>
-                <td className={`${cell} text-[#a9bccf]`}>{v.effectiveFrom || "—"}</td>
+                <td className={`${cell} text-tx2`}>{v.effectiveFrom || "—"}</td>
                 <td className={cell}>
-                  <span className={v.status === "active" ? "text-[#7fb894]" : v.status === "draft" ? "text-[#e0bd8b]" : "text-[#6f869c]"}>
+                  <span className={v.status === "active" ? "text-ok" : v.status === "draft" ? "text-brand2" : "text-tx3"}>
                     {v.status === "active" ? "生效中" : v.status === "draft" ? "草稿" : "已封存"}
                   </span>
                 </td>
-                <td className={`${cell} text-[#a9bccf] max-w-[280px] truncate`}>{v.changeNote || "—"}</td>
+                <td className={`${cell} text-tx2 max-w-[280px] truncate`}>{v.changeNote || "—"}</td>
                 <td className={`${cell} text-right whitespace-nowrap`}>
                   {v.status !== "active" && active && (
                     <button type="button" disabled={pending} className={`${BTN} mr-1`}
@@ -985,32 +985,32 @@ function VersionsPanel({
       </div>
 
       {diffFor && (
-        <section className="rounded-lg border border-white/10 bg-[#0a2138] p-4">
+        <section className="rounded-lg border border-line bg-field p-4">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-sm font-bold">
               「{versions.find((v) => v.id === diffFor)?.version}」與生效版「{active?.version}」的差異
             </h3>
             <div className="flex-1" />
-            <button type="button" className="text-xs text-[#a9bccf] underline"
+            <button type="button" className="text-xs text-tx2 underline"
               onClick={() => { setDiffFor(null); setDiff(null); }}>
               收合
             </button>
           </div>
           {!diff ? (
-            <p className="text-xs text-[#6f869c]">比對中…</p>
+            <p className="text-xs text-tx3">比對中…</p>
           ) : diff.changes.length === 0 ? (
-            <p className="text-xs text-[#7fb894]">兩版完全相同，沒有任何差異。</p>
+            <p className="text-xs text-ok">兩版完全相同，沒有任何差異。</p>
           ) : (
             <>
-              <p className="text-xs text-[#e0bd8b] mb-2">
+              <p className="text-xs text-brand2 mb-2">
                 共 {diff.changes.length} 項差異。發布後，生效版底下
                 <b> {diff.unpaidCases} </b>
                 筆尚未發放的案件會依新制度重算；已發放的不受影響（§31）。
               </p>
-              <div className="overflow-x-auto rounded-lg border border-white/10">
+              <div className="overflow-x-auto rounded-lg border border-line">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-[#12334f] text-[#a9bccf] text-left">
+                    <tr className="bg-panel2 text-tx2 text-left">
                       <th className="px-2 py-1.5">分類</th>
                       <th className="px-2 py-1.5">項目</th>
                       <th className="px-2 py-1.5">生效版</th>
@@ -1019,12 +1019,12 @@ function VersionsPanel({
                   </thead>
                   <tbody>
                     {diff.changes.map((c, i) => (
-                      <tr key={i} className="border-t border-white/8">
-                        <td className="px-2 py-1.5 text-[#6f869c]">{c.group}</td>
+                      <tr key={i} className="border-t border-line">
+                        <td className="px-2 py-1.5 text-tx3">{c.group}</td>
                         <td className="px-2 py-1.5">{c.label}</td>
-                        <td className="px-2 py-1.5 text-[#a9bccf]">{c.before}</td>
+                        <td className="px-2 py-1.5 text-tx2">{c.before}</td>
                         <td className={`px-2 py-1.5 font-semibold ${
-                          c.kind === "removed" ? "text-[#e08b7a]" : "text-[#7fb894]"
+                          c.kind === "removed" ? "text-danger" : "text-ok"
                         }`}>{c.after}</td>
                       </tr>
                     ))}
@@ -1037,7 +1037,7 @@ function VersionsPanel({
       )}
 
       <section>
-        <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-2">目前版本資訊</h3>
+        <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">目前版本資訊</h3>
         <div className="flex flex-wrap items-center gap-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="版本名稱（如 V4.0）"
             className={`${FILLED} w-40`} />
@@ -1056,8 +1056,8 @@ function VersionsPanel({
       </section>
 
       <section>
-        <h3 className="text-sm font-bold border-l-[3px] border-[#e0bd8b] pl-2 mb-2">建立新版本</h3>
-        <p className="text-xs text-[#7f9ab2] mb-2">
+        <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">建立新版本</h3>
+        <p className="text-xs text-tx2 mb-2">
           新版本會完整複製目前版本的職級、門檻與參數，先以草稿存在，可先試算；發布後才成為新案件的計算依據，已結案件不受影響。
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -1093,7 +1093,7 @@ function LiveCheck({ params }: { params: CompParams }) {
   const bad = runnable.filter((r) => !r.res!.balanced);
 
   return (
-    <div className="mt-6 rounded-lg border border-white/10 bg-[#0a2138] p-4">
+    <div className="mt-6 rounded-lg border border-line bg-field p-4">
       <div className="flex items-center gap-2 mb-2">
         <h3 className="text-sm font-bold">即時驗算</h3>
         <select value={mc} onChange={(e) => setMc(e.target.value)}
@@ -1103,43 +1103,43 @@ function LiveCheck({ params }: { params: CompParams }) {
             <option key={m.code} value={m.code}>{m.name}</option>
           ))}
         </select>
-        <span className="text-xs text-[#7f9ab2]">
+        <span className="text-xs text-tx2">
           用辦法的七個範例即時重跑目前設定（尚未存檔的改動也算在內）
         </span>
         <div className="flex-1" />
         {runnable.length === 0 ? (
-          <span className="text-xs text-[#6f869c]">職級表尚未涵蓋範例所需代號</span>
+          <span className="text-xs text-tx3">職級表尚未涵蓋範例所需代號</span>
         ) : bad.length === 0 ? (
-          <span className="text-xs text-[#7fb894]">全部加總 100% ✓</span>
+          <span className="text-xs text-ok">全部加總 100% ✓</span>
         ) : (
-          <span className="text-xs text-[#e08b7a]">{bad.length} 個範例加總不等於 100%</span>
+          <span className="text-xs text-danger">{bad.length} 個範例加總不等於 100%</span>
         )}
       </div>
       <div className="grid gap-1.5 md:grid-cols-2">
         {results.map(({ s, res }) => (
-          <div key={s.id} className="rounded-md bg-[#0d2b45] px-3 py-2 text-xs">
+          <div key={s.id} className="rounded-md bg-panel px-3 py-2 text-xs">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-[#cfdcea]">{s.title}</span>
+              <span className="font-semibold text-tx">{s.title}</span>
               <div className="flex-1" />
               {!res ? (
-                <span className="text-[#6f869c]">不適用</span>
+                <span className="text-tx3">不適用</span>
               ) : res.balanced ? (
-                <span className="text-[#7fb894]">100% ✓</span>
+                <span className="text-ok">100% ✓</span>
               ) : (
-                <span className="text-[#e08b7a]">{res.totalPct}%</span>
+                <span className="text-danger">{res.totalPct}%</span>
               )}
             </div>
             {res && (
-              <div className="mt-1 text-[#8fa6ba] leading-relaxed">
+              <div className="mt-1 text-tx2 leading-relaxed">
                 {res.lines.map((l, i) => (
                   <span key={i} className="mr-2 whitespace-nowrap">
-                    {l.name} <b className="text-[#cfdcea]">{l.totalPct}%</b>
+                    {l.name} <b className="text-tx">{l.totalPct}%</b>
                   </span>
                 ))}
               </div>
             )}
             {res && res.warnings.length > 0 && (
-              <div className="mt-1 text-[#e0bd8b]">{res.warnings.join("；")}</div>
+              <div className="mt-1 text-brand2">{res.warnings.join("；")}</div>
             )}
           </div>
         ))}

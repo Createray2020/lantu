@@ -6,16 +6,20 @@ import { UserButton } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import type { LicenseState } from "@/lib/license";
 import UiScaleToggle from "@/components/UiScaleToggle";
+import ThemeToggle from "@/components/ThemeToggle";
+import { DEFAULT_THEME, type ThemeName } from "@/lib/theme";
 import LicenseBadge from "./LicenseBadge";
 
 // 各頁共用頂欄：品牌 + 首頁/客戶/儀表板/學習區切換 + 字級 + 剩餘天數 + 後台 + Clerk 頭貼。
 export default function DashboardHeader({
   isAdmin = false,
   uiScale = 100,
+  theme = DEFAULT_THEME,
   license,
 }: {
   isAdmin?: boolean;
   uiScale?: number;
+  theme?: ThemeName;
   license?: LicenseState;
 }) {
   const pathname = usePathname();
@@ -62,22 +66,22 @@ export default function DashboardHeader({
 
   const tab = (active: boolean) =>
     `px-3 py-1.5 rounded-md text-sm font-bold transition ${
-      active ? "bg-[#c99a5b] text-[#08202a]" : "text-[#a9bccf] hover:text-[#eef2f7]"
+      active ? "bg-brand text-onbrand" : "text-tx2 hover:text-tx"
     }`;
 
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-2.5 bg-gradient-to-r from-[#081a2b] to-[#0d2b45] border-b border-white/10">
+    <header className="sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-2.5 bg-gradient-to-r from-canvas to-panel border-b border-line">
       <Link href="/home" className="flex items-center gap-2 mr-2" title="回官網首頁">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt="嵐途" className="h-[26px] w-auto max-w-[150px] object-contain" />
         ) : (
           <svg width="26" height="26" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-            <path d="M15 12 L15 33 L34 33" stroke="#a9bccf" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" strokeWidth="2.6" strokeLinecap="round" fill="none" />
+            <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" fill="none" />
           </svg>
         )}
-        <span className="font-serif tracking-[0.14em] text-[#eef2f7] text-lg">嵐途</span>
+        <span className="font-serif tracking-[0.14em] text-tx text-lg">嵐途</span>
       </Link>
       <nav className="flex items-center gap-1">
         <Link href="/dashboard" className={tab(onHome)}>首頁</Link>
@@ -88,12 +92,12 @@ export default function DashboardHeader({
           {pendingErr ? (
             <span
               title="待處理數暫時讀不到，請重新整理"
-              className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#6b7d8f] text-[#0d2b45] text-[10px] font-bold grid place-items-center"
+              className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-tx3 text-panel text-[10px] font-bold grid place-items-center"
             >
               ?
             </span>
           ) : pending > 0 ? (
-            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#e5484d] text-white text-[10px] font-bold grid place-items-center">
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-danger-solid text-onsolid text-[10px] font-bold grid place-items-center">
               {pending}
             </span>
           ) : null}
@@ -103,30 +107,31 @@ export default function DashboardHeader({
         <Link href="/dashboard/learn" className={tab(onLearn)}>學習區</Link>
       </nav>
       <div className="flex-1" />
+      <ThemeToggle initial={theme} persist compact />
       <UiScaleToggle initial={uiScale} persist />
       {license && <LicenseBadge license={license} />}
       <Link
         href="/dashboard/profile"
-        className="text-[#a9bccf] hover:text-[#eef2f7] text-xs font-bold px-2.5 py-1.5 rounded-md border border-white/15"
+        className="text-tx2 hover:text-tx text-xs font-bold px-2.5 py-1.5 rounded-md border border-line2"
       >
         我的檔案
       </Link>
       <Link
         href="/portal"
-        className="text-[#a9bccf] hover:text-[#eef2f7] text-xs font-bold px-2.5 py-1.5 rounded-md border border-white/15"
+        className="text-tx2 hover:text-tx text-xs font-bold px-2.5 py-1.5 rounded-md border border-line2"
       >
         我的規劃
       </Link>
       <Link
         href="/home"
-        className="text-[#a9bccf] hover:text-[#eef2f7] text-xs font-bold px-2.5 py-1.5 rounded-md border border-white/15"
+        className="text-tx2 hover:text-tx text-xs font-bold px-2.5 py-1.5 rounded-md border border-line2"
       >
         官網首頁
       </Link>
       {isAdmin && (
         <Link
           href="/admin"
-          className="rounded-md bg-[#0d2b45] border border-[#c99a5b]/50 text-[#e0bd8b] text-xs font-bold px-2.5 py-1.5"
+          className="rounded-md bg-panel border border-brand/50 text-brand2 text-xs font-bold px-2.5 py-1.5 shadow-e1"
         >
           後台
         </Link>

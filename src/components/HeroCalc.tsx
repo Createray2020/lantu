@@ -25,8 +25,8 @@ function Field({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
-    <div className="rounded-xl bg-[#0d2b45]/80 border border-white/10 px-4 py-3 text-left">
-      <div className="text-[11px] text-[#a7bacb] mb-1.5">{label}</div>
+    <div className="rounded-xl bg-panel/80 border border-line px-4 py-3 text-left shadow-e1">
+      <div className="text-[11px] text-tx2 mb-1.5">{label}</div>
       <div className="flex items-baseline gap-1">
         <input
           type="number"
@@ -47,15 +47,15 @@ function Field({
             onChange(Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : value);
             setDraft(null);
           }}
-          className="w-full bg-transparent text-2xl font-bold text-[#e0bd8b] focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="w-full bg-transparent text-2xl font-bold text-brand2 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           aria-label={label}
         />
-        <span className="text-[12px] text-[#a7bacb] shrink-0">{unit}</span>
+        <span className="text-[12px] text-tx2 shrink-0">{unit}</span>
       </div>
       <input
         type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => { setDraft(null); onChange(parseFloat(e.target.value)); }}
-        className="w-full accent-[#c99a5b] h-1 mt-2"
+        className="w-full accent-brand h-1 mt-2"
         aria-label={`${label} 滑桿`}
       />
     </div>
@@ -78,7 +78,7 @@ export default function HeroCalc() {
   }
 
   return (
-    <div className="rounded-2xl border border-[#c99a5b]/40 bg-[#0b2036]/80 p-5 sm:p-6 backdrop-blur">
+    <div className="rounded-2xl border border-brand/40 bg-field/80 p-5 sm:p-6 backdrop-blur">
       <div className="grid grid-cols-2 gap-3">
         <Field label="我現在幾歲" value={h.curAge} min={20} max={80} unit="歲" onChange={set("curAge")} />
         <Field label="想幾歲退休" value={h.retireAge} min={50} max={85} unit="歲" onChange={set("retireAge")} />
@@ -86,25 +86,25 @@ export default function HeroCalc() {
         <Field label="每月能存" value={h.monthlySave} min={0} max={10} step={0.1} unit="萬" onChange={set("monthlySave")} />
       </div>
 
-      <div className="mt-5 rounded-xl bg-[#12334f] border border-white/10 p-5 text-center">
-        <div className="text-[#a7bacb] text-sm">照這樣存，你 {h.retireAge} 歲退休後每月可領</div>
-        <div className="font-serif text-4xl sm:text-5xl text-[#e0bd8b] my-2">
+      <div className="mt-5 rounded-xl bg-panel2 border border-line p-5 text-center shadow-e1">
+        <div className="text-tx2 text-sm">照這樣存，你 {h.retireAge} 歲退休後每月可領</div>
+        <div className="font-serif text-4xl sm:text-5xl text-brand2 my-2">
           {ntfmt(r.totalMonthly)} <span className="text-xl">元</span>
         </div>
-        <div className="text-[12px] text-[#6f869c]">相當於現在的 {ntfmt(r.presentMonthly)} 元／月</div>
+        <div className="text-[12px] text-tx3">相當於現在的 {ntfmt(r.presentMonthly)} 元／月</div>
 
         <div className="grid grid-cols-3 gap-2 mt-4 text-[11.5px]">
           {[
-            ["自行準備", r.selfMonthly, "#9fd3d0"],
-            ["勞退提撥", r.laborPensionMonthly, "#2fb0a8"],
-            ["勞保年金", r.laborInsMonthly, "#1f6f6b"],
+            ["自行準備", r.selfMonthly, "var(--teal)"],
+            ["勞退提撥", r.laborPensionMonthly, "var(--teal)"],
+            ["勞保年金", r.laborInsMonthly, "var(--teal2)"],
           ].map(([label, v, c]) => (
-            <div key={label as string} className="rounded-lg bg-[#0d2b45] border border-white/8 py-2">
-              <div className="flex items-center justify-center gap-1 text-[#a7bacb]">
+            <div key={label as string} className="rounded-lg bg-panel border border-line py-2 shadow-e1">
+              <div className="flex items-center justify-center gap-1 text-tx2">
                 <i className="w-2 h-2 rounded-sm inline-block" style={{ background: c as string }} />
                 {label as string}
               </div>
-              <div className="text-[#cdd9e5] font-semibold mt-0.5">{ntfmt(v as number)}</div>
+              <div className="text-tx font-semibold mt-0.5">{ntfmt(v as number)}</div>
             </div>
           ))}
         </div>
@@ -112,22 +112,22 @@ export default function HeroCalc() {
 
       <button
         onClick={goFull}
-        className="w-full mt-4 font-bold text-[#08202a] bg-[#c99a5b] hover:bg-[#e0bd8b] px-7 py-3.5 rounded-lg text-[15px]"
+        className="w-full mt-4 font-bold text-onbrand bg-brand hover:bg-brand2 px-7 py-3.5 rounded-lg text-[15px]"
       >
         繼續算購房、購車、教育金 →
       </button>
       <div className="mt-2.5 text-center">
-        <span className="text-[11px] text-[#6f869c]">免費・不用註冊・資料留在你的瀏覽器</span>
+        <span className="text-[11px] text-tx3">免費・不用註冊・資料留在你的瀏覽器</span>
         <button
           type="button"
           onClick={() => setShowAssume((v) => !v)}
-          className="ml-2 text-[11px] text-[#a7bacb] hover:text-white underline underline-offset-4"
+          className="ml-2 text-[11px] text-tx2 hover:text-tx underline underline-offset-4"
         >
           {showAssume ? "收合假設" : "本試算的假設"}
         </button>
       </div>
       {showAssume && (
-        <div className="mt-3 rounded-lg bg-[#081a2b]/70 border border-white/10 p-3.5 text-[11px] leading-relaxed text-[#a7bacb] text-left">
+        <div className="mt-3 rounded-lg bg-canvas/70 border border-line p-3.5 text-[11px] leading-relaxed text-tx2 text-left">
           年報酬 3%（情境假設，非預期或保證報酬）／通膨 1.5%／預估壽命 85 歲／
           勞退以月薪 × 6% 提繳、勞保年金以平均月投保薪資（上限 45,800）× 年資 × 1.55% 概算，
           年資假設 {ASSUMED_WORK_START_AGE} 歲起算至退休。

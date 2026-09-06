@@ -1,0 +1,780 @@
+<title>嵐途介面盤點 0905</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#FAF8F4; --surface:#FFFFFF; --surface-2:#F4F0E8;
+  --ink:#201B15; --ink-2:#6B6157; --ink-3:#948A7D;
+  --rule:#E3DDD2; --rule-2:#CFC6B7;
+  --accent:#8A6A18; --accent-soft:#F0E4C4;
+  --crit:#BC3A33; --warn:#B8860B; --low:#1A6FA8;
+  --crit-ink:#A3302A; --warn-ink:#8A6408; --low-ink:#155C8C;
+  --crit-wash:#FBEDEB; --warn-wash:#F8F0DC; --low-wash:#E9F1F8;
+  --ok:#2F6E52; --ok-wash:#E6F1EA;
+  --serif:"Noto Serif TC",Georgia,"Songti TC",serif;
+  --sans:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#14120E; --surface:#1D1A15; --surface-2:#252118;
+    --ink:#F0EAE0; --ink-2:#9C9284; --ink-3:#786F63;
+    --rule:#2E2A23; --rule-2:#413B31;
+    --accent:#E3B54A; --accent-soft:#3A3020;
+    --crit-ink:#E8776A; --warn-ink:#DFAA4A; --low-ink:#6FAEE0;
+    --crit-wash:#2E1A17; --warn-wash:#2B2312; --low-wash:#152430;
+    --ok:#6FB48F; --ok-wash:#16281F;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14120E; --surface:#1D1A15; --surface-2:#252118;
+  --ink:#F0EAE0; --ink-2:#9C9284; --ink-3:#786F63;
+  --rule:#2E2A23; --rule-2:#413B31;
+  --accent:#E3B54A; --accent-soft:#3A3020;
+  --crit-ink:#E8776A; --warn-ink:#DFAA4A; --low-ink:#6FAEE0;
+  --crit-wash:#2E1A17; --warn-wash:#2B2312; --low-wash:#152430;
+  --ok:#6FB48F; --ok-wash:#16281F;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 96px}
+
+/* hero */
+.hero{padding:60px 0 36px;border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+h1{font-family:var(--serif);font-weight:700;font-size:clamp(29px,5vw,44px);
+  line-height:1.26;margin:0 0 16px;text-wrap:balance;letter-spacing:-.01em}
+.lede{max-width:680px;color:var(--ink-2);font-size:16px;margin:0 0 32px}
+.lede strong{color:var(--ink);font-weight:500}
+.nums{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule)}
+.num{flex:1 1 150px;padding:18px 20px 16px;border-right:1px solid var(--rule)}
+.num:last-child{border-right:0}
+.num b{display:block;font-family:var(--mono);font-weight:700;
+  font-size:clamp(24px,3.6vw,33px);line-height:1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.num span{display:block;margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.num.c b{color:var(--crit-ink)} .num.g b{color:var(--ok)}
+
+/* 根因 */
+.roots{display:grid;gap:1px;background:var(--rule);border:1px solid var(--rule);
+  margin:38px 0 8px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.root{background:var(--surface);padding:20px 20px 22px}
+.root .rk{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.root h4{font-family:var(--serif);font-size:17px;margin:0 0 9px;line-height:1.4}
+.root p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.7}
+
+/* 色票 */
+.swat{display:flex;flex-wrap:wrap;gap:14px;margin:20px 0 4px}
+.sw{flex:0 0 auto;width:132px}
+.sw i{display:block;height:42px;border:1px solid var(--rule-2);border-radius:2px}
+.sw b{display:block;font-family:var(--mono);font-size:11px;margin-top:7px;font-weight:500}
+.sw span{display:block;font-size:11.5px;color:var(--ink-3);line-height:1.5}
+.drift{border:1px solid var(--rule);background:var(--surface);padding:18px 20px;margin:22px 0}
+.drift h4{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 14px}
+.driftrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:13px}
+.driftrow:last-child{margin-bottom:0}
+.driftrow>.lb{font-size:12.5px;color:var(--ink-2);width:126px;flex:0 0 auto}
+.chipc{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rule);
+  border-radius:2px;padding:3px 9px 3px 4px;font-family:var(--mono);font-size:11px;
+  background:var(--surface-2)}
+.chipc i{width:15px;height:15px;border-radius:1px;border:1px solid rgba(0,0,0,.16)}
+
+/* filter */
+.filter{position:sticky;top:0;z-index:20;background:var(--bg);
+  border-bottom:1px solid var(--rule);padding:12px 0;margin:40px 0 8px;
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filter .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);margin-right:2px}
+button.chip{font-family:var(--mono);font-size:12px;padding:5px 11px;
+  border:1px solid var(--rule-2);background:transparent;color:var(--ink-2);
+  border-radius:3px;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+button.chip:hover{border-color:var(--ink-3);color:var(--ink)}
+button.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* sections */
+section{padding-top:46px;scroll-margin-top:58px}
+.sechead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:2px solid var(--ink);padding-bottom:10px}
+.sechead h2{font-family:var(--serif);font-weight:700;font-size:22px;margin:0;letter-spacing:-.01em}
+.sechead .tally{font-family:var(--mono);font-size:12px;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;margin-left:auto}
+.secnote{color:var(--ink-2);font-size:14px;max-width:790px;margin:16px 0 8px}
+
+/* finding */
+.f{border-bottom:1px solid var(--rule);padding:20px 0}
+.f.hide{display:none}
+.f-top{display:flex;gap:11px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.sev{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;
+  padding:3px 8px;border-radius:3px;white-space:nowrap;line-height:1.4}
+.sev::before{content:"";display:inline-block;width:7px;height:7px;border-radius:1px;
+  margin-right:6px;vertical-align:0}
+.sev.crit{color:var(--crit-ink);background:var(--crit-wash)}
+.sev.crit::before{background:var(--crit)}
+.sev.warn{color:var(--warn-ink);background:var(--warn-wash)}
+.sev.warn::before{background:var(--warn)}
+.sev.low{color:var(--low-ink);background:var(--low-wash)}
+.sev.low::before{background:var(--low)}
+.fid{font-family:var(--mono);font-size:12px;color:var(--ink-3);font-weight:500}
+.ft{font-family:var(--serif);font-size:17px;font-weight:700;line-height:1.5;
+  margin:0;flex:1 1 100%;letter-spacing:-.005em}
+.fb{font-size:14px;color:var(--ink-2);margin:0 0 11px;max-width:820px}
+.fb strong{color:var(--ink);font-weight:500}
+.ev{font-family:var(--mono);font-size:12px;background:var(--surface-2);
+  border-left:2px solid var(--rule-2);padding:9px 13px;margin:0 0 10px;
+  overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:var(--ink-2);line-height:1.65}
+.ev b{color:var(--ink);font-weight:500}
+.fx{font-size:13.5px;color:var(--ink);margin:0;padding-left:15px;border-left:2px solid var(--accent)}
+.fx::before{content:"修法　";font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  color:var(--accent);font-weight:700}
+.tagL{font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:2px 7px;
+  border-radius:999px;line-height:1.5;white-space:nowrap;border:1px solid var(--rule-2);color:var(--ink-3)}
+.tagL.lt{color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft)}
+
+/* plan */
+.steps{counter-reset:s;margin:22px 0 0;padding:0;list-style:none}
+.steps li{counter-increment:s;border-top:1px solid var(--rule);padding:18px 0 18px 52px;position:relative}
+.steps li:last-child{border-bottom:1px solid var(--rule)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:18px;
+  font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+  border:1px solid var(--accent-soft);background:var(--accent-soft);
+  width:28px;height:28px;display:grid;place-items:center;border-radius:2px}
+.steps h4{font-family:var(--serif);font-size:17px;margin:0 0 6px}
+.steps p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.steps .cost{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:7px;display:block}
+
+table.tk{width:100%;border-collapse:collapse;margin:20px 0 0;font-size:13px}
+table.tk th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:500;
+  border-bottom:1px solid var(--rule-2);padding:0 10px 8px 0}
+table.tk td{border-bottom:1px solid var(--rule);padding:9px 10px 9px 0;vertical-align:top}
+table.tk td:first-child{font-family:var(--mono);font-size:12px;white-space:nowrap}
+table.tk td.sc i{display:inline-block;width:14px;height:14px;border-radius:1px;
+  border:1px solid rgba(0,0,0,.18);vertical-align:-2px;margin-right:6px}
+.tkwrap{overflow-x:auto}
+
+footer{margin-top:64px;padding-top:22px;border-top:1px solid var(--rule);
+  font-size:12.5px;color:var(--ink-3);font-family:var(--mono)}
+@media (max-width:640px){
+  .driftrow>.lb{width:100%}
+  .wrap{padding:0 18px 72px}
+}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">嵐途 LAN TU · 介面盤點 · 2026/09/05</p>
+  <h1>看起來全部黏在一起，是因為整套系統只用一種 1px 半透明線在分隔所有東西</h1>
+  <p class="lede">這輪不動任何功能，只用教練的眼睛從頭走一遍：官網、教練端、規劃器、客戶端、後台。<strong>49 項發現</strong>，全部收斂成三條根因——沒有色彩 token 層、沒有共用版面殼、沒有層次（elevation）。第三條就是「黏在一起」的直接答案：全站 <strong>3,162 處寫死的色碼</strong>撐起來的畫面，分隔手段只有 <code>border-white/10</code> 這一招，卡片、清單列、統計磚、彈窗長得一模一樣。順帶把<strong>淺色版的 9 顆地雷</strong>先挖出來——那不是把顏色反過來就能做的事。</p>
+  <div class="nums">
+    <div class="num c"><b>49</b><span>發現項目</span></div>
+    <div class="num"><b>3,162</b><span>寫死的色碼</span></div>
+    <div class="num"><b>103</b><span>不同的 hex 值</span></div>
+    <div class="num c"><b>3</b><span>全站陰影用量</span></div>
+    <div class="num"><b>26</b><span>種字級</span></div>
+  </div>
+</header>
+
+<div class="roots">
+  <div class="root">
+    <p class="rk">根因 A</p>
+    <h4>沒有 token 層，顏色是每次手打的</h4>
+    <p>Next 端 2,565 處、規劃器 597 處，103 個不同 hex。同一個「次要說明文字」有 <code>#a9bccf</code> 和 <code>#a7bacb</code> 兩種；同一個「輸入框底色」有 <code>#0a1a2b</code> 和 <code>#0a1a28</code>——差一個字元，肉眼分不出來，卻是兩份要各自維護的字串。這就是淺色版做不出來的原因。</p>
+  </div>
+  <div class="root">
+    <p class="rk">根因 B</p>
+    <h4>沒有共用版面殼，每頁自己刻一遍</h4>
+    <p><code>/dashboard</code> 和 <code>/portal</code> 底下都沒有 <code>layout.tsx</code>，頂欄靠每支 page 自己 import。漏掉的三頁（我的業務／我的公開檔案／業務制度說明）整條導覽列直接消失。後台則是 11 份逐字複製的 header。容器寬度全站 8 種。</p>
+  </div>
+  <div class="root">
+    <p class="rk">根因 C</p>
+    <h4>只有 1px 線在分隔，沒有層次</h4>
+    <p>教練端全部 118 支 tsx 只出現 <strong>3 次</strong> shadow，規劃器表格儲存格 padding 只有 <code>6px 7px</code>，後台表格沒有一張有 zebra 或 hover。卡片、清單列、統計磚、空狀態共用同一組 class——所有東西都停在同一個平面上。</p>
+  </div>
+</div>
+
+<div class="drift">
+  <h4>同語意、不同顏色 — 這是「介面看起來不乾淨」的底層原因</h4>
+  <div class="driftrow"><span class="lb">次要說明文字</span>
+    <span class="chipc"><i style="background:#a9bccf"></i>#a9bccf</span>
+    <span class="chipc"><i style="background:#a7bacb"></i>#a7bacb</span>
+    <span class="chipc"><i style="background:#6f869c"></i>#6f869c</span>
+    <span class="chipc"><i style="background:#6b7d8f"></i>#6b7d8f</span>
+    <span class="chipc"><i style="background:#7f9ab2"></i>#7f9ab2</span>
+    <span class="chipc"><i style="background:#8fa6ba"></i>#8fa6ba</span>
+  </div>
+  <div class="driftrow"><span class="lb">成功／正向</span>
+    <span class="chipc"><i style="background:#7bd88f"></i>#7bd88f</span>
+    <span class="chipc"><i style="background:#8fc0a3"></i>#8fc0a3</span>
+    <span class="chipc"><i style="background:#7bbf6a"></i>#7bbf6a</span>
+    <span class="chipc"><i style="background:#7fb894"></i>#7fb894</span>
+    <span class="chipc"><i style="background:#7fd1a8"></i>#7fd1a8</span>
+    <span class="chipc"><i style="background:#9fd0a6"></i>#9fd0a6</span>
+    <span class="chipc"><i style="background:#a7dcbb"></i>#a7dcbb</span>
+  </div>
+  <div class="driftrow"><span class="lb">錯誤／危險</span>
+    <span class="chipc"><i style="background:#ff9b9b"></i>#ff9b9b</span>
+    <span class="chipc"><i style="background:#e5484d"></i>#e5484d</span>
+    <span class="chipc"><i style="background:#d9773f"></i>#d9773f</span>
+    <span class="chipc"><i style="background:#f0b8b8"></i>#f0b8b8</span>
+    <span class="chipc"><i style="background:#e08b7a"></i>#e08b7a</span>
+  </div>
+  <div class="driftrow"><span class="lb">輸入框底色</span>
+    <span class="chipc"><i style="background:#0a1a2b"></i>#0a1a2b</span>
+    <span class="chipc"><i style="background:#0a1a28"></i>#0a1a28</span>
+    <span class="chipc"><i style="background:#0a1a20"></i>#0a1a20</span>
+    <span class="chipc"><i style="background:#0d2b45"></i>#0d2b45</span>
+    <span class="chipc"><i style="background:#12334f"></i>#12334f</span>
+  </div>
+  <div class="driftrow"><span class="lb">主要動作鈕</span>
+    <span class="chipc"><i style="background:#c99a5b"></i>#c99a5b 金（教練端＋後台金系）</span>
+    <span class="chipc"><i style="background:#1d5c8a"></i>#1d5c8a 藍（後台藍系）</span>
+  </div>
+</div>
+
+<nav class="filter" aria-label="篩選">
+  <span class="lbl">區域</span>
+  <button class="chip" data-g="all" aria-pressed="true">全部 49</button>
+  <button class="chip" data-g="A" aria-pressed="false">教練端 9</button>
+  <button class="chip" data-g="B" aria-pressed="false">規劃器 12</button>
+  <button class="chip" data-g="C" aria-pressed="false">客戶端 4</button>
+  <button class="chip" data-g="D" aria-pressed="false">後台 6</button>
+  <button class="chip" data-g="E" aria-pressed="false">跨畫面 9</button>
+  <button class="chip" data-g="F" aria-pressed="false">淺色版地雷 9</button>
+</nav>
+
+<section id="A">
+  <div class="sechead"><h2>A · 教練端（每天開的那幾頁）</h2><span class="tally">9 項</span></div>
+  <p class="secnote">按教練的動線走：登入 → 首頁 → 客戶清單 → 客戶詳情 → 我的業務。前四項是天天會撞到的。</p>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">A1</span>
+      <h3 class="ft">三頁點進去導覽列直接消失，只剩一顆「← 回系統」</h3></div>
+    <p class="fb">「我的業務」「我的公開檔案」「業務制度說明」沒有 import <code>DashboardHeader</code>，各自手刻了一條幾乎逐字相同的迷你 header——<strong>沒有七個分頁連結、沒有字級切換、沒有授權徽章</strong>。教練從首頁點進去，整個導覽就沒了，只能靠瀏覽器上一頁。三份 header 各自維護，改一處另兩處不會跟。</p>
+    <p class="ev"><b>my-business/page.tsx:119-131</b>　<b>profile/page.tsx:39-51</b>　<b>handbook/page.tsx:44-58</b>
+&lt;header className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-[#0d2b45]"&gt;
+  … &lt;Link href="/dashboard" className="text-[#a9bccf] text-sm"&gt;← 回系統&lt;/Link&gt;</p>
+    <p class="fx">補 <code>src/app/dashboard/layout.tsx</code>，把 header 收成 layout 一次套用；八支已經正確 import 的頁面同時把重複的 import 拿掉。</p>
+  </article>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">A2</span>
+      <h3 class="ft">同三頁沒有 <code>mx-auto</code>，寬螢幕上整頁貼左、右邊一大片空</h3></div>
+    <p class="fb">其餘所有頁面都是 <code>max-w-* mx-auto</code> 置中，只有這三頁漏了。在 27 吋螢幕上看起來像壞掉。</p>
+    <p class="ev"><b>my-business/page.tsx:136</b> &lt;section className="p-6 max-w-5xl"&gt;
+<b>profile/page.tsx:53</b>　&lt;section className="p-6 max-w-5xl"&gt;
+<b>handbook/page.tsx:59</b>　&lt;section className="p-6 max-w-4xl space-y-4"&gt;</p>
+    <p class="fx">併進 A1 的 layout 一起解：內容容器也收成同一個 <code>&lt;PageShell&gt;</code>。</p>
+  </article>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">A3</span>
+      <h3 class="ft">字級切換（老花友善）只在 8 頁看得到，其餘 7 頁調不了</h3></div>
+    <p class="fb"><code>UiScaleToggle</code> 全站只掛三處。我的業務、公開檔案、業務制度、規劃編輯器、版本歷程、範本、報聘申請頁全都沒有。<strong>元件自己的註解就寫著「缺一個就會出現有些畫面放大了、有些沒有」</strong>——缺的正是「看得到那顆鈕」。後台 11 頁也一顆都沒有。</p>
+    <p class="ev">掛載點只有三個：<b>DashboardHeader.tsx:106</b>（persist）、<b>portal/page.tsx:127</b>、<b>LandingView.tsx:40</b></p>
+    <p class="fx">跟 A1 同一個 layout 解決；後台 header 也補一份（順便放主題切換）。</p>
+  </article>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">A4</span>
+      <h3 class="ft">客戶清單工具列：搜尋＋三個下拉擠成一排，沒有標籤也沒有分組</h3></div>
+    <p class="fb">自由搜尋、狀態篩選、標籤篩選、排序四種不同性質的控制項只靠 8px 的 <code>gap-2</code> 分開，全靠 placeholder 和預設 option 文字辨識用途。上一排標頭又把 h1、客戶計數、額度徽章、新增按鈕四種東西塞在同樣的 <code>gap-2</code> 裡。</p>
+    <p class="ev"><b>ClientList.tsx:119-146</b> &lt;div className="flex flex-wrap gap-2 mb-4"&gt;（input + 3×select）
+<b>ClientList.tsx:86</b>　 &lt;div className="flex flex-wrap items-center gap-2 mb-4"&gt;（h1 + 計數 + 徽章 + 按鈕）</p>
+    <p class="fx">標題列與篩選列拆成兩塊，篩選列給獨立底色容器；搜尋框與三個下拉之間放一條分隔，下拉補上前綴標籤。</p>
+  </article>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">A5</span>
+      <h3 class="ft">客戶詳情：統計磚、清單列、表單分組、空狀態長得一模一樣</h3></div>
+    <p class="fb">同一個 <code>Card</code> class 字串被四種語意完全不同的區塊共用。掃視時分不出「這是一個數字」還是「這是一筆可以點的紀錄」。</p>
+    <p class="ev"><b>ClientDetail.tsx:645</b> bg-[#0c2135] border border-white/10 rounded-xl px-3.5 py-3
+同一組樣式又出現在：<b>:342</b> 諮詢紀錄列　<b>:360</b> 待辦列　<b>:406</b> 年度版本列　<b>:652</b> 空狀態</p>
+    <p class="fx">分三個層級：統計磚（無邊框、有底色、大數字）／清單列（只有下緣線、hover 有反應）／區塊容器（有邊框、有標題）。</p>
+  </article>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">A6</span>
+      <h3 class="ft">「年度版本」分頁零筆時完全空白，沒有任何提示</h3></div>
+    <p class="fb">同一個分頁下方的版本比較表有 <code>compare.length >= 2</code> 的判斷，這裡卻沒有 <code>plans.length === 0</code> 分支。新客戶第一次點進去只看到標題和一顆按鈕，中間一片空，容易被當成壞掉。</p>
+    <p class="ev"><b>ClientDetail.tsx:404-424</b> {plans.map(...)} —— 沒有零筆分支</p>
+    <p class="fx">補空狀態；順便把全站空狀態的長相統一（現在有純文字、虛線框加 emoji、置中 td 三種）。</p>
+  </article>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">A7</span>
+      <h3 class="ft">待辦的「刪」沒有二次確認、也沒有 padding，誤觸就永久刪掉</h3></div>
+    <p class="fb">同一支檔案裡封存客戶、刪除年度版本、刪除諮詢紀錄三個動作<strong>都有</strong> <code>window.confirm()</code>，只有這顆沒有。而且它是純文字 12px、零 padding，觸控目標極小。</p>
+    <p class="ev"><b>ClientDetail.tsx:614</b> &lt;button className="text-[#6b7d8f] text-xs" onClick={() =&gt; onDeleteItem(i.id)}&gt;刪&lt;/button&gt;</p>
+    <p class="fx">補確認、補 <code>px-2 py-1</code>、補 <code>aria-label</code>。（這條嚴格說是行為，但誤刪風險放這裡一起講。）</p>
+  </article>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">A8</span>
+      <h3 class="ft">每次換頁閃一下白畫面</h3></div>
+    <p class="fb">整個範圍內沒有任何 <code>loading.tsx</code>／<code>error.tsx</code>／<code>not-found.tsx</code>。所有頁面都是 <code>force-dynamic</code> 的 async server component，抓資料期間瀏覽器顯示預設的白色過場——在一個全站 <code>#081a2b</code> 深底的產品裡，每次導頁都刺一下眼。資料庫出錯時也會退回 Next 的通用錯誤頁，風格完全跳出產品。</p>
+    <p class="ev">find src -name "loading.tsx" -o -name "error.tsx" -o -name "not-found.tsx" → 0 筆</p>
+    <p class="fx">補一份共用的 <code>loading.tsx</code>（深底骨架）與 <code>error.tsx</code>；淺色版做完後兩者都吃 token，不會再閃色。</p>
+  </article>
+
+  <article class="f" data-g="A">
+    <div class="f-top"><span class="sev low">細節打磨</span><span class="fid">A9</span>
+      <h3 class="ft">字級切換鈕自己是全站最小的觸控目標之一</h3></div>
+    <p class="fb">功能明確是給看不清楚、手指精準度較差的人用的，按鈕本身卻只有 <code>py-0.5</code>（約 20px 高）。</p>
+    <p class="ev"><b>UiScaleToggle.tsx:98</b> "px-1.5 py-0.5 rounded font-bold transition leading-none"</p>
+    <p class="fx">拉到至少 32px 高；主題切換鈕做的時候和它並排，用同一組尺寸。</p>
+  </article>
+</section>
+
+<section id="B">
+  <div class="sechead"><h2>B · 規劃器（教練一天待最久的畫面）</h2><span class="tally">12 項</span></div>
+  <p class="secnote"><code>public/lantu-app.html</code>，14,763 行單檔。好消息是它 <code>:root</code> 已經有一套 CSS 變數，是全系統唯一為換膚做好準備的地方；壞消息是變數被繞過了 597 次。</p>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">B1</span>
+      <h3 class="ft">資料分頁開頭連三排長得一樣的圓角膠囊，才看得到第一個輸入格</h3></div>
+    <p class="fb">分頁列 → 分組導覽 → 資料完整度列，三排都是圓角膠囊、都是小字、彼此只差 16–18px。教練打開分頁第一眼看到的是三條視覺重量相同的橫條，得先解析一遍才知道哪排是導覽、哪排是狀態。</p>
+    <p class="ev"><b>lantu-app.html:31</b> .tabbar{…margin-bottom:18px}
+<b>lantu-app.html:41</b> .dgroups{…margin-bottom:16px;padding-bottom:5px}
+<b>lantu-app.html:46</b> .cmpl{…margin-bottom:16px}
+<b>lantu-app.html:4499</b> '&lt;div class="dgroups"&gt;'+tb+'&lt;/div&gt;&lt;div data-calc="completeness"&gt;'+…</p>
+    <p class="fx">三排各給不同的視覺角色：分頁列留下底線式、分組導覽改成無框的文字群、完整度列做成一塊有底色的狀態卡並和下方內容拉開 24px。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">B2</span>
+      <h3 class="ft">分類鈕換行時的垂直間距只有 1px，兩排黏成一團</h3></div>
+    <p class="ev"><b>lantu-app.html:42</b> .dgrow{display:flex;flex-wrap:wrap;align-items:center;gap:<b>1px</b> 3px}</p>
+    <p class="fx">改 <code>gap:6px 6px</code>。單行字。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">B3</span>
+      <h3 class="ft">「規劃參數」把 13 個欄位倒進同一格網格，現金流假設和蒙地卡羅旋鈕混在一起</h3></div>
+    <p class="fb">通膨、薪資成長、投資報酬、學費成長、計畫儲蓄率、緊急預備月數、安全現金、模擬年期，<strong>再加三個標準差欄位</strong>，全部掛在同一個 <code>&lt;h4&gt;規劃參數&lt;/h4&gt;</code> 底下、同一個 <code>gap:12px</code> 的網格裡。教練得逐欄讀標籤才分得出「這是假設」還是「這是模擬用的風險旋鈕」。</p>
+    <p class="ev"><b>lantu-app.html:5007-5013</b> paramsSec()　<b>:143</b> .fgrid{gap:12px}</p>
+    <p class="fx">拆三組小標：<em>成長假設</em>／<em>安全水位</em>／<em>模擬設定</em>，每組之間 20px 並補一條細線。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">B4</span>
+      <h3 class="ft">財務四合一：六張可編輯表格疊在一起，儲存格 padding 只有 6px 7px</h3></div>
+    <p class="fb">表格本身 <code>6px 7px</code>、格內輸入框再 <code>5px 7px</code>、外層 panel 只有 <code>14px 15px</code>。一整片金額輸入框從左貼到右，行與行之間沒有喘息，也沒有 zebra 或 hover 幫忙對行。</p>
+    <p class="ev"><b>lantu-app.html:127</b> th,td{padding:6px 7px;border-bottom:1px solid var(--line)}
+<b>lantu-app.html:130</b> td input,td select{…padding:5px 7px}
+<b>lantu-app.html:197</b> .finpanel{padding:14px 15px}　<b>:10212-10239</b> financeSec() 六表堆疊</p>
+    <p class="fx">儲存格拉到 <code>9px 12px</code>，補 <code>tr:hover</code> 底色與 <code>tbody tr:nth-child(even)</code> 微弱條紋，六張表之間改用有標題的區塊分隔。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">B5</span>
+      <h3 class="ft">同一個元件在 A 分頁是卡片、在 B 分頁變成裸文字</h3></div>
+    <p class="fb"><code>.sec</code> 平常是有邊框有底色的卡片，一旦被放進分析摺疊區就被剝光，只剩 14px 下留白。使用者在兩個分頁看到同一種內容，一次有容器一次沒有。</p>
+    <p class="ev"><b>lantu-app.html:113</b> .sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
+<b>lantu-app.html:120</b> .anbody&gt;.sec{background:transparent;border:none;padding:0;margin-bottom:14px}</p>
+    <p class="fx">分析區內改用 <code>.sec.flat</code> 明確命名，並保留左側細線當群組標記，不要整個消失。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">B6</span>
+      <h3 class="ft">標籤離輸入框只有 3px，輸入框和面板底色幾乎同色</h3></div>
+    <p class="fb">label 與 input 的距離（3px）比 input 彼此的距離（12px）差太少，眼睛抓不到「一組」的邊界；輸入框底 <code>#0a1a20</code> 對上面板 <code>#0d2b45</code> 明度差很小，欄位不會浮出來。</p>
+    <p class="ev"><b>lantu-app.html:144</b> .f label{color:var(--mut);font-size:12px;margin-bottom:3px}
+<b>lantu-app.html:145</b> .f input,.f select{border:1px solid var(--line);border-radius:8px;padding:7px 9px}</p>
+    <p class="fx">label 距離拉到 6px、群組間距拉到 18px；輸入框底色與面板拉開一階（換成 token 後兩套主題都成立）。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">B7</span>
+      <h3 class="ft">25 種字級、16 種圓角，而且九成的字都是 700 以上</h3></div>
+    <p class="fb">字級有 11／11.5／12／12.5／13／13.5 這種半像素階，光半像素就佔了約 190 個宣告。字重只有四種，700 和 800 加起來佔 90／103——所有東西都在喊，就沒有東西被聽見。卡片圓角在 9/10/11/12/14/16px 之間跳。</p>
+    <p class="ev">font-size 25 種：12px×110、13px×98、12.5px×86、11.5px×60、11px×42 …
+border-radius 16 種：999px×14、10px×12、6px×10、8px×9、11px×9 …
+font-weight：700×47、800×43、400×9、600×4</p>
+    <p class="fx">收成 6 階字級（11/12/13/15/18/24）、3 階圓角（4/8/12）、3 階字重（400/600/800），一次改 CSS 即可，不動結構。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev low">細節打磨</span><span class="fid">B8</span>
+      <h3 class="ft">同一顆膠囊被獨立定義了 10 次，同一種左色條卡片 6 次</h3></div>
+    <p class="fb">全部都是 <code>border-radius:999px</code> ＋ 小字 ＋ 1px 邊框，但每個各自手調 padding（<code>1px 8px</code>／<code>2px 9px</code>／<code>3px 10px</code>／<code>6px 13px</code>）和字級（10.5–13px）。另外還有一組直接寫在 JS 字串裡、連 class 都沒用。</p>
+    <p class="ev">膠囊：<b>:90-91</b> .tagMust/.tagOff　<b>:92</b> .owner　<b>:50</b> .cmpl .dot　<b>:102</b> .anchip　<b>:353</b> .jobtag　<b>:438</b> .ckpill　<b>:530-531</b> .pqOk/.pqNo　<b>:25</b> .roleSw button　<b>:309</b> .sortbtn
+JS 內聯重寫：<b>:8018</b> <b>:9617</b> <b>:11289</b> <b>:11887</b>
+按鈕兩套：<b>:27</b> .tbtn（9px 圓角）vs <b>:14490</b> .lnbtn（8px 圓角）</p>
+    <p class="fx">留一個 <code>.pill</code> 基底 ＋ 語意修飾詞；JS 內聯那四處改成套 class。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">B9</span>
+      <h3 class="ft">14,763 行裡只有 2 條 <code>:focus</code>、1 條 <code>:disabled</code>、0 條驗證樣式</h3></div>
+    <p class="fb">而且那兩條 <code>:focus</code> 都是<strong>把外框關掉</strong>。一個分頁上百個輸入格，用鍵盤 Tab 過去沒有任何視覺定位點。欄位填錯也沒有任何紅框——完全沒有 <code>.error</code>／<code>.invalid</code> 這類 class 存在。</p>
+    <p class="ev"><b>:323</b> .bgf textarea:focus{outline:none;border-color:var(--amber2)}
+<b>:14484</b> .lnta:focus{outline:none;border-color:var(--amber)}
+<b>:14496</b> .lnbtn:disabled{opacity:.4}　—— 全檔僅此三條</p>
+    <p class="fx">加一條全域 <code>:focus-visible{outline:2px solid var(--amber);outline-offset:2px}</code>，加 <code>[aria-invalid]</code> 的紅框樣式，加通用 <code>:disabled</code>。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">B10</span>
+      <h3 class="ft">排序、移除、勾選的按鈕只有 18–22px</h3></div>
+    <p class="ev"><b>:79</b> .pitem .mv button 22×22（人生目標順位調整）　<b>:105</b> .anchip i 18×18（移除）
+<b>:14565</b> .ivchk 18×18（訪談檢核）　<b>:7208 :7619 :8295 :8473</b> style="width:17px;height:17px"（勾選框）</p>
+    <p class="fx">最小 28×28，並把可點區域用 padding 撐開（視覺大小可以維持不變）。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev low">細節打磨</span><span class="fid">B11</span>
+      <h3 class="ft">12 個沒有系統的 z-index，浮動按鈕要用 <code>bottom:74px</code> 硬躲底列</h3></div>
+    <p class="fb">在用的值是 5、9、12、15、30、58、60、95、99、99、110、111、130。頂欄（30）比註記底列（60）還低。程式碼自己的註解已經在解釋這個魔術數字了。</p>
+    <p class="ev"><b>:14650</b> .ivfab{position:fixed;right:18px;bottom:74px}　註解：「.lnbar 是 z-index 60 的全寬底列，所以按鈕要墊高 74px 才不會被壓住」</p>
+    <p class="fx">定五階：內容 1／黏頂 10／浮層 100／彈窗 1000／提示 2000，寫成變數。</p>
+  </article>
+
+  <article class="f" data-g="B">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">B12</span>
+      <h3 class="ft">最寬的表格寫死 1300px，而全檔只有 6 個斷點——130% 字級下必爆</h3></div>
+    <p class="fb">側欄固定 262px 且只有在 ≤820px 才收起來，中間 820–1200px 這段沒有任何處理，而那正是 1440–1600px 螢幕開 115–130% 字級後會落到的區間。註解裡已經記錄過一次類似的縮放災難（SVG 在寬螢幕被放大 1.4–2.1 倍），是靠一條全域 <code>max-width</code> 補起來的。</p>
+    <p class="ev"><b>:305</b> .actstbl table{min-width:1300px}　<b>:380</b> .matrix{min-width:720px}　<b>:418</b> .cktbl{min-width:640px}
+<b>:29</b> .shell{grid-template-columns:262px 1fr}　斷點只有 1080/1024/820/820/720 five ＋ print</p>
+    <p class="fx">側欄補一個 1200px 的中間態（收成 200px 或圖示列）；寬表改成關鍵欄固定、其餘可摺。</p>
+  </article>
+</section>
+
+<section id="C">
+  <div class="sechead"><h2>C · 客戶端</h2><span class="tally">4 項</span></div>
+  <p class="secnote">客戶只會用這幾頁，而且多半在手機上。</p>
+
+  <article class="f" data-g="C">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">C1</span>
+      <h3 class="ft">自稱「手機為主」的排序元件，方向鍵只有 26×26px</h3></div>
+    <p class="fb">檔案開頭的註解寫著「手機為主，所以拖曳一定配 ◀ ▶ 按鈕，不能只靠拖」——立意正確，但給出的按鈕比建議觸控目標小了一截，旁邊的「移除」鍵更小（只有 <code>px-1.5</code> 包一個符號，沒有固定尺寸）。</p>
+    <p class="ev"><b>IntentPicker.tsx:136-141</b> className="w-[26px] h-[26px] rounded-md border border-white/12"</p>
+    <p class="fx">拉到 40×40；這是客戶在手機上第一個要操作的東西。</p>
+  </article>
+
+  <article class="f" data-g="C">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">C2</span>
+      <h3 class="ft">四個彈窗沒有一個標 <code>role="dialog"</code>，三個連 Esc 都關不掉</h3></div>
+    <p class="ev">StageGuideModal <b>StageGuide.tsx:82-105</b>（只有這個有 Esc）
+NewClientDialog <b>ClientList.tsx:328-378</b>　PhotoCropper <b>:100-</b>　RiskQuizModal <b>:68-</b>
+四個都只是 fixed inset-0 + bg-black/60 + onClick 關閉</p>
+    <p class="fx">抽一個共用 <code>&lt;Modal&gt;</code>：<code>role="dialog" aria-modal</code>、Esc 關閉、開啟時把焦點移進去、關閉時還回原處。順便統一遮罩色（現在有四種黑）。</p>
+  </article>
+
+  <article class="f" data-g="C">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">C3</span>
+      <h3 class="ft">課程完成度只靠顏色表示，勾勾被設成透明</h3></div>
+    <p class="ev"><b>CourseView.tsx:82-87</b> 已完成 bg-[#6f8f74] / 未完成 border-white/25 <b>text-transparent</b></p>
+    <p class="fx">未完成留空心圓、已完成放實心勾（不是把勾藏起來），色弱也讀得出來。</p>
+  </article>
+
+  <article class="f" data-g="C">
+    <div class="f-top"><span class="sev low">細節打磨</span><span class="fid">C4</span>
+      <h3 class="ft">人生護照自己上下 padding 對不齊</h3></div>
+    <p class="ev"><b>PassportWizard.tsx:263</b> px-4 sm:px-8（內容）　<b>:416</b> px-5 sm:px-8（底部固定列）</p>
+    <p class="fx">同一個值。順帶一提，這支檔案的 <code>Face</code> 區塊 <code>gap-x-5 gap-y-4</code> 是全站間距做得最好的一處，可以拿來當基準。</p>
+  </article>
+</section>
+
+<section id="D">
+  <div class="sechead"><h2>D · 後台</h2><span class="tally">6 項</span></div>
+  <p class="secnote">後台只有你和少數人在用，但它是「兩套設計系統並存」最明顯的地方。</p>
+
+  <article class="f" data-g="D">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">D1</span>
+      <h3 class="ft">後台同時跑著藍系和金系兩套設計，同一個「選取中的頁籤」有兩種顏色</h3></div>
+    <p class="fb">案件／顧問／培訓／系統／模擬器／檔案是<strong>藍系</strong>（主鈕 <code>#1d5c8a</code>）；分類／學習／範本／報聘設定／客戶視圖／分析預設／品牌是<strong>金系</strong>（主鈕 <code>#c99a5b</code>）。兩邊都是一般 CRUD 板子，分界不對應任何功能差異——看起來就是不同時期不同人寫的。</p>
+    <p class="ev">選取中的篩選頁籤：<b>CasesBoard.tsx:228</b> bg-[#1d5c8a] border-[#2b7cb5] text-white
+　　　　　　　　　　vs <b>CategoriesBoard.tsx:100</b> bg-[#c99a5b] text-[#081a2b]</p>
+    <p class="fx">全部收到金系（品牌色），藍色留給「唯讀／共同執案」這類狀態語意。</p>
+  </article>
+
+  <article class="f" data-g="D">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">D2</span>
+      <h3 class="ft">教練名冊的一列裡塞進整組授權表單和整份審核清單，字只有 10–11px</h3></div>
+    <p class="ev"><b>admin/page.tsx:171-184</b> 一格 &lt;td&gt; 裡放 <b>LicenseCell.tsx:105-198</b>（職級選單＋日期＋數量單位＋名額覆寫）
+另一格放 <b>ReviewPanel.tsx:99-169</b>（整份審核檢核清單）</p>
+    <p class="fx">授權與審核改成點開的側欄或彈窗，名冊列只留狀態徽章。</p>
+  </article>
+
+  <article class="f" data-g="D">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">D3</span>
+      <h3 class="ft">案件板的展開列把對帳、動作鈕、客戶問卷三件不相干的事塞進同一格</h3></div>
+    <p class="ev"><b>CasesBoard.tsx:311-422</b> 一個 &lt;td colSpan={9}&gt; 內：撥款子表 ＋ 追蹤列 ＋ 動作鈕列(:377-409) ＋ CoachSurvey(:601-646)，彼此只靠 mt-3 / mt-6
+<b>CasesBoard.tsx:223-243</b> 篩選頁籤 ＋ 成功失敗訊息 ＋ 匯出匯入鈕擠在同一條 flex</p>
+    <p class="fx">展開列拆成三張有小標的子卡；篩選與批次動作用一條分隔線隔開。</p>
+  </article>
+
+  <article class="f" data-g="D">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">D4</span>
+      <h3 class="ft">後台沒有任何一張表格有斑馬紋或 hover，數字有時候不靠右</h3></div>
+    <p class="fb">全站 <code>odd:</code>／<code>even:</code>／<code>tr:hover</code> 零命中。只有 CSV 匯入預覽那一張有 sticky 表頭，真正長的資料表反而都沒有。分類／保險商品／生育費用／營所稅四張板子的數字欄從不靠右。表頭本身也有三種寫法（<code>bg-[#12334f] text-xs</code>／<code>bg-[#0d2b45]</code> 無 text-xs／完全沒底色）。</p>
+    <p class="ev">grep "odd:|even:|&lt;tr.*hover:" src/app/admin → 0 筆　　sticky top-0 僅 <b>CasesBoard.tsx:559</b></p>
+    <p class="fx">一次補齊：表頭統一、長表 sticky、<code>tr:hover</code>、數字欄 <code>text-right tabular-nums</code>。</p>
+  </article>
+
+  <article class="f" data-g="D">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">D5</span>
+      <h3 class="ft">四塊最忙的板子把 focus 外框關掉又沒補回來</h3></div>
+    <p class="fb">全站 <code>focus-visible</code> 零命中。10 支檔案用 <code>outline-none</code>，其中 6 支還補了邊框變色，剩下四支什麼都沒有——而那四支正好是案件登錄、顧問編輯、培訓登錄、模擬器，也就是最需要連續鍵盤輸入的地方。</p>
+    <p class="ev">關掉沒補：<b>CasesBoard.tsx:17-18</b>　<b>AdvisorsBoard.tsx:11-12</b>　<b>TrainingBoard.tsx:11-12</b>　<b>Simulator.tsx:13</b></p>
+    <p class="fx">token 化的同時，在 globals.css 補一條全域 <code>:focus-visible</code> 金色外框，這四支自動補齊。</p>
+  </article>
+
+  <article class="f" data-g="D">
+    <div class="f-top"><span class="sev low">細節打磨</span><span class="fid">D6</span>
+      <h3 class="ft">11 支後台頁面各自貼了一份逐字相同的 header</h3></div>
+    <p class="fb">cases／learn／advisors／system／categories／training／profiles／analysis／apply／brand／client-view，只有 h1 和 <code>max-w-*</code> 不同。目前看起來一致，但要改頭欄（例如加主題切換）就得改 11 個地方。</p>
+    <p class="fx">收成 <code>src/app/admin/layout.tsx</code>。</p>
+  </article>
+</section>
+
+<section id="E">
+  <div class="sechead"><h2>E · 跨畫面的一致性</h2><span class="tally">9 項</span></div>
+  <p class="secnote">這一節不屬於任何單一畫面，但它們是「整體看起來不精緻」的累積來源。</p>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">E1</span>
+      <h3 class="ft">全站只有 3 次陰影，所有東西停在同一個平面上</h3></div>
+    <p class="fb">118 支 tsx 裡 shadow 只出現三次（其中兩次在彈窗）。卡片、清單列、按鈕、彈窗之間唯一的區隔手段是 1px 的 <code>border-white/10~15</code>，共 448 處。<strong>這就是「全部黏在一起」最直接的成因</strong>——不是間距不夠，是沒有第二種分隔語言。</p>
+    <p class="ev">border-white/N：448 處　　shadow：3 處（shadow×1、shadow-2xl×1、shadow-[0_18px_50px…]×1）</p>
+    <p class="fx">導入三階層次：底層（頁面底色）／面板（底色差一階，無邊框）／浮起（有陰影）。邊框只留給需要圈住的東西，不要當萬用分隔線。</p>
+  </article>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">E2</span>
+      <h3 class="ft">26 種字級，其中 <code>text-[11px]</code> 用了 115 次、<code>text-xs</code>（12px）用了 139 次</h3></div>
+    <p class="fb">兩套系統並存：Tailwind 具名尺寸和手打的 arbitrary px。<code>text-[12px]</code>、<code>text-[12.5px]</code>、<code>text-[13px]</code>、<code>text-[13.5px]</code> 四個差不到 1.5px 的尺寸同時活著，光 <code>ClientDetail.tsx</code> 一支檔案就同時用了 10/11/11.5/12/12.5/13 六種。這些差異在螢幕上根本看不出來，純粹是每次手打造成的漂移。</p>
+    <p class="ev">text-sm 234・text-xs 139・text-[11px] 115・text-[12px] 58・text-[13px] 48・text-[12.5px] 33・text-[11.5px] 22 …（共 26 種）</p>
+    <p class="fx">定 6 階並全域取代；半像素階一律併掉。</p>
+  </article>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev crit">天天卡到</span><span class="fid">E3</span>
+      <h3 class="ft">最常用的說明文字顏色對比只有 3.8:1，而且多半是 11px 小字</h3></div>
+    <p class="fb"><code>#6f869c</code> 在 <code>#0d2b45</code> 上約 3.83:1、在 <code>#12334f</code> 上約 3.45:1，都低於 WCAG AA 的 4.5:1；而它幾乎都搭配 11–12px（不屬於「大字」的放寬標準）。它偏偏是全站最常見的「為什麼要這樣填」「注意事項」用色——也就是最需要被讀到的那些字。</p>
+    <p class="ev">大量出現於 HomeView / PassportWizard / ProfileEditor / SetupWizard 等數十處</p>
+    <p class="fx">次要文字提到 <code>#8fa6ba</code> 一階（約 5.2:1），三級文字才用現在這個亮度。淺色版要另外定，不能沿用。</p>
+  </article>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">E4</span>
+      <h3 class="ft">金色同時是品牌色、選取狀態、和警示色</h3></div>
+    <p class="fb">額度快滿、草稿未存、護照過期都用 <code>#c99a5b</code> 淡底加邊框——和「這是主要按鈕」「這個頁籤被選中」用同一個顏色。使用者看到金色時無法判斷這是「重點」還是「要注意的問題」。</p>
+    <p class="ev"><b>ClientList.tsx:93-96</b> 額度快滿　<b>ClientDetail.tsx:503</b> 草稿提醒　<b>PassportWizard.tsx:278</b> 護照過期</p>
+    <p class="fx">警示改用獨立的琥珀／橘色階，金色只留給品牌與選取。</p>
+  </article>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">E5</span>
+      <h3 class="ft">錯誤訊息有四種長相，其中一種還是橘色的</h3></div>
+    <p class="fb">純文字紅、徽章式紅、深酒紅滿版 banner、以及<strong>橘色</strong>純文字——同樣是「這個動作失敗了」。橘色那組容易被讀成「警示」而不是「錯誤」。而紅色徽章又同時代表「額度已滿（危險）」和「授權過期唯讀（狀態）」兩種嚴重程度完全不同的事。</p>
+    <p class="ev">① <b>SetupWizard.tsx:110,120,155</b> text-[#ff9b9b]　② <b>ClientList.tsx:93</b> #e5484d/#ff9d9f
+③ <b>PlanEditor.tsx:414</b> bg-[#5b1f22] text-[#ffd7d8]（全站唯一滿版）　④ <b>ClientDetail.tsx:145</b> text-[#d9773f] 橘色</p>
+    <p class="fx">收成兩種：行內錯誤（欄位旁紅字）與區塊錯誤（<code>role="alert"</code> 的紅底 banner，照 PlanEditor 那份做，它本來就做得最完整）。</p>
+  </article>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">E6</span>
+      <h3 class="ft">同一種輸入框存在 10 種寫法，底色 4 種、圓角 3 種、只有部分有 focus</h3></div>
+    <p class="ev"><b>ClientDetail.tsx:49</b> #0a1a2b rounded-md <b>無 focus</b>　<b>ClientList.tsx:82</b> #0d2b45 rounded-md
+<b>ProfileEditor.tsx:15</b> #0d2b45 rounded focus:border-[#c99a5b]　<b>SetupWizard.tsx:22</b> #0a1a28 rounded-lg
+<b>HomeSwitcher.tsx:49</b> #12334f rounded-lg　…（共 10 種）</p>
+    <p class="fx">抽 <code>&lt;Field&gt;</code>／<code>&lt;Select&gt;</code> 兩個元件。順便把只有邏輯沒有樣式的 <code>MoneyInput</code>（<code>className=""</code> 預設值）補上預設外觀。</p>
+  </article>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">E7</span>
+      <h3 class="ft">送出中的狀態有三種完整度</h3></div>
+    <p class="fb">護照精靈做到 idle/saving/success/error 四態加轉圈；新增客戶和儲存個人檔案只把文字換成「處理中…」；後台全部只有文字換字，沒有任何 spinner 或骨架。</p>
+    <p class="ev">完整：<b>PassportWizard.tsx:451-459</b>（animate-spin）　只換字：<b>ClientList.tsx:372</b>　<b>ProfileEditor.tsx:306</b>　後台全部</p>
+    <p class="fx">抽一顆 <code>&lt;SubmitButton&gt;</code>，四態一次到位。</p>
+  </article>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev warn">明顯不一致</span><span class="fid">E8</span>
+      <h3 class="ft">危險動作全靠 <code>window.confirm()</code>，而它不吃字級設定</h3></div>
+    <p class="fb">瀏覽器原生對話框套不到產品的深色樣式，也<strong>完全不受 <code>--ui-scale</code> 影響</strong>——已經開了「特大」字級的老花使用者，看到的確認框還是系統預設大小。這讓老花友善這件事在最關鍵的一步破功。</p>
+    <p class="ev"><b>ClientDetail.tsx:141,178,202</b>　<b>SetupWizard.tsx:80</b>　<b>IntentPicker.tsx:45</b></p>
+    <p class="fx">用 C2 抽出來的 <code>&lt;Modal&gt;</code> 做一個 <code>&lt;ConfirmDialog&gt;</code> 取代。</p>
+  </article>
+
+  <article class="f" data-g="E">
+    <div class="f-top"><span class="sev low">細節打磨</span><span class="fid">E9</span>
+      <h3 class="ft">客戶清單的階段徽章是「連結裡包按鈕」</h3></div>
+    <p class="fb">整列是 <code>&lt;Link&gt;</code>，裡面又放了 <code>&lt;span role="button" tabIndex={0}&gt;</code>，靠 <code>preventDefault</code> 硬攔外層導航。鍵盤使用者在同一個可聚焦區域會遇到兩層衝突的互動語意，也容易誤觸。</p>
+    <p class="ev"><b>ClientList.tsx:173-221</b>（外層 Link）→ <b>:200-222</b>（內層 role="button"）</p>
+    <p class="fx">徽章移出 Link，或整列改成 <code>&lt;div&gt;</code> 內含一個明確的「開啟」連結。</p>
+  </article>
+</section>
+
+<section id="F">
+  <div class="sechead"><h2>F · 淺色版的地雷</h2><span class="tally">9 項</span></div>
+  <p class="secnote">結論先講：<strong>顏色不能反過來，得先有 token 層。</strong>沒有 token 就硬做，會出現「有些輸入框還是黑的、所有邊框消失、圖表配色錯亂」，而且沒有任何機制會告訴你漏了哪一個。以下九項是實際會炸的地方。</p>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev crit">必炸</span><span class="fid">F1</span>
+      <h3 class="ft">所有邊框都是半透明白，換成淺底會全部消失</h3></div>
+    <p class="fb">規劃器的 <code>--line</code> 是 <code>rgba(255,255,255,.11)</code>，全檔用了一百多次；Next 端則是 448 處 <code>border-white/N</code>（8 種透明度）。白色疊在淺色底上等於沒有——卡片邊界、表格分隔線、輸入框外框會在同一瞬間全部不見，整個畫面糊成一片。</p>
+    <p class="ev"><b>lantu-app.html:8</b> --line:rgba(255,255,255,.11)　＋ 33 處 rgba(255,255,255,…) 當進度條軌道／hover 底
+Next 端 border-white/5・/8・/10・/12・/15・/20・/25 共 448 處</p>
+    <p class="fx"><code>--line</code> 改成實色 token，兩套主題各給一個值（深色 <code>#1e3d5c</code>／淺色 <code>#dfe4ea</code>）。</p>
+  </article>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev crit">必炸</span><span class="fid">F2</span>
+      <h3 class="ft">已經有一個手工淺色分支，而且它現在就是壞的</h3></div>
+    <p class="fb">規劃器裡有 75 個 <code>dark?'X':'Y'</code> 三元式和 8 處 <code>theme==='light'</code>，是為報表／圖表做的半套淺色。其中生涯藍圖的膠囊在「淺色」分支還是輸出深藍底加白字，坐在一張已經正確變淺的卡片上。<strong>一個人漏了一個值，沒有任何東西會抓到。</strong>這正是「靠人工維護深淺兩份色碼」的必然結果。</p>
+    <p class="ev"><b>lantu-app.html:11877</b> CARDBG:'#faf7f1'（卡片已變淺）
+<b>lantu-app.html:11887</b> background:'+(dark?'#08252e':'<b>#0d2b45</b>')+';color:<b>#fff</b>（膠囊仍是深底白字）</p>
+    <p class="fx">這 75 個三元式全部改成讀 CSS 變數，讓它們自動跟著主題走，順手修掉這個 bug。</p>
+  </article>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev crit">必炸</span><span class="fid">F3</span>
+      <h3 class="ft">8 種「輸入框深底色」要逐一換掉，而它們本來就已經漏抄過</h3></div>
+    <p class="fb"><code>#0a1a2b</code>／<code>#0a1a28</code>／<code>#0a1a20</code>／<code>#0a2135</code>／<code>#0a2137</code>／<code>#0a2138</code>／<code>#0b2036</code>／<code>#0f2740</code> 全都是同一個語意「比面板再深一階」。既然這 8 個值本來就是複製誤差的產物，人工替換一定會漏，結果就是淺色版裡卡著幾個黑洞。</p>
+    <p class="fx">先合併成一個 <code>--field-bg</code>，再做淺色。順序不能反。</p>
+  </article>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev warn">要處理</span><span class="fid">F4</span>
+      <h3 class="ft">6 個漸層各自寫死兩個深色停點</h3></div>
+    <p class="ev"><b>:16</b> .top linear-gradient(90deg,#081a2b,#0d2b45)　<b>:174</b> .report .rc　<b>:178</b> .hero2
+<b>:343</b> .pcard .phd　<b>:14519</b> .lnbar　<b>:14651</b> .ivfab</p>
+    <p class="fx">改成 <code>linear-gradient(90deg,var(--grad-a),var(--grad-b))</code>。</p>
+  </article>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev warn">要處理</span><span class="fid">F5</span>
+      <h3 class="ft">寫死在色塊上的文字色會變成深底深字或淺底淺字</h3></div>
+    <p class="fb">金色膠囊上的 <code>#08202a</code>、深藍膠囊上的 <code>#fff</code> 這類配對現在成立，純粹是有人手動配過。主題一換、底色一動，這些文字色不會跟著走。</p>
+    <p class="ev"><b>:63</b> .gcard.on{color:#08202a}（金底深字）　<b>:11887</b> color:#fff（藍底白字）
+Next 端：26 支檔案用 text-white，同語意的地方又有人用 text-[#eef2f7]</p>
+    <p class="fx">配一組 <code>--on-accent</code>／<code>--on-danger</code> token，文字色永遠跟著底色走。</p>
+  </article>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev warn">要處理</span><span class="fid">F6</span>
+      <h3 class="ft">圖表顏色寫在 inline style 和 SVG 屬性裡，一般掃描抓不到</h3></div>
+    <p class="fb">規劃器有 1,341 個 inline <code>style="…"</code>，圖表的圖例配色（<code>#5b93d6,#5cc08a,#e79ec4,#f0c34e,#ef6f6f</code>）在五個不同的函式裡各複製了一份。Next 端也有 <code>stroke="#0a1a20"</code>、<code>conic-gradient(#2f8f8f …)</code> 這種寫在 SVG 屬性和 style 物件裡的顏色，改 class 完全動不到。</p>
+    <p class="ev">圖例各自複製：<b>:11838</b> <b>:11864</b> <b>:11924</b> <b>:11979</b> <b>:12073</b>
+<b>HomeView.tsx:124,127</b> stroke="#0a1a20" fill="#a7bacb"　PassportWizard 甜甜圈 conic-gradient</p>
+    <p class="fx">抽一份共用的圖表色盤陣列，兩套主題各一組；SVG 一律改用 <code>currentColor</code> 或 <code>var()</code>。</p>
+  </article>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev warn">要處理</span><span class="fid">F7</span>
+      <h3 class="ft"><code>globals.css</code> 裡那段深色模式是死碼，會誤導人</h3></div>
+    <p class="fb">它定義了 <code>--background</code>／<code>--foreground</code> 和一段 <code>@media (prefers-color-scheme: dark)</code>——但全站沒有任何一頁用這兩個變數（每頁都直接寫 <code>bg-[#081a2b]</code>）。看起來像「深淺主題的基礎建設已經有了」，實際上是 create-next-app 留下來的骨架。</p>
+    <p class="ev"><b>globals.css:19-23</b> @media (prefers-color-scheme:dark){:root{--background:#0a0a0a;--foreground:#ededed}}</p>
+    <p class="fx">第一步先清掉，換成真正的 token 定義，避免下一個人以為已經處理過。</p>
+  </article>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev low">別忘了</span><span class="fid">F8</span>
+      <h3 class="ft">分頁工具列顏色鎖死深藍</h3></div>
+    <p class="ev"><b>layout.tsx:33</b> export const viewport = { themeColor: "#0d2b45" }</p>
+    <p class="fx">改成隨主題切換（或至少不要在淺色版讓瀏覽器 UI 還是深藍）。</p>
+  </article>
+
+  <article class="f" data-g="F">
+    <div class="f-top"><span class="sev low">別忘了</span><span class="fid">F9</span>
+      <h3 class="ft">沒有 <code>color-scheme</code>，原生控制項不會跟著換</h3></div>
+    <p class="fb">捲軸、原生 <code>&lt;select&gt;</code> 下拉、日期選擇器、勾選框這些瀏覽器自己畫的東西，不看你的 CSS，只看 <code>color-scheme</code>。缺了它，淺色版會出現深色捲軸配白色頁面。</p>
+    <p class="fx">在兩套主題的 <code>:root</code> 各宣告 <code>color-scheme: dark</code> / <code>light</code>。</p>
+  </article>
+</section>
+
+<section id="plan">
+  <div class="sechead"><h2>建議施工順序</h2><span class="tally">五批</span></div>
+  <p class="secnote">前兩批是地基（淺色版的前置條件），第三批才是淺色版本身，第四五批是美觀修正。每一批都可以獨立上線、獨立回頭。</p>
+
+  <ol class="steps">
+    <li>
+      <h4>把 103 個 hex 收斂成一組語意 token</h4>
+      <p>建一份 <code>tokens.css</code>：底色三階、文字三階、線一階、品牌兩階、狀態四色、輸入框一階、遮罩一階，約 22 個變數。然後用機械替換把 <code>bg-[#0d2b45]</code> 換成 <code>bg-[var(--panel)]</code>（Tailwind v4 吃得下）。<strong>這一步同時把 7 種綠、5 種灰藍、8 種輸入框底色合併掉</strong>——也就是把 E1–E6、F1、F3、F5、F7 一次解掉。畫面看起來應該幾乎沒變，這正是驗收標準。</p>
+      <span class="cost">影響：src 全部 118 支 tsx ＋ 規劃器 CSS 區塊。不動任何邏輯。</span>
+    </li>
+    <li>
+      <h4>補共用版面殼</h4>
+      <p><code>dashboard/layout.tsx</code>、<code>admin/layout.tsx</code>、<code>loading.tsx</code>、<code>error.tsx</code>，加上 <code>&lt;Field&gt;</code>／<code>&lt;Modal&gt;</code>／<code>&lt;ConfirmDialog&gt;</code>／<code>&lt;SubmitButton&gt;</code> 四個共用元件。解掉 A1–A3、A8、C2、D6、E6–E8。</p>
+      <span class="cost">影響：新增 8 支檔案，改 14 支既有頁面。</span>
+    </li>
+    <li>
+      <h4>淺色版 ＋ 教練自己切換</h4>
+      <p>比照現有的字級切換做同一套三重寫入：<code>&lt;html data-theme&gt;</code> 屬性、localStorage（首次繪製前就套上，不閃）、<code>coaches.theme</code> 欄位（換裝置也記得）。規劃器 iframe 走既有的 <code>postMessage</code> 管道，多加一個 <code>lantu:theme</code>。切換鈕放在字級鈕旁邊，後台頭欄也補一份。</p>
+      <span class="cost">前置：第 1 批。新增一支 migration（下一號是 0036）、一支 lib、一顆元件。</span>
+    </li>
+    <li>
+      <h4>間距與層次（真正解決「黏在一起」）</h4>
+      <p>導入三階層次取代滿場 1px 邊框；規劃器的 B1–B6；教練端的 A4–A6；後台的 D1–D4。這批是純視覺，改動範圍大但風險低。</p>
+      <span class="cost">影響：主要是 CSS 與 className，不動資料流。</span>
+    </li>
+    <li>
+      <h4>可及性與收尾</h4>
+      <p>全域 <code>:focus-visible</code>、觸控目標放大、B9–B12、C1、C3、E9。</p>
+      <span class="cost">影響：小範圍、可零散進行。</span>
+    </li>
+  </ol>
+
+  <h3 class="grp" style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin:44px 0 0;padding-bottom:8px;border-bottom:1px solid var(--rule)">建議的 token 對照（第 1 批的內容）</h3>
+  <div class="tkwrap">
+  <table class="tk">
+    <thead><tr><th>Token</th><th>用途</th><th>深色（現況）</th><th>淺色（提案）</th></tr></thead>
+    <tbody>
+      <tr><td>--bg</td><td>頁面底</td><td class="sc"><i style="background:#081a2b"></i>#081a2b</td><td class="sc"><i style="background:#F4F6F8"></i>#F4F6F8</td></tr>
+      <tr><td>--panel</td><td>卡片／面板</td><td class="sc"><i style="background:#0d2b45"></i>#0d2b45</td><td class="sc"><i style="background:#FFFFFF"></i>#FFFFFF</td></tr>
+      <tr><td>--panel-2</td><td>巢狀卡片／表頭</td><td class="sc"><i style="background:#12334f"></i>#12334f</td><td class="sc"><i style="background:#EAEEF3"></i>#EAEEF3</td></tr>
+      <tr><td>--field-bg</td><td>輸入框底（併掉 8 個）</td><td class="sc"><i style="background:#0a1a2b"></i>#0a1a2b</td><td class="sc"><i style="background:#FBFCFD"></i>#FBFCFD</td></tr>
+      <tr><td>--line</td><td>所有邊框（取代半透明白）</td><td class="sc"><i style="background:#1e3d5c"></i>#1e3d5c</td><td class="sc"><i style="background:#DDE3EA"></i>#DDE3EA</td></tr>
+      <tr><td>--tx</td><td>主要文字</td><td class="sc"><i style="background:#eef2f7"></i>#eef2f7</td><td class="sc"><i style="background:#14212E"></i>#14212E</td></tr>
+      <tr><td>--tx-2</td><td>次要文字（提亮，見 E3）</td><td class="sc"><i style="background:#8fa6ba"></i>#8fa6ba</td><td class="sc"><i style="background:#4A5C6E"></i>#4A5C6E</td></tr>
+      <tr><td>--tx-3</td><td>三級文字</td><td class="sc"><i style="background:#6f869c"></i>#6f869c</td><td class="sc"><i style="background:#75838F"></i>#75838F</td></tr>
+      <tr><td>--brand</td><td>品牌金（主鈕／選取）</td><td class="sc"><i style="background:#c99a5b"></i>#c99a5b</td><td class="sc"><i style="background:#9A6F22"></i>#9A6F22</td></tr>
+      <tr><td>--brand-2</td><td>金色高亮</td><td class="sc"><i style="background:#e0bd8b"></i>#e0bd8b</td><td class="sc"><i style="background:#C08F3C"></i>#C08F3C</td></tr>
+      <tr><td>--on-brand</td><td>金底上的字</td><td class="sc"><i style="background:#08202a"></i>#08202a</td><td class="sc"><i style="background:#FFFFFF"></i>#FFFFFF</td></tr>
+      <tr><td>--ok</td><td>成功（併掉 7 個綠）</td><td class="sc"><i style="background:#8fc0a3"></i>#8fc0a3</td><td class="sc"><i style="background:#2F7D57"></i>#2F7D57</td></tr>
+      <tr><td>--warn</td><td>警示（從金色獨立出來）</td><td class="sc"><i style="background:#e0a45c"></i>#e0a45c</td><td class="sc"><i style="background:#A8681A"></i>#A8681A</td></tr>
+      <tr><td>--danger</td><td>錯誤（併掉 5 個紅橘）</td><td class="sc"><i style="background:#ff9d9f"></i>#ff9d9f</td><td class="sc"><i style="background:#C0362F"></i>#C0362F</td></tr>
+      <tr><td>--info</td><td>唯讀／共同執案</td><td class="sc"><i style="background:#8fb8ff"></i>#8fb8ff</td><td class="sc"><i style="background:#2C6FB5"></i>#2C6FB5</td></tr>
+      <tr><td>--scrim</td><td>彈窗遮罩（併掉 4 種黑）</td><td class="sc"><i style="background:#040c14"></i>#040c14 / 70%</td><td class="sc"><i style="background:#14212E"></i>#14212E / 45%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="secnote" style="margin-top:18px">淺色版不做純白配灰的辦公室感，而是<strong>白面板浮在極淡藍灰底</strong>上——和深色版共用同一組藍調，換過去不會覺得是另一個產品。金色在白底上必須壓深到 <code>#9A6F22</code> 才有足夠對比，這是唯一一個兩套主題不能共用色相亮度的地方。</p>
+</section>
+
+<footer>
+  嵐途 LAN TU · 介面盤點 2026/09/05 · 49 項 · 唯讀稽核，本輪未改動任何程式碼<br>
+  掃描範圍：src 118 支 tsx（2,565 處色碼）＋ public/lantu-app.html（14,763 行、597 處色碼）
+</footer>
+</div>
+
+<script>
+(function(){
+  var chips=[].slice.call(document.querySelectorAll('button.chip'));
+  var items=[].slice.call(document.querySelectorAll('.f'));
+  var secs=[].slice.call(document.querySelectorAll('section[id]'));
+  chips.forEach(function(c){
+    c.addEventListener('click',function(){
+      var g=c.dataset.g;
+      chips.forEach(function(x){x.setAttribute('aria-pressed',String(x===c));});
+      items.forEach(function(f){
+        f.classList.toggle('hide', g!=='all' && f.dataset.g!==g);
+      });
+      secs.forEach(function(s){
+        if(s.id==='plan'){ s.style.display = (g==='all')?'':'none'; return; }
+        var any=s.querySelector('.f:not(.hide)');
+        s.style.display=any?'':'none';
+      });
+    });
+  });
+})();
+</script>

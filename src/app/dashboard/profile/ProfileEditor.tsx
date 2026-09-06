@@ -12,10 +12,10 @@ import { saveMyProfileAction } from "./actions";
 import { DISPLAY_NAME_MAX } from "@/lib/coachName";
 import PhotoCropper, { type CropSource } from "./PhotoCropper";
 
-const INPUT = "bg-[#0d2b45] border border-white/15 rounded px-2 py-1.5 text-sm text-[#eef2f7] outline-none focus:border-[#c99a5b]";
-const EMPTY = "bg-[#0d2b45] border border-dashed border-[#3d5b78] rounded px-2 py-1.5 text-sm text-[#8fa6ba] outline-none focus:border-[#c99a5b]";
-const BTN = "rounded-lg px-3 py-1.5 text-sm border border-white/15 text-[#a9bccf] hover:bg-[#17406a] disabled:opacity-40";
-const BTN_SOLID = "rounded-lg px-4 py-2 text-sm bg-[#c99a5b] text-[#08202a] font-bold hover:bg-[#e0bd8b] disabled:opacity-40";
+const INPUT = "bg-panel border border-line2 rounded px-2 py-1.5 text-sm text-tx outline-none focus:border-brand";
+const EMPTY = "bg-panel border border-dashed border-line2 rounded px-2 py-1.5 text-sm text-tx2 outline-none focus:border-brand";
+const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
+const BTN_SOLID = "rounded-lg px-4 py-2 text-sm bg-brand text-onbrand font-bold hover:bg-brand2 disabled:opacity-40";
 
 const ACCEPT = ["image/png", "image/jpeg", "image/webp"];
 const MAX_FILE = 8 * 1024 * 1024;
@@ -135,40 +135,40 @@ export default function ProfileEditor({
       {/* 編輯 */}
       <div className="space-y-4">
         {!published && (
-          <div className="rounded-xl border border-[#e08b7a]/40 bg-[#e08b7a]/10 px-4 py-3 text-sm text-[#e08b7a]">
+          <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
             你的檔案目前被管理員下架，不會出現在官網。內容仍可編輯。
           </div>
         )}
 
         {/* 教練自己的隱藏開關。跟上面那條管理員下架是兩回事：
             勾這個是自己的決定、存檔就生效；被管理員下架的話勾不勾都不會出現在官網。 */}
-        <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4">
+        <div className="rounded-xl border border-line bg-panel p-4 shadow-e1">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={f.selfHidden}
               disabled={pending}
               onChange={(e) => set("selfHidden", e.target.checked)}
-              className="mt-0.5 w-4 h-4 accent-[#c99a5b] shrink-0"
+              className="mt-0.5 w-4 h-4 accent-brand shrink-0"
             />
             <span>
               <span className="text-sm font-bold">不要把我的資料放上官網</span>
-              <span className="block text-[12px] text-[#a9bccf] mt-1 leading-relaxed">
+              <span className="block text-[12px] text-tx2 mt-1 leading-relaxed">
                 勾選後，你不會出現在官網的教練頁，客戶也無法在那裡挑到你。
-                <b className="text-[#e0bd8b]">你的教練編號照常有效</b>——
+                <b className="text-brand2">你的教練編號照常有效</b>——
                 已經拿到編號的客戶還是可以指定你，一樣要你按接受才會掛上。
               </span>
             </span>
           </label>
           {f.selfHidden && !published && (
-            <p className="text-[11px] text-[#e08b7a] mt-2">
+            <p className="text-[11px] text-danger mt-2">
               （你的檔案本來就已經被管理員下架，取消勾選也不會出現在官網。）
             </p>
           )}
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
-          <h2 className="text-sm font-bold border-l-[3px] border-[#c99a5b] pl-2">顯示名稱</h2>
+        <div className="rounded-xl border border-line bg-panel p-4 space-y-3 shadow-e1">
+          <h2 className="text-sm font-bold border-l-[3px] border-brand pl-2">顯示名稱</h2>
           <label className="block">
             <input
               value={f.displayName}
@@ -178,30 +178,30 @@ export default function ProfileEditor({
               placeholder={loginName || "你的名字"}
               className={`${f.displayName ? INPUT : EMPTY} w-full`}
             />
-            <span className="block text-[11px] text-[#6f869c] mt-1.5 leading-relaxed">
-              這是<b className="text-[#a9bccf]">全站</b>會顯示的名字——官網教練頁、工作台、組織表、客戶看到的都是它。
+            <span className="block text-[11px] text-tx3 mt-1.5 leading-relaxed">
+              這是<b className="text-tx2">全站</b>會顯示的名字——官網教練頁、工作台、組織表、客戶看到的都是它。
               留空就沿用登入帳號的姓名{loginName ? `（${loginName}）` : ""}。
-              改這裡<b className="text-[#a9bccf]">不會</b>動到你的登入帳號，最多 {DISPLAY_NAME_MAX} 個字。
+              改這裡<b className="text-tx2">不會</b>動到你的登入帳號，最多 {DISPLAY_NAME_MAX} 個字。
             </span>
           </label>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
-          <h2 className="text-sm font-bold border-l-[3px] border-[#c99a5b] pl-2">大頭照</h2>
+        <div className="rounded-xl border border-line bg-panel p-4 space-y-3 shadow-e1">
+          <h2 className="text-sm font-bold border-l-[3px] border-brand pl-2">大頭照</h2>
           <div className="flex items-center gap-4">
             {f.photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={f.photoUrl} alt="大頭照" className="w-24 h-24 rounded-xl object-cover border border-white/15" />
+              <img src={f.photoUrl} alt="大頭照" className="w-24 h-24 rounded-xl object-cover border border-line2" />
             ) : (
-              <div className="w-24 h-24 rounded-xl border border-dashed border-[#3d5b78] grid place-items-center text-xs text-[#6f869c]">
+              <div className="w-24 h-24 rounded-xl border border-dashed border-line2 grid place-items-center text-xs text-tx3">
                 未上傳
               </div>
             )}
             <div className="space-y-2">
               <input ref={fileRef} type="file" accept={ACCEPT.join(",")} disabled={pending}
                 onChange={onPickPhoto}
-                className="text-xs text-[#a9bccf] file:mr-2 file:rounded-lg file:border file:border-white/15 file:bg-transparent file:px-3 file:py-1.5 file:text-[#a9bccf]" />
-              <p className="text-[11px] text-[#6f869c]">
+                className="text-xs text-tx2 file:mr-2 file:rounded-lg file:border file:border-line2 file:bg-transparent file:px-3 file:py-1.5 file:text-tx2" />
+              <p className="text-[11px] text-tx3">
                 選好照片後可以拖曳、縮放決定要框哪一塊，再裁成正方形壓縮。清楚的正面照最有效。
               </p>
               {f.photoUrl && (
@@ -210,33 +210,33 @@ export default function ProfileEditor({
               )}
             </div>
           </div>
-          {photoErr && <p className="text-sm text-[#e08b7a]">{photoErr}</p>}
+          {photoErr && <p className="text-sm text-danger">{photoErr}</p>}
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
-          <h2 className="text-sm font-bold border-l-[3px] border-[#c99a5b] pl-2">你想讓客戶第一眼看到什麼</h2>
+        <div className="rounded-xl border border-line bg-panel p-4 space-y-3 shadow-e1">
+          <h2 className="text-sm font-bold border-l-[3px] border-brand pl-2">你想讓客戶第一眼看到什麼</h2>
           <label className="block">
-            <span className="block text-xs text-[#a9bccf] mb-1">一句話標語</span>
+            <span className="block text-xs text-tx2 mb-1">一句話標語</span>
             <input value={f.headline} disabled={pending} maxLength={60}
               onChange={(e) => set("headline", e.target.value)}
               placeholder="例：陪你把每一筆錢，放到它該去的地方"
               className={`${f.headline ? INPUT : EMPTY} w-full`} />
-            <span className="block text-[11px] text-[#6f869c] mt-0.5">{f.headline.length}/60</span>
+            <span className="block text-[11px] text-tx3 mt-0.5">{f.headline.length}/60</span>
           </label>
           <label className="block">
-            <span className="block text-xs text-[#a9bccf] mb-1">自我介紹</span>
+            <span className="block text-xs text-tx2 mb-1">自我介紹</span>
             <textarea rows={7} value={f.bio} disabled={pending} maxLength={1000}
               onChange={(e) => set("bio", e.target.value)}
               placeholder={"你為什麼做這一行、擅長陪什麼樣的人、合作起來會是什麼感覺。\n寫給看不懂財務術語的人看。"}
               className={`${f.bio ? INPUT : EMPTY} w-full leading-relaxed`} />
-            <span className="block text-[11px] text-[#6f869c] mt-0.5">{f.bio.length}/1000</span>
+            <span className="block text-[11px] text-tx3 mt-0.5">{f.bio.length}/1000</span>
           </label>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
-          <h2 className="text-sm font-bold border-l-[3px] border-[#c99a5b] pl-2">專長領域</h2>
+        <div className="rounded-xl border border-line bg-panel p-4 space-y-3 shadow-e1">
+          <h2 className="text-sm font-bold border-l-[3px] border-brand pl-2">專長領域</h2>
           {specialtyOptions.length === 0 ? (
-            <p className="text-xs text-[#e0bd8b]">
+            <p className="text-xs text-brand2">
               公司還沒設定專長清單。請管理員到「業務制度 › 個案認定與結案 › 專長領域清單」設定。
             </p>
           ) : (
@@ -247,8 +247,8 @@ export default function ProfileEditor({
                   <button key={s} type="button" disabled={pending}
                     onClick={() => toggle("specialties", s)}
                     className={`rounded-full px-3 py-1.5 text-xs border ${
-                      on ? "bg-[#c99a5b] text-[#08202a] border-[#c99a5b] font-bold"
-                         : "border-white/15 text-[#a9bccf] hover:border-white/35"
+                      on ? "bg-brand text-onbrand border-brand font-bold"
+                         : "border-line2 text-tx2 hover:border-line2"
                     }`}>
                     {s}
                   </button>
@@ -256,22 +256,22 @@ export default function ProfileEditor({
               })}
             </div>
           )}
-          <p className="text-[11px] text-[#6f869c]">
+          <p className="text-[11px] text-tx3">
             專長同時用於客戶選教練，以及公司派案時挑選合適人選。
           </p>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-[#0d2b45] p-4 space-y-3">
-          <h2 className="text-sm font-bold border-l-[3px] border-[#c99a5b] pl-2">經歷與服務方式</h2>
+        <div className="rounded-xl border border-line bg-panel p-4 space-y-3 shadow-e1">
+          <h2 className="text-sm font-bold border-l-[3px] border-brand pl-2">經歷與服務方式</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="block text-xs text-[#a9bccf] mb-1">從業年資</span>
+              <span className="block text-xs text-tx2 mb-1">從業年資</span>
               <input type="number" min={0} max={80} value={f.yearsExp} disabled={pending}
                 onChange={(e) => set("yearsExp", e.target.value)} placeholder="未填"
                 className={`${f.yearsExp ? INPUT : EMPTY} w-28`} />
             </label>
             <label className="block">
-              <span className="block text-xs text-[#a9bccf] mb-1">背景／前一份工作</span>
+              <span className="block text-xs text-tx2 mb-1">背景／前一份工作</span>
               <input value={f.prevRole} disabled={pending} maxLength={60}
                 onChange={(e) => set("prevRole", e.target.value)} placeholder="例：銀行理財專員 8 年"
                 className={`${f.prevRole ? INPUT : EMPTY} w-full`} />
@@ -281,7 +281,7 @@ export default function ProfileEditor({
             value={f.credentials} disabled={pending}
             onChange={(v) => set("credentials", v)} />
           <div>
-            <span className="block text-xs text-[#a9bccf] mb-1">服務方式</span>
+            <span className="block text-xs text-tx2 mb-1">服務方式</span>
             <div className="flex flex-wrap gap-2">
               {["線上", "實體"].map((m) => {
                 const on = f.serviceModes.includes(m);
@@ -289,8 +289,8 @@ export default function ProfileEditor({
                   <button key={m} type="button" disabled={pending}
                     onClick={() => toggle("serviceModes", m)}
                     className={`rounded-full px-3 py-1.5 text-xs border ${
-                      on ? "bg-[#c99a5b] text-[#08202a] border-[#c99a5b] font-bold"
-                         : "border-white/15 text-[#a9bccf] hover:border-white/35"
+                      on ? "bg-brand text-onbrand border-brand font-bold"
+                         : "border-line2 text-tx2 hover:border-line2"
                     }`}>
                     {m}
                   </button>
@@ -308,7 +308,7 @@ export default function ProfileEditor({
           </button>
           <Link href="/coaches" className={BTN}>看官網上的樣子 →</Link>
           {msg && (
-            <span className={`text-sm ${msg.ok ? "text-[#7fb894]" : "text-[#e08b7a]"}`}>
+            <span className={`text-sm ${msg.ok ? "text-ok" : "text-danger"}`}>
               {msg.ok ? `${msg.text} ✓` : `儲存失敗：${msg.text}`}
             </span>
           )}
@@ -317,7 +317,7 @@ export default function ProfileEditor({
 
       {/* 預覽 */}
       <div className="lg:sticky lg:top-4 h-fit">
-        <div className="text-xs text-[#a9bccf] mb-2">客戶會看到的樣子</div>
+        <div className="text-xs text-tx2 mb-2">客戶會看到的樣子</div>
         <CoachCard
           name={f.displayName.trim() || loginName || coachName} rankLabel={rankLabel}
           headline={f.headline} bio={f.bio} specialties={f.specialties}
@@ -339,7 +339,7 @@ function ListField({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs text-[#a9bccf] mb-1">{label}</span>
+      <span className="block text-xs text-tx2 mb-1">{label}</span>
       <textarea rows={Math.max(2, value.length + 1)} value={value.join("\n")} disabled={disabled}
         onChange={(e) => onChange(e.target.value.split("\n").map((x) => x.trim()).filter(Boolean))}
         placeholder={hint}
@@ -366,21 +366,21 @@ export function CoachCard({
   compact?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0d2b45] p-5">
+    <div className="rounded-2xl border border-line bg-panel p-5 shadow-e1">
       <div className="flex items-start gap-4">
         {photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={photoUrl} alt={name} className="w-20 h-20 rounded-xl object-cover border border-white/15 shrink-0" />
+          <img src={photoUrl} alt={name} className="w-20 h-20 rounded-xl object-cover border border-line2 shrink-0" />
         ) : (
-          <div className="w-20 h-20 rounded-xl bg-[#12334f] border border-white/10 grid place-items-center text-2xl text-[#c99a5b] shrink-0">
+          <div className="w-20 h-20 rounded-xl bg-panel2 border border-line grid place-items-center text-2xl text-brand shrink-0 shadow-e1">
             {name.slice(0, 1)}
           </div>
         )}
         <div className="min-w-0">
-          <div className="font-serif text-lg text-[#eef2f7]">{name}</div>
-          {rankLabel && <div className="text-xs text-[#a7bacb]">{rankLabel}</div>}
-          {headline && <p className="text-sm text-[#e0bd8b] mt-1.5 leading-snug">{headline}</p>}
-          <div className="text-[11px] text-[#6f869c] mt-1 space-x-2">
+          <div className="font-serif text-lg text-tx">{name}</div>
+          {rankLabel && <div className="text-xs text-tx2">{rankLabel}</div>}
+          {headline && <p className="text-sm text-brand2 mt-1.5 leading-snug">{headline}</p>}
+          <div className="text-[11px] text-tx3 mt-1 space-x-2">
             {yearsExp !== null && !Number.isNaN(yearsExp) && <span>年資 {yearsExp} 年</span>}
             {prevRole && <span>· {prevRole}</span>}
           </div>
@@ -390,7 +390,7 @@ export function CoachCard({
       {specialties.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3">
           {specialties.map((s) => (
-            <span key={s} className="rounded-full bg-[#12334f] border border-white/10 px-2.5 py-1 text-[11px] text-[#cfdcea]">
+            <span key={s} className="rounded-full bg-panel2 border border-line px-2.5 py-1 text-[11px] text-tx shadow-e1">
               {s}
             </span>
           ))}
@@ -398,13 +398,13 @@ export function CoachCard({
       )}
 
       {bio && (
-        <p className={`text-sm text-[#a7bacb] mt-3 leading-relaxed whitespace-pre-wrap ${compact ? "line-clamp-4" : ""}`}>
+        <p className={`text-sm text-tx2 mt-3 leading-relaxed whitespace-pre-wrap ${compact ? "line-clamp-4" : ""}`}>
           {bio}
         </p>
       )}
 
       {(credentials.length > 0 || serviceModes.length > 0 || areas.length > 0) && (
-        <div className="mt-3 pt-3 border-t border-white/8 text-[11px] text-[#6f869c] space-y-1">
+        <div className="mt-3 pt-3 border-t border-line text-[11px] text-tx3 space-y-1">
           {credentials.length > 0 && <div>證照：{credentials.join("、")}</div>}
           {serviceModes.length > 0 && <div>服務方式：{serviceModes.join("、")}</div>}
           {areas.length > 0 && <div>服務地區：{areas.join("、")}</div>}

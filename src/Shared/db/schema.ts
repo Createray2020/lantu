@@ -70,6 +70,10 @@ export const coaches = pgTable('coaches', {
   // 介面縮放百分比（老花友善）：100 / 115 / 130。
   uiScale: integer('ui_scale').default(100).notNull(),
 
+  // 介面主題：dark（預設，深藍底）/ light（白面板、淡藍灰底）。
+  // 與 ui_scale 同一類——跟著帳號走的介面偏好，不是業務設定，所以不過使用期限的唯讀閘。
+  theme: text('theme').default('dark').notNull(),
+
   // ── 教練編號（2026/08/24 Ray 拍板）──────────────────────────
   // 格式：FC + 西元年後兩碼 + 月 + 三碼流水號（FC2609002 ＝ 2026/09 第二位報聘的教練）。
   // 發號時機＝「核准報聘」那一刻（status 第一次轉 active）；待審申請不佔號。

@@ -81,11 +81,11 @@ export default function UiScaleToggle({
 
   return (
     <div
-      className="flex items-center gap-0.5 rounded-md border border-white/15 px-1 py-0.5 shrink-0"
+      className="flex items-center gap-0.5 rounded-md border border-line2 px-1 py-0.5 shrink-0"
       title="調整字級（老花友善）"
     >
       {!compact && (
-        <span className="text-[#7d93a8] text-[10px] font-bold px-1 select-none">字級</span>
+        <span className="text-tx2 text-[10px] font-bold px-1 select-none">字級</span>
       )}
       {UI_SCALES.map((s) => (
         <button
@@ -95,8 +95,8 @@ export default function UiScaleToggle({
           title={s.hint}
           aria-label={`字級${s.label}`}
           aria-pressed={scale === s.value}
-          className={`px-1.5 py-0.5 rounded font-bold transition leading-none ${
-            scale === s.value ? "bg-[#c99a5b] text-[#08202a]" : "text-[#a9bccf] hover:text-[#eef2f7]"
+          className={`px-2 py-1 min-h-[26px] rounded font-bold transition leading-none ${
+            scale === s.value ? "bg-brand text-onbrand" : "text-tx2 hover:text-tx"
           }`}
           style={{ fontSize: `${10 + (s.value - 100) * 0.14}px` }}
         >

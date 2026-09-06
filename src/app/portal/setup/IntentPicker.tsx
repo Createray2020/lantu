@@ -68,18 +68,18 @@ export default function IntentPicker({ value, onChange }: { value: Intent; onCha
     });
 
   return (
-    <section className="rounded-2xl bg-[#12334f] border border-white/8 p-5 sm:p-6 mb-4">
+    <section className="rounded-2xl bg-panel2 border border-line p-5 sm:p-6 mb-4 shadow-e1">
       <h2 className="font-serif text-lg mb-1">🧭 你想解決什麼</h2>
-      <p className="text-[11px] text-[#6f869c] mb-4">選起來的，我們就當作一定要達成；沒選的不會再問你相關問題。</p>
+      <p className="text-[11px] text-tx3 mb-4">選起來的，我們就當作一定要達成；沒選的不會再問你相關問題。</p>
 
       {/* 關注議題 */}
-      <div className="text-[12px] text-[#a7bacb] mb-2">關注議題 · 可複選</div>
+      <div className="text-[12px] text-tx2 mb-2">關注議題 · 可複選</div>
       <div className="flex flex-wrap gap-2 mb-6">
         {PURPOSES.map((p) => {
           const on = value.purposes.includes(p);
           return (
             <button key={p} type="button" onClick={() => togglePurpose(p)}
-              className={`rounded-full px-3 py-1.5 text-[12.5px] font-bold border ${on ? "bg-[#c99a5b] text-[#08202a] border-[#c99a5b]" : "bg-[#17406a] text-[#a7bacb] border-white/12 hover:border-[#e0bd8b]"}`}>
+              className={`rounded-full px-3 py-1.5 text-[12.5px] font-bold border ${on ? "bg-brand text-onbrand border-brand" : "bg-panel3 text-tx2 border-line hover:border-brand2"}`}>
               {on ? "✓ " : ""}{p}
             </button>
           );
@@ -88,10 +88,10 @@ export default function IntentPicker({ value, onChange }: { value: Intent; onCha
 
       {/* 人生目標 */}
       <div className="flex items-center flex-wrap gap-2 mb-2">
-        <span className="text-[12px] text-[#a7bacb]">人生目標 · 選了＝一定要達成</span>
+        <span className="text-[12px] text-tx2">人生目標 · 選了＝一定要達成</span>
         <span className="flex-1" />
         <button type="button" onClick={selectAll}
-          className="text-[12px] font-bold text-[#e0bd8b] border border-[#c99a5b]/40 rounded-lg px-3 py-1 hover:bg-white/5">
+          className="text-[12px] font-bold text-brand2 border border-brand/40 rounded-lg px-3 py-1 hover:bg-tx/5">
           我全都要 · 跑完整人生模擬
         </button>
       </div>
@@ -101,14 +101,14 @@ export default function IntentPicker({ value, onChange }: { value: Intent; onCha
           const on = i >= 0;
           return (
             <button key={m.name} type="button" onClick={() => toggleTarget(m.name)}
-              className={`relative text-left rounded-xl border px-3 py-2.5 ${on ? "bg-[#c99a5b] text-[#08202a] border-[#c99a5b]" : "bg-[#17406a] text-[#a7bacb] border-white/12 hover:border-[#e0bd8b]"}`}>
+              className={`relative text-left rounded-xl border px-3 py-2.5 ${on ? "bg-brand text-onbrand border-brand" : "bg-panel3 text-tx2 border-line hover:border-brand2"}`}>
               {on && (
-                <span className="absolute -top-2 -right-2 grid place-items-center w-[22px] h-[22px] rounded-full bg-[#08202a] text-[#e0bd8b] border border-[#c99a5b] font-serif text-[12px] font-extrabold">
+                <span className="absolute -top-2 -right-2 grid place-items-center w-[22px] h-[22px] rounded-full bg-onbrand text-brand2 border border-brand font-serif text-[12px] font-extrabold">
                   {i + 1}
                 </span>
               )}
               <span className="block font-bold text-[13.5px] leading-tight">{m.name}</span>
-              <span className={`block text-[11px] mt-0.5 ${on ? "text-[#08202a]/65" : "text-[#6f869c]"}`}>
+              <span className={`block text-[11px] mt-0.5 ${on ? "text-onbrand/65" : "text-tx3"}`}>
                 {on && m.name === DEFAULT_TARGET ? "預設必達 · " : ""}{m.hint}
               </span>
             </button>
@@ -117,10 +117,10 @@ export default function IntentPicker({ value, onChange }: { value: Intent; onCha
       </div>
 
       {/* 優先序 */}
-      <div className="text-[12px] text-[#a7bacb] mb-1">哪個最重要？</div>
-      <p className="text-[11px] text-[#6f869c] mb-2">拖曳或用 ◀ ▶ 排出順序。錢不夠時，我們會從最後一項開始調整。</p>
+      <div className="text-[12px] text-tx2 mb-1">哪個最重要？</div>
+      <p className="text-[11px] text-tx3 mb-2">拖曳或用 ◀ ▶ 排出順序。錢不夠時，我們會從最後一項開始調整。</p>
       {must.length === 0 ? (
-        <div className="text-[12.5px] text-[#6f869c] py-1">
+        <div className="text-[12.5px] text-tx3 py-1">
           尚未選擇任何人生目標——這份規劃只會看你的收支與資產結構，不含任何未來目標。
         </div>
       ) : (
@@ -129,16 +129,16 @@ export default function IntentPicker({ value, onChange }: { value: Intent; onCha
             <div key={t} draggable
               onDragStart={(e) => e.dataTransfer.setData("text/plain", String(i))}
               onDrop={(e) => { e.preventDefault(); drop(parseInt(e.dataTransfer.getData("text/plain"), 10), i); }}
-              className="flex items-center gap-2 rounded-lg bg-[#0a2137] border border-white/10 pl-3 pr-1.5 py-1.5 cursor-grab">
-              <span className="text-[#6f869c] tracking-tighter">⣿</span>
-              <span className="font-serif text-[14px] font-extrabold text-[#e0bd8b] min-w-[14px] text-center">{i + 1}</span>
-              <span className="flex-1 font-bold text-[13px] text-[#eef2f7]">{t}</span>
+              className="flex items-center gap-2 rounded-lg bg-field border border-line pl-3 pr-1.5 py-1.5 cursor-grab">
+              <span className="text-tx3 tracking-tighter">⣿</span>
+              <span className="font-serif text-[14px] font-extrabold text-brand2 min-w-[14px] text-center">{i + 1}</span>
+              <span className="flex-1 font-bold text-[13px] text-tx">{t}</span>
               <button type="button" aria-label="往前" onClick={() => move(i, -1)}
-                className="w-[26px] h-[26px] rounded-md border border-white/12 text-[#a7bacb] text-[11px] hover:border-[#e0bd8b] hover:text-[#e0bd8b]">◀</button>
+                className="w-10 h-10 rounded-md border border-line text-tx2 text-[13px] hover:border-brand2 hover:text-brand2">◀</button>
               <button type="button" aria-label="往後" onClick={() => move(i, 1)}
-                className="w-[26px] h-[26px] rounded-md border border-white/12 text-[#a7bacb] text-[11px] hover:border-[#e0bd8b] hover:text-[#e0bd8b]">▶</button>
+                className="w-10 h-10 rounded-md border border-line text-tx2 text-[13px] hover:border-brand2 hover:text-brand2">▶</button>
               <button type="button" aria-label="移除" onClick={() => toggleTarget(t)}
-                className="px-1.5 text-[#6f869c] hover:text-[#ff9b9b]">✕</button>
+                className="w-10 h-10 grid place-items-center text-tx3 hover:text-danger">✕</button>
             </div>
           ))}
         </div>
