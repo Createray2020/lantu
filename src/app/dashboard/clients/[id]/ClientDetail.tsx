@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -46,7 +48,7 @@ type ActionOutcome = { ok: true } | { ok: false; error: string };
 type IdOutcome = { ok: true; id: string } | { ok: false; error: string };
 const FALLBACK_ERR = "這個動作沒有完成。請重新整理頁面再試一次；若還是失敗請聯繫管理員。";
 
-const field = "w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx";
+const field = FIELD;
 const btn = "px-3 py-1.5 text-sm font-bold rounded-md";
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -138,7 +140,7 @@ export default function ClientDetail({
         <span className="text-tx2">{client.name}</span>
       </div>
 
-      <ClientHeader client={client} onSave={(patch) => run(() => updateClientAction(client.id, patch))} onArchive={() => { if (confirm("確定封存這位客戶？")) run(() => archiveClientAction(client.id)); }} pending={pending} readOnly={readOnly} />
+      <ClientHeader client={client} onSave={(patch) => run(() => updateClientAction(client.id, patch))} onArchive={async () => { if (await confirmDialog("確定封存這位客戶？")) run(() => archiveClientAction(client.id)); }} pending={pending} readOnly={readOnly} />
 
       {isOwner && <Collaborators clientId={client.id} collaborators={collaborators} readOnly={readOnly} />}
 
@@ -175,7 +177,7 @@ export default function ClientDetail({
           onClone={(id) => runId(() => clonePlanAction(id), (newId) => router.push(`/dashboard/plans/${newId}/edit`))}
           onNew={() => runId(() => createPlanAction(client.id, client.name), (newId) => router.push(`/dashboard/plans/${newId}/edit`))}
           onStatus={(id, status) => run(() => updatePlanMetaAction(client.id, id, { status }))}
-          onDelete={(id) => { if (confirm("刪除此年度版本？此動作無法復原。")) run(() => deletePlanAction(client.id, id)); }}
+          onDelete={async (id) => { if (await confirmDialog("刪除此年度版本？此動作無法復原。")) run(() => deletePlanAction(client.id, id)); }}
         />
       )}
 
@@ -199,7 +201,7 @@ export default function ClientDetail({
             return ok ? { ok: true } : { ok: false, error: "草稿丟不掉——它可能已經被存成正式紀錄了，重新整理看看。" };
           })}
           onUpdateReview={(id, input) => run(() => updateReviewAction(client.id, id, input))}
-          onDeleteReview={(id) => { if (confirm("刪除此諮詢紀錄？")) run(() => deleteReviewAction(client.id, id)); }}
+          onDeleteReview={async (id) => { if (await confirmDialog("刪除此諮詢紀錄？")) run(() => deleteReviewAction(client.id, id)); }}
           onAddItem={(input) => run(() => createActionItemAction(client.id, input))}
           onToggleItem={(id, done) => run(() => setActionItemDoneAction(client.id, id, done))}
           onDeleteItem={(id) => run(() => deleteActionItemAction(client.id, id))}
@@ -261,13 +263,13 @@ function ClientHeader({ client, onSave, onArchive, pending, readOnly = false }: 
       <div className="flex-1 min-w-[200px]">
         <div className="flex items-center gap-2">
           <h1 className="font-serif text-2xl">{client.name}</h1>
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-panel text-tx2 border border-line shadow-e1">{STATUS_LABEL[client.status] ?? client.status}</span>
+          <span className="text-11 px-2 py-0.5 rounded-full bg-panel text-tx2 border border-line shadow-e1">{STATUS_LABEL[client.status] ?? client.status}</span>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {client.source && <span className="text-[11px] text-tx3">來源 {client.source}</span>}
-          {(client.tags ?? []).map((t) => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-panel text-tx2 border border-line">{t}</span>)}
+          {client.source && <span className="text-11 text-tx3">來源 {client.source}</span>}
+          {(client.tags ?? []).map((t) => <span key={t} className="text-10 px-1.5 py-0.5 rounded bg-panel text-tx2 border border-line">{t}</span>)}
         </div>
-        <div className="text-[12px] text-tx3 mt-2 flex flex-wrap gap-x-4">
+        <div className="text-xs text-tx3 mt-2 flex flex-wrap gap-x-4">
           {client.contact?.phone && <span>☎ {client.contact.phone}</span>}
           {client.contact?.email && <span>✉ {client.contact.email}</span>}
           {client.contact?.line && <span>LINE {client.contact.line}</span>}
@@ -298,13 +300,13 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
           <div className="flex items-end gap-2">
             <span className="text-2xl font-extrabold leading-none tracking-wide" style={{ color: stageColor(latest?.healthGrade) }} title={stageTask(latest?.healthGrade)}>{latest ? stageName(latest.healthGrade) : "—"}</span>
             {latestCmp && (
-              <span className="text-[11px] text-tx3 leading-tight">安 {latestCmp.safety ?? "—"}<br />由 {latestCmp.freedom ?? "—"} · 願 {latestCmp.vision ?? "—"}</span>
+              <span className="text-11 text-tx3 leading-tight">安 {latestCmp.safety ?? "—"}<br />由 {latestCmp.freedom ?? "—"} · 願 {latestCmp.vision ?? "—"}</span>
             )}
           </div>
           <button
             type="button"
             onClick={() => setShowStageGuide(true)}
-            className="mt-1.5 text-[11px] text-tx2 underline decoration-dotted underline-offset-4 hover:text-brand2"
+            className="mt-1.5 text-11 text-tx2 underline decoration-dotted underline-offset-4 hover:text-brand2"
           >
             這個階段是怎麼判定的 ⓘ
           </button>
@@ -317,16 +319,16 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
       {passportPlan && (
         <div className="rounded-xl border border-brand/30 bg-panel px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-e1">
           <div className="min-w-0">
-            <div className="text-[11px] tracking-[0.18em] text-brand mb-0.5">客戶自己的規劃</div>
+            <div className="text-11 tracking-[0.18em] text-brand mb-0.5">客戶自己的規劃</div>
             <div className="text-sm text-tx">
               這位客戶做過<b className="text-brand2"> 人生護照 </b>
               {passportPlan.updatedAt && <span className="text-tx3">（最後更新 {passportPlan.updatedAt}）</span>}
             </div>
-            <div className="text-[11px] text-tx3 mt-0.5">這份屬於客戶，你可以看、不能改。</div>
+            <div className="text-11 text-tx3 mt-0.5">這份屬於客戶，你可以看、不能改。</div>
           </div>
           <Link
             href={`/dashboard/plans/${passportPlan.id}/history`}
-            className="shrink-0 text-[13px] text-tx2 hover:text-tx border border-line2 rounded-lg px-3 py-1.5"
+            className="shrink-0 text-13 text-tx2 hover:text-tx border border-line2 rounded-lg px-3 py-1.5"
           >
             看版本紀錄 →
           </Link>
@@ -339,13 +341,13 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
           {reviews.length === 0 ? <Empty>尚無諮詢紀錄</Empty> : (
             <div className="grid gap-2">
               {reviews.slice(0, 5).map((r) => (
-                <div key={r.id} className="bg-panel border border-line rounded-lg px-3 py-2 shadow-e1">
+                <div key={r.id} className="bg-panel border-b border-line last:border-b-0 px-3 py-2.5 first:rounded-t-lg last:rounded-b-lg hover:bg-panel2 transition-colors">
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-brand2">{r.date}</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-panel text-tx2">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
-                    {r.planId && planYear.get(r.planId) && <span className="text-[11px] text-tx3">對應 {planYear.get(r.planId)} 版</span>}
+                    <span className="text-11 px-1.5 py-0.5 rounded bg-panel text-tx2">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
+                    {r.planId && planYear.get(r.planId) && <span className="text-11 text-tx3">對應 {planYear.get(r.planId)} 版</span>}
                   </div>
-                  {r.summary && <div className="text-[13px] text-tx2 mt-1 whitespace-pre-wrap">{r.summary}</div>}
+                  {r.summary && <div className="text-13 text-tx2 mt-1 whitespace-pre-wrap">{r.summary}</div>}
                 </div>
               ))}
             </div>
@@ -357,11 +359,11 @@ function Overview({ latest, latestCmp, planCount, nextAppt, reviews, openItems, 
           {openItems.length === 0 ? <Empty>沒有待辦</Empty> : (
             <div className="grid gap-2">
               {openItems.map((i) => (
-                <label key={i.id} className="flex items-start gap-2 bg-panel border border-line rounded-lg px-3 py-2 cursor-pointer shadow-e1">
+                <label key={i.id} className="flex items-start gap-2 bg-panel border-b border-line last:border-b-0 px-3 py-2.5 first:rounded-t-lg last:rounded-b-lg cursor-pointer hover:bg-panel2 transition-colors">
                   <input type="checkbox" checked={i.done} disabled={readOnly} onChange={() => onToggle(i.id, !i.done)} className="mt-1 disabled:opacity-50" />
                   <span className="flex-1 text-sm">
                     {i.title}
-                    <span className="block text-[11px] text-tx3">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
+                    <span className="block text-11 text-tx3">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
                   </span>
                 </label>
               ))}
@@ -407,18 +409,18 @@ function Plans({ plans, compare, pending, readOnly = false, onOpen, onClone, onN
           // 中間一片空白，容易被當成頁面壞掉。
           <div className="rounded-lg border border-dashed border-line2 px-4 py-6 text-center">
             <div className="text-sm text-tx2">還沒有年度版本</div>
-            <div className="text-[12px] text-tx3 mt-1">按上方「＋ 空白版本」建立第一份，或從人生護照帶進來。</div>
+            <div className="text-xs text-tx3 mt-1">按上方「＋ 空白版本」建立第一份，或從人生護照帶進來。</div>
           </div>
         )}
         {plans.map((p, idx) => (
           <div key={p.id} className="bg-panel border border-line rounded-lg px-3 py-3 flex flex-wrap items-center gap-3 shadow-e1">
             <div className="w-16">
               <div className="text-lg font-bold">{p.year}</div>
-              {idx === 0 && <div className="text-[10px] text-ok">最新</div>}
+              {idx === 0 && <div className="text-10 text-ok">最新</div>}
             </div>
-            <div className="text-[12px] font-bold w-16 text-center" style={{ color: stageColor(p.healthGrade) }}>{stageName(p.healthGrade)}</div>
+            <div className="text-xs font-bold w-16 text-center" style={{ color: stageColor(p.healthGrade) }}>{stageName(p.healthGrade)}</div>
             <div className="text-sm tabular-nums w-28">{fmtMoney(p.netWorth)}</div>
-            <div className="text-[11px] text-tx3 flex-1 min-w-[120px]">{p.label} · 依據 {p.basedOnDate ?? "—"} · 更新 {p.updatedAt ?? "—"}</div>
+            <div className="text-11 text-tx3 flex-1 min-w-[120px]">{p.label} · 依據 {p.basedOnDate ?? "—"} · 更新 {p.updatedAt ?? "—"}</div>
             <select value={p.status} onChange={(e) => onStatus(p.id, e.target.value)} disabled={readOnly} className="bg-field border border-line2 rounded-md text-xs px-2 py-1.5 text-tx2 disabled:opacity-60">
               {Object.entries(PLAN_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
@@ -440,7 +442,7 @@ function Plans({ plans, compare, pending, readOnly = false, onOpen, onClone, onN
                 <tr>
                   <th className="text-left text-tx3 font-normal px-3 py-2 sticky left-0 bg-canvas">指標</th>
                   {compare.map((c) => (
-                    <th key={c.id} className="text-right px-3 py-2 whitespace-nowrap">{c.year}<span className="block text-[10px] text-tx3 font-normal">{PLAN_STATUS_LABEL[c.status] ?? c.status}</span></th>
+                    <th key={c.id} className="text-right px-3 py-2 whitespace-nowrap">{c.year}<span className="block text-10 text-tx3 font-normal">{PLAN_STATUS_LABEL[c.status] ?? c.status}</span></th>
                   ))}
                 </tr>
               </thead>
@@ -508,10 +510,10 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
     <div className="grid gap-5">
       {/* ── 草稿提醒：按了結束卻沒存，場次已封但紀錄還沒生出來 ── */}
       {draft && !readOnly && (
-        <div className="bg-brand/10 border border-brand/45 rounded-xl px-3.5 py-3 grid gap-2">
-          <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
+        <div className="bg-warn/10 border border-warn/45 rounded-xl px-3.5 py-3 grid gap-2">
+          <div className="flex flex-wrap items-center gap-2.5 text-13">
             <span className="text-brand2 font-bold">⚠️ {draft.endedAt ?? ""} 那一場的摘要還沒存</span>
-            <span className="text-tx3 text-[12px]">結束諮詢時產了草稿，但沒有送出成正式紀錄。</span>
+            <span className="text-tx3 text-xs">結束諮詢時產了草稿，但沒有送出成正式紀錄。</span>
             <div className="flex-1" />
             {!draftOpen && (
               <button className={btn + " bg-brand text-onbrand"} onClick={() => setDraftOpen(true)}>開啟草稿</button>
@@ -540,10 +542,10 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
             ＋ 新增諮詢
           </button>
         )}
-        <span className="text-[12px] text-tx3">補記過去的諮詢也走這裡，日期可以自己選。</span>
+        <span className="text-xs text-tx3">補記過去的諮詢也走這裡，日期可以自己選。</span>
         <div className="flex-1" />
         {openItems.length > 0 && (
-          <a href="#actionItems" className="text-[12px] text-brand2 hover:underline">
+          <a href="#actionItems" className="text-xs text-brand2 hover:underline">
             未完成待辦 {openItems.length} 件 ↓
           </a>
         )}
@@ -578,24 +580,24 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
               ) : (
                 <details key={r.id} className="bg-panel border border-line rounded-lg open:border-brand/45 shadow-e1">
                   <summary className="list-none cursor-pointer px-3 py-2.5 flex items-center gap-2.5">
-                    <span className="text-tx3 text-[11px] shrink-0">▸</span>
+                    <span className="text-tx3 text-11 shrink-0">▸</span>
                     <span className="text-brand2 font-bold tabular-nums shrink-0">{r.date}</span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-panel text-tx2 shrink-0">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
-                    <span className="text-[12.5px] text-tx3 truncate">{firstLine(r.summary)}</span>
+                    <span className="text-11 px-1.5 py-0.5 rounded bg-panel text-tx2 shrink-0">{REVIEW_TYPE_LABEL[r.type] ?? r.type}</span>
+                    <span className="text-xs text-tx3 truncate">{firstLine(r.summary)}</span>
                   </summary>
                   <div className="px-3 pb-3 pt-1 border-t border-line">
-                    <div className="text-[11.5px] text-tx3 my-2">
+                    <div className="text-11 text-tx3 my-2">
                       {r.attendees ? `出席：${r.attendees}` : "未填出席"}
                       {r.planId && planYear.get(r.planId) ? ` · 對應 ${planYear.get(r.planId)} 版` : ""}
                       {r.nextAppt ? ` · 下次預約 ${r.nextAppt}` : ""}
                     </div>
                     {r.summary
-                      ? <div className="text-[13px] text-tx2 whitespace-pre-wrap leading-relaxed">{r.summary}</div>
-                      : <div className="text-[12px] text-tx3">這一筆沒有內容。</div>}
+                      ? <div className="text-13 text-tx2 whitespace-pre-wrap leading-relaxed">{r.summary}</div>
+                      : <div className="text-xs text-tx3">這一筆沒有內容。</div>}
                     {!readOnly && (
                       <div className="flex gap-2 mt-3">
-                        <button className="text-[11.5px] px-2.5 py-1 rounded-md border border-line text-tx2" onClick={() => { setEditing(r.id); setAdding(false); }}>編輯</button>
-                        <button className="text-[11.5px] px-2.5 py-1 rounded-md border border-line text-tx3" onClick={() => onDeleteReview(r.id)}>刪除</button>
+                        <button className="text-11 px-2.5 py-1 rounded-md border border-line text-tx2" onClick={() => { setEditing(r.id); setAdding(false); }}>編輯</button>
+                        <button className="text-11 px-2.5 py-1 rounded-md border border-line text-tx3" onClick={() => onDeleteReview(r.id)}>刪除</button>
                       </div>
                     )}
                   </div>
@@ -611,13 +613,13 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
         <div>
           <h3 className="text-xs uppercase tracking-wider text-tx3 mb-2">動作項目清單</h3>
           <div className="bg-panel border border-line rounded-xl p-3 grid gap-2.5 shadow-e1">
-            {actionItems.length === 0 && <p className="text-[12px] text-tx3">目前沒有動作項目。</p>}
+            {actionItems.length === 0 && <p className="text-xs text-tx3">目前沒有動作項目。</p>}
             {actionItems.map((i) => (
               <label key={i.id} className="flex items-start gap-2 border-t border-line pt-2 first:border-0 first:pt-0">
                 <input type="checkbox" checked={i.done} disabled={readOnly} onChange={() => onToggleItem(i.id, !i.done)} className="mt-1 disabled:opacity-50" />
                 <span className={"flex-1 text-sm " + (i.done ? "line-through text-tx3" : "")}>
                   {i.title}
-                  <span className="block text-[11px] text-tx3">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
+                  <span className="block text-11 text-tx3">{i.owner ? i.owner + " · " : ""}{i.dueDate ? "期限 " + i.dueDate : "無期限"}</span>
                 </span>
                 {!readOnly && (
                   // 同一支檔案裡封存客戶、刪除年度版本、刪除諮詢紀錄都有二次確認，
@@ -625,8 +627,8 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
                   <button
                     className="text-tx3 hover:text-danger text-xs px-2 py-1 rounded"
                     aria-label={`刪除待辦「${i.title}」`}
-                    onClick={() => {
-                      if (window.confirm(`刪除待辦「${i.title}」？這個動作無法復原。`)) onDeleteItem(i.id);
+                    onClick={async () => {
+                      if (await confirmDialog(`刪除待辦「${i.title}」？這個動作無法復原。`)) onDeleteItem(i.id);
                     }}
                   >
                     刪
@@ -660,10 +662,15 @@ function Reviews({ clientId, reviews, actionItems, plans, planYear, draft, pendi
   );
 }
 
+/**
+ * 統計磚：只放一個數字。刻意「無邊框、底色差一階」——
+ * 和下面的清單列（有下緣線、hover 有反應）是兩種不同的東西，
+ * 改版前兩者共用同一組 class，掃視時分不出哪個是數字、哪個是可點的紀錄。
+ */
 function Card({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-panel border border-line rounded-xl px-3.5 py-3 shadow-e1">
-      <div className="text-[11px] uppercase tracking-wider text-tx3 mb-1.5">{label}</div>
+    <div className="bg-panel2 rounded-xl px-3.5 py-3">
+      <div className="text-11 uppercase tracking-wider text-tx3 mb-1.5">{label}</div>
       {children}
     </div>
   );

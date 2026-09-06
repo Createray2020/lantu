@@ -35,7 +35,7 @@ function Slider({
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-1.5">
-        <span className="text-[12px] text-tx2">{label}</span>
+        <span className="text-xs text-tx2">{label}</span>
         <span className="flex items-baseline gap-1 shrink-0">
           <input
             type="number"
@@ -56,9 +56,9 @@ function Slider({
               onChange(Number.isFinite(v) ? clamp(v) : value);
               setDraft(null);
             }}
-            className="w-[96px] rounded-md border border-line2 bg-field px-2 py-1 text-right text-[15px] font-bold text-brand2 focus:border-brand focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="w-[96px] rounded-md border border-line2 bg-field px-2 py-1 text-right text-15 font-bold text-brand2 focus:border-brand focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
-          {unit && <span className="w-4 text-[11px] text-tx2">{unit}</span>}
+          {unit && <span className="w-4 text-11 text-tx2">{unit}</span>}
         </span>
       </div>
       <input
@@ -66,7 +66,7 @@ function Slider({
         onChange={(e) => { setDraft(null); onChange(parseFloat(e.target.value)); }}
         className="w-full accent-teal h-1.5"
       />
-      <div className="flex justify-between text-[10px] text-tx3 mt-0.5">
+      <div className="flex justify-between text-10 text-tx3 mt-0.5">
         <span>{minLabel ?? min}</span>
         <span>{maxLabel ?? max}</span>
       </div>
@@ -85,7 +85,7 @@ function Donut({ loan, down }: { loan: number; down: number }) {
       >
         <div className="w-20 h-20 rounded-full bg-panel2 grid place-items-center text-2xl">🏠</div>
       </div>
-      <div className="flex gap-4 text-[11px] text-tx2">
+      <div className="flex gap-4 text-11 text-tx2">
         <span className="flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm inline-block bg-teal" />貸款</span>
         <span className="flex items-center gap-1"><i className="w-2.5 h-2.5 rounded-sm inline-block bg-teal" />自備款</span>
       </div>
@@ -110,7 +110,7 @@ function LoanCard({ title, icon, r, rate }: { title: string; icon: string; r: Lo
           {r.graceMonths > 0 && <>▶ 1-{r.graceMonths} 月還 {ntfmt(r.graceMonthly)}（寬限期）<br /></>}
           ▶ {r.graceMonths + 1}-{r.graceMonths + r.amortMonths} 月還 {ntfmt(r.amortMonthly)}
         </div>
-        <div className="text-[11px] text-tx3 mt-2">
+        <div className="text-11 text-tx3 mt-2">
           {Math.round((r.graceMonths + r.amortMonths) / 12)} 年貸款 / 本息均攤 / 單一利率({rate}%)
         </div>
       </div>
@@ -122,7 +122,7 @@ function Bar({ label, value, total, color }: { label: string; value: number; tot
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
   return (
     <div className="mb-2">
-      <div className="flex justify-between text-[12px] mb-0.5">
+      <div className="flex justify-between text-xs mb-0.5">
         <span className="text-tx">{label}</span>
         <span className="text-tx font-semibold">月領 {ntfmt(value)}</span>
       </div>
@@ -146,7 +146,7 @@ function Face({
           <span>{icon}</span><span>{label}能力分析</span>
         </div>
         <div className="text-right">
-          <div className="text-[10px] tracking-[0.2em] text-tx3">月存</div>
+          <div className="text-10 tracking-[0.2em] text-tx3">月存</div>
           <div className="font-bold text-teal">{monthly} 萬</div>
         </div>
       </div>
@@ -267,7 +267,7 @@ export default function PassportWizard({
         <h1 className="font-serif text-2xl mb-2">{mode === "public" ? "人生護照 · 免費試算" : "我的人生護照"}</h1>
         <div className="text-tx2 text-sm mb-1">每月應存合計</div>
         <div className="font-serif text-4xl text-brand2">{m.totalMonthlyWan.toFixed(1)} 萬</div>
-        <p className="text-[11px] text-tx3 mt-2">拉動下方條件，即時看你每月存這些錢能達成什麼。</p>
+        <p className="text-11 text-tx3 mt-2">拉動下方條件，即時看你每月存這些錢能達成什麼。</p>
         {/* ⚠️ 護照的年份存在資料裡，跨年不會自己走；「目前年齡」是客戶自己拉的，也不會自己長一歲。
             **兩半必須一起前進**——只改年齡不改年份（或反過來）算出來的目標歲數反而更錯：
             2026 年做的護照、購屋填 2036，客戶 30 歲 → 40 歲。
@@ -275,28 +275,28 @@ export default function PassportWizard({
             所以做成一顆「一起前進一年」的按鈕，而不是一句提醒；也刻意不自動跑，
             默默改掉客戶看過的數字比讓他自己按一下糟糕得多。 */}
         {stale && (
-          <div className="mt-3 mx-auto max-w-lg rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-[12px] leading-relaxed text-brand2">
+          <div className="mt-3 mx-auto max-w-lg rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-xs leading-relaxed text-brand2">
             這份護照是 <b>{by}</b> 年做的，現在是 <b>{baseYear}</b> 年。
             各項目標填的是<b>西元年份</b>，所以它們沒有跑掉——但你的<b>目前年齡</b>還停在 {p.retire.curAge} 歲。
             <button
               type="button"
               onClick={rollForward}
-              className="ml-2 rounded-md border border-brand px-2.5 py-1 text-[12px] font-semibold text-brand2 hover:bg-brand hover:text-canvas"
+              className="ml-2 rounded-md border border-brand px-2.5 py-1 text-xs font-semibold text-brand2 hover:bg-brand hover:text-canvas"
             >
               更新到 {baseYear} 年（年齡 {p.retire.curAge} → {rolledAge} 歲）
             </button>
-            <span className="block mt-1 text-[11px] text-brand2">按了之後記得再存一次檔。</span>
+            <span className="block mt-1 text-11 text-brand2">按了之後記得再存一次檔。</span>
           </div>
         )}
         <button
           type="button"
           onClick={() => setShowAssume((v) => !v)}
-          className="mt-3 text-[11px] text-tx2 hover:text-tx underline underline-offset-4"
+          className="mt-3 text-11 text-tx2 hover:text-tx underline underline-offset-4"
         >
           {showAssume ? "收合" : "本試算採用的假設"}
         </button>
         {showAssume && (
-          <div className="mt-3 text-left rounded-xl bg-canvas/70 border border-line p-4 text-[11.5px] leading-relaxed text-tx2">
+          <div className="mt-3 text-left rounded-xl bg-canvas/70 border border-line p-4 text-11 leading-relaxed text-tx2">
             <ul className="space-y-1 list-disc pl-4">
               <li>各面向的年報酬、貸款利率、學費上漲率皆為<b className="text-tx">情境假設</b>，由你自行設定，非預期或保證之報酬。</li>
               <li>退休：預估壽命 {p.retire.lifeExp} 歲、勞退提繳率 {p.retire.contribRate}%、勞保年金採平均月投保薪資 × 年資 × 1.55% 概算，現值以通膨 1.5% 折現。</li>
@@ -342,7 +342,7 @@ export default function PassportWizard({
             <div className="w-full">
               <div className="text-tx2 text-sm mb-1">🌴 {p.retire.retireAge} 歲退休可支應生活費</div>
               <div className="font-serif text-3xl text-brand2 mb-1">總計 {ntfmt(m.retire.totalMonthly)} /月</div>
-              <div className="text-[11px] text-tx3 mb-4">（現值約 {ntfmt(m.retire.presentMonthly)}）</div>
+              <div className="text-11 text-tx3 mb-4">（現值約 {ntfmt(m.retire.presentMonthly)}）</div>
               <Bar label="自行準備" value={m.retire.selfMonthly} total={m.retire.totalMonthly} color="var(--teal)" />
               <Bar label="企業提撥（勞退）" value={m.retire.laborPensionMonthly} total={m.retire.totalMonthly} color="var(--teal)" />
               <Bar label="社會保險（勞保）" value={m.retire.laborInsMonthly} total={m.retire.totalMonthly} color="var(--teal2)" />
@@ -367,7 +367,7 @@ export default function PassportWizard({
                 折算至出生時共約存 <b className="text-brand2">{wan(m.support.savedAtBirth)} 萬</b><br />
                 每位小孩共約花 <b className="text-brand2">{wan(m.support.perChildCost)} 萬</b>
               </div>
-              <div className="text-[11px] text-tx3 mt-2">扶養至 {m.support.raiseToAge} 歲 / 學費上漲率 {p.support.tuitionGrowth}%</div>
+              <div className="text-11 text-tx3 mt-2">扶養至 {m.support.raiseToAge} 歲 / 學費上漲率 {p.support.tuitionGrowth}%</div>
             </div>
           }>
           <Slider label="預計出生年份" value={p.support.birthYear} min={by} max={by + 30} onChange={(v) => set("support", "birthYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 30} 年`} />
@@ -384,7 +384,7 @@ export default function PassportWizard({
               <div className="text-5xl mb-2">✈️</div>
               <div className="text-tx2 text-sm">{m.travel.travelYear} 年旅遊基金</div>
               <div className="font-serif text-4xl text-brand2 my-1">{ntfmt(m.travel.fund)} 元</div>
-              <div className="text-[11px] text-tx3 mt-2">月存 {ntfmt(m.travel.monthly * 10000)} 元 / 年報酬 {p.travel.annualReturn}%</div>
+              <div className="text-11 text-tx3 mt-2">月存 {ntfmt(m.travel.monthly * 10000)} 元 / 年報酬 {p.travel.annualReturn}%</div>
             </div>
           }>
           <Slider label="旅遊時間" value={p.travel.travelYear} min={by} max={by + 15} onChange={(v) => set("travel", "travelYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 15} 年`} />
@@ -418,7 +418,7 @@ export default function PassportWizard({
             {status === "confirm" ? (
               <div className="text-sm">
                 <div className="text-brand2 font-semibold">你已經有一份規劃了</div>
-                <div className="text-tx2 text-[12px]">
+                <div className="text-tx2 text-xs">
                   最後更新：{existingAt ? new Date(existingAt).toLocaleString("zh-TW", { hour12: false }) : "—"}
                   ．覆蓋後舊內容仍留在版本紀錄裡，可以回復。
                 </div>
@@ -431,7 +431,7 @@ export default function PassportWizard({
               <div className="text-ok text-sm">已儲存，正在開啟你的規劃…</div>
             ) : (
               <>
-                <div className="text-[11px] tracking-[0.2em] text-tx3">合計 每月應存</div>
+                <div className="text-11 tracking-[0.2em] text-tx3">合計 每月應存</div>
                 <div className="font-serif text-2xl text-brand2">{m.totalMonthlyWan.toFixed(1)} 萬</div>
               </>
             )}

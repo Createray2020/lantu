@@ -6,16 +6,17 @@
 // 比填完再去別頁確認可靠得多。
 
 import { useMemo, useRef, useState, useTransition } from "react";
+import SubmitButton from "@/components/ui/SubmitButton";
+import { FIELD_EMPTY, FIELD_SM } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { saveMyProfileAction } from "./actions";
 import { DISPLAY_NAME_MAX } from "@/lib/coachName";
 import PhotoCropper, { type CropSource } from "./PhotoCropper";
 
-const INPUT = "bg-panel border border-line2 rounded px-2 py-1.5 text-sm text-tx outline-none focus:border-brand";
-const EMPTY = "bg-panel border border-dashed border-line2 rounded px-2 py-1.5 text-sm text-tx2 outline-none focus:border-brand";
+const INPUT = FIELD_SM;
+const EMPTY = FIELD_EMPTY;
 const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
-const BTN_SOLID = "rounded-lg px-4 py-2 text-sm bg-brand text-onbrand font-bold hover:bg-brand2 disabled:opacity-40";
 
 const ACCEPT = ["image/png", "image/jpeg", "image/webp"];
 const MAX_FILE = 8 * 1024 * 1024;
@@ -153,7 +154,7 @@ export default function ProfileEditor({
             />
             <span>
               <span className="text-sm font-bold">不要把我的資料放上官網</span>
-              <span className="block text-[12px] text-tx2 mt-1 leading-relaxed">
+              <span className="block text-xs text-tx2 mt-1 leading-relaxed">
                 勾選後，你不會出現在官網的教練頁，客戶也無法在那裡挑到你。
                 <b className="text-brand2">你的教練編號照常有效</b>——
                 已經拿到編號的客戶還是可以指定你，一樣要你按接受才會掛上。
@@ -161,7 +162,7 @@ export default function ProfileEditor({
             </span>
           </label>
           {f.selfHidden && !published && (
-            <p className="text-[11px] text-danger mt-2">
+            <p className="text-11 text-danger mt-2">
               （你的檔案本來就已經被管理員下架，取消勾選也不會出現在官網。）
             </p>
           )}
@@ -178,7 +179,7 @@ export default function ProfileEditor({
               placeholder={loginName || "你的名字"}
               className={`${f.displayName ? INPUT : EMPTY} w-full`}
             />
-            <span className="block text-[11px] text-tx3 mt-1.5 leading-relaxed">
+            <span className="block text-11 text-tx3 mt-1.5 leading-relaxed">
               這是<b className="text-tx2">全站</b>會顯示的名字——官網教練頁、工作台、組織表、客戶看到的都是它。
               留空就沿用登入帳號的姓名{loginName ? `（${loginName}）` : ""}。
               改這裡<b className="text-tx2">不會</b>動到你的登入帳號，最多 {DISPLAY_NAME_MAX} 個字。
@@ -201,7 +202,7 @@ export default function ProfileEditor({
               <input ref={fileRef} type="file" accept={ACCEPT.join(",")} disabled={pending}
                 onChange={onPickPhoto}
                 className="text-xs text-tx2 file:mr-2 file:rounded-lg file:border file:border-line2 file:bg-transparent file:px-3 file:py-1.5 file:text-tx2" />
-              <p className="text-[11px] text-tx3">
+              <p className="text-11 text-tx3">
                 選好照片後可以拖曳、縮放決定要框哪一塊，再裁成正方形壓縮。清楚的正面照最有效。
               </p>
               {f.photoUrl && (
@@ -221,7 +222,7 @@ export default function ProfileEditor({
               onChange={(e) => set("headline", e.target.value)}
               placeholder="例：陪你把每一筆錢，放到它該去的地方"
               className={`${f.headline ? INPUT : EMPTY} w-full`} />
-            <span className="block text-[11px] text-tx3 mt-0.5">{f.headline.length}/60</span>
+            <span className="block text-11 text-tx3 mt-0.5">{f.headline.length}/60</span>
           </label>
           <label className="block">
             <span className="block text-xs text-tx2 mb-1">自我介紹</span>
@@ -229,7 +230,7 @@ export default function ProfileEditor({
               onChange={(e) => set("bio", e.target.value)}
               placeholder={"你為什麼做這一行、擅長陪什麼樣的人、合作起來會是什麼感覺。\n寫給看不懂財務術語的人看。"}
               className={`${f.bio ? INPUT : EMPTY} w-full leading-relaxed`} />
-            <span className="block text-[11px] text-tx3 mt-0.5">{f.bio.length}/1000</span>
+            <span className="block text-11 text-tx3 mt-0.5">{f.bio.length}/1000</span>
           </label>
         </div>
 
@@ -256,7 +257,7 @@ export default function ProfileEditor({
               })}
             </div>
           )}
-          <p className="text-[11px] text-tx3">
+          <p className="text-11 text-tx3">
             專長同時用於客戶選教練，以及公司派案時挑選合適人選。
           </p>
         </div>
@@ -303,9 +304,12 @@ export default function ProfileEditor({
         </div>
 
         <div className="flex items-center gap-3">
-          <button type="button" className={BTN_SOLID} disabled={pending || !dirty} onClick={save}>
-            {pending ? "儲存中…" : "儲存並公開"}
-          </button>
+          <SubmitButton type="button" disabled={pending || !dirty} onClick={save}
+          state={pending ? "pending" : "idle"}
+          pendingLabel="儲存中…"
+        >
+          儲存並公開
+        </SubmitButton>
           <Link href="/coaches" className={BTN}>看官網上的樣子 →</Link>
           {msg && (
             <span className={`text-sm ${msg.ok ? "text-ok" : "text-danger"}`}>
@@ -380,7 +384,7 @@ export function CoachCard({
           <div className="font-serif text-lg text-tx">{name}</div>
           {rankLabel && <div className="text-xs text-tx2">{rankLabel}</div>}
           {headline && <p className="text-sm text-brand2 mt-1.5 leading-snug">{headline}</p>}
-          <div className="text-[11px] text-tx3 mt-1 space-x-2">
+          <div className="text-11 text-tx3 mt-1 space-x-2">
             {yearsExp !== null && !Number.isNaN(yearsExp) && <span>年資 {yearsExp} 年</span>}
             {prevRole && <span>· {prevRole}</span>}
           </div>
@@ -390,7 +394,7 @@ export function CoachCard({
       {specialties.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3">
           {specialties.map((s) => (
-            <span key={s} className="rounded-full bg-panel2 border border-line px-2.5 py-1 text-[11px] text-tx shadow-e1">
+            <span key={s} className="rounded-full bg-panel2 border border-line px-2.5 py-1 text-11 text-tx shadow-e1">
               {s}
             </span>
           ))}
@@ -404,7 +408,7 @@ export function CoachCard({
       )}
 
       {(credentials.length > 0 || serviceModes.length > 0 || areas.length > 0) && (
-        <div className="mt-3 pt-3 border-t border-line text-[11px] text-tx3 space-y-1">
+        <div className="mt-3 pt-3 border-t border-line text-11 text-tx3 space-y-1">
           {credentials.length > 0 && <div>證照：{credentials.join("、")}</div>}
           {serviceModes.length > 0 && <div>服務方式：{serviceModes.join("、")}</div>}
           {areas.length > 0 && <div>服務地區：{areas.join("、")}</div>}

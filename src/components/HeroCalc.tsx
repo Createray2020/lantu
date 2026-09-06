@@ -26,7 +26,7 @@ function Field({
   const [draft, setDraft] = useState<string | null>(null);
   return (
     <div className="rounded-xl bg-panel/80 border border-line px-4 py-3 text-left shadow-e1">
-      <div className="text-[11px] text-tx2 mb-1.5">{label}</div>
+      <div className="text-11 text-tx2 mb-1.5">{label}</div>
       <div className="flex items-baseline gap-1">
         <input
           type="number"
@@ -50,7 +50,7 @@ function Field({
           className="w-full bg-transparent text-2xl font-bold text-brand2 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           aria-label={label}
         />
-        <span className="text-[12px] text-tx2 shrink-0">{unit}</span>
+        <span className="text-xs text-tx2 shrink-0">{unit}</span>
       </div>
       <input
         type="range" min={min} max={max} step={step} value={value}
@@ -91,9 +91,9 @@ export default function HeroCalc() {
         <div className="font-serif text-4xl sm:text-5xl text-brand2 my-2">
           {ntfmt(r.totalMonthly)} <span className="text-xl">元</span>
         </div>
-        <div className="text-[12px] text-tx3">相當於現在的 {ntfmt(r.presentMonthly)} 元／月</div>
+        <div className="text-xs text-tx3">相當於現在的 {ntfmt(r.presentMonthly)} 元／月</div>
 
-        <div className="grid grid-cols-3 gap-2 mt-4 text-[11.5px]">
+        <div className="grid grid-cols-3 gap-2 mt-4 text-11">
           {[
             ["自行準備", r.selfMonthly, "var(--teal)"],
             ["勞退提撥", r.laborPensionMonthly, "var(--teal)"],
@@ -112,22 +112,22 @@ export default function HeroCalc() {
 
       <button
         onClick={goFull}
-        className="w-full mt-4 font-bold text-onbrand bg-brand hover:bg-brand2 px-7 py-3.5 rounded-lg text-[15px]"
+        className="w-full mt-4 font-bold text-onbrand bg-brand hover:bg-brand2 px-7 py-3.5 rounded-lg text-15"
       >
         繼續算購房、購車、教育金 →
       </button>
       <div className="mt-2.5 text-center">
-        <span className="text-[11px] text-tx3">免費・不用註冊・資料留在你的瀏覽器</span>
+        <span className="text-11 text-tx3">免費・不用註冊・資料留在你的瀏覽器</span>
         <button
           type="button"
           onClick={() => setShowAssume((v) => !v)}
-          className="ml-2 text-[11px] text-tx2 hover:text-tx underline underline-offset-4"
+          className="ml-2 text-11 text-tx2 hover:text-tx underline underline-offset-4"
         >
           {showAssume ? "收合假設" : "本試算的假設"}
         </button>
       </div>
       {showAssume && (
-        <div className="mt-3 rounded-lg bg-canvas/70 border border-line p-3.5 text-[11px] leading-relaxed text-tx2 text-left">
+        <div className="mt-3 rounded-lg bg-canvas/70 border border-line p-3.5 text-11 leading-relaxed text-tx2 text-left">
           年報酬 3%（情境假設，非預期或保證報酬）／通膨 1.5%／預估壽命 85 歲／
           勞退以月薪 × 6% 提繳、勞保年金以平均月投保薪資（上限 45,800）× 年資 × 1.55% 概算，
           年資假設 {ASSUMED_WORK_START_AGE} 歲起算至退休。

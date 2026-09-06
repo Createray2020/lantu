@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD } from "@/components/ui/Field";
 import Link from "next/link";
 import { computeGap, ntfmt, wan, type CrossInputs } from "@/lib/passport";
 import MoneyInput from "@/components/MoneyInput";
@@ -13,15 +15,13 @@ import { saveSetupAction, revokeCoachAction } from "./actions";
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[12px] text-tx2">{label}</span>
+      <span className="text-xs text-tx2">{label}</span>
       <span className="mt-1 block">{children}</span>
     </label>
   );
 }
-const inputCls =
-  "w-full bg-field border border-line rounded-lg px-3 py-2 text-tx text-sm focus:border-brand outline-none";
-const inputErrCls =
-  "w-full bg-field border border-danger/70 rounded-lg px-3 py-2 text-tx text-sm focus:border-danger outline-none";
+const inputCls = FIELD;
+const inputErrCls = `${FIELD} border-danger`;
 
 const emptyBasics: ClientBasics = { name: "", birth: "", gender: "", phone: "", email: "", marital: "", dependents: 0 };
 const emptyCross: CrossInputs = { income: 0, expense: 0, assets: 0, liabilities: 0 };
@@ -77,7 +77,7 @@ export default function SetupWizard({
   }
 
   async function onRevoke() {
-    if (!confirm("確定要解除與教練的連結嗎？")) return;
+    if (!await confirmDialog("確定要解除與教練的連結嗎？")) return;
     setReqStatus("sending"); setReqErr(null);
     try {
       const res = await revokeCoachAction();
@@ -107,7 +107,7 @@ export default function SetupWizard({
               value={b.name}
               onChange={(e) => setBasic("name", e.target.value)}
             />
-            {fieldErr.name && <span className="block text-[11px] text-danger mt-1">⚠ {fieldErr.name}</span>}
+            {fieldErr.name && <span className="block text-11 text-danger mt-1">⚠ {fieldErr.name}</span>}
           </Field>
           <Field label="生日">
             <input
@@ -117,7 +117,7 @@ export default function SetupWizard({
               value={b.birth}
               onChange={(e) => setBasic("birth", e.target.value)}
             />
-            {fieldErr.birth && <span className="block text-[11px] text-danger mt-1">⚠ {fieldErr.birth}</span>}
+            {fieldErr.birth && <span className="block text-11 text-danger mt-1">⚠ {fieldErr.birth}</span>}
           </Field>
           <Field label="性別">
             <select className={inputCls} value={b.gender} onChange={(e) => setBasic("gender", e.target.value)}>
@@ -140,7 +140,7 @@ export default function SetupWizard({
       {/* 財務現況十字表 */}
       <section className="rounded-2xl bg-panel2 border border-line p-5 sm:p-6 mb-4 shadow-e1">
         <h2 className="font-serif text-lg mb-1">➕ 財務現況十字表</h2>
-        <p className="text-[11px] text-tx3 mb-4">收入支出填「每月」，資產負債填「目前總額」（單位：元）。</p>
+        <p className="text-11 text-tx3 mb-4">收入支出填「每月」，資產負債填「目前總額」（單位：元）。</p>
         <div className="grid grid-cols-2 gap-4">
           <Field label="每月收入"><MoneyInput className={inputCls} value={c.income} placeholder="0" onChange={(v) => setCross("income", v ?? 0)} /></Field>
           <Field label="每月支出"><MoneyInput className={inputCls} value={c.expense} placeholder="0" onChange={(v) => setCross("expense", v ?? 0)} /></Field>
@@ -186,7 +186,7 @@ export default function SetupWizard({
           {/* ⚠️ 缺口是規劃的起點，不是成績單。
               「還差 X 才能達成」「做得很好」都把它講成了考試分數——而嵐途的命題是
               「比原本更優化」，不是「補平」。教練端 planHeroV2 已經是這個口徑，這裡跟上。 */}
-          <p className="text-[11px] text-tx3 mt-4">
+          <p className="text-11 text-tx3 mt-4">
             {gap.monthlyGap > 0
               ? `以目前的收支，每月差 NT$ ${ntfmt(gap.monthlyGap)}。多數人在這個階段都有缺口，這是規劃的起點，不是壞消息——教練會陪你排出先做哪一件、每一步能改善多少。`
               : `以目前的收支，每月結餘已覆蓋這些目標所需的金額。接下來要看的是配置與順序：哪些錢放在哪裡、哪一步先做，教練會陪你一起排。`}
@@ -209,13 +209,13 @@ export default function SetupWizard({
         ) : localLink.state === "pending" ? (
           <div className="mt-3 rounded-lg border border-brand/30 bg-panel/50 p-4 shadow-e1">
             <div className="text-brand2 text-sm">⏳ 已送出連結申請{localLink.coachName ? `給 ${localLink.coachName}` : ""}，等待教練接受。</div>
-            <p className="text-[11px] text-tx3 mt-1">教練接受後，你的規劃就正式開始，對方能與你一起檢視與優化。</p>
+            <p className="text-11 text-tx3 mt-1">教練接受後，你的規劃就正式開始，對方能與你一起檢視與優化。</p>
           </div>
         ) : (
           <>
             {/* 選教練改到官網教練頁進行：那裡有每位教練自己寫的介紹、專長與服務方式，
                 比一排只有姓名的選項有判斷依據得多。連結關係仍是雙向確認，沒有變。 */}
-            <p className="text-[11px] text-tx3 mb-4">
+            <p className="text-11 text-tx3 mb-4">
               先看看每位教練的專長與自我介紹，挑一位合得來的送出邀請，對方接受後就會和你一起規劃。
             </p>
             <div className="flex flex-wrap items-center gap-3">
@@ -223,7 +223,7 @@ export default function SetupWizard({
                 className="font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg">
                 瀏覽教練並選擇 →
               </Link>
-              <span className="text-[11px] text-tx3">
+              <span className="text-11 text-tx3">
                 目前有 {coaches.length} 位教練
               </span>
             </div>

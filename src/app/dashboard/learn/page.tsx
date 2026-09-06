@@ -50,7 +50,7 @@ export default async function LearnPage() {
 
         {[...groups.entries()].map(([cat, list]) => (
           <section key={cat} className="mb-7">
-            <h2 className="text-[11px] tracking-[0.22em] text-tx3 mb-2.5">{cat}</h2>
+            <h2 className="text-11 tracking-[0.22em] text-tx3 mb-2.5">{cat}</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               {list.map((c) => {
                 const pct = c.lessonCount ? Math.round((c.doneCount / c.lessonCount) * 100) : 0;
@@ -68,7 +68,7 @@ export default async function LearnPage() {
                       <div className="flex items-start gap-2">
                         <h3 className="font-bold flex-1">{c.title}</h3>
                         {c.completed && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ok-solid/20 text-ok border border-ok-solid/50 whitespace-nowrap">
+                          <span className="text-10 font-bold px-1.5 py-0.5 rounded bg-ok-solid/20 text-ok border border-ok-solid/50 whitespace-nowrap">
                             已完成
                           </span>
                         )}
@@ -81,12 +81,12 @@ export default async function LearnPage() {
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <span className="text-[11px] text-tx3 whitespace-nowrap">
+                        <span className="text-11 text-tx3 whitespace-nowrap">
                           {c.doneCount}/{c.lessonCount} 單元
                         </span>
                       </div>
                       {c.trainingHours != null && (
-                        <div className="text-[11px] text-tx3 mt-1.5">
+                        <div className="text-11 text-tx3 mt-1.5">
                           完課認列 {c.trainingHours} 小時訓練時數
                         </div>
                       )}

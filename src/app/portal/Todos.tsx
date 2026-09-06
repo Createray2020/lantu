@@ -36,9 +36,9 @@ export default function Todos({ items }: { items: ClientTodo[] }) {
         className="mt-[3px] w-[16px] h-[16px] accent-brand shrink-0"
       />
       <span className="flex-1 min-w-0">
-        <span className={`text-[13.5px] ${t.done ? "text-tx3 line-through" : "text-tx"}`}>{t.title}</span>
+        <span className={`text-13 ${t.done ? "text-tx3 line-through" : "text-tx"}`}>{t.title}</span>
         {(t.owner || t.dueDate) && (
-          <span className="block text-[11px] text-tx3 mt-0.5">
+          <span className="block text-11 text-tx3 mt-0.5">
             {t.owner ? `由 ${t.owner} 處理` : ""}
             {t.owner && t.dueDate ? " · " : ""}
             {t.dueDate ? `${t.dueDate} 前` : ""}
@@ -51,8 +51,8 @@ export default function Todos({ items }: { items: ClientTodo[] }) {
   return (
     <div className="max-w-2xl mx-auto mb-6 rounded-xl border border-line bg-panel2 overflow-hidden shadow-e1">
       <div className="px-4 py-3 flex items-center gap-2">
-        <span className="text-[13px] font-bold text-brand2">我的待辦</span>
-        <span className="text-[11.5px] text-tx2">
+        <span className="text-13 font-bold text-brand2">我的待辦</span>
+        <span className="text-11 text-tx2">
           {open.length > 0 ? `還有 ${open.length} 項待補` : "都完成了"}
         </span>
       </div>
@@ -61,7 +61,7 @@ export default function Todos({ items }: { items: ClientTodo[] }) {
       ))}
       {done.length > 0 && (
         <details>
-          <summary className="cursor-pointer px-4 py-2 text-[11.5px] text-tx3 list-none border-t border-line">
+          <summary className="cursor-pointer px-4 py-2 text-11 text-tx3 list-none border-t border-line">
             已完成 {done.length} 項
           </summary>
           {done.map((t) => (
@@ -69,7 +69,7 @@ export default function Todos({ items }: { items: ClientTodo[] }) {
           ))}
         </details>
       )}
-      <p className="px-4 py-2.5 text-[11px] text-tx3 border-t border-line">
+      <p className="px-4 py-2.5 text-11 text-tx3 border-t border-line">
         清單會隨著規劃一起長出來，<b className="text-tx2">不必等全部補齊才開始</b>——缺哪一項，
         只是那一塊的試算會先用預估值。
       </p>

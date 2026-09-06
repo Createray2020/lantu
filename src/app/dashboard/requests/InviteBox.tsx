@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SubmitButton from "@/components/ui/SubmitButton";
 import { createInviteAction } from "./actions";
 
 // 教練產生反向邀請連結；傳給客戶，客戶登入開啟即直接掛到本教練。
@@ -38,10 +39,12 @@ export default function InviteBox() {
           <button onClick={gen} className="text-tx2 hover:text-tx border border-line2 px-3 py-2 rounded-lg text-sm">另產一條</button>
         </div>
       ) : (
-        <button onClick={gen} disabled={busy}
-          className="text-onbrand bg-brand hover:bg-brand2 px-5 py-2 rounded-lg text-sm font-bold disabled:opacity-50">
-          {busy ? "產生中…" : "產生邀請連結"}
-        </button>
+        <SubmitButton onClick={gen} disabled={busy}
+          state={busy ? "pending" : "idle"}
+          pendingLabel="產生中…"
+        >
+          產生邀請連結
+        </SubmitButton>
       )}
       {err && <div className="text-danger text-sm mt-2">⚠ {err}</div>}
     </div>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD } from "@/components/ui/Field";
 import { saveBirthCostAction, resetBirthCostAction, type ActionResult } from "./actions";
 import type { BirthCostRow } from "@/lib/birthCosts";
 import { fmtMoney } from "@/lib/money";
@@ -15,8 +17,7 @@ import MoneyInput from "@/components/MoneyInput";
 // 與企業稅務常數同一套規則：只能改內建清單裡的 key、不能新增；
 // 「回復內建」＝把 DB 那一列刪掉，回到程式裡的 seed。
 
-const inputCls =
-  "w-full rounded border border-line2 bg-field px-2 py-1 text-sm text-tx outline-none focus:border-brand";
+const inputCls = FIELD;
 const btnCls =
   "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
 
@@ -65,7 +66,7 @@ export default function BirthCostsBoard({ rows, basis }: { rows: BirthCostRow[];
         <div key={g} className="mb-5">
           <h3 className="text-xs text-tx2 mb-2">{g}</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse min-w-[820px]">
+            <table className="w-full text-sm border-collapse min-w-[820px] tbl-sticky">
               <thead>
                 <tr>
                   {["項目", "目前值", "新值", "資料基準", "備註 / 來源", ""].map((h) => (
@@ -82,11 +83,11 @@ export default function BirthCostsBoard({ rows, basis }: { rows: BirthCostRow[];
                     <tr key={r.key}>
                       <td className="px-3 py-2 border-t border-line align-top">
                         <div className="font-semibold text-tx">{r.label}</div>
-                        <code className="text-[11px] text-tx3">{r.key}</code>
+                        <code className="text-11 text-tx3">{r.key}</code>
                       </td>
                       <td className="px-3 py-2 border-t border-line align-top whitespace-nowrap">
                         <span className="text-brand2 font-bold">{fmtMoney(r.amount)}</span>
-                        <div className="text-[11px] text-tx3">{UNIT_HINT[r.unit] ?? r.unit}</div>
+                        <div className="text-11 text-tx3">{UNIT_HINT[r.unit] ?? r.unit}</div>
                       </td>
                       <td className="px-3 py-2 border-t border-line align-top w-[130px]">
                         <MoneyInput className={inputCls} allowEmpty
@@ -107,8 +108,8 @@ export default function BirthCostsBoard({ rows, basis }: { rows: BirthCostRow[];
                           儲存
                         </button>
                         <button disabled={pending} className={`${btnCls} ml-2`}
-                          onClick={() => {
-                            if (!confirm(`「${r.label}」回復程式內建值？`)) return;
+                          onClick={async () => {
+                            if (!await confirmDialog(`「${r.label}」回復程式內建值？`)) return;
                             setDraft((prev) => { const n = { ...prev }; delete n[r.key]; return n; });
                             run(() => resetBirthCostAction(r.key), `已回復「${r.label}」的內建值`);
                           }}>

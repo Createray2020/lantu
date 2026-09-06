@@ -126,8 +126,8 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
               <span className="w-6 text-right text-xs text-tx3 tabular-nums">{i + 1}</span>
               <span className="flex-1 min-w-0">
                 <span className="text-sm">{r.t}</span>
-                {r.cond && <span className="ml-2 text-[11px] text-tx3">（{r.cond}）</span>}
-                {r.hidden && <span className="ml-2 text-[11px] text-brand2">預設收起</span>}
+                {r.cond && <span className="ml-2 text-11 text-tx3">（{r.cond}）</span>}
+                {r.hidden && <span className="ml-2 text-11 text-brand2">預設收起</span>}
               </span>
               <button className={btn} onClick={() => move(i, -1)} disabled={i === 0 || pending} title="往上一格">↑</button>
               <button className={btn} onClick={() => move(i, 1)} disabled={i === list.length - 1 || pending} title="往下一格">↓</button>

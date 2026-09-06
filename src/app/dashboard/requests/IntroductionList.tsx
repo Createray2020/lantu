@@ -42,14 +42,14 @@ export default function IntroductionList({ intros }: { intros: Intro[] }) {
       {list.map((it) => (
         <div key={it.coachId} className="rounded-xl bg-panel2 border border-line p-4 shadow-e1">
           <div className="text-tx font-semibold">{it.applicantName || "（未命名）"}</div>
-          <div className="text-[11px] text-tx3">
+          <div className="text-11 text-tx3">
             {[it.applicantEmail, it.phone].filter(Boolean).join("｜") || "（未留聯絡方式）"}
           </div>
           {it.currentJob && <div className="text-tx2 text-sm mt-2">現況：{it.currentJob}</div>}
           {it.motive && (
             <div className="text-tx2 text-sm mt-1 whitespace-pre-wrap">報聘動機：{it.motive}</div>
           )}
-          <p className="mt-3 text-[11px] text-tx3 leading-relaxed">
+          <p className="mt-3 text-11 text-tx3 leading-relaxed">
             按「確認推薦」代表：此申請人確實由你推薦，並同意其進入後續嵐途審核流程。
           </p>
           <textarea

@@ -7,9 +7,9 @@ export default function ApplyStepList({ steps }: { steps: ApplyStep[] }) {
   return (
     <ol className="grid gap-2">
       {steps.map((s, i) => (
-        <li key={i} className="flex items-start gap-2 text-[12px]">
+        <li key={i} className="flex items-start gap-2 text-xs">
           <span
-            className="mt-[2px] w-4 h-4 rounded-full grid place-items-center text-[9px] font-bold shrink-0"
+            className="mt-[2px] w-4 h-4 rounded-full grid place-items-center text-10 font-bold shrink-0"
             style={{
               background: s.bad ? "color-mix(in srgb, var(--warn) 13%, transparent)" : s.done ? "color-mix(in srgb, var(--ok) 13%, transparent)" : "color-mix(in srgb, var(--tx) 6%, transparent)",
               color: s.bad ? "var(--warn)" : s.done ? "var(--ok)" : "var(--tx3)",

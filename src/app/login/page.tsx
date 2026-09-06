@@ -23,8 +23,8 @@ function Shell({ children }: { children: React.ReactNode }) {
               </svg>
             </span>
             <span className="flex flex-col leading-tight min-w-0">
-              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[15px] whitespace-nowrap">嵐途 LAN TU</span>
-              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
+              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-13 sm:text-15 whitespace-nowrap">嵐途 LAN TU</span>
+              <span className="hidden sm:block text-10 tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
             </span>
           </Link>
         </div>
@@ -73,7 +73,7 @@ export default async function LoginPage({
                 免費申請
               </Link>
             </p>
-            <p className="text-[13px] text-tx3">
+            <p className="text-13 text-tx3">
               想加入嵐途教練團隊？
               <Link href="/join" className="text-tx2 hover:text-tx underline underline-offset-4">看看這裡</Link>
               <span className="mx-1.5">·</span>
@@ -130,7 +130,7 @@ export default async function LoginPage({
           </Link>
         </div>
 
-        <p className="text-center text-[13px] text-tx3 mt-7">
+        <p className="text-center text-13 text-tx3 mt-7">
           之後也能從頁首直接切換，不必回到這裡。
         </p>
       </div>

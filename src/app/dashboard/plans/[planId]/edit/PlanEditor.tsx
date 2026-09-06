@@ -404,7 +404,7 @@ export default function PlanEditor({
         {readOnly && (
           <span
             className={
-              "text-[11px] font-bold px-2 py-0.5 rounded border " +
+              "text-11 font-bold px-2 py-0.5 rounded border " +
               (readOnlyReason === "collab"
                 ? "border-info/60 text-info bg-info/10"
                 : "border-danger-solid/60 text-danger bg-danger-solid/10")
@@ -427,15 +427,15 @@ export default function PlanEditor({
           role="alert"
           className="sticky top-0 z-40 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-danger-solid/25 text-danger border-b border-danger/40"
         >
-          <span className="text-[13px] font-bold">
+          <span className="text-13 font-bold">
             ⚠️ 儲存失敗——重試 4 次都沒成功，這一段修改<b className="underline">還沒進資料庫</b>。請不要關掉這個分頁。
           </span>
-          <span className="text-[12px] text-danger">檢查一下網路，或按「立即重試」。</span>
+          <span className="text-xs text-danger">檢查一下網路，或按「立即重試」。</span>
           <div className="flex-1" />
           <button
             type="button"
             onClick={() => void doSave()}
-            className="text-[13px] font-bold rounded-md px-3 py-1 bg-danger text-danger-solid/25 hover:bg-white"
+            className="text-13 font-bold rounded-md px-3 py-1 bg-danger text-danger-solid/25 hover:bg-white"
           >
             立即重試
           </button>

@@ -199,6 +199,17 @@
   --color-grade-b: var(--grade-b);
   --color-grade-a: var(--grade-a);
 
+  /* ── 字級量表 ────────────────────────────────────────────────────────────
+     改版前有 26 種字級，其中 11.5 / 12.5 / 13.5 / 14.5 這種半像素階佔了一大半
+     ——螢幕上根本看不出差別，純粹是每次手打造成的漂移；而且 text-[12px] 與
+     text-xs（也是 12px）兩套系統並存。
+     ⚠️ 新的字級一律從這個梯子挑，不要再寫 text-[12.5px]：
+        10 / 11 / xs(12) / 13 / sm(14) / 15 / base(16) / lg(18) / xl(20) / 2xl / 3xl / 4xl */
+  --text-10: 10px;
+  --text-11: 11px;
+  --text-13: 13px;
+  --text-15: 15px;
+
   --shadow-e1: var(--sh-1);
   --shadow-e2: var(--sh-2);
   --shadow-e3: var(--sh-3);
@@ -260,5 +271,24 @@ tbody tr:hover {
 }
 /* 數字欄一律等寬對齊，金額才比得出位數。 */
 .tabular-nums, td:has(> .tabular-nums) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 長表的表頭黏住 ────────────────────────────────────────────────────────
+   後台的資料表動輒上百列，捲到一半就看不到欄位名，只能往回捲。
+   ⚠️ top 不能是 0：AdminHeader / DashboardHeader 是 sticky 的，表頭會滑到它底下。
+   用 rem 才會跟著字級縮放一起長高。 */
+:root { --header-h: 3.4rem; }
+.tbl-sticky thead th {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 2;
+  background: var(--panel2);
+}
+
+/* 數字一律靠右、等寬對齊——金額不對齊就比不出位數。
+   數字輸入框全站通用；顯示用的儲存格加 .num。 */
+input[type="number"], .num {
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }

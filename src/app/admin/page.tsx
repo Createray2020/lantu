@@ -96,16 +96,16 @@ export default async function Admin() {
                       {/* 教練可以自己改顯示名稱，所以名冊要同時秀出登入帳號的真名，
                           否則對帳號時分不出「雷立揚」是哪一位。相同就不重複印。 */}
                       {c.clerkName && c.clerkName !== c.name && (
-                        <div className="text-tx3 text-[11px]">登入姓名：{c.clerkName}</div>
+                        <div className="text-tx3 text-11">登入姓名：{c.clerkName}</div>
                       )}
                       <div className="text-tx3 text-xs">{c.email}</div>
                       {/* 教練編號：核准報聘時發，之後不變。待審帳號還沒有號。 */}
-                      <div className="text-[11px] font-mono tracking-wider text-brand">
+                      <div className="text-11 font-mono tracking-wider text-brand">
                         {c.code ?? "—"}
                       </div>
                       {/* 申請表單填的手機／現職（存在 note）與推薦人。核准前就是靠這幾行判斷，
                           印在這裡才不用為了看一行字點進別的頁。 */}
-                      {c.note && <div className="text-tx2 text-[11px] mt-1 whitespace-pre-wrap">{c.note}</div>}
+                      {c.note && <div className="text-tx2 text-11 mt-1 whitespace-pre-wrap">{c.note}</div>}
                       {/* 2026/08/31 起申請自述住 coach_applications；舊帳號沒有這一列，只印上面那行 note。 */}
                       {app && (
                         <ReviewPanel

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
 import { useRouter } from "next/navigation";
 import { inviteCollaboratorAction, revokeCollaboratorAction } from "./collabActions";
 
@@ -50,8 +51,8 @@ export default function Collaborators({
     });
   }
 
-  function revoke(id: string, name: string | null) {
-    if (!confirm(`移除 ${name ?? "這位教練"}？對方會立刻看不到這位客戶的資料。`)) return;
+  async function revoke(id: string, name: string | null) {
+    if (!await confirmDialog(`移除 ${name ?? "這位教練"}？對方會立刻看不到這位客戶的資料。`)) return;
     setMsg(null);
     start(async () => {
       const r = await revokeCollaboratorAction(clientId, id);
@@ -69,7 +70,7 @@ export default function Collaborators({
         className="w-full flex items-center gap-2 px-4 py-2.5 text-left"
       >
         <span className="text-sm font-bold text-tx">共同執案</span>
-        <span className="text-[11px] px-2 py-0.5 rounded-full bg-panel text-tx2 border border-line shadow-e1">
+        <span className="text-11 px-2 py-0.5 rounded-full bg-panel text-tx2 border border-line shadow-e1">
           {active === 0 ? "未邀請" : `${active} 位協作教練`}
         </span>
         <div className="flex-1" />
@@ -78,7 +79,7 @@ export default function Collaborators({
 
       {open && (
         <div className="px-4 pb-4 grid gap-3 border-t border-line pt-3">
-          <p className="text-[12px] text-tx2">
+          <p className="text-xs text-tx2">
             輸入對方的教練編號邀請他一起看這位客戶。協作教練看得到客戶資料、諮詢紀錄與所有報告書，
             但<b className="text-brand2">只能看不能改</b>；你隨時可以移除。
           </p>
@@ -105,16 +106,16 @@ export default function Collaborators({
           )}
 
           {collaborators.length === 0 ? (
-            <p className="text-[12px] text-tx3">目前沒有協作教練。</p>
+            <p className="text-xs text-tx3">目前沒有協作教練。</p>
           ) : (
             <ul className="grid gap-1.5">
               {collaborators.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-center gap-2 border-t border-line pt-2">
                   <span className="text-sm text-tx">{c.coachName ?? "（未命名教練）"}</span>
-                  {c.coachCode && <span className="text-[11px] text-tx3 tabular-nums">{c.coachCode}</span>}
+                  {c.coachCode && <span className="text-11 text-tx3 tabular-nums">{c.coachCode}</span>}
                   <span
                     className={
-                      "text-[10px] px-1.5 py-0.5 rounded border " +
+                      "text-10 px-1.5 py-0.5 rounded border " +
                       (c.status === "accepted"
                         ? "border-ok/50 text-ok bg-ok/10"
                         : "border-brand/50 text-brand2 bg-brand/10")

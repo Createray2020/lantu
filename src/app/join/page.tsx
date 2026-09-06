@@ -29,8 +29,8 @@ export default function JoinPage() {
               </svg>
             </span>
             <span className="flex flex-col leading-tight min-w-0">
-              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[15px] whitespace-nowrap">嵐途 LAN TU</span>
-              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-brand">JOIN US</span>
+              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-13 sm:text-15 whitespace-nowrap">嵐途 LAN TU</span>
+              <span className="hidden sm:block text-10 tracking-[0.3em] text-brand">JOIN US</span>
             </span>
           </Link>
           <a href={LINE_URL} target="_blank" rel="noopener noreferrer"
@@ -45,7 +45,7 @@ export default function JoinPage() {
         <div className="absolute inset-0 bg-[radial-gradient(1200px_400px_at_50%_-10%,rgba(201,154,91,0.16),transparent)]" />
         <div className="relative max-w-3xl mx-auto px-5 sm:px-8 pt-20 pb-14 text-center">
           <div className="text-brand text-xs tracking-[0.34em] mb-5">加入嵐途</div>
-          <h1 className="font-serif text-[30px] sm:text-[42px] leading-[1.35] mb-6">
+          <h1 className="font-serif text-3xl sm:text-[42px] leading-[1.35] mb-6">
             如果你想做的是<br /><span className="text-brand2">把客戶的問題整個解決掉</span>
           </h1>
           <p className="text-tx2 text-base leading-relaxed">
@@ -99,7 +99,7 @@ export default function JoinPage() {
             "你不想碰數字。這份工作有很大一部分是把別人的財務整份算清楚。",
             "你不想讓人看你的過程。規劃是攤開來跟客戶一起做的，包含你的假設與依據。",
           ].map((t) => (
-            <li key={t} className="flex gap-3 text-tx text-[15px] leading-relaxed">
+            <li key={t} className="flex gap-3 text-tx text-15 leading-relaxed">
               <span className="text-danger shrink-0">✕</span>
               <span>{t}</span>
             </li>
@@ -121,7 +121,7 @@ export default function JoinPage() {
               ["應屆／在學", "剛畢業或還在唸書", "從基本功與證照開始，跟著資深教練實際跑案，先看懂一份完整規劃長什麼樣。"],
             ].map(([t, who, d]) => (
               <div key={t} className="rounded-xl bg-panel2 border border-line p-5 shadow-e1">
-                <div className="text-[11px] tracking-[0.2em] text-brand mb-2">{who}</div>
+                <div className="text-11 tracking-[0.2em] text-brand mb-2">{who}</div>
                 <div className="font-serif text-lg mb-2">{t}</div>
                 <p className="text-tx2 text-sm leading-relaxed">{d}</p>
               </div>
@@ -145,7 +145,7 @@ export default function JoinPage() {
             <div key={n} className="text-center px-4">
               <div className="font-serif text-3xl text-brand mb-3">{n}</div>
               <div className="font-semibold mb-1">{t}</div>
-              <div className="text-[11px] text-brand mb-2">{dur}</div>
+              <div className="text-11 text-brand mb-2">{dur}</div>
               <p className="text-tx2 text-sm leading-relaxed">{d}</p>
             </div>
           ))}
@@ -157,10 +157,10 @@ export default function JoinPage() {
           <h2 className="font-serif text-2xl sm:text-3xl mb-3">想先聊聊看嗎？</h2>
           <p className="text-tx2 mb-8">第一步只是一次對話，不用履歷，也不用先決定什麼。</p>
           <a href={LINE_URL} target="_blank" rel="noopener noreferrer"
-             className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-8 py-3.5 rounded-lg text-[15px]">
+             className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-8 py-3.5 rounded-lg text-15">
             用 LINE 預約 1 對 1 說明
           </a>
-          <div className="mt-3 text-[12px] text-tx3">LINE 官方帳號 {LINE_ID}</div>
+          <div className="mt-3 text-xs text-tx3">LINE 官方帳號 {LINE_ID}</div>
 
           {/* 已經談過、或直接就想申請的人，之前只能等我們私訊給網址。
               LINE 預約仍是主 CTA，這顆是次要動作。/apply 會自己分岔到註冊或申請頁。 */}
@@ -170,7 +170,7 @@ export default function JoinPage() {
                   className="inline-block text-sm font-bold text-tx bg-tx/10 hover:bg-tx/15 border border-line2 px-6 py-2.5 rounded-lg">
               直接送出教練申請 →
             </Link>
-            <div className="mt-2 text-[12px] text-tx3">送出後由嵐途審核（含費用確認），開通才進得了系統。</div>
+            <div className="mt-2 text-xs text-tx3">送出後由嵐途審核（含費用確認），開通才進得了系統。</div>
           </div>
         </div>
       </section>

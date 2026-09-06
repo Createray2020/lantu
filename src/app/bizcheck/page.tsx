@@ -28,15 +28,15 @@ export default async function BizCheckPage() {
               </svg>
             </span>
             <span className="flex flex-col leading-tight min-w-0">
-              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[15px] whitespace-nowrap">嵐途 LAN TU</span>
-              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
+              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-13 sm:text-15 whitespace-nowrap">嵐途 LAN TU</span>
+              <span className="hidden sm:block text-10 tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/passport" className="hidden sm:inline text-sm text-tx2 hover:text-tx px-3 py-2 rounded-lg">人生護照</Link>
             <Link
               href={userId ? "/portal" : "/login"}
-              className="text-[13px] sm:text-sm text-tx2 hover:text-tx px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-line2 whitespace-nowrap"
+              className="text-13 sm:text-sm text-tx2 hover:text-tx px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-line2 whitespace-nowrap"
             >
               {userId ? "我的規劃" : "登入"}
             </Link>

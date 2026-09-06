@@ -55,7 +55,7 @@ export default function StatusActions({ id, status }: { id: string; status: stri
           </button>
         )}
       </div>
-      {error && <span className="text-[10px] text-danger">失敗：{error}</span>}
+      {error && <span className="text-10 text-danger">失敗：{error}</span>}
     </div>
   );
 }

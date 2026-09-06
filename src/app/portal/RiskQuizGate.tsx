@@ -28,7 +28,7 @@ export default function RiskQuizGate({ invited }: { invited: boolean }) {
           </button>
           <button
             onClick={() => setDismissed(true)}
-            className="text-[12.5px] text-tx2 underline underline-offset-[3px] hover:text-tx"
+            className="text-xs text-tx2 underline underline-offset-[3px] hover:text-tx"
           >
             先不要
           </button>

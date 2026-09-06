@@ -3,15 +3,17 @@
 // 顧問職級與晉升追蹤。上半是總表，點開是個人頁（可編制度欄位＋看雙軌進度＋異動時間軸）。
 
 import { Fragment, useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD_EMPTY, FIELD_SM } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import { recomputeAllAction, saveAdvisorAction, setRankAction } from "./actions";
 import { fmtMoney } from "@/lib/money";
 import MoneyInput from "@/components/MoneyInput";
 
-const INPUT = "bg-panel border border-line2 rounded px-2 py-1 text-sm text-tx outline-none";
-const EMPTY = "bg-panel border border-dashed border-line2 rounded px-2 py-1 text-sm text-tx2 outline-none";
+const INPUT = FIELD_SM;
+const EMPTY = FIELD_EMPTY;
 const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
-const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-info-solid border border-info-solid text-onsolid hover:brightness-110 disabled:opacity-40";
+const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-brand border border-brand text-onbrand hover:brightness-110 disabled:opacity-40";
 
 export type GapView = { label: string; need: number; have: number; met: boolean; unit?: "money" | "count" };
 export type TrackView = { toCode: string; gaps: GapView[]; met: boolean } | null;
@@ -96,7 +98,7 @@ export default function AdvisorsBoard({
           .map(([v, l]) => (
             <button key={v} type="button" onClick={() => setTab(v)}
               className={`rounded-lg px-3 py-1.5 text-sm border ${
-                tab === v ? "bg-info-solid border-info-solid text-onsolid" : "border-line text-tx2 hover:bg-panel2"
+                tab === v ? "bg-brand border-brand text-onbrand" : "border-line text-tx2 hover:bg-panel2"
               }`}>
               {l}
             </button>
@@ -108,8 +110,8 @@ export default function AdvisorsBoard({
           </span>
         )}
         <button type="button" disabled={pending} className={BTN_SOLID}
-          onClick={() => {
-            if (confirm(`依目前制度重算 ${year} 年度全體教練的晉升／真除／維持資格？達標者會自動晉升並留下異動紀錄。`))
+          onClick={async () => {
+            if (await confirmDialog(`依目前制度重算 ${year} 年度全體教練的晉升／真除／維持資格？達標者會自動晉升並留下異動紀錄。`))
               run(() => recomputeAllAction(year), "已重算");
           }}>
           {pending ? "重算中…" : "重算全體"}
@@ -117,7 +119,7 @@ export default function AdvisorsBoard({
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-3 py-2">教練</th>
@@ -264,7 +266,7 @@ function AdvisorDetail({
                         </span>
                       </div>
                       <div className="h-1.5 rounded bg-field overflow-hidden mt-0.5">
-                        <div className="h-full" style={{ width: `${pct}%`, background: g.met ? "var(--ok-solid)" : "var(--info-solid)" }} />
+                        <div className="h-full" style={{ width: `${pct}%`, background: g.met ? "var(--ok-solid)" : "var(--brand)" }} />
                       </div>
                     </div>
                   );

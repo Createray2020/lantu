@@ -15,9 +15,9 @@ const TAG: Record<string, string> = {
 function Section({ title, more, children }: { title: string; more?: string; children: React.ReactNode }) {
   return (
     <div className="bg-panel border border-line rounded-xl px-4 py-4 mb-4 shadow-e1">
-      <h4 className="text-[14.5px] font-bold text-brand2 flex items-center gap-2 mb-3">
+      <h4 className="text-sm font-bold text-brand2 flex items-center gap-2 mb-3">
         {title}
-        {more && <span className="ml-auto text-tx2 text-[12px] font-bold">{more} →</span>}
+        {more && <span className="ml-auto text-tx2 text-xs font-bold">{more} →</span>}
       </h4>
       {children}
     </div>
@@ -36,10 +36,10 @@ function Kpi({ icon, label, value, sm, note, up, dn, top = "var(--tx2)", pending
   if (pending) { value = "—"; sm = undefined; note = "尚未填寫"; up = undefined; dn = undefined; }
   return (
     <div className="bg-panel2 border border-line rounded-xl px-4 py-3 shadow-e1" style={{ borderTop: `3px solid ${top}` }}>
-      <div className="text-tx2 text-[12.5px] flex items-center gap-1.5">{icon && <span>{icon}</span>}{label}</div>
-      <div className={"text-[23px] font-extrabold mt-1 leading-tight" + (pending ? " text-tx3" : "")}>{value}{sm && <span className="text-[12px] text-tx3 font-semibold"> {sm}</span>}</div>
+      <div className="text-tx2 text-xs flex items-center gap-1.5">{icon && <span>{icon}</span>}{label}</div>
+      <div className={"text-[23px] font-extrabold mt-1 leading-tight" + (pending ? " text-tx3" : "")}>{value}{sm && <span className="text-xs text-tx3 font-semibold"> {sm}</span>}</div>
       {(note || up || dn) && (
-        <div className="text-[11.5px] mt-0.5 text-tx3">
+        <div className="text-11 mt-0.5 text-tx3">
           {up && <span className="text-ok font-bold">▲ {up}</span>}
           {dn && <span className="text-danger font-bold">▼ {dn}</span>} {note}
         </div>
@@ -64,7 +64,7 @@ function Progress({ label, cur, goal, unit, kind }: { label: string; cur: number
   const fmt = (v: number) => (unit === "money" ? nt(v) : v.toLocaleString("en-US") + unit);
   return (
     <div className="my-2.5">
-      <div className="flex justify-between text-[12.5px] mb-1.5">
+      <div className="flex justify-between text-xs mb-1.5">
         <span>{label}</span>
         <span><b className="text-tx">{fmt(cur)}</b> <span className="text-tx3">/ {fmt(goal)} ({pct}%)</span></span>
       </div>
@@ -80,14 +80,14 @@ function Leaderboard({ rows }: { rows: { name: string; income: number }[] }) {
     <div className="grid gap-1">
       {rows.map((r, i) => (
         <div key={i} className="grid grid-cols-[20px_1fr_auto] gap-3 items-center py-1.5">
-          <div className={`text-center text-[13px] font-extrabold ${i === 0 ? "text-brand" : "text-tx3"}`}>{medal[i] ?? i + 1}</div>
+          <div className={`text-center text-13 font-extrabold ${i === 0 ? "text-brand" : "text-tx3"}`}>{medal[i] ?? i + 1}</div>
           <div>
-            <span className="text-[13.5px] font-bold block mb-1">{r.name}</span>
+            <span className="text-13 font-bold block mb-1">{r.name}</span>
             <div className="h-[9px] bg-field rounded-md overflow-hidden">
               <div className="h-full rounded-md" style={{ width: `${(r.income / max) * 100}%`, background: i === 0 ? "linear-gradient(90deg,var(--brand),var(--brand2))" : "linear-gradient(90deg,var(--tx3),var(--tx2))" }} />
             </div>
           </div>
-          <div className="font-extrabold text-[13px] tabular-nums">{nt(r.income)}</div>
+          <div className="font-extrabold text-13 tabular-nums">{nt(r.income)}</div>
         </div>
       ))}
     </div>
@@ -104,9 +104,9 @@ function Funnel({ steps }: { steps: { label: string; value: number }[] }) {
         return (
           <div key={i} className="relative h-[38px] rounded-lg flex items-center justify-between px-3.5 text-onbrand font-bold"
             style={{ width: `${w}%`, background: "linear-gradient(90deg,rgba(201,154,91,.9),rgba(201,154,91,.55))" }}>
-            <span className="text-[13px]">{s.label}</span>
-            <span className="text-[14px] tabular-nums">{s.value.toLocaleString("en-US")}</span>
-            {conv != null && <span className="absolute -right-14 top-1/2 -translate-y-1/2 text-tx2 text-[11.5px] font-semibold whitespace-nowrap">轉化 {conv}%</span>}
+            <span className="text-13">{s.label}</span>
+            <span className="text-sm tabular-nums">{s.value.toLocaleString("en-US")}</span>
+            {conv != null && <span className="absolute -right-14 top-1/2 -translate-y-1/2 text-tx2 text-11 font-semibold whitespace-nowrap">轉化 {conv}%</span>}
           </div>
         );
       })}
@@ -133,7 +133,7 @@ function Gauge({ score }: { score: number }) {
 // preserveAspectRatio="none" 會把 SVG 內的文字一起拉扁，所以刻度用 HTML 疊在上下兩側。
 function Spark({ vals, fmtVal }: { vals: number[]; fmtVal?: (v: number) => string }) {
   const w = 320, h = 70;
-  if (!vals.length) return <div className="text-[11.5px] text-tx3">尚無資料</div>;
+  if (!vals.length) return <div className="text-11 text-tx3">尚無資料</div>;
   const mx = Math.max(...vals), mn = Math.min(...vals), rng = (mx - mn) || 1;
   const f = fmtVal ?? ((v: number) => String(v));
   const pts = vals.map((v, i) => {
@@ -144,7 +144,7 @@ function Spark({ vals, fmtVal }: { vals: number[]; fmtVal?: (v: number) => strin
   const area = `4,${h - 2} ${pts.join(" ")} ${w - 4},${h - 2}`;
   return (
     <div>
-      <div className="flex justify-between text-[10.5px] text-tx3 tabular-nums mb-0.5">
+      <div className="flex justify-between text-10 text-tx3 tabular-nums mb-0.5">
         <span>最高 {f(mx)}</span>
         <span>最新 {f(vals[vals.length - 1])}</span>
       </div>
@@ -154,7 +154,7 @@ function Spark({ vals, fmtVal }: { vals: number[]; fmtVal?: (v: number) => strin
         <polyline points={pts.join(" ")} fill="none" className="stroke-brand2" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         {pts.map((p, i) => { const [cx, cy] = p.split(","); return <circle key={i} cx={cx} cy={cy} r="2.6" className="fill-brand2" />; })}
       </svg>
-      <div className="text-[10.5px] text-tx3 tabular-nums mt-0.5">最低 {f(mn)}</div>
+      <div className="text-10 text-tx3 tabular-nums mt-0.5">最低 {f(mn)}</div>
     </div>
   );
 }
@@ -163,9 +163,9 @@ function Hero({ k, h1, sub, right }: { k: string; h1: string; sub: React.ReactNo
   return (
     <div className="rounded-2xl border border-line px-6 py-5 mb-4 flex items-center gap-4 flex-wrap" style={{ background: "linear-gradient(120deg,var(--panel),var(--panel2))" }}>
       <div>
-        <div className="text-brand tracking-[0.16em] text-[11.5px] font-bold">{k}</div>
+        <div className="text-brand tracking-[0.16em] text-11 font-bold">{k}</div>
         <h1 className="text-[22px] font-extrabold my-1">{h1}</h1>
-        <div className="text-tx2 text-[13.5px]">{sub}</div>
+        <div className="text-tx2 text-13">{sub}</div>
       </div>
       {right && <div className="ml-auto flex gap-2.5 flex-wrap">{right}</div>}
     </div>
@@ -174,7 +174,7 @@ function Hero({ k, h1, sub, right }: { k: string; h1: string; sub: React.ReactNo
 
 /** 業績／活動量／增員這幾塊的資料來源是 member_metrics —— 由後台填，不是系統算的。 */
 const NoData = ({ children }: { children: React.ReactNode }) => (
-  <div className="text-tx3 text-[12.5px] py-6 text-center">{children}</div>
+  <div className="text-tx3 text-xs py-6 text-center">{children}</div>
 );
 
 // ══════════ 主管 ══════════
@@ -190,7 +190,7 @@ function ManagerView({ d }: { d: ManagerHome }) {
         h1={d.hasMetrics ? `本月團隊達成 ${k.achievePct}%` : `${d.teamName}`}
         sub={<>{d.memberCount} 位教練 · <b className="text-brand2">{k.pending} 件</b> 待你審核{d.hasMetrics ? null : <> · 本月尚未有業績資料</>}</>}
         right={d.hasMetrics
-          ? <div className="min-w-[150px]"><div className="text-[11.5px] text-tx2">團隊月目標進度</div><div className="text-[15px] font-extrabold text-brand2">{k.achievePct}%</div><div className="mt-1.5"><Bar pct={k.achievePct} /></div></div>
+          ? <div className="min-w-[150px]"><div className="text-11 text-tx2">團隊月目標進度</div><div className="text-15 font-extrabold text-brand2">{k.achievePct}%</div><div className="mt-1.5"><Bar pct={k.achievePct} /></div></div>
           : undefined} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
@@ -211,12 +211,12 @@ function ManagerView({ d }: { d: ManagerHome }) {
           <><div className="grid grid-cols-4 gap-2.5">
             {act.map((a, i) => (
               <div key={i} className="bg-panel2 border border-line rounded-lg px-3 py-2.5 text-center shadow-e1">
-                <div className="text-[20px] font-extrabold">{a.v}</div>
-                <div className="text-[12px] text-tx2 mt-0.5">{a.l}</div>
+                <div className="text-xl font-extrabold">{a.v}</div>
+                <div className="text-xs text-tx2 mt-0.5">{a.l}</div>
               </div>
             ))}
           </div>
-          <div className="text-tx3 text-[11.5px] mt-2.5">業務核心 KPI — 拜訪／電話／提案／成交漏斗即時彙總</div></>
+          <div className="text-tx3 text-11 mt-2.5">業務核心 KPI — 拜訪／電話／提案／成交漏斗即時彙總</div></>
           )}
         </Section>
         <Section title="🧲 增員漏斗（本季）"><Funnel steps={d.funnel} /></Section>
@@ -225,14 +225,14 @@ function ManagerView({ d }: { d: ManagerHome }) {
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <Section title="📈 團隊本週約訪熱度">
           <Spark vals={d.weekly} fmtVal={(v) => `${v} 場`} />
-          <div className="text-tx3 text-[11.5px] mt-1.5">週日 → 週六 · 本週合計 {d.weekly.reduce((a, b) => a + b, 0)} 場約訪</div>
+          <div className="text-tx3 text-11 mt-1.5">週日 → 週六 · 本週合計 {d.weekly.reduce((a, b) => a + b, 0)} 場約訪</div>
         </Section>
         <Section title="✅ 待審核與簽核" more="成員審核">
           {d.pending.length === 0 ? <Empty>沒有待審核項目</Empty> : d.pending.map((p, i) => (
             <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
               <div className="w-[18px] h-[18px] rounded border-2 border-tx3 shrink-0" />
-              <div className="flex-1 min-w-0"><div className="font-bold text-[13.5px]">{p.title}</div><div className="text-tx2 text-[12px]">{p.sub}</div></div>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${TAG[p.tagKind]}`}>{p.tag}</span>
+              <div className="flex-1 min-w-0"><div className="font-bold text-13">{p.title}</div><div className="text-tx2 text-xs">{p.sub}</div></div>
+              <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[p.tagKind]}`}>{p.tag}</span>
             </div>
           ))}
         </Section>
@@ -255,8 +255,8 @@ function OwnerView({ d }: { d: OwnerHome }) {
           ? <>{d.teams.length} 個團隊 · {k.headcount} 位夥伴 · 客戶留存率 {k.retention}%</>
           : <>{d.teams.length} 個團隊 · {k.headcount} 位夥伴 · 業績與活動量由後台「訓練時數與業績」登錄</>}
         right={<>
-          <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-[12.5px] text-tx2 shadow-e1">🏢 團隊 <b className="text-tx">{d.teams.length}</b></div>
-          <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-[12.5px] text-tx2 shadow-e1">🧑‍🤝‍🧑 人力 <b className="text-tx">{k.headcount}</b></div>
+          <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">🏢 團隊 <b className="text-tx">{d.teams.length}</b></div>
+          <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">🧑‍🤝‍🧑 人力 <b className="text-tx">{k.headcount}</b></div>
         </>} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
@@ -277,7 +277,7 @@ function OwnerView({ d }: { d: OwnerHome }) {
               <Gauge score={d.healthScore} />
               <div className="flex-1 min-w-[180px] flex flex-col gap-2.5">
                 {d.health.map((g, i) => (
-                  <div key={i} className="flex items-center gap-2.5 text-[12.5px]">
+                  <div key={i} className="flex items-center gap-2.5 text-xs">
                     <span className="text-tx2 min-w-[74px]">{g.label}</span>
                     <div className="flex-1 h-[7px] bg-field rounded overflow-hidden"><div className="h-full rounded" style={{ width: `${g.pct}%`, background: g.color }} /></div>
                     <span className="font-extrabold min-w-[38px] text-right">{g.pct}%</span>
@@ -292,8 +292,8 @@ function OwnerView({ d }: { d: OwnerHome }) {
               : !d.hasMetrics ? <NoData>本月還沒有業績資料。</NoData>
               : d.teams.map((t, i) => (
               <div key={i} className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 items-center py-2.5 border-b border-line last:border-0">
-                <div><div className="font-bold text-[13.5px]">{t.name}</div><div className="text-tx2 text-[12px]">{t.headcount} 位成員</div></div>
-                <div className="text-right font-extrabold tabular-nums">{nt(t.income)}<div className="text-tx2 text-[12px] font-normal">達成率 {t.achievePct}%</div></div>
+                <div><div className="font-bold text-13">{t.name}</div><div className="text-tx2 text-xs">{t.headcount} 位成員</div></div>
+                <div className="text-right font-extrabold tabular-nums">{nt(t.income)}<div className="text-tx2 text-xs font-normal">達成率 {t.achievePct}%</div></div>
                 <div className="col-span-2 h-2 bg-field rounded overflow-hidden"><div className="h-full rounded" style={{ width: `${(t.income / tmax) * 100}%`, background: "linear-gradient(90deg,var(--tx3),var(--tx2))" }} /></div>
               </div>
             ))}
@@ -307,7 +307,7 @@ function OwnerView({ d }: { d: OwnerHome }) {
             {d.trend.some((t) => t.value > 0) ? (
               <>
                 <Spark vals={d.trend.map((t) => t.value)} fmtVal={(v) => `${fmtMoney(v)} 萬`} />
-                <div className="text-tx3 text-[11.5px] mt-1.5">近 {d.trend.length} 個月業績（萬）</div>
+                <div className="text-tx3 text-11 mt-1.5">近 {d.trend.length} 個月業績（萬）</div>
               </>
             ) : <NoData>還沒有任何月份的業績資料，畫不出趨勢。</NoData>}
           </Section>
@@ -331,7 +331,7 @@ export default function Home({ data }: { data: HomeView }) {
       {data.member && <MemberViewWithDate d={data.member} today={data.today} />}
       {data.manager && <ManagerView d={data.manager} />}
       {data.owner && <OwnerView d={data.owner} />}
-      <div className="text-tx3 text-[11.5px] text-center mt-6 pt-4 border-t border-line">
+      <div className="text-tx3 text-11 text-center mt-6 pt-4 border-t border-line">
         嵐途 LAN TU · 組織管理後台 · {data.today} · {data.periodLabel} · 業績／活動量／增員由後台登錄
       </div>
     </div>
@@ -348,7 +348,7 @@ function MemberViewWithDate({ d, today }: { d: MemberHome; today: string }) {
           ? <>{today} · 本月收益目標已達成 <b className="text-brand2">{d.progressPct}%</b> 💪</>
           : <>{today} · 本月還沒有業績資料</>}
         right={d.hasMetrics
-          ? <div className="min-w-[150px]"><div className="text-[11.5px] text-tx2">本月收益進度</div><div className="text-[15px] font-extrabold text-brand2">{d.progressPct}%</div><div className="mt-1.5"><Bar pct={d.progressPct} /></div></div>
+          ? <div className="min-w-[150px]"><div className="text-11 text-tx2">本月收益進度</div><div className="text-15 font-extrabold text-brand2">{d.progressPct}%</div><div className="mt-1.5"><Bar pct={d.progressPct} /></div></div>
           : undefined} />
       <MemberBody d={d} />
     </>
@@ -372,10 +372,10 @@ function MemberBody({ d }: { d: MemberHome }) {
           <Section title="📌 今日待辦與提醒" more="全部待辦">
             {d.todos.length === 0 ? <Empty>今天沒有待辦</Empty> : d.todos.map((t, i) => (
               <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
-                <span className="text-brand2 font-extrabold text-[13px] w-11 tabular-nums">{t.time}</span>
+                <span className="text-brand2 font-extrabold text-13 w-11 tabular-nums">{t.time}</span>
                 <div className="w-[18px] h-[18px] rounded border-2 border-tx3 shrink-0" />
-                <div className="flex-1 min-w-0"><div className="font-bold text-[13.5px]">{t.title}</div><div className="text-tx2 text-[12px]">{t.sub}</div></div>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${TAG[t.tagKind]}`}>{t.tag}</span>
+                <div className="flex-1 min-w-0"><div className="font-bold text-13">{t.title}</div><div className="text-tx2 text-xs">{t.sub}</div></div>
+                <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[t.tagKind]}`}>{t.tag}</span>
               </div>
             ))}
           </Section>
@@ -383,8 +383,8 @@ function MemberBody({ d }: { d: MemberHome }) {
             {d.watch.length === 0 ? <Empty>目前沒有待關注客戶</Empty> : d.watch.map((w, i) => (
               <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: w.dot === "warn" ? "var(--danger)" : w.dot === "ok" ? "var(--ok)" : "var(--tx2)" }} />
-                <div className="flex-1 min-w-0"><div className="font-bold text-[13.5px]">{w.name}</div><div className="text-tx2 text-[12px]">{w.note}</div></div>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${TAG[w.tagKind]}`}>{w.tag}</span>
+                <div className="flex-1 min-w-0"><div className="font-bold text-13">{w.name}</div><div className="text-tx2 text-xs">{w.note}</div></div>
+                <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[w.tagKind]}`}>{w.tag}</span>
               </div>
             ))}
           </Section>
@@ -397,11 +397,11 @@ function MemberBody({ d }: { d: MemberHome }) {
           <Section title="📢 最新公告" more="公告中心">
             {d.announcements.length === 0 ? <Empty>目前沒有公告</Empty> : d.announcements.map((a) => (
               <div key={a.id} className="py-2.5 border-b border-line last:border-0">
-                <div className="font-bold text-[13.5px] flex gap-2 items-center">
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${a.category === "important" ? TAG.warn : a.category === "activity" ? TAG.amber : TAG.mut}`}>{a.category === "important" ? "重要" : a.category === "activity" ? "活動" : "一般"}</span>
+                <div className="font-bold text-13 flex gap-2 items-center">
+                  <span className={`text-11 font-bold px-2 py-0.5 rounded ${a.category === "important" ? TAG.warn : a.category === "activity" ? TAG.amber : TAG.mut}`}>{a.category === "important" ? "重要" : a.category === "activity" ? "活動" : "一般"}</span>
                   {a.title}
                 </div>
-                <div className="text-tx3 text-[11px] mt-1">{a.author}</div>
+                <div className="text-tx3 text-11 mt-1">{a.author}</div>
               </div>
             ))}
           </Section>
@@ -409,12 +409,12 @@ function MemberBody({ d }: { d: MemberHome }) {
             <div className="flex gap-2.5 flex-wrap">
               {/* 證照與進修時數同樣來自 member_metrics：沒填就不要編一個出來。 */}
               {d.compliance.licenseNote && (
-                <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-[12.5px] text-tx2 shadow-e1">📇 {d.compliance.licenseNote}</div>
+                <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">📇 {d.compliance.licenseNote}</div>
               )}
               {d.hasMetrics && (
-                <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-[12.5px] text-tx2 shadow-e1">🎓 進修時數 <b className="text-tx">{d.compliance.ceHours} / {d.compliance.ceHoursGoal} 小時</b></div>
+                <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">🎓 進修時數 <b className="text-tx">{d.compliance.ceHours} / {d.compliance.ceHoursGoal} 小時</b></div>
               )}
-              <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-[12.5px] text-tx2 shadow-e1">🛡️ 適合度問卷待補 <b className="text-tx">{d.compliance.kycPending} 位</b></div>
+              <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">🛡️ 適合度問卷待補 <b className="text-tx">{d.compliance.kycPending} 位</b></div>
             </div>
             {!d.hasMetrics && !d.compliance.licenseNote && (
               <NoData>證照與進修時數還沒登錄。</NoData>

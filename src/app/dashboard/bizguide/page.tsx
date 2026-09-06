@@ -111,7 +111,7 @@ export default async function BizGuidePage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <h3 className="text-xs text-tx2 mb-1">A. 公司面（暖身，建立專業感）</h3>
-              <ol className="list-decimal list-inside space-y-1 text-[13px]">
+              <ol className="list-decimal list-inside space-y-1 text-13">
                 <li>公司是哪一年成立的？當初為什麼想做這一行？</li>
                 <li>現在的營收大概是什麼量級？這三年的趨勢？</li>
                 <li>主要客戶集中度如何？最大的一家佔多少營收？</li>
@@ -121,7 +121,7 @@ export default async function BizGuidePage() {
             </div>
             <div>
               <h3 className="text-xs text-brand2 mb-1">B. 公私交界面（核心，最有價值的一組）</h3>
-              <ol className="list-decimal list-inside space-y-1 text-[13px]" start={6}>
+              <ol className="list-decimal list-inside space-y-1 text-13" start={6}>
                 <li>公司的借款，你個人有簽連帶保證嗎？總金額大概多少？</li>
                 <li>你自己在公司領多少薪水？當初怎麼決定這個數字的？</li>
                 <li>這幾年有分配過股利嗎？如果沒有，是基於什麼考量？</li>
@@ -132,7 +132,7 @@ export default async function BizGuidePage() {
             </div>
             <div>
               <h3 className="text-xs text-tx2 mb-1">C. 個人與家庭面</h3>
-              <ol className="list-decimal list-inside space-y-1 text-[13px]" start={12}>
+              <ol className="list-decimal list-inside space-y-1 text-13" start={12}>
                 <li>如果公司三個月沒有進帳，你家裡的開銷撐得住嗎？</li>
                 <li>你目前的保險是什麼時候買的？有沒有重新檢視過？</li>
                 <li>除了公司，你個人還有哪些資產？</li>
@@ -141,7 +141,7 @@ export default async function BizGuidePage() {
             </div>
             <div>
               <h3 className="text-xs text-brand2 mb-1">D. 未來面（最能打開規劃需求）</h3>
-              <ol className="list-decimal list-inside space-y-1 text-[13px]" start={16}>
+              <ol className="list-decimal list-inside space-y-1 text-13" start={16}>
                 <li className="text-tx font-semibold">如果明天你想退休，這家公司在沒有你的情況下，還值多少錢？</li>
                 <li>你希望幾歲的時候可以不用每天進公司？</li>
                 <li>有想過交棒給誰嗎？他準備好了嗎？</li>

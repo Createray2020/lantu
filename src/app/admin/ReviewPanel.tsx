@@ -83,7 +83,7 @@ export default function ReviewPanel({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-2 py-1 text-[11px] text-tx2 hover:text-tx"
+        className="w-full flex items-center gap-2 px-2 py-1 text-11 text-tx2 hover:text-tx"
       >
         <span>{open ? "▾" : "▸"}</span>
         <span>報聘資料</span>
@@ -97,7 +97,7 @@ export default function ReviewPanel({
       </button>
 
       {open && (
-        <div className="px-2 pb-2 grid gap-2 text-[11px]">
+        <div className="px-2 pb-2 grid gap-2 text-11">
           <div className="text-tx2">
             推薦人：
             {app.introducerName
@@ -153,7 +153,7 @@ export default function ReviewPanel({
               );
             })}
             <textarea
-              className="mt-1 w-full bg-field border border-line2 rounded-md px-2 py-1 text-[11px] text-tx placeholder:text-tx3"
+              className="mt-1 w-full bg-field border border-line2 rounded-md px-2 py-1 text-11 text-tx placeholder:text-tx3"
               rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}

@@ -4,6 +4,8 @@
 // 每一列分潤都能展開看「這個 % 怎麼來的」（sale trace 由引擎產生，不是這裡拼字串）。
 
 import { Fragment, useMemo, useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD_EMPTY, FIELD_SM } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import {
   confirmImportAction, createBatchAction, createCaseAction, markBatchPaidAction,
@@ -14,10 +16,10 @@ import { fmtMoney } from "@/lib/money";
 import { hasPaidPayout, planReversals } from "@/lib/comp/reversal";
 import MoneyInput from "@/components/MoneyInput";
 
-const INPUT = "bg-panel border border-line2 rounded px-2 py-1 text-sm text-tx outline-none";
-const EMPTY = "bg-panel border border-dashed border-line2 rounded px-2 py-1 text-sm text-tx2 outline-none";
+const INPUT = FIELD_SM;
+const EMPTY = FIELD_EMPTY;
 const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
-const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-info-solid border border-info-solid text-onsolid hover:brightness-110 disabled:opacity-40";
+const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-brand border border-brand text-onbrand hover:brightness-110 disabled:opacity-40";
 
 export type PayoutView = {
   id: string; payeeId: string | null; payeeKey: string; payeeName: string;
@@ -137,7 +139,7 @@ export default function CasesBoard({
                     m.countPromotion ? "計入晉升" : "不計晉升",
                     m.countMaintenance ? "計入維持資格" : "不計維持資格",
                   ];
-                  return <span className="block text-[11px] text-tx3 mt-0.5">{tags.join(" · ")}</span>;
+                  return <span className="block text-11 text-tx3 mt-0.5">{tags.join(" · ")}</span>;
                 })()}
               </span>
             </label>
@@ -152,7 +154,7 @@ export default function CasesBoard({
               <span className="w-20 text-tx2">案件來源</span>
               <input type="checkbox" checked={form.isCompanyLead}
                 onChange={(e) => setForm({ ...form, isCompanyLead: e.target.checked })}
-                className="h-4 w-4 accent-info-solid" />
+                className="h-4 w-4 accent-brand" />
               <span className="text-tx">公司派案</span>
             </label>
           </div>
@@ -169,7 +171,7 @@ export default function CasesBoard({
                 <span className="w-20 text-tx2">推廣者</span>
                 <input type="checkbox" checked={form.selfBoth}
                   onChange={(e) => setForm({ ...form, selfBoth: e.target.checked })}
-                  className="h-4 w-4 accent-info-solid" />
+                  className="h-4 w-4 accent-brand" />
                 <span className="text-tx text-xs mr-1">自推自執</span>
                 {!form.selfBoth && (
                   <select value={form.promoterId} onChange={(e) => setForm({ ...form, promoterId: e.target.value })}
@@ -189,13 +191,13 @@ export default function CasesBoard({
               <span className="w-20 text-tx2">實收日</span>
               <input type="date" value={form.paidAt} onChange={(e) => setForm({ ...form, paidAt: e.target.value })}
                 className={`${form.paidAt ? INPUT : EMPTY} w-40`} />
-              <span className="text-[11px] text-tx3">未實收不進發放批次</span>
+              <span className="text-11 text-tx3">未實收不進發放批次</span>
             </label>
             <label className="flex items-center gap-2 text-sm">
               <span className="w-20 text-tx2">問卷回收</span>
               <input type="date" value={form.surveyAt} onChange={(e) => setForm({ ...form, surveyAt: e.target.value })}
                 className={`${form.surveyAt ? INPUT : EMPTY} w-40`} />
-              <span className="text-[11px] text-tx3">未回收不計晉升指標</span>
+              <span className="text-11 text-tx3">未回收不計晉升指標</span>
             </label>
           </div>
         </div>
@@ -225,7 +227,7 @@ export default function CasesBoard({
           .map(([v, l]) => (
             <button key={v} type="button" onClick={() => setTab(v)}
               className={`rounded-lg px-3 py-1.5 text-sm border ${
-                tab === v ? "bg-info-solid border-info-solid text-onsolid" : "border-line text-tx2 hover:bg-panel2"
+                tab === v ? "bg-brand border-brand text-onbrand" : "border-line text-tx2 hover:bg-panel2"
               }`}>
               {l}
             </button>
@@ -251,7 +253,7 @@ export default function CasesBoard({
 
       {/* 案件列表 */}
       <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-3 py-2">客戶</th>
@@ -273,7 +275,7 @@ export default function CasesBoard({
                   <tr className="border-t border-line">
                     <td className="px-3 py-2">
                       <div className="font-semibold">{c.clientName}</div>
-                      <div className="text-[11px] text-tx3">
+                      <div className="text-11 text-tx3">
                         {c.moduleName || "未指定模塊"} · {c.caseYear} 年度
                         {c.isCompanyLead && " · 公司派案"}
                       </div>
@@ -281,14 +283,14 @@ export default function CasesBoard({
                     <td className="px-3 py-2 text-right tabular-nums">
                       {fmtMoney(c.fee)}
                       {c.refundAmount > 0 && (
-                        <div className="text-[11px] text-danger">退 {fmtMoney(c.refundAmount)}</div>
+                        <div className="text-11 text-danger">退 {fmtMoney(c.refundAmount)}</div>
                       )}
                     </td>
                     <td className="px-3 py-2 text-tx2">{c.isCompanyLead ? "公司" : nameOf(c.promoterId)}</td>
                     <td className="px-3 py-2 text-tx2">{nameOf(c.executorId)}</td>
                     <td className="px-3 py-2 text-tx2">
                       {c.surveyAt
-                        ? <>{c.surveyAt}{c.surveyBy === "coach" && <span className="block text-[11px] text-tx3">教練代填</span>}</>
+                        ? <>{c.surveyAt}{c.surveyBy === "coach" && <span className="block text-11 text-tx3">教練代填</span>}</>
                         : <span className="text-brand">未回收</span>}
                     </td>
                     <td className="px-3 py-2 text-tx2">{c.paidAt ?? <span className="text-brand">未實收</span>}</td>
@@ -297,9 +299,9 @@ export default function CasesBoard({
                         style={{ background: st.color + "22", color: st.color }}>
                         {st.label}
                       </span>
-                      {!c.balanced && <div className="text-[11px] text-danger">分潤未達 100%</div>}
+                      {!c.balanced && <div className="text-11 text-danger">分潤未達 100%</div>}
                     </td>
-                    <td className="px-3 py-2 text-[11px] text-tx3">{c.versionLabel}</td>
+                    <td className="px-3 py-2 text-11 text-tx3">{c.versionLabel}</td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       <button type="button" className="text-xs text-tx2 underline mr-2"
                         onClick={() => setOpen(open === c.id ? null : c.id)}>
@@ -312,7 +314,7 @@ export default function CasesBoard({
                     <tr className="bg-field">
                       <td colSpan={9} className="px-4 py-3">
                         <div className="overflow-x-auto rounded-lg border border-line">
-                          <table className="w-full text-sm">
+                          <table className="w-full text-sm tbl-sticky">
                             <thead>
                               <tr className="bg-panel2 text-tx2 text-left text-xs">
                                 <th className="px-3 py-1.5">受分潤人</th>
@@ -331,7 +333,7 @@ export default function CasesBoard({
                                 <Fragment key={p.id}>
                                   <tr className="border-t border-line">
                                     <td className="px-3 py-1.5">{p.payeeName}</td>
-                                    <td className="px-3 py-1.5 text-[11px] text-tx3">{p.role}</td>
+                                    <td className="px-3 py-1.5 text-11 text-tx3">{p.role}</td>
                                     <td className="px-3 py-1.5 text-right tabular-nums">{p.promoPct || "—"}</td>
                                     <td className="px-3 py-1.5 text-right tabular-nums">{p.execPct || "—"}</td>
                                     <td className="px-3 py-1.5 text-right tabular-nums">{p.bonusPct || "—"}</td>
@@ -339,7 +341,7 @@ export default function CasesBoard({
                                     <td className={`px-3 py-1.5 text-right tabular-nums ${p.reversal ? "text-danger" : ""}`}>
                                       {fmtMoney(p.amount)}
                                     </td>
-                                    <td className="px-3 py-1.5 text-[11px] text-tx2">
+                                    <td className="px-3 py-1.5 text-11 text-tx2">
                                       {p.reversal ? "退費沖回" : p.status === "pending" ? "待入批" : p.status === "batched" ? "已入批" : "已發放"}
                                     </td>
                                     <td className="px-3 py-1.5 text-right">
@@ -378,7 +380,7 @@ export default function CasesBoard({
                           {/* 已發放的案件不提供「重算分潤」：發出去的錢不會因為改制度而改變（§31），
                               而且重算會撞 (case_id, payee_key) 的唯一鍵。要動帳只能走沖回。 */}
                           {hasPaidPayout(c.payouts) ? (
-                            <span className="text-[11px] text-tx2">
+                            <span className="text-11 text-tx2">
                               分潤已發放，不能重算；要退費請用下方的「產生沖回」。
                             </span>
                           ) : (
@@ -451,7 +453,7 @@ export default function CasesBoard({
           </button>
         </div>
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">月份</th><th className="px-3 py-2">發放日</th>
@@ -477,8 +479,8 @@ export default function CasesBoard({
                     </a>
                     {b.status !== "paid" && (
                       <button type="button" disabled={pending} className={BTN}
-                        onClick={() => {
-                          if (confirm(`確定把 ${b.period} 批次（${fmtMoney(b.totalAmount)} 元）標記為已發放？發放後不可重算。`))
+                        onClick={async () => {
+                          if (await confirmDialog(`確定把 ${b.period} 批次（${fmtMoney(b.totalAmount)} 元）標記為已發放？發放後不可重算。`))
                             run(() => markBatchPaidAction(b.id), "已標記發放");
                         }}>
                         標記已發放
@@ -555,7 +557,7 @@ function ImportPanel({
             {badCount > 0 && <>，<b className="text-danger">{badCount}</b> 筆有問題（不會匯入）</>}
           </p>
           <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-line">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs tbl-sticky">
               <thead className="sticky top-0 bg-panel2 text-tx2 text-left">
                 <tr>
                   <th className="px-2 py-1.5">列</th><th className="px-2 py-1.5">客戶</th>
@@ -633,7 +635,7 @@ function CoachSurvey({
       {marketingEnabled && (
         <label className="flex items-center gap-2 mt-2 text-xs text-tx2">
           <input type="checkbox" checked={optIn} disabled={disabled}
-            onChange={(e) => setOptIn(e.target.checked)} className="h-4 w-4 accent-info-solid" />
+            onChange={(e) => setOptIn(e.target.checked)} className="h-4 w-4 accent-brand" />
           客戶已同意作為見證素材
         </label>
       )}
@@ -680,17 +682,17 @@ function RefundBox({
           onChange={(v) => setAmt(v === null ? "" : String(v))} placeholder="退費金額"
           className={`${amt ? INPUT : EMPTY} w-28`} />
         <button type="button" disabled={disabled || !amt || (paid && !preview.length)} className={BTN}
-          onClick={() => {
+          onClick={async () => {
             const msg = paid
               ? `退費 ${fmtMoney(n)} 元（原顧問費 ${fmtMoney(fee)}${refundAmount ? `，已退 ${fmtMoney(refundAmount)}` : ""}）？\n`
                 + `分潤已發放，系統不會重算，而是產生 ${preview.length} 筆負數沖回列，合計 ${fmtMoney(total)} 元。`
               : `退費 ${fmtMoney(n)} 元（原 ${fmtMoney(fee)}）？系統會依實收比例重算全鏈分潤。`;
-            if (confirm(msg)) onRefund(n, paid);
+            if (await confirmDialog(msg)) onRefund(n, paid);
           }}>
           {paid ? "產生沖回" : "退費重算"}
         </button>
         {paid && (
-          <span className="text-[11px] text-tx2">
+          <span className="text-11 text-tx2">
             {refundAmount > 0 && `已退 ${fmtMoney(refundAmount)}；`}只沖回本次新增的退費金額
           </span>
         )}

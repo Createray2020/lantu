@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
 import { useRouter } from "next/navigation";
 import { LESSON_KINDS } from "@/lib/learn";
 import {
@@ -130,7 +131,7 @@ function CourseCard({
           </span>
         </button>
         <span
-          className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+          className={`text-10 font-bold px-2 py-0.5 rounded border ${
             course.published
               ? "border-ok-solid/60 text-ok bg-ok-solid/15"
               : "border-line2 text-tx3"
@@ -141,7 +142,9 @@ function CourseCard({
         <span className="text-xs text-tx2">
           完課 <b className="text-brand2">{course.completedBy.length}</b> 人
         </span>
-        <button type="button" onClick={onToggle} className={BTN}>
+        <button type="button" onClick={onToggle}
+          className="rounded-md border border-line2 text-tx2 text-xs px-2.5 py-1 hover:text-tx"
+        >
           {open ? "收合" : "編輯"}
         </button>
       </div>
@@ -217,9 +220,9 @@ function CourseCard({
             <button
               type="button"
               disabled={busy}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  confirm(
+                  await confirmDialog(
                     `刪除「${course.title}」？\n\n這門課的 ${course.lessons.length} 個單元與所有教練的完課紀錄會一起被刪除，無法復原。\n若只是不想讓人看到，請改成「未上架」。`,
                   )
                 ) {
@@ -344,7 +347,7 @@ function LessonEditor({
               </select>
             </label>
           </div>
-          {kind && <p className="text-[11px] text-tx3">{kind.hint}</p>}
+          {kind && <p className="text-11 text-tx3">{kind.hint}</p>}
           {p.kind !== "text" && (
             <label className="block">
               <span className="text-xs text-tx2">連結網址</span>
@@ -383,8 +386,8 @@ function LessonEditor({
             <button
               type="button"
               disabled={busy}
-              onClick={() => {
-                if (confirm(`刪除單元「${lesson.title}」？教練在這個單元的完成紀錄會一起消失。`)) {
+              onClick={async () => {
+                if (await confirmDialog(`刪除單元「${lesson.title}」？教練在這個單元的完成紀錄會一起消失。`)) {
                   run(() => deleteLessonAction(lesson.id));
                 }
               }}

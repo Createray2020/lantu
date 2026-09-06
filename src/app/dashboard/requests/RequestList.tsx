@@ -35,7 +35,7 @@ export default function RequestList({ requests }: { requests: Req[] }) {
           <div className="min-w-0">
             <div className="text-tx font-semibold">{rq.clientName}</div>
             {rq.note ? <div className="text-tx2 text-sm">{rq.note}</div> : null}
-            <div className="text-[11px] text-tx3">想連結你為教練</div>
+            <div className="text-11 text-tx3">想連結你為教練</div>
           </div>
           <div className="flex gap-2 shrink-0">
             <button onClick={() => respond(rq.id, true)} disabled={busy === rq.id}

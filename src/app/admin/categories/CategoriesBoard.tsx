@@ -1,5 +1,7 @@
 "use client";
 import MoneyInput from "@/components/MoneyInput";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD } from "@/components/ui/Field";
 
 import { useMemo, useState, useTransition } from "react";
 import {
@@ -32,8 +34,7 @@ const KIND_HINT: Record<CatKind, string> = {
     "大類決定負債品質：房貸看房貸負擔率、信貸／勾了「消費性負債」的會進消費性負債比。放錯會讓債務體質評級失真。",
 };
 
-const inputCls =
-  "w-full rounded border border-line2 bg-field px-2 py-1 text-sm text-tx outline-none focus:border-brand";
+const inputCls = FIELD;
 const btnCls =
   "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
 
@@ -183,7 +184,7 @@ function CatTable({
       </p>
 
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead className="bg-panel text-tx2">
             <tr>
               <th className="px-2 py-2 text-left font-medium">排序</th>
@@ -279,7 +280,7 @@ function CatTable({
                     ) : (
                       <span className="text-tx2">已停用</span>
                     )}
-                    {r.isSystem && <span className="ml-1 text-[10px] text-brand">系統</span>}
+                    {r.isSystem && <span className="ml-1 text-10 text-brand">系統</span>}
                   </td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap">
                     {isEdit ? (
@@ -329,8 +330,8 @@ function CatTable({
                           <button
                             disabled={pending}
                             className={btnCls + " ml-1"}
-                            onClick={() => {
-                              if (confirm(`確定刪除「${r.label}」？既有資料若用過這個名稱，會變成無法對應的舊值。`)) {
+                            onClick={async () => {
+                              if (await confirmDialog(`確定刪除「${r.label}」？既有資料若用過這個名稱，會變成無法對應的舊值。`)) {
                                 run(() => deleteCategoryAction(r.id), `已刪除「${r.label}」`);
                               }
                             }}
@@ -476,7 +477,7 @@ function EduTable({
         <b>碩博士與延修生不適用</b>；公立大專<b>沒有</b>普及性減免。
       </p>
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead className="bg-panel text-tx2">
             <tr>
               <th className="px-2 py-2 text-left font-medium">學段</th>
@@ -496,7 +497,7 @@ function EduTable({
                 <td className="px-2 py-1.5 font-medium whitespace-nowrap">
                   {r.stage}
                   {r.source && (
-                    <div className="mt-0.5 max-w-[16rem] text-[10px] leading-snug text-tx2">{r.source}</div>
+                    <div className="mt-0.5 max-w-[16rem] text-10 leading-snug text-tx2">{r.source}</div>
                   )}
                 </td>
                 <td className="px-2 py-1.5">{num(r, "startAge")}</td>
@@ -524,8 +525,8 @@ function EduTable({
         <button
           disabled={pending}
           className={btnCls}
-          onClick={() => {
-            if (confirm("回復官方預設值會覆蓋所有手動改過的金額，確定嗎？")) {
+          onClick={async () => {
+            if (await confirmDialog("回復官方預設值會覆蓋所有手動改過的金額，確定嗎？")) {
               run(() => resetEduCostsAction(), "已回復官方預設值");
             }
           }}

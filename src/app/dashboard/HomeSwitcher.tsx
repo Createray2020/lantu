@@ -33,7 +33,7 @@ export default function HomeSwitcher({
           <button
             key={v}
             onClick={() => go(v)}
-            className={`px-4 py-1.5 rounded-full text-[13px] font-bold transition ${
+            className={`px-4 py-1.5 rounded-full text-13 font-bold transition ${
               rank === v ? "bg-brand text-onbrand" : "text-tx2 hover:text-tx"
             }`}
           >
@@ -46,7 +46,7 @@ export default function HomeSwitcher({
         <select
           value={focusId}
           onChange={(e) => go("manager", e.target.value)}
-          className="bg-panel2 border border-line text-tx text-[13px] rounded-lg px-3 py-1.5 shadow-e1"
+          className="bg-panel2 border border-line text-tx text-13 rounded-lg px-3 py-1.5 shadow-e1"
         >
           {teamOptions.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
         </select>
@@ -55,12 +55,12 @@ export default function HomeSwitcher({
         <select
           value={focusId}
           onChange={(e) => go("member", e.target.value)}
-          className="bg-panel2 border border-line text-tx text-[13px] rounded-lg px-3 py-1.5 shadow-e1"
+          className="bg-panel2 border border-line text-tx text-13 rounded-lg px-3 py-1.5 shadow-e1"
         >
           {memberOptions.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
         </select>
       )}
-      <span className="text-[11px] text-tx3">預覽視角 · 業績/活動/增員為可編輯模擬資料</span>
+      <span className="text-11 text-tx3">預覽視角 · 業績/活動/增員為可編輯模擬資料</span>
     </div>
   );
 }

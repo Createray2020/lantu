@@ -34,9 +34,9 @@ export default function CollabInviteList({ invites }: { invites: Invite[] }) {
           <div className="min-w-0">
             <div className="text-tx font-semibold">
               {iv.clientName}
-              {iv.clientCode && <span className="ml-2 font-mono text-[11px] text-tx3">{iv.clientCode}</span>}
+              {iv.clientCode && <span className="ml-2 font-mono text-11 text-tx3">{iv.clientCode}</span>}
             </div>
-            <div className="text-[11px] text-tx3">{iv.ownerName ?? "某位教練"} 邀請你共同執案（唯讀）</div>
+            <div className="text-11 text-tx3">{iv.ownerName ?? "某位教練"} 邀請你共同執案（唯讀）</div>
           </div>
           <div className="flex gap-2 shrink-0">
             <button onClick={() => respond(iv.id, true)} disabled={busy === iv.id}

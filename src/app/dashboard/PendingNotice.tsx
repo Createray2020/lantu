@@ -50,10 +50,10 @@ export default function PendingNotice({
 
         {!suspended && progress && (
           <div className="mt-5 mb-5 text-left border border-line rounded-lg p-4 bg-field">
-            <div className="text-[11px] text-tx3 mb-2">報聘路線：{routeMeta(progress.route).label}</div>
+            <div className="text-11 text-tx3 mb-2">報聘路線：{routeMeta(progress.route).label}</div>
             <ApplyStepList steps={steps} />
             {progress.introducerNote && (
-              <p className="mt-3 pt-3 border-t border-line text-[11px] text-tx2 whitespace-pre-wrap">
+              <p className="mt-3 pt-3 border-t border-line text-11 text-tx2 whitespace-pre-wrap">
                 推薦人留言：{progress.introducerNote}
               </p>
             )}
@@ -61,7 +61,7 @@ export default function PendingNotice({
         )}
 
         {!suspended && (
-          <p className="text-tx3 text-[11px] leading-relaxed mb-5">
+          <p className="text-tx3 text-11 leading-relaxed mb-5">
             資料完整並完成推薦人確認後，原則上於 1～3 個工作日內完成審核。
           </p>
         )}

@@ -63,7 +63,7 @@ export default function ProfilesBoard({ rows }: { rows: Row[] }) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-3 py-2">教練</th>
@@ -80,16 +80,16 @@ export default function ProfilesBoard({ rows }: { rows: Row[] }) {
               <tr key={r.id}>
                 <td className={td}>
                   <div className="font-semibold">{r.name}</div>
-                  <div className="text-[11px] text-tx3">{r.email}</div>
+                  <div className="text-11 text-tx3">{r.email}</div>
                 </td>
                 <td className={`${td} text-tx2 max-w-[260px] truncate`}>
                   {r.headline ?? <span className="text-tx3">—</span>}
                 </td>
-                <td className={`${td} text-[11px] text-tx2`}>
+                <td className={`${td} text-11 text-tx2`}>
                   {r.specialties.length ? r.specialties.join("、") : "—"}
                 </td>
                 <td className={td}>{r.hasPhoto ? "✓" : "—"}</td>
-                <td className={`${td} text-[11px] text-tx3`}>{r.updatedAt ?? "—"}</td>
+                <td className={`${td} text-11 text-tx3`}>{r.updatedAt ?? "—"}</td>
                 <td className={td}>
                   {r.status !== "active" ? (
                     <span className="text-tx3 text-xs">帳號未開通</span>

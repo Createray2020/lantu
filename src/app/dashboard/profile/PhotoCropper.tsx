@@ -6,6 +6,7 @@
 // 預覽用 CSS 定位、輸出用 canvas，兩邊吃同一組 (zoom, ox, oy)，所以看到什麼就存到什麼。
 
 import { useRef, useState } from "react";
+import Modal from "@/components/ui/Modal";
 
 const VIEW = 320;   // 預覽視窗邊長（CSS px）
 const OUT = 400;    // 輸出邊長
@@ -88,7 +89,7 @@ export default function PhotoCropper({
     });
   }
 
-  function confirm() {
+  function applyCrop() {
     try {
       onDone(renderCrop(src, zoom, off.x, off.y));
     } catch (e) {
@@ -97,10 +98,10 @@ export default function PhotoCropper({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-scrim/70 p-4" role="presentation">
-      <div className="w-full max-w-md rounded-xl border border-line2 bg-panel p-5 text-tx shadow-e3">
-        <div className="mb-1 font-serif text-lg tracking-[0.08em]">調整大頭照</div>
-        <p className="mb-3 text-[12px] text-tx2">拖曳移動、下方滑桿縮放；框內的範圍就是客戶會看到的樣子。</p>
+    <Modal onClose={onCancel} labelledBy="cropTitle" width="max-w-md">
+      <div className="p-5 text-tx">
+        <div id="cropTitle" className="mb-1 font-serif text-lg tracking-[0.08em]">調整大頭照</div>
+        <p className="mb-3 text-xs text-tx2">拖曳移動、下方滑桿縮放；框內的範圍就是客戶會看到的樣子。</p>
 
         <div
           className="relative mx-auto overflow-hidden rounded-xl border border-line2 bg-panel touch-none select-none cursor-grab active:cursor-grabbing shadow-e1"
@@ -124,13 +125,13 @@ export default function PhotoCropper({
         </div>
 
         <div className="mt-3 flex items-center gap-3">
-          <span className="text-[12px] text-tx2">縮放</span>
+          <span className="text-xs text-tx2">縮放</span>
           <input
             type="range" min={1} max={MAX_ZOOM} step={0.01} value={zoom}
             onChange={(e) => setZoomAnchored(parseFloat(e.target.value))}
             className="flex-1 accent-brand"
           />
-          <span className="w-10 text-right text-[12px] tabular-nums text-brand2">{zoom.toFixed(1)}×</span>
+          <span className="w-10 text-right text-xs tabular-nums text-brand2">{zoom.toFixed(1)}×</span>
         </div>
 
         {err && <p className="mt-2 text-sm text-danger">{err}</p>}
@@ -146,12 +147,12 @@ export default function PhotoCropper({
             className="rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3">
             取消
           </button>
-          <button type="button" onClick={confirm}
+          <button type="button" onClick={applyCrop}
             className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-onbrand hover:bg-brand2">
             使用這個範圍
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

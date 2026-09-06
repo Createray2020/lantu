@@ -17,9 +17,9 @@ export default async function OverviewPage() {
 
   const kpi = (label: string, value: number, hint?: string) => (
     <div className="bg-panel border border-line rounded-xl px-4 py-3 shadow-e1">
-      <div className="text-[11px] uppercase tracking-wider text-tx3">{label}</div>
+      <div className="text-11 uppercase tracking-wider text-tx3">{label}</div>
       <div className="text-3xl font-bold mt-1">{value}</div>
-      {hint && <div className="text-[11px] text-tx3">{hint}</div>}
+      {hint && <div className="text-11 text-tx3">{hint}</div>}
     </div>
   );
 
@@ -48,7 +48,7 @@ export default async function OverviewPage() {
                   <Link key={i} href={`/dashboard/clients/${a.clientId}`} className="flex items-center gap-2 bg-panel hover:bg-panel2 border border-line rounded-lg px-3 py-2 text-sm shadow-e1">
                     <span className="text-brand2 font-bold w-24">{a.date}</span>
                     <span className="flex-1">{a.clientName}</span>
-                    <span className="text-[11px] text-tx3">{REVIEW_TYPE_LABEL[a.type] ?? a.type}</span>
+                    <span className="text-11 text-tx3">{REVIEW_TYPE_LABEL[a.type] ?? a.type}</span>
                   </Link>
                 ))}
               </div>
@@ -61,7 +61,7 @@ export default async function OverviewPage() {
                     <Link key={i} href={`/dashboard/clients/${a.clientId}`} className="flex items-center gap-2 bg-panel hover:bg-panel2 border border-line rounded-lg px-3 py-2 text-sm shadow-e1">
                       <span className="text-tx2 w-24">{a.date}</span>
                       <span className="flex-1">{a.clientName}</span>
-                      <span className="text-[11px] text-tx3">{REVIEW_TYPE_LABEL[a.type] ?? a.type}</span>
+                      <span className="text-11 text-tx3">{REVIEW_TYPE_LABEL[a.type] ?? a.type}</span>
                     </Link>
                   ))}
                 </div>
@@ -77,7 +77,7 @@ export default async function OverviewPage() {
                   <Link key={i} href={`/dashboard/clients/${a.clientId}`} className="flex items-center gap-2 bg-panel hover:bg-panel2 border border-danger/30 rounded-lg px-3 py-2 text-sm shadow-e1">
                     <span className="text-danger font-bold w-24">{a.date}</span>
                     <span className="flex-1">{a.clientName}</span>
-                    <span className="text-[11px] text-tx3">{REVIEW_TYPE_LABEL[a.type] ?? a.type}</span>
+                    <span className="text-11 text-tx3">{REVIEW_TYPE_LABEL[a.type] ?? a.type}</span>
                   </Link>
                 ))}
               </div>
@@ -90,9 +90,9 @@ export default async function OverviewPage() {
                   <Link key={i.id} href={`/dashboard/clients/${i.clientId}`} className="flex items-start gap-2 bg-panel hover:bg-panel2 border border-line rounded-lg px-3 py-2 text-sm shadow-e1">
                     <span className="flex-1">
                       {i.title}
-                      <span className="block text-[11px] text-tx3">{i.clientName}{i.owner ? " · " + i.owner : ""}</span>
+                      <span className="block text-11 text-tx3">{i.clientName}{i.owner ? " · " + i.owner : ""}</span>
                     </span>
-                    <span className={"text-[11px] " + (i.overdue ? "text-danger" : "text-tx3")}>{i.dueDate ?? "無期限"}</span>
+                    <span className={"text-11 " + (i.overdue ? "text-danger" : "text-tx3")}>{i.dueDate ?? "無期限"}</span>
                   </Link>
                 ))}
               </div>
@@ -121,21 +121,21 @@ function Dist({ title, data, labelMap, stageColored, note }: { title: string; da
   const max = Math.max(1, ...entries.map(([, v]) => v));
   return (
     <div className="bg-panel border border-line rounded-xl p-3 shadow-e1">
-      <div className="text-[12px] text-tx2 mb-2">{title}</div>
+      <div className="text-xs text-tx2 mb-2">{title}</div>
       {entries.length === 0 ? <div className="text-tx3 text-sm">—</div> : (
         <div className="grid gap-1.5">
           {entries.map(([k, v]) => (
             <div key={k} className="flex items-center gap-2 text-sm">
-              <span className="w-16 text-[12px] truncate" style={stageColored ? { color: stageColor(k), fontWeight: 700 } : undefined}>{labelMap?.[k] ?? k}</span>
+              <span className="w-16 text-xs truncate" style={stageColored ? { color: stageColor(k), fontWeight: 700 } : undefined}>{labelMap?.[k] ?? k}</span>
               <div className="flex-1 h-2 rounded bg-field overflow-hidden">
                 <div className="h-full rounded" style={{ width: `${(v / max) * 100}%`, background: stageColored ? stageColor(k) : "var(--brand)" }} />
               </div>
-              <span className="w-6 text-right text-[12px] text-tx2">{v}</span>
+              <span className="w-6 text-right text-xs text-tx2">{v}</span>
             </div>
           ))}
         </div>
       )}
-      {note && <div className="text-[11px] text-tx3 mt-2">{note}</div>}
+      {note && <div className="text-11 text-tx3 mt-2">{note}</div>}
     </div>
   );
 }

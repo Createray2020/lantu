@@ -7,6 +7,8 @@
 // React 不會把 uncontrolled select 的實際選取值同步過去，畫面永遠彈回舊值，
 // 看起來像「存不進去」（其實 DB 已寫入）。這裡改成受控 state ＋ 明確的存檔狀態回饋。
 import { useEffect, useState, useTransition } from "react";
+import SubmitButton from "@/components/ui/SubmitButton";
+import { FIELD_SM } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import { updateOrg } from "./actions";
 
@@ -68,8 +70,7 @@ export default function OrgCell({
     });
   }
 
-  const sel =
-    "bg-panel border border-line rounded px-1.5 py-1 text-xs text-tx disabled:opacity-50";
+  const sel = FIELD_SM;
 
   return (
     <div className="flex flex-col gap-1">
@@ -103,17 +104,19 @@ export default function OrgCell({
               </option>
             ))}
         </select>
-        <button
+        <SubmitButton
           type="button"
           onClick={save}
           disabled={pending || !dirty}
-          className="rounded bg-panel2 border border-line2 text-tx2 px-2 py-1 text-xs hover:bg-panel3 disabled:opacity-40 disabled:hover:bg-panel2"
+        
+          state={pending ? "pending" : "idle"}
+          pendingLabel="存檔中…"
         >
-          {pending ? "存檔中…" : "存"}
-        </button>
+          存
+        </SubmitButton>
       </div>
-      {saved && <span className="text-[10px] text-ok-solid">已儲存 ✓</span>}
-      {error && <span className="text-[10px] text-danger">儲存失敗：{error}</span>}
+      {saved && <span className="text-10 text-ok-solid">已儲存 ✓</span>}
+      {error && <span className="text-10 text-danger">儲存失敗：{error}</span>}
     </div>
   );
 }

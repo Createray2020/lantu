@@ -81,7 +81,7 @@ export default function CourseView({
                 }`}
               >
                 <span
-                  className={`mt-0.5 w-4 h-4 shrink-0 rounded-full border grid place-items-center text-[9px] ${
+                  className={`mt-0.5 w-4 h-4 shrink-0 rounded-full border grid place-items-center text-10 ${
                     l.done
                       ? "bg-ok-solid border-ok-solid text-onsolid"
                       // 未完成留空心圓，不要把勾設成透明——色弱使用者分不出兩種狀態。
@@ -92,7 +92,7 @@ export default function CourseView({
                 </span>
                 <span className="min-w-0">
                   <span className="block text-sm">{l.title}</span>
-                  <span className="block text-[11px] text-tx3">
+                  <span className="block text-11 text-tx3">
                     {KIND_LABEL[l.kind] ?? l.kind}
                     {l.durationMin ? ` · ${l.durationMin} 分鐘` : ""}
                   </span>

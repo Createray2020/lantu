@@ -92,7 +92,7 @@ export default function ThemeToggle({
       title="切換深色／淺色介面"
     >
       {!compact && (
-        <span className="text-tx3 text-[10px] font-bold px-1 select-none">介面</span>
+        <span className="text-tx3 text-10 font-bold px-1 select-none">介面</span>
       )}
       {THEMES.map((t) => (
         <button
@@ -102,7 +102,7 @@ export default function ThemeToggle({
           title={t.hint}
           aria-label={`${t.label}介面`}
           aria-pressed={theme === t.value}
-          className={`px-2 py-1 rounded text-[11px] font-bold transition leading-none min-h-[26px] ${
+          className={`px-2 py-1 rounded text-11 font-bold transition leading-none min-h-[26px] ${
             theme === t.value ? "bg-brand text-onbrand" : "text-tx2 hover:text-tx"
           }`}
         >

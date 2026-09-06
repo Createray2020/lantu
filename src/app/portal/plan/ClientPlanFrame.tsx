@@ -148,7 +148,7 @@ export default function ClientPlanFrame({
           </SignOutButton>
         </div>
         {track === "client" && (
-          <p className="text-[11px] text-tx3 mt-0.5">這份是你自己填的；教練接手後會有更完整的一份。</p>
+          <p className="text-11 text-tx3 mt-0.5">這份是你自己填的；教練接手後會有更完整的一份。</p>
         )}
       </div>
       <iframe

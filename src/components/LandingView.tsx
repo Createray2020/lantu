@@ -32,8 +32,8 @@ export default async function LandingView() {
               </svg>
             </span>
             <span className="flex flex-col leading-tight min-w-0">
-              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-[13px] sm:text-[15px] whitespace-nowrap">嵐途 LAN TU</span>
-              <span className="hidden sm:block text-[9px] tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
+              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-13 sm:text-15 whitespace-nowrap">嵐途 LAN TU</span>
+              <span className="hidden sm:block text-10 tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -41,8 +41,8 @@ export default async function LandingView() {
             <ThemeToggle compact />
             <UiScaleToggle compact />
             <Link href="/coaches" className="hidden sm:inline text-sm text-tx2 hover:text-tx px-3 py-2 rounded-lg whitespace-nowrap">認識教練</Link>
-            <Link href="/login" className="text-[13px] sm:text-sm text-tx2 hover:text-tx px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-line2 whitespace-nowrap">登入</Link>
-            <Link href="/passport" className="text-[13px] sm:text-sm font-bold text-onbrand bg-brand hover:bg-brand2 px-3.5 sm:px-4 py-2 rounded-lg whitespace-nowrap">免費試算</Link>
+            <Link href="/login" className="text-13 sm:text-sm text-tx2 hover:text-tx px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-line2 whitespace-nowrap">登入</Link>
+            <Link href="/passport" className="text-13 sm:text-sm font-bold text-onbrand bg-brand hover:bg-brand2 px-3.5 sm:px-4 py-2 rounded-lg whitespace-nowrap">免費試算</Link>
           </div>
         </div>
       </header>
@@ -62,7 +62,7 @@ export default async function LandingView() {
                 退休要準備多少、房子什麼時候買得起、小孩養不養得起——
                 這些問題都有答案，只是要有人把它算出來。填四個數字，馬上看到你的第一個答案。
               </p>
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 text-[12.5px]">
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 text-xs">
                 {["不用註冊", "不賣金融商品", "3 分鐘看到結果"].map((t) => (
                   <span key={t} className="rounded-full border border-brand/40 text-brand2 px-3 py-1">{t}</span>
                 ))}
@@ -83,11 +83,11 @@ export default async function LandingView() {
           ].map(([n, label]) => (
             <div key={label as string}>
               <div className="font-serif text-2xl sm:text-3xl text-brand2">{n as number}</div>
-              <div className="text-[11.5px] sm:text-[13px] text-tx2 mt-1">{label as string}</div>
+              <div className="text-11 sm:text-13 text-tx2 mt-1">{label as string}</div>
             </div>
           ))}
         </div>
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 pb-5 text-center text-[10.5px] text-tx3">
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 pb-5 text-center text-10 text-tx3">
           截至 {stats.asOf}
         </div>
       </section>
@@ -131,7 +131,7 @@ export default async function LandingView() {
               <div key={n} className="text-center px-4">
                 <div className="font-serif text-3xl text-brand mb-3">{n}</div>
                 <div className="font-semibold mb-1">{t}</div>
-                <div className="text-[11px] text-brand mb-2">{dur}</div>
+                <div className="text-11 text-brand mb-2">{dur}</div>
                 <p className="text-tx2 text-sm leading-relaxed">{d}</p>
               </div>
             ))}
@@ -165,7 +165,7 @@ export default async function LandingView() {
                   </div>
                 )}
                 <div className="text-sm mt-2 group-hover:text-brand2">{c.name}</div>
-                {c.specialties[0] && <div className="text-[11px] text-tx3 truncate">{c.specialties[0]}</div>}
+                {c.specialties[0] && <div className="text-11 text-tx3 truncate">{c.specialties[0]}</div>}
               </Link>
             ))}
           </div>
@@ -182,7 +182,7 @@ export default async function LandingView() {
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20 text-center">
           <h2 className="font-serif text-2xl sm:text-3xl mb-3">先看到數字，再決定要不要找人</h2>
           <p className="text-tx2 mb-8">不用留電話、不用註冊，三分鐘就有結果。</p>
-          <Link href="/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-8 py-3.5 rounded-lg text-[15px]">
+          <Link href="/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-8 py-3.5 rounded-lg text-15">
             免費試算我的人生護照
           </Link>
           <div className="mt-5 text-sm">

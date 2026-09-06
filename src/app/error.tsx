@@ -29,7 +29,7 @@ export default function Error({
           把下面那串代碼一起回報，工程端才查得到對應的伺服器紀錄。
         </p>
         {error.digest && (
-          <p className="text-[11px] font-mono text-tx3 mb-5 break-all">代碼 {error.digest}</p>
+          <p className="text-11 font-mono text-tx3 mb-5 break-all">代碼 {error.digest}</p>
         )}
         <div className="flex flex-wrap gap-2">
           <button

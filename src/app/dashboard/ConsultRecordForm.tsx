@@ -15,11 +15,13 @@
  */
 
 import { useState } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD } from "@/components/ui/Field";
 import { REVIEW_TYPES, REVIEW_TYPE_LABEL, REVIEW_TYPE_DESC } from "./format";
 
-const field = "w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx";
+const field = FIELD;
 const btn = "px-3 py-1.5 text-sm font-bold rounded-md";
-const lab = "text-[11px] text-tx2";
+const lab = "text-11 text-tx2";
 
 export type ConsultRecordValue = {
   date: string;
@@ -67,12 +69,12 @@ export default function ConsultRecordForm({
   return (
     <div className="bg-panel border border-line rounded-xl p-3 grid gap-2.5 shadow-e1">
       {error && (
-        <div role="alert" className="text-[12.5px] font-bold text-danger bg-danger-solid/25 border border-danger/45 rounded-lg px-3 py-2">
+        <div role="alert" className="text-xs font-bold text-danger bg-danger-solid/25 border border-danger/45 rounded-lg px-3 py-2">
           ⚠️ {error}
         </div>
       )}
       {notice && (
-        <div className="text-[12px] text-brand2 bg-brand/10 border border-brand/40 rounded-lg px-3 py-2">
+        <div className="text-xs text-brand2 bg-brand/10 border border-brand/40 rounded-lg px-3 py-2">
           {notice}
         </div>
       )}
@@ -81,14 +83,14 @@ export default function ConsultRecordForm({
         <div>
           <label className={lab}>日期</label>
           <input type="date" className={field} value={date} onChange={(e) => setDate(e.target.value)} />
-          <p className="text-[10.5px] text-tx3 mt-0.5">補記過去的諮詢就把日期改成當天，時間軸會排到正確的位置。</p>
+          <p className="text-10 text-tx3 mt-0.5">補記過去的諮詢就把日期改成當天，時間軸會排到正確的位置。</p>
         </div>
         <div>
           <label className={lab}>類型</label>
           <select className={field} value={type} onChange={(e) => setType(e.target.value)}>
             {REVIEW_TYPES.map((t) => <option key={t} value={t}>{REVIEW_TYPE_LABEL[t]}</option>)}
           </select>
-          <p className="text-[10.5px] text-tx3 mt-0.5">{REVIEW_TYPE_DESC[type] ?? ""}</p>
+          <p className="text-10 text-tx3 mt-0.5">{REVIEW_TYPE_DESC[type] ?? ""}</p>
         </div>
       </div>
 
@@ -122,7 +124,7 @@ export default function ConsultRecordForm({
       </div>
 
       {todos.length > 0 && (
-        <div className="text-[12px] text-tx2 bg-panel border border-line rounded-lg px-3 py-2 shadow-e1">
+        <div className="text-xs text-tx2 bg-panel border border-line rounded-lg px-3 py-2 shadow-e1">
           <b className="text-brand2">存檔後會有 {todos.length} 筆待辦進追蹤：</b>
           <ul className="mt-1 grid gap-0.5">
             {todos.map((t, i) => <li key={i} className="text-tx3">· {t}</li>)}
@@ -154,8 +156,8 @@ export default function ConsultRecordForm({
         )}
         {onDiscard && (
           <button
-            className="text-[12px] text-tx3 hover:text-danger ml-auto"
-            onClick={() => { if (confirm("這一場就不留紀錄了？\n\n草稿會丟掉，但諮詢場次與還原點都會保留。")) onDiscard(); }}
+            className="text-xs text-tx3 hover:text-danger ml-auto"
+            onClick={async () => { if (await confirmDialog("這一場就不留紀錄了？\n\n草稿會丟掉，但諮詢場次與還原點都會保留。")) onDiscard(); }}
             disabled={pending}
           >
             這場不留紀錄

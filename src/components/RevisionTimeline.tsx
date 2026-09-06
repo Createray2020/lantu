@@ -70,7 +70,7 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap text-sm">
                     <span
-                      className={`text-[10.5px] px-2 py-0.5 rounded border ${
+                      className={`text-10 px-2 py-0.5 rounded border ${
                         it.track === "client"
                           ? "border-teal/50 text-teal"
                           : "border-brand/50 text-brand"
@@ -79,13 +79,13 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                       {trackLabel(it.track)}
                     </span>
                     {it.track === "coach" && (
-                      <span className="text-[11px] text-tx3">{it.planLabel || `${it.planYear} 版`}</span>
+                      <span className="text-11 text-tx3">{it.planLabel || `${it.planYear} 版`}</span>
                     )}
                     {isLatest && (
-                      <span className="text-[10.5px] px-2 py-0.5 rounded bg-brand text-onbrand font-bold">目前版本</span>
+                      <span className="text-10 px-2 py-0.5 rounded bg-brand text-onbrand font-bold">目前版本</span>
                     )}
                   </div>
-                  <div className="text-[12.5px] text-tx2 mt-1">
+                  <div className="text-xs text-tx2 mt-1">
                     {mine ? "我" : it.editorType === "client" ? "客戶" : "教練"}
                     {it.editorName ? `．${it.editorName}` : ""}
                     ．{new Date(it.createdAt).toLocaleString("zh-TW", { hour12: false })}
@@ -99,14 +99,14 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                       <button
                         onClick={() => setConfirming(null)}
                         disabled={busy === it.id}
-                        className="text-[12.5px] text-tx2 hover:text-tx px-3 py-1.5 rounded-lg border border-line2"
+                        className="text-xs text-tx2 hover:text-tx px-3 py-1.5 rounded-lg border border-line2"
                       >
                         取消
                       </button>
                       <button
                         onClick={() => doRestore(it)}
                         disabled={busy === it.id}
-                        className="text-[12.5px] font-bold text-onbrand bg-brand hover:bg-brand2 disabled:opacity-60 px-3 py-1.5 rounded-lg"
+                        className="text-xs font-bold text-onbrand bg-brand hover:bg-brand2 disabled:opacity-60 px-3 py-1.5 rounded-lg"
                       >
                         {busy === it.id ? "回復中…" : "確定回復"}
                       </button>
@@ -114,7 +114,7 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                   ) : (
                     <button
                       onClick={() => { setConfirming(it.id); setErr(null); }}
-                      className="shrink-0 text-[12.5px] text-tx2 hover:text-tx px-3 py-1.5 rounded-lg border border-line2"
+                      className="shrink-0 text-xs text-tx2 hover:text-tx px-3 py-1.5 rounded-lg border border-line2"
                     >
                       回復這一版
                     </button>
@@ -122,7 +122,7 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                 )}
               </div>
               {confirming === it.id && (
-                <p className="mt-2 text-[11.5px] text-tx3">
+                <p className="mt-2 text-11 text-tx3">
                   會把這一版的內容變成目前版本。中間的版本不會消失，回復本身也會留一筆紀錄，隨時能再回來。
                 </p>
               )}

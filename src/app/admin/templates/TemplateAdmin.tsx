@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Modal from "@/components/ui/Modal";
+import { FIELD } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { TemplateListItem } from "@/lib/templates";
@@ -13,7 +15,7 @@ import {
   updateTemplateAction,
 } from "./actions";
 
-const field = "w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx";
+const field = FIELD;
 
 /** 已下架＝status 不是 active。舊資料沒有這個欄位時視為上架中。 */
 const archivedOf = (t: TemplateListItem) => t.status === "archived";
@@ -106,21 +108,21 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-tx3 w-5 text-right">{i + 1}</span>
+                  <span className="text-10 font-mono text-tx3 w-5 text-right">{i + 1}</span>
                   <Link href={`/admin/templates/${t.id}`} className="font-bold hover:text-brand2 truncate">
                     {t.name}
                   </Link>
                   {archivedOf(t) && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-line2 text-tx3">已下架</span>
+                    <span className="text-10 px-1.5 py-0.5 rounded border border-line2 text-tx3">已下架</span>
                   )}
                 </div>
                 {t.templateLabel && (
-                  <div className="ml-7 mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-panel text-tx2 border border-line">
+                  <div className="ml-7 mt-1 inline-block text-10 px-1.5 py-0.5 rounded bg-panel text-tx2 border border-line">
                     {t.templateLabel}
                   </div>
                 )}
               </div>
-              <div className="text-[12px] font-bold" style={{ color: stageColor(t.healthGrade) }}>
+              <div className="text-xs font-bold" style={{ color: stageColor(t.healthGrade) }}>
                 {t.healthGrade ? stageName(t.healthGrade) : <span className="text-tx3">尚未填內容</span>}
               </div>
               <div className="text-sm tabular-nums text-tx">{fmtMoney(t.netWorth ?? null)}</div>
@@ -196,12 +198,12 @@ export default function TemplateAdmin({ templates }: { templates: TemplateListIt
                 )}
               </div>
               {archived && confirmDel !== t.id && (
-                <p className="md:col-span-4 text-[12px] text-tx2 bg-panel/60 border border-line rounded-md px-3 py-2 shadow-e1">
+                <p className="md:col-span-4 text-xs text-tx2 bg-panel/60 border border-line rounded-md px-3 py-2 shadow-e1">
                   已下架：教練端的清單看不到這一份，內容完整保留著。要真的刪掉才按「永久刪除」。
                 </p>
               )}
               {confirmDel === t.id && (
-                <p className="md:col-span-4 text-[12px] text-danger bg-danger-solid/25/40 border border-danger-solid/30 rounded-md px-3 py-2">
+                <p className="md:col-span-4 text-xs text-danger bg-danger-solid/25/40 border border-danger-solid/30 rounded-md px-3 py-2">
                   永久刪除會把這份範本連同它所有年度版本一起刪掉，<b>救不回來</b>。
                   已經有教練「複製一份給自己」的那些客戶不受影響——那些是各自獨立的資料。
                 </p>
@@ -273,10 +275,10 @@ function TemplateDialog({
   const [local, setLocal] = useState("");
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-scrim/60 px-4" onClick={onClose}>
-      <div className="w-full max-w-md bg-panel border border-line2 rounded-xl p-5 shadow-e3" onClick={(e) => e.stopPropagation()}>
-        <h2 className="font-serif text-lg mb-1">{title}</h2>
-        <p className="text-[11px] text-tx3 mb-4">這兩個欄位是教練在清單上看到的，取名時想著「他要怎麼跟客戶介紹這一份」。</p>
+    <Modal onClose={onClose} labelledBy="tplDlgTitle" width="max-w-md">
+      <div className="p-5">
+        <h2 id="tplDlgTitle" className="font-serif text-lg mb-1">{title}</h2>
+        <p className="text-11 text-tx3 mb-4">這兩個欄位是教練在清單上看到的，取名時想著「他要怎麼跟客戶介紹這一份」。</p>
         <div className="grid gap-3">
           <div>
             <label className="text-xs text-tx2">範本名稱 *</label>
@@ -303,6 +305,6 @@ function TemplateDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

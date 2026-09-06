@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import Modal from "@/components/ui/Modal";
 import {
   STAGE_ORDER,
   STAGE_METRICS,
@@ -18,7 +18,7 @@ export function StageGuideTable({ current }: { current?: string | null }) {
     <div>
       <table className="w-full border-collapse text-left">
         <thead>
-          <tr className="text-[11px] uppercase tracking-wider text-tx3">
+          <tr className="text-11 uppercase tracking-wider text-tx3">
             <th className="px-2 py-1.5 font-normal">階段</th>
             <th className="px-2 py-1.5 font-normal">判定條件</th>
             <th className="px-2 py-1.5 font-normal">當前課題與意義</th>
@@ -33,12 +33,12 @@ export function StageGuideTable({ current }: { current?: string | null }) {
                 className="border-t border-line align-top"
                 style={on ? { background: "rgba(201,154,91,.16)" } : undefined}
               >
-                <td className="px-2 py-2 whitespace-nowrap text-[13px] font-extrabold" style={{ color: stageColor(k) }}>
+                <td className="px-2 py-2 whitespace-nowrap text-13 font-extrabold" style={{ color: stageColor(k) }}>
                   {on ? "▶ " : ""}
                   {STAGE_LABEL[k]}
                 </td>
-                <td className={`px-2 py-2 text-[12.5px] ${on ? "text-brand2" : "text-tx2"}`}>{STAGE_GATE[k]}</td>
-                <td className="px-2 py-2 text-[12.5px]">
+                <td className={`px-2 py-2 text-xs ${on ? "text-brand2" : "text-tx2"}`}>{STAGE_GATE[k]}</td>
+                <td className="px-2 py-2 text-xs">
                   <b className="text-tx">{STAGE_TASK[k]}</b>
                   <div className="mt-1 leading-relaxed text-tx2">{STAGE_DESC[k]}</div>
                 </td>
@@ -48,19 +48,19 @@ export function StageGuideTable({ current }: { current?: string | null }) {
         </tbody>
       </table>
 
-      <div className="mt-4 text-[11px] uppercase tracking-wider text-tx3">三項指標怎麼算</div>
+      <div className="mt-4 text-11 uppercase tracking-wider text-tx3">三項指標怎麼算</div>
       <table className="mt-1 w-full border-collapse text-left">
         <tbody>
           {STAGE_METRICS.map(([name, formula]) => (
             <tr key={name} className="border-t border-line align-top">
-              <td className="px-2 py-1.5 whitespace-nowrap text-[12.5px] text-tx2">{name}</td>
-              <td className="px-2 py-1.5 text-[12.5px] text-tx2">{formula}</td>
+              <td className="px-2 py-1.5 whitespace-nowrap text-xs text-tx2">{name}</td>
+              <td className="px-2 py-1.5 text-xs text-tx2">{formula}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <p className="mt-3 text-[11.5px] leading-relaxed text-tx3">
+      <p className="mt-3 text-11 leading-relaxed text-tx3">
         判定是<b className="text-tx2">關卡制</b>不是分數區間：依序檢查「安全度與收支 → 財務自由度 → 願景達成度」，
         任何一關未過就停在該階段。階段代表的是旅程位置與當前該做的事，
         <b className="text-tx2">不是好壞評價</b>——同一階段的成因可能完全不同。
@@ -70,26 +70,12 @@ export function StageGuideTable({ current }: { current?: string | null }) {
 }
 
 export function StageGuideModal({ current, onClose }: { current?: string | null; onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
+  // Esc、焦點移入與歸還、背景鎖捲都由共用的 <Modal> 處理。
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-scrim/60 p-4"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div
-        className="max-h-[85vh] w-full max-w-3xl overflow-auto rounded-xl border border-line2 bg-panel p-5 text-tx shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={onClose} labelledBy="stageGuideTitle" width="max-w-3xl">
+      <div className="max-h-[85vh] overflow-auto p-5 text-tx">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="font-serif text-lg tracking-[0.08em]">財務階段是怎麼判定的</h3>
+          <h3 id="stageGuideTitle" className="font-serif text-lg tracking-[0.08em]">財務階段是怎麼判定的</h3>
           <button
             onClick={onClose}
             className="rounded-md border border-line2 px-2.5 py-1 text-sm text-tx2 hover:text-tx"
@@ -98,12 +84,12 @@ export function StageGuideModal({ current, onClose }: { current?: string | null;
           </button>
         </div>
         {current && (
-          <div className="mb-3 text-[13px] font-extrabold" style={{ color: stageColor(current) }}>
+          <div className="mb-3 text-13 font-extrabold" style={{ color: stageColor(current) }}>
             這位客戶目前在 {STAGE_LABEL[current] ?? "未評估"}
           </div>
         )}
         <StageGuideTable current={current} />
       </div>
-    </div>
+    </Modal>
   );
 }

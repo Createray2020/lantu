@@ -10,6 +10,8 @@
 //    這個坑在 /admin 職級選單踩過一次，這裡從頭就用受控 state ＋ 明確存檔回饋。
 
 import { Fragment, useMemo, useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD_SM } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TABS, type Field, type TabSpec } from "./spec";
@@ -29,8 +31,7 @@ type VersionLite = {
   effectiveFrom: string | null; changeNote: string | null;
 };
 
-const INPUT =
-  "bg-panel rounded px-2 py-1 text-sm text-tx outline-none focus:border-brand2";
+const INPUT = FIELD_SM;
 const FILLED = `${INPUT} border border-line2`;
 import MoneyInput from "@/components/MoneyInput";
 
@@ -38,7 +39,7 @@ const EMPTY = `${INPUT} border border-dashed border-line2 text-tx2`;
 const BTN =
   "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
 const BTN_SOLID =
-  "rounded-lg px-3 py-1.5 text-sm bg-info-solid border border-info-solid text-onsolid hover:brightness-110 disabled:opacity-40";
+  "rounded-lg px-3 py-1.5 text-sm bg-brand border border-brand text-onbrand hover:brightness-110 disabled:opacity-40";
 
 function fmtInt(n: number | null | undefined) {
   return n === null || n === undefined ? "" : String(n);
@@ -146,10 +147,10 @@ export default function SystemEditor({
         <select
           value={versionId}
           // 換版本＝整頁重載，state 裡沒存的東西全部消失。先問一句。
-          onChange={(e) => {
+          onChange={async (e) => {
             const next = e.target.value;
             if (next === versionId) return;
-            if (dirty && !confirm("這個版本有還沒儲存的變更，切換版本會把它們丟掉。確定要切換？")) return;
+            if (dirty && !await confirmDialog("這個版本有還沒儲存的變更，切換版本會把它們丟掉。確定要切換？")) return;
             router.push(`/admin/system?v=${next}`);
           }}
           className={FILLED}
@@ -178,8 +179,8 @@ export default function SystemEditor({
         <button
           type="button"
           disabled={pending || !editable}
-          onClick={() => {
-            if (confirm("確定把這個版本的所有數字清空？（開關與職級表也會一併清掉）")) {
+          onClick={async () => {
+            if (await confirmDialog("確定把這個版本的所有數字清空？（開關與職級表也會一併清掉）")) {
               run(() => clearAllAction(versionId), "已全部清空");
             }
           }}
@@ -198,7 +199,7 @@ export default function SystemEditor({
             onClick={() => setTab(t.id)}
             className={`rounded-lg px-3 py-1.5 text-sm border ${
               t.id === tab
-                ? "bg-info-solid border-info-solid text-onsolid"
+                ? "bg-brand border-brand text-onbrand"
                 : "border-line text-tx2 hover:bg-panel2"
             }`}
           >
@@ -248,8 +249,8 @@ export default function SystemEditor({
               )}
               {rankModule && rankRowsOfModule.length > 0 && (
                 <button type="button" disabled={!editable || pending} className={BTN}
-                  onClick={() => {
-                    if (confirm("刪掉這個模塊的自訂表？之後這個模塊會沿用預設表。"))
+                  onClick={async () => {
+                    if (await confirmDialog("刪掉這個模塊的自訂表？之後這個模塊會沿用預設表。"))
                       setRanks((rs) => rs.filter((r) => (r.moduleCode ?? "") !== rankModule));
                   }}>
                   刪除自訂表（改回沿用預設）
@@ -407,7 +408,7 @@ function FieldRow({
     <label className="flex items-start justify-between gap-3 rounded-lg bg-field border border-line px-3 py-2">
       <span className="text-sm text-tx leading-snug pt-1">
         {field.label}
-        {field.hint && <span className="block text-[11px] text-tx3">{field.hint}</span>}
+        {field.hint && <span className="block text-11 text-tx3">{field.hint}</span>}
       </span>
       <span className="shrink-0">
         {field.type === "bool" && (
@@ -416,7 +417,7 @@ function FieldRow({
             checked={value === true}
             disabled={disabled}
             onChange={(e) => onChange(e.target.checked ? true : false)}
-            className="mt-1.5 h-4 w-4 accent-info-solid"
+            className="mt-1.5 h-4 w-4 accent-brand"
           />
         )}
         {(field.type === "num" || field.type === "pct" || field.type === "money") &&
@@ -504,7 +505,7 @@ function ModulesTable({
   return (
     <div>
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">代號</th>
@@ -547,17 +548,17 @@ function ModulesTable({
                   <td className={cell}>
                     <input type="checkbox" checked={m.countPromotion !== false} disabled={disabled}
                       onChange={(e) => upd(i, { countPromotion: e.target.checked })}
-                      className="h-4 w-4 accent-info-solid" />
+                      className="h-4 w-4 accent-brand" />
                   </td>
                   <td className={cell}>
                     <input type="checkbox" checked={m.countMaintenance !== false} disabled={disabled}
                       onChange={(e) => upd(i, { countMaintenance: e.target.checked })}
-                      className="h-4 w-4 accent-info-solid" />
+                      className="h-4 w-4 accent-brand" />
                   </td>
                   <td className={cell}>
                     <input type="checkbox" checked={m.enabled !== false} disabled={disabled}
                       onChange={(e) => upd(i, { enabled: e.target.checked })}
-                      className="h-4 w-4 accent-info-solid" />
+                      className="h-4 w-4 accent-brand" />
                   </td>
                   <td className={`${cell} text-right whitespace-nowrap`}>
                     <button type="button" className="text-xs text-tx2 underline mr-2"
@@ -682,7 +683,7 @@ function RanksTable({
   return (
     <div>
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">序</th>
@@ -815,7 +816,7 @@ function ThresholdTable({
       <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-1">{title}</h3>
       {note && <p className="text-xs text-tx2 mb-2">{note}</p>}
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               {showFrom && <th className="px-2 py-2">起始職級</th>}
@@ -886,7 +887,7 @@ function ThresholdTable({
                 <td className={cell}>
                   <input type="checkbox" checked={r.enabled !== false} disabled={disabled}
                     onChange={(e) => upd(idx, { enabled: e.target.checked })}
-                    className="h-4 w-4 accent-info-solid" />
+                    className="h-4 w-4 accent-brand" />
                 </td>
                 <td className={`${cell} text-right`}>
                   <button type="button" disabled={disabled}
@@ -935,7 +936,7 @@ function VersionsPanel({
   return (
     <div className="space-y-5">
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">版本</th><th className="px-2 py-2">生效日</th>
@@ -970,8 +971,8 @@ function VersionsPanel({
                   )}
                   {v.status === "draft" && (
                     <button type="button" disabled={pending} className={BTN}
-                      onClick={() => {
-                        if (confirm(`確定把「${v.version}」發布為生效版？目前生效中的版本會轉為已封存。`))
+                      onClick={async () => {
+                        if (await confirmDialog(`確定把「${v.version}」發布為生效版？目前生效中的版本會轉為已封存。`))
                           run(() => publishVersionAction(v.id), "已發布為生效版");
                       }}>
                       發布
@@ -1008,7 +1009,7 @@ function VersionsPanel({
                 筆尚未發放的案件會依新制度重算；已發放的不受影響（§31）。
               </p>
               <div className="overflow-x-auto rounded-lg border border-line">
-                <table className="w-full text-xs">
+                <table className="w-full text-xs tbl-sticky">
                   <thead>
                     <tr className="bg-panel2 text-tx2 text-left">
                       <th className="px-2 py-1.5">分類</th>

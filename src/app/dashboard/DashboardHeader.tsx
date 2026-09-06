@@ -92,12 +92,12 @@ export default function DashboardHeader({
           {pendingErr ? (
             <span
               title="待處理數暫時讀不到，請重新整理"
-              className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-tx3 text-panel text-[10px] font-bold grid place-items-center"
+              className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-tx3 text-panel text-10 font-bold grid place-items-center"
             >
               ?
             </span>
           ) : pending > 0 ? (
-            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-danger-solid text-onsolid text-[10px] font-bold grid place-items-center">
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-danger-solid text-onsolid text-10 font-bold grid place-items-center">
               {pending}
             </span>
           ) : null}

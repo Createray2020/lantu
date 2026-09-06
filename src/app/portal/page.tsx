@@ -130,7 +130,7 @@ export default async function Portal() {
           {coachState === "active" && (
             <Link
               href="/dashboard"
-              className="text-[13px] sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+              className="text-13 sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
             >
               教練工作台
             </Link>
@@ -138,7 +138,7 @@ export default async function Portal() {
           {coachState === "pending" && (
             <Link
               href="/dashboard"
-              className="text-[13px] sm:text-sm text-brand2 hover:text-tx border border-brand/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+              className="text-13 sm:text-sm text-brand2 hover:text-tx border border-brand/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
             >
               報聘審核中
             </Link>
@@ -146,13 +146,13 @@ export default async function Portal() {
           {coachState === "none" && (
             <Link
               href="/dashboard/apply"
-              className="text-[13px] sm:text-sm text-brand2 hover:text-tx border border-brand/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+              className="text-13 sm:text-sm text-brand2 hover:text-tx border border-brand/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
             >
               申請成為教練
             </Link>
           )}
           <SignOutButton redirectUrl="/">
-            <button className="text-[13px] sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5">登出</button>
+            <button className="text-13 sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5">登出</button>
           </SignOutButton>
         </div>
       </header>
@@ -177,7 +177,7 @@ export default async function Portal() {
               <div className="text-brand text-xs tracking-[0.3em] mb-2">MY LIFE PASSPORT</div>
               <h1 className="font-serif text-3xl mb-2">{name}，你的人生護照</h1>
               {setup.code && (
-                <div className="font-mono text-[11px] tracking-[0.2em] text-tx3 mb-2" title="你的客戶編號">
+                <div className="font-mono text-11 tracking-[0.2em] text-tx3 mb-2" title="你的客戶編號">
                   客戶編號 {setup.code}
                 </div>
               )}
@@ -186,7 +186,7 @@ export default async function Portal() {
             </div>
 
             <div className="rounded-2xl bg-panel2 border border-line p-5 mb-6 shadow-e1">
-              <div className="text-[12.5px] text-tx2 mb-2">
+              <div className="text-xs text-tx2 mb-2">
                 這 {r.totalMonthlyWan.toFixed(1)} 萬，五個面向各佔多少
               </div>
               <div className="flex h-[26px] rounded-md overflow-hidden bg-tx/5">
@@ -194,7 +194,7 @@ export default async function Portal() {
                   <span
                     key={seg.label}
                     title={`${seg.label} 月存 ${seg.monthly} 萬`}
-                    className="flex items-center justify-center overflow-hidden text-[11px] font-extrabold text-onbrand whitespace-nowrap"
+                    className="flex items-center justify-center overflow-hidden text-11 font-extrabold text-onbrand whitespace-nowrap"
                     style={{ width: `calc(${seg.pct.toFixed(1)}% - 2px)`, marginRight: 2, background: seg.color }}
                   >
                     <span className="sm:hidden">{seg.innerNarrow}</span>
@@ -205,7 +205,7 @@ export default async function Portal() {
               {/* 圖例是完整的——條上塞不下標籤的那幾段，答案在這裡。 */}
               <div className="grid gap-y-1.5 gap-x-4 mt-3 sm:grid-cols-2">
                 {segments.map((seg) => (
-                  <div key={seg.label} className="flex items-center gap-2 text-[12px] text-tx2">
+                  <div key={seg.label} className="flex items-center gap-2 text-xs text-tx2">
                     <span className="w-[11px] h-[11px] rounded-[3px] shrink-0" style={{ background: seg.color }} />
                     <b className="text-tx font-bold">{seg.label}</b>
                     <span>{seg.head}</span>
@@ -220,39 +220,39 @@ export default async function Portal() {
               <Link href="/portal/plan" className="font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg text-sm">
                 查看我的完整財務藍圖
               </Link>
-              <Link href="/portal/setup" className="text-[12.5px] text-tx2 hover:text-tx underline underline-offset-[3px]">
+              <Link href="/portal/setup" className="text-xs text-tx2 hover:text-tx underline underline-offset-[3px]">
                 補資料 · 看缺口 · 選教練
               </Link>
-              <Link href="/portal/passport" className="text-[12.5px] text-tx2 hover:text-tx underline underline-offset-[3px]">
+              <Link href="/portal/passport" className="text-xs text-tx2 hover:text-tx underline underline-offset-[3px]">
                 重新調整人生護照
               </Link>
-              <Link href="/portal/history" className="text-[12.5px] text-tx2 hover:text-tx underline underline-offset-[3px]">
+              <Link href="/portal/history" className="text-xs text-tx2 hover:text-tx underline underline-offset-[3px]">
                 版本紀錄
               </Link>
             </div>
 
             {/* 必達目標與下一步都是「還可以再看」的內容，收起來讓大數字與那條帶子先講完話。 */}
             <details className="rounded-xl border border-line bg-panel2 overflow-hidden shadow-e1">
-              <summary className="cursor-pointer px-5 py-3 text-[13px] font-bold text-brand2 list-none">
+              <summary className="cursor-pointer px-5 py-3 text-13 font-bold text-brand2 list-none">
                 必達目標優先序與下一步
               </summary>
               <div className="px-5 pb-5">
                 {mustHave.length > 0 ? (
                   <>
-                    <p className="text-[11px] text-tx3 mb-3">錢不夠時，我們會從順位在後的開始調整。可到「補資料」頁重新排。</p>
+                    <p className="text-11 text-tx3 mb-3">錢不夠時，我們會從順位在後的開始調整。可到「補資料」頁重新排。</p>
                     <div className="flex flex-wrap gap-2">
                       {mustHave.map((t, i) => (
                         <span key={t} className="inline-flex items-center gap-2 rounded-lg bg-field border border-line px-3 py-1.5">
-                          <span className="font-serif text-[13px] font-extrabold text-brand2">{i + 1}</span>
-                          <span className="text-[13px] text-tx">{t}</span>
+                          <span className="font-serif text-13 font-extrabold text-brand2">{i + 1}</span>
+                          <span className="text-13 text-tx">{t}</span>
                         </span>
                       ))}
                     </div>
                   </>
                 ) : (
-                  <p className="text-[13px] text-tx3">尚未設定必達目標。到「補資料」頁就能排。</p>
+                  <p className="text-13 text-tx3">尚未設定必達目標。到「補資料」頁就能排。</p>
                 )}
-                <p className="text-tx2 text-[13px] leading-relaxed mt-4">
+                <p className="text-tx2 text-13 leading-relaxed mt-4">
                   下一步：補完現況、選一位教練——填上基本資料與財務現況，看你的缺口與願景達成率；
                   再選一位教練送出連結邀請，對方接受後就能一起把規劃做深。
                 </p>

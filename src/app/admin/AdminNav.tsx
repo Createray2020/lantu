@@ -60,7 +60,7 @@ export default function AdminNav() {
       <div className="px-5 py-3 flex flex-wrap items-start gap-x-7 gap-y-3">
         {GROUPS.map((g) => (
           <div key={g.title} className="min-w-0">
-            <div className="text-[10px] tracking-[0.22em] text-tx3 mb-1.5">{g.title}</div>
+            <div className="text-10 tracking-[0.22em] text-tx3 mb-1.5">{g.title}</div>
             <div className="flex flex-wrap gap-1.5">
               {g.items.map((it) => {
                 const on = isOn(it.href);
@@ -70,7 +70,7 @@ export default function AdminNav() {
                     href={it.href}
                     aria-current={on ? "page" : undefined}
                     className={
-                      "rounded-lg px-2.5 py-1.5 text-[13px] whitespace-nowrap border transition " +
+                      "rounded-lg px-2.5 py-1.5 text-13 whitespace-nowrap border transition " +
                       (on
                         ? "bg-brand text-onbrand border-brand font-bold"
                         : "text-tx2 border-line hover:bg-panel3 hover:text-tx")

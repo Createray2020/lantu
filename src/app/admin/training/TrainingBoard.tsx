@@ -3,15 +3,16 @@
 // 訓練時數與研討會。維持資格的訓練門檻要有資料來源，否則那個「8 小時」只是紙上規定。
 
 import { Fragment, useState, useTransition } from "react";
+import { FIELD_EMPTY, FIELD_SM } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import {
   addExternalAction, createSessionAction, markAttendanceAction, reviewExternalAction,
 } from "./actions";
 
-const INPUT = "bg-panel border border-line2 rounded px-2 py-1 text-sm text-tx outline-none";
-const EMPTY = "bg-panel border border-dashed border-line2 rounded px-2 py-1 text-sm text-tx2 outline-none";
+const INPUT = FIELD_SM;
+const EMPTY = FIELD_EMPTY;
 const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3 disabled:opacity-40";
-const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-info-solid border border-info-solid text-onsolid hover:brightness-110 disabled:opacity-40";
+const BTN_SOLID = "rounded-lg px-3 py-1.5 text-sm bg-brand border border-brand text-onbrand hover:brightness-110 disabled:opacity-40";
 
 export type SessionView = {
   id: string; heldOn: string; topic: string; mode: string; hours: number | null;
@@ -108,7 +109,7 @@ export default function TrainingBoard({
         </div>
 
         <div className="mt-3 overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">日期</th><th className="px-3 py-2">主題</th>
@@ -178,7 +179,7 @@ export default function TrainingBoard({
           </button>
         </div>
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">申請人</th><th className="px-3 py-2">課程</th>
@@ -224,7 +225,7 @@ export default function TrainingBoard({
       <div className="rounded-xl border border-line bg-panel p-4 shadow-e1">
         <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">{year} 年度訓練時數總表</h3>
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">教練</th>
@@ -245,7 +246,7 @@ export default function TrainingBoard({
                   <td className="px-3 py-2 text-right tabular-nums">
                     {h.external}
                     {h.externalRaw > h.external && (
-                      <span className="text-[11px] text-tx3"> / 申請 {h.externalRaw}</span>
+                      <span className="text-11 text-tx3"> / 申請 {h.externalRaw}</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold">{h.total}</td>
@@ -282,7 +283,7 @@ function RollCall({
         {peers.map((p) => (
           <label key={p.id} className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1 text-xs">
             <input type="checkbox" checked={sel.includes(p.id)} onChange={() => toggle(p.id)}
-              className="h-3.5 w-3.5 accent-info-solid" />
+              className="h-3.5 w-3.5 accent-brand" />
             <span className={p.id === session.speakerId ? "text-brand2" : "text-tx"}>
               {p.name}{p.id === session.speakerId && "（講師）"}
             </span>

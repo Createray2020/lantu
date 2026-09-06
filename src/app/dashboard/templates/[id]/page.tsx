@@ -48,7 +48,7 @@ export default async function TemplateViewPage({
             key={p.id}
             href={`/dashboard/templates/${id}?plan=${p.id}`}
             className={
-              "text-[11px] rounded px-1.5 py-0.5 border " +
+              "text-11 rounded px-1.5 py-0.5 border " +
               (p.id === plan.id
                 ? "border-brand text-brand2 bg-brand/10 font-bold"
                 : "border-line2 text-tx2 hover:bg-panel3")

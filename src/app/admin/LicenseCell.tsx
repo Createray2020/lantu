@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import SubmitButton from "@/components/ui/SubmitButton";
 import {
   INTERN_MONTHS, RANK_GROUP_LABEL, addPeriod, licenseState,
   type LicenseUnit,
@@ -160,14 +161,13 @@ export default function LicenseCell({
             <span className="text-tx3">（含當日）</span>
           </p>
 
-          <button
-            type="button"
+          <SubmitButton type="button"
             onClick={save}
             disabled={busy || !from}
-            className="w-full bg-brand text-onbrand font-bold rounded px-2 py-1 disabled:opacity-50"
+            state={busy ? "pending" : "idle"}
           >
             {licenseUntil ? "延長 / 更新期限" : "開通期限"}
-          </button>
+          </SubmitButton>
 
           <div className="pt-2 border-t border-line">
             <label className="block">

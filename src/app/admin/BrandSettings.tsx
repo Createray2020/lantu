@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
 import { saveBrandLogo, removeBrandLogo } from "./actions";
 
 // saveBrandLogo 會 throw（例如 missing-logo），而正式環境會把訊息換成無意義的 digest——
@@ -213,8 +214,8 @@ export default function BrandSettings({ currentLogo }: { currentLogo: string | n
             type="button"
             disabled={pending}
             // 這一顆影響全組織每一個人看到的 Logo，而且沒有復原鍵——按錯就要重新上傳原圖。
-            onClick={() => {
-              if (confirm("移除後全組織會回到嵐途預設標記，確定？")) {
+            onClick={async () => {
+              if (await confirmDialog("移除後全組織會回到嵐途預設標記，確定？")) {
                 run(() => removeBrandLogo(), "已移除，已還原成嵐途預設標記");
               }
             }}

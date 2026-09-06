@@ -85,7 +85,7 @@ export default function UiScaleToggle({
       title="調整字級（老花友善）"
     >
       {!compact && (
-        <span className="text-tx2 text-[10px] font-bold px-1 select-none">字級</span>
+        <span className="text-tx2 text-10 font-bold px-1 select-none">字級</span>
       )}
       {UI_SCALES.map((s) => (
         <button

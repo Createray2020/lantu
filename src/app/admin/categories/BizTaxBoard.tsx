@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { confirmDialog } from "@/components/ui/confirm";
+import { FIELD } from "@/components/ui/Field";
 import { saveBizTaxAction, resetBizTaxAction, type ActionResult } from "./actions";
 import type { BizTaxRow } from "@/lib/bizTaxParams";
 import { fmtMoney } from "@/lib/money";
@@ -15,8 +17,7 @@ import MoneyInput from "@/components/MoneyInput";
 // 只能改內建清單裡的 key、不能新增：前端那些常數名是寫死的，多一列沒有用，
 // 少一列反而會讓試算靜靜地算出 NaN。「回復內建值」＝把 DB 那列刪掉。
 
-const inputCls =
-  "w-full rounded border border-line2 bg-field px-2 py-1 text-sm text-tx outline-none focus:border-brand";
+const inputCls = FIELD;
 const btnCls =
   "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
 
@@ -69,7 +70,7 @@ export default function BizTaxBoard({ rows, basis }: { rows: BizTaxRow[]; basis:
         <div key={g} className="mb-5">
           <h3 className="text-xs text-tx2 mb-2">{g}</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse min-w-[820px]">
+            <table className="w-full text-sm border-collapse min-w-[820px] tbl-sticky">
               <thead>
                 <tr>
                   {["項目", "目前值", "新值", "資料基準", "備註 / 法源", ""].map((h) => (
@@ -86,11 +87,11 @@ export default function BizTaxBoard({ rows, basis }: { rows: BizTaxRow[]; basis:
                     <tr key={r.key}>
                       <td className="px-3 py-2 border-t border-line align-top">
                         <div className="font-semibold text-tx">{r.label}</div>
-                        <code className="text-[11px] text-tx3">{r.key}</code>
+                        <code className="text-11 text-tx3">{r.key}</code>
                       </td>
                       <td className="px-3 py-2 border-t border-line align-top whitespace-nowrap">
                         <span className="text-brand2 font-bold">{display(r.value, r.unit)}</span>
-                        <div className="text-[11px] text-tx3">{UNIT_HINT[r.unit]}</div>
+                        <div className="text-11 text-tx3">{UNIT_HINT[r.unit]}</div>
                       </td>
                       <td className="px-3 py-2 border-t border-line align-top w-[130px]">
                         {/* 金額欄補千分位；比率／倍數是小數，維持自由輸入。 */}
@@ -117,8 +118,8 @@ export default function BizTaxBoard({ rows, basis }: { rows: BizTaxRow[]; basis:
                           儲存
                         </button>
                         <button disabled={pending} className={`${btnCls} ml-2`}
-                          onClick={() => {
-                            if (!confirm(`「${r.label}」回復程式內建值？`)) return;
+                          onClick={async () => {
+                            if (!await confirmDialog(`「${r.label}」回復程式內建值？`)) return;
                             setDraft((prev) => { const n = { ...prev }; delete n[r.key]; return n; });
                             run(() => resetBizTaxAction(r.key), `已回復「${r.label}」的內建值`);
                           }}>

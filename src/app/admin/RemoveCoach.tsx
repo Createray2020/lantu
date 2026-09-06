@@ -6,6 +6,7 @@
 //   2. 名下客戶：要先整批轉移給接手教練
 // 資料庫的 RESTRICT 是最後一道防線，這裡先擋是為了給得出人看得懂的理由。
 import { useState, useTransition } from "react";
+import SubmitButton from "@/components/ui/SubmitButton";
 import { useRouter } from "next/navigation";
 import { transferClientsAction, removeCoachAction } from "./actions";
 
@@ -57,7 +58,7 @@ export default function RemoveCoach({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[10px] text-tx3 hover:text-danger underline underline-offset-2"
+        className="text-10 text-tx3 hover:text-danger underline underline-offset-2"
       >
         移除帳號…
       </button>
@@ -70,20 +71,20 @@ export default function RemoveCoach({
         <span className="text-xs font-bold text-danger">移除「{name}」</span>
         <div className="flex-1" />
         <button type="button" onClick={() => { setOpen(false); setConfirming(false); setError(null); setMsg(null); }}
-          className="text-[10px] text-tx3 hover:text-tx">收起</button>
+          className="text-10 text-tx3 hover:text-tx">收起</button>
       </div>
 
-      <div className="text-[11px] text-tx2 mb-2">
+      <div className="text-11 text-tx2 mb-2">
         名下客戶 <b className="text-tx">{clientCount}</b> 位 · 分潤案件 <b className="text-tx">{caseCount}</b> 筆
       </div>
 
       {blockedByCases ? (
-        <p className="text-[11px] text-brand2 leading-relaxed">
+        <p className="text-11 text-brand2 leading-relaxed">
           此教練有 {caseCount} 筆案件分潤紀錄，依稽核不可移除。<br />要停止他的存取請用「停權」。
         </p>
       ) : blockedByClients ? (
         <>
-          <p className="text-[11px] text-tx2 mb-2 leading-relaxed">
+          <p className="text-11 text-tx2 mb-2 leading-relaxed">
             移除前要先把 {clientCount} 位客戶轉給接手教練（客戶與規劃會完整保留）。
           </p>
           <select
@@ -105,21 +106,23 @@ export default function RemoveCoach({
         </>
       ) : confirming ? (
         <>
-          <p className="text-[11px] text-danger mb-2 leading-relaxed">
+          <p className="text-11 text-danger mb-2 leading-relaxed">
             確定要永久移除這個帳號？此動作無法復原。
           </p>
           <div className="flex gap-2">
-            <button type="button" disabled={pending} onClick={doRemove}
-              className="flex-1 rounded-md bg-danger-solid text-onsolid font-bold px-3 py-1.5 text-xs disabled:opacity-50">
-              {pending ? "移除中…" : "確定移除"}
-            </button>
+            <SubmitButton type="button" disabled={pending} onClick={doRemove}
+          state={pending ? "pending" : "idle"}
+          pendingLabel="移除中…"
+        >
+          確定移除
+        </SubmitButton>
             <button type="button" onClick={() => setConfirming(false)}
               className="rounded-md border border-line2 text-tx2 px-3 py-1.5 text-xs">取消</button>
           </div>
         </>
       ) : (
         <>
-          <p className="text-[11px] text-tx2 mb-2">沒有客戶也沒有分潤紀錄，可以移除。</p>
+          <p className="text-11 text-tx2 mb-2">沒有客戶也沒有分潤紀錄，可以移除。</p>
           <button type="button" onClick={() => setConfirming(true)}
             className="w-full rounded-md border border-danger-solid text-danger font-bold px-3 py-1.5 text-xs">
             移除帳號
@@ -127,8 +130,8 @@ export default function RemoveCoach({
         </>
       )}
 
-      {msg && <div className="mt-2 text-[10px] text-ok">{msg}</div>}
-      {error && <div className="mt-2 text-[10px] text-danger">失敗：{error}</div>}
+      {msg && <div className="mt-2 text-10 text-ok">{msg}</div>}
+      {error && <div className="mt-2 text-10 text-danger">失敗：{error}</div>}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { FIELD } from "@/components/ui/Field";
 import {
   saveInsProductAction, deleteInsProductAction, importInsProductsAction, type ActionResult,
 } from "./actions";
@@ -15,8 +16,7 @@ import { INS_PRODUCT_KINDS } from "@/lib/insProducts.defaults";
 //
 // 商品是幾千筆，不可能一列一列敲 → CSV 匯入才是主要入口，手動新增只用於補一兩筆。
 
-const inputCls =
-  "w-full rounded border border-line2 bg-field px-2 py-1 text-sm text-tx outline-none focus:border-brand";
+const inputCls = FIELD;
 const btnCls =
   "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
 
@@ -82,8 +82,8 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
                 className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${pick === co.name ? "bg-panel3 text-tx" : "text-tx2 hover:bg-panel2"}`}
               >
                 <span className="flex-1">{co.name}</span>
-                <span className="text-[10px] text-tx3">{co.cat}</span>
-                <span className="text-[10px] text-tx3">{co.n || ""}</span>
+                <span className="text-10 text-tx3">{co.cat}</span>
+                <span className="text-10 text-tx3">{co.n || ""}</span>
               </button>
             ))}
           </div>
@@ -95,7 +95,7 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
           ) : (
             <>
               <div className="overflow-x-auto rounded border border-line">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm tbl-sticky">
                   <thead className="bg-field text-xs text-tx3">
                     <tr>
                       <th className="px-2 py-1.5 text-left">代號</th>

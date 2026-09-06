@@ -11,6 +11,7 @@
 //      不是公開目錄。所以千萬不要為了「方便」把 C 階也加進建議清單。
 
 import { useMemo, useState, useTransition } from "react";
+import SubmitButton from "@/components/ui/SubmitButton";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CoachCard } from "@/app/dashboard/profile/ProfileEditor";
@@ -111,13 +112,13 @@ export default function CoachList({
                 </Link>
                 <div className="flex-1" />
                 {c.code && (
-                  <span className="font-mono text-[10px] tracking-wider text-tx3" title="教練編號">
+                  <span className="font-mono text-10 tracking-wider text-tx3" title="教練編號">
                     {c.code}
                   </span>
                 )}
                 {/* C 階教練照常呈現，只是不給直接指定的按鈕（見檔頭的派案規則）。 */}
                 {!c.pickable ? (
-                  <span className="text-[11px] text-tx3 border border-line rounded-lg px-2.5 py-1.5">
+                  <span className="text-11 text-tx3 border border-line rounded-lg px-2.5 py-1.5">
                     需教練編號指定
                   </span>
                 ) : link.state === "none" ? (
@@ -181,7 +182,7 @@ function CodeEntry({ coaches, link }: { coaches: PublicCoach[]; link: LinkState 
   return (
     <div className="rounded-xl border border-line bg-white/[0.03] px-4 py-4">
       <div className="text-sm font-bold mb-1">已經有指定的教練了？輸入教練編號</div>
-      <p className="text-[12px] text-tx2 leading-relaxed mb-3">
+      <p className="text-xs text-tx2 leading-relaxed mb-3">
         每位嵐途教練都有一組專屬編號（格式如 <span className="font-mono text-brand">FC2609002</span>）。
         向你的教練索取後輸入，就會直接把連結申請送給他。
       </p>
@@ -204,10 +205,12 @@ function CodeEntry({ coaches, link }: { coaches: PublicCoach[]; link: LinkState 
             spellCheck={false}
             className="font-mono tracking-wider rounded-lg bg-panel border border-line2 px-3 py-2 text-sm w-48 focus:border-brand outline-none shadow-e1"
           />
-          <button type="submit" disabled={pending || !key}
-            className="rounded-lg bg-brand text-onbrand font-bold px-3 py-2 text-xs hover:bg-brand2 disabled:opacity-40">
-            {pending ? "送出中…" : "指定這位教練"}
-          </button>
+          <SubmitButton type="submit" disabled={pending || !key}
+          state={pending ? "pending" : "idle"}
+          pendingLabel="送出中…"
+        >
+          指定這位教練
+        </SubmitButton>
 
           {suggestions.length > 0 && (
             <ul className="absolute top-full left-0 mt-1 z-10 w-64 rounded-lg border border-line2 bg-panel shadow-lg overflow-hidden">
@@ -217,7 +220,7 @@ function CodeEntry({ coaches, link }: { coaches: PublicCoach[]; link: LinkState 
                     className="w-full text-left px-3 py-2 text-xs hover:bg-panel2 flex items-center gap-2">
                     <span className="font-mono text-brand">{c.code}</span>
                     <span className="text-tx">{c.name}</span>
-                    {c.rankLabel && <span className="text-[10px] text-tx3">{c.rankLabel}</span>}
+                    {c.rankLabel && <span className="text-10 text-tx3">{c.rankLabel}</span>}
                   </button>
                 </li>
               ))}

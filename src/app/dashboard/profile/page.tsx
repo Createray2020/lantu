@@ -56,7 +56,7 @@ export default async function ProfilePage() {
           <div className="font-mono text-2xl tracking-[0.14em] text-brand2 mt-0.5">
             {me.code ?? "—"}
           </div>
-          <p className="text-[12px] text-tx2 mt-1 leading-relaxed">
+          <p className="text-xs text-tx2 mt-1 leading-relaxed">
             把這組編號給客戶，他到{" "}
             <Link href="/coaches" className="underline underline-offset-4 hover:text-tx">官網教練頁</Link>{" "}
             輸入就能直接把連結申請送給你（一樣要你按接受才會掛上）。

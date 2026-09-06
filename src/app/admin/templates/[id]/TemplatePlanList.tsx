@@ -95,13 +95,13 @@ export default function TemplatePlanList({
             >
               <div className="font-bold">
                 {p.year}
-                {p.label && <span className="ml-2 text-[12px] font-normal text-tx2">{p.label}</span>}
+                {p.label && <span className="ml-2 text-xs font-normal text-tx2">{p.label}</span>}
                 {/* 客戶軌（人生護照）示範也可以是範本的一部分，但它跟教練軌不是同一種東西，要標出來。 */}
                 {p.track !== "coach" && (
-                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded border border-line2 text-tx2">人生護照</span>
+                  <span className="ml-2 text-10 px-1.5 py-0.5 rounded border border-line2 text-tx2">人生護照</span>
                 )}
               </div>
-              <div className="text-[12px] font-bold" style={{ color: stageColor(p.healthGrade) }}>
+              <div className="text-xs font-bold" style={{ color: stageColor(p.healthGrade) }}>
                 {p.healthGrade ? stageName(p.healthGrade) : "—"}
               </div>
               <div className="text-sm tabular-nums text-tx">{fmtMoney(p.netWorth ?? null)}</div>

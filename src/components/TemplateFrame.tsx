@@ -196,10 +196,10 @@ export default function TemplateFrame({
       <div className="flex items-center gap-3 px-4 py-2 bg-panel border-b border-line text-tx">
         <Link href={backHref} className="text-sm text-tx2 hover:text-tx">← {backLabel}</Link>
         <span className="text-sm font-bold">{title}</span>
-        {subtitle && <span className="text-[12px] text-tx2">{subtitle}</span>}
+        {subtitle && <span className="text-xs text-tx2">{subtitle}</span>}
         <span
           className={
-            "text-[11px] font-bold px-2 py-0.5 rounded border " +
+            "text-11 font-bold px-2 py-0.5 rounded border " +
             (readOnly
               ? "border-brand/60 text-brand2 bg-brand/10"
               : "border-info/60 text-info bg-info/10")
@@ -221,14 +221,14 @@ export default function TemplateFrame({
           role="alert"
           className="sticky top-0 z-40 flex flex-wrap items-center gap-3 px-4 py-2.5 bg-danger-solid/25 text-danger border-b border-danger/40"
         >
-          <span className="text-[13px] font-bold">
+          <span className="text-13 font-bold">
             ⚠️ 儲存失敗——這一段修改<b className="underline">還沒進資料庫</b>。請不要關掉這個分頁。
           </span>
           <div className="flex-1" />
           <button
             type="button"
             onClick={() => void doSave()}
-            className="text-[13px] font-bold rounded-md px-3 py-1 bg-danger text-danger-solid/25 hover:bg-white"
+            className="text-13 font-bold rounded-md px-3 py-1 bg-danger text-danger-solid/25 hover:bg-white"
           >
             立即重試
           </button>

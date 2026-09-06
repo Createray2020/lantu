@@ -23,9 +23,9 @@ export default function CoachEntry({
   if (state === "suspended") {
     return (
       <section className="max-w-2xl mx-auto mt-12 rounded-xl border border-line bg-field px-5 py-5">
-        <div className="text-[11px] tracking-[0.25em] text-tx3 mb-2">COACH</div>
+        <div className="text-11 tracking-[0.25em] text-tx3 mb-2">COACH</div>
         <h2 className="font-serif text-lg mb-1.5">教練帳號已停權</h2>
-        <p className="text-[13px] text-tx2 leading-relaxed">
+        <p className="text-13 text-tx2 leading-relaxed">
           你的教練身分目前已停權，客戶端的功能不受影響。若有疑問請與嵐途聯繫。
         </p>
       </section>
@@ -35,18 +35,18 @@ export default function CoachEntry({
   if (state === "pending") {
     return (
       <section className="max-w-2xl mx-auto mt-12 rounded-xl border border-brand/30 bg-brand/5 px-5 py-5">
-        <div className="text-[11px] tracking-[0.25em] text-brand mb-2">COACH</div>
+        <div className="text-11 tracking-[0.25em] text-brand mb-2">COACH</div>
         <h2 className="font-serif text-lg mb-1.5">你的報聘申請審核中</h2>
-        <p className="text-[13px] text-tx2 leading-relaxed mb-4">
+        <p className="text-13 text-tx2 leading-relaxed mb-4">
           開通需經審核（含費用確認）。開通後這裡會變成教練工作台的入口。
           資料完整並完成推薦人確認後，原則上於 1～3 個工作日內完成審核。
         </p>
         {progress && (
           <div className="rounded-lg border border-line bg-field p-4">
-            <div className="text-[11px] text-tx3 mb-2">報聘路線：{routeMeta(progress.route).label}</div>
+            <div className="text-11 text-tx3 mb-2">報聘路線：{routeMeta(progress.route).label}</div>
             <ApplyStepList steps={applySteps(progress)} />
             {progress.introducerNote && (
-              <p className="mt-3 pt-3 border-t border-line text-[11px] text-tx2 whitespace-pre-wrap">
+              <p className="mt-3 pt-3 border-t border-line text-11 text-tx2 whitespace-pre-wrap">
                 推薦人留言：{progress.introducerNote}
               </p>
             )}
@@ -58,9 +58,9 @@ export default function CoachEntry({
 
   return (
     <section className="max-w-2xl mx-auto mt-12 rounded-xl border border-line bg-field px-5 py-5">
-      <div className="text-[11px] tracking-[0.25em] text-brand mb-2">COACH</div>
+      <div className="text-11 tracking-[0.25em] text-brand mb-2">COACH</div>
       <h2 className="font-serif text-lg mb-1.5">想成為嵐途財務教練？</h2>
-      <p className="text-[13px] text-tx2 leading-relaxed mb-4">
+      <p className="text-13 text-tx2 leading-relaxed mb-4">
         你現在的帳號是客戶身分。教練與客戶並不互斥——同一組帳號可以兩邊都用，
         報聘核准後你仍然保有這裡的個人規劃。有推薦人可填教練編號，沒有也能直接申請。
       </p>
@@ -73,7 +73,7 @@ export default function CoachEntry({
         </Link>
         <Link
           href="/join"
-          className="text-[12.5px] text-tx2 hover:text-tx underline underline-offset-4"
+          className="text-xs text-tx2 hover:text-tx underline underline-offset-4"
         >
           先看看教練在做什麼
         </Link>

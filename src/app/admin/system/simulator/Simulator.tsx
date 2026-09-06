@@ -4,13 +4,14 @@
 // 所以「試算出來的數字」與「日後真的發下去的數字」不可能不一致。
 
 import { Fragment, useMemo, useState } from "react";
+import { FIELD_SM } from "@/components/ui/Field";
 import { ranksForModule, splitForModule, type ChainNode } from "@/lib/comp/engine";
 import { SCENARIOS, isApplicable } from "@/lib/comp/scenarios";
 import type { CompParams } from "@/lib/comp/types";
 import { fmtMoney } from "@/lib/money";
 import MoneyInput from "@/components/MoneyInput";
 
-const INPUT = "bg-panel border border-line2 rounded px-2 py-1 text-sm text-tx outline-none";
+const INPUT = FIELD_SM;
 const BTN = "rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3";
 
 type Row = { rankCode: string };
@@ -89,7 +90,7 @@ export default function Simulator({ params }: { params: CompParams }) {
                   {modules.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
                 </select>
                 {activeModule && (
-                  <span className="block text-[11px] text-tx3 mt-0.5">
+                  <span className="block text-11 text-tx3 mt-0.5">
                     {activeModule.splitMode === "flat" ? "固定比例分潤（不沿輔導鏈）" : "差％逐層"}
                     {" · "}
                     {activeModule.price == null ? "看實收" : `定價 ${fmtMoney(activeModule.price)}`}
@@ -108,7 +109,7 @@ export default function Simulator({ params }: { params: CompParams }) {
           <label className="flex items-center gap-2 text-sm">
             <span className="w-24 text-tx2">案件來源</span>
             <input type="checkbox" checked={companyLead} onChange={(e) => setCompanyLead(e.target.checked)}
-              className="h-4 w-4 accent-info-solid" />
+              className="h-4 w-4 accent-brand" />
             <span className="text-tx">公司派案（推廣端全數歸公司）</span>
           </label>
           <label className="flex items-center gap-2 text-sm">
@@ -118,7 +119,7 @@ export default function Simulator({ params }: { params: CompParams }) {
             </select>
             <label className="flex items-center gap-1 ml-2">
               <input type="checkbox" checked={selfBoth} onChange={(e) => setSelfBoth(e.target.checked)}
-                className="h-4 w-4 accent-info-solid" />
+                className="h-4 w-4 accent-brand" />
               <span className="text-tx">自推自執</span>
             </label>
           </label>
@@ -178,7 +179,7 @@ export default function Simulator({ params }: { params: CompParams }) {
           </span>
         </div>
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">角色</th>
@@ -196,7 +197,7 @@ export default function Simulator({ params }: { params: CompParams }) {
                   <tr className="border-t border-line">
                     <td className="px-3 py-2">
                       <div className="font-semibold">{l.name}</div>
-                      <div className="text-[11px] text-tx3">{l.role}</div>
+                      <div className="text-11 text-tx3">{l.role}</div>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{l.promoPct || "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{l.execPct || "—"}</td>
