@@ -13,8 +13,12 @@ import type { ReactNode } from "react";
  *    不要再在別處宣告第三份。
  */
 
+// ⚠️ 手機是 text-base（16px）不是 text-sm——低於 16px 的欄位在 iOS Safari 一聚焦
+//    就會把整頁放大而且不會縮回。globals.css 有一條 640px 以下的 16px 地板當總安全網
+//    （它連沒用這個常數的欄位也蓋得到），這裡再寫一次是為了讓意圖留在元件層，
+//    不要有人看到 text-sm 就以為手機也是 14px。
 const BASE =
-  "w-full bg-field border border-line2 rounded-md text-sm px-3 py-2 text-tx " +
+  "w-full bg-field border border-line2 rounded-md text-base sm:text-sm px-3 py-2 text-tx " +
   "placeholder:text-tx3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
 
 /** 一般輸入框／下拉／多行 */

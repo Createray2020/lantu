@@ -234,7 +234,7 @@ export default async function LandingView() {
       </footer>
 
       {/* 手機底部固定 CTA：行動流量近六成，且多數是單手拇指操作 */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-field/95 backdrop-blur border-t border-brand/40 px-4 py-3">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-field/95 backdrop-blur border-t border-brand/40 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
         <Link href="/passport" className="block text-center font-bold text-onbrand bg-brand px-6 py-3 rounded-lg">
           免費試算我的人生護照
         </Link>

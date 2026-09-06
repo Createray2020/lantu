@@ -26,13 +26,17 @@ export default async function AdminHeader({
 }) {
   const [brand, me] = await Promise.all([getBrand(), ensureCoach()]);
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-2.5 border-b border-line bg-panel">
-      <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
+    // ⚠️ flex-wrap 不能省：右側那組（主題 88px＋字級 122px＋回系統＋頭貼）是不可壓縮的，
+    //    390px 扣掉內距只剩約 358px，沒有 wrap 就是把最右邊的東西推出畫面。
+    //    刻意不用 hidden sm:* 把切換鈕藏起來——字級切換正是給老花用的，
+    //    在手機上更需要，寧可頂欄多一列。
+    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 sm:px-6 py-2.5 border-b border-line bg-panel">
+      <Link href="/home" className="flex items-center gap-3 min-w-0" title="回官網首頁">
         {brand.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={brand.logoUrl} alt="嵐途" className="h-7 w-auto max-w-[160px] object-contain" />
         )}
-        <span className="font-serif text-lg tracking-[0.14em]">嵐途 LAN TU</span>
+        <span className="font-serif text-lg tracking-[0.14em] truncate">嵐途 LAN TU</span>
       </Link>
       <span className="text-tx2 text-xs">{label}</span>
       <div className="flex-1" />

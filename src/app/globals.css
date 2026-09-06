@@ -285,10 +285,34 @@ tbody tr:hover {
   z-index: 2;
   background: var(--panel2);
 }
+/* ⚠️ 手機關掉黏頂表頭。--header-h 是寫死的一列高度，但頂欄在窄螢幕會換行
+   （兩三列都有可能）→ top 一定對不上，不是把表頭蓋掉就是浮在半空。
+   而且手機的可視高度本來就少，黏一條表頭反而更擠；表格在這裡是橫向捲的，
+   縱向捲到哪一列看不看得到欄名，不是手機上的主要問題。 */
+@media (max-width: 640px) {
+  .tbl-sticky thead th { position: static; }
+}
 
 /* 數字一律靠右、等寬對齊——金額不對齊就比不出位數。
    數字輸入框全站通用；顯示用的儲存格加 .num。 */
 input[type="number"], .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── 手機的輸入框字級地板 ──────────────────────────────────────────────────
+   ⚠️ iOS Safari 對 font-size < 16px 的欄位，一聚焦就自動把整頁放大，而且**不會縮回**；
+      在 fixed 疊層裡（規劃器外框、彈窗）連兩指縮都救不回版面。全站輸入框原本一律
+      text-sm＝14px、後台審核面板 11px、規劃器內 12px，於是「每點一格就被放大一次」。
+      這是手機上第一個、也是最致命的擋路點，所以在這裡設一個 16px 的地板。
+   ⚠️ 一定要 !important：Tailwind 的 text-sm 是 class（specificity 0,1,0），
+      單靠元素選擇器蓋不過去。
+   ⚠️ range/checkbox/radio 不吃字級（改了反而會影響原生控制項的尺寸），排除掉。
+   桌機不受影響——這條只在 640px 以下生效。 */
+@media (max-width: 640px) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }

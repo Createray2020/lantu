@@ -184,7 +184,7 @@ function CatTable({
       </p>
 
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm tbl-sticky">
+        <table className="min-w-[900px] w-full text-sm tbl-sticky">
           <thead className="bg-panel text-tx2">
             <tr>
               <th className="px-2 py-2 text-left font-medium">排序</th>
@@ -477,7 +477,7 @@ function EduTable({
         <b>碩博士與延修生不適用</b>；公立大專<b>沒有</b>普及性減免。
       </p>
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm tbl-sticky">
+        <table className="min-w-[900px] w-full text-sm tbl-sticky">
           <thead className="bg-panel text-tx2">
             <tr>
               <th className="px-2 py-2 text-left font-medium">學段</th>
@@ -496,8 +496,11 @@ function EduTable({
               <tr key={r.stage} className="border-t border-line align-top">
                 <td className="px-2 py-1.5 font-medium whitespace-nowrap">
                   {r.stage}
+                  {/* ⚠️ whitespace-nowrap 會從 td 繼承下來，把 max-w-[16rem] 整個廢掉
+                      ——政策來源那幾十個字會排成一條不換行的長列，把整張表撐到數千 px 寬。
+                      nowrap 是為了讓「階段」名稱不斷行，不是為了這段說明。 */}
                   {r.source && (
-                    <div className="mt-0.5 max-w-[16rem] text-10 leading-snug text-tx2">{r.source}</div>
+                    <div className="mt-0.5 max-w-[16rem] whitespace-normal text-10 leading-snug text-tx2">{r.source}</div>
                   )}
                 </td>
                 <td className="px-2 py-1.5">{num(r, "startAge")}</td>

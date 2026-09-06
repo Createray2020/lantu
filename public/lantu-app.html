@@ -211,8 +211,55 @@ td.calc{white-space:nowrap}
 @media(max-width:1200px){.shell{grid-template-columns:200px 1fr}.side{padding:14px 10px}}
 @media(max-width:820px){.shell{grid-template-columns:1fr}.side{border-right:none;border-bottom:1px solid var(--line)}.big3{grid-template-columns:1fr}}
 
+/* ══════════════════════════════════════════════════════════════════════
+   手機（≤820px）。這一段之前不存在——全檔最小的斷點是 720px，而且那幾條清一色
+   只做「多欄 grid 收成單欄」，沒有一條處理字級、內距、固定寬度或觸控。
+   ⚠️ 這裡只讓「看」變得可用（客戶看報告書、教練翻給客戶看）。
+      「編輯規劃」是電腦的事，外框已經在小螢幕擋下來了（見 PlanEditor 的守門）。
+   ══════════════════════════════════════════════════════════════════════ */
+@media (max-width:820px){
+  /* ⚠️ 全檔沒有任何一個輸入欄 ≥16px（表格內 12px、.f input 甚至沒設、吃 UA 的 13.3px）。
+     iOS Safari 一聚焦就把整頁放大而且不會縮回，在 fixed 疊層裡更回不去。
+     規劃器是獨立文件，Next 那邊 globals.css 的同一條規則到不了這裡，要各寫一次。 */
+  input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=color]),
+  select,textarea{font-size:16px}
+
+  /* .top 的 padding-right:150px 是留給非 embed 模式那顆浮動頭貼的。
+     390px 下它吃掉 38% 的寬，剩 222px → 頂欄折成四五列、實測高 203px。 */
+  .top{padding-right:18px;gap:8px}
+  .top .brand small{display:none}
+
+  /* 三層內距疊加後，報告書的可用寬只剩 266px（實測），是全檔最窄的內容區。 */
+  .main{padding:12px}
+  .sec{padding:14px 12px}
+  .report{padding:20px 16px;overflow-x:auto}
+
+  /* ⚠️ 報告書的表格：中文可以**逐字**換行 → 表格的 min-content 極小 → 它只會一路縮到
+     容器寬，欄位被壓成一字一行（實測：家庭成員表 5 欄擠在 266px，「王太太」斷兩行）。
+     兩件事要一起做才有用：
+       ① display:block + overflow-x → 這張表自己變成一個橫向捲動容器；
+       ② 每一格給欄寬下限 → 否則內部表格照樣縮到容器寬，第 ① 條永遠不會觸發
+          （只加 ① 實測 scrollWidth 仍等於 clientWidth，等於沒改）。
+     ⚠️ 用 min-width 而不是 white-space:nowrap：nowrap 會讓「包含項目／定義」那種
+     長句欄變成一條上千 px 的長列。給下限則是欄位夠寬就好，長句照樣換行。
+     欄少的表（2–3 欄）加總還在容器內，不會多出無謂的橫捲。 */
+  .report table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  .report table th,.report table td{min-width:6.5em}
+
+  /* 圖只有上限沒有下限，在窄螢幕會無下限縮小：viewBox 760 的生涯藍圖在 300px 容器裡
+     是 0.39×，圖內 9.5–11px 的軸標變成螢幕上的 3.7–4.3px。給一個下限，讓它改成可橫捲。 */
+  .report svg[viewBox]:not([height]){min-width:min(var(--svgw,560px),560px)}
+
+  /* 報告書目錄兩欄在 266px 下每欄 119px，中文章節名逐字折行。 */
+  .rtoc{column-count:1!important}
+}
+
 /* ===== embed 模式（單一年度版本編輯器，由 /dashboard 外殼載入）===== */
 html.embed .side,html.embed-single .side{display:none!important}
+/* ⚠️ embed 只藏了 .side，.top 沒藏 → 手機上會同時出現父層 header 與規劃器頂欄，兩層工具列。
+   品牌那一塊父層已經有了，藏掉。⚠️ 角色切換（教練端／客戶端）要留著——
+   父層沒有這顆，而「翻給客戶看」正是教練會在手機上做的事。 */
+@media (max-width:820px){html.embed .top .brand{display:none}}
 html.embed .shell,html.embed-single .shell{grid-template-columns:1fr!important}
 /* ===== 收支資債 四合一輸入台 ===== */
 .finsum{position:sticky;top:0;z-index:40;background:color-mix(in srgb, var(--bg) 94%, transparent);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:14px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
@@ -1650,7 +1697,9 @@ function n(v){v=Number(v);return isNaN(v)?0:v}
 // ⚠️ 圖只准縮小、不准放大（規則見檔頭 .ckchart 那段註解）。每一張流體 SVG 都要鎖在
 // **自己的 viewBox 寬度**上：容器一旦比 viewBox 寬，整張圖連同寫死的 font-size 一起被等比拉大。
 // 全域兜底在 CSS 的 `.main :where(svg[viewBox]:not([height]))`；這裡是逐張精確鎖。
-function svgFitCSS(W){return 'max-width:'+n(W)+'px;height:auto;display:block;margin:0 auto';}
+// --svgw 帶著這張圖的 viewBox 寬度：手機的 min-width 要取 min(自己的寬, 下限)，
+// 不然本來就窄的小圖會被硬撐大。inline style 沒辦法寫 media query，只能把值傳出去。
+function svgFitCSS(W){return 'max-width:'+n(W)+'px;--svgw:'+n(W)+'px;height:auto;display:block;margin:0 auto';}
 function svgFit(W){return ' style="'+svgFitCSS(W)+'"';}
 // 收合區塊：畫面先講結論（圖），「逐項數字」那種表格一律收在圖底下。
 // ⚠️ 只放衍生顯示，不要拿它包輸入框（<details> 收起來時裡面的框拿不到焦點）。
@@ -3973,7 +4022,7 @@ function fanSVG(mc){var W=760,H=230,pad=40,years=mc.years;
   gridY+='<line x1="'+pad+'" y1="'+gy.toFixed(1)+'" x2="'+(W-pad)+'" y2="'+gy.toFixed(1)+'" stroke="rgba(255,255,255,.06)"/>'+
    '<text x="'+(pad-6)+'" y="'+(gy+3).toFixed(1)+'" fill="var(--mut2)" font-size="9" text-anchor="end">'+cfAxis(gv)+'</text>';}
  return '<div id="mcReadout" style="background:var(--field);border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:13px;color:var(--mut)">移動滑鼠／手指到圖上任一年齡，即時顯示估算金額</div>'+
-  '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+';cursor:crosshair;touch-action:none" onmousemove="hoverChart(event,\'mc\')" ontouchmove="hoverChart(event,\'mc\')">'+gridY+'<path d="'+top+' '+bot+' Z" fill="rgba(45,212,191,.18)" stroke="none"/>'+
+  '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+';cursor:crosshair;touch-action:pan-y" onmousemove="hoverChart(event,\'mc\')" ontouchmove="hoverChart(event,\'mc\')">'+gridY+'<path d="'+top+' '+bot+' Z" fill="rgba(45,212,191,.18)" stroke="none"/>'+
   '<line x1="'+pad+'" y1="'+zeroY+'" x2="'+(W-pad)+'" y2="'+zeroY+'" stroke="rgba(255,107,107,.5)" stroke-dasharray="4 4"/>'+
   '<path d="'+med+'" fill="none" stroke="#c99a5b" stroke-width="2.5"/>'+ticks+
   '<line id="mcCursor" x1="0" y1="'+pad+'" x2="0" y2="'+(H-pad)+'" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" style="display:none"/></svg>'+
@@ -6684,7 +6733,7 @@ function gapChartSVG(c,set,theme,idKey){
   window.__charts[idKey]={a0:rows[0].age,rows:rows.map(function(r){return r.invest}),
    after:ra?ra.map(function(r){return r.invest}):null,bals:rows.map(function(r){return r.bal}),
    W:W,pad:pL,padR:pR,n:rows.length,gapChart:true};
-  hov=' style="cursor:crosshair;touch-action:none" onmousemove="hoverChart(event,\''+idKey+'\')" ontouchmove="hoverChart(event,\''+idKey+'\')"';
+  hov=' style="cursor:crosshair;touch-action:pan-y" onmousemove="hoverChart(event,\''+idKey+'\')" ontouchmove="hoverChart(event,\''+idKey+'\')"';
   cursor='<line id="'+idKey+'Cursor" x1="0" y1="'+pT+'" x2="0" y2="'+(pT+plotH)+'" stroke="'+K.LAB+'" stroke-width="1" stroke-opacity=".45" style="display:none"/>';
   read='<div id="'+idKey+'Readout" style="background:var(--field);border:1px solid var(--line);border-radius:9px;padding:7px 11px;margin-bottom:7px;font-size:12.5px;color:var(--mut)">移動滑鼠／手指到圖上任一年齡，看該年的可投資資產</div>';
  }
@@ -11284,7 +11333,7 @@ function trackingChartSVG(c){var proj=projection(c),rows=proj.rows;if(!rows.leng
  var actMap={};tk.forEach(function(t){actMap[n(t.age)]=n(t.net)});
  window.__charts=window.__charts||{};window.__charts.tk={a0:rows[0].age,rows:rows.map(function(r){return r.net}),actual:actMap,W:W,pad:pad,n:rows.length};
  return '<div id="tkReadout" style="background:var(--field);border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:13px;color:var(--mut)">移動滑鼠／手指到圖上任一年齡，比對模擬與實際淨資產</div>'+
-  '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+';cursor:crosshair;touch-action:none" onmousemove="hoverChart(event,\'tk\')" ontouchmove="hoverChart(event,\'tk\')"><path d="'+line+'" fill="none" stroke="#a9bccf" stroke-width="2.5"/>'+aline+tline+dots+ticks+
+  '<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+';cursor:crosshair;touch-action:pan-y" onmousemove="hoverChart(event,\'tk\')" ontouchmove="hoverChart(event,\'tk\')"><path d="'+line+'" fill="none" stroke="#a9bccf" stroke-width="2.5"/>'+aline+tline+dots+ticks+
   '<line id="tkCursor" x1="0" y1="'+pad+'" x2="0" y2="'+(H-pad)+'" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" style="display:none"/></svg>'+
   '<div class="muted" style="margin-top:6px">青線＝未調整的模擬走勢；'+(afterRows?'<b style="color:var(--amber2)">金色虛線＝採用方案後的規劃線（'+esc(leverSummary(lvT))+'）</b>；':'')+'黑點/線＝實際淨資產。'+
   (afterRows?'實際值應該往金線靠，若貼著青線走代表方案沒有真的被執行。':'差距越大代表實際與規劃偏離越多。')+'</div>';
@@ -11982,7 +12031,7 @@ function annualBalanceSVG(proj,theme){var rows=proj.rows;if(!rows.length)return 
  var ticks='';for(var i3=0;i3<rows.length;i3+=5)ticks+='<text x="'+X(i3).toFixed(1)+'" y="'+(H-9)+'" fill="'+TICK+'" font-size="9" text-anchor="middle">'+rows[i3].age+'</text>';
  var tn=proj.turnNeg,tni=tn?rows.findIndex(function(r){return r.age===tn;}):-1,tnx=tni>=0?X(tni):null;
  var legArr=[['var(--amber2)','年度收支結餘(左軸)'],['#5cc08a',hasPlan?'自由儲蓄累積(右軸)':'可投資資產累積(右軸)']];if(hasPlan)legArr.push(['#7fb0e6','計劃儲蓄累積(右軸)']);var leg=legArr.map(function(l){return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px"><span style="width:11px;height:11px;border-radius:2px;background:'+l[0]+';display:inline-block"></span>'+l[1]+'</span>';}).join('');
- var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+(dark?';cursor:crosshair;touch-action:none':'')+'"'+(dark?' onmousemove="hoverChart(event,\'cf\')" ontouchmove="hoverChart(event,\'cf\')"':'')+'>'+grid+
+ var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+(dark?';cursor:crosshair;touch-action:pan-y':'')+'"'+(dark?' onmousemove="hoverChart(event,\'cf\')" ontouchmove="hoverChart(event,\'cf\')"':'')+'>'+grid+
   '<line x1="'+pL+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+zeroY.toFixed(1)+'" stroke="'+ZERO+'" stroke-dasharray="4 4"/>'+bars+
   '<path d="'+line+'" fill="none" stroke="#5cc08a" stroke-width="2.2"/>'+pline+dots+gL+gR+ticks+
   (tnx!==null?'<line x1="'+tnx.toFixed(1)+'" y1="'+pT+'" x2="'+tnx.toFixed(1)+'" y2="'+(H-pB)+'" stroke="var(--warn)" stroke-dasharray="3 3"/><text x="'+tnx.toFixed(1)+'" y="12" fill="var(--warn)" font-size="10" text-anchor="middle">轉負 '+tn+'歲</text>':'')+
@@ -12030,7 +12079,7 @@ function careerBlueprint(c,proj,theme){var rows=proj.rows;if(!rows||!rows.length
  for(k=0;k<=NL;k++){var y=pT+plotH*k/NL;grid+='<line x1="'+pL+'" y1="'+y.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+y.toFixed(1)+'" stroke="'+GRID+'"/>';var lv=ieMax*(NL-k)/NL;gL+='<text x="'+(pL-6)+'" y="'+(y+3).toFixed(1)+'" fill="'+AX+'" font-size="9" text-anchor="end">'+cfAxis(lv)+'</text>';var rv=nMax-nSpan*k/NL;gR+='<text x="'+(W-pR+6)+'" y="'+(y+3).toFixed(1)+'" fill="'+AX+'" font-size="9" text-anchor="start">'+cfAxis(rv)+'</text>';}
  var ticks='';for(var i2=0;i2<rows.length;i2+=5)ticks+='<text x="'+X(i2).toFixed(1)+'" y="'+(H-9)+'" fill="'+TICK+'" font-size="9" text-anchor="middle">'+rows[i2].age+'</text>';
  window.__charts=window.__charts||{};if(dark)window.__charts.blp={a0:rows[0].age,incs:incs,exps:exps,nets:nets,W:W,pad:pL,n:rows.length};
- var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+(dark?';cursor:crosshair;touch-action:none':'')+'"'+(dark?' onmousemove="hoverChart(event,\'blp\')" ontouchmove="hoverChart(event,\'blp\')"':'')+'>'+grid+
+ var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+(dark?';cursor:crosshair;touch-action:pan-y':'')+'"'+(dark?' onmousemove="hoverChart(event,\'blp\')" ontouchmove="hoverChart(event,\'blp\')"':'')+'>'+grid+
    '<path d="'+posArea+'" fill="'+POS+'" stroke="none"/>'+
    '<path d="'+negArea+'" fill="'+NEG+'" stroke="none"/>'+
    '<line x1="'+pL+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+zeroY.toFixed(1)+'" stroke="'+(dark?TPAL.zero:'rgba(0,0,0,.15)')+'" stroke-dasharray="4 4"/>'+
@@ -12880,7 +12929,7 @@ function rNumberSections(body){
 function rTOC(titles){
  if(!titles.length)return '';
  return '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px">'+
-  '<b style="color:#0d2b45">目錄</b><ol style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
+  '<b style="color:#0d2b45">目錄</b><ol class="rtoc" style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
   titles.map(function(t){return '<li>'+esc(t)+'</li>';}).join('')+'</ol></div>';
 }
 // 報告書的三個數字：一排 KPI，不要更多。超過三個就是還沒想清楚哪個最重要。
@@ -14263,13 +14312,25 @@ function mountReport(){
 }
 
 /* ───────── 諮詢狀態列 ───────── */
+/* 量出註記列真正佔掉多少高度，寫進 --lnbar-h。桌機是一列（約 52px），
+   390px 折成四五列會到 130–170px——寫死的那個 52 就是「底部內容被吃掉」的來源。 */
+function syncLnBarH(bar){
+ var h = (bar && bar.style.display!=='none') ? Math.round(bar.getBoundingClientRect().height) : 0;
+ document.documentElement.style.setProperty('--lnbar-h', h+'px');
+}
 function mountSessBar(){
  var bar=document.getElementById('lnSessBar');
  if(!bar){
   bar=document.createElement('div'); bar.id='lnSessBar'; document.body.appendChild(bar);
+  // 內容會隨狀態換行數（「已記 N 則」那句長短不一），所以用 ResizeObserver 而不是量一次。
+  if(window.ResizeObserver){ try{ new ResizeObserver(function(){ syncLnBarH(bar); }).observe(bar); }catch(e){} }
  }
  var c=C();
- if(!c){ bar.style.display='none'; return; }
+ if(!c){ bar.style.display='none'; syncLnBarH(bar); return; }
+ /* ⚠️ 這個函式原本沒有任何 role 判斷，客戶端也會被掛上「不在諮詢中／註記照樣可寫，
+    會歸到『日常維護』／開始諮詢（停用）」這條**教練端術語**的固定底列——
+    而且那條列上還有「回到上次諮詢開始時」，那是會覆蓋資料的動作，不該出現在客戶眼前。 */
+ if(LN.role==='client'){ bar.style.display='none'; syncLnBarH(bar); return; }
  bar.style.display='';
  var s=sess();
  var cnt=s?allNotes().filter(function(x){return x.sessId===s.id}).length:0;
@@ -14287,6 +14348,7 @@ function mountSessBar(){
      (lastSessionId()?'<button class="lnbtn" onclick="LN.restore(\''+lastSessionId()+'\')">回到上次諮詢開始時</button>':''))+
   '<button class="lnbtn pri" onclick="LN.session()"'+(LN.role!=='owner'?' disabled':'')+'>'+(s?'結束並產摘要':'開始諮詢')+'</button>'+
   '</div>';
+ syncLnBarH(bar);
 }
 
 /* 最近一場已結束的諮詢＝「上次」。remote 由父層灌 LN_REMOTE_STATE.past。 */
@@ -14646,7 +14708,10 @@ var CSS = `
 .lnbarin b{font-size:12.5px;color:var(--amber2)}
 .lndot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent);flex:none}
 .lndot.off{background:var(--mut2);box-shadow:none}
-body{padding-bottom:52px}
+/* ⚠️ 52px 是照桌機那一列量的。.lnbar 是 flex-wrap，390px 下折成四五列、實高 130–170px
+   → 每個分頁底部 80–120px 內容被永久遮住（「＋ 新增」鈕、報告書結尾都在那一區）。
+   改吃 --lnbar-h，由 mountSessBar 用 ResizeObserver 量出來寫進去。 */
+body{padding-bottom:var(--lnbar-h,52px)}
 
 /* 彈窗 */
 .lnmask{position:fixed;inset:0;background:rgba(4,14,24,.76);display:none;align-items:center;
@@ -14672,7 +14737,7 @@ body{padding-bottom:52px}
 .lnsum{font-size:13px;line-height:1.6;padding:6px 0 6px 13px;border-left:2px solid var(--line);margin-bottom:5px}
 .lncopy{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px 14px;
  font:12px/1.75 ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;margin:12px 0 0}
-.lntoast{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);background:#123a5c;
+.lntoast{position:fixed;left:50%;bottom:calc(var(--lnbar-h,52px) + 14px);transform:translateX(-50%);background:#123a5c;
  border:1px solid var(--amber);color:var(--amber2);padding:9px 18px;border-radius:999px;font-size:13px;
  font-weight:700;z-index:120;opacity:0;pointer-events:none;transition:opacity .2s;max-width:88vw;text-align:center}
 .lntoast.on{opacity:1}
@@ -14801,7 +14866,7 @@ else boot();
    ══════════════════════════════════════════════════════════════════════ */
 (function(){
 var CSS=`
-.ivfab{position:fixed;right:18px;bottom:74px;z-index:60;display:none;align-items:center;gap:8px;
+.ivfab{position:fixed;right:18px;bottom:calc(var(--lnbar-h,52px) + 22px);z-index:60;display:none;align-items:center;gap:8px;
  background:linear-gradient(180deg,var(--card2),var(--card));color:#e9d3ae;border:1px solid color-mix(in srgb, var(--amber) 55%, transparent);
  border-radius:999px;padding:10px 16px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;
  box-shadow:0 8px 22px rgba(var(--sh),.38)}

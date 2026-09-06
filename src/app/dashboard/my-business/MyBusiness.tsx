@@ -199,7 +199,7 @@ export default function MyBusiness({ v }: { v: MyView }) {
       <div className="rounded-xl border border-line bg-panel p-4 shadow-e1">
         <h2 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">我的分潤明細</h2>
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm">
+          <table className="min-w-[780px] w-full text-sm">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">月份</th><th className="px-3 py-2">客戶</th>

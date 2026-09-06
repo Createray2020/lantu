@@ -63,7 +63,7 @@ export default function ProfilesBoard({ rows }: { rows: Row[] }) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full text-sm tbl-sticky">
+        <table className="min-w-[780px] w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-3 py-2">教練</th>

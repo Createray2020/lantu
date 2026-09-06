@@ -15,6 +15,9 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
   {
     title: "人員與組織",
     items: [
+      // 待我處理排在教練帳號之前：它是「有人在等」的那一類，而且是後台唯一
+      // 在手機上做得完的入口（見 admin/inbox/InboxBoard.tsx 的檔頭）。
+      { href: "/admin/inbox", label: "待我處理" },
       { href: "/admin", label: "教練帳號" },
       { href: "/admin/apply", label: "報聘設定" },
       { href: "/admin/profiles", label: "對外檔案" },
@@ -61,7 +64,9 @@ export default function AdminNav() {
         {GROUPS.map((g) => (
           <div key={g.title} className="min-w-0">
             <div className="text-10 tracking-[0.22em] text-tx3 mb-1.5">{g.title}</div>
-            <div className="flex flex-wrap gap-1.5">
+            {/* 手機改單列橫捲。原本 3 組共 14 個 nowrap 連結一起 wrap，在 390px
+                會堆成 8–10 列、約 300px 高的導覽塊，每一頁都頂在內容前面。 */}
+            <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 sm:flex-wrap sm:overflow-visible sm:mx-0 sm:px-0">
               {g.items.map((it) => {
                 const on = isOn(it.href);
                 return (

@@ -253,7 +253,7 @@ export default function CasesBoard({
 
       {/* 案件列表 */}
       <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full text-sm tbl-sticky">
+        <table className="min-w-[900px] w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-3 py-2">客戶</th>
@@ -314,7 +314,7 @@ export default function CasesBoard({
                     <tr className="bg-field">
                       <td colSpan={9} className="px-4 py-3">
                         <div className="overflow-x-auto rounded-lg border border-line">
-                          <table className="w-full text-sm tbl-sticky">
+                          <table className="min-w-[900px] w-full text-sm tbl-sticky">
                             <thead>
                               <tr className="bg-panel2 text-tx2 text-left text-xs">
                                 <th className="px-3 py-1.5">受分潤人</th>
@@ -453,7 +453,7 @@ export default function CasesBoard({
           </button>
         </div>
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm tbl-sticky">
+          <table className="min-w-[640px] w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">月份</th><th className="px-3 py-2">發放日</th>
@@ -557,7 +557,7 @@ function ImportPanel({
             {badCount > 0 && <>，<b className="text-danger">{badCount}</b> 筆有問題（不會匯入）</>}
           </p>
           <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-line">
-            <table className="w-full text-xs tbl-sticky">
+            <table className="min-w-[820px] w-full text-xs tbl-sticky">
               <thead className="sticky top-0 bg-panel2 text-tx2 text-left">
                 <tr>
                   <th className="px-2 py-1.5">列</th><th className="px-2 py-1.5">客戶</th>

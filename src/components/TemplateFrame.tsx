@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import SmallScreenGate from "@/components/SmallScreenGate";
 import { UI_SCALE_KEY, normalizeScale } from "@/lib/uiScale";
 import { THEME_KEY, DEFAULT_THEME, normalizeTheme } from "@/lib/theme";
 
@@ -191,10 +192,38 @@ export default function TemplateFrame({
     error: "儲存失敗",
   };
 
+  // 同一個 iframe 兩種掛法（唯讀直接掛、可編輯包上守門），抽成變數才不會有兩份會走鐘的副本。
+  const frame = (
+    <iframe
+      ref={iframeRef}
+      src="/lantu-app.html?embed=1"
+      title={title}
+      className="flex-1 w-full border-0"
+      onLoad={() =>
+        iframeRef.current?.contentWindow?.postMessage(
+          {
+            type: "lantu:init",
+            data,
+            uiScale: normalizeScale(uiScale), theme: currentTheme(),
+            readOnly,
+            readOnlyNote: note,
+            clientCode: null,
+            notes: [],
+            session: null,
+            past: [],
+            noteAccess: "none",
+          },
+          window.location.origin,
+        )
+      }
+    />
+  );
+
   return (
     <div className="fixed inset-0 flex flex-col bg-canvas">
-      <div className="flex items-center gap-3 px-4 py-2 bg-panel border-b border-line text-tx">
-        <Link href={backHref} className="text-sm text-tx2 hover:text-tx">← {backLabel}</Link>
+      {/* 不會 wrap 的單列 flex：390px 下「← 回上一頁」會被逐字斷行，而它是唯一的出口。 */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 bg-panel border-b border-line text-tx">
+        <Link href={backHref} className="shrink-0 whitespace-nowrap text-sm text-tx2 hover:text-tx">← {backLabel}</Link>
         <span className="text-sm font-bold">{title}</span>
         {subtitle && <span className="text-xs text-tx2">{subtitle}</span>}
         <span
@@ -235,29 +264,16 @@ export default function TemplateFrame({
         </div>
       )}
 
-      <iframe
-        ref={iframeRef}
-        src="/lantu-app.html?embed=1"
-        title={title}
-        className="flex-1 w-full border-0"
-        onLoad={() =>
-          iframeRef.current?.contentWindow?.postMessage(
-            {
-              type: "lantu:init",
-              data,
-              uiScale: normalizeScale(uiScale), theme: currentTheme(),
-              readOnly,
-              readOnlyNote: note,
-              clientCode: null,
-              notes: [],
-              session: null,
-              past: [],
-              noteAccess: "none",
-            },
-            window.location.origin,
-          )
-        }
-      />
+      {/* ⚠️ 範本「編輯」是建構型工作，小螢幕擋下來並給出口；
+          唯讀檢視（示範範本）刻意不擋——那只是看，看本來就該在手機上做得到。 */}
+      {readOnly ? frame : (
+        <SmallScreenGate
+          title="這一段請用電腦開"
+          reason="編輯全公司共用的範本會牽動每一位教練看到的內容，欄位多且要互相對照，在手機上不適合。看範本內容不受影響。"
+        >
+          {frame}
+        </SmallScreenGate>
+      )}
     </div>
   );
 }

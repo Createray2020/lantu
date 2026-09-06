@@ -505,7 +505,7 @@ function ModulesTable({
   return (
     <div>
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm tbl-sticky">
+        <table className="min-w-[820px] w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">代號</th>
@@ -683,7 +683,7 @@ function RanksTable({
   return (
     <div>
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm tbl-sticky">
+        <table className="min-w-[1000px] w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">序</th>
@@ -816,7 +816,7 @@ function ThresholdTable({
       <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-1">{title}</h3>
       {note && <p className="text-xs text-tx2 mb-2">{note}</p>}
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm tbl-sticky">
+        <table className="min-w-[820px] w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               {showFrom && <th className="px-2 py-2">起始職級</th>}
@@ -936,7 +936,7 @@ function VersionsPanel({
   return (
     <div className="space-y-5">
       <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full text-sm tbl-sticky">
+        <table className="min-w-[640px] w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
               <th className="px-2 py-2">版本</th><th className="px-2 py-2">生效日</th>
@@ -1009,7 +1009,7 @@ function VersionsPanel({
                 筆尚未發放的案件會依新制度重算；已發放的不受影響（§31）。
               </p>
               <div className="overflow-x-auto rounded-lg border border-line">
-                <table className="w-full text-xs tbl-sticky">
+                <table className="min-w-[560px] w-full text-xs tbl-sticky">
                   <thead>
                     <tr className="bg-panel2 text-tx2 text-left">
                       <th className="px-2 py-1.5">分類</th>

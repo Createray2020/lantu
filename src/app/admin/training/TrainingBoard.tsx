@@ -109,7 +109,7 @@ export default function TrainingBoard({
         </div>
 
         <div className="mt-3 overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm tbl-sticky">
+          <table className="min-w-[720px] w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">日期</th><th className="px-3 py-2">主題</th>
@@ -179,7 +179,7 @@ export default function TrainingBoard({
           </button>
         </div>
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm tbl-sticky">
+          <table className="min-w-[780px] w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">申請人</th><th className="px-3 py-2">課程</th>
@@ -225,7 +225,7 @@ export default function TrainingBoard({
       <div className="rounded-xl border border-line bg-panel p-4 shadow-e1">
         <h3 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">{year} 年度訓練時數總表</h3>
         <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-sm tbl-sticky">
+          <table className="min-w-[780px] w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
                 <th className="px-3 py-2">教練</th>

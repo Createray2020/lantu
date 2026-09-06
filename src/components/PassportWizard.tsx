@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   computePassport, emptyPassport, passportBaseYear, rollPassportForward, BASE_YEAR, ntfmt, wan,
@@ -56,7 +56,9 @@ function Slider({
               onChange(Number.isFinite(v) ? clamp(v) : value);
               setDraft(null);
             }}
-            className="w-[96px] rounded-md border border-line2 bg-field px-2 py-1 text-right text-15 font-bold text-brand2 focus:border-brand focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            // w-[96px] 在 390px 的兩欄版面裡只留約 30px 給標籤，「退休時總工作年資」
+            // 會被壓成一字一行；手機給 w-20 並讓標籤獨佔一行（見 Face 的 grid-cols-1）。
+            className="w-20 sm:w-[96px] rounded-md border border-line2 bg-field px-2 py-1 text-right text-base sm:text-15 font-bold text-brand2 focus:border-brand focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           {unit && <span className="w-4 text-11 text-tx2">{unit}</span>}
         </span>
@@ -151,12 +153,32 @@ function Face({
         </div>
       </div>
       <div className="grid lg:grid-cols-2 gap-6 p-5 sm:p-6">
-        <div className="grid grid-cols-2 gap-x-5 gap-y-4 content-start">{children}</div>
+        {/* ⚠️ grid-cols-2 原本沒有斷點：390px 下每欄只有約 149px，扣掉固定寬的數字框
+            就剩約 30px 給標籤。手機一欄，標籤才有整行可用。 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4 content-start">{children}</div>
         <div className="rounded-xl bg-panel border border-line p-5 grid place-items-center shadow-e1">{result}</div>
       </div>
     </section>
   );
 }
+
+/* ---------- 手機的分步導覽 ----------
+   ⚠️ 為什麼手機要分步、桌機不分：這五個面向在桌機是一次攤開比較用的（拉高購房月存、
+      看退休少多少），那是「建構」；但客戶多半在手機上第一次碰到它，一次看到 26 支拉桿
+      只會關掉。手機一次一個面向，桌機維持一次全開——**同一個元件、同一份資料，只有排法不同**。
+
+   ⚠️ 刻意不用真的換頁（router.push）：一來每一步都要一次網路往返，二來捲動位置會亂跑。
+      改成同一頁的 step 狀態 ＋ history 的 pushState，這樣**瀏覽器的返回鍵就等於上一步**——
+      那是手機使用者的本能，不用另外教，也不會有人按了返回就整個離開試算。 */
+const STEPS = [
+  { key: "house", icon: "🏠", label: "購房" },
+  { key: "car", icon: "🚗", label: "購車" },
+  { key: "retire", icon: "🌴", label: "退休" },
+  { key: "support", icon: "👨‍👩‍👧", label: "扶養" },
+  { key: "travel", icon: "✈️", label: "旅遊" },
+  { key: "done", icon: "📋", label: "完成" },
+] as const;
+const LAST = STEPS.length - 1;
 
 /* ---------- 主元件 ---------- */
 // mode="public"：官網 /passport，未登入可玩。按存檔＝把草稿存進 sessionStorage 再導去註冊。
@@ -183,6 +205,8 @@ export default function PassportWizard({
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [existingAt, setExistingAt] = useState<string | null>(null);
   const [showAssume, setShowAssume] = useState(false);
+  // 手機的目前步驟。桌機不看它（所有面向都用 sm:block 常駐顯示）。
+  const [step, setStep] = useState(0);
 
   // render 期間校正 state（React 允許、且不會像 effect 那樣先閃一幀舊值）。
   // 只有公開頁、或註冊回來帶 restore 的那一趟才吃草稿——否則 sessionStorage 裡的殘留
@@ -203,6 +227,43 @@ export default function PassportWizard({
   const stale = by < baseYear;   // 舊年度的護照在新的一年被打開
   const m = useMemo(() => computePassport(p), [p]);
 
+  // 進來時如果網址上帶了 ?step=n（多半是按了返回鍵回到這一頁），照它定位。
+  const [stepFromUrl, setStepFromUrl] = useState(false);
+  if (isClient && !stepFromUrl) {
+    setStepFromUrl(true);
+    const n = Number(new URLSearchParams(window.location.search).get("step"));
+    if (Number.isInteger(n) && n >= 0 && n <= LAST) setStep(n);
+  }
+
+  // 返回鍵＝上一步。history 的 state 就是步數，popstate 回來時照它還原。
+  useEffect(() => {
+    function onPop(e: PopStateEvent) {
+      const n = (e.state as { pwStep?: number } | null)?.pwStep;
+      setStep(Number.isInteger(n) && n! >= 0 && n! <= LAST ? (n as number) : 0);
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const goto = useCallback(
+    (n: number) => {
+      const next = Math.min(LAST, Math.max(0, n));
+      setStep(next);
+      // ⚠️ 每換一步存一次草稿。分步式最大的風險就是「翻到第四頁接了通電話，回來全沒了」，
+      //    而 passportDraft 這套機制本來就是為「官網試算 → 註冊 → 回來接回資料」做的，
+      //    正好是同一件事。⚠️ 只在 public 存：private 是登入後的正式頁，
+      //    在那裡留下 sessionStorage 殘留，會在下一次帶 restore 進來時把已存檔的護照蓋掉。
+      if (mode === "public") saveDraft(p);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("step", String(next));
+        window.history.pushState({ pwStep: next }, "", url);
+      }
+      window.scrollTo({ top: 0, behavior: "auto" });
+    },
+    [mode, p],
+  );
+
   function set<K extends keyof PassportFaces>(face: K, key: keyof PassportFaces[K], v: number) {
     setEdited((prev) => {
       const base = prev ?? initial ?? emptyPassport(baseYear);
@@ -211,6 +272,8 @@ export default function PassportWizard({
     if (status !== "saving") { setStatus("idle"); setErrMsg(null); }
   }
   const yr = (v: number) => `${v} 年`;
+  // 手機一次只顯示目前這一步；桌機（sm 以上）全部常駐——同一份 JSX，只有可見性不同。
+  const pane = (i: number) => (step === i ? "" : "hidden sm:block");
 
   // 把整份護照往前推到今年。⚠️ 年份與年齡必須一起走——理由與不變量寫在 rollPassportForward()。
   const rolledAge = rollPassportForward(p, baseYear).retire.curAge;
@@ -261,8 +324,55 @@ export default function PassportWizard({
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 pb-32">
+      {/* ── 手機的分步導覽（桌機不出現）──────────────────────────────────────
+          三件事擠在一條：現在第幾步、目前的合計（**每一步都看得到回饋**，
+          不必填完六步才知道自己在做什麼）、以及可以直接跳段——
+          客戶可能只想算退休，不該逼他一路按過購房購車。 */}
+      <div className="sm:hidden sticky top-0 z-20 -mx-4 mb-4 border-b border-line bg-canvas/95 px-4 py-2.5 backdrop-blur">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <span className="text-11 tracking-[0.2em] text-tx3">步驟 {step + 1} / {STEPS.length}</span>
+          <span className="text-13 text-tx2">
+            合計 <b className="text-brand2">{m.totalMonthlyWan.toFixed(1)} 萬</b> / 月
+          </span>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto">
+          {STEPS.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => goto(i)}
+              aria-current={i === step ? "step" : undefined}
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 min-h-[36px] text-13 ${
+                i === step
+                  ? "border-brand bg-brand text-onbrand font-bold"
+                  : "border-line2 text-tx2"
+              }`}
+            >
+              {s.icon} {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ⚠️ 這條警示刻意留在分步之外：它講的是「年齡沒跟著年份前進」，
+          客戶在哪一步都該看得到，不能只在最後一步才冒出來——那時候他已經照舊年齡填完了。 */}
+      {stale && (
+        <div className="mb-4 mx-auto max-w-lg rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-xs leading-relaxed text-brand2">
+          這份護照是 <b>{by}</b> 年做的，現在是 <b>{baseYear}</b> 年。
+          各項目標填的是<b>西元年份</b>，所以它們沒有跑掉——但你的<b>目前年齡</b>還停在 {p.retire.curAge} 歲。
+          <button
+            type="button"
+            onClick={rollForward}
+            className="ml-2 rounded-md border border-brand px-2.5 py-1 text-xs font-semibold text-brand2 hover:bg-brand hover:text-canvas"
+          >
+            更新到 {baseYear} 年（年齡 {p.retire.curAge} → {rolledAge} 歲）
+          </button>
+          <span className="block mt-1 text-11 text-brand2">按了之後記得再存一次檔。</span>
+        </div>
+      )}
+
       {/* 標頭＋每月應存彙總 */}
-      <div className="rounded-2xl bg-gradient-to-br from-panel to-panel2 border border-brand/30 p-6 mb-6 text-center">
+      <div className={`${pane(LAST)} rounded-2xl bg-gradient-to-br from-panel to-panel2 border border-brand/30 p-6 mb-6 text-center`}>
         <div className="text-brand text-xs tracking-[0.3em] mb-1">MY LIFE PASSPORT · {by} 年度</div>
         <h1 className="font-serif text-2xl mb-2">{mode === "public" ? "人生護照 · 免費試算" : "我的人生護照"}</h1>
         <div className="text-tx2 text-sm mb-1">每月應存合計</div>
@@ -274,20 +384,6 @@ export default function PassportWizard({
             隔年他只把年齡改成 31 而年份還停在 2026 → 41 歲，但 2036 其實只剩 9 年，正解是 40。
             所以做成一顆「一起前進一年」的按鈕，而不是一句提醒；也刻意不自動跑，
             默默改掉客戶看過的數字比讓他自己按一下糟糕得多。 */}
-        {stale && (
-          <div className="mt-3 mx-auto max-w-lg rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-xs leading-relaxed text-brand2">
-            這份護照是 <b>{by}</b> 年做的，現在是 <b>{baseYear}</b> 年。
-            各項目標填的是<b>西元年份</b>，所以它們沒有跑掉——但你的<b>目前年齡</b>還停在 {p.retire.curAge} 歲。
-            <button
-              type="button"
-              onClick={rollForward}
-              className="ml-2 rounded-md border border-brand px-2.5 py-1 text-xs font-semibold text-brand2 hover:bg-brand hover:text-canvas"
-            >
-              更新到 {baseYear} 年（年齡 {p.retire.curAge} → {rolledAge} 歲）
-            </button>
-            <span className="block mt-1 text-11 text-brand2">按了之後記得再存一次檔。</span>
-          </div>
-        )}
         <button
           type="button"
           onClick={() => setShowAssume((v) => !v)}
@@ -315,6 +411,7 @@ export default function PassportWizard({
 
       <div className="space-y-4">
         {/* 購房 */}
+        <div className={pane(0)}>
         <Face icon="🏠" label="購房" monthly={p.house.monthly}
           result={<LoanCard title="房價" icon="🏠" r={m.house} rate={p.house.rate} />}>
           <Slider label="購買時間" value={p.house.buyYear} min={by} max={by + 30} onChange={(v) => set("house", "buyYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 30} 年`} />
@@ -324,8 +421,10 @@ export default function PassportWizard({
           <Slider label="貸款成數" value={p.house.loanRatio} min={1} max={9} onChange={(v) => set("house", "loanRatio", v)} fmt={(v) => `${v} 成`} minLabel="1 成" maxLabel="9 成" />
           <Slider label="貸款年期" value={p.house.loanYears} min={5} max={40} onChange={(v) => set("house", "loanYears", v)} fmt={(v) => `${v} 年`} minLabel="5 年" maxLabel="40 年" />
         </Face>
+        </div>
 
         {/* 購車 */}
+        <div className={pane(1)}>
         <Face icon="🚗" label="購車" monthly={p.car.monthly}
           result={<LoanCard title="車價" icon="🚗" r={m.car} rate={p.car.rate} />}>
           <Slider label="購買時間" value={p.car.buyYear} min={by} max={by + 20} onChange={(v) => set("car", "buyYear", v)} fmt={yr} minLabel={`${by} 年`} maxLabel={`${by + 20} 年`} />
@@ -335,8 +434,10 @@ export default function PassportWizard({
           <Slider label="貸款成數" value={p.car.loanRatio} min={1} max={9} onChange={(v) => set("car", "loanRatio", v)} fmt={(v) => `${v} 成`} minLabel="1 成" maxLabel="9 成" />
           <Slider label="貸款年期" value={p.car.loanYears} min={1} max={10} onChange={(v) => set("car", "loanYears", v)} fmt={(v) => `${v} 年`} minLabel="1 年" maxLabel="10 年" />
         </Face>
+        </div>
 
         {/* 退休 */}
+        <div className={pane(2)}>
         <Face icon="🌴" label="退休" monthly={p.retire.monthly}
           result={
             <div className="w-full">
@@ -355,8 +456,10 @@ export default function PassportWizard({
           <Slider label="退休時總工作年資" value={p.retire.workYears} min={15} max={60} onChange={(v) => set("retire", "workYears", v)} fmt={(v) => `${v} 年`} minLabel="15 年" maxLabel="60 年" />
           <Slider label="年報酬" value={p.retire.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("retire", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
         </Face>
+        </div>
 
         {/* 扶養 */}
+        <div className={pane(3)}>
         <Face icon="👨‍👩‍👧" label="扶養" monthly={p.support.monthly}
           result={
             <div className="text-center">
@@ -376,8 +479,10 @@ export default function PassportWizard({
           <Slider label="年報酬" value={p.support.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("support", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
           <Slider label="扶養到幾歲" value={p.support.raiseToAge} min={18} max={30} onChange={(v) => set("support", "raiseToAge", v)} fmt={(v) => `${v} 歲`} minLabel="18 歲" maxLabel="30 歲" />
         </Face>
+        </div>
 
         {/* 旅遊 */}
+        <div className={pane(4)}>
         <Face icon="✈️" label="旅遊" monthly={p.travel.monthly}
           result={
             <div className="text-center">
@@ -392,6 +497,7 @@ export default function PassportWizard({
           <Slider label="月存入起始年" value={p.travel.startYear} min={by - 20} max={by + 10} onChange={(v) => set("travel", "startYear", v)} fmt={yr} minLabel={`${by - 20}`} maxLabel={`${by + 10}`} />
           <Slider label="年報酬" value={p.travel.annualReturn} min={0} max={15} step={0.5} onChange={(v) => set("travel", "annualReturn", v)} fmt={(v) => `${v}%`} minLabel="0%" maxLabel="15%" />
         </Face>
+        </div>
       </div>
 
       <div className="mt-5 text-center">
@@ -404,8 +510,10 @@ export default function PassportWizard({
         )}
       </div>
 
-      {/* 底部合計＋存檔 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-field/95 backdrop-blur border-t border-line">
+      {/* 底部合計＋存檔。
+          ⚠️ pb 要含 env(safe-area-inset-bottom)：iPhone 的 home indicator 與 Chrome iOS
+          的底部工具列會蓋掉最後約 20px，而這裡放的正是整條動線最重要的那顆按鈕。 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-field/95 backdrop-blur border-t border-line pb-[env(safe-area-inset-bottom,0px)]">
         {/* 儲存中的進度指示條（不確定式） */}
         {status === "saving" && (
           <div className="absolute -top-0.5 left-0 right-0 h-1 overflow-hidden bg-tx/5">
@@ -436,8 +544,29 @@ export default function PassportWizard({
               </>
             )}
           </div>
+          {/* 手機的上一步／下一步。最後一步換成存檔鈕（下面那組），桌機一律不出現。
+              ⚠️ 用 CSS 決定可見性而不是判斷視窗寬度：伺服器端算不出視窗寬，
+              用 JS 偵測會在第一幀畫錯再跳一下。 */}
+          <div className={`shrink-0 items-center gap-2 sm:hidden ${step === LAST || status === "confirm" ? "hidden" : "flex"}`}>
+            <button
+              type="button"
+              onClick={() => goto(step - 1)}
+              disabled={step === 0}
+              className="rounded-lg border border-line2 px-4 py-3 text-sm text-tx2 disabled:opacity-40"
+            >
+              上一步
+            </button>
+            <button
+              type="button"
+              onClick={() => goto(step + 1)}
+              className="rounded-lg bg-brand px-6 py-3 font-bold text-onbrand"
+            >
+              {step === LAST - 1 ? "看結果" : "下一步"}
+            </button>
+          </div>
+
           {status === "confirm" ? (
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex flex-wrap justify-end items-center gap-2">
               <button onClick={() => { setStatus("idle"); setExistingAt(null); }}
                 className="text-sm text-tx2 hover:text-tx px-4 py-3 rounded-lg border border-line2">
                 取消
@@ -449,7 +578,10 @@ export default function PassportWizard({
             </div>
           ) : (
             <button onClick={() => onSave()} disabled={status === "saving"}
-              className="shrink-0 font-bold text-onbrand bg-brand hover:bg-brand2 disabled:opacity-60 px-7 py-3 rounded-lg inline-flex items-center gap-2">
+              // 手機只在最後一步出現（前面幾步那裡是「下一步」）；桌機一律在。
+              className={`shrink-0 font-bold text-onbrand bg-brand hover:bg-brand2 disabled:opacity-60 px-7 py-3 rounded-lg items-center gap-2 sm:inline-flex ${
+                step === LAST ? "inline-flex" : "hidden"
+              }`}>
               {status === "saving" && (
                 <span className="w-4 h-4 border-2 border-onbrand/40 border-t-onbrand rounded-full animate-spin" />
               )}

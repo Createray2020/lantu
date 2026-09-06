@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import SmallScreenGate from "@/components/SmallScreenGate";
 import {
   savePlanDataAction,
   addNoteAction,
@@ -392,11 +393,13 @@ export default function PlanEditor({
 
   return (
     <div className="fixed inset-0 flex flex-col bg-canvas">
-      <div className="flex items-center gap-3 px-4 py-2 bg-panel border-b border-line text-tx">
+      {/* ⚠️ 這一列原本沒有 flex-wrap：「← 返回客戶」在 390px 下會被逐字斷行成直條，
+          而它是離開規劃器的唯一出口。 */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 bg-panel border-b border-line text-tx">
         <Link
           href={`/dashboard/clients/${clientId}`}
           onClick={() => router.refresh()}
-          className="text-sm text-tx2 hover:text-tx"
+          className="shrink-0 whitespace-nowrap text-sm text-tx2 hover:text-tx"
         >
           ← 返回客戶
         </Link>
@@ -501,18 +504,25 @@ export default function PlanEditor({
           </div>
         </div>
       )}
-      <iframe
-        ref={iframeRef}
-        src="/lantu-app.html?embed=1"
-        title={`嵐途規劃 ${year}`}
-        className="flex-1 w-full border-0"
-        onLoad={() =>
-          iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:init", data, uiScale: normalizeScale(uiScale), theme: currentTheme(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz },
-            window.location.origin,
-          )
-        }
-      />
+      {/* ⚠️ 編輯規劃是電腦的事——見 SmallScreenGate 的檔頭。客戶端的唯讀檢視
+          （ClientPlanFrame）刻意不套這道門：看報告書本來就該在手機上做得到。 */}
+      <SmallScreenGate
+        title="這一段請用電腦開"
+        reason="編輯規劃要同時看好幾組數字、上百個欄位互相牽動。在手機的螢幕上填得完的機率很低，而且容易填錯。看規劃結果與報告書不受影響——那在手機上是好好的。"
+      >
+        <iframe
+          ref={iframeRef}
+          src="/lantu-app.html?embed=1"
+          title={`嵐途規劃 ${year}`}
+          className="flex-1 w-full border-0"
+          onLoad={() =>
+            iframeRef.current?.contentWindow?.postMessage(
+              { type: "lantu:init", data, uiScale: normalizeScale(uiScale), theme: currentTheme(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz },
+              window.location.origin,
+            )
+          }
+        />
+      </SmallScreenGate>
     </div>
   );
 }

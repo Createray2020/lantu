@@ -114,8 +114,11 @@ export default async function Portal() {
 
   return (
     <div className="min-h-screen bg-canvas text-tx flex flex-col">
-      <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-line">
-        <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
+      {/* ⚠️ 客戶登入後看到的第一個畫面就是這裡。原本是不會 wrap 的單列 flex：
+          右側（主題 88＋字級 122＋教練工作台 100＋登出 48＋gap）約 465px，
+          390px 的手機只有約 350px 可用 → 右側按鈕直接被推出畫面外。 */}
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 sm:px-8 py-4 border-b border-line">
+        <Link href="/home" className="flex items-center gap-3 min-w-0" title="回官網首頁">
           <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
             <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
               <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -124,7 +127,7 @@ export default async function Portal() {
           </span>
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <ThemeToggle compact />
           <UiScaleToggle compact />
           {coachState === "active" && (

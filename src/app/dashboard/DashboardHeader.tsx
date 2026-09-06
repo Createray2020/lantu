@@ -64,14 +64,19 @@ export default function DashboardHeader({
     };
   }, [pathname]);
 
+  // shrink-0 + nowrap：在可橫捲的 nav 裡，少了這兩個中文分頁名會被壓成一字一行。
   const tab = (active: boolean) =>
-    `px-3 py-1.5 rounded-md text-sm font-bold transition ${
+    `shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-sm font-bold transition ${
       active ? "bg-brand text-onbrand" : "text-tx2 hover:text-tx"
     }`;
 
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 py-2.5 bg-gradient-to-r from-canvas to-panel border-b border-line">
-      <Link href="/home" className="flex items-center gap-2 mr-2" title="回官網首頁">
+    // ⚠️ 手機只做「不破版」：加 flex-wrap、讓分頁列自己橫捲。
+    //    刻意不做漢堡選單、也不隱藏任何入口——教練端的手機動線要等「管理邊界」定案
+    //    （待辦/註記/業績各自算不算手機的事）才動，現在改導覽結構等於先斬後奏。
+    //    代價是頂欄在 390px 會變成兩三列，但東西都在、也不再有東西被推出畫面。
+    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 sm:px-6 py-2.5 bg-gradient-to-r from-canvas to-panel border-b border-line">
+      <Link href="/home" className="flex items-center gap-2 mr-2 shrink-0" title="回官網首頁">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt="嵐途" className="h-[26px] w-auto max-w-[150px] object-contain" />
@@ -83,7 +88,9 @@ export default function DashboardHeader({
         )}
         <span className="font-serif tracking-[0.14em] text-tx text-lg">嵐途</span>
       </Link>
-      <nav className="flex items-center gap-1">
+      {/* 7 個分頁在 390px 排不下。改成單列可橫捲（而不是 wrap 成三列），
+          順序與可見性完全不變；-my-1 py-1 是留給待確認那顆紅點的溢出空間。 */}
+      <nav className="flex items-center gap-1 min-w-0 max-w-full overflow-x-auto -my-1 py-1">
         <Link href="/dashboard" className={tab(onHome)}>首頁</Link>
         <Link href="/dashboard/clients" className={tab(onClients)}>客戶</Link>
         <Link href="/dashboard/overview" className={tab(onOverview)}>儀表板</Link>

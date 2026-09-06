@@ -29,7 +29,8 @@ export default function SubmitButton({
       {...rest}
       disabled={rest.disabled || state === "pending"}
       aria-busy={state === "pending"}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg text-sm font-bold px-4 py-2 min-h-[36px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
+      // 手機 44px（觸控命中區的下限），桌機維持原本的 36px。
+      className={`inline-flex items-center justify-center gap-2 rounded-lg text-sm font-bold px-4 py-2 min-h-[44px] sm:min-h-[36px] transition disabled:opacity-50 disabled:cursor-not-allowed ${
         state === "error" ? "bg-danger-solid text-onsolid" : "bg-brand text-onbrand"
       } ${className}`}
     >

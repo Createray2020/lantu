@@ -95,7 +95,7 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
           ) : (
             <>
               <div className="overflow-x-auto rounded border border-line">
-                <table className="w-full text-sm tbl-sticky">
+                <table className="min-w-[720px] w-full text-sm tbl-sticky">
                   <thead className="bg-field text-xs text-tx3">
                     <tr>
                       <th className="px-2 py-1.5 text-left">代號</th>

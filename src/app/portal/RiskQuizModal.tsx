@@ -94,7 +94,7 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
           </div>
         ) : (
           <>
-            <div className="max-h-[62vh] overflow-auto px-5 py-4">
+            <div className="max-h-[62dvh] overflow-auto px-5 py-4">
               <p className="mb-4 rounded-lg bg-tx/5 px-3 py-2.5 text-xs leading-relaxed text-tx2">
                 題目裡的「這一筆資金」是<b className="text-brand2">假設情境</b>——
                 問的是「如果要做長期配置，你會怎麼選」，不代表你現在要投入任何一筆錢。

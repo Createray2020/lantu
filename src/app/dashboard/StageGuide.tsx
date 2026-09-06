@@ -16,7 +16,10 @@ import {
 export function StageGuideTable({ current }: { current?: string | null }) {
   return (
     <div>
-      <table className="w-full border-collapse text-left">
+      {/* ⚠️ 這兩張表原本沒有橫捲容器。三欄長文在 max-w-3xl 的彈窗裡、390px 螢幕上
+          只分到約 318px，後兩欄各剩 90/130px → 中文被壓成一字一行、四個階段展開近千 px 高。 */}
+      <div className="overflow-x-auto">
+      <table className="min-w-[560px] w-full border-collapse text-left">
         <thead>
           <tr className="text-11 uppercase tracking-wider text-tx3">
             <th className="px-2 py-1.5 font-normal">階段</th>
@@ -47,9 +50,11 @@ export function StageGuideTable({ current }: { current?: string | null }) {
           })}
         </tbody>
       </table>
+      </div>
 
       <div className="mt-4 text-11 uppercase tracking-wider text-tx3">三項指標怎麼算</div>
-      <table className="mt-1 w-full border-collapse text-left">
+      <div className="overflow-x-auto">
+      <table className="mt-1 min-w-[460px] w-full border-collapse text-left">
         <tbody>
           {STAGE_METRICS.map(([name, formula]) => (
             <tr key={name} className="border-t border-line align-top">
@@ -59,6 +64,7 @@ export function StageGuideTable({ current }: { current?: string | null }) {
           ))}
         </tbody>
       </table>
+      </div>
 
       <p className="mt-3 text-11 leading-relaxed text-tx3">
         判定是<b className="text-tx2">關卡制</b>不是分數區間：依序檢查「安全度與收支 → 財務自由度 → 願景達成度」，
@@ -73,7 +79,7 @@ export function StageGuideModal({ current, onClose }: { current?: string | null;
   // Esc、焦點移入與歸還、背景鎖捲都由共用的 <Modal> 處理。
   return (
     <Modal onClose={onClose} labelledBy="stageGuideTitle" width="max-w-3xl">
-      <div className="max-h-[85vh] overflow-auto p-5 text-tx">
+      <div className="max-h-[85dvh] overflow-auto p-5 text-tx">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 id="stageGuideTitle" className="font-serif text-lg tracking-[0.08em]">財務階段是怎麼判定的</h3>
           <button

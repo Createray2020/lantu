@@ -85,7 +85,11 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-scrim/60 px-4 py-8 overflow-y-auto"
+      // ⚠️ 不能用 grid place-items-center：面板比容器高的時候，置中會讓它「往上下兩邊」
+      //    同時溢出，而捲動捲不到被推出上緣的那一段——標題與前幾個欄位就永遠碰不到。
+      //    手機叫出鍵盤後可視高度只剩約 400px，這是必發不是邊角案例。
+      //    items-start ＋ 面板 my-auto：放得下時仍然置中，放不下時從頂端開始、整份捲得到。
+      className="fixed inset-0 z-50 flex items-start justify-center bg-scrim/60 px-4 py-8 overflow-y-auto"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -97,7 +101,7 @@ export default function Modal({
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : label}
         tabIndex={-1}
-        className={`w-full ${width} rounded-xl border border-line bg-panel shadow-e3 outline-none`}
+        className={`my-auto w-full ${width} rounded-xl border border-line bg-panel shadow-e3 outline-none`}
       >
         {children}
       </div>

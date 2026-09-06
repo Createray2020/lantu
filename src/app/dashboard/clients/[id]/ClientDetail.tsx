@@ -437,7 +437,7 @@ function Plans({ plans, compare, pending, readOnly = false, onOpen, onClone, onN
         <section>
           <h3 className="text-xs uppercase tracking-wider text-tx3 mb-2">版本比較（歷年對照）</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <table className="min-w-[560px] w-full text-sm border-collapse">
               <thead>
                 <tr>
                   <th className="text-left text-tx3 font-normal px-3 py-2 sticky left-0 bg-canvas">指標</th>

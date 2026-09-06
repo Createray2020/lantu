@@ -61,7 +61,7 @@ export default async function HandbookPage() {
             <p className="text-xs text-tx3">尚未設定服務模塊。</p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-line">
-              <table className="w-full text-sm">
+              <table className="min-w-[1000px] w-full text-sm">
                 <thead className="bg-panel2">
                   <tr>
                     <th className={th}>服務</th><th className={th}>分潤模式</th>
@@ -102,7 +102,7 @@ export default async function HandbookPage() {
         <div className={card}>
           <h2 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">職級與分潤率</h2>
           <div className="overflow-x-auto rounded-lg border border-line">
-            <table className="w-full text-sm">
+            <table className="min-w-[950px] w-full text-sm">
               <thead className="bg-panel2">
                 <tr>
                   <th className={th}>職級</th><th className={th}>代號</th>
@@ -140,7 +140,7 @@ export default async function HandbookPage() {
                   {kind === "promotion_a" ? "A 軌（個人路徑）" : "B 軌（個人＋團隊路徑）"}
                 </div>
                 <div className="overflow-x-auto rounded-lg border border-line">
-                  <table className="w-full text-sm">
+                  <table className="min-w-[900px] w-full text-sm">
                     <thead className="bg-panel2">
                       <tr>
                         <th className={th}>晉升</th><th className={th}>個案數</th><th className={th}>顧問費</th>
@@ -180,7 +180,7 @@ export default async function HandbookPage() {
           <div className={card}>
             <h2 className="text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-2">同業招募與真除</h2>
             <div className="overflow-x-auto rounded-lg border border-line">
-              <table className="w-full text-sm">
+              <table className="min-w-[560px] w-full text-sm">
                 <thead className="bg-panel2">
                   <tr>
                     <th className={th}>核定職級</th><th className={th}>期間個案數</th>

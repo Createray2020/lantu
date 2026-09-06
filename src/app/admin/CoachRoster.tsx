@@ -101,7 +101,7 @@ export default function CoachRoster({
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full text-sm">
+        <table className="min-w-[900px] w-full text-sm">
           {head}
           <tbody>
             {shown.map((r) => r.node)}
