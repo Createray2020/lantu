@@ -23,8 +23,14 @@ export default async function LandingView() {
       {/* 頂欄：4 項以內。主 CTA 是「免費試算」而不是「客戶登入」—— */}
       {/* 登入是給老客戶的，第一次來的人按不下去。 */}
       <header className="sticky top-0 z-30 backdrop-blur bg-canvas/85 border-b border-line">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-          <Link href="/home" className="flex items-center gap-2.5 sm:gap-3 min-w-0" title="回官網首頁">
+        {/* ⚠️ 手機上這一列原本會疊在一起：右側那組是 shrink-0、實測 356px，
+            而 390px 扣掉 px-5 只剩 350px → 品牌連結被壓成寬度 0，但它的文字是
+            whitespace-nowrap，於是直接溢出、蓋在切換鈕底下（Ray 2026/09/06 回報）。
+            390px 本來就塞不下「品牌＋兩組切換＋登入＋免費試算」，所以要的是**換行**，
+            不是壓縮：手機分兩列（第一列品牌與動作、第二列偏好切換），
+            桌機靠 sm:ml-auto 把兩者推回右側同一列，順序與間距和改版前相同。 */}
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 min-h-16 sm:h-16 py-2 sm:py-0 flex flex-wrap items-center justify-between sm:justify-start gap-y-2 sm:gap-3">
+          <Link href="/home" className="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink-0" title="回官網首頁">
             <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
               <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
                 <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -36,10 +42,14 @@ export default async function LandingView() {
               <span className="hidden sm:block text-10 tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
             </span>
           </Link>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* 字級切換：官網也放，看不清楚字的人在第一屏就要能放大，不必先登入 */}
+          {/* 字級切換：官網也放，看不清楚字的人在第一屏就要能放大，不必先登入。
+              手機：order-3＋w-full＝自己一列（靠右）。桌機：sm:ml-auto 把它連同後面的
+              動作鈕一起推到右側，於是又變回改版前那一列。 */}
+          <div className="order-3 w-full flex items-center justify-end gap-2 sm:order-none sm:w-auto sm:ml-auto sm:gap-3">
             <ThemeToggle compact />
             <UiScaleToggle compact />
+          </div>
+          <div className="order-2 flex items-center gap-2 sm:order-none sm:gap-3 shrink-0">
             <Link href="/coaches" className="hidden sm:inline text-sm text-tx2 hover:text-tx px-3 py-2 rounded-lg whitespace-nowrap">認識教練</Link>
             <Link href="/login" className="text-13 sm:text-sm text-tx2 hover:text-tx px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-line2 whitespace-nowrap">登入</Link>
             <Link href="/passport" className="text-13 sm:text-sm font-bold text-onbrand bg-brand hover:bg-brand2 px-3.5 sm:px-4 py-2 rounded-lg whitespace-nowrap">免費試算</Link>
