@@ -69,7 +69,7 @@ export default function BizTaxBoard({ rows, basis }: { rows: BizTaxRow[]; basis:
       {groups.map((g) => (
         <div key={g} className="mb-5">
           <h3 className="text-xs text-tx2 mb-2">{g}</h3>
-          <div className="overflow-x-auto">
+          <div className="tbl-wrap">
             <table className="w-full text-sm border-collapse min-w-[820px] tbl-sticky">
               <thead>
                 <tr>

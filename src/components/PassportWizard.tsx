@@ -328,7 +328,9 @@ export default function PassportWizard({
           三件事擠在一條：現在第幾步、目前的合計（**每一步都看得到回饋**，
           不必填完六步才知道自己在做什麼）、以及可以直接跳段——
           客戶可能只想算退休，不該逼他一路按過購房購車。 */}
-      <div className="sm:hidden sticky top-0 z-20 -mx-4 mb-4 border-b border-line bg-canvas/95 px-4 py-2.5 backdrop-blur">
+      {/* ⚠️ top 由頁面決定（--sticky-top）：/passport 上面有 h-16 的公開頂欄要讓開，
+          /portal/passport 沒有頂欄、0 才對。寫死 top-0 會讓這條在公開站整條被蓋掉。 */}
+      <div className="sm:hidden sticky top-[var(--sticky-top)] z-20 -mx-4 mb-4 border-b border-line bg-canvas/95 px-4 py-2.5 backdrop-blur">
         <div className="mb-2 flex items-center justify-between gap-3">
           <span className="text-11 tracking-[0.2em] text-tx3">步驟 {step + 1} / {STEPS.length}</span>
           <span className="text-13 text-tx2">

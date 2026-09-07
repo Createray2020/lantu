@@ -118,7 +118,7 @@ export default function AdvisorsBoard({
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-line">
+      <div className="tbl-wrap rounded-xl border border-line">
         <table className="min-w-[1100px] w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">

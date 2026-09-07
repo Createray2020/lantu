@@ -18,7 +18,7 @@ export const metadata = {
 export default async function PublicPassportPage() {
   const { userId } = await auth();
   return (
-    <div className="min-h-screen bg-canvas text-tx">
+    <div className="under-topbar min-h-screen bg-canvas text-tx">
       <header className="sticky top-0 z-30 backdrop-blur bg-canvas/85 border-b border-line">
         <div className="max-w-5xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
           <Link href="/home" className="flex items-center gap-3" title="回官網首頁">

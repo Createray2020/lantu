@@ -178,7 +178,7 @@ export default function Simulator({ params }: { params: CompParams }) {
             驗算 {res.totalPct}%{res.balanced ? " ✓" : " ✗"}
           </span>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-line">
+        <div className="tbl-wrap rounded-lg border border-line">
           <table className="min-w-[780px] w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">

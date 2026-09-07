@@ -252,7 +252,7 @@ export default function CasesBoard({
       )}
 
       {/* 案件列表 */}
-      <div className="overflow-x-auto rounded-xl border border-line">
+      <div className="tbl-wrap rounded-xl border border-line">
         <table className="min-w-[900px] w-full text-sm tbl-sticky">
           <thead>
             <tr className="bg-panel2 text-tx2 text-left text-xs">
@@ -313,7 +313,7 @@ export default function CasesBoard({
                   {open === c.id && (
                     <tr className="bg-field">
                       <td colSpan={9} className="px-4 py-3">
-                        <div className="overflow-x-auto rounded-lg border border-line">
+                        <div className="tbl-wrap rounded-lg border border-line">
                           <table className="min-w-[900px] w-full text-sm tbl-sticky">
                             <thead>
                               <tr className="bg-panel2 text-tx2 text-left text-xs">
@@ -452,7 +452,7 @@ export default function CasesBoard({
             產生／更新批次
           </button>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-line">
+        <div className="tbl-wrap rounded-lg border border-line">
           <table className="min-w-[640px] w-full text-sm tbl-sticky">
             <thead>
               <tr className="bg-panel2 text-tx2 text-left text-xs">
@@ -558,7 +558,7 @@ function ImportPanel({
           </p>
           <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-line">
             <table className="min-w-[820px] w-full text-xs tbl-sticky">
-              <thead className="sticky top-0 bg-panel2 text-tx2 text-left">
+              <thead className="bg-panel2 text-tx2 text-left">
                 <tr>
                   <th className="px-2 py-1.5">列</th><th className="px-2 py-1.5">客戶</th>
                   <th className="px-2 py-1.5">服務模塊</th><th className="px-2 py-1.5">顧問費</th>

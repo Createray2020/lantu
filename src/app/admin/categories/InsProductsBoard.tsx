@@ -94,7 +94,7 @@ export default function InsProductsBoard({ rows }: { rows: InsProductRow[] }) {
             <div className="text-sm text-tx3 py-8 text-center">先從左邊選一家保險公司。</div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded border border-line">
+              <div className="tbl-wrap rounded border border-line">
                 <table className="min-w-[720px] w-full text-sm tbl-sticky">
                   <thead className="bg-field text-xs text-tx3">
                     <tr>

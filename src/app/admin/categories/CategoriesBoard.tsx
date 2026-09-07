@@ -183,7 +183,7 @@ function CatTable({
         系統預設的細類<b>不可刪除</b>（既有客戶資料還指著這些名稱），要拿掉請按「停用」——選單不再出現，舊資料照樣顯示。
       </p>
 
-      <div className="overflow-x-auto rounded-lg border border-line">
+      <div className="tbl-wrap rounded-lg border border-line">
         <table className="min-w-[900px] w-full text-sm tbl-sticky">
           <thead className="bg-panel text-tx2">
             <tr>
@@ -476,7 +476,7 @@ function EduTable({
         政策前提：高中職 112 學年第 2 學期起<b>學費全免</b>（雜費／代辦／餐費仍自付）；私立大專每年補助 3.5 萬，
         <b>碩博士與延修生不適用</b>；公立大專<b>沒有</b>普及性減免。
       </p>
-      <div className="overflow-x-auto rounded-lg border border-line">
+      <div className="tbl-wrap rounded-lg border border-line">
         <table className="min-w-[900px] w-full text-sm tbl-sticky">
           <thead className="bg-panel text-tx2">
             <tr>

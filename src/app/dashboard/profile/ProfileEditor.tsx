@@ -308,7 +308,8 @@ export default function ProfileEditor({
       </div>
 
       {/* 預覽 */}
-      <div className="lg:sticky lg:top-4 h-fit">
+      {/* ⚠️ top 不能是 1rem：DashboardHeader 是 sticky top-0，卡片會鑽到它底下。 */}
+      <div className="lg:sticky lg:top-[calc(var(--header-h)+1rem)] h-fit">
         <div className="text-xs text-tx2 mb-2">客戶會看到的樣子</div>
         <CoachCard
           name={f.displayName.trim() || loginName || coachName} rankLabel={rankLabel}

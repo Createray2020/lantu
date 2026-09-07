@@ -274,22 +274,55 @@ tbody tr:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── 黏住的東西要讓開頂欄：兩個偏移 token ────────────────────────────────
+   ⚠️ 不能用單一常數：後台頂欄（AdminHeader / DashboardHeader，py-2.5＋一列內容）
+      約 3rem，公開站頂欄（/、/passport、/join、/bizcheck）是 h-16＝4rem，
+      而同一個元件會同時出現在兩邊——PassportWizard 在 /passport 底下有頂欄、
+      在 /portal/passport 完全沒有。所以是「頁面告訴元件要讓開多少」，
+      不是元件自己猜。 */
+:root {
+  /* 後台／教練端頂欄的讓位高度。故意抓得比實際高一點當安全邊界。 */
+  --header-h: 3.4rem;
+  /* 「我上面有沒有一條黏住的頂欄」——預設沒有；有頂欄的頁面自己覆蓋。 */
+  --sticky-top: 0px;
+}
+/* 公開站頂欄是 h-16。掛在頁面最外層那個 div 上，底下所有黏住的元素才讓得開。 */
+.under-topbar { --sticky-top: 4rem; }
+
 /* ── 長表的表頭黏住 ────────────────────────────────────────────────────────
    後台的資料表動輒上百列，捲到一半就看不到欄位名，只能往回捲。
-   ⚠️ top 不能是 0：AdminHeader / DashboardHeader 是 sticky 的，表頭會滑到它底下。
-   用 rem 才會跟著字級縮放一起長高。 */
-:root { --header-h: 3.4rem; }
+
+   ⚠️⚠️ 這裡踩過一個完全不噴錯的坑，改之前先看懂：
+   sticky 的 top 是相對「最近的**捲動容器**」，不是相對視窗。而依 CSS 規格，
+   overflow-x:auto 會把另一軸的 visible 強制成 auto——所以每一個
+   `<div class="overflow-x-auto">` 都是**雙軸**捲動容器。表頭原本寫
+   top:var(--header-h)（想讓開 sticky 頂欄）於是被解讀成「離這個 div 頂端 3.4rem」，
+   而這個 div 根本不縱向捲，表頭就往下掉 3.4rem **蓋住第一列**，
+   原位留下一條空的灰帶。全站 20 張表全部包在這種 div 裡，
+   也就是說這個功能從上線到 2026/09/07 之前一次都沒生效過，
+   只是多數表格短、那條灰帶看起來像間隔線所以沒人發現。
+
+   正解：讓表格外框自己成為縱向捲動框（.tbl-wrap），表頭 top:0 黏在**框**的頂端。
+   偏移量從此不依賴任何頂欄——頂欄改高改矮、換行、公開頁 4rem 對後台 3rem，
+   通通與這裡無關。新增表格時：外框用 .tbl-wrap，不要再寫 overflow-x-auto。 */
+.tbl-wrap {
+  overflow: auto;
+  /* 只有比一屏還長的表才會長出自己的捲軸；短表格高度不到上限，
+     沒有捲軸、表頭待在原位，外觀與行為跟改版前一模一樣。 */
+  max-height: calc(100dvh - 6rem);
+}
 .tbl-sticky thead th {
   position: sticky;
-  top: var(--header-h);
+  top: 0;
   z-index: 2;
+  /* ⚠️ 一定要不透明：黏住之後底下的列是真的從表頭後面捲過去的。 */
   background: var(--panel2);
 }
-/* ⚠️ 手機關掉黏頂表頭。--header-h 是寫死的一列高度，但頂欄在窄螢幕會換行
-   （兩三列都有可能）→ top 一定對不上，不是把表頭蓋掉就是浮在半空。
-   而且手機的可視高度本來就少，黏一條表頭反而更擠；表格在這裡是橫向捲的，
+/* ⚠️ 手機維持改版前的行為：不設高度上限、表頭不黏。
+   窄螢幕可視高度本來就少，再套一層縱向捲動框只會更擠；表格在這裡是橫向捲的，
    縱向捲到哪一列看不看得到欄名，不是手機上的主要問題。 */
 @media (max-width: 640px) {
+  .tbl-wrap { max-height: none; }
   .tbl-sticky thead th { position: static; }
 }
 
