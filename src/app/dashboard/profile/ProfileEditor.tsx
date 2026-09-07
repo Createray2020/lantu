@@ -13,6 +13,8 @@ import Link from "next/link";
 import { saveMyProfileAction } from "./actions";
 import { DISPLAY_NAME_MAX } from "@/lib/coachName";
 import PhotoCropper, { type CropSource } from "./PhotoCropper";
+import CoachCard from "@/components/CoachCard";
+import SpecialtyChip from "@/components/SpecialtyChip";
 
 const INPUT = FIELD_SM;
 const EMPTY = FIELD_EMPTY;
@@ -82,7 +84,8 @@ export default function ProfileEditor({
   const set = <K extends keyof ProfileForm>(k: K, v: ProfileForm[K]) =>
     setF((s) => ({ ...s, [k]: v }));
 
-  const toggle = (k: "specialties" | "serviceModes", v: string) =>
+  // 專長已改成「可排序清單」（見 SpecialtyPicker），這裡只剩服務方式在用。
+  const toggle = (k: "serviceModes", v: string) =>
     setF((s) => ({
       ...s,
       [k]: s[k].includes(v) ? s[k].filter((x) => x !== v) : [...s[k], v],
@@ -236,27 +239,12 @@ export default function ProfileEditor({
 
         <div className="rounded-xl border border-line bg-panel p-4 space-y-3 shadow-e1">
           <h2 className="text-sm font-bold border-l-[3px] border-brand pl-2">專長領域</h2>
-          {specialtyOptions.length === 0 ? (
-            <p className="text-xs text-brand2">
-              公司還沒設定專長清單。請管理員到「業務制度 › 個案認定與結案 › 專長領域清單」設定。
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {specialtyOptions.map((s) => {
-                const on = f.specialties.includes(s);
-                return (
-                  <button key={s} type="button" disabled={pending}
-                    onClick={() => toggle("specialties", s)}
-                    className={`rounded-full px-3 py-1.5 text-xs border ${
-                      on ? "bg-brand text-onbrand border-brand font-bold"
-                         : "border-line2 text-tx2 hover:border-line2"
-                    }`}>
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <SpecialtyPicker
+            options={specialtyOptions}
+            value={f.specialties}
+            disabled={pending}
+            onChange={(v) => set("specialties", v)}
+          />
           <p className="text-11 text-tx3">
             專長同時用於客戶選教練，以及公司派案時挑選合適人選。
           </p>
@@ -352,66 +340,125 @@ function ListField({
   );
 }
 
-/** 教練卡片。編輯預覽與官網列表共用同一個元件，所見即所得不是靠人工同步。 */
-export function CoachCard({
-  name, rankLabel, headline, bio, specialties, photoUrl, yearsExp, prevRole,
-  credentials, serviceModes, areas, compact = false,
+/**
+ * 專長領域：可排序的已選清單 ＋ 可加入的候選清單。
+ *
+ * 為什麼要排序：官網首頁的臉孔牆只印得下**一個**專長，印的是 `specialties[0]`。
+ * 改版前這個「第一個」等於教練當初勾選的先後順序，教練自己看不到、也改不了——
+ * 等於首頁替他決定了對外的第一印象（Ray 2026/09/07 回報）。
+ * 現在排第一個就是主專長，卡片與首頁都用專屬顏色把它點出來。
+ *
+ * ⚠️ 已選清單直接來自 `value`（教練存過的值），不是從 `options` 過濾出來的——
+ *    公司之後把某個專長從制度清單移掉時，教練身上的舊值仍要看得見、拖得動、移得掉。
+ *    改成 `options.filter(o => value.includes(o))` 會讓那些值在畫面上人間蒸發，
+ *    但存檔時又原封不動寫回去，而且完全不噴錯。
+ */
+function SpecialtyPicker({
+  options, value, disabled, onChange,
 }: {
-  name: string;
-  /**
-   * 對外只印制度職級（認證教練／資深教練／首席教練／實習教練）。
-   * ⚠️ 這裡刻意不是 `title`：教練自填的職稱（「執行長」那種）是對內稱謂，
-   *    Ray 2026/08/24 拍板一律不上官網。要改回顯示頭銜之前先跟他確認。
-   */
-  rankLabel: string | null;
-  headline: string | null; bio: string | null;
-  specialties: string[]; photoUrl: string | null; yearsExp: number | null;
-  prevRole: string | null; credentials: string[]; serviceModes: string[]; areas: string[];
-  compact?: boolean;
+  options: string[]; value: string[]; disabled: boolean;
+  onChange: (v: string[]) => void;
 }) {
+  const [from, setFrom] = useState<number | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+  const rest = options.filter((o) => !value.includes(o));
+
+  const move = (i: number, j: number) => {
+    if (i === j || j < 0 || j >= value.length) return;
+    const next = [...value];
+    const [x] = next.splice(i, 1);
+    next.splice(j, 0, x);
+    onChange(next);
+  };
+
+  if (options.length === 0 && value.length === 0) {
+    return (
+      <p className="text-xs text-brand2">
+        公司還沒設定專長清單。請管理員到「業務制度 › 個案認定與結案 › 專長領域清單」設定。
+      </p>
+    );
+  }
+
   return (
-    <div className="rounded-2xl border border-line bg-panel p-5 shadow-e1">
-      <div className="flex items-start gap-4">
-        {photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photoUrl} alt={name} className="w-20 h-20 rounded-xl object-cover border border-line2 shrink-0" />
-        ) : (
-          <div className="w-20 h-20 rounded-xl bg-panel2 border border-line grid place-items-center text-2xl text-brand shrink-0 shadow-e1">
-            {name.slice(0, 1)}
-          </div>
-        )}
-        <div className="min-w-0">
-          <div className="font-serif text-lg text-tx">{name}</div>
-          {rankLabel && <div className="text-xs text-tx2">{rankLabel}</div>}
-          {headline && <p className="text-sm text-brand2 mt-1.5 leading-snug">{headline}</p>}
-          <div className="text-11 text-tx3 mt-1 space-x-2">
-            {yearsExp !== null && !Number.isNaN(yearsExp) && <span>年資 {yearsExp} 年</span>}
-            {prevRole && <span>· {prevRole}</span>}
-          </div>
+    <div className="space-y-3">
+      <div>
+        <div className="text-xs text-tx2 mb-1.5">
+          已選（拖曳調整順序，<b className="text-tx">排第一個的就是主專長</b>）
         </div>
+        {value.length === 0 ? (
+          <p className="text-11 text-tx3 border border-dashed border-line2 rounded-lg px-3 py-2">
+            還沒選專長。從下面點一個加進來，第一個加進來的就是主專長。
+          </p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {value.map((s, i) => {
+              const stale = options.length > 0 && !options.includes(s);
+              return (
+                <li
+                  key={s}
+                  draggable={!disabled}
+                  onDragStart={(e) => {
+                    setFrom(i);
+                    e.dataTransfer.effectAllowed = "move";
+                    // ⚠️ 一定要 setData：Chrome 沒有它也拖得動，但 Firefox / Safari 會直接不啟動拖曳。
+                    // 值本身用不到（順序靠 state 的 from），但這個呼叫不能省。
+                    try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* 舊瀏覽器可能擋 */ }
+                  }}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOver(i); }}
+                  onDragLeave={() => setOver((o) => (o === i ? null : o))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (from !== null) move(from, i);
+                    setFrom(null); setOver(null);
+                  }}
+                  onDragEnd={() => { setFrom(null); setOver(null); }}
+                  className={
+                    "flex items-center gap-0.5 rounded-full border px-1 py-0.5 cursor-grab active:cursor-grabbing " +
+                    (over === i && from !== null && from !== i ? "border-brand " : "border-line2 ") +
+                    (from === i ? "opacity-50" : "")
+                  }
+                >
+                  {/* 拖曳在手機與鍵盤上都不成立，所以 ←／→ 不是裝飾，是唯一的備援途徑。 */}
+                  <button type="button" disabled={disabled || i === 0}
+                    onClick={() => move(i, i - 1)}
+                    aria-label={`${s} 往前一位`} title="往前一位"
+                    className="px-1 text-tx3 hover:text-tx disabled:opacity-25">←</button>
+                  <SpecialtyChip name={s} primary={i === 0} className="px-2.5 py-1 text-xs"
+                    title={i === 0 ? "主專長：官網首頁與教練卡片會用這個顏色點出來" : undefined} />
+                  {stale && (
+                    <span className="text-10 text-warn px-0.5"
+                      title="這個專長已不在公司的專長清單裡。移除之後就加不回來了。">舊</span>
+                  )}
+                  <button type="button" disabled={disabled || i === value.length - 1}
+                    onClick={() => move(i, i + 1)}
+                    aria-label={`${s} 往後一位`} title="往後一位"
+                    className="px-1 text-tx3 hover:text-tx disabled:opacity-25">→</button>
+                  <button type="button" disabled={disabled}
+                    onClick={() => onChange(value.filter((x) => x !== s))}
+                    aria-label={`移除 ${s}`} title="移除"
+                    className="px-1 text-tx3 hover:text-danger">×</button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <p className="text-11 text-tx3 mt-1.5">
+          手機上拖不動時用 ← → 調整。主專長會出現在官網首頁的教練臉孔牆上，並用專屬顏色標示。
+        </p>
       </div>
 
-      {specialties.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          {specialties.map((s) => (
-            <span key={s} className="rounded-full bg-panel2 border border-line px-2.5 py-1 text-11 text-tx shadow-e1">
-              {s}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {bio && (
-        <p className={`text-sm text-tx2 mt-3 leading-relaxed whitespace-pre-wrap ${compact ? "line-clamp-4" : ""}`}>
-          {bio}
-        </p>
-      )}
-
-      {(credentials.length > 0 || serviceModes.length > 0 || areas.length > 0) && (
-        <div className="mt-3 pt-3 border-t border-line text-11 text-tx3 space-y-1">
-          {credentials.length > 0 && <div>證照：{credentials.join("、")}</div>}
-          {serviceModes.length > 0 && <div>服務方式：{serviceModes.join("、")}</div>}
-          {areas.length > 0 && <div>服務地區：{areas.join("、")}</div>}
+      {rest.length > 0 && (
+        <div>
+          <div className="text-xs text-tx2 mb-1.5">可加入</div>
+          <div className="flex flex-wrap gap-2">
+            {rest.map((s) => (
+              <button key={s} type="button" disabled={disabled}
+                onClick={() => onChange([...value, s])}
+                className="rounded-full px-3 py-1.5 text-xs border border-line2 text-tx2 hover:border-brand hover:text-tx disabled:opacity-40">
+                ＋ {s}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -44,7 +44,7 @@ export default async function CoachPage({ params }: { params: Promise<{ id: stri
 
       <main className="flex-1 px-5 sm:px-8 py-10 max-w-2xl w-full mx-auto">
         {/* 沿用列表的卡片與選擇流程，單人頁只是把清單縮成一位。 */}
-        <CoachList coaches={[coach]} link={link} />
+        <CoachList coaches={[coach]} link={link} full />
       </main>
 
       <footer className="border-t border-line px-5 sm:px-8 py-6 text-center text-xs text-tx3">

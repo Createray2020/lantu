@@ -14,7 +14,7 @@ import { useMemo, useState, useTransition } from "react";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CoachCard } from "@/app/dashboard/profile/ProfileEditor";
+import CoachCard from "@/components/CoachCard";
 import { pickCoachAction, pickCoachByCodeAction } from "./actions";
 import { normalizeCode } from "@/lib/codes";
 import type { PublicCoach } from "@/lib/coachProfile";
@@ -26,10 +26,18 @@ export type LinkState =
   | { state: "linked"; coachName: string | null };
 
 export default function CoachList({
-  coaches, link,
+  coaches, link, full = false,
 }: {
   coaches: PublicCoach[];
   link: LinkState;
+  /**
+   * true＝自我介紹印全文。單人頁 /coaches/[id] 用它。
+   *
+   * ⚠️ 改版前單人頁重用這個元件卻沿用寫死的 `compact`，於是「看完整介紹」點進去
+   *    自我介紹**仍然**被 line-clamp-4 截掉——整個官網沒有一處看得到全文
+   *    （Ray 2026/09/07 回報）。列表要截斷是為了讓多張卡片等高好比較，單人頁沒有這個理由。
+   */
+  full?: boolean;
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<string | null>(null);
@@ -104,12 +112,14 @@ export default function CoachList({
         <div className="grid gap-4 md:grid-cols-2">
           {shown.map((c) => (
             <div key={c.id} className="flex flex-col">
-              <CoachCard {...c} compact />
+              <CoachCard {...c} compact={!full} />
               <div className="flex items-center gap-2 mt-2">
-                <Link href={`/coaches/${c.id}`}
-                  className="text-xs text-tx2 hover:text-tx underline underline-offset-4">
-                  看完整介紹
-                </Link>
+                {!full && (
+                  <Link href={`/coaches/${c.id}`}
+                    className="text-xs text-tx2 hover:text-tx underline underline-offset-4">
+                    看完整介紹
+                  </Link>
+                )}
                 <div className="flex-1" />
                 {c.code && (
                   <span className="font-mono text-10 tracking-wider text-tx3" title="教練編號">

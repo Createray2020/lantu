@@ -40,6 +40,24 @@ describe("saveMyProfileAction", () => {
     expect(asMock(saveProfile).mock.calls[0][1].specialties).toEqual(["退休規劃", "稅務規劃"]);
   });
 
+  // ⚠️ 主專長沒有自己的欄位，就是陣列的第一個（教練在「我的檔案」拖曳決定）。
+  // 所以「存檔要保序」是主專長這個功能的地基：clean() 若哪天改成 sort 或用會重排的容器，
+  // 官網上的主專長就會無聲地換成別的專長。這條測試是那件事唯一的哨兵。
+  it("⚠️ 專長順序原封不動存下去（第一個＝主專長）", async () => {
+    await saveMyProfileAction({ specialties: ["稅務規劃", "退休規劃", "資產傳承"] });
+    expect(asMock(saveProfile).mock.calls[0][1].specialties)
+      .toEqual(["稅務規劃", "退休規劃", "資產傳承"]);
+    vi.clearAllMocks();
+    // 拖成不同順序就是不同的主專長
+    await saveMyProfileAction({ specialties: ["資產傳承", "稅務規劃", "退休規劃"] });
+    expect(asMock(saveProfile).mock.calls[0][1].specialties[0]).toBe("資產傳承");
+  });
+
+  it("去重保留第一次出現的位置（重複值不會把主專長擠掉）", async () => {
+    await saveMyProfileAction({ specialties: ["退休規劃", "稅務規劃", "退休規劃"] });
+    expect(asMock(saveProfile).mock.calls[0][1].specialties).toEqual(["退休規劃", "稅務規劃"]);
+  });
+
   it("照片超過 300KB 擋下（這串 base64 會跟著公開列表送給每個訪客）", async () => {
     const r = await saveMyProfileAction({ photoUrl: photo(320_000) });
     expect(r).toEqual({ ok: false, error: "照片太大（壓縮後仍超過 300KB）" });

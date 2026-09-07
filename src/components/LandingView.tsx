@@ -4,6 +4,7 @@ import UiScaleToggle from "./UiScaleToggle";
 import ThemeToggle from "./ThemeToggle";
 import { getLandingStats } from "@/lib/landing";
 import { listPublicCoaches } from "@/lib/coachProfile";
+import CoachSpotlight from "./CoachSpotlight";
 
 const LINE_ID = "@088janyq";
 const LINE_URL = "https://line.me/R/ti/p/%40088janyq";
@@ -155,30 +156,10 @@ export default async function LandingView() {
           <div className="text-center mb-9">
             <div className="text-brand text-xs tracking-[0.3em] mb-2">MEET THE COACHES</div>
             <h2 className="font-serif text-2xl sm:text-3xl mb-2">陪你走的人</h2>
-            <p className="text-tx2 text-sm">每位教練都有自己寫的完整檔案，可以先看過再決定。</p>
+            <p className="text-tx2 text-sm">點開任何一位，就地看完他自己寫的完整檔案——不用離開這一頁。</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {faces.map((c) => (
-              <Link key={c.id} href={`/coaches/${c.id}`} className="group text-center">
-                {c.photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={c.photoUrl}
-                    alt={c.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full aspect-square rounded-xl object-cover border border-line2 group-hover:border-brand transition"
-                  />
-                ) : (
-                  <div className="w-full aspect-square rounded-xl bg-panel2 border border-line grid place-items-center text-3xl text-brand shadow-e1">
-                    {c.name.slice(0, 1)}
-                  </div>
-                )}
-                <div className="text-sm mt-2 group-hover:text-brand2">{c.name}</div>
-                {c.specialties[0] && <div className="text-11 text-tx3 truncate">{c.specialties[0]}</div>}
-              </Link>
-            ))}
-          </div>
+          <CoachSpotlight coaches={faces} />
+
           <div className="text-center mt-8">
             <Link href="/coaches" className="text-sm text-tx2 hover:text-tx underline underline-offset-4">
               看全部教練與專長 →
