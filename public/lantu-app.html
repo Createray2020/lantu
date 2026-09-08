@@ -14,7 +14,9 @@
  --field:#0a1a2b;--line:#1c3a58;--line2:#2a4d73;
  --tx:#eef2f7;--mut:#a9bccf;--mut2:#8296ab;
  --amber:#c99a5b;--amber2:#e0bd8b;--onbrand:#08202a;
- --teal:#a9bccf;--blue:#a9bccf;--purple:#b7c6b0;
+ /* ⚠️ 改版前 --teal / --blue 都等於 --mut(#a9bccf)：三個名字同一個 hex，
+    所以 KPI 上緣色條、進度條、rtable code 標成強調卻看起來是灰的。給它們真的顏色。 */
+ --teal:#8fbfc8;--blue:#8fb8ff;--purple:#b7c6b0;
  --ok:#8fc0a3;--warn:#e08a68;--danger:#ff9d9f;--info:#8fb8ff;--gap2:#ef6f6f;
  /* 圖表分類色盤：舊版每個繪圖函式各自複製一份，同一種資料在不同圖上是不同顏色 */
  --c1:#5b93d6;--c2:#5cc08a;--c3:#f0c34e;--c4:#ef6f6f;--c5:#b7c6b0;--c6:#e79ec4;
@@ -30,7 +32,8 @@
  --tx:#14212e;--mut:#4a5c6e;--mut2:#75838f;
  /* ⚠️ 金色是唯一兩套主題不能共用亮度的地方：#c99a5b 在白底上只有 2.4:1 */
  --amber:#9a6f22;--amber2:#c08f3c;--onbrand:#ffffff;
- --teal:#4a5c6e;--blue:#2c6fb5;--purple:#5f7a63;
+  /* 同上：淺色版 --teal 也等於 --mut(#4a5c6e)。新值對白底約 5.7:1。 */
+ --teal:#2a6f7a;--blue:#2c6fb5;--purple:#5f7a63;
  --ok:#2f7d57;--warn:#a8681a;--danger:#c0362f;--info:#2c6fb5;--gap2:#c2453e;
  --c1:#2e6db4;--c2:#2c8c5f;--c3:#a8760c;--c4:#c2453e;--c5:#5f7a63;--c6:#a8497e;
  --sh:96,116,136;
@@ -141,21 +144,57 @@ h1,h2,h3,h4{margin:0}
 .anmod>summary::before{content:'▸';color:var(--amber2);font-size:12px;transition:transform .15s}
 .anmod[open]>summary::before{transform:rotate(90deg)}
 .anmod>summary:hover{background:color-mix(in srgb, var(--tx) 2%, transparent)}
-.anmod>summary .ant{font-size:15px;font-weight:700;color:var(--amber2)}
+/* ⚠️ 改版前這裡與 .sec h4 完全同值（15px/700/--amber2），模組標題與它底下的
+   小節標題長得一模一樣 → 階層被壓平。模組升到 L1。 */
+.anmod>summary .ant{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--tx);letter-spacing:.03em}
 .anmod>summary .hint{font-weight:400}
 .anmod[open]>summary{border-bottom:1px solid var(--line)}
 .anbody{padding:14px 18px 16px}
 .anbody>.sec{background:transparent;border:none;border-left:2px solid var(--line);border-radius:0;padding:0 0 0 13px;margin-bottom:18px;box-shadow:none}
 .anbody>.sec:last-child{margin-bottom:0}
-.sec h4{font-size:15px;margin-bottom:12px;color:var(--amber2);display:flex;align-items:center;gap:8px}
+/* ── 資料分頁：一個分頁＝一個模組（一張卡），裡面的小節只用左框線 ──────────
+   這個做法分析頁的 .anbody>.sec 早就在用了，這裡推廣到資料分頁。
+   間距本身在講親疏：模組之間 28px、模組內小節之間 18px。
+   ⚠️⚠️ 這裡刻意不寫 overflow:hidden。收支資債的 .finsum 是 position:sticky，
+      只要任何祖先變成捲動容器（overflow 非 visible），它的 top 就會改以那個
+      容器為基準、不再以 .main 為基準——就會浮在半空或蓋住下面的內容。 */
+.dmod{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:var(--r);box-shadow:0 1px 2px rgba(var(--sh),.22);margin-bottom:28px}
+.dmodhead{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;padding:15px 20px 12px;border-bottom:1px solid var(--line)}
+.dmodhead h3{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--tx);margin:0;letter-spacing:.03em}
+.dmodhead .dmtag{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--mut);border:1px solid var(--line2);border-radius:999px;padding:2px 9px}
+.dmodbody{padding:16px 20px 18px}
+.dmodbody>.sec{background:transparent;border:none;border-left:2px solid var(--line);border-radius:0;padding:0 0 0 13px;margin-bottom:18px;box-shadow:none}
+.dmodbody>.sec:last-child{margin-bottom:0}
+/* 模組卡本身就是 --panel，裡面的四象限面板要退一階才分得出層次 */
+.dmodbody .finpanel{background:var(--card)}
+.dmodbody .finsum{background:color-mix(in srgb, var(--panel) 94%, transparent)}
+@media(max-width:720px){.dmodhead{padding:13px 14px 10px}.dmodbody{padding:14px 14px 16px}.dmodbody>.sec{padding-left:10px}}
+/* ── 字級四階（改版前 11/12/13/14/15 五個相鄰值，差 1px 等於沒有階層）──────
+   L1 模組標題 19px serif 700 --tx（.dmodhead h3 / .anmod .ant）
+   L2 小節標題 15px 700 --amber（.sec h4）
+   L3 內容與輸入值 13px 400 --tx
+   L4 欄名與標籤 11px 600 --mut2 + letter-spacing
+   註解 12px 400 --mut2
+   ⚠️ 顏色從 --amber2 換成 --amber：淺色主題下 --amber2(#c08f3c) 對白底只有
+      約 2.9:1，15px 的標題未達 AA；--amber(#9a6f22) 約 4.5:1。深色版兩者都夠。 */
+.sec h4{font-size:15px;font-weight:700;margin-bottom:10px;color:var(--amber);display:flex;align-items:center;gap:8px;flex-wrap:wrap;letter-spacing:.01em}
 .sec h4 .add{margin-left:auto;background:var(--card);border:1px solid var(--line);color:var(--teal);border-radius:8px;padding:4px 11px;font-size:12px;font-weight:700}
 .sec .hint{color:var(--mut2);font-size:12px;font-weight:400;margin-left:8px}
+/* 註解跟標題並排會把標題的視覺重量稀釋掉；讓它掉到標題下一行（order 5 排在
+   「＋ 新增」等按鈕之後，flex-basis 100% 讓它自己占一列）。 */
+.sec h4 .hint{flex:1 0 100%;order:5;margin-left:0;margin-top:2px;line-height:1.55}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:9px 11px;border-bottom:1px solid var(--line);text-align:left}
 /* 分行的第二種線索。一列十幾欄的輸入表只靠 1px 線對行，眼睛會跳行。 */
 tbody tr:nth-child(even)>td{background:color-mix(in srgb, var(--tx) 2.5%, transparent)}
 tbody tr:hover>td{background:color-mix(in srgb, var(--tx) 6%, transparent)}
-th{color:var(--mut);font-size:12px;font-weight:700;white-space:nowrap}
+/* ⚠️ 一定要排在上面兩條斑馬紋／hover 之後：三條的權重都是 (0,1,3)，靠順序決勝。
+   灰底＝系統算出來的唯讀值，白框＝你要填的。改版前兩者長得一模一樣。 */
+tbody tr>td.calc,tbody tr>td.muted{background:var(--field)}
+/* 欄名是標籤不是內容：退到 L4，讓資料本身站出來。改版前 700 讓表頭跟標題一樣重。 */
+/* ⚠️ 顏色維持 --mut 不要降到 --mut2：淺色主題下 --mut2 對白底只有 3.89:1，
+   而這一階全是 11px 小字。層級由「字級＋字重＋字距」做出來，不是靠把字調淡。 */
+th{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em;white-space:nowrap}
 td input,td select{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:8px;padding:6px 9px;font-size:12px}
 td input[type=checkbox]{width:auto;min-width:0}
 /* 下拉/輸入格不再被欄位數壓縮成看不到字；表格改為可橫向捲動 */
@@ -171,14 +210,14 @@ td.calc{white-space:nowrap}
 @media(max-width:1080px){.lgwrap{grid-template-columns:minmax(0,1fr)}.lgwrap>.sec{margin-bottom:16px}}
 .del{background:none;border:none;color:var(--warn);font-size:15px;padding:0 4px}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:16px 18px}
-.f label{display:block;color:var(--mut);font-size:12px;margin-bottom:6px}
+.f label{display:block;color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em;margin-bottom:6px}
 .f input,.f select{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:8px;padding:8px 10px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;border-top:3px solid var(--teal)}
-.kpi .lb{color:var(--mut);font-size:12px}.kpi .vv{font-size:22px;font-weight:800;margin-top:3px}.kpi small{color:var(--mut2);font-size:11px}
+.kpi .lb{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em}.kpi .vv{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:4px;line-height:1.15;font-variant-numeric:tabular-nums}.kpi small{color:var(--mut2);font-size:11px}
 .gauges{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
 .gau{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;text-align:center}
-.gau .t{color:var(--mut);font-size:13px}.arc{width:150px;height:82px;margin:8px auto 2px}.gau .sc{font-size:26px;font-weight:800}
+.gau .t{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em}.arc{width:150px;height:82px;margin:8px auto 2px}.gau .sc{font-family:var(--serif);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
 .gradebox{display:inline-flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 20px}
 .gradebox .g{font-size:26px;font-weight:700;line-height:1.25;letter-spacing:.04em}
 .rmodebox{margin:6px 0 0}.rmodebtns{display:flex;gap:8px;flex-wrap:wrap}
@@ -187,7 +226,7 @@ td.calc{white-space:nowrap}
 .rmode.on{border-color:var(--amber);background:color-mix(in srgb, var(--amber) 12%, transparent)}.rmode.on b{color:var(--amber2)}
 .romoney{padding:7px 10px;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-weight:700}
 .romoney .hint{font-weight:400}
-.rtable td.k{color:var(--tx);font-weight:700}.rtable code{color:var(--teal);font-family:ui-monospace,monospace;font-size:12px}
+.rtable td.k{color:var(--mut);font-weight:400}.rtable code{color:var(--teal);font-family:ui-monospace,monospace;font-size:12px}
 .bad{color:var(--warn);font-weight:700}.good{color:var(--ok);font-weight:800}
 .bar{height:8px;background:var(--field);border-radius:4px;overflow:hidden;margin-top:5px}.bar>i{display:block;height:100%;background:var(--teal)}
 .advcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:12px;padding:13px 15px;margin-bottom:10px}
@@ -196,7 +235,7 @@ td.calc{white-space:nowrap}
 .muted{color:var(--mut);font-size:12px}
 .big3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
 .big3 .b{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:12px}
-.big3 .b .l{color:var(--mut);font-size:12px}.big3 .b .v{font-size:19px;font-weight:800;margin-top:2px}
+.big3 .b .l{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em}.big3 .b .v{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:3px;line-height:1.15;font-variant-numeric:tabular-nums}
 .report{background:#fdfbf6;color:#22333a;border-radius:12px;padding:34px 38px;max-width:820px;margin:0 auto;box-shadow:0 10px 40px rgba(0,0,0,.4);font-family:var(--serif)}
 .report h2{color:#0d2b45;border-bottom:2px solid #c99a5b;padding-bottom:8px;margin:26px 0 12px;font-size:20px;letter-spacing:.04em}
 .report h2:first-child{margin-top:0}.report table{font-size:13px}
@@ -266,7 +305,7 @@ html.embed .shell,html.embed-single .shell{grid-template-columns:1fr!important}
 .finsg{display:flex;gap:10px;align-items:stretch;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
 .finsg .gt{writing-mode:vertical-rl;text-orientation:upright;font-size:11px;letter-spacing:.16em;color:var(--amber2);font-weight:700}
 .finsg .cells{display:flex;gap:14px;flex-wrap:wrap;align-items:center;flex:1}
-.finsg .l{color:var(--mut);font-size:12px}.finsg .v{font-size:18px;font-weight:800;line-height:1.2}.finsg .v.big{font-size:21px}
+.finsg .l{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.06em}.finsg .v{font-family:var(--serif);font-size:19px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}.finsg .v.big{font-size:23px}
 .finsg .op{color:var(--mut2);font-size:18px;font-weight:700;align-self:center}
 .pos{color:var(--ok)}.neg{color:var(--warn)}
 .finhint{color:var(--mut);font-size:12px;margin:0 2px 12px}
@@ -277,7 +316,7 @@ html.embed .shell,html.embed-single .shell{grid-template-columns:1fr!important}
 .finph{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .finph h4{font-size:15px;color:var(--tx);margin:0}
 .finph .ic{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
-.finph .sub{margin-left:auto;text-align:right}.finph .sub .sl{color:var(--mut);font-size:11px}.finph .sub .sv{font-size:15px;font-weight:800}
+.finph .sub{margin-left:auto;text-align:right}.finph .sub .sl{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.06em}.finph .sub .sv{font-family:var(--serif);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
 .finph .add{margin-left:10px}
 .fintag{font-size:11px;color:var(--mut2);border:1px solid var(--line);border-radius:8px;padding:1px 6px;font-weight:400}
 .fintbl{overflow-x:auto;flex:1}
@@ -4612,7 +4651,12 @@ function dataPane(c){
  else if(app.dataTab==='bizexit')body=(targetOn(c,'事業退場規劃')?goalHead(c,'事業退場規劃')+bizExitSec(c):foldedGoal(c,'事業退場規劃',''));
  else body=trackingSec(c);
  if(['incomes','expenses','assets','liabilities'].indexOf(app.dataTab)>=0)body=ownerBar(c)+body;
- return '<div class="dgroups">'+tb+'</div><div data-calc="completeness">'+completenessHTML(c)+'</div>'+body;
+ // 分頁名＝模組標題（L1，19px serif），與小節標題（L2，15px）差開一階。
+ // 對不到的分頁（理論上不會有）就退回原本的裸 body，不硬塞一個空標題。
+ var dlab='',dgrp='';
+ dgroups.forEach(function(g){g.subs.forEach(function(s){if(s[0]===app.dataTab){dlab=s[1];dgrp=(g.no?g.no+' ':'')+g.name}})});
+ var wrapped=dlab?('<div class="dmod"><div class="dmodhead"><h3>'+esc(dlab)+'</h3><span class="dmtag">'+esc(dgrp)+'</span></div><div class="dmodbody">'+body+'</div></div>'):body;
+ return '<div class="dgroups">'+tb+'</div><div data-calc="completeness">'+completenessHTML(c)+'</div>'+wrapped;
 }
 // ===== 家庭成員：全員卡片化（本人／配偶＝完整工作卡；其餘＝身分＋投保＋分攤＋財務獨立歲）=====
 var MEMBER_INS_TYPES=['勞保','職業工會','農保','公保','軍保','國民年金','勞工職業災害保險','就業保險','健保眷屬','退休','無'];
