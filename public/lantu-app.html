@@ -200,7 +200,7 @@ tbody tr>td.calc,tbody tr>td.muted{background:var(--field)}
 /* ⚠️ 顏色維持 --mut 不要降到 --mut2：淺色主題下 --mut2 對白底只有 3.89:1，
    而這一階全是 11px 小字。層級由「字級＋字重＋字距」做出來，不是靠把字調淡。 */
 th{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em;white-space:nowrap}
-td input,td select{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:8px;padding:6px 9px;font-size:12px}
+td input,td select{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
 td input[type=checkbox]{width:auto;min-width:0}
 /* 下拉/輸入格不再被欄位數壓縮成看不到字；表格改為可橫向捲動 */
 td select{width:auto;min-width:100%}
@@ -209,6 +209,11 @@ td input[type=number]{min-width:88px}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tw>table{min-width:100%;width:auto}
 td.calc{white-space:nowrap}
+/* ── placeholder ──────────────────────────────────────────────────────────
+   ⚠️ 改版前全站沒有任何 ::placeholder 規則，顏色由瀏覽器自己決定，深淺兩個主題
+      都不受控。值變成 14px/600 之後，placeholder 必須明確定義成「輕的、灰的」，
+      「有值」與「還沒填」的差別才會是**字本身**的差別——底色色塊完全不動。 */
+input::placeholder,textarea::placeholder{color:var(--mut2);font-weight:400;font-size:13px;opacity:1}
 /* 人生財務目標清單 ↔ 人生價值環：左右並排對照 */
 .lgwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.82fr);gap:16px;align-items:start}
 .lgwrap>.sec{margin-bottom:0;min-width:0}
@@ -216,7 +221,13 @@ td.calc{white-space:nowrap}
 .del{background:none;border:none;color:var(--warn);font-size:15px;padding:0 4px}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:16px 18px}
 .f label{display:block;color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em;margin-bottom:6px}
-.f input,.f select{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:8px;padding:8px 10px}
+/* ── 欄位裡的「值」要自己講話 ──────────────────────────────────────────────
+   ⚠️ 改版前 .f input / .f select **完全沒設 font-size**。input 的字級不會從 body
+      繼承，吃的是瀏覽器預設（約 13.3px、字重 400）——比它上面 11px/600 的欄名
+      重不了多少，值因此浮不出來，要盯著看才知道格子裡寫什麼。
+   底色色塊、邊框、圓角一律不動；只把值放大到 14px、加重到 600、用 --tx。
+   padding 同步收 1px，格子高度幾乎不變。 */
+.f input,.f select{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:8px;padding:7px 10px;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;border-top:3px solid var(--teal)}
 .kpi .lb{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em}.kpi .vv{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:4px;line-height:1.15;font-variant-numeric:tabular-nums}.kpi small{color:var(--mut2);font-size:11px}
@@ -443,7 +454,7 @@ tr.actnote td{padding-top:0;border-top:0}
 .bggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:9px}
 /* 跟 .f label 是同一件事（欄位標籤），規格就要一樣，不能一個 12px/400 一個 11px/600。 */
 .bgf label{display:block;font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut);margin-bottom:4px}
-.bgf textarea{width:100%;background:var(--field);border:1px solid var(--line);border-radius:8px;color:inherit;font:inherit;font-size:12px;padding:6px 8px;resize:vertical;line-height:1.5}
+.bgf textarea{width:100%;background:var(--field);border:1px solid var(--line);border-radius:8px;color:var(--tx);font:inherit;font-size:13px;padding:6px 9px;resize:vertical;line-height:1.55}
 .bgf textarea:focus{border-color:var(--amber2)}
 .loanblk summary::-webkit-details-marker{display:none}
 .dupwarn{font-size:.68rem;padding:1px 6px;border-radius:8px;background:color-mix(in srgb, var(--warn) 16%, transparent);color:var(--warn);white-space:nowrap;margin-left:4px}
@@ -514,7 +525,7 @@ details[open]>.foldln::before{content:'\25BE'}
 .polbadge.due{color:var(--warn);border-color:color-mix(in srgb, var(--warn) 55%, transparent)}
 .pcard .phd .polbadge{margin-left:0}
 .pcard .phd .av+.pident{margin-right:auto}
-.claimin{width:100%;background:var(--field);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:7px 9px;font-size:12px}
+.claimin{width:100%;background:var(--field);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:6px 9px;font-size:13px;font-weight:600}
 /* 保障中心 */
 .matrix{width:100%;border-collapse:collapse;font-size:12px;min-width:720px}
 .matrix th,.matrix td{text-align:center;padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
