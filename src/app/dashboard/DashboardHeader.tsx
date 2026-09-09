@@ -16,11 +16,15 @@ export default function DashboardHeader({
   uiScale = 100,
   theme = DEFAULT_THEME,
   license,
+  learnOn = true,
 }: {
   isAdmin?: boolean;
   uiScale?: number;
   theme?: ThemeName;
   license?: LicenseState;
+  // 學習區模組關閉時整顆入口不出現（見 /admin/modules）。預設 true：
+  // 沒傳的呼叫端（例如測試）維持改版前的行為。
+  learnOn?: boolean;
 }) {
   const pathname = usePathname();
   const onHome = pathname === "/dashboard";
@@ -111,7 +115,7 @@ export default function DashboardHeader({
         </Link>
         <Link href="/dashboard/my-business" className={tab(onBusiness)}>我的業務</Link>
         <Link href="/dashboard/bizguide" className={tab(onBizGuide)}>企業主手冊</Link>
-        <Link href="/dashboard/learn" className={tab(onLearn)}>學習區</Link>
+        {learnOn && <Link href="/dashboard/learn" className={tab(onLearn)}>學習區</Link>}
       </nav>
       <div className="flex-1" />
       <ThemeToggle initial={theme} persist compact />

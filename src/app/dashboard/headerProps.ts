@@ -5,8 +5,12 @@ import { isAdmin as checkAdmin, type Coach } from "@/lib/coach";
 import { licenseState, type LicenseState } from "@/lib/license";
 import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
 import { DEFAULT_THEME, normalizeTheme, type ThemeName } from "@/lib/theme";
+import { isModuleOn } from "@/lib/platformModules";
 
-export type HeaderProps = { isAdmin: boolean; uiScale: number; theme: ThemeName; license: LicenseState };
+// learnOn：學習區模組的開關（/admin/modules）。關閉時頂欄不出現學習區入口——
+// 入口與頁面各自判斷會漂（頁面擋住了、頂欄還亮著一個點進去是建置中的分頁），
+// 所以跟 isAdmin 一樣收在這裡算一次。
+export type HeaderProps = { isAdmin: boolean; uiScale: number; theme: ThemeName; license: LicenseState; learnOn: boolean };
 
 export async function headerProps(coach: Coach): Promise<HeaderProps> {
   return {
@@ -14,5 +18,6 @@ export async function headerProps(coach: Coach): Promise<HeaderProps> {
     uiScale: coach.uiScale ?? DEFAULT_UI_SCALE,
     theme: normalizeTheme(coach.theme ?? DEFAULT_THEME),
     license: licenseState(coach),
+    learnOn: await isModuleOn("learn"),
   };
 }

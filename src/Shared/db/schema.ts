@@ -115,7 +115,35 @@ export const clientUsers = pgTable('client_users', {
   name: text('name'),
   status: text('status').default('active').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  // ── 訪客足跡（2026/09/09 Ray 要求）────────────────────────────────
+  // 後台「訪客記錄」要看得到「有多少外部客戶真的回來過」。此前整套系統對這件事
+  // 一個欄位都沒有：只知道誰註冊過，不知道他註冊完之後有沒有再出現。
+  //
+  // ⚠️ 「一次登入」＝一個 Clerk session，不是一次頁面載入。ensureClientUser() 每開一頁
+  //    就跑一次，用 lastSessionId 比對才不會把「在站上翻了十頁」記成十次登入。
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  loginCount: integer('login_count').default(0).notNull(),
+  lastSessionId: text('last_session_id'),
 });
+
+// 訪客登入事件（2026/09/09 Ray 拍板：**全部保留、不設保存期限**，因為之後要做訪客行為分析）。
+//
+// ⚠️ 這張表會單向長大，沒有任何清理機制——這是 Ray 明確要的（儲存空間另外想辦法），
+//    不是漏做。要加清理前先問過他，不要看到「沒有 retention」就自己補一支 cron 砍掉歷史。
+//    量級參考：一位訪客一天回來三次＝一年約 1,000 列，一列不到 100 bytes。
+// ⚠️ 寫入點只有 lib/clientUser.ts 的 ensureClientUser()，且只在 session 換新時寫，
+//    正常翻頁不會產生任何一列。
+export const clientLoginEvents = pgTable('client_login_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientUserId: text('client_user_id').notNull().references(() => clientUsers.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id'),
+  at: timestamp('at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 單一訪客的登入歷史（後台明細頁）。
+  index('cle_user_at_idx').on(t.clientUserId, t.at.desc()),
+  // 「最近 7 天有多少人回來」這類全站統計。
+  index('cle_at_idx').on(t.at.desc()),
+]);
 
 // 客戶（永久身份）
 export const clients = pgTable('clients', {
@@ -1104,6 +1132,25 @@ export const coachApplySettings = pgTable('coach_apply_settings', {
 // ⚠️ 沒有列＝顯示。只有明確 hidden=true 的模組才會被關掉，
 //    所以之後新增模組不會因為後台沒設定就整塊消失。
 // key 對應 src/lib/clientDashModules.ts 的 CLIENT_DASH_MODULES。
+// ── 模組開關（2026/09/09 Ray 拍板）──────────────────────────────────
+//
+// 「先關掉學習區，架設完成再打開」——但做成的不是一顆學習區專用的布林，而是一張
+// 模組開關表：未來任何模組要進維修都在這裡關，不用再改一次架構。
+//
+// ⚠️ 合併語意與 client_dash_defaults 刻意**相反**：這裡「沒有列」不等於開啟，
+//    而是回到程式端清單裡各模組自己的 defaultEnabled（見 lib/platformModules.ts）。
+//    學習區的 defaultEnabled 就是 false ——部署上去即為關閉，不需要先跑一支 seed；
+//    要是這裡也寫成「沒設定＝開」，部署完成的那一刻學習區就是開著的，跟 Ray 要的相反。
+// ⚠️ 程式端不認得的 key（模組已下架）一律忽略，不讓死資料變成一個看不見的開關。
+export const platformModules = pgTable('platform_modules', {
+  key: text('key').primaryKey(),
+  enabled: boolean('enabled').default(true).notNull(),
+  // 維修說明：關閉時顯示給使用者看的那段字。留空＝用程式端的預設文案。
+  notice: text('notice'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: text('updated_by').references(() => coaches.id, { onDelete: 'set null' }),
+});
+
 export const clientDashDefaults = pgTable('client_dash_defaults', {
   key: text('key').primaryKey(),
   hidden: boolean('hidden').default(false).notNull(),

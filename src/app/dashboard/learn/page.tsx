@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ensureCoach } from "@/lib/coach";
 import { listCoursesFor } from "@/lib/learn";
+import { isModuleOn, moduleNotice } from "@/lib/platformModules";
 import DashboardHeader from "../DashboardHeader";
 import { headerProps } from "../headerProps";
 import ReadOnlyBanner from "../ReadOnlyBanner";
+import ModuleClosed from "./ModuleClosed";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +18,19 @@ export default async function LearnPage() {
   if (!coach) redirect("/dashboard");
   if (coach.status !== "active") redirect("/dashboard");
 
-  const courses = await listCoursesFor(coach);
   const hp = await headerProps(coach);
+  // 模組閘：頂欄入口已經藏起來了，但直接打網址的人也得看到同一件事。
+  // 藏入口是「不引導」，這裡才是「擋住」。
+  if (!(await isModuleOn("learn"))) {
+    return (
+      <div className="min-h-screen bg-canvas text-tx">
+        <DashboardHeader {...hp} />
+        <ModuleClosed title="學習區建置中" notice={await moduleNotice("learn")} />
+      </div>
+    );
+  }
+
+  const courses = await listCoursesFor(coach);
 
   const groups = new Map<string, typeof courses>();
   for (const c of courses) {

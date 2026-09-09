@@ -9,6 +9,7 @@
 import { revalidatePath } from "next/cache";
 import { requireCoach } from "@/lib/guard";
 import { markLesson } from "@/lib/learn";
+import { isModuleOn } from "@/lib/platformModules";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -19,6 +20,8 @@ export async function markLessonAction(
 ): Promise<ActionResult> {
   try {
     const me = await requireCoach();
+    // 模組關閉時連寫入都擋掉：只把畫面藏起來的話，開著舊分頁的人還是寫得進進度。
+    if (!(await isModuleOn("learn"))) return { ok: false, error: "學習區目前未開放" };
     await markLesson(me.id, lessonId, done);
     revalidatePath("/dashboard/learn");
     revalidatePath(`/dashboard/learn/${courseId}`);

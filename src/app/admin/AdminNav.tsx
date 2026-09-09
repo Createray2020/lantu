@@ -23,6 +23,9 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin/profiles", label: "對外檔案" },
       { href: "/admin/training", label: "訓練時數" },
       { href: "/admin/learn", label: "學習區" },
+      // 外部客戶（官網自己註冊的那群）與教練帳號是兩批人，刻意排在同一組的最後：
+      // 這一組回答的是「平台上有誰」。
+      { href: "/admin/visitors", label: "訪客記錄" },
     ],
   },
   {
@@ -42,6 +45,7 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin/analysis", label: "分析模組" },
       { href: "/admin/client-view", label: "客戶端顯示" },
       { href: "/admin/brand", label: "品牌設定" },
+      { href: "/admin/modules", label: "模組開關" },
     ],
   },
 ];

@@ -2,10 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ensureCoach } from "@/lib/coach";
 import { getCourse, listLessons, doneLessonIds, listCoursesFor, embedUrl } from "@/lib/learn";
+import { isModuleOn, moduleNotice } from "@/lib/platformModules";
 import DashboardHeader from "../../DashboardHeader";
 import { headerProps } from "../../headerProps";
 import ReadOnlyBanner from "../../ReadOnlyBanner";
 import CourseView, { type LessonView } from "./CourseView";
+import ModuleClosed from "../ModuleClosed";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,16 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
   const coach = await ensureCoach();
   if (!coach) redirect("/dashboard");
   if (coach.status !== "active") redirect("/dashboard");
+
+  if (!(await isModuleOn("learn"))) {
+    const hp0 = await headerProps(coach);
+    return (
+      <div className="min-h-screen bg-canvas text-tx">
+        <DashboardHeader {...hp0} />
+        <ModuleClosed title="學習區建置中" notice={await moduleNotice("learn")} />
+      </div>
+    );
+  }
 
   const course = await getCourse(courseId);
   if (!course) notFound();

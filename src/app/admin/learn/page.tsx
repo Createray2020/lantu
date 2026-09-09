@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { ensureCoach, isAdmin, listCoaches } from "@/lib/coach";
 import { listAllCourses, listLessons, courseCompletion, rankOptions as buildRankOptions } from "@/lib/learn";
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
+import { isModuleOn } from "@/lib/platformModules";
 import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
+import Link from "next/link";
 import LearnBoard, { type CourseRow } from "./LearnBoard";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,10 @@ export default async function AdminLearnPage() {
   const me = await ensureCoach();
   if (!me) redirect("/dashboard");
   if (!(await isAdmin(me))) redirect("/dashboard");
+
+  // 後台不受模組開關影響（關著的時候正是要把課程先建好的時候），但一定要標出來——
+  // 否則會出現「後台明明有八門課，教練說看不到」這種找不到原因的回報。
+  const learnOn = await isModuleOn("learn");
 
   const version = await ensureActiveVersion();
   const [courses, params, coaches, completion] = await Promise.all([
@@ -71,6 +77,14 @@ export default async function AdminLearnPage() {
             其他連結則顯示成「用新分頁開啟」。
           </p>
         </div>
+        {!learnOn && (
+          <div className="mb-4 rounded-xl border border-brand/40 bg-brand/10 px-4 py-3 text-sm">
+            <b className="text-brand2">學習區目前對教練端關閉中。</b>
+            這一頁照常可以編輯，但教練看不到入口、也進不去課程。要開放請到{" "}
+            <Link href="/admin/modules" className="underline underline-offset-2 font-bold">模組開關</Link>
+            {" "}打開。
+          </div>
+        )}
         <LearnBoard courses={rows} rankOptions={rankOptions} />
       </section>
     </main>
