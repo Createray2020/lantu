@@ -4537,6 +4537,12 @@ function setAmtByPeriodLive(arr,idx,val){var c=activeCase();if(!c)return;var it=
 // 新增任何衍生數字時只要掛 data-calc，不必再記得補同步邏輯 —— 這是「數字不會更新」bug 的根治。
 var CALC={
  eduTotal:function(c){return eduDerivedHTML(c);},
+ // 手冊第 3 章的兩題：改變的準備度、財務決策分工。兩者都不進引擎，
+ // 但都必須產生一句可行動的判讀，否則就是「填得進去卻不影響任何結果」的死欄位。
+ readiness:function(c){return readinessHint(c);},
+ decision:function(c){return decisionHint(c);},
+ // 「最晚實現」＝除了壓低金額之外的第二種讓步。訪談問卷問了兩年，系統一直沒收。
+ defer:function(c){return deferHint(c);},
  lifestyleNow:function(c){return fmt(lifestyleAnnualNow(c));},
  lifestyleCount:function(c){return String((c.travel||[]).length+(c.hobby||[]).length+(c.luxury||[]).length);},
  coverageDerived:function(c){return coverageDerivedHTML(c);},
@@ -4878,7 +4884,7 @@ function dataPane(c){
  else if(app.dataTab==='liabilities')body=liabilitiesSec(c);
  else if(app.dataTab==='retire')body=(targetOn(c,'退休生活規劃')?goalHead(c,'退休生活規劃')+retireSec(c):foldedGoal(c,'退休生活規劃',tabFilled(c,'retire')?'（先前已填的退休參數保留、仍列入模擬）':''));
  else if(app.dataTab==='education')body=(targetOn(c,'子女教養規劃')?goalHead(c,'子女教養規劃')+eduSec(c):foldedGoal(c,'子女教養規劃',tabFilled(c,'education')?'（先前已填的教育金資料保留、仍列入模擬）':''));
- else if(app.dataTab==='goals')body=goalsTabHead(c)+tableSec('目標 / 置產 / 願望','goals',c.goals,[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']])+detailSec(c,'house')+detailSec(c,'car')+houseCalcSec(c);
+ else if(app.dataTab==='goals')body=goalsTabHead(c)+tableSec('目標 / 置產 / 願望','goals',c.goals,[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['latest','最晚完成歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']])+'<div data-calc="defer">'+deferHint(c)+'</div>'+detailSec(c,'house')+detailSec(c,'car')+houseCalcSec(c);
  else if(app.dataTab==='lifestyle')body=lifestyleSec(c);
  else if(app.dataTab==='needs')body=needsSec(c);
  else if(app.dataTab==='coverages')body='<div class="sec"><h4 style="color:var(--mut)">簡易保障輸入 <span class="hint">若已於「現有保單」逐張登錄，此處通常留空；系統會自動彙總。員工團體保險也可登錄於此（計入已備）。</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外傷殘,住院醫療,醫療雜費,薪資補償（日）,薪資補償（月）,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','money'],['social','已備社會','money']]);
@@ -5234,6 +5240,7 @@ function personCard(c,m,idx,isPrimary){
    ageField(p.age,p.birth,'oninput="setMeta(\'profile\',\'age\',this.value,\'num\')"',null,'self')+
    fFld('oninput="setMeta(\'profile\',\'retireAge\',this.value,\'num\')"','預計退休年齡',p.retireAge,'num')+
    fFld('oninput="setLifeExp(this.value)"','預估壽命',p.lifeExp,'num')+
+   fFld('oninput="setMeta(\'profile\',\'residence\',this.value)"','現居地',p.residence)+
    '<div class="f"><label>聯徵信用評分(200-800)</label><input type="number" data-creditinput value="'+esc(creditScoreOf(c)||'')+'" oninput="setCreditScore(this.value)"></div>';
  }else if(m.unborn){
   // 未出生子女：出生日期與年齡都不適用，改填「預計在本人幾歲時出生」，右邊即時換算成幾年後。
@@ -5294,6 +5301,19 @@ function personCard(c,m,idx,isPrimary){
  }
  // 家庭分攤 · 財務獨立歲
  var ratioFields=fFld(mb('depRatio','num'),'家計負擔%',m.depRatio,'num')+fFld(mb('expRatio','num'),'支出比例%',m.expRatio,'num');
+ // ⚠️ 分工與分攤是兩件事：depRatio／expRatio 問的是「錢由誰出、出多少」，
+ //    這裡問的是「這件事由誰拍板」。方案要說服的是後者——找錯人，方案再好也不會被執行。
+ var decideRow='<div class="bgf" style="grid-column:1/-1"><label>財務決策分工 <span class="hint" style="font-weight:400">這位成員在哪些面向是拍板的人（可複選）</span></label>'+
+  '<div style="display:flex;flex-wrap:wrap;gap:7px;padding:4px 0">'+DECIDE_AREAS.map(function(a){
+    var on=((m.decides)||[]).indexOf(a)>=0;
+    return '<label style="display:inline-flex;align-items:center;gap:5px;background:'+(on?'var(--amber)':'var(--card)')+
+     ';color:'+(on?'var(--onbrand)':'var(--mut)')+';border:1px solid '+(on?'var(--amber)':'var(--line)')+
+     ';border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:700;cursor:pointer"><input type="checkbox" '+(on?'checked ':'')+
+     'onchange="toggleDecide('+idx+',\''+a+'\',this.checked)" style="accent-color:var(--amber)">'+a+'</label>';
+   }).join('')+'</div>'+
+  '<label style="display:flex;align-items:center;gap:7px;padding:2px 0"><input type="checkbox" '+(m.jointConfirm?'checked ':'')+
+   'onchange="set(\'members:'+idx+'\',\'jointConfirm\',this.checked)" style="accent-color:var(--amber)">'+
+   '<span class="muted" style="font-size:11.5px">重大決定需要與其他人共同確認（＝方案不能只對他一個人講）</span></label></div>';
  if(!isEarner)ratioFields+=fFld(mb('indepAge','num'),'財務獨立歲',m.indepAge,'num');
  // ⚠️ C6：這句承諾以前只有責任遞減「圖」做到，壽險需求數字完全沒看 indepAge。
  //    2026/08/29 起 grossLifeNeed() 真的照做（protectYearsEff），所以這裡把
@@ -5303,7 +5323,7 @@ function personCard(c,m,idx,isPrimary){
    +'<br>作用範圍：壽險需求裡的<b>「家庭年生活費 × 保障年數」</b>那一段——保障年數會逐年扣掉已獨立成員的份額；貸款、教育金、喪葬費不受影響。'
    +'<br>留空＝不設財務獨立歲，全程都算進責任。</div>'
   :'';
- var ratioBlock='<div class="subhd">家庭分攤'+(!isEarner?' · 財務獨立':'')+'</div><div class="fgrid">'+ratioFields+'</div>'+ratioHint;
+ var ratioBlock='<div class="subhd">家庭分攤'+(!isEarner?' · 財務獨立':'')+'</div><div class="fgrid">'+ratioFields+decideRow+'</div>'+ratioHint;
  // ⚠️ 角色沒選＝這個人不存在於任何計算裡，而且完全不噴錯。
  //    Ray 0831 實測：家庭分頁加了四位小孩、三位的角色留空，子女教育分頁只帶得出一位，
  //    看起來就是「明明加過了卻沒有」，於是在教育分頁又新增一次＝重複的人。
@@ -5317,6 +5337,43 @@ function personCard(c,m,idx,isPrimary){
 // 背景補充：這些沒有欄位可以放，但它們是判斷「這個人接下來會怎麼決定」的脈絡。
 // 一個換過三次產業的業務、跟一個待了二十年的公務員，同樣的數字要給的建議完全不同。
 // 純文字、不進任何計算，會被帶進報告書的客戶側寫。
+// ===== 財務決策分工（members[].decides / jointConfirm）=====
+// 手冊第 3 章「家庭財務分工」。訪談問卷從來沒問過這一段——它問的是「家計負擔比例」，
+// 那是誰出錢；這裡問的是誰拍板。兩者常常不是同一個人，而方案要說服的是後者。
+var DECIDE_AREAS=['日常支出','儲蓄與投資','貸款與大額支出','保險','孝親與子女','報稅與文件'];
+function toggleDecide(idx,area,on){
+ var c=activeCase(),m=(c.members||[])[idx];if(!m)return;
+ var a=Array.isArray(m.decides)?m.decides.slice():[];
+ var i=a.indexOf(area);
+ if(on){if(i<0)a.push(area);}else if(i>=0)a.splice(i,1);
+ m.decides=a;save();render();
+}
+// 六個面向誰都沒認領，就是「這場會談還沒問到底」——把它指出來，欄位才有作用。
+function decisionHint(c){
+ var ms=(c&&c.members)||[];
+ var by={},joint=[];
+ DECIDE_AREAS.forEach(function(a){by[a]=[];});
+ ms.forEach(function(m){
+  (Array.isArray(m.decides)?m.decides:[]).forEach(function(a){if(by[a])by[a].push(m.name||'（未命名）');});
+  if(m.jointConfirm)joint.push(m.name||'（未命名）');
+ });
+ var claimed=DECIDE_AREAS.filter(function(a){return by[a].length;});
+ if(!claimed.length)return '<div class="hint" style="display:block;margin-top:10px">'+
+  '<b>財務決策分工還沒問。</b>在每位成員卡片的「家庭分攤」裡勾選他是哪些面向的決策者。'+
+  '這一段問的不是誰出錢（那是家計負擔%），是<b>誰拍板</b>——找錯人，方案再好也不會被執行。</div>';
+ var lines=DECIDE_AREAS.map(function(a){
+  return by[a].length
+   ? '<span style="color:var(--tx)">'+esc(a)+'</span>：'+esc(by[a].join('、'))+(by[a].length>1?' <span class="muted">（多人共管）</span>':'')
+   : '<span style="color:var(--gap2)">'+esc(a)+'：尚未指定</span>';
+ });
+ var miss=DECIDE_AREAS.length-claimed.length;
+ var tail=miss
+  ? '<br><b style="color:var(--gap2)">還有 '+miss+' 個面向沒有人負責</b>——不是每個家庭都六項齊全，但沒問到跟沒有人管是兩件事，值得回頭確認一次。'
+  : '<br>六個面向都有人負責。';
+ if(joint.length)tail+='<br>需共同確認：<b>'+esc(joint.join('、'))+'</b>——方案簡報要把這些人一起找來，不能只對其中一位講。';
+ return '<div class="hint" style="display:block;margin-top:10px;line-height:1.9;border-left:3px solid var(--amber2);padding-left:10px">'+
+  lines.join('<br>')+tail+'</div>';
+}
 var BG_FIELDS=[
  ['edu','學經歷','最高學歷、就讀學校科系、重要證照'],
  ['career','職涯發展歷程','做過哪些產業與職務、幾次轉換、目前的位置與下一步'],
@@ -5368,6 +5425,7 @@ function peopleSec(c){
  members.forEach(function(m,i){if(i===pi)return;cards+=personCard(c,m,i,false);});
  var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'members\')">＋ 新增家庭成員</button></div>';
  return bizOwnerWarnHTML(c)+familyTreeSec(c)+'<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+
+  '<div class="sec"><h4>誰決定這個家的錢 <span class="hint">六個面向各由誰拍板；方案要說服的是他們</span></h4><div data-calc="decision">'+decisionHint(c)+'</div></div>'+
   '<div data-calc="nhiSummary">'+nhiSummaryHTML(c)+'</div>'+paramsSec(c);
 }
 // 全家健保費彙總＋支出表同步狀態。⚠️ data-calc 容器內不可以有輸入框，
@@ -8563,6 +8621,56 @@ function careerCalcHTML(c){
   rows.map(function(g){return esc(g.name)+' '+fmt(g.present)+' 元';}).join('、')+
   '。這兩筆已經進入現金流與缺口計算，可以到那張表微調金額或最低標準。</div>';
 }
+// ===== 最晚實現（goals[].latest / marriage.latestAge / travel[].latest）=====
+// 訪談問卷在婚姻（最晚年齡）、孝親（最晚實現）、旅遊（最晚實現）各問過一次，
+// 系統一直沒有收——於是資源不足時，教練手上只有「壓低金額」一種讓步可以談。
+// ⚠️ 這一波只收資料並把它讀出來；把它接成求解器的第三根槓桿是另一件事，
+//    在那之前這裡至少要讓教練看見「還有哪些目標是可以往後挪的」。
+function deferRows(c){
+ var out=[];
+ (c.goals||[]).forEach(function(g){
+  if(!g||g.on===false)return;
+  var st=n(g.start),la=n(g.latest);
+  if(st>0&&la>st)out.push({name:(g.name||g.type||'（未命名目標）'),from:st,to:la});
+ });
+ var mr=c.marriage||{};
+ if(mr.plan==='是'){var ma=n(mr.age),ml=n(mr.latestAge);
+  if(ma>0&&ml>ma)out.push({name:'婚姻',from:ma,to:ml});}
+ (c.travel||[]).forEach(function(t){
+  if(!t||t.on===false)return;
+  var st=n(t.start),la=n(t.latest);
+  if(st>0&&la>st)out.push({name:'旅遊'+(t.cat?'（'+t.cat+'）':''),from:st,to:la});
+ });
+ return out;
+}
+// 「問了但沒有彈性」與「根本沒問」是兩回事，提示要分得開。
+function deferAsked(c){
+ var asked=0,total=0;
+ (c.goals||[]).forEach(function(g){if(!g||g.on===false)return;if(!(n(g.start)>0))return;total++;if(n(g.latest)>0)asked++;});
+ var mr=c.marriage||{};
+ if(mr.plan==='是'&&n(mr.age)>0){total++;if(n(mr.latestAge)>0)asked++;}
+ (c.travel||[]).forEach(function(t){if(!t||t.on===false)return;if(!(n(t.start)>0))return;total++;if(n(t.latest)>0)asked++;});
+ return {asked:asked,total:total};
+}
+function deferHint(c){
+ var st=deferAsked(c),rows=deferRows(c);
+ if(!st.total)return '<div class="hint" style="display:block;margin-top:10px">目標還沒有填時間，先把「起始歲」填上，才談得到能不能往後挪。</div>';
+ if(!st.asked)return '<div class="hint" style="display:block;margin-top:10px">'+
+  '<b>「最晚完成歲」'+st.total+' 個目標都還沒問。</b>訪談問卷本來就有這一題（婚姻問最晚年齡、孝親與旅遊問最晚實現）。'+
+  '它的用處是：資源不足時，除了把金額壓低，還有<b>往後挪</b>這個選項——不問就等於少一種讓步可以談。</div>';
+ var lines=rows.map(function(r){
+  return '<span style="color:var(--tx)">'+esc(r.name)+'</span>：'+r.from+' → '+r.to+' 歲 <b style="color:var(--amber2)">可延 '+(r.to-r.from)+' 年</b>';
+ });
+ var rigid=st.asked-rows.length;
+ var body=rows.length
+  ? lines.join('<br>')
+  : '<b>已問過的目標都沒有延後空間</b>（最晚＝理想時間）——這代表時間這條路走不通，只能從金額與優先序讓步。';
+ var tail='';
+ if(st.asked<st.total)tail+='<br><span style="color:var(--gap2)">還有 '+(st.total-st.asked)+' 個目標沒問「最晚」</span>——補齊才知道時間上總共有多少彈性。';
+ if(rows.length&&rigid>0)tail+='<br><span class="muted">另有 '+rigid+' 個目標問過但沒有延後空間。</span>';
+ return '<div class="hint" style="display:block;margin-top:10px;line-height:1.9;border-left:3px solid var(--amber2);padding-left:10px">'+
+  body+tail+'<br><span class="muted">已問 '+st.asked+' / '+st.total+' 個目標。</span></div>';
+}
 function goalsSec(c){
  return '<div class="sec"><h4>人生目標與優先序 <span class="hint">選了＝必須達成，沒選＝不列入規劃、對應欄位收合；順序＝資源不足時的取捨依據</span></h4>'+
   '<div class="prio"><div class="ph"><b>必須達成 · 優先序</b><span class="hint">拖曳排序，或用 ◀ ▶ 微調（平板／手機用）</span>'+
@@ -9105,6 +9213,28 @@ function interviewSec(c){
   '<div class="hint" style="margin-top:10px">✓ 是系統依「那一段有沒有資料」自動判定的，不用自己維護。'+
   '談過但決定不做、系統偵測不到的，點方框手動勾起來。這份清單只是導航——資料一律回各分頁填。</div></div>';
 }
+// ===== 改變的準備度（moneyStyle.willing / confidence）=====
+// 手冊第 3 章「安全感、阻力與準備度」的最後一題。兩個數字分開問是有意義的：
+// 「想做」與「相信做得到」是兩種不同的缺，缺哪一個決定這一場之後該給什麼。
+// ⚠️ 這一格刻意產生一句可行動的判讀，不是把數字存起來就算了——
+//    參照 params.freeSaving 被移除的理由：填得進去卻不影響任何結果的欄位不要留。
+function readinessHint(c){
+ var ms=(c&&c.moneyStyle)||{};
+ var w=ms.willing,f=ms.confidence;
+ var has=function(x){return x!==''&&x!=null&&isFinite(Number(x))};
+ if(!has(w)&&!has(f))return '<div class="hint" style="margin-top:8px;display:block">兩題都問完才判讀得出來。'+
+  '<b>意願</b>＝他想不想做；<b>信心</b>＝他相信不相信自己做得到。這兩件事常常不一樣，而缺哪一邊決定這一場之後要給方案還是給動機。</div>';
+ if(!has(w)||!has(f))return '<div class="hint" style="margin-top:8px;display:block">還差一題。兩個數字都有才判讀得出來——'+
+  (has(w)?'再問一次「你相信自己做得到的程度是幾分？」':'再問一次「這件事你想做的程度是幾分？」')+'</div>';
+ var W=Math.max(0,Math.min(10,n(w))),F=Math.max(0,Math.min(10,n(f)));
+ var hi=6,txt,tone;
+ if(W>=hi&&F>=hi){tone='var(--ok-solid)';txt='<b>想做，也相信做得到。</b>可以直接進方案與行動承諾——這種狀態下把待辦開出來，他會真的去做。';}
+ else if(W>=hi&&F<hi){tone='var(--amber2)';txt='<b>想做，但不相信自己做得到。</b>缺的是方法與陪伴，不是動機。方案要切小、第一步要小到不可能失敗，別一次給整套。';}
+ else if(W<hi&&F>=hi){tone='var(--amber2)';txt='<b>做得到，但沒有很想做。</b>缺的是動機。先回「人生藍圖」那一段把價值觀與目標接起來，不要急著談數字。';}
+ else{tone='var(--gap2)';txt='<b>意願與信心都偏低。</b>這一場先不要給方案——給了也不會執行。回到「為什麼要做這件事」，把一件他真的在意的事找出來再往下。';}
+ return '<div class="hint" style="margin-top:8px;display:block;border-left:3px solid '+tone+';padding-left:10px;line-height:1.8">'+
+  '意願 <b>'+W+'</b> / 信心 <b>'+F+'</b> — '+txt+'</div>';
+}
 function intentSec(c){var it=c.intent||{};
  var lifeTbl=tableSec('人生財務目標清單','lifeGoals',c.lifeGoals||[],[['name','目標','text'],['priority','優先序','num'],['value','價值觀 / 重要原因','text'],['importance','重要程度（5最高）','imp'],['linkModule','對應模組','sel:退休,教育,置產,購車,傳承,婚姻,創業,其他'],['note','備註','text']],
   '自由填寫客戶「最在意的事」與背後的價值觀；對應模組做軟連結，於報告呈現。這張清單捕捉「為什麼」，下方的人生目標捕捉「做什麼」，實際運算仍由各模組（退休/教育/置產…）負責。');
@@ -9122,11 +9252,14 @@ function intentSec(c){var it=c.intent||{};
       '<div data-calc="career">'+careerCalcHTML(c)+'</div></div>'
    :foldedGoal(c,'職涯規劃',(c.career||{}).plan&&c.career.plan!=='無'?'（先前已填「'+esc(c.career.plan)+'」，資料保留、仍列入模擬）':''))+
   (targetOn(c,'婚姻規劃')
-   ?'<div class="sec" data-goalanchor="婚姻規劃"><h4>婚姻規劃 '+mustBadge(c,'婚姻規劃')+'</h4><div class="fgrid">'+ofld('marriage','plan','是否結婚','sel:否,是')+ofld('marriage','age','理想結婚年齡','num')+ofld('marriage','budget','婚禮預算(理想)','money')+ofld('marriage','minBudget','婚禮預算(最低)','money')+ofld('marriage','importance','重要度（5最高）','imp')+'</div><div class="hint" style="margin-top:8px">旅遊/休閒/奢侈品/傳承 於「目標/置產」分頁以對應類型新增，並可填理想與最低雙檔。</div></div>'+detailSec(c,'wedding')
+   ?'<div class="sec" data-goalanchor="婚姻規劃"><h4>婚姻規劃 '+mustBadge(c,'婚姻規劃')+'</h4><div class="fgrid">'+ofld('marriage','plan','是否結婚','sel:否,是')+ofld('marriage','age','理想結婚年齡','num')+ofld('marriage','latestAge','最晚結婚年齡','num')+ofld('marriage','budget','婚禮預算(理想)','money')+ofld('marriage','minBudget','婚禮預算(最低)','money')+ofld('marriage','importance','重要度（5最高）','imp')+'</div><div class="hint" style="margin-top:8px">旅遊/休閒/奢侈品/傳承 於「目標/置產」分頁以對應類型新增，並可填理想與最低雙檔。</div></div>'+detailSec(c,'wedding')
    :foldedGoal(c,'婚姻規劃',(c.marriage||{}).plan==='是'?'（先前已填婚姻規劃，資料保留、仍列入模擬）':''))+
   '<div class="sec"><h4>理財模式評估 <span class="hint">記帳、儲蓄與投資經驗，判讀理財習慣</span></h4><div class="fgrid">'+ofld('moneyStyle','bookkeep','記帳經驗','sel:無,曾記帳但中斷,持續記帳中')+ofld('moneyStyle','budgeting','收支管理','sel:未管理,有記錄無計劃,有計劃管理')+ofld('moneyStyle','emergency','緊急預備金','sel:尚未準備,已準備')+ofld('moneyStyle','emergencyAmt','預備金金額','money')+'</div>'+
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">儲蓄經驗（可複選）</div>'+chips('savingExp',SAVING_EXP,it.savingExp)+'</div>'+
-   '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">投資經驗（可複選）</div>'+chips('investExp',INVEST_EXP,it.investExp)+chipsOther('investExp',it)+'</div></div>'+
+   '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">投資經驗（可複選）</div>'+chips('investExp',INVEST_EXP,it.investExp)+chipsOther('investExp',it)+'</div>'+
+   '<div class="subhd" style="margin-top:12px">改變的準備度 <span class="hint">訪談題：這件事你想做的程度 0–10？你相信自己做得到的程度 0–10？</span></div>'+
+   '<div class="fgrid">'+ofld('moneyStyle','willing','改變意願 0–10','num')+ofld('moneyStyle','confidence','改變信心 0–10','num')+'</div>'+
+   '<div data-calc="readiness">'+readinessHint(c)+'</div></div>'+
   pendingSec(c);
 }
 // ⚠️⚠️ 2026/08/31 Ray 回報：第 2 題起有五題把「您現在有一筆錢要投資」當成前提，
@@ -10700,7 +10833,7 @@ function financeSec(c){
 }
 
 function lifestyleSec(c){
- var travel=tableSec('旅遊規劃','travel',c.travel,[['on','納入','bool'],['cat','國內/外','sel:國內,國外'],['sub','類型','sel:認知旅遊,體育旅遊,消費旅遊,鄉村旅遊,宗教旅遊'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','每次預算(理想)','money'],['minAmount','每次(最低)','money'],['imp','重要度（5最高）','imp']]);
+ var travel=tableSec('旅遊規劃','travel',c.travel,[['on','納入','bool'],['cat','國內/外','sel:國內,國外'],['sub','類型','sel:認知旅遊,體育旅遊,消費旅遊,鄉村旅遊,宗教旅遊'],['start','開始歲','num'],['latest','最晚起始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','每次預算(理想)','money'],['minAmount','每次(最低)','money'],['imp','重要度（5最高）','imp']]);
  var hobby=tableSec('休閒興趣','hobby',c.hobby,[['on','納入','bool'],['sub','類型','sel:體能類,收藏類,思考類,娛樂創作類,社會服務類,栽培飼養類,其他類'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','平均花費(每次)','money'],['minAmount','最低','money'],['imp','重要度（5最高）','imp']]);
  var luxury=tableSec('奢侈品購買','luxury',c.luxury,[['on','納入','bool'],['sub','類別','sel:豪宅,珠寶寶石黃金,鐘錶,首飾配件,服裝精品,化妝品,工藝品,古董,樂器,家用電器,衛浴設施,寵物,私人飛機,郵輪遊艇,超跑豪華車,其他'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','價格','money'],['minAmount','最低','money'],['imp','重要度（5最高）','imp']]);
  // ⚠️ 掛 data-goalanchor：訪談檢核清單與「填細節 →」都靠它捲到對應的表。
