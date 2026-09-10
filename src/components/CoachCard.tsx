@@ -48,13 +48,12 @@ export default function CoachCard({
         </div>
       </div>
 
-      {/* 第一個＝主專長（教練在「我的檔案」拖曳決定），用顏色點出來；其餘維持中性。 */}
+      {/* 順序＝教練在「我的檔案」拖曳決定的，第一個是他想先被看到的那一項。
+          ⚠️ 但一律不上色：把第一個標出顏色會讀成「他只會這一項」（Ray 2026/09/10）。 */}
       {specialties.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {specialties.map((s, i) => (
-            <SpecialtyChip key={s} name={s} primary={i === 0}
-              title={i === 0 ? "主專長" : undefined}
-              className="px-2.5 py-1 text-11" />
+          {specialties.map((s) => (
+            <SpecialtyChip key={s} name={s} className="px-2.5 py-1 text-11" />
           ))}
         </div>
       )}

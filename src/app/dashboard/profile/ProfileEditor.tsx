@@ -347,7 +347,9 @@ function ListField({
  * 為什麼要排序：官網首頁的臉孔牆只印得下**一個**專長，印的是 `specialties[0]`。
  * 改版前這個「第一個」等於教練當初勾選的先後順序，教練自己看不到、也改不了——
  * 等於首頁替他決定了對外的第一印象（Ray 2026/09/07 回報）。
- * 現在排第一個就是主專長，卡片與首頁都用專屬顏色把它點出來。
+ * 現在排第一個就是主專長，官網首頁的臉孔牆印的就是它。
+ * ⚠️ 但**不上色**：2026/09/10 Ray 看到成品後拍板，把第一個標成彩色色塊會讀成
+ *    「他只會這一項」，反而縮小了教練自己填的範圍。順序本身就是表達，不必再加視覺強調。
  *
  * ⚠️ 已選清單直接來自 `value`（教練存過的值），不是從 `options` 過濾出來的——
  *    公司之後把某個專長從制度清單移掉時，教練身上的舊值仍要看得見、拖得動、移得掉。
@@ -384,7 +386,7 @@ function SpecialtyPicker({
     <div className="space-y-3">
       <div>
         <div className="text-xs text-tx2 mb-1.5">
-          已選（拖曳調整順序，<b className="text-tx">排第一個的就是主專長</b>）
+          已選（拖曳調整順序，<b className="text-tx">排第一個的會出現在官網首頁</b>）
         </div>
         {value.length === 0 ? (
           <p className="text-11 text-tx3 border border-dashed border-line2 rounded-lg px-3 py-2">
@@ -424,8 +426,14 @@ function SpecialtyPicker({
                     onClick={() => move(i, i - 1)}
                     aria-label={`${s} 往前一位`} title="往前一位"
                     className="px-1 text-tx3 hover:text-tx disabled:opacity-25">←</button>
-                  <SpecialtyChip name={s} primary={i === 0} className="px-2.5 py-1 text-xs"
-                    title={i === 0 ? "主專長：官網首頁與教練卡片會用這個顏色點出來" : undefined} />
+                  <SpecialtyChip name={s} className="px-2.5 py-1 text-xs"
+                    title={i === 0 ? "排第一個：官網首頁只印得下這一項" : undefined} />
+                  {/* ⚠️ 這個標記是**中性文字**，不是顏色。官網上一律不替任何專長上色——
+                      把第一個標出來會讀成「他只會這一項」（Ray 2026/09/10）。 */}
+                  {i === 0 && (
+                    <span className="text-10 text-tx2 px-0.5 whitespace-nowrap"
+                      title="官網首頁的教練臉孔牆只印得下一項，印的就是它">主</span>
+                  )}
                   {stale && (
                     <span className="text-10 text-warn px-0.5"
                       title="這個專長已不在公司的專長清單裡。移除之後就加不回來了。">舊</span>
@@ -444,7 +452,8 @@ function SpecialtyPicker({
           </ul>
         )}
         <p className="text-11 text-tx3 mt-1.5">
-          手機上拖不動時用 ← → 調整。主專長會出現在官網首頁的教練臉孔牆上，並用專屬顏色標示。
+          手機上拖不動時用 ← → 調整。官網首頁的教練臉孔牆只印得下一項，印的就是排第一個的這個；
+          點開之後客戶會看到你全部的專長。
         </p>
       </div>
 

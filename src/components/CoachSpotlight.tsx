@@ -14,7 +14,6 @@ import { useState } from "react";
 import Link from "next/link";
 import Modal from "./ui/Modal";
 import CoachCard from "./CoachCard";
-import SpecialtyChip from "./SpecialtyChip";
 import type { PublicCoach } from "@/lib/coachProfile";
 
 export default function CoachSpotlight({ coaches }: { coaches: PublicCoach[] }) {
@@ -47,10 +46,10 @@ export default function CoachSpotlight({ coaches }: { coaches: PublicCoach[] }) 
               </div>
             )}
             <div className="text-sm mt-2 group-hover:text-brand2">{c.name}</div>
-            {/* 主專長＝specialties[0]，順序由教練自己在「我的檔案」拖曳決定。 */}
-            {c.specialties[0] && (
-              <SpecialtyChip name={c.specialties[0]} primary className="mt-1 px-2 py-0.5 text-10 max-w-full truncate" />
-            )}
+            {/* 這裡只印得下一個，印的是教練排在第一個的那一項（順序在「我的檔案」拖曳決定）。
+                ⚠️ 純文字不上色：色塊會讓這唯一露出的一項讀起來像「他只會這個」（Ray 2026/09/10）。
+                想看其他專長的人按下去就有——那正是這顆按鈕存在的理由。 */}
+            {c.specialties[0] && <div className="text-11 text-tx3 truncate">{c.specialties[0]}</div>}
             <div className="text-10 text-tx3 mt-1 group-hover:text-tx2">點開看全部</div>
           </button>
         ))}
