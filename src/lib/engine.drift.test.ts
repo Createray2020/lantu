@@ -825,6 +825,46 @@ describe("雙實作對拍：死欄位接線（C1–C11）", () => {
       .toEqual(a.expenses.map((e: { amount: number }) => e.amount));
   });
 
+  /**
+   * 2026-09-10 第七根槓桿「延後目標」＋傳承進願景壓縮。
+   *
+   * ⚠️ 這一批最容易漂：deferRoomOf / legacyFloor 是新的共用判準，
+   *    而 applyLevers 的兩個新分支一邊改了另一邊沒改，畫面與 DB 快照會給出不同的方案。
+   */
+  it("D1 延後目標：deferRoomOf / leverRange / leverGate 兩邊逐字一致，同一份個案同一個答案", () => {
+    expect(HTML).toContain("var CAP_DEFER=20;");
+    expect(HTML).toContain("function deferRoomOf(x){var st=n(x&&x.start),la=n(x&&x.latest);return (st>0&&la>st)?(la-st):0;}");
+    expect(HTML).toContain("if(id==='defer')return {lo:0,hi:Math.min(CAP_DEFER,deferRoom(c)),step:1};");
+    expect(HTML).toContain("if(deferRoom(c)<=0){block.defer=1;");
+    expect(HTML).toContain("{id:'defer',      name:'延後目標',     unit:'年', hint:'把填了「最晚完成歲」的目標往後挪',dir:'up',step:1}");
+
+    const c = E.sampleCase();
+    c.goals = [
+      { on: true, name: "換屋", type: "購屋", present: 12000000, start: 50, end: 50, latest: 55 },
+      { on: true, name: "購車", type: "購車", present: 1000000, start: 45, end: 45, latest: 46 },
+    ];
+    expect(w.deferRoom(JSON.parse(JSON.stringify(c)))).toBe(E.deferRoom(c));
+    const a = E.applyLevers(c, { defer: 3 });
+    const b = w.applyLevers(JSON.parse(JSON.stringify(c)), { defer: 3 });
+    expect(b.goals.map((g: { start: number }) => g.start))
+      .toEqual(a.goals.map((g: { start: number }) => g.start));
+    expect(w.gapWith(JSON.parse(JSON.stringify(c)), { defer: 3 }))
+      .toBeCloseTo(E.gapWith(c, { defer: 3 }), 6);
+  });
+
+  it("D2 傳承進願景壓縮：legacyFloor / legacyRoom / applyLevers 兩邊逐字一致", () => {
+    expect(HTML).toContain("function legacyFloor(lg){var lo=n(lg&&lg.perHeirMin),hi=n(lg&&lg.perHeirCash);return lo>0?Math.min(lo,hi):0;}");
+    expect(HTML).toContain("if(alg&&alg.on!==false){var lf=legacyFloor(alg);alg.perHeirCash=n(alg.perHeirCash)-vx*Math.max(0,n(alg.perHeirCash)-lf);}");
+    expect(HTML).toContain(" s+=legacyRoom(c);");
+
+    const c = E.sampleCase();
+    c.legacy = { on: true, heirs: 2, perHeirCash: 20000000, perHeirMin: 5000000, feedEstate: false };
+    expect(w.legacyRoom(JSON.parse(JSON.stringify(c)))).toBe(E.legacyRoom(c));
+    expect(w.visionRoom(JSON.parse(JSON.stringify(c)))).toBe(E.visionRoom(c));
+    expect(w.applyLevers(JSON.parse(JSON.stringify(c)), { vision: 100 }).legacy.perHeirCash)
+      .toBe(E.applyLevers(c, { vision: 100 }).legacy.perHeirCash);
+  });
+
   it("C2 照護月數：careMonthsOf / careNeedRows 兩邊逐字一致，且 120 的預設兩邊相同", () => {
     expect(HTML).toContain("var DEFAULT_CARE_MONTHS=120;");
     expect(HTML).toContain("function careMonthsOf(nd){");

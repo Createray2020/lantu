@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
  *    留著只會讓教練以為自己在調整什麼。這裡連 CALC 註冊一起釘住。
  */
 const HTML = readFileSync(new URL("../../public/lantu-app.html", import.meta.url), "utf8");
+const ENGINE = readFileSync(new URL("./engine.ts", import.meta.url), "utf8");
 
 describe("訪談欄位：問卷問了、系統沒收的", () => {
   it("最晚完成歲：目標表有欄位，且與『結束歲』分開（兩者語意不同）", () => {
@@ -58,11 +59,54 @@ describe("訪談欄位：手冊相對於問卷新增的", () => {
   });
 });
 
+describe("第二批：手冊剩下的功能欄位", () => {
+  it("規劃單位（個人／家庭）＋為什麼", () => {
+    expect(HTML).toContain("ofld('planScope','unit','規劃單位','sel:未指定,個人,家庭')");
+    expect(HTML).toContain("ofld('planScope','why','為什麼是這個範圍')");
+  });
+
+  it("傳承：理想與最低雙檔＋四項法律安排", () => {
+    expect(HTML).toContain("ofld('legacy','perHeirCash','每人現金傳承(理想)','money')");
+    expect(HTML).toContain("ofld('legacy','perHeirMin','每人現金傳承(最低)','money')");
+    for (const k of ["will", "trust", "beneficiaryDone", "guardian"]) {
+      expect(HTML).toContain("ofld('legacy','" + k + "'");
+    }
+  });
+
+  it("短期資金需求：新陣列要同時進 CASE_ARRAYS 與兩份 newCase 的清空清單", () => {
+    expect(HTML).toContain("var CASE_ARRAYS=['members','birthPlan','actions','shortTerm',");
+    expect(HTML).toContain("['birthPlan','actions','shortTerm','incomes',");
+    expect(ENGINE).toContain("['shortTerm','incomes',");
+  });
+
+  it("保障預算：金額欄＋最優先複選", () => {
+    expect(HTML).toContain("ofld('coverPlan','monthly','每月可接受保障預算','money')");
+    expect(HTML).toContain("function toggleCoverFirst(k){");
+    expect(HTML).toContain("chips('coverFirst',KINDS,cp.first,'toggleCoverFirst')");
+  });
+
+  it("⚠️ 產險不另做保單表：保單表早就吃得下產險（bigCat／17 種細分／到期日）", () => {
+    expect(HTML).toContain("'產物':['汽車強制','汽車第三人責任'");
+    expect(HTML).toContain("bigCat:'人身'");
+    expect(HTML).toContain("termEnd:''");
+    expect(HTML).toContain("function propInsSec(c){");
+  });
+});
+
 describe("⚠️ 四個欄位都要產生判讀，不能是死欄位", () => {
   it("三個衍生函式都存在", () => {
     expect(HTML).toContain("function readinessHint(c){");
     expect(HTML).toContain("function decisionHint(c){");
     expect(HTML).toContain("function deferHint(c){");
+  });
+
+  it("第二批的四個判讀函式也都在 CALC 註冊", () => {
+    for (const [key, fn] of [["planScope", "planScopeHint"], ["legacyArrange", "legacyArrangeHint"],
+      ["shortTerm", "shortTermHint"], ["coverBudget", "coverBudgetHint"]]) {
+      expect(HTML).toContain("function " + fn + "(c){");
+      expect(HTML).toContain(key + ":function(c){return " + fn + "(c);}");
+      expect(HTML).toContain('data-calc="' + key + '"');
+    }
   });
 
   it("三個都在 CALC 註冊過（沒註冊＝畫面永遠是舊值）", () => {

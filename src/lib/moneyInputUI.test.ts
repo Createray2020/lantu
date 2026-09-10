@@ -55,7 +55,7 @@ describe("四支欄位產生器的 money 分支", () => {
   });
 
   it("ofld（傳承／職涯／理財模式這類物件欄位）", () => {
-    const box = w.ofld("legacy", "perHeirCash", "每人現金傳承", "money");
+    const box = w.ofld("legacy", "perHeirCash", "每人現金傳承(理想)", "money");
     expectMoneyBox(box, "ofld");
   });
 
@@ -99,7 +99,9 @@ describe("欄位宣告：這些欄位必須是 money，不能被改回 num", () 
     // 規劃參數 / 傳承 / 職涯
     "fld('planInit','計劃儲蓄期初','money')",
     "fld('planYearly','計劃儲蓄年投入','money')",
-    "ofld('legacy','perHeirCash','每人現金傳承','money')",
+    "ofld('legacy','perHeirCash','每人現金傳承(理想)','money')",
+    "ofld('legacy','perHeirMin','每人現金傳承(最低)','money')",
+    "ofld('coverPlan','monthly','每月可接受保障預算','money')",
     "ofld('career','switchFund','轉換期預備金（空窗期生活費）','money')",
     "ofld('career','startupBudget','創業投入本金（一次性）','money')",
     "ofld('moneyStyle','emergencyAmt','預備金金額','money')",

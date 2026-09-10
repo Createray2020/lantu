@@ -97,14 +97,17 @@ describe("願景達成度", () => {
   });
 });
 
-describe("六根槓桿", () => {
-  const IDS = ["income", "expense", "rate", "retire", "retireLevel", "vision"];
+describe("七根槓桿", () => {
+  // 2026-09-10 新增第七根「延後目標」：願景讓步除了壓金額，還有挪時間這條路。
+  const IDS = ["income", "expense", "rate", "retire", "retireLevel", "vision", "defer"];
 
-  it("六根都在 LEVERS 裡，而且延後退休是整數年", () => {
+  it("七根都在 LEVERS 裡，而且兩根時間型的都是整數年", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(E.LEVERS.map((l: any) => l.id)).toEqual(IDS);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(E.LEVERS.find((l: any) => l.id === "retire").step).toBe(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(E.LEVERS.find((l: any) => l.id === "defer").step).toBe(1);
   });
 
   it.each(IDS)("『%s』對缺口是單調的（拉越大缺口越小）", (id) => {
@@ -169,10 +172,68 @@ describe("六根槓桿", () => {
     c.goals.forEach((g: any) => { g.minPresent = 0; g.imp = 5; });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [c.travel, c.hobby, c.luxury].forEach((arr: any) => (arr || []).forEach((w: any) => { w.minAmount = 0; w.imp = 5; }));
+    // ⚠️ 2026-09-10 起傳承也算可壓縮空間，所以「沒有空間」的情境要連它一起關掉，
+    //    否則這個測試測到的是傳承而不是目標。
+    c.legacy = { ...(c.legacy || {}), on: false };
     expect(E.visionRoom(c)).toBe(0);
     const gate = E.leverGate(c);
     expect(gate.block.vision).toBeTruthy();
     expect(E.solveLever(c, "vision", {}, gate).blocked).toBe(true);
+  });
+
+  /**
+   * 傳承走 legacyNeed()（heirs × perHeirCash）自己的路，不是 goals 的一列。
+   * ⚠️ 所以 visionRoom() 與 applyLevers() 都要各別處理它——漏掉任一邊就會出現
+   *    「visionRoom 說有空間，但求解器怎麼拉都拉不動」這種假可行解。
+   */
+  it("傳承算進可壓縮空間，而且願景槓桿真的壓得動它", () => {
+    const c = E.sampleCase();
+    c.legacy = { on: true, heirs: 2, perHeirCash: 20000000, perHeirMin: 0, feedEstate: false };
+    expect(E.visionRoom(c)).toBeGreaterThanOrEqual(40000000);
+    expect(E.applyLevers(c, { vision: 100 }).legacy.perHeirCash).toBe(0);
+    expect(E.applyLevers(c, { vision: 50 }).legacy.perHeirCash).toBe(10000000);
+  });
+
+  it("填了「每人現金傳承(最低)」就壓不到底——那是客戶談定的界線", () => {
+    const c = E.sampleCase();
+    c.legacy = { on: true, heirs: 2, perHeirCash: 20000000, perHeirMin: 12000000, feedEstate: false };
+    expect(E.visionRoom(c)).toBe(2 * 8000000 + E.visionRoom({ ...c, legacy: { on: false } }));
+    expect(E.applyLevers(c, { vision: 100 }).legacy.perHeirCash).toBe(12000000);
+  });
+
+  it("傳承設為不納入規劃時，願景槓桿不碰它", () => {
+    const c = E.sampleCase();
+    c.legacy = { on: false, heirs: 2, perHeirCash: 20000000, perHeirMin: 0 };
+    expect(E.applyLevers(c, { vision: 100 }).legacy.perHeirCash).toBe(20000000);
+  });
+
+  /** 延後目標：每一項各自受自己的「最晚完成歲」限制，取 min(要求年數, 該項空間)。 */
+  it("延後目標：各自受「最晚完成歲」限制，不會被槓桿推過頭", () => {
+    const c = E.sampleCase();
+    c.goals = [
+      { on: true, name: "換屋", type: "購屋", present: 12000000, start: 50, end: 50, latest: 55 },
+      { on: true, name: "購車", type: "購車", present: 1000000, start: 45, end: 45, latest: 46 },
+      { on: true, name: "沒問過的", type: "其他", present: 500000, start: 48, end: 48 },
+    ];
+    expect(E.deferRoom(c)).toBe(5);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const g = E.applyLevers(c, { defer: 3 }).goals as any[];
+    expect(g[0].start).toBe(53);          // 空間 5 年，推滿 3 年
+    expect(g[0].end).toBe(53);
+    expect(g[1].start).toBe(46);          // 空間只有 1 年，只推 1 年
+    expect(g[2].start).toBe(48);          // 沒填最晚＝沒問過，一動也不動
+  });
+
+  it("沒有任何目標填「最晚完成歲」時，延後目標這根會被標成沒得動", () => {
+    const c = E.sampleCase();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (c.goals || []).forEach((g: any) => { delete g.latest; });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (c.travel || []).forEach((t: any) => { delete t.latest; });
+    expect(E.deferRoom(c)).toBe(0);
+    const gate = E.leverGate(c);
+    expect(gate.block.defer).toBeTruthy();
+    expect(E.solveLever(c, "defer", {}, gate).blocked).toBe(true);
   });
 });
 

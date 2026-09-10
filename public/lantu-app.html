@@ -1089,6 +1089,8 @@ function sampleCase(){return {
  //    留著只會讓教練以為自己在調整什麼。UI 的輸入框一併拿掉。
  params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
  tracking:[{year:2024,age:40,net:9500000},{year:2025,age:41,net:9950000}],
+ shortTerm:[{name:'小寶幼兒園註冊費',inYears:1,amount:80000,minAmount:60000,prepared:0,alt:'否'},
+  {name:'機車換車',inYears:2,amount:90000,minAmount:60000,prepared:30000,alt:'可延後'}],
  riskQuiz:{ans:{0:1,1:2,2:2,3:2,4:1,5:2,6:2,7:2,8:2,9:2,10:2,11:2}},
  members:[
   {name:'王大明',role:'本人',gender:'男',age:40,worked:15,insType:'勞保',insSalary:45800,depRatio:100,expRatio:40,indepAge:''},
@@ -1174,7 +1176,7 @@ function sampleCase(){return {
   {name:'生活預備金',pct:6,ret:1,benefit:'流動安全網'}
  ]}
 };}
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['birthPlan','actions','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,mode:'',retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['birthPlan','actions','shortTerm','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,mode:'',retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
  c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};c.career={plan:'無',switchAge:'',switchFund:'',startupType:'',startupBudget:'',importance:0};c.marriage={plan:'否',age:'',budget:'',minBudget:'',importance:0};c.credit={cards:0,payFull:'是',firstCardOver1yr:'否',installment:'無',badRecord5yr:'否',recentApply:'無',score:''};c.overseas={hasAssets:'否',identity:'否',purpose:'',assetTypes:''};c.legacy={on:true,heirs:0,perHeirCash:0,perHeirNote:'',feedEstate:false};c.nextReview='';c.riskQuiz={ans:{}};c.profile.credit='';c.profile.birth='';c.profile.jobType='一般就業者';c.profile.jobTypeOther='';c.profile.monthlySalary=0;c.profile.jobCompany='';c.profile.jobTitle='';c.profile.jobNote='';c.company=defaultCompany();c.lifeGoals=[];c.reportNote='';return c}
 
 // ===== 工作類別 / 投保級距 =====
@@ -1441,7 +1443,7 @@ function applyInsFromSalaryMember(m){if(!m||m.jobType==='企業主')return;m.ins
 // ===== 舊資料防護：所有資料進入點（localStorage / 匯入 JSON / iframe lantu:init）一律先過 migrateCase =====
 // 引擎對 c.profile / c.params / 13 個陣列完全沒有防護，缺任何一個都會在 render() 丟例外 → 整頁白畫面。
 var CASE_SCHEMA_VERSION=2;
-var CASE_ARRAYS=['members','birthPlan','actions','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','lifeGoals','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'];
+var CASE_ARRAYS=['members','birthPlan','actions','shortTerm','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury','lifeGoals','companies','bizYears','vat401','reconcile','ownerLoans','guarantees','bizAssets','channels','compScenarios'];
 function _fill(dflt,cur){var o={};Object.keys(dflt||{}).forEach(function(k){o[k]=dflt[k]});Object.keys(cur||{}).forEach(function(k){if(cur[k]!==undefined)o[k]=cur[k]});return o;}
 // ══ 成員改名的連動 ═══════════════════════════════════════════════
 // 成員姓名是全系統的外鍵：下面八個欄位全部以「字串姓名」關聯，改名若不連動，
@@ -1805,6 +1807,8 @@ function applyMarriagePlan(c){
  var g=(idx>=0)?c.goals[idx]:{on:true,marriageAuto:true,growth:'通膨',freq:0,prepared:0,loanRatio:0,appreciation:0};
  g.marriageAuto=true;g.name='結婚（預算）';g.type='婚姻';g.present=budget;g.minPresent=n(mr.minBudget);
  g.start=age;g.end=age;g.imp=n(mr.importance)||3;
+ // 「最晚結婚年齡」跟著進 goals，延後目標那根槓桿才碰得到婚姻這一列。
+ g.latest=n(mr.latestAge);
  if(idx<0)c.goals.push(g);
 }
 
@@ -3647,9 +3651,29 @@ function visionRate(c){return visionRateOf(projection(c))}
 function goalFloor(g){var v=n(g.minPresent);if(v>0)return Math.min(v,n(g.present));return n(g.imp)>=5?n(g.present):0}
 function wishFloor(w){var v=n(w.minAmount);if(v>0)return Math.min(v,n(w.amount));return n(w.imp)>=5?n(w.amount):0}
 // 願景還有多少可壓縮空間（現值口徑的粗估，只用來判斷「這根槓桿有沒有得動」）。
+// ===== 願景讓步的第二條路：時間（goals[].latest / travel[].latest）=====
+// ⚠️ 「調整願景」壓的是金額，這一根挪的是時間。兩者互不取代：
+//    有人寧可晚三年買同一間房，也不願意買小一點的。訪談問卷本來就問過「最晚實現」。
+var CAP_DEFER=20;               // 延後上限（年）。再多就不是規劃，是放棄。
+function deferRoomOf(x){var st=n(x&&x.start),la=n(x&&x.latest);return (st>0&&la>st)?(la-st):0;}
+function deferRoom(c){
+ var m=0;
+ (((c||{}).goals)||[]).forEach(function(g){if(visionOn(g))m=Math.max(m,deferRoomOf(g));});
+ (((c||{}).travel)||[]).forEach(function(t){if(visionOn(t))m=Math.max(m,deferRoomOf(t));});
+ return m;
+}
+// 傳承的壓縮下限。與 goalFloor 同一套語意：填了最低就以它為底，沒填就可以壓到 0。
+// ⚠️ legacy 沒有 imp 欄位，所以沒有「重要度 5 ＝不可動」那條保護——
+//    要保住傳承就得填「每人現金傳承(最低)」，這也是畫面上那句提示的用意。
+function legacyFloor(lg){var lo=n(lg&&lg.perHeirMin),hi=n(lg&&lg.perHeirCash);return lo>0?Math.min(lo,hi):0;}
+function legacyRoom(c){var lg=(c&&c.legacy)||{};if(lg.on===false)return 0;
+ return n(lg.heirs)*Math.max(0,n(lg.perHeirCash)-legacyFloor(lg));}
 function visionRoom(c){
  var s=sum(c.goals,function(g){return visionOn(g)?Math.max(0,n(g.present)-goalFloor(g)):0});
  [c.travel,c.hobby,c.luxury].forEach(function(arr){s+=sum(arr,function(w){return visionOn(w)?Math.max(0,n(w.amount)-wishFloor(w))*(n(w.freq)||1):0})});
+ // ⚠️ 傳承走 legacyNeed() 自己的路（heirs × perHeirCash），不是 goals 的一列——
+ //    所以它要在這裡各別加進來，而不是靠 goals 那一段。改成 goals 列會雙算。
+ s+=legacyRoom(c);
  return s;
 }
 
@@ -3664,7 +3688,9 @@ var LEVERS=[
  // 退休權重 w 整段跳掉——反解會收斂到「延後 0.0001 年就填平了」這種假答案。
  {id:'retire',     name:'延後退休',     unit:'年', hint:'工作收入延長、退休期縮短',dir:'up',step:1},
  {id:'retireLevel',name:'降低退休水準', unit:'%',  hint:'退休期支出調降',          dir:'up'},
- {id:'vision',     name:'調整願景',     unit:'%',  hint:'目標與生活願望往「最低金額」壓縮',dir:'up'}
+ {id:'vision',     name:'調整願景',     unit:'%',  hint:'目標與生活願望往「最低金額」壓縮',dir:'up'},
+ // step:1 ＝ 只能整數年，理由同「延後退休」：投影的時間軸是整數歲。
+ {id:'defer',      name:'延後目標',     unit:'年', hint:'把填了「最晚完成歲」的目標往後挪',dir:'up',step:1}
 ];
 function leverName(id){for(var i=0;i<LEVERS.length;i++)if(LEVERS[i].id===id)return LEVERS[i].name;return id}
 function leverUnit(id){for(var i=0;i<LEVERS.length;i++)if(LEVERS[i].id===id)return LEVERS[i].unit;return ''}
@@ -3678,6 +3704,7 @@ function leverGate(c,grade){
  if(grade==='D'){block.rate=1;reason.rate='整裝期：收支尚未轉正或基本保障未備，先不談提高報酬率——順序錯了風險會反咬。';}
  var rateCap=(grade==='C')?Math.min(CAP_RATE,CAP_RATE_STARTER):CAP_RATE;
  if(visionRoom(c)<=0){block.vision=1;reason.vision='目標與生活願望都沒有填「金額(最低)」、或重要度都是 5——沒有可壓縮空間。';}
+ if(deferRoom(c)<=0){block.defer=1;reason.defer='沒有任何目標填了「最晚完成歲」，或最晚＝理想時間——時間上沒有可讓的空間。';}
  return {grade:grade,block:block,reason:reason,rateCap:rateCap};
 }
 
@@ -3737,6 +3764,7 @@ function leverRange(c,id,gate){
  if(id==='income')return {lo:0,hi:incomeCeilingPct(c)};
  if(id==='expense')return {lo:0,hi:expenseCutCap(c)};
  if(id==='retireLevel')return {lo:0,hi:CAP_RETIRE_CUT};
+ if(id==='defer')return {lo:0,hi:Math.min(CAP_DEFER,deferRoom(c)),step:1};
  return {lo:0,hi:CAP_VISION_CUT};
 }
 
@@ -3773,6 +3801,19 @@ function applyLevers(c,set){
  if(vx>0){
   (a.goals||[]).forEach(function(g){if(!visionOn(g))return;var f=goalFloor(g);g.present=n(g.present)-vx*Math.max(0,n(g.present)-f)});
   [a.travel,a.hobby,a.luxury].forEach(function(arr){(arr||[]).forEach(function(w){if(!visionOn(w))return;var f=wishFloor(w);w.amount=n(w.amount)-vx*Math.max(0,n(w.amount)-f)})});
+  // 傳承一起壓。⚠️ 它不在 goals 裡，上面那兩段碰不到它——漏了這一行，
+  //    visionRoom() 會把傳承算進「有空間」，但求解器怎麼拉都拉不動那一段。
+  var alg=a.legacy;
+  if(alg&&alg.on!==false){var lf=legacyFloor(alg);alg.perHeirCash=n(alg.perHeirCash)-vx*Math.max(0,n(alg.perHeirCash)-lf);}
+ }
+ // 延後目標：每一項各自受自己的「最晚完成歲」限制，取 min(要求年數, 該項的空間)。
+ // ⚠️ 與「可刪減%」同一條原則——教練與客戶談定的界線不能被槓桿蓋過去。
+ var dy=n(set.defer);
+ if(dy>0){
+  (a.goals||[]).forEach(function(g){if(!visionOn(g))return;var d=Math.min(dy,deferRoomOf(g));if(d<=0)return;
+   g.start=n(g.start)+d;if(n(g.end))g.end=n(g.end)+d;});
+  (a.travel||[]).forEach(function(t){if(!visionOn(t))return;var d=Math.min(dy,deferRoomOf(t));if(d<=0)return;
+   t.start=n(t.start)+d;});
  }
  return a;
 }
@@ -4543,6 +4584,10 @@ var CALC={
  decision:function(c){return decisionHint(c);},
  // 「最晚實現」＝除了壓低金額之外的第二種讓步。訪談問卷問了兩年，系統一直沒收。
  defer:function(c){return deferHint(c);},
+ planScope:function(c){return planScopeHint(c);},
+ legacyArrange:function(c){return legacyArrangeHint(c);},
+ shortTerm:function(c){return shortTermHint(c);},
+ coverBudget:function(c){return coverBudgetHint(c);},
  lifestyleNow:function(c){return fmt(lifestyleAnnualNow(c));},
  lifestyleCount:function(c){return String((c.travel||[]).length+(c.hobby||[]).length+(c.luxury||[]).length);},
  coverageDerived:function(c){return coverageDerivedHTML(c);},
@@ -5374,6 +5419,52 @@ function decisionHint(c){
  return '<div class="hint" style="display:block;margin-top:10px;line-height:1.9;border-left:3px solid var(--amber2);padding-left:10px">'+
   lines.join('<br>')+tail+'</div>';
 }
+// ===== 規劃單位（planScope.unit）=====
+// 手冊「會談前｜準備與調頻」的第一個確認事項：先確認以個人或家庭為規劃單位。
+// ⚠️ 系統原本靠「成員表裡放了誰」隱含表達，所以資料不一致時完全不會有人發現——
+//    選了「個人」卻放了配偶與子女，收支、責任、支出佔比全部照家庭算。
+function planScopeHint(c){
+ var ps=(c&&c.planScope)||{},u=ps.unit||'';
+ var ms=(c&&c.members)||[];
+ var others=ms.filter(function(m){return m&&m.role&&m.role!=='本人';}).length;
+ if(!u||u==='未指定')return '<div class="hint" style="display:block;margin-top:8px">'+
+  '還沒確認規劃單位。目前成員表有本人＋<b>'+others+'</b> 位其他成員，系統就照這個範圍算。'+
+  '先問一句「這次是只看你自己，還是連家庭一起看？」——它決定後面每一個數字的分母。</div>';
+ var bad=(u==='個人'&&others>0)||(u==='家庭'&&others===0);
+ if(!bad)return '<div class="hint" style="display:block;margin-top:8px;border-left:3px solid var(--ok-solid);padding-left:10px">'+
+  '規劃單位「'+esc(u)+'」與成員表一致（本人＋'+others+' 位）。</div>';
+ return '<div class="hint" style="display:block;margin-top:8px;border-left:3px solid var(--gap2);padding-left:10px;line-height:1.8">'+
+  '<b style="color:var(--gap2)">規劃單位與成員表對不上。</b>'+
+  (u==='個人'
+   ? '選了「個人」，但成員表有 '+others+' 位其他成員——他們的支出佔比、家計負擔與財務獨立歲都會照家庭算進去。'
+   : '選了「家庭」，但成員表只有本人——配偶與子女沒進來，家庭生活費、責任反推與教育金都會少一整段。')+
+  '<br>兩邊擇一改：不是改這個選項，就是改成員表。</div>';
+}
+// ===== 傳承的法律安排（legacy.will / trust / beneficiaryDone / guardian）=====
+// ⚠️ 金額談完了不等於傳承做完了。這四件沒做，錢再多也不會照他想的方式到位。
+function legacyArrangeHint(c){
+ var lg=(c&&c.legacy)||{};
+ var items=[['will','遺囑'],['trust','信託'],['beneficiaryDone','保單受益人指定'],['guardian','未成年子女監護安排']];
+ var todo=items.filter(function(it){var v=lg[it[0]];return !v||v==='未處理';});
+ var doing=items.filter(function(it){return lg[it[0]]==='規劃中';});
+ var lines=[];
+ // 理想與最低的差額＝傳承這一項在資源不足時能讓出多少。
+ var heirs=n(lg.heirs),ideal=n(lg.perHeirCash),floor=n(lg.perHeirMin);
+ if(heirs>0&&ideal>0){
+  var room=Math.max(0,ideal-Math.min(floor,ideal))*heirs;
+  lines.push(floor>0
+   ? '可壓縮空間：'+heirs+' 位 ×（'+fmt(ideal)+' − '+fmt(Math.min(floor,ideal))+'）＝ <b style="color:var(--amber2)">'+fmt(room)+' 元</b>'
+   : '<span style="color:var(--gap2)">「每人現金傳承(最低)」還沒填</span>——沒有最低標準，資源不足時傳承這一項就完全讓不出空間。');
+ }
+ if(!todo.length&&!doing.length&&items.every(function(it){return lg[it[0]];})){
+  lines.push('四項法律安排都已完成。');
+ }else{
+  if(todo.length)lines.push('<span style="color:var(--gap2)">未處理：'+todo.map(function(it){return esc(it[1]);}).join('、')+'</span>——這幾項適合直接開成待辦。');
+  if(doing.length)lines.push('規劃中：'+doing.map(function(it){return esc(it[1]);}).join('、'));
+ }
+ if(!lines.length)return '';
+ return '<div class="hint" style="display:block;margin-top:8px;line-height:1.9;border-left:3px solid var(--amber2);padding-left:10px">'+lines.join('<br>')+'</div>';
+}
 var BG_FIELDS=[
  ['edu','學經歷','最高學歷、就讀學校科系、重要證照'],
  ['career','職涯發展歷程','做過哪些產業與職務、幾次轉換、目前的位置與下一步'],
@@ -5424,7 +5515,11 @@ function peopleSec(c){
  var cards=personCard(c,primary,pi,true);
  members.forEach(function(m,i){if(i===pi)return;cards+=personCard(c,m,i,false);});
  var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'members\')">＋ 新增家庭成員</button></div>';
- return bizOwnerWarnHTML(c)+familyTreeSec(c)+'<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+
+ return bizOwnerWarnHTML(c)+
+  '<div class="sec"><h4>規劃單位 <span class="hint">這份規劃算誰的收支、資產與責任</span></h4><div class="fgrid">'+
+   ofld('planScope','unit','規劃單位','sel:未指定,個人,家庭')+ofld('planScope','why','為什麼是這個範圍')+'</div>'+
+   '<div data-calc="planScope">'+planScopeHint(c)+'</div></div>'+
+  familyTreeSec(c)+'<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+
   '<div class="sec"><h4>誰決定這個家的錢 <span class="hint">六個面向各由誰拍板；方案要說服的是他們</span></h4><div data-calc="decision">'+decisionHint(c)+'</div></div>'+
   '<div data-calc="nhiSummary">'+nhiSummaryHTML(c)+'</div>'+paramsSec(c);
 }
@@ -7115,7 +7210,7 @@ function leverBarsHTML(c,solo,theme,withAct){
   else if(r.blocked){st='⚪';col=K.MUT;txt='現階段不建議動用';frac=0;}
   else if(r.feasible){st='🟢';col=K.OK;
    frac=Math.max(0.02,Math.min(1,(r.cap-r.lo)>0?(r.x-r.lo)/(r.cap-r.lo):1));
-   txt=(r.id==='rate'?('拉到 '+r.x.toFixed(2)+'%'):(r.id==='retire'?('延後 '+Math.round(r.x)+' 年'):((r.id==='income'?'增加':r.id==='expense'?'削減':r.id==='vision'?'壓縮':'調降')+' '+r.x.toFixed(1)+'%')));}
+   txt=(r.id==='rate'?('拉到 '+r.x.toFixed(2)+'%'):((r.id==='retire'||r.id==='defer')?('延後 '+Math.round(r.x)+' 年'):((r.id==='income'?'增加':r.id==='expense'?'削減':r.id==='vision'?'壓縮':'調降')+' '+r.x.toFixed(1)+'%')));}
   else {st='🔴';col=K.GAP;frac=1;
    txt='拉到上限仍差 '+cfAxis(r.gap);}
   var capTxt=(r.id==='retire'?r.cap+' 年':(+r.cap.toFixed(1))+'%');
@@ -7211,7 +7306,7 @@ function foldSec(title,hint,inner,open){
 }
 function leverLabel(id,v){
  if(id==='rate')return (v===''||v==null)?'未指定':(+v).toFixed(2)+'%';
- if(id==='retire')return Math.round(n(v))+' 年';
+ if(id==='retire'||id==='defer')return Math.round(n(v))+' 年';
  return (+n(v)).toFixed(1)+'%';
 }
 function leverSummary(set){
@@ -9244,7 +9339,11 @@ function intentSec(c){var it=c.intent||{};
   entitySec(c)+
   goalsSec(c)+
   (targetOn(c,'傳承規劃')
-   ?'<div class="sec" data-goalanchor="傳承規劃"><h4>傳承規劃 '+mustBadge(c,'傳承規劃')+'</h4><div class="fgrid">'+ofld('legacy','on','納入本次規劃','bool')+ofld('legacy','heirs','繼承人數','num')+ofld('legacy','perHeirCash','每人現金傳承','money')+ofld('legacy','perHeirNote','每人其他(如一間房)')+ofld('legacy','feedEstate','納入遺產稅考量','bool')+'</div><div class="hint" style="margin-top:6px">傳承總需求(現金)＝繼承人數 × 每人現金傳承，會列入建議與缺口總表。<br>傳承是願景的一部分，客戶若決定這次不處理，把「納入本次規劃」設為 false 即可，資料仍會保留。</div></div>'
+   ?'<div class="sec" data-goalanchor="傳承規劃"><h4>傳承規劃 '+mustBadge(c,'傳承規劃')+'</h4><div class="fgrid">'+ofld('legacy','on','納入本次規劃','bool')+ofld('legacy','heirs','繼承人數','num')+ofld('legacy','perHeirCash','每人現金傳承(理想)','money')+ofld('legacy','perHeirMin','每人現金傳承(最低)','money')+ofld('legacy','perHeirNote','每人其他(如一間房)')+ofld('legacy','feedEstate','納入遺產稅考量','bool')+'</div>'+
+     '<div class="subhd" style="margin-top:12px">法律安排 <span class="hint">傳承真正的爭議多半不在金額，在這四件有沒有做</span></div><div class="fgrid">'+
+     ofld('legacy','will','遺囑','sel:未處理,規劃中,已完成')+ofld('legacy','trust','信託','sel:未處理,規劃中,已完成')+
+     ofld('legacy','beneficiaryDone','保單受益人指定','sel:未處理,規劃中,已完成')+ofld('legacy','guardian','未成年子女監護安排','sel:未處理,規劃中,已完成')+'</div>'+
+     '<div data-calc="legacyArrange">'+legacyArrangeHint(c)+'</div><div class="hint" style="margin-top:6px">傳承總需求(現金)＝繼承人數 × 每人現金傳承，會列入建議與缺口總表。<br>傳承是願景的一部分，客戶若決定這次不處理，把「納入本次規劃」設為 false 即可，資料仍會保留。</div></div>'
    :foldedGoal(c,'傳承規劃',n((c.legacy||{}).heirs)>0?'（先前已填 '+n(c.legacy.heirs)+' 位繼承人，資料保留、仍列入模擬）':''))+
   (targetOn(c,'職涯規劃')
    ?'<div class="sec" data-goalanchor="職涯規劃"><h4>職涯 / 創業規劃 '+mustBadge(c,'職涯規劃')+'</h4><div class="fgrid">'+ofld('career','plan','是否轉換或創業','sel:無,考慮轉職,考慮創業')+ofld('career','switchAge','預計幾歲轉換','num')+ofld('career','switchFund','轉換期預備金（空窗期生活費）','money')+ofld('career','startupType','創業類別')+ofld('career','startupBudget','創業投入本金（一次性）','money')+ofld('career','importance','重要度（5最高）','imp')+'</div>'+
@@ -10805,6 +10904,46 @@ function assetIncomeMirrorHTML(c){
   '（那一格只加收入表的列）——所以請不要為了讓總額好看而在收入表重打一次，那會被算兩次。</div>'+
   '</details></div>';
 }
+// ===== 短期資金需求（c.shortTerm[]，2 年內）=====
+// 手冊 2｜人生藍圖的「短期資金需求」。人生目標表最短也是以「幾歲」為單位的長期事件，
+// 裝不下「明年三月要繳的錢」——而這筆錢正是**不能拿去做長期配置**的那一段。
+// ⚠️ 這一波只做讀數，刻意不從可投資資產裡真的扣掉：那會動到核心資產、風險性資產比與
+//    流動性四個既有指標的分母，是另一件事。這裡把「該扣多少」算給教練看。
+function shortTermSec(c){
+ var tbl=tableSec('短期資金需求（2 年內）','shortTerm',c.shortTerm||[],[
+  ['name','需求','text'],['inYears','幾年內','num'],['amount','理想金額','money'],
+  ['minAmount','最低金額','money'],['prepared','已備','money'],['alt','可否延後／替代','sel:否,可延後,可替代']],
+  '兩年內一定會動用的錢。它不是人生目標（沒有「幾歲」這個尺度），但它決定了可投資資產裡有多少是不能碰的。');
+ return '<div class="sec" style="margin-top:14px"><h4>短期資金需求 <span class="hint">兩年內要動用的錢，不能拿去做長期配置</span></h4>'+
+  '<div data-calc="shortTerm">'+shortTermHint(c)+'</div></div>'+tbl;
+}
+// 缺口（理想−已備）與流動資產的關係，就是這張表唯一要回答的事。
+function shortTermNeed(c){
+ return sum((c&&c.shortTerm)||[],function(x){return Math.max(0,n(x&&x.amount)-n(x&&x.prepared));});
+}
+function shortTermFloor(c){
+ return sum((c&&c.shortTerm)||[],function(x){
+  var lo=n(x&&x.minAmount),hi=n(x&&x.amount);
+  return Math.max(0,(lo>0?Math.min(lo,hi):hi)-n(x&&x.prepared));});
+}
+function shortTermHint(c){
+ var rows=(c&&c.shortTerm)||[];
+ if(!rows.length)return '<div class="hint" style="display:block">'+
+  '還沒問。訪談時問一句「未來兩年內，有沒有什麼一定要用到錢的事？」'+
+  '——這筆錢不能算進可長期配置的部位，也會直接牴觸風險屬性第 12 題的答案。</div>';
+ var need=shortTermNeed(c),floor=shortTermFloor(c);
+ var liq=liquidMovable(c);
+ var left=liq-need;
+ var lines=['兩年內要備的（理想）：<b>'+fmt(need)+'</b> 元'+(floor<need?('；壓到最低標準是 <b>'+fmt(floor)+'</b> 元'):'')];
+ lines.push('可變現流動資產 <b>'+fmt(liq)+'</b> 元 → 扣掉之後真正能做長期配置的約 '+
+  (left>=0?'<b style="color:var(--amber2)">'+fmt(left)+'</b> 元':'<b style="color:var(--gap2)">不足 '+fmt(-left)+' 元</b>'));
+ if(left<0)lines.push('<span style="color:var(--gap2)">流動資產撐不住兩年內的需求</span>——先解決這一段，再談任何長期配置或保費調整。');
+ // 與風險屬性第 12 題對照：那一題問的正是「期間內動用資金的可能性」。
+ var q12=((c.riskQuiz||{}).ans||{})[11];
+ var pick=Array.isArray(q12)?Math.max.apply(null,q12.map(function(x){return n(x);})):n(q12);
+ if(q12!=null&&pick<=1&&need>0)lines.push('<span style="color:var(--gap2)">⚠️ 風險屬性第 12 題答的是「幾乎不會動用」，但這裡列了 '+fmt(need)+' 元兩年內要動用</span>——兩邊有一個是錯的，回頭確認一次。');
+ return '<div class="hint" style="display:block;line-height:1.9;border-left:3px solid var(--amber2);padding-left:10px">'+lines.join('<br>')+'</div>';
+}
 function financeSec(c){
  var t=finTotals(c);
  var summary='<div class="finsum">'+
@@ -10829,7 +10968,7 @@ function financeSec(c){
   '<div class="finpanel sav" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">儲</div><h4>儲蓄理財投入 <span class="fintag">不計入支出</span></h4><div class="sub"><div class="sl">年化合計</div><div class="sv" style="color:var(--teal)" id="finSub_sav">'+fmt(t.sav)+'</div></div>'+sortBtn('savings','saving')+'<button class="add" onclick="addRow(\'savings\')">＋ 新增</button></div><div class="fintbl">'+finSavTable(c)+'</div><div class="finfoot"><span>零存整付、儲蓄險保費、定期定額、勞退自提、投資型保單投資保費——這些是「換口袋」不是「花掉」，所以不進總支出，而是「有效儲蓄率」的分子。</span></div></div>'+
   '<div class="finpanel lay" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">布</div><h4>資產布局規劃</h4></div><div class="fintbl">'+assetLayoutTable(c)+'</div></div>'+
  '</div>';
- return ownerBar(c)+summary+incomeCeilingSec(c)+'<div class="finhint">💡 一個介面同時填完：左上收入、右上支出＝現金流；左下資產、右下負債＝資產負債表；下方儲蓄理財投入與資產布局。任一格輸入，頂部年結餘、淨值即時更新。每列左側的 ⠿ 可拖曳排序，「⇅ 自動整理」把同分類的項目收攏在一起。</div>'+quad;
+ return ownerBar(c)+summary+incomeCeilingSec(c)+shortTermSec(c)+'<div class="finhint">💡 一個介面同時填完：左上收入、右上支出＝現金流；左下資產、右下負債＝資產負債表；下方儲蓄理財投入與資產布局。任一格輸入，頂部年結餘、淨值即時更新。每列左側的 ⠿ 可拖曳排序，「⇅ 自動整理」把同分類的項目收攏在一起。</div>'+quad;
 }
 
 function lifestyleSec(c){
@@ -12107,6 +12246,62 @@ function needsSec(c){
   cards+'<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'needs\')">＋ 新增被保人需求</button></div>';
 }
 
+// ===== 保障預算與取捨（c.coverPlan）=====
+// 手冊「保障決策」的兩題：目前每月可接受的保障預算是多少？預算不夠時最優先的是什麼？
+// ⚠️ 缺口算得出來，但「能花多少錢補」是方案設計的硬約束。沒有它，缺口表只是一張帳單。
+// ⚠️ 刻意不做「排出十個名次」：手冊問的是「最優先的是什麼」，複選比排序好問也好答。
+function toggleCoverFirst(k){
+ var c=activeCase();if(!c)return;
+ c.coverPlan=(c.coverPlan&&typeof c.coverPlan==='object')?c.coverPlan:{};
+ var a=Array.isArray(c.coverPlan.first)?c.coverPlan.first.slice():[];
+ var i=a.indexOf(k);
+ if(i<0)a.push(k);else a.splice(i,1);
+ c.coverPlan.first=a;save();render();
+}
+function coverBudgetSec(c){
+ var cp=(c&&c.coverPlan)||{};
+ return '<div class="sec"><h4>保障預算與取捨 <span class="hint">訪談題：每月可接受的保障預算？預算不夠時最優先補哪一項？</span></h4>'+
+  '<div class="fgrid">'+ofld('coverPlan','monthly','每月可接受保障預算','money')+'</div>'+
+  '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">預算不夠時最優先（可複選）</div>'+
+   chips('coverFirst',KINDS,cp.first,'toggleCoverFirst')+'</div>'+
+  '<div data-calc="coverBudget">'+coverBudgetHint(c)+'</div></div>';
+}
+function coverBudgetHint(c){
+ var cp=(c&&c.coverPlan)||{},budget=n(cp.monthly);
+ var first=Array.isArray(cp.first)?cp.first:[];
+ // 分母用「保障型」保費：理財型是儲蓄不是保障，混進來會讓預算判讀失真。
+ var prot=annualPremiumBy(c,'保障型'),now=prot/12;
+ var lines=[];
+ if(budget>0){
+  var room=budget-now;
+  lines.push('目前保障型保費 <b>'+fmt(Math.round(now))+'</b> 元/月（年繳 '+fmt(prot)+'）；預算 <b>'+fmt(budget)+'</b> 元/月 → '+
+   (room>=0?'還有 <b style="color:var(--amber2)">'+fmt(Math.round(room))+'</b> 元/月的空間'
+          :'<b style="color:var(--gap2)">已超出 '+fmt(Math.round(-room))+' 元/月</b>'));
+  if(room<0)lines.push('超出預算時，先看的不是再買什麼，而是<b>現有保單裡有沒有理財型可以挪</b>。');
+ }else{
+  lines.push('<span style="color:var(--gap2)">每月保障預算還沒問。</span>缺口算得出來，但「能花多少錢補」才是方案設計的硬約束——沒有它，缺口表只是一張帳單。'+
+   '（目前保障型保費 '+fmt(Math.round(now))+' 元/月，可以拿這個數字當談話的起點。）');
+ }
+ // 依「最優先」在前、其餘按缺口大小排，列出前五項。
+ var gaps=[];
+ (coverageGaps(c)||[]).forEach(function(g){if(Math.max(0,n(g.gap))>0)gaps.push(g);});
+ if(gaps.length){
+  gaps.sort(function(a,b){
+   var fa=first.indexOf(a.kind)>=0?0:1,fb=first.indexOf(b.kind)>=0?0:1;
+   if(fa!==fb)return fa-fb;
+   return n(b.gap)-n(a.gap);
+  });
+  var top=gaps.slice(0,5).map(function(g,i){
+   var mark=first.indexOf(g.kind)>=0?'<span style="color:var(--amber2)">★</span> ':'';
+   return (i+1)+'. '+mark+esc(g.member||'')+' · '+esc(g.kind)+'　缺 <b>'+fmt(Math.max(0,n(g.gap)))+'</b> '+kindUnit(g.kind);
+  });
+  lines.push('<b>補強順序</b>'+(first.length?'（★＝教練與客戶談定的最優先）':'（尚未指定最優先，暫按缺口大小排）')+'：<br>'+top.join('<br>'));
+  if(gaps.length>5)lines.push('<span class="muted">另有 '+(gaps.length-5)+' 項缺口未列。</span>');
+ }else{
+  lines.push('目前沒有未補的缺口。');
+ }
+ return '<div class="hint" style="display:block;margin-top:10px;line-height:1.9;border-left:3px solid var(--amber2);padding-left:10px">'+lines.join('<br>')+'</div>';
+}
 function coverageDerivedHTML(c){return coverageHubParts(c).derived;}
 function coverageHubSec(c){
  var parts=coverageHubParts(c);
@@ -12118,6 +12313,7 @@ function coverageHubSec(c){
   coverageWheelHTML(c)+
   policyCheckupSec(c)+
   '<div data-calc="coverageDerived">'+parts.derived+'</div>'+
+  coverBudgetSec(c)+
   // ⚠️ 產險比對放在 coverageDerived 容器**外面**：它自己帶輸入框（需求參數／保額覆寫），
   //    包進會被 innerHTML 重畫的容器裡會把正在打字的框換掉。
   propInsSec(c)+

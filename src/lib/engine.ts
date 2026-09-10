@@ -65,6 +65,9 @@ function sampleCase(){return {
  //    留著只會讓教練以為自己在調整什麼。UI 的輸入框一併拿掉。
  params:{inflation:1.5,salaryGrowth:2,invReturn:5,tuitionGrowth:3,planSaving:0,emergencyMonths:6,horizon:85,invReturnStd:12,inflationStd:1,salaryStd:1},
  tracking:[{year:2024,age:40,net:9500000},{year:2025,age:41,net:9950000}],
+ // 兩年內一定會動用的錢。不是人生目標（沒有「幾歲」這個尺度），但它決定可投資部位裡有多少不能碰。
+ shortTerm:[{name:'小寶幼兒園註冊費',inYears:1,amount:80000,minAmount:60000,prepared:0,alt:'否'},
+  {name:'機車換車',inYears:2,amount:90000,minAmount:60000,prepared:30000,alt:'可延後'}],
  riskQuiz:{ans:{0:1,1:2,2:2,3:2,4:1,5:2,6:2,7:2,8:2,9:2,10:2,11:2}},
  members:[
   {name:'王大明',role:'本人',gender:'男',age:40,worked:15,insType:'勞保',insSalary:45800,depRatio:100,expRatio:40,indepAge:''},
@@ -147,7 +150,7 @@ function sampleCase(){return {
 
 function defaultCompany(){return {name:'',taxId:'',industry:'',role:'負責人',sharePct:100,annualRevenue:0,netProfit:0,ownerLoan:0,note:''};}
 
-function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,mode:'',retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0,estateDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
+function newCase(){var c=sampleCase();c.id=uid();c.profile.name='新客戶';['shortTerm','incomes','expenses','savings','retireExpenses','assets','liabilities','education','goals','needs','coverages','policies','tracking','travel','hobby','luxury'].forEach(function(k){c[k]=[]});c.params.invReturnStd=12;c.params.inflationStd=1;c.params.salaryStd=1;c.members=[{name:'本人',role:'本人',gender:'男',age:40,worked:0,insType:'勞保',insSalary:0,depRatio:100,expRatio:100,indepAge:''}];c.retire={monthLiving:0,mode:'',retireReturn:4,retireInflation:1.5,prepared:[]};c.taxParams={married:false,dependents:0,otherDeduction:0,estateDeduction:0};c.plan={retireDelay:0,movableToOverseas:0,allocations:[]};
  // profile.credit 是信用評分的舊欄位（與 credit.score 雙寫）。sampleCase 帶 700 分，
  // 這裡若不一併清掉，新客戶會憑空拿到示範資料的評分並白送約 12.5 分財務安全度。
  c.profile.credit='';
@@ -1601,9 +1604,29 @@ function visionRate(c){return visionRateOf(projection(c))}
 function goalFloor(g){var v=n(g.minPresent);if(v>0)return Math.min(v,n(g.present));return n(g.imp)>=5?n(g.present):0}
 function wishFloor(w){var v=n(w.minAmount);if(v>0)return Math.min(v,n(w.amount));return n(w.imp)>=5?n(w.amount):0}
 // 願景還有多少可壓縮空間（現值口徑的粗估，只用來判斷「這根槓桿有沒有得動」）。
+// ===== 願景讓步的第二條路：時間（goals[].latest / travel[].latest）=====
+// ⚠️ 「調整願景」壓的是金額，這一根挪的是時間。兩者互不取代：
+//    有人寧可晚三年買同一間房，也不願意買小一點的。訪談問卷本來就問過「最晚實現」。
+var CAP_DEFER=20;               // 延後上限（年）。再多就不是規劃，是放棄。
+function deferRoomOf(x){var st=n(x&&x.start),la=n(x&&x.latest);return (st>0&&la>st)?(la-st):0;}
+function deferRoom(c){
+ var m=0;
+ (((c||{}).goals)||[]).forEach(function(g){if(visionOn(g))m=Math.max(m,deferRoomOf(g));});
+ (((c||{}).travel)||[]).forEach(function(t){if(visionOn(t))m=Math.max(m,deferRoomOf(t));});
+ return m;
+}
+// 傳承的壓縮下限。與 goalFloor 同一套語意：填了最低就以它為底，沒填就可以壓到 0。
+// ⚠️ legacy 沒有 imp 欄位，所以沒有「重要度 5 ＝不可動」那條保護——
+//    要保住傳承就得填「每人現金傳承(最低)」，這也是畫面上那句提示的用意。
+function legacyFloor(lg){var lo=n(lg&&lg.perHeirMin),hi=n(lg&&lg.perHeirCash);return lo>0?Math.min(lo,hi):0;}
+function legacyRoom(c){var lg=(c&&c.legacy)||{};if(lg.on===false)return 0;
+ return n(lg.heirs)*Math.max(0,n(lg.perHeirCash)-legacyFloor(lg));}
 function visionRoom(c){
  var s=sum(c.goals,function(g){return visionOn(g)?Math.max(0,n(g.present)-goalFloor(g)):0});
  [c.travel,c.hobby,c.luxury].forEach(function(arr){s+=sum(arr,function(w){return visionOn(w)?Math.max(0,n(w.amount)-wishFloor(w))*(n(w.freq)||1):0})});
+ // ⚠️ 傳承走 legacyNeed() 自己的路（heirs × perHeirCash），不是 goals 的一列——
+ //    所以它要在這裡各別加進來，而不是靠 goals 那一段。改成 goals 列會雙算。
+ s+=legacyRoom(c);
  return s;
 }
 
@@ -1618,7 +1641,9 @@ var LEVERS=[
  // 退休權重 w 整段跳掉——反解會收斂到「延後 0.0001 年就填平了」這種假答案。
  {id:'retire',     name:'延後退休',     unit:'年', hint:'工作收入延長、退休期縮短',dir:'up',step:1},
  {id:'retireLevel',name:'降低退休水準', unit:'%',  hint:'退休期支出調降',          dir:'up'},
- {id:'vision',     name:'調整願景',     unit:'%',  hint:'目標與生活願望往「最低金額」壓縮',dir:'up'}
+ {id:'vision',     name:'調整願景',     unit:'%',  hint:'目標與生活願望往「最低金額」壓縮',dir:'up'},
+ // step:1 ＝ 只能整數年，理由同「延後退休」：投影的時間軸是整數歲。
+ {id:'defer',      name:'延後目標',     unit:'年', hint:'把填了「最晚完成歲」的目標往後挪',dir:'up',step:1}
 ];
 function leverName(id){for(var i=0;i<LEVERS.length;i++)if(LEVERS[i].id===id)return LEVERS[i].name;return id}
 function leverUnit(id){for(var i=0;i<LEVERS.length;i++)if(LEVERS[i].id===id)return LEVERS[i].unit;return ''}
@@ -1632,6 +1657,7 @@ function leverGate(c,grade){
  if(grade==='D'){block.rate=1;reason.rate='整裝期：收支尚未轉正或基本保障未備，先不談提高報酬率——順序錯了風險會反咬。';}
  var rateCap=(grade==='C')?Math.min(CAP_RATE,CAP_RATE_STARTER):CAP_RATE;
  if(visionRoom(c)<=0){block.vision=1;reason.vision='目標與生活願望都沒有填「金額(最低)」、或重要度都是 5——沒有可壓縮空間。';}
+ if(deferRoom(c)<=0){block.defer=1;reason.defer='沒有任何目標填了「最晚完成歲」，或最晚＝理想時間——時間上沒有可讓的空間。';}
  return {grade:grade,block:block,reason:reason,rateCap:rateCap};
 }
 
@@ -1691,6 +1717,7 @@ function leverRange(c,id,gate){
  if(id==='income')return {lo:0,hi:incomeCeilingPct(c)};
  if(id==='expense')return {lo:0,hi:expenseCutCap(c)};
  if(id==='retireLevel')return {lo:0,hi:CAP_RETIRE_CUT};
+ if(id==='defer')return {lo:0,hi:Math.min(CAP_DEFER,deferRoom(c)),step:1};
  return {lo:0,hi:CAP_VISION_CUT};
 }
 
@@ -1727,6 +1754,19 @@ function applyLevers(c,set){
  if(vx>0){
   (a.goals||[]).forEach(function(g){if(!visionOn(g))return;var f=goalFloor(g);g.present=n(g.present)-vx*Math.max(0,n(g.present)-f)});
   [a.travel,a.hobby,a.luxury].forEach(function(arr){(arr||[]).forEach(function(w){if(!visionOn(w))return;var f=wishFloor(w);w.amount=n(w.amount)-vx*Math.max(0,n(w.amount)-f)})});
+  // 傳承一起壓。⚠️ 它不在 goals 裡，上面那兩段碰不到它——漏了這一行，
+  //    visionRoom() 會把傳承算進「有空間」，但求解器怎麼拉都拉不動那一段。
+  var alg=a.legacy;
+  if(alg&&alg.on!==false){var lf=legacyFloor(alg);alg.perHeirCash=n(alg.perHeirCash)-vx*Math.max(0,n(alg.perHeirCash)-lf);}
+ }
+ // 延後目標：每一項各自受自己的「最晚完成歲」限制，取 min(要求年數, 該項的空間)。
+ // ⚠️ 與「可刪減%」同一條原則——教練與客戶談定的界線不能被槓桿蓋過去。
+ var dy=n(set.defer);
+ if(dy>0){
+  (a.goals||[]).forEach(function(g){if(!visionOn(g))return;var d=Math.min(dy,deferRoomOf(g));if(d<=0)return;
+   g.start=n(g.start)+d;if(n(g.end))g.end=n(g.end)+d;});
+  (a.travel||[]).forEach(function(t){if(!visionOn(t))return;var d=Math.min(dy,deferRoomOf(t));if(d<=0)return;
+   t.start=n(t.start)+d;});
  }
  return a;
 }
@@ -2750,6 +2790,11 @@ export {
   goalFloor,
   wishFloor,
   visionRoom,
+  deferRoom,
+  deferRoomOf,
+  legacyFloor,
+  legacyRoom,
+  CAP_DEFER,
   LEVERS,
   leverName,
   leverGate,
