@@ -566,6 +566,103 @@ details[open]>.foldln::before{content:'\25BE'}
 .pcard .phd .polbadge{margin-left:0}
 .pcard .phd .av+.pident{margin-right:auto}
 .claimin{width:100%;background:var(--field);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:6px 9px;font-size:13px;font-weight:600}
+/* ══ 賓士圖（嵐途雙環風險需求圖）＋ 旁邊的紀錄框 ══════════════════ */
+/* 三環色取自 Ray 提供的原圖；深色版提亮以維持白字對比。 */
+:root{--wresp:#c8873f;--wresp2:#a86f30;--wcrit:#4f7cae;--wcrit2:#3d648e;--wmed:#9aa6b1;--wmed2:#7d8993}
+:root[data-theme="light"]{--wresp:#c1873f;--wresp2:#9c6a2c;--wcrit:#4a72a0;--wcrit2:#385a80;--wmed:#b0b7bd;--wmed2:#8d949a}
+.cwmemrow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:2px 0 12px}
+.cwmemrow .lb{font-size:11px;color:var(--mut2);letter-spacing:.08em;margin-right:2px}
+.cwmem{background:var(--field);border:1px solid var(--line2);color:var(--mut);border-radius:999px;
+ padding:5px 15px;font:inherit;font-size:13px;cursor:pointer}
+.cwmem.on{background:var(--amber);border-color:var(--amber);color:var(--onbrand);font-weight:700}
+.cwmem.add{border-style:dashed;color:var(--mut2)}
+.cwhub{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:20px;align-items:start}
+@media(max-width:1080px){.cwhub{grid-template-columns:1fr}}
+.cwbox.cwnone{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;color:var(--mut)}
+.cwwheel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 10px 4px}
+/* ⚠️ max-width 與 viewBox 的 600 是一組：容器比 viewBox 寬時 SVG 字級會等比放大
+   （與 .ckchart 同一條規矩）。改一邊要改兩邊，covWheelUI.test.ts 釘住。 */
+.cwwheel svg{display:block;max-width:600px;margin:0 auto;height:auto}
+.cwseg{cursor:pointer;transition:filter .12s}
+.cwseg:hover{filter:brightness(1.18)}
+.cwseg.cwdim{filter:saturate(.5) brightness(.8)}
+.cwseg.cwsel{filter:brightness(1.18);stroke:var(--tx);stroke-width:2.5px}
+:root[data-theme="light"] .cwseg.cwdim{filter:saturate(.3) brightness(1.14)}
+:root[data-theme="light"] .cwseg.cwsel{filter:none;stroke:var(--tx);stroke-width:2.5px}
+.cwlab{pointer-events:none;font-size:13px;font-weight:700;fill:#fff;letter-spacing:.02em}
+.cwring{pointer-events:none;font-family:var(--serif);font-weight:700;fill:#fff}
+.cwtitle{font-family:var(--serif);font-size:17px;font-weight:700;fill:var(--amber2)}
+.cwlegend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--mut2);padding:6px 4px 8px;align-items:center}
+.cwlegend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
+.cwlegend .tip{margin-left:auto}
+.cwtots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 2px 4px}
+.cwtot{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.cwtot .l{font-size:11px;color:var(--mut2)}
+.cwtot .v{font-family:var(--serif);font-size:16px;font-weight:800;color:var(--amber2);line-height:1.35}
+.cwtot .v span{font-size:11px;color:var(--mut2);font-weight:400}
+.cwnotadd{font-size:11px;color:var(--mut2);padding:2px 4px 8px;line-height:1.6}
+.cwnotadd b{color:var(--mut)}
+/* 紀錄框：在圖的旁邊，不蓋在上面 */
+.cwpad{background:var(--panel);border:1px solid var(--line2);border-radius:12px;overflow:hidden;
+ position:sticky;top:var(--sticky-top,3.4rem)}
+.cwempty{padding:34px 22px;text-align:center;color:var(--mut2);font-size:13px;line-height:1.85}
+.cwempty .big{font-size:30px;margin-bottom:8px}
+.cwempty b{color:var(--mut)}
+.cwempty .sm{display:block;margin-top:12px;font-size:11px}
+.cwhd{padding:13px 16px 12px;border-bottom:1px solid var(--line);position:relative}
+.cwtag{font-size:11px;letter-spacing:.1em;font-weight:700;display:inline-block;padding:2px 9px;border-radius:4px;margin-bottom:6px}
+.cwhd h4{font-family:var(--serif);font-size:19px;margin:0;color:var(--tx);font-weight:700}
+.cwsub{font-size:11px;color:var(--mut2);margin-top:3px;line-height:1.7}
+.cwx{position:absolute;top:11px;right:11px;background:none;border:none;color:var(--mut2);font-size:17px;
+ cursor:pointer;line-height:1;padding:3px 6px}
+.cwx:hover{color:var(--tx)}
+.cwpill{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;vertical-align:3px;margin-left:4px}
+.cw-gap{background:color-mix(in srgb,var(--gap2) 18%,transparent);color:var(--gap2)}
+.cw-ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.cw-high{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.cw-none{background:color-mix(in srgb,var(--mut2) 18%,transparent);color:var(--mut2)}
+.cwnums{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+.cwnum{padding:10px 8px;text-align:center;border-right:1px solid var(--line)}
+.cwnum:last-child{border-right:none}
+.cwnum .l{font-size:11px;color:var(--mut2);letter-spacing:.06em}
+.cwnum .v{font-family:var(--serif);font-size:17px;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums}
+.cwnum .u{font-size:10px;color:var(--mut2)}
+.cwneed{color:var(--amber2)}.cwhave{color:var(--teal)}
+.cwgap{color:var(--gap2)}.cwok{color:var(--ok)}.cwhigh{color:var(--warn)}
+.cwsrc{font-size:11px;color:var(--mut2);padding:7px 16px;border-bottom:1px solid var(--line);line-height:1.7}
+.cwbody{padding:12px 16px 16px;max-height:min(560px,58vh);overflow:auto}
+.cwsec{font-size:11px;letter-spacing:.11em;color:var(--mut2);font-weight:700;margin:2px 0 8px}
+.cwsec.mt{margin-top:16px}
+.cwf{margin-bottom:11px}
+.cwf label{display:block;font-size:11px;color:var(--mut);margin-bottom:4px}
+.cwf input{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);
+ border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
+/* ⚠️ 刻意不寫 outline:none —— 全域 :focus-visible 那條金色外框是鍵盤操作唯一的定位點，
+   關掉就等於把鍵盤使用者丟在畫面上找不到自己在哪。這裡只補 hover/focus 的邊框提示。 */
+.cwf input:focus{border-color:var(--amber)}
+.cwauto{background:var(--field);border:1px solid var(--line);border-left:3px solid var(--teal);
+ border-radius:0 8px 8px 0;padding:9px 12px;margin-bottom:9px}
+.cwauto .t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.cwauto .n{font-size:13px;color:var(--mut)}
+.cwauto .a{font-family:var(--serif);font-size:16px;font-weight:800;color:var(--tx);font-variant-numeric:tabular-nums}
+.cwauto .s{font-size:11px;color:var(--mut2);line-height:1.65;margin-top:3px}
+.cwauto.off{border-left-color:var(--mut2);opacity:.72}
+.cwgo{background:none;border:none;color:var(--teal);font:inherit;font-size:11px;cursor:pointer;padding:2px 0;margin-top:2px}
+.cwgo:hover{color:var(--amber2)}
+.cwck{display:flex;align-items:flex-start;gap:8px;font-size:11px;color:var(--mut2);padding:6px 0;line-height:1.55;cursor:pointer}
+.cwck input{margin-top:3px;accent-color:var(--amber);flex:none}
+.cwck b{color:var(--mut)}
+.cwadv{border-top:1px dashed var(--line2);margin-top:14px;padding-top:10px}
+.cwadv>summary{cursor:pointer;font-size:12px;color:var(--amber2);font-weight:700;list-style:none;display:flex;align-items:center;gap:6px}
+.cwadv>summary::-webkit-details-marker{display:none}
+.cwadv>summary::before{content:"▸";font-size:10px;transition:transform .15s}
+.cwadv[open]>summary::before{transform:rotate(90deg)}
+.cwwhy{font-size:11px;color:var(--mut2);line-height:1.7;margin:7px 0 10px}
+.cwadvb{margin-top:10px}
+.cwhint{font-size:11px;color:var(--mut2);line-height:1.75;background:var(--field);border-radius:8px;padding:9px 11px;margin:10px 0 0}
+.cwhint b{color:var(--amber2)}
+.cwhint.warn{border-left:3px solid var(--warn);border-radius:0 8px 8px 0}
+.cwfoot{border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap}
 /* 保障中心 */
 .matrix{width:100%;border-collapse:collapse;font-size:12px;min-width:720px}
 .matrix th,.matrix td{text-align:center;padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -973,7 +1070,7 @@ function finName(arr,i,kind,row){
  return '<div class="finname">'+finTxt(arr,i,'name',row.name)+catTodo(kind,row)+'</div>';
 }
 // ────────────────────────────────────────────────────────────────────────
-var app={role:'coach',activeTab:'data',dataTab:'family',reportDoc:'family',ownerView:'全家',activeId:null,cases:[],tools:{loan:{amt:5000000,rate:2,years:20},ret:{age:40,rAge:65,life:85,month:50000,infl:1.5,rr:4},comp:{target:15000000,years:20,rate:6,start:0},irr:{monthly:10000,months:73,fv:911097,start:0},car:{price:2500000,life:15,used:8,cc:2500,sellLoss:15,oil:36000,park:48000,other:45000},house:{oldPrice:12000000,newPrice:18000000,down:5400000,rate:1.7,years:30,deco:1700000},biz:{cash:500000,monthRev:300000,monthCost:250000,setup:1500000},
+var app={role:'coach',activeTab:'data',dataTab:'family',covNeed:0,covCell:'',reportDoc:'family',ownerView:'全家',activeId:null,cases:[],tools:{loan:{amt:5000000,rate:2,years:20},ret:{age:40,rAge:65,life:85,month:50000,infl:1.5,rr:4},comp:{target:15000000,years:20,rate:6,start:0},irr:{monthly:10000,months:73,fv:911097,start:0},car:{price:2500000,life:15,used:8,cc:2500,sellLoss:15,oil:36000,park:48000,other:45000},house:{oldPrice:12000000,newPrice:18000000,down:5400000,rate:1.7,years:30,deco:1700000},biz:{cash:500000,monthRev:300000,monthCost:250000,setup:1500000},
  cash13:{open:2000000,inflow:800000,outflow:750000,vat:250000,profitTax:600000,safe:1500000},
  leak:{profit:1000000,ar:400000,inv:300000,capex:500000,principal:200000,tax:250000,dep:300000},
  cashh:{cash:3000000,fixed:1000000,arDays:75,invDays:45,apDays:40,ocf:1200000,netProfit:1000000,capex:500000,ebt:1250000,interest:300000}}};
@@ -4453,6 +4550,12 @@ var CALC={
  completeness:function(c){return completenessHTML(c);},
  houseCalc:function(c,i){return houseCalcDerivedHTML(c,i);},
  coverageNeeds:function(c){return coverageHubParts(c).needsTbl;},
+ // 賓士圖的四個衍生區。⚠️ 全部不含輸入框——輸入框住在靜態外殼裡，
+ // 只有 covRedraw()（換被保人／換格子）會重建外殼。理由見 covPadHTML 的註解。
+ cwWheel:function(c){var i=covNeedIdx(c);return i<0?'':covWheelSVG(c,c.needs[i]);},
+ cwTots:function(c){return covTotsHTML(c);},
+ cwNums:function(c){return covNumsHTML(c);},
+ cwDeriv:function(c){return covDerivHTML(c);},
  // 已備退休金改「方式」或金額時，下面那段換算說明要當場跟著變。
  preparedConv:function(c){return preparedConvHTML(c);},
  // 健保費試算：改投保薪資／眷口／類別時，同一張成員卡上的試算與明細當場重算。
@@ -4460,7 +4563,21 @@ var CALC={
  nhiSummary:function(c){return nhiSummaryHTML(c);},
  propIns:function(c){return propInsHTML(c);}
 };
+// ⚠️⚠️ 重入鎖。2026/09/10：下面還原焦點的 x.focus() 會讓「剛被 innerHTML 換掉的那個舊
+//    input」補噴一次 change → set() → syncDerived() → **syncCalcNodes 自己重入**，
+//    把外層正要還原的節點再換掉一次。結果是外層拿到的是已經脫離 DOM 的元素，
+//    setSelectionRange 打在空氣上，瀏覽器則把新 input 整串選起來——
+//    使用者看到的症狀是「打第二個字，前面打的全部被蓋掉」。
+//    以前踩不到，是因為在此之前沒有任何 data-calc 區塊裡放著同時掛
+//    oninput(setLive) 與 onchange(set) 的輸入框（需求卡只有 onchange，打字中不會進來）。
+//    鎖住之後，那次補噴的 change 仍會正常走 set() 存檔，只是不再重畫一次。
+var _syncingCalc=false;
 function syncCalcNodes(){var c=activeCase();if(!c)return;
+ if(_syncingCalc)return;
+ _syncingCalc=true;
+ try{syncCalcNodesInner(c);}finally{_syncingCalc=false;}
+}
+function syncCalcNodesInner(c){
  var list=document.querySelectorAll('[data-calc]');
  for(var i=0;i<list.length;i++){var el=list[i];
   // data-calc="key" 或 "key:arg"（同一種區塊在畫面上有很多份時用，例如每一張購置試算卡）
@@ -11340,6 +11457,397 @@ function coverageCheckupHTML(c,ck,pc){
 }
 // 保障中心的衍生區（KPI／全家保障地圖／產險涵蓋／健檢報告）抽成獨立函式，
 // 讓下方 needs 參數表打字時能即時重算，而不是要切走再切回來。
+// ═══ 賓士圖（嵐途雙環風險需求圖）：保障中心的前端切口 ═════════════════════
+// ⚠️⚠️ 這是**呈現層**，不是第二套計算。每一格的需求與已備一律回頭呼叫既有引擎
+//    （grossLifeNeed／medicalDailyNeed／coverageGaps／existingCover 那一套），
+//    這裡一個公式都不重寫——重寫就會出現「圖上 920 萬、五欄表 1,772 萬」那種
+//    同一份資料兩個數字的災難。
+// 為什麼要有這一層：教練在客戶面前談的是三個問句（走了誰接手／倒下了誰養／住院誰付），
+//    但後端是保單健診那套完整結構（10 個險種、17 個需求欄位、產險與 $領回兩條平行線）。
+//    這張圖是把後端的東西「照諮詢順序」重新排一次，不是把後端變簡單。
+// 兩條收斂規則（Ray 2026/09/10 拍板）：
+//   ① 圖上有、後端沒有 → 增設欄位。實際盤點下來 12 格全部對得到既有欄位，一格都沒增。
+//   ② 後端有、圖上沒有 → **不硬壓進圖**，收進該格紀錄框的「進階」摺疊區。
+//      收容清單：預留遺產稅／個人連帶保證／保障年數／家計負擔覆寫%／
+//      癌症住院日額／自付差額／照護月數。
+// ⚠️ covWheelUI.test.ts 釘住兩件事：(a) 圖上每個欄位都真的存在於 NEED_BLOCKS；
+//    (b) NEED_BLOCKS 的每個欄位都有家（不是主欄就是進階欄），一個都不能漏。
+//    以後有人在需求卡加欄位卻忘了掛上圖，測試會紅。
+//
+// ⚠️⚠️ 內環三格的「缺口」不是各自獨立的：
+//    責任那 5 格在引擎裡合成 **一條壽險缺口**（grossLifeNeed），
+//    病房費／看護費（＋進階的自付差額）合成 **一條住院醫療日額**（medicalDailyNeed）。
+//    所以那些格子點進去只顯示「本格金額」，缺口顯示的是它所屬險種整條的——
+//    刻意不在格子層級偽造一個缺口出來。
+var COV_WHEEL=[
+ {ring:'責任',tone:'resp',kind:'壽險',
+  note:'走了，誰接手。這一環的五格是壽險需求的<b>組成</b>，缺口在「責任」這一層一起看。',
+  cells:[
+   {key:'living',lb:'生活費',part:'壽險',go:'finance',goLb:'收支資債 · 支出表',
+    calc:function(c,nd){return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*familyAnnualLiving(c)*protectYearsEff(c,nd);},
+    src:function(c,nd){
+     var py=n(nd.protectYears),pyE=protectYearsEff(c,nd);
+     var s='家計負擔 <b>'+n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))+'%</b> × 家庭年生活費 <b>'+fmt(familyAnnualLiving(c))+'</b> × 保障 <b>'+py+'</b> 年';
+     if(Math.abs(pyE-py)>0.005)s+='<br>✅ 責任遞減：'+indepDeps(c,nd.member).map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立（支出比例 '+n(d.expRatio)+'%）';}).join('、')+'，等效 <b>'+pyE.toFixed(2)+'</b> 年';
+     return s;}},
+   {key:'loan',lb:'貸款',part:'壽險',go:'finance',goLb:'收支資債 · 負債表',
+    tg:'payDebt',tgLb:'身故要清償家庭負債',tgHint:'預設依角色：本人／配偶列入，子女／父母不列入',
+    on:function(c,nd){return needCoversDebt(c,nd);},
+    calc:function(c,nd){return needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0;},
+    src:function(c){return '負債表餘額合計 <b>'+fmt(sum(c.liabilities,function(l){return lBal(l)}))+'</b>';}},
+   {key:'edu',lb:'教育費',part:'壽險',go:'education',goLb:'子女教育',
+    tg:'fundEdu',tgLb:'身故要備妥子女教育金',tgHint:'預設依角色，同上',
+    on:function(c,nd){return needCoversEdu(c,nd);},
+    calc:function(c,nd){return needCoversEdu(c,nd)?eduTotal(c):0;},
+    src:function(c){return '子女教育分頁（終值）<b>'+fmt(eduTotal(c))+'</b>';}},
+   {key:'parent',lb:'父母孝養',part:'壽險',go:'finance',goLb:'收支資債 · 支出表',
+    tg:'supportParents',tgLb:'身故要接續父母奉養',tgHint:'預設依角色，同上',
+    on:function(c,nd){return needCoversParents(c,nd);},
+    calc:function(c,nd){return needCoversParents(c,nd)?familyAnnualParentSupport(c)*n(nd.protectYears):0;},
+    src:function(c,nd){return '支出表「孝親」年額 <b>'+fmt(familyAnnualParentSupport(c))+'</b> × 保障 <b>'+n(nd.protectYears)+'</b> 年';}},
+   {key:'funeral',lb:'生命禮儀費',part:'壽險',
+    fields:[['funeral','生命禮儀費（喪葬費）','money']]}
+  ],
+  adv:[['estateTax','預留遺產稅','money'],['protectYears','保障年數（生活費要撐幾年）','num'],
+       ['depRatioOverride','家計負擔覆寫 %（留空＝用成員卡的值）','num']],
+  advAuto:[{lb:'個人連帶保證',calc:function(c,nd){return guaranteeFor(c,nd.member);},
+            src:'信用／企業分頁登錄的連帶保證餘額（自動帶入，不在這裡改）'}],
+  advWhy:'保單健診後端有、賓士圖上沒有的責任項目與參數。<b>預留遺產稅</b>與<b>個人連帶保證</b>是獨立責任（都有進壽險毛需求）；<b>保障年數</b>與<b>家計負擔%</b>是上面五格共用的參數——改了，生活費與父母孝養兩格會當場跟著動。'},
+
+ {ring:'重病重殘',tone:'crit',
+  note:'活著，但賺不了錢。這一環三格各自是獨立險種，缺口一格一格看。',
+  cells:[
+   // 2026/09/10 Ray：長期照護金 ↔ 重大疾病 對調（諮詢時的講述順序）。
+   {key:'care',lb:'長期照護金',kind:'每月照護',
+    fields:[['monthCare','每月照護金','money','每月照護']],
+    adv:[['careMonths','照護月數','num']],
+    advWhy:'<b>照護月數</b>不是給付項目、是換算參數：月缺口 × 月數＝長照總需求，只當<b>佐證數字</b>，刻意不併進一次性給付那一堆（單位不同，相加沒有意義）。'},
+   {key:'disability',lb:'意外傷殘',kind:'意外傷殘',
+    fields:[['disability','意外傷殘保障','money','意外傷殘']]},
+   {key:'critical',lb:'重大疾病',lb2:'（含癌症）',multiKind:true,
+    fields:[['critical','重大疾病一次金','money','重病給付'],
+            ['firstCancer','初次罹癌一次金','money','初次罹癌']],
+    adv:[['cancerHosp','癌症住院日額（選填）','money','癌症住院']],
+    advWhy:'<b>癌症住院日額</b>在需求分析裡多半被一般住院日額取代，所以不上圖；欄位保留是為了既有保單的資料不遺失（拿掉會靜默歸零）。'}
+  ]},
+
+ {ring:'醫療',tone:'med',
+  note:'住院期間，每天在燒的錢。病房費＋自付差額＋看護費三項<b>合成</b>一條「住院醫療日額」缺口；薪資補償與雜費各自獨立。',
+  cells:[
+   {key:'room',lb:'病房費',part:'住院醫療',
+    fields:[['room','病房費（日額）','money']],
+    adv:[['selfPay','自付差額（日額）','money']],
+    advWhy:'<b>自付差額</b>在引擎裡與病房費、看護費併成同一條「住院醫療日額需求」（medicalDailyNeed），所以掛在這一格底下，不另開一格。'},
+   {key:'nursing',lb:'看護費',part:'住院醫療',
+    fields:[['nursing','看護費（日額）','money']]},
+   {key:'income',lb:'薪資補償',multiKind:true,
+    fields:[['incomeCompMonth','薪資補償（月額）','money','薪資補償（月）'],
+            ['incomeCompDay','薪資補償（日額）','money','薪資補償（日）']]},
+   {key:'misc',lb:'醫療雜費',kind:'醫療雜費',
+    fields:[['miscDaily','住院雜費（每次住院）','money','醫療雜費']]}
+  ]}
+];
+var COV_TONE={resp:['var(--wresp)','var(--wresp2)'],crit:['var(--wcrit)','var(--wcrit2)'],med:['var(--wmed)','var(--wmed2)']};
+
+// 目前看的是哪一張需求卡。needs 被刪到剩比較少張時要夾回範圍內。
+function covNeedIdx(c){
+ var L=(c.needs||[]).length;if(!L)return -1;
+ var i=n(app.covNeed);return (i>=0&&i<L)?i:0;
+}
+// 換人／換格：整塊重建。這兩個動作都是「使用者剛點了一下」，沒有人正在打字，換掉是安全的。
+// ⚠️ 刻意不走 render()：這張圖在頁面最上面，整頁重建會把捲軸拉回頂端。
+function covRedraw(){
+ var el=document.getElementById('cwRoot');var c=activeCase();
+ if(el&&c)el.innerHTML=covRootHTML(c);
+}
+function covPickNeed(i){app.covNeed=+i;app.covCell='';covRedraw();}
+function covPick(ring,key){
+ var id=ring+'|'+(key||'');
+ app.covCell=(app.covCell===id)?'':id;
+ covRedraw();
+}
+
+// 一格自己的金額（不是缺口）。auto 格走 calc()，一般格是它主欄位的加總。
+function covCellAmt(c,nd,cl){
+ if(cl.calc)return cl.calc(c,nd);
+ return (cl.fields||[]).reduce(function(a,f){return a+n(nd[f[0]])},0);
+}
+// 一格對到的險種清單（缺口是從這裡來的，一律走 coverageGaps 的既有結果）。
+function covCellKinds(cl){
+ if(cl.kind)return [cl.kind];
+ var out=[];(cl.fields||[]).concat(cl.adv||[]).forEach(function(f){if(f[3])out.push(f[3])});
+ if(!out.length&&cl.part)out.push(cl.part);
+ return out;
+}
+// 這一位被保人的缺口列，key 成 {險種:列}。
+function covGapMap(c,nd){
+ var by={};coverageGaps(c).forEach(function(g){if(g.member===nd.member)by[g.kind]=g;});
+ return by;
+}
+// 格子狀態：none 尚未填／ok 已足額／gap 有缺口／high 已備超過需求。
+function covCellState(c,nd,cl,gm){
+ var amt=covCellAmt(c,nd,cl);
+ var ks=covCellKinds(cl);
+ var any=false,gap=0,need=0;
+ ks.forEach(function(k){var g=gm[k];if(!g)return;any=true;gap+=g.gap;need+=g.need;});
+ if(amt<=0&&need<=0)return 'none';
+ if(!any)return 'none';
+ return gap>0?'gap':(gap<0?'high':'ok');
+}
+var COV_ST={gap:['var(--gap2)','有缺口'],ok:['var(--ok)','已足額'],
+ high:['var(--warn)','已備超過需求'],none:['var(--mut2)','尚未填']};
+
+// ── SVG 幾何 ───────────────────────────────────────────────────
+// ⚠️ viewBox 固定 600×620；容器寬度由 CSS 的 max-width 控。SVG 的字級是使用者單位，
+//    容器比 viewBox 寬時字會等比放大——與 .ckchart 同一條規矩。
+function covArcPath(cx,cy,r0,r1,a0,a1){
+ function pol(r,a){var t=(a-90)*Math.PI/180;return [cx+r*Math.cos(t),cy+r*Math.sin(t)];}
+ var p0=pol(r1,a0),p1=pol(r1,a1),p2=pol(r0,a1),p3=pol(r0,a0),lg=(a1-a0)>180?1:0;
+ return 'M'+p0[0].toFixed(2)+' '+p0[1].toFixed(2)+'A'+r1+' '+r1+' 0 '+lg+' 1 '+p1[0].toFixed(2)+' '+p1[1].toFixed(2)+
+        'L'+p2[0].toFixed(2)+' '+p2[1].toFixed(2)+'A'+r0+' '+r0+' 0 '+lg+' 0 '+p3[0].toFixed(2)+' '+p3[1].toFixed(2)+'Z';
+}
+function covWheelSVG(c,nd){
+ var CX=300,CY=300,R0=86,R1=158,R2=170,R3=262,G=1.6;
+ function pol(r,a){var t=(a-90)*Math.PI/180;return [CX+r*Math.cos(t),CY+r*Math.sin(t)];}
+ var gm=covGapMap(c,nd),sel=app.covCell||'';
+ var o=['<svg viewBox="0 0 600 620" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="嵐途雙環風險需求圖">'];
+ o.push('<text x="300" y="26" text-anchor="middle" class="cwtitle">嵐途雙環風險需求圖</text>');
+ var a=0;
+ COV_WHEEL.forEach(function(ring){
+  var span=120,each=span/ring.cells.length,tone=COV_TONE[ring.tone];
+  var inSel=(sel===ring.ring+'|');
+  var dim=sel&&sel.indexOf(ring.ring+'|')!==0?' cwdim':'';
+  o.push('<path class="cwseg'+dim+(inSel?' cwsel':'')+'" d="'+covArcPath(CX,CY,R0,R1,a+G/2,a+span-G/2)+
+   '" fill="'+tone[0]+'" onclick="covPick(\''+ring.ring+'\',\'\')"><title>'+esc(ring.ring)+'</title></path>');
+  var mid=a+span/2,lp=pol((R0+R1)/2,mid),two=ring.ring==='重病重殘';
+  o.push('<text class="cwring" x="'+lp[0].toFixed(1)+'" y="'+(lp[1]+(two?-6:8)).toFixed(1)+'" text-anchor="middle" font-size="'+(two?25:23)+'">'+
+   (two?'<tspan x="'+lp[0].toFixed(1)+'">重病</tspan><tspan x="'+lp[0].toFixed(1)+'" dy="1.02em">重殘</tspan>':esc(ring.ring))+'</text>');
+  ring.cells.forEach(function(cl,i){
+   var a0=a+i*each,a1=a0+each,m=(a0+a1)/2;
+   var st=covCellState(c,nd,cl,gm),isSel=(sel===ring.ring+'|'+cl.key);
+   var d2=sel&&!isSel?' cwdim':'';
+   o.push('<path class="cwseg'+d2+(isSel?' cwsel':'')+'" d="'+covArcPath(CX,CY,R2,R3,a0+G/2,a1-G/2)+
+    '" fill="'+(st==='none'?tone[1]:tone[0])+'"'+(st==='none'?' opacity="0.55"':'')+
+    ' onclick="covPick(\''+ring.ring+'\',\''+cl.key+'\')"><title>'+esc(cl.lb+(cl.lb2||''))+' · '+COV_ST[st][1]+'</title></path>');
+   // 標籤一律水平。原圖只有責任那一環是旋轉的，但旋轉後長標籤在左半圈會側躺，
+   // 而這些格子是要被點的操作元件——可讀性優先（Ray 2026/09/10 看過原型後定案）。
+   var tp=pol((R2+R3)/2,m),x=tp[0].toFixed(1);
+   o.push('<text class="cwlab" x="'+x+'" y="'+tp[1].toFixed(1)+'"'+(st==='none'?' opacity="0.75"':'')+' text-anchor="middle">'+
+    '<tspan x="'+x+'" dy="'+(cl.lb2?'-0.25em':'0.36em')+'">'+esc(cl.lb)+'</tspan>'+
+    (cl.lb2?'<tspan x="'+x+'" dy="1.2em" font-size="11">'+esc(cl.lb2)+'</tspan>':'')+'</text>');
+   var dp=pol(R3-9,m);
+   o.push('<circle cx="'+dp[0].toFixed(1)+'" cy="'+dp[1].toFixed(1)+'" r="4" fill="'+(st==='none'?'none':COV_ST[st][0])+
+    '" stroke="'+COV_ST[st][0]+'" stroke-width="1.4" pointer-events="none"/>');
+  });
+  a+=span;
+ });
+ // 圓心：一次性給付缺口。日額／月額用小字掛在下面——三堆刻意不相加（gapTotals）。
+ var gt=gapTotals(c);
+ o.push('<circle cx="'+CX+'" cy="'+CY+'" r="'+(R0-9)+'" fill="var(--card)" stroke="var(--line)"/>');
+ o.push('<text x="'+CX+'" y="'+(CY-16)+'" text-anchor="middle" font-size="10.5" fill="var(--mut2)">一次性給付缺口</text>');
+ o.push('<text x="'+CX+'" y="'+(CY+8)+'" text-anchor="middle" font-size="21" font-weight="800" fill="var(--gap2)" font-family="var(--serif)">'+fmt(gt.lump)+'</text>');
+ o.push('<text x="'+CX+'" y="'+(CY+26)+'" text-anchor="middle" font-size="10.5" fill="var(--mut2)">元</text>');
+ o.push('<text x="'+CX+'" y="'+(CY+46)+'" text-anchor="middle" font-size="10.5" fill="var(--mut)">日 '+fmt(gt.daily)+'　月 '+fmt(gt.monthly)+'</text>');
+ o.push('</svg>');
+ return o.join('');
+}
+
+// ── 紀錄框（在圖的旁邊，不蓋在上面）─────────────────────────────
+// ⚠️ 輸入框走 setLive(oninput)＋set(onchange)，與需求卡同一條路；整塊掛在
+//    data-calc="coverageWheel" 裡由 syncCalcNodes() 重畫，它會以 oninput|onchange
+//    屬性字串當識別碼還原焦點與游標（見 syncCalcNodes 的註解）。
+function covFld(i,f){
+ var lb=esc(f[1]),k=f[0];
+ var bind='oninput="setLive(\'needs:'+i+'\',\''+k+'\',this.value,\'num\')" onchange="set(\'needs:'+i+'\',\''+k+'\',this.value,\'num\')"';
+ var nd=(activeCase().needs||[])[i]||{};
+ if(f[2]==='money')return '<div class="cwf"><label>'+lb+'</label>'+moneyCell(bind,nd[k])+'</div>';
+ return '<div class="cwf"><label>'+lb+'</label><input type="number" value="'+esc(nd[k]==null?'':nd[k])+'" '+bind+'></div>';
+}
+function covNums(need,have,gap,unit,src,tag){
+ var cls=gap>0?'cwgap':(gap<0?'cwhigh':'cwok');
+ var gv=gap>0?fmt(gap):(gap<0?'－'+fmt(-gap):'0');
+ return '<div class="cwnums">'+
+  '<div class="cwnum"><div class="l">現在需求 NEED</div><div class="v cwneed">'+fmt(need)+'</div><div class="u">'+esc(unit)+(tag?' · '+esc(tag):'')+'</div></div>'+
+  '<div class="cwnum"><div class="l">現在保單 HAVE</div><div class="v cwhave">'+fmt(have)+'</div><div class="u">'+esc(unit)+'</div></div>'+
+  '<div class="cwnum"><div class="l">缺口</div><div class="v '+cls+'">'+gv+'</div><div class="u">'+esc(unit)+'</div></div></div>'+
+  (src?'<div class="cwsrc">已備來源：'+src+'</div>':'');
+}
+function covAdvHTML(i,list,why,auto,c,nd){
+ var nA=(list||[]).length+((auto||[]).length);
+ if(!nA)return '';
+ var body=(auto||[]).map(function(x){
+  return '<div class="cwauto"><div class="t"><span class="n">'+esc(x.lb)+'</span><span class="a">'+fmt(x.calc(c,nd))+'</span></div>'+
+   '<div class="s">'+x.src+'</div></div>';
+ }).join('')+(list||[]).map(function(f){return covFld(i,f)}).join('');
+ return '<details class="cwadv"><summary>進階欄位（'+nA+'）· 賓士圖上沒有的</summary>'+
+  (why?'<div class="cwwhy">'+why+'</div>':'')+'<div class="cwadvb">'+body+'</div></details>';
+}
+// ⚠️⚠️ 紀錄框拆成「靜態外殼」與「衍生區」兩層，這不是潔癖是必要的：
+//    syncCalcNodes() 是用 innerHTML 換掉整個 data-calc 容器，正在打字的 <input>
+//    一旦被換掉，值會被模型值正規化、游標會掉，而且舊 input 在被換掉的瞬間還會
+//    補噴一次 change（見 _syncingCalc 的註解）。所以輸入框一律留在 data-calc **外面**，
+//    只有「會跟著數字動的東西」進去——與 propInsSec／houseCalcCardsHTML 同一條規矩。
+//    外殼只在「換被保人／換格子」時由 covRedraw() 重建，那時沒有人在打字。
+function covPadHTML(c,nd,i){
+ var sel=app.covCell||'';
+ if(!sel)return '<div class="cwempty"><div class="big">◎</div><b>點圓餅圖上任何一格</b><br>'+
+  '右邊就會開這一格的紀錄框：需求 · 已備 · 缺口，以及能直接改的欄位。<br>'+
+  '<span class="sm">內環三格＝三個問句；外環十二格＝實務上真的要問的細項。</span></div>';
+ var p=sel.split('|'),ring=COV_WHEEL.filter(function(r){return r.ring===p[0]})[0];
+ if(!ring){app.covCell='';return covPadHTML(c,nd,i);}
+ var tone=COV_TONE[ring.tone][0];
+ var foot='<div class="cwfoot"><button class="tbtn" onclick="covGotoNeeds()">到下方完整需求卡</button>'+
+  '<button class="tbtn" onclick="app.covCell=\'\';covRedraw()">關閉</button></div>';
+ var nums='<div data-calc="cwNums">'+covNumsHTML(c)+'</div>';
+ var deriv='<div data-calc="cwDeriv">'+covDerivHTML(c)+'</div>';
+
+ // ① 內環：整環總覽
+ if(!p[1]){
+  return '<div class="cwhd"><button class="cwx" onclick="app.covCell=\'\';covRedraw()">✕</button>'+
+   '<span class="cwtag" style="background:color-mix(in srgb,'+tone+' 26%,transparent);color:'+tone+'">內環 · 三大類</span>'+
+   '<h4>'+esc(ring.ring)+'</h4><div class="cwsub">'+ring.note+'</div></div>'+nums+
+   '<div class="cwbody"><div class="cwsec">這一環的 '+ring.cells.length+' 個組成</div>'+deriv+
+   covAdvHTML(i,ring.adv,ring.advWhy,ring.advAuto,c,nd)+'</div>'+foot;
+ }
+
+ // ② 外環：單一格子
+ var cl=ring.cells.filter(function(x){return x.key===p[1]})[0];
+ if(!cl){app.covCell='';return covPadHTML(c,nd,i);}
+ var gm=covGapMap(c,nd),st=covCellState(c,nd,cl,gm);
+ var body;
+ if(cl.calc){
+  // 自動帶入的格子沒有輸入框：金額與來源都是衍生的，開關才是靜態的。
+  var on=cl.on?cl.on(c,nd):true;
+  body='<div class="cwsec">自動帶入 · 不用手填</div>'+deriv+
+   (cl.tg?'<label class="cwck"><input type="checkbox" '+(on?'checked ':'')+
+    'onchange="set(\''+'needs:'+i+'\',\''+cl.tg+'\',this.checked);covRedraw()"><span><b>'+
+    esc(cl.tgLb)+'</b><br>'+esc(cl.tgHint)+'</span></label>':'')+
+   covAdvHTML(i,cl.adv,cl.advWhy,null,c,nd);
+ }else{
+  body='<div class="cwsec">這一格要填的</div>'+(cl.fields||[]).map(function(f){return covFld(i,f)}).join('')+
+   covAdvHTML(i,cl.adv,cl.advWhy,null,c,nd)+deriv;
+ }
+ return '<div class="cwhd"><button class="cwx" onclick="app.covCell=\'\';covRedraw()">✕</button>'+
+  '<span class="cwtag" style="background:color-mix(in srgb,'+tone+' 26%,transparent);color:'+tone+'">'+esc(ring.ring)+'</span>'+
+  '<h4>'+esc(cl.lb+(cl.lb2||''))+' <span class="cwpill cw-'+st+'">'+COV_ST[st][1]+'</span></h4>'+
+  '<div class="cwsub">'+(cl.part?'屬於「'+esc(cl.part)+'」的組成':(cl.kind?'險種：'+esc(cl.kind):'涵蓋多條險種'))+'</div></div>'+
+  nums+'<div class="cwbody">'+body+'</div>'+foot;
+}
+// 目前選取的環／格。回 null 代表沒有選任何一格。
+function covSel(c){
+ var sel=app.covCell||'';if(!sel)return null;
+ var p=sel.split('|'),ring=COV_WHEEL.filter(function(r){return r.ring===p[0]})[0];
+ if(!ring)return null;
+ var cl=p[1]?ring.cells.filter(function(x){return x.key===p[1]})[0]:null;
+ if(p[1]&&!cl)return null;
+ var i=covNeedIdx(c);if(i<0)return null;
+ return {ring:ring,cell:cl,nd:c.needs[i],i:i};
+}
+// 衍生區之一：紀錄框頂端的三個數字。多險種的格子沒有這一條（單位不同不能加總）。
+function covNumsHTML(c){
+ var s=covSel(c);if(!s)return '';
+ var gm=covGapMap(c,s.nd);
+ var k=s.cell?(s.cell.part||(s.cell.multiKind?null:s.cell.kind)):s.ring.kind;
+ if(!k)return '';
+ var g=gm[k]||{need:0,have:0,gap:0};
+ return covNums(g.need,g.have,g.gap,kindUnit(k),covHaveSrc(c,s.nd,k),
+  (s.cell&&s.cell.part)?('「'+k+'」整條'):'');
+}
+// 衍生區之二：自動帶入的金額／多險種逐條／組成說明／長照換算——全部會跟著輸入框動。
+function covDerivHTML(c){
+ var s=covSel(c);if(!s)return '';
+ var nd=s.nd,gm=covGapMap(c,nd),out='';
+ if(!s.cell){
+  out=s.ring.cells.map(function(cl){
+   return '<div class="cwauto" style="border-left-color:'+COV_TONE[s.ring.tone][0]+'"><div class="t"><span class="n">'+
+    esc(cl.lb+(cl.lb2||''))+'</span><span class="a">'+fmt(covCellAmt(c,nd,cl))+'</span></div></div>';
+  }).join('');
+  if(s.ring.kind)out+='<div class="cwhint">這一環的 '+s.ring.cells.length+' 格<b>合成一條「'+esc(s.ring.kind)+
+   '」缺口</b>——所以格子點進去只有本格金額，缺口在這一層看。這是既有引擎的語意，圖只是把它畫出來。</div>';
+  return out;
+ }
+ var cl=s.cell;
+ if(cl.calc){
+  var on=cl.on?cl.on(c,nd):true;
+  out+='<div class="cwauto'+(on?'':' off')+'"><div class="t"><span class="n">'+esc(cl.lb)+'</span><span class="a">'+
+   fmt(covCellAmt(c,nd,cl))+'</span></div><div class="s">'+(on?cl.src(c,nd):'此項目未列入（下方開關關閉）')+'</div>'+
+   (cl.go?'<button class="cwgo" onclick="jumpTab(\''+cl.go+'\')">→ 前往「'+esc(cl.goLb||cl.go)+'」修改來源數字</button>':'')+'</div>';
+ }
+ if(cl.multiKind){
+  out+='<div class="cwsec mt">這一格涵蓋 '+covCellKinds(cl).length+' 條獨立缺口</div>'+
+   covCellKinds(cl).map(function(k){
+    var g=gm[k]||{need:0,have:0,gap:0};
+    var st=g.need<=0?'none':(g.gap>0?'gap':(g.gap<0?'high':'ok'));
+    return '<div class="cwauto" style="border-left-color:'+COV_ST[st][0]+'"><div class="t"><span class="n">'+esc(k)+
+     '</span><span class="a">需求 '+fmt(g.need)+' ／ 已備 '+fmt(g.have)+'</span></div>'+
+     '<div class="s">缺口 <b style="color:'+COV_ST[st][0]+'">'+(g.gap>0?fmt(g.gap):(g.gap<0?'已備多 '+fmt(-g.gap):'0'))+' '+
+     esc(kindUnit(k))+'</b>　·　已備來源：'+covHaveSrc(c,nd,k)+'</div></div>';
+   }).join('');
+ }
+ if(cl.part){
+  out+='<div class="cwhint">這一格是<b>「'+esc(cl.part)+'」的組成之一</b>，不是獨立險種——上面那三個數字是 '+
+   esc(cl.part)+' 整條的。<br>本格金額：<b>'+fmt(covCellAmt(c,nd,cl))+' '+esc(kindUnit(cl.part))+'</b></div>';
+ }
+ if(cl.key==='care'){
+  var cm=careMonthsOf(nd),gc=gm['每月照護']||{gap:0};
+  out+='<div class="cwhint warn">長照總需求換算：每月 <b>'+fmt(n(nd.monthCare))+'</b> 元/月 × <b>'+cm.months+
+   '</b> 個月 ＝ <b>'+fmt(n(nd.monthCare)*cm.months)+'</b> 元；月缺口換算總額約 <b>'+fmt(Math.max(0,gc.gap)*cm.months)+'</b> 元。'+
+   (cm.assumed?'<br>⚠️ 「照護月數」未填，上面這個 '+cm.months+' 個月<b>是系統的假設值</b>，不是客戶填的。':'')+
+   '<br>ℹ️ 這是<b>佐證數字</b>：缺口表仍以元/月呈現，刻意不與一次性給付相加。</div>';
+ }
+ return out;
+}
+// 已備來源：把「這個數字從哪張保單來」講出來。查不到就回 —。
+function covHaveSrc(c,nd,kind){
+ var f=POLICY_MAP[kind];
+ var out=[];
+ if(f)(c.policies||[]).forEach(function(p){
+  if(p.insured!==nd.member||!policyActive(p))return;
+  if(n(p[f])>0)out.push(esc(p.name||p.subtype||'未命名')+' '+fmt(n(p[f])));
+ });
+ (c.coverages||[]).forEach(function(x){
+  if(x.member!==nd.member||kindNorm(x.kind)!==kind)return;
+  if(n(x.comm)+n(x.social)>0)out.push('已備補充 '+fmt(n(x.comm)+n(x.social)));
+ });
+ if(kind==='壽險'&&nd.member===(primaryMember(c)||{}).name&&liquidMovable(c)>0)
+  out.push('可動用流動資產 '+fmt(liquidMovable(c)));
+ return out.length?out.join('　＋　'):'—';
+}
+function covGotoNeeds(){
+ var el=document.querySelector('[data-calc="coverageNeeds"]');
+ if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+// 整塊＝被保人切換 ＋ 圖 ＋ 紀錄框。
+// ⚠️ 分區原則：會被 innerHTML 重畫的（data-calc）一律不含輸入框。
+//    cwWheel／cwTots／cwNums／cwDeriv 是純衍生；輸入框住在它們外面的靜態外殼裡，
+//    只有 covRedraw()（換人／換格）會重建外殼——那時沒有人在打字。
+function covRootHTML(c){
+ c.needs=c.needs||[];
+ var i=covNeedIdx(c);
+ if(i<0)return '<div class="cwbox cwnone">尚未建立保障需求。<button class="add" onclick="addRow(\'needs\')">＋ 建第一張需求卡</button>'+
+  '<div class="hint" style="display:block;margin-top:6px">建好之後，這張圖會用它來畫——十二格各自是諮詢時要問的一個切口。</div></div>';
+ var nd=c.needs[i];
+ var chips=c.needs.map(function(x,j){
+  return '<button type="button" class="cwmem'+(j===i?' on':'')+'" onclick="covPickNeed('+j+')">'+esc(x.member||'（未指定）')+'</button>';
+ }).join('');
+ return '<div class="cwmemrow"><span class="lb">被保人</span>'+chips+
+  '<button type="button" class="cwmem add" onclick="addRow(\'needs\')">＋ 新增被保人需求</button></div>'+
+  '<div class="cwhub"><div><div class="cwwheel"><div data-calc="cwWheel">'+covWheelSVG(c,nd)+'</div>'+
+  '<div class="cwlegend"><span><i style="background:var(--gap2)"></i>有缺口</span>'+
+  '<span><i style="background:var(--ok)"></i>已足額</span>'+
+  '<span><i style="background:var(--warn)"></i>已備超過需求</span>'+
+  '<span><i style="background:var(--mut2);opacity:.5"></i>尚未填（灰底）</span>'+
+  '<span class="tip">點任一格 → 右側開紀錄框</span></div></div>'+
+  '<div data-calc="cwTots">'+covTotsHTML(c)+'</div></div>'+
+  '<div class="cwpad">'+covPadHTML(c,nd,i)+'</div></div>';
+}
+function coverageWheelHTML(c){return '<div id="cwRoot">'+covRootHTML(c)+'</div>';}
+function covTotsHTML(c){
+ var t=gapTotals(c);
+ function box(l,v,u){return '<div class="cwtot"><div class="l">'+l+'</div><div class="v">'+fmt(v)+' <span>'+u+'</span></div></div>';}
+ return '<div class="cwtots">'+box('一次性給付缺口',t.lump,'元')+box('日額缺口',t.daily,'元/日')+box('月額缺口',t.monthly,'元/月')+'</div>'+
+  '<div class="cwnotadd">⚠️ 三種給付單位<b>刻意不相加</b>：一次性給付（元）、日額（元/日）、月額（元/月）各自成堆。把 30,000 元/月 加進一千多萬裡的那個數字沒有意義。</div>';
+}
 function coverageHubParts(c){
  c.policies=c.policies||[];c.needs=c.needs||[];c.coverages=c.coverages||[];
  var mtx=coverageMatrix(c),ck=coverageCheckup(c),pc=propertyChecklist(c);
@@ -11472,6 +11980,9 @@ function coverageHubSec(c){
  // 版面順序＝結論在前、原料在後：先給保單檢查報告（一張主圖＋3 個數字＋三張比對表），
  // 地圖／產險／生命資產表／保費與領回報表全部收合，最後才是逐張保單與需求的輸入表。
  return '<div class="ppband">保障中心 <span class="hint">保單檢查報告 · 逐張保單 · 需求反推</span></div>'+
+  // ⚠️ 賓士圖擺最上面＝諮詢的切口在前、完整結構在後。它只是既有需求卡與缺口的
+  //    另一個入口與另一種畫法，下面九個區塊的位置與功能一律不動。
+  coverageWheelHTML(c)+
   policyCheckupSec(c)+
   '<div data-calc="coverageDerived">'+parts.derived+'</div>'+
   // ⚠️ 產險比對放在 coverageDerived 容器**外面**：它自己帶輸入框（需求參數／保額覆寫），

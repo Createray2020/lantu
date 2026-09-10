@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>保障中心 · 嵐途雙環風險需求圖 原型</title>
+<style>
+:root{
+ --bg:#081a2b;--panel:#0d2b45;--card:#12334f;--card2:#17406a;
+ --field:#0a1a2b;--line:#1c3a58;--line2:#2a4d73;
+ --tx:#eef2f7;--mut:#a9bccf;--mut2:#8296ab;
+ --amber:#c99a5b;--amber2:#e0bd8b;--onbrand:#08202a;
+ --teal:#8fbfc8;--blue:#8fb8ff;
+ --ok:#8fc0a3;--warn:#e08a68;--gap2:#ef6f6f;
+ --serif:"Noto Serif TC","Songti TC","PingFang TC",serif;
+ /* 賓士圖三環色（取自 Ray 給的原圖，深色版微調提亮以達對比） */
+ --w-resp:#c8873f;--w-resp2:#a86f30;
+ --w-crit:#4f7cae;--w-crit2:#3d648e;
+ --w-med:#9aa6b1;--w-med2:#7d8993;
+}
+:root[data-theme="light"]{
+ --bg:#f4f6f8;--panel:#ffffff;--card:#eaeef3;--card2:#dfe6ee;
+ --field:#fbfcfd;--line:#e3e8ee;--line2:#c9d2dc;
+ --tx:#14212e;--mut:#4a5c6e;--mut2:#75838f;
+ --amber:#9a6f22;--amber2:#c08f3c;--onbrand:#ffffff;
+ --teal:#2a6f7a;--blue:#2c6fb5;
+ --ok:#2f7d57;--warn:#a8681a;--gap2:#c2453e;
+ --w-resp:#c1873f;--w-resp2:#9c6a2c;
+ --w-crit:#4a72a0;--w-crit2:#385a80;
+ --w-med:#b0b7bd;--w-med2:#8d949a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);
+ font:14px/1.7 "PingFang TC","Noto Sans TC",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+ padding:0 0 60px}
+.wrap{max-width:1240px;margin:0 auto;padding:18px 16px 0}
+
+/* 原型外框說明條（正式版不會有） */
+.protobar{background:var(--card2);border:1px dashed var(--amber);border-radius:10px;
+ padding:9px 14px;font-size:12.5px;color:var(--mut);display:flex;gap:12px;
+ align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.protobar b{color:var(--amber2)}
+.protobar button{margin-left:auto;background:var(--field);border:1px solid var(--line2);
+ color:var(--mut);border-radius:7px;padding:5px 12px;cursor:pointer;font:inherit;font-size:12px}
+
+/* 區塊帶（沿用系統 .ppband） */
+.ppband{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--amber2);
+ border-left:4px solid var(--amber);padding:2px 0 2px 11px;margin:0 0 4px}
+.ppband .hint{font-family:inherit;font-size:11.5px;font-weight:400;color:var(--mut2);
+ margin-left:9px;letter-spacing:0}
+
+.dmod{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+ padding:16px 18px 18px;margin-top:10px}
+
+/* 被保人切換 */
+.memrow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:2px 0 12px}
+.memrow .lb{font-size:11px;color:var(--mut2);letter-spacing:.08em;margin-right:2px}
+.memchip{background:var(--field);border:1px solid var(--line2);color:var(--mut);
+ border-radius:999px;padding:5px 15px;font:inherit;font-size:12.5px;cursor:pointer}
+.memchip.on{background:var(--amber);border-color:var(--amber);color:var(--onbrand);font-weight:700}
+.memchip.add{border-style:dashed;color:var(--mut2)}
+
+/* 主版面：圖 + 旁邊的註記框 */
+.hub{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:20px;align-items:start}
+@media(max-width:940px){.hub{grid-template-columns:1fr}}
+
+.wheelbox{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:10px 10px 4px}
+.wheelbox svg{width:100%;height:auto;display:block;max-width:620px;margin:0 auto}
+.seg{cursor:pointer;transition:filter .12s}
+.seg:hover{filter:brightness(1.18)}
+.seg.dim{filter:saturate(.5) brightness(.8)}
+.seg.sel{filter:brightness(1.18);stroke:var(--tx);stroke-width:2.5px}
+:root[data-theme="light"] .seg.dim{filter:saturate(.3) brightness(1.14)}
+:root[data-theme="light"] .seg.sel{filter:none;stroke:var(--tx);stroke-width:2.5px}
+.seglab{pointer-events:none;font-size:12.5px;font-weight:700;fill:#fff;letter-spacing:.02em}
+:root[data-theme="light"] .seglab{fill:#fff}
+.ringlab{pointer-events:none;font-family:var(--serif);font-weight:700;fill:#fff}
+.wtitle{font-family:var(--serif);font-size:17px;font-weight:700;fill:var(--amber2)}
+
+/* 三個總額（單位不相加） */
+.tots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 2px 4px}
+.tot{background:var(--field);border:1px solid var(--line);border-radius:9px;padding:7px 10px}
+.tot .l{font-size:10.5px;color:var(--mut2)}
+.tot .v{font-family:var(--serif);font-size:16px;font-weight:800;color:var(--amber2);line-height:1.35}
+.notadd{font-size:11px;color:var(--mut2);padding:2px 4px 8px;line-height:1.6}
+
+/* 圖例 */
+.wlegend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut2);
+ padding:6px 4px 8px;align-items:center}
+.wlegend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
+
+/* ── 註記框（在圖的旁邊，不蓋在上面）── */
+.notepad{background:var(--panel);border:1px solid var(--line2);border-radius:13px;
+ position:sticky;top:14px;overflow:hidden}
+.npempty{padding:34px 22px;text-align:center;color:var(--mut2);font-size:13px;line-height:1.85}
+.npempty .big{font-size:30px;margin-bottom:8px}
+.npempty b{color:var(--mut);font-weight:700}
+
+.nphd{padding:13px 16px 12px;border-bottom:1px solid var(--line);position:relative}
+.nphd .ring{font-size:11px;letter-spacing:.1em;font-weight:700;display:inline-block;
+ padding:2px 9px;border-radius:5px;margin-bottom:6px}
+.nphd h4{font-family:var(--serif);font-size:19px;margin:0;color:var(--tx);font-weight:700}
+.nphd .sub{font-size:11.5px;color:var(--mut2);margin-top:3px}
+.npx{position:absolute;top:11px;right:11px;background:none;border:none;color:var(--mut2);
+ font-size:17px;cursor:pointer;line-height:1;padding:3px 6px}
+.npx:hover{color:var(--tx)}
+
+.npnums{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+.npnum{padding:10px 8px;text-align:center;border-right:1px solid var(--line)}
+.npnum:last-child{border-right:none}
+.npnum .l{font-size:10.5px;color:var(--mut2);letter-spacing:.06em}
+.npnum .v{font-family:var(--serif);font-size:17px;font-weight:800;line-height:1.3}
+.npnum .u{font-size:10px;color:var(--mut2)}
+.v-need{color:var(--amber2)}.v-have{color:var(--teal)}
+.v-gap{color:var(--gap2)}.v-ok{color:var(--ok)}.v-high{color:var(--warn)}
+
+.npbody{padding:12px 16px 16px;max-height:min(560px,58vh);overflow:auto}
+.npsec{font-size:10.5px;letter-spacing:.11em;color:var(--mut2);font-weight:700;
+ margin:2px 0 8px}
+.npsec.mt{margin-top:16px}
+
+.fld{margin-bottom:11px}
+.fld label{display:block;font-size:11.5px;color:var(--mut);margin-bottom:4px}
+.fld input,.fld select{width:100%;background:var(--field);border:1px solid var(--line2);
+ color:var(--tx);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
+.fld input:focus,.fld select:focus{outline:none;border-color:var(--amber);
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--amber) 22%,transparent)}
+.fld .u{font-size:10.5px;color:var(--mut2);margin-left:5px}
+
+/* 自動帶入（唯讀）*/
+.autofld{background:var(--field);border:1px solid var(--line);border-left:3px solid var(--teal);
+ border-radius:0 9px 9px 0;padding:9px 12px;margin-bottom:9px}
+.autofld .t{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.autofld .n{font-size:12.5px;color:var(--mut)}
+.autofld .a{font-family:var(--serif);font-size:16px;font-weight:800;color:var(--tx);
+ font-variant-numeric:tabular-nums}
+.autofld .src{font-size:11px;color:var(--mut2);line-height:1.6;margin-top:3px}
+.autofld .go{background:none;border:none;color:var(--teal);font:inherit;font-size:11.5px;
+ cursor:pointer;padding:2px 0;margin-top:2px}
+.autofld .go:hover{color:var(--amber2)}
+.autofld.off{border-left-color:var(--mut2);opacity:.72}
+
+.ck{display:flex;align-items:flex-start;gap:8px;font-size:11.5px;color:var(--mut2);
+ padding:6px 0;line-height:1.55;cursor:pointer}
+.ck input{margin-top:3px;accent-color:var(--amber);flex:none}
+
+details.adv{border-top:1px dashed var(--line2);margin-top:14px;padding-top:10px}
+details.adv>summary{cursor:pointer;font-size:12px;color:var(--amber2);font-weight:700;
+ list-style:none;display:flex;align-items:center;gap:6px}
+details.adv>summary::-webkit-details-marker{display:none}
+details.adv>summary::before{content:"▸";font-size:10px;transition:transform .15s}
+details.adv[open]>summary::before{transform:rotate(90deg)}
+details.adv .why{font-size:11px;color:var(--mut2);line-height:1.7;margin:7px 0 10px}
+details.adv .body{margin-top:10px}
+
+.nphint{font-size:11.5px;color:var(--mut2);line-height:1.75;background:var(--field);
+ border-radius:8px;padding:9px 11px;margin:10px 0 0}
+.nphint b{color:var(--amber2)}
+.nphint.warnbox{border-left:3px solid var(--warn);border-radius:0 8px 8px 0}
+
+.npfoot{border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap}
+.npfoot button{background:var(--field);border:1px solid var(--line2);color:var(--mut);
+ border-radius:8px;padding:7px 13px;font:inherit;font-size:12px;cursor:pointer}
+.npfoot button:hover{border-color:var(--amber);color:var(--amber2)}
+
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+.pill.gap{background:color-mix(in srgb,var(--gap2) 18%,transparent);color:var(--gap2)}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.high{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.none{background:color-mix(in srgb,var(--mut2) 18%,transparent);color:var(--mut2)}
+
+/* 下方既有區塊的示意（原封不動保留） */
+.keeps{margin-top:18px;background:var(--card);border:1px solid var(--line);
+ border-radius:12px;padding:13px 16px}
+.keeps h5{margin:0 0 8px;font-size:12.5px;color:var(--amber2)}
+.keeps ol{margin:0;padding-left:20px;font-size:12.5px;color:var(--mut);line-height:2}
+.keeps .tag{font-size:10.5px;color:var(--mut2);margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="protobar">
+ <span><b>原型 · 不是正式系統</b>　資料＝示範案「王大明」的真實計算結果（壽險毛需求 17,724,396／已備 14,480,000）。欄位可以改，圖與數字會即時跟著動。</span>
+ <button onclick="toggleTheme()">切換淺色／深色</button>
+</div>
+
+<div class="ppband">保障中心 <span class="hint">保單檢查報告 · 逐張保單 · 需求反推</span></div>
+
+<div class="dmod">
+ <div class="memrow">
+  <span class="lb">被保人</span>
+  <button class="memchip on">王大明</button>
+  <button class="memchip">林小美</button>
+  <button class="memchip add">＋ 新增被保人需求</button>
+ </div>
+
+ <div class="hub">
+  <div>
+   <div class="wheelbox">
+    <div id="wheel"></div>
+    <div class="wlegend">
+     <span><i style="background:var(--gap2)"></i>有缺口</span>
+     <span><i style="background:var(--ok)"></i>已足額</span>
+     <span><i style="background:var(--warn)"></i>已備超過需求</span>
+     <span><i style="background:var(--mut2);opacity:.5"></i>尚未填（灰底）</span>
+     <span style="margin-left:auto">點任一格 → 右側開紀錄框</span>
+    </div>
+   </div>
+   <div class="tots" id="tots"></div>
+   <div class="notadd">⚠️ 三種給付單位<b>刻意不相加</b>：一次性給付（元）、日額（元/日）、月額（元/月）各自成堆。把 30,000 元/月 加進 1,700 萬裡的那個數字沒有意義。</div>
+  </div>
+
+  <div class="notepad" id="pad"></div>
+ </div>
+
+ <div class="keeps">
+  <h5>圖以下的既有區塊：位置與功能完全不動</h5>
+  <ol>
+   <li>保單檢查報告（主圖＋3 KPI＋①保費 ②保障 ③$領回 五欄比對表）<span class="tag">policyCheckupSec</span></li>
+   <li>全家保障地圖 · 產險涵蓋 · 五面向診斷<span class="tag">收合</span></li>
+   <li>產險比對（住宅火險＋地震／第三人責任／車體／雇主·公共意外）<span class="tag">平行線，不進人身缺口</span></li>
+   <li>生命資產表 · 保費報表 · $領回報表 · 主約效益分析<span class="tag">收合</span></li>
+   <li>現有保單逐張登錄</li>
+   <li>保障需求完整卡（三大塊）· 已備保障手動補充<span class="tag">圓餅圖是它的入口，不是它的取代</span></li>
+  </ol>
+ </div>
+</div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   WHEEL_MODEL — 賓士圖的資料模型（正式版會原樣搬進 lantu-app.html）
+   ring  : 內環三大類
+   cells : 外環格子。每格帶
+     key      識別碼
+     label    圖上文字
+     kind     對應的已備險種（KINDS）；null＝這格是別的險種的組成
+     part     這格是哪個險種的組成（component），缺口在那一層看
+     unit     給付單位
+     auto     自動帶入（唯讀＋來源說明），非教練手填
+     fields   主欄位（紀錄框上半）
+     adv      進階欄位（紀錄框下半的摺疊區）＝「後端有、賓士圖沒有」的收容處
+════════════════════════════════════════════════════════════════ */
+const MODEL=[
+{ring:'責任',label:'責任',color:'--w-resp',dark:'--w-resp2',kind:'壽險',unit:'元',
+ note:'走了，誰接手。這一環的五格是壽險需求的<b>組成</b>，缺口在「責任」這一層一起看。',
+ cells:[
+  {key:'living',label:'生活費',auto:true,unit:'元',part:'壽險',
+   src:'家計負擔 <b>100%</b> × 家庭年生活費 <b>720,000</b> × 保障 <b>{py}</b> 年',
+   go:'收支資債 · 支出表',
+   calc:s=>Math.round(s.depRatio/100*720000*s.protectYears)},
+  {key:'loan',label:'貸款',auto:true,unit:'元',part:'壽險',toggle:'payDebt',
+   toggleLabel:'身故要清償家庭負債',
+   toggleHint:'預設依角色：本人／配偶列入，子女／父母不列入',
+   src:'負債表餘額合計 <b>10,000,000</b>',go:'收支資債 · 負債表',
+   calc:s=>s.payDebt?10000000:0},
+  {key:'edu',label:'教育費',auto:true,unit:'元',part:'壽險',toggle:'fundEdu',
+   toggleLabel:'身故要備妥子女教育金',toggleHint:'預設依角色，同上',
+   src:'子女教育分頁（終值）<b>2,324,396</b>',go:'子女教育',
+   calc:s=>s.fundEdu?2324396:0},
+  {key:'parent',label:'父母孝養',auto:true,unit:'元',part:'壽險',toggle:'supportParents',
+   toggleLabel:'身故要接續父母奉養',toggleHint:'預設依角色，同上',
+   src:'支出表「孝親」年額 <b>240,000</b> × 保障 <b>{py}</b> 年',go:'收支資債 · 支出表',
+   calc:s=>s.supportParents?240000*s.protectYears:0},
+  {key:'funeral',label:'生命禮儀費',unit:'元',part:'壽險',
+   fields:[{f:'funeral',label:'生命禮儀費（喪葬費）',unit:'元'}]}
+ ],
+ adv:[{f:'estateTax',label:'預留遺產稅',unit:'元'},
+      {f:'protectYears',label:'保障年數（生活費要撐幾年）',unit:'年'},
+      {f:'depRatio',label:'家計負擔覆寫 %（留空＝用成員卡的值）',unit:'%'}],
+ advWhy:'保單健診後端有、賓士圖上沒有的責任欄位。<b>遺產稅預留</b>是獨立項目；<b>保障年數</b>與<b>家計負擔%</b>是上面五格共用的參數——改了，生活費與父母孝養兩格會當場跟著動。'
+},
+{ring:'重病重殘',label:'重病<tspan x="0" dy="1.05em">重殘</tspan>',plain:'重病重殘',
+ color:'--w-crit',dark:'--w-crit2',unit:'元',
+ note:'活著，但賺不了錢。這一環三格各自是獨立險種，缺口一格一格看。',
+ cells:[
+  /* 2026/09/10 Ray：長期照護金 ↔ 重大疾病 對調。 */
+  {key:'care',label:'長期照護金',unit:'元/月',kind:'每月照護',
+   fields:[{f:'monthCare',label:'每月照護金',unit:'元/月',kind:'每月照護'}],
+   adv:[{f:'careMonths',label:'照護月數',unit:'月'}],
+   advWhy:'<b>照護月數</b>不是給付項目、是換算參數：月缺口 × 月數＝長照總需求，只當<b>佐證數字</b>，刻意不併進一次性給付那一堆。'},
+  {key:'disability',label:'意外傷殘',unit:'元',kind:'意外傷殘',
+   fields:[{f:'disability',label:'意外傷殘保障',unit:'元',kind:'意外傷殘'}]},
+  {key:'critical',label:'重大疾病',label2:'（含癌症）',unit:'元',multi:true,
+   fields:[{f:'critical',label:'重大疾病一次金',unit:'元',kind:'重病給付'},
+           {f:'firstCancer',label:'初次罹癌一次金',unit:'元',kind:'初次罹癌'}],
+   adv:[{f:'cancerHosp',label:'癌症住院日額（選填）',unit:'元/日',kind:'癌症住院'}],
+   advWhy:'<b>癌症住院日額</b>在需求分析裡多半被一般住院日額取代，所以不上圖；欄位保留是為了既有保單的資料不遺失。'}
+ ]
+},
+{ring:'醫療',label:'醫療',color:'--w-med',dark:'--w-med2',unit:'元/日',
+ note:'住院期間，每天在燒的錢。病房費＋自付差額＋看護費三項<b>合成</b>「住院醫療日額」一條缺口；薪資補償與雜費各自獨立。',
+ cells:[
+  {key:'room',label:'病房費',unit:'元/日',part:'住院醫療',
+   fields:[{f:'room',label:'病房費（日額）',unit:'元/日'}],
+   adv:[{f:'selfPay',label:'自付差額（日額）',unit:'元/日'}],
+   advWhy:'<b>自付差額</b>在引擎裡與病房費、看護費併成同一條「住院醫療日額需求」，所以掛在這一格底下，不另開一格。'},
+  {key:'nursing',label:'看護費',unit:'元/日',part:'住院醫療',
+   fields:[{f:'nursing',label:'看護費（日額）',unit:'元/日'}]},
+  {key:'income',label:'薪資補償',unit:'元/月',multi:true,
+   fields:[{f:'incomeCompMonth',label:'薪資補償（月額）',unit:'元/月',kind:'薪資補償（月）'},
+           {f:'incomeCompDay',label:'薪資補償（日額）',unit:'元/日',kind:'薪資補償（日）'}]},
+  {key:'misc',label:'醫療雜費',unit:'元',kind:'醫療雜費',
+   fields:[{f:'miscDaily',label:'住院雜費（每次住院）',unit:'元',kind:'醫療雜費'}]}
+ ]
+}];
+
+/* 示範案「王大明」的需求值（真實 sampleCase） */
+let S={protectYears:5,depRatio:100,payDebt:true,fundEdu:true,supportParents:true,
+ funeral:600000,estateTax:0,
+ critical:2000000,firstCancer:300000,cancerHosp:2000,disability:3000000,
+ monthCare:30000,careMonths:120,
+ room:2000,selfPay:1500,nursing:1500,
+ incomeCompMonth:50000,incomeCompDay:0,miscDaily:3000};
+
+/* 已備（保單表逐張加總 ＋ 可動用流動資產） */
+const HAVE={'壽險':3000000+11480000,'意外傷殘':1000000,'住院醫療':2000,'醫療雜費':100000,
+ '薪資補償（日）':0,'薪資補償（月）':0,'初次罹癌':0,'癌症住院':0,'重病給付':2000000,'每月照護':0};
+const HAVE_SRC={'壽險':'定期壽險 3,000,000 ＋ 可動用流動資產 11,480,000',
+ '意外傷殘':'定期壽險（意外）1,000,000','住院醫療':'國泰終身醫療 2,000 元/日',
+ '醫療雜費':'國泰終身醫療 100,000','重病給付':'重大傷病定期 2,000,000',
+ '初次罹癌':'—','癌症住院':'—','薪資補償（日）':'—','薪資補償（月）':'—','每月照護':'—'};
+
+const fmt=v=>Math.round(v||0).toLocaleString('en-US');
+const cellNeed=(cl,ring)=>{
+ if(cl.auto)return cl.calc(S);
+ return (cl.fields||[]).reduce((a,f)=>a+(+S[f.f]||0),0)+
+        ((cl.key==='room')?0:0);
+};
+/* 險種層級的需求（＝缺口的分子），與 coverageGaps() 同一條語意 */
+function kindNeed(kind){
+ switch(kind){
+  case '壽險':return MODEL[0].cells.reduce((a,c)=>a+(c.auto?c.calc(S):(+S.funeral||0)),0)+(+S.estateTax||0);
+  case '住院醫療':return (+S.room||0)+(+S.selfPay||0)+(+S.nursing||0);
+  case '重病給付':return +S.critical||0;
+  case '初次罹癌':return +S.firstCancer||0;
+  case '癌症住院':return +S.cancerHosp||0;
+  case '意外傷殘':return +S.disability||0;
+  case '每月照護':return +S.monthCare||0;
+  case '醫療雜費':return +S.miscDaily||0;
+  case '薪資補償（月）':return +S.incomeCompMonth||0;
+  case '薪資補償（日）':return +S.incomeCompDay||0;
+ }
+ return 0;
+}
+/* 一格的狀態：這格自己有沒有數字 + 它所屬險種的缺口 */
+function cellState(ring,cl){
+ const need=cl.auto?cl.calc(S):(cl.fields||[]).reduce((a,f)=>a+(+S[f.f]||0),0);
+ const kinds=cl.kind?[cl.kind]:(cl.fields||[]).filter(f=>f.kind).map(f=>f.kind);
+ const k=cl.part||null;
+ let gap=0,any=false;
+ if(kinds.length){kinds.forEach(kk=>{const g=kindNeed(kk)-(HAVE[kk]||0);gap+=g;any=true});}
+ else if(k){const g=kindNeed(k)-(HAVE[k]||0);gap=g;any=true;}
+ if(need<=0&&!(cl.auto&&need>0))return{s:'none',need,gap};
+ if(!any)return{s:'none',need,gap};
+ return{s:gap>0?'gap':(gap<0?'high':'ok'),need,gap};
+}
+const STCOL={gap:'var(--gap2)',ok:'var(--ok)',high:'var(--warn)',none:'var(--mut2)'};
+const STTXT={gap:'有缺口',ok:'已足額',high:'已備超過需求',none:'尚未填'};
+
+/* ── SVG 幾何 ── */
+const CX=300,CY=300,R0=86,R1=158,R2=170,R3=262,GAP=1.6;
+const pol=(r,a)=>{const t=(a-90)*Math.PI/180;return[CX+r*Math.cos(t),CY+r*Math.sin(t)]};
+function arc(r0,r1,a0,a1){
+ const [x0,y0]=pol(r1,a0),[x1,y1]=pol(r1,a1),[x2,y2]=pol(r0,a1),[x3,y3]=pol(r0,a0);
+ const lg=(a1-a0)>180?1:0;
+ return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r1} ${r1} 0 ${lg} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`
+  +`L${x2.toFixed(2)} ${y2.toFixed(2)}A${r0} ${r0} 0 ${lg} 0 ${x3.toFixed(2)} ${y3.toFixed(2)}Z`;
+}
+let SEL=null;
+
+function drawWheel(){
+ let o=['<svg viewBox="0 0 600 620" role="img" aria-label="嵐途雙環風險需求圖">'];
+ o.push(`<text x="300" y="26" text-anchor="middle" class="wtitle">嵐途雙環風險需求圖</text>`);
+ let a=0;
+ MODEL.forEach(ring=>{
+  const span=120,cn=ring.cells.length,each=span/cn;
+  const selRing=SEL&&SEL.ring===ring.ring;
+  /* 內環 */
+  const dimIn=SEL&&!selRing?' dim':'';
+  o.push(`<path class="seg${dimIn}${SEL&&SEL.cell===null&&selRing?' sel':''}" d="${arc(R0,R1,a+GAP/2,a+span-GAP/2)}" fill="var(${ring.color})" onclick="pick('${ring.ring}',null)"><title>${ring.plain||ring.label}</title></path>`);
+  const mid=a+span/2,[lx,ly]=pol((R0+R1)/2,mid);
+  const two=/tspan/.test(ring.label);
+  o.push(`<text class="ringlab" x="${lx.toFixed(1)}" y="${(ly+(two?-6:8)).toFixed(1)}" text-anchor="middle" font-size="${two?25:23}" transform="translate(0,0)">`
+   +(two?`<tspan x="${lx.toFixed(1)}">重病</tspan><tspan x="${lx.toFixed(1)}" dy="1.02em">重殘</tspan>`:ring.label)+`</text>`);
+  /* 外環 */
+  ring.cells.forEach((cl,i)=>{
+   const a0=a+i*each,a1=a0+each,m=(a0+a1)/2;
+   const st=cellState(ring,cl);
+   const sel=SEL&&SEL.cell===cl.key;
+   const dim=(SEL&&!sel)?' dim':'';
+   const fill=st.s==='none'?`var(${ring.dark})`:`var(${ring.color})`;
+   const op=st.s==='none'?'opacity="0.55"':'';
+   o.push(`<path class="seg${dim}${sel?' sel':''}" d="${arc(R2,R3,a0+GAP/2,a1-GAP/2)}" fill="${fill}" ${op} onclick="pick('${ring.ring}','${cl.key}')"><title>${cl.label}${cl.label2||''} · ${STTXT[st.s]}</title></path>`);
+   /* 標籤：一律水平。原圖只有責任那一環是旋轉的，但旋轉後長標籤在左半圈很難讀，
+      而這裡的格子是要被點的操作元件，可讀性優先。 */
+   const [tx,ty]=pol((R2+R3)/2,m);
+   const t2=cl.label2;
+   o.push(`<text class="seglab" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" ${st.s==='none'?'opacity="0.75"':''}>`
+    +`<tspan x="${tx.toFixed(1)}" dy="${t2?'-0.25em':'0.36em'}">${cl.label}</tspan>`
+    +(t2?`<tspan x="${tx.toFixed(1)}" dy="1.2em" font-size="11">${t2}</tspan>`:'')+`</text>`);
+   /* 狀態點：貼在外緣 */
+   const [dx,dy]=pol(R3-9,m);
+   o.push(`<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4" fill="${st.s==='none'?'none':STCOL[st.s]}" stroke="${STCOL[st.s]}" stroke-width="1.4" pointer-events="none"/>`);
+  });
+  a+=span;
+ });
+ /* 中心 */
+ o.push(`<circle cx="${CX}" cy="${CY}" r="${R0-9}" fill="var(--card)" stroke="var(--line)"/>`);
+ const tl=gapTotals();
+ o.push(`<text x="${CX}" y="${CY-16}" text-anchor="middle" font-size="10.5" fill="var(--mut2)">一次性給付缺口</text>`);
+ o.push(`<text x="${CX}" y="${CY+8}" text-anchor="middle" font-size="21" font-weight="800" fill="var(--gap2)" font-family="var(--serif)">${fmt(tl.lump)}</text>`);
+ o.push(`<text x="${CX}" y="${CY+26}" text-anchor="middle" font-size="10.5" fill="var(--mut2)">元</text>`);
+ o.push(`<text x="${CX}" y="${CY+46}" text-anchor="middle" font-size="10.5" fill="var(--mut)">日 ${fmt(tl.daily)}　月 ${fmt(tl.monthly)}</text>`);
+ o.push('</svg>');
+ document.getElementById('wheel').innerHTML=o.join('');
+}
+
+const UNIT_OF={'壽險':'元','意外傷殘':'元','住院醫療':'元/日','醫療雜費':'元',
+ '薪資補償（日）':'元/日','薪資補償（月）':'元/月','初次罹癌':'元','癌症住院':'元/日',
+ '重病給付':'元','每月照護':'元/月'};
+function gapTotals(){
+ const t={lump:0,daily:0,monthly:0};
+ Object.keys(UNIT_OF).forEach(k=>{
+  const g=Math.max(0,kindNeed(k)-(HAVE[k]||0));if(g<=0)return;
+  const u=UNIT_OF[k];
+  if(u==='元/日')t.daily+=g;else if(u==='元/月')t.monthly+=g;else t.lump+=g;
+ });
+ return t;
+}
+function drawTots(){
+ const t=gapTotals();
+ document.getElementById('tots').innerHTML=
+  `<div class="tot"><div class="l">一次性給付缺口</div><div class="v">${fmt(t.lump)} <span style="font-size:11px;color:var(--mut2)">元</span></div></div>`+
+  `<div class="tot"><div class="l">日額缺口</div><div class="v">${fmt(t.daily)} <span style="font-size:11px;color:var(--mut2)">元/日</span></div></div>`+
+  `<div class="tot"><div class="l">月額缺口</div><div class="v">${fmt(t.monthly)} <span style="font-size:11px;color:var(--mut2)">元/月</span></div></div>`;
+}
+
+/* ── 註記框 ── */
+function pick(ringName,cellKey){
+ if(SEL&&SEL.ring===ringName&&SEL.cell===cellKey){SEL=null}
+ else SEL={ring:ringName,cell:cellKey};
+ draw();
+}
+function closePad(){SEL=null;draw()}
+
+function numFld(f){
+ const v=S[f.f];
+ return `<div class="fld"><label>${f.label}<span class="u">${f.unit||''}</span></label>`+
+  `<input type="text" inputmode="numeric" value="${v===''||v==null?'':fmt(v)}" `+
+  `onfocus="this.value=(${v}||0)===0?'':String(${v})" `+
+  `oninput="setF('${f.f}',this.value)" onblur="draw()"></div>`;
+}
+function setF(k,v){S[k]=(String(v).replace(/[^0-9.\-]/g,'')==='')?0:+String(v).replace(/[^0-9.\-]/g,'');
+ drawWheel();drawTots();refreshNums();}
+
+function padHTML(){
+ if(!SEL)return `<div class="npempty"><div class="big">◎</div>
+  <b>點圓餅圖上任何一格</b><br>右邊就會開這一格的紀錄框：<br>需求 · 已備 · 缺口，以及能直接改的欄位。<br>
+  <span style="display:block;margin-top:12px;font-size:11.5px">內環三格＝三個問句；外環十二格＝實務上真的要問的細項。</span></div>`;
+ const ring=MODEL.find(r=>r.ring===SEL.ring);
+ const RC={'責任':'--w-resp','重病重殘':'--w-crit','醫療':'--w-med'}[ring.ring];
+ const tagStyle=`background:color-mix(in srgb,var(${RC}) 26%,transparent);color:var(${RC.replace('--w-','--w-')})`;
+
+ /* ① 內環：整環總覽 */
+ if(!SEL.cell){
+  const kind=ring.kind;
+  const rows=ring.cells.map(cl=>{
+   const nv=cl.auto?cl.calc(S):(cl.fields||[]).reduce((a,f)=>a+(+S[f.f]||0),0);
+   return `<div class="autofld" style="border-left-color:var(${RC})"><div class="t"><span class="n">${cl.label}${cl.label2||''}</span><span class="a">${fmt(nv)} <span style="font-size:10.5px;color:var(--mut2)">${cl.unit}</span></span></div></div>`;
+  }).join('');
+  let nums='';
+  if(kind){
+   const need=kindNeed(kind),have=HAVE[kind]||0,gap=need-have;
+   nums=numsHTML(need,have,gap,UNIT_OF[kind],HAVE_SRC[kind]);
+  }
+  return `<div class="nphd"><button class="npx" onclick="closePad()">✕</button>
+   <span class="ring" style="${tagStyle}">內環 · 三大類</span>
+   <h4>${ring.plain||ring.label}</h4>
+   <div class="sub">${ring.note}</div></div>${nums}
+   <div class="npbody"><div class="npsec">這一環的 ${ring.cells.length} 個組成</div>${rows}
+   ${kind?`<div class="nphint">這一環的五格<b>合成一條「${kind}」缺口</b>——所以格子點進去只有需求金額，缺口在這一層看。這是既有引擎的語意，圖只是把它畫出來。</div>`:''}
+   ${ring.adv?advHTML(ring.adv,ring.advWhy):''}</div>
+   <div class="npfoot"><button>到下方完整需求卡</button><button onclick="closePad()">關閉</button></div>`;
+ }
+
+ /* ② 外環：單一格子 */
+ const cl=ring.cells.find(c=>c.key===SEL.cell);
+ const st=cellState(ring,cl);
+ let nums='',hint='';
+ if(cl.auto||cl.part){
+  const k=cl.part;const need=kindNeed(k),have=HAVE[k]||0;
+  nums=numsHTML(need,have,need-have,UNIT_OF[k],HAVE_SRC[k],`「${k}」整條`);
+  hint=`<div class="nphint">這一格是<b>「${k}」的組成之一</b>，不是獨立險種——上面那三個數字是 ${k} 整條的。<br>本格金額：<b>${fmt(cl.auto?cl.calc(S):(cl.fields||[]).reduce((a,f)=>a+(+S[f.f]||0),0))} ${cl.unit}</b></div>`;
+ }else if(cl.multi){
+  const rows=(cl.fields||[]).concat(cl.adv||[]).filter(f=>f.kind).map(f=>{
+   const need=kindNeed(f.kind),have=HAVE[f.kind]||0,gap=need-have;
+   const s=need<=0?'none':(gap>0?'gap':(gap<0?'high':'ok'));
+   return `<div class="autofld" style="border-left-color:${STCOL[s]}"><div class="t"><span class="n">${f.kind}</span>
+    <span class="a">需求 ${fmt(need)} ／ 已備 ${fmt(have)}</span></div>
+    <div class="src">缺口 <b style="color:${STCOL[s]}">${gap>0?fmt(gap):(gap<0?'已備多 '+fmt(-gap):'0')} ${UNIT_OF[f.kind]}</b>　·　已備來源：${HAVE_SRC[f.kind]}</div></div>`;
+  }).join('');
+  hint=`<div class="npsec mt">這一格涵蓋 ${(cl.fields||[]).filter(f=>f.kind).length+((cl.adv||[]).filter(f=>f.kind).length)} 條獨立缺口</div>${rows}`;
+ }else if(cl.kind){
+  const need=kindNeed(cl.kind),have=HAVE[cl.kind]||0;
+  nums=numsHTML(need,have,need-have,UNIT_OF[cl.kind],HAVE_SRC[cl.kind]);
+ }
+
+ let body='';
+ if(cl.auto){
+  const src=cl.src.replace('{py}',S.protectYears);
+  const on=cl.toggle?S[cl.toggle]:true;
+  body+=`<div class="npsec">自動帶入 · 不用手填</div>
+   <div class="autofld${on?'':' off'}"><div class="t"><span class="n">${cl.label}</span>
+   <span class="a">${fmt(cl.calc(S))} <span style="font-size:10.5px;color:var(--mut2)">元</span></span></div>
+   <div class="src">${on?src:'此項目未列入（下方開關關閉）'}</div>
+   <button class="go">→ 前往「${cl.go}」修改來源數字</button></div>`;
+  if(cl.toggle)body+=`<label class="ck"><input type="checkbox" ${on?'checked':''} onchange="S.${cl.toggle}=this.checked;draw()">
+   <span><b style="color:var(--mut)">${cl.toggleLabel}</b><br>${cl.toggleHint}</span></label>`;
+ }else{
+  body+=`<div class="npsec">這一格要填的</div>`+(cl.fields||[]).map(numFld).join('');
+ }
+ if(cl.adv)body+=advHTML(cl.adv,cl.advWhy);
+ if(cl.key==='care'){
+  const g=Math.max(0,kindNeed('每月照護')-HAVE['每月照護']);
+  body+=`<div class="nphint warnbox">長照總需求換算：每月 <b>${fmt(S.monthCare)}</b> 元/月 × <b>${S.careMonths}</b> 個月 ＝ <b>${fmt(S.monthCare*S.careMonths)}</b> 元；月缺口換算總額約 <b>${fmt(g*S.careMonths)}</b> 元。<br>這是<b>佐證數字</b>，缺口表仍以元/月呈現，不與一次性給付相加。</div>`;
+ }
+
+ return `<div class="nphd"><button class="npx" onclick="closePad()">✕</button>
+  <span class="ring" style="${tagStyle}">${ring.plain||ring.label}</span>
+  <h4>${cl.label}${cl.label2||''} <span class="pill ${st.s==='none'?'none':st.s}" style="vertical-align:3px;margin-left:4px">${STTXT[st.s]}</span></h4>
+  <div class="sub">${cl.part?'屬於「'+cl.part+'」的組成':(cl.kind?'險種：'+cl.kind:'涵蓋多條險種')}</div></div>
+  ${nums}<div class="npbody">${body}${hint}</div>
+  <div class="npfoot"><button>到下方完整需求卡</button><button>加進調整方案</button><button onclick="closePad()">關閉</button></div>`;
+}
+function numsHTML(need,have,gap,unit,src,lab){
+ const cls=gap>0?'v-gap':(gap<0?'v-high':'v-ok');
+ const gv=gap>0?fmt(gap):(gap<0?'－'+fmt(-gap):'0');
+ return `<div class="npnums" data-nums>
+  <div class="npnum"><div class="l">現在需求 NEED</div><div class="v v-need">${fmt(need)}</div><div class="u">${unit}${lab?' · '+lab:''}</div></div>
+  <div class="npnum"><div class="l">現在保單 HAVE</div><div class="v v-have">${fmt(have)}</div><div class="u">${unit}</div></div>
+  <div class="npnum"><div class="l">缺口</div><div class="v ${cls}">${gv}</div><div class="u">${unit}</div></div>
+ </div>${src&&src!=='—'?`<div style="font-size:11px;color:var(--mut2);padding:7px 16px;border-bottom:1px solid var(--line)">已備來源：${src}</div>`:''}`;
+}
+function advHTML(list,why){
+ return `<details class="adv"><summary>進階欄位（${list.length}）· 賓士圖上沒有的</summary>
+  <div class="why">${why||''}</div><div class="body">${list.map(numFld).join('')}</div></details>`;
+}
+/* 打字時只換數字、不重畫整個框（不然游標會掉） */
+function refreshNums(){
+ const pad=document.getElementById('pad');
+ const old=pad.querySelector('[data-nums]');if(!old)return;
+ const tmp=document.createElement('div');tmp.innerHTML=padHTML();
+ const neu=tmp.querySelector('[data-nums]');if(neu)old.innerHTML=neu.innerHTML;
+}
+function draw(){drawWheel();drawTots();document.getElementById('pad').innerHTML=padHTML()}
+function toggleTheme(){const r=document.documentElement;
+ r.dataset.theme=r.dataset.theme==='light'?'dark':'light';draw()}
+draw();
+</script>
+</body>
+</html>
