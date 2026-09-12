@@ -29,8 +29,8 @@ const fresh = () => {
   return w.app.cases[0];
 };
 const go = (tab: string) => { w.app.activeTab = "data"; w.app.dataTab = tab; w.render(); };
-// 2026/08/31：訪談檢核清單改成右下角常駐浮層，內容仍是同一支 interviewSec()。
-const openIv = () => { w.IVP.open(); return w.document.querySelector(".ivdbody") as Element; };
+
+const HTML = readFileSync(new URL("../../public/lantu-app.html", import.meta.url), "utf8");
 
 describe("分頁順序＝問卷順序", () => {
   it("②未來的需求 排在 ③現在的狀況 之前（先講夢想，最後才問錢）", () => {
@@ -99,6 +99,98 @@ describe("分頁順序＝問卷順序", () => {
     expect(w.app.dataTab).toBe("finance");
     expect(w.app.ivFacet).toBe("asset");
     expect(w.document.querySelector("#app .dgcur b")!.textContent).toBe("資產現況");
+  });
+});
+
+/**
+ * 聚焦模式（2026-09-12）。
+ *
+ * ⚠️ 折疊靠宿主上的 data-ivsec／既有錨點，不是 DOM 結構。宿主被刪掉不會噴任何錯，
+ *    只會讓那個面向「聚焦沒反應」——所以這一組把宿主的存在性整批釘住。
+ */
+describe("聚焦模式", () => {
+  /** 同一分頁有兩個以上面向的，折疊才有意義；單一面向的分頁聚焦是 no-op。 */
+  function multiFacetTabs() {
+    const cnt: Record<string, number> = {};
+    for (const st of w.INTERVIEW_STEPS) cnt[st.tab] = (cnt[st.tab] ?? 0) + 1;
+    return Object.keys(cnt).filter((t) => cnt[t] > 1);
+  }
+
+  it("多面向分頁的每一個面向，在它自己的分頁上都找得到宿主", () => {
+    fresh();
+    const tabs = new Set(multiFacetTabs());
+    const missing: string[] = [];
+    for (const st of w.INTERVIEW_STEPS) {
+      if (!tabs.has(st.tab)) continue;
+      go(st.tab);
+      const sel = w.ivSecSel(st);
+      if (!w.document.querySelector(`#app ${sel}`)) missing.push(`${st.k}(${sel})`);
+    }
+    expect(missing, `這些面向聚焦會沒反應：${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("預設關閉——不強迫改變現役教練「直接點分頁、整頁捲」的動線", () => {
+    fresh();
+    w.app.ivFocusOn = false;
+    go("finance");
+    expect(w.app.ivFocusOn).toBeFalsy();
+    expect(w.document.querySelectorAll("#app .ivfold").length).toBe(0);
+    expect(w.document.querySelector("#ivFocusSw")!.className).not.toContain("on");
+  });
+
+  /** ⚠️ ivFocusOn 是 app 層狀態，fresh() 不會重設——每條測試自己把它設明確，不要用 toggle 累積。 */
+  function focusOn(k: string) {
+    fresh();
+    w.ivGoto(k);
+    w.app.ivFocusOn = true;
+    w.render();
+  }
+
+  it("開了之後：目前這一段留著，同分頁其餘折起來", () => {
+    focusOn("asset");
+    expect(w.app.ivFocusOn).toBe(true);
+    const hit = w.document.querySelector('#app [data-ivsec="asset"]')!;
+    expect(hit.className).not.toContain("ivfold");
+    for (const k of ["income", "expense", "debt", "shortterm"]) {
+      const el = w.document.querySelector(`#app [data-ivsec="${k}"]`)!;
+      expect(el.className, `${k} 應該被折起來`).toContain("ivfold");
+      expect(el.getAttribute("data-ivname"), `${k} 少了折疊後要顯示的名稱`).toBeTruthy();
+    }
+  });
+
+  it("折起來的區塊可以點開，而且不會關掉聚焦模式", () => {
+    focusOn("asset");
+    const el = w.document.querySelector('#app [data-ivsec="income"]')!;
+    (el as HTMLElement).click();
+    expect(el.className).not.toContain("ivfold");
+    expect(w.app.ivFocusOn, "點開一塊不等於退出聚焦").toBe(true);
+  });
+
+  it("關掉聚焦立刻回到整頁", () => {
+    focusOn("asset");
+    expect(w.document.querySelectorAll("#app .ivfold").length).toBeGreaterThan(0);
+    w.toggleIvFocus();
+    expect(w.document.querySelectorAll("#app .ivfold").length).toBe(0);
+  });
+
+  it("⚠️ 不會折到包含目前區塊的外層（否則目標會跟著被藏掉）", () => {
+    focusOn("coverbudget");
+    const hit = w.document.querySelector('#app [data-ivsec="coverbudget"]')!;
+    expect(hit.className).not.toContain("ivfold");
+    const folded = [...w.document.querySelectorAll("#app .ivfold")];
+    expect(folded.length, "保障中心有兩個面向，應該折到一個").toBeGreaterThan(0);
+    expect(folded.every((el: Element) => !el.contains(hit)), "折到外層會把目標一起藏掉").toBe(true);
+  });
+
+  it("bg 與 basic 共用宿主（背景住在成員卡裡面，不是它的兄弟）", () => {
+    const bg = w.INTERVIEW_STEPS.find((s: { k: string }) => s.k === "bg");
+    expect(w.ivSecSel(bg)).toBe('[data-ivsec="basic"]');
+  });
+
+  it("折疊後那一行標題靠 CSS 的 attr(data-ivname) 產生，不在 DOM 上插節點", () => {
+    const css = HTML.slice(0, HTML.indexOf("</style>"));
+    expect(css).toContain('attr(data-ivname)');
+    expect(css, "折疊後的一行標題要靠 ::before 產生").toMatch(/\.ivfold::before[\s\S]{0,120}attr\(data-ivname\)/);
   });
 });
 
@@ -189,11 +281,30 @@ describe("子女的其他準備基金", () => {
 });
 
 describe("訪談檢核清單", () => {
-  // ⚠️ 2026-09-11 擴成 35 個面向。問卷骨幹（nw 未標記的那 20 題）順序仍然一個字都不能動，
-  //    理由見 layoutChartsUI.test.ts 同名護欄的註解。
-  it("問卷骨幹的人生目標段落順序不變（先講夢想，最後才問錢）", () => {
+  /**
+   * ⚠️⚠️ 2026-09-11：清單從 20 題擴成 35 個面向（補進手冊有、問卷沒有的那幾段）。
+   *
+   * 這條護欄原本寫死「20 題、一個字都不能動」，守的是**問卷順序這個 know-how**——
+   * 題目順序＝教練實際在問的順序，先講夢想、最後問錢。那件事仍然要守，
+   * 但「不准成長」不是守它的正確方式（有意識的擴充與無意識的漂移是兩回事）。
+   *
+   * 改成守真正該守的：**問卷原本那 20 題的相對順序一個字都不能動**。
+   * 新增的面向一律標 nw:1，濾掉之後必須逐字還原成下面這一串。
+   *
+   * ⚠️ 2026-09-12：這條原本住在 layoutChartsUI.test.ts 的「⑥ 訪談檢核浮層」裡，
+   *    浮層移除後整組搬過來——它守的是清單本身，不是版面。
+   */
+  it("⚠️ 問卷骨幹 20 題的順序一個字都沒動（新增面向不得插進它們之間打亂順序）", () => {
     const spine = w.INTERVIEW_STEPS.filter((s: { nw?: number }) => !s.nw);
     expect(spine.length).toBe(20);
+    expect(spine.map((s: { k: string }) => s.k).join(",")).toBe(
+      "purpose,basic,career,house,car,marry,child,parent,travel,hobby,luxury," +
+      "retire,legacy,income,expense,asset,debt,credit,cover,doc",
+    );
+  });
+
+  it("問卷骨幹的人生目標段落順序不變（先講夢想，最後才問錢）", () => {
+    const spine = w.INTERVIEW_STEPS.filter((s: { nw?: number }) => !s.nw);
     expect(spine.slice(2, 13).map((s: { name: string }) => s.name)).toEqual([
       "職涯規劃", "購屋規劃", "購車規劃", "婚姻規劃", "子女教養", "孝親規劃",
       "旅遊規劃", "休閒興趣", "奢侈品", "退休規劃", "傳承規劃",
@@ -306,33 +417,33 @@ describe("訪談檢核清單", () => {
     expect(bad, `這些段落的「前往」會跳到不存在的分頁：${bad.join(", ")}`).toEqual([]);
   });
 
-  it("清單畫得出來，而且每一段都有提示（提示才是不會漏問的關鍵）", () => {
-    fresh();
-    go("intent");
-    openIv();
-    // ⚠️ 守的是「每一個面向都有提示」，不是某個固定題數——提示才是不會漏問的關鍵。
-    const total = w.INTERVIEW_STEPS.length;
-    expect(w.document.querySelectorAll(".ivdbody .ivrow").length).toBe(total);
-    const hints = [...w.document.querySelectorAll(".ivdbody .ivhint")].map((e: Element) => e.textContent!.trim());
-    expect(hints.filter((t: string) => t.length > 4).length).toBe(total);
+  // ⚠️ 2026-09-12 浮層移除後，提示的家從 .ivhint 換成下拉上面向鈕的 title。
+  //    守的仍然是同一件事：**每一個面向都有提示**，不是某個固定題數。
+  it("每一段都有提示（提示才是不會漏問的關鍵）", () => {
+    const bad = w.INTERVIEW_STEPS
+      .filter((s: { hint?: string }) => !s.hint || s.hint.trim().length <= 4)
+      .map((s: { k: string }) => s.k);
+    expect(bad, `這些面向沒有提示，教練會漏問：${bad.join(", ")}`).toEqual([]);
   });
 
-  it("點清單裡的「前往」＝要去填資料，浮層自己讓開", () => {
+  it("提示跟著面向進下拉的 title——不必為了看題句再開一個容器", () => {
     fresh();
     go("intent");
-    openIv();
-    expect(w.IVP.isOpen()).toBe(true);
-    w.jumpTab("family");
-    expect(w.IVP.isOpen()).toBe(false);
-    expect(w.app.dataTab).toBe("family");
+    const items = [...w.document.querySelectorAll("#app .dmenu .ivt")];
+    expect(items.length).toBeGreaterThan(0);
+    const byK = new Map<string, string>(
+      w.INTERVIEW_STEPS.map((s: { k: string; hint?: string }) => [s.k, s.hint || ""] as [string, string]),
+    );
+    const bad = items
+      .filter((e: Element) => (e.getAttribute("title") || "").trim() !== (byK.get(e.getAttribute("data-ivk")!) || "").trim())
+      .map((e: Element) => e.getAttribute("data-ivk"));
+    expect(bad, `這些面向的 title 不是它的訪談題句：${bad.join(", ")}`).toEqual([]);
   });
 
   it("休閒與奢侈品的分類直接列在提示裡（不塞進下拉把層級打平）", () => {
-    fresh();
-    go("intent");
-    const html = openIv().innerHTML as string;
-    expect(html).toMatch(/體能／收藏／思考/);
-    expect(html).toMatch(/豪宅／珠寶/);
+    const hints = w.INTERVIEW_STEPS.map((s: { hint?: string }) => s.hint || "").join("\n");
+    expect(hints).toMatch(/體能／收藏／思考/);
+    expect(hints).toMatch(/豪宅／珠寶/);
   });
 });
 

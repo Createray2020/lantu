@@ -112,6 +112,22 @@ h1,h2,h3,h4{margin:0}
 .dgcnt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.7;padding:0 5px;border-radius:999px;background:var(--field);border:1px solid var(--line2);color:var(--mut2)}
 .dgcnt.full{background:color-mix(in srgb,var(--ok) 18%,transparent);border-color:transparent;color:var(--ok)}
 .ivline{display:flex;align-items:center;gap:2px}
+/* 聚焦模式（2026-09-12）：折起來的區塊只留一行標題，點一下展開。
+   ⚠️ 用 ::before + attr(data-ivname) 產生那一行，才不必在 DOM 上插節點。 */
+[data-ivsec].ivfold,[data-goalanchor].ivfold,[data-ivanchor].ivfold{
+ border:1px dashed var(--line2);border-radius:8px;background:var(--field);
+ padding:0;margin-bottom:8px;cursor:pointer;overflow:hidden}
+[data-ivsec].ivfold>*,[data-goalanchor].ivfold>*,[data-ivanchor].ivfold>*{display:none}
+[data-ivsec].ivfold::before,[data-goalanchor].ivfold::before,[data-ivanchor].ivfold::before{
+ content:"\203a " attr(data-ivname);display:block;padding:8px 12px;font-size:13px;color:var(--mut2)}
+[data-ivsec].ivfold:hover::before,[data-goalanchor].ivfold:hover::before,[data-ivanchor].ivfold:hover::before{color:var(--amber2)}
+[data-ivsec].ivfold:focus-visible,[data-goalanchor].ivfold:focus-visible,[data-ivanchor].ivfold:focus-visible{
+ outline:2px solid var(--amber2);outline-offset:2px}
+.ivfsw{font-family:inherit;font-size:12px;padding:3px 10px;border-radius:999px;cursor:pointer;
+ border:1px solid var(--line2);background:none;color:var(--mut2);margin-left:6px}
+.ivfsw:hover{border-color:var(--amber);color:var(--amber2)}
+.ivfsw.on{background:var(--amber);border-color:var(--amber);color:var(--onbrand);font-weight:700}
+.ivfsw:focus-visible{outline:2px solid var(--amber2);outline-offset:2px}
 .dmenu .ivline>.ivt{flex:1;min-width:0;display:flex;align-items:center;gap:8px;text-align:left}
 .ivtick{flex:none;width:26px;height:26px;border-radius:4px;border:1px solid transparent;background:none;
  color:var(--line2);font-size:12px;cursor:pointer;font-family:inherit;line-height:1}
@@ -821,13 +837,6 @@ details.antools .anbar,details.antools .sec{margin-bottom:8px}
 .blIdeal{font-size:12px;color:var(--mut2);line-height:1.35}
 .blNa{grid-column:2 / span 2;font-size:12px;color:var(--mut)}
 @media(max-width:720px){.blRow{grid-template-columns:1fr 1fr;gap:4px 10px}.blTrack{grid-column:1 / -1}}
-/* ⑥ 訪談檢核清單：依分頁分群 */
-.ivgrp{border:1px solid var(--line);border-radius:12px;background:var(--field);margin-bottom:9px;overflow:hidden}
-.ivgrphd{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:8px 12px;background:color-mix(in srgb, var(--tx) 3%, transparent);border-bottom:1px solid var(--line)}
-.ivgrphd .ivgn{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--amber);
- border:1px solid var(--line);border-radius:8px;padding:1px 8px;line-height:1.5}
-.ivgrphd b{font-size:13px;color:var(--tx)}
-.ivgrp .ivlist{padding:4px 10px 8px}
 /* ⑦ 前置條件列 */
 .pqBar{display:flex;flex-wrap:wrap;align-items:center;gap:7px 10px;background:var(--field);
  border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:12px;
@@ -4841,7 +4850,7 @@ function bindTabs(){document.querySelectorAll('[data-tab]').forEach(function(b){
  // ⚠️ 手動標記不可以連帶把選單關掉或跳分頁——教練是在下拉裡連續勾好幾個。
  document.querySelectorAll('[data-ivtick]').forEach(function(b){
   b.onclick=function(e){e.stopPropagation();toggleIvStep(b.dataset.ivtick)}});
- bindDGroups();syncNavH();}
+ bindDGroups();syncNavH();applyIvFocus();bindIvFold();}
 
 /* ── 分頁選單列：群組下拉 ──────────────────────────────────────────────────
    ⚠️⚠️ 開關面板只切換 hidden，**絕對不要在這裡呼叫 render()**。
@@ -4916,6 +4925,46 @@ var DTAB_LABEL={intent:'意圖 / 生涯',family:'家庭 / 參數',risk:'風險�
  goals:'目標/置產',education:'子女教育',lifestyle:'生活願望',retire:'退休',
  finance:'收支資債',credit:'信用/海外',coverage:'保障中心',tax:'稅賦',
  plan:'調整方案',tracking:'真實追蹤'};
+// ===== 聚焦模式（2026-09-12）=====
+// 點下拉裡的某個面向 → 該區塊留著、同分頁其餘折成一行標題（點一下就展開）。
+//
+// ⚠️⚠️ 折疊靠宿主上的 data-ivsec／既有錨點，**不是 DOM 結構**。原本想「收合目標元素的
+//    兄弟節點」，但區塊沒有統一的父層——intentSec 的人生價值環包在 .lgwrap 裡，
+//    不是其他區塊的兄弟，靠結構走會時好時壞。改成照鍵比對。
+//
+// ⚠️ 預設關閉。現役教練的動線是「直接點分頁、整頁捲」，強制聚焦會讓他們找不到東西；
+//    開關放在分組列右邊，開了才生效，關了立刻回整頁。
+// ⚠️ 只有「同一分頁有兩個以上面向」的分頁折疊才有意義；沒掛宿主的面向聚焦是 no-op，
+//    不會出錯也不會有效果（interviewUI.test.ts 有一條把宿主的存在性整批釘住）。
+function ivSecSel(st){return st?(st.a||'[data-ivsec="'+(st.sec||st.k)+'"]'):''}
+function toggleIvFocus(){app.ivFocusOn=!app.ivFocusOn;render();}
+function ivUnfold(el){if(el){el.classList.remove('ivfold');el.removeAttribute('tabindex');}}
+function applyIvFocus(){
+ var pane=document.querySelector('#app .dmodbody')||document.getElementById('app');
+ if(!pane)return;
+ pane.querySelectorAll('.ivfold').forEach(ivUnfold);
+ if(!app.ivFocusOn)return;
+ var c=activeCase();if(!c)return;
+ var st=navStep(navCurFacet(c));if(!st)return;
+ var hit=pane.querySelector(ivSecSel(st));if(!hit)return;
+ INTERVIEW_STEPS.forEach(function(o){
+  if(o.tab!==st.tab||o.k===st.k)return;
+  if((o.sec||o.k)===(st.sec||st.k))return;       // 共用宿主的（bg ↔ basic）不折自己
+  var el=pane.querySelector(ivSecSel(o));
+  // ⚠️ 跳過包含或被包含於目標的節點：折外層會把目標一起藏掉（保障中心就是包在一起的）。
+  if(!el||el===hit||el.contains(hit)||hit.contains(el))return;
+  el.classList.add('ivfold');
+  el.setAttribute('tabindex','0');
+  if(!el.getAttribute('data-ivname'))el.setAttribute('data-ivname',o.name);
+ });
+}
+// 折起來的區塊：點一下或按 Enter／空白就展開這一塊（不關掉聚焦模式）。
+function bindIvFold(){
+ document.querySelectorAll('.ivfold').forEach(function(el){
+  el.onclick=function(){ivUnfold(el)};
+  el.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();ivUnfold(el)}};
+ });
+}
 function navStep(k){var r=null;INTERVIEW_STEPS.forEach(function(s){if(s.k===k)r=s});return r;}
 /** 某一群的面向清單，帶「客戶沒勾這個目標」與「問過了沒」兩個旗標。 */
 function navFacets(c,fg){
@@ -4978,9 +5027,12 @@ function dataPane(c){
     // ⚠️ 淡出（客戶沒勾這個目標）仍然可點——沿用「取消勾選不刪資料」的既有語意。
     // 兩顆鈕：左邊＝去填（ivGoto），右邊的勾＝手動標記「談過但系統偵測不到」（例如談完決定不做）。
     // ⚠️ 手動標記本來只有訪談浮層做得到，浮層移除後這個能力必須留在這裡，不能一起消失。
+    // ⚠️ hint（實際的訪談題句）同理：它是「不會漏問」的那份 know-how，浮層是它原本的家，
+    //    現在掛在面向鈕的 title 上——滑過去就看得到，不必為了看題句再開一個容器。
     return '<span class="ivline">'+
      '<button type="button" data-ivk="'+x.st.k+'" class="dtab ivt'+(x.st.k===curFacet?' on':'')+(x.dim?' dim':'')+
-     '" data-ivs="'+(x.state||'none')+'"><i class="ivdot"></i>'+esc(x.st.name)+(x.st.nw?'<i class="ivnew">新</i>':'')+'</button>'+
+     '" data-ivs="'+(x.state||'none')+'" title="'+esc(x.st.hint||x.st.name)+'"><i class="ivdot"></i>'+
+     esc(x.st.name)+(x.st.nw?'<i class="ivnew">新</i>':'')+'</button>'+
      '<button type="button" class="ivtick'+(x.state==='manual'?' on':'')+'" data-ivtick="'+x.st.k+'"'+
      ' title="'+(x.state==='auto'?'這一段系統偵測到有資料了':'談過但系統偵測不到？點一下手動標記')+'"'+
      (x.state==='auto'?' disabled':'')+' aria-label="手動標記已談過">✓</button></span>';
@@ -5034,7 +5086,10 @@ function dataPane(c){
   if(cf)dgroups.forEach(function(g){if(g.fg===cf.g)dgrp=(g.no?g.no+' ':'')+g.name});}
  var wrapped=dlab?('<div class="dmod"><div class="dmodhead"><h3>'+esc(dlab)+'</h3><span class="dmtag">'+esc(dgrp)+'</span></div><div class="dmodbody">'+body+'</div></div>'):body;
  var curName=(navStep(curFacet)||{}).name||dlab;
- return '<div class="dgbar" id="dgbar">'+tb+(curName?'<span class="dgcur">目前 <b>'+esc(curName)+'</b></span>':'')+'</div>'+
+ var fbtn='<button type="button" id="ivFocusSw" class="ivfsw'+(app.ivFocusOn?' on':'')+'" onclick="toggleIvFocus()"'+
+  ' title="'+(app.ivFocusOn?'關閉後回到整頁顯示':'只顯示目前這一段，同分頁其餘折起來')+'"'+
+  ' aria-pressed="'+(app.ivFocusOn?'true':'false')+'">聚焦</button>';
+ return '<div class="dgbar" id="dgbar">'+tb+'<span class="dgcur">'+(curName?'目前 <b>'+esc(curName)+'</b> ':'')+fbtn+'</span></div>'+
   '<div data-calc="completeness">'+completenessHTML(c)+'</div>'+wrapped;
 }
 // ===== 家庭成員：全員卡片化（本人／配偶＝完整工作卡；其餘＝身分＋投保＋分攤＋財務獨立歲）=====
@@ -5598,12 +5653,16 @@ function peopleSec(c){
  members.forEach(function(m,i){if(i===pi)return;cards+=personCard(c,m,i,false);});
  var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'members\')">＋ 新增家庭成員</button></div>';
  return bizOwnerWarnHTML(c)+
-  '<div class="sec"><h4>規劃單位 <span class="hint">這份規劃算誰的收支、資產與責任</span></h4><div class="fgrid">'+
+  '<div class="sec" data-ivsec="scope" data-ivname="規劃單位與界線"><h4>規劃單位 <span class="hint">這份規劃算誰的收支、資產與責任</span></h4><div class="fgrid">'+
    ofld('planScope','unit','規劃單位','sel:未指定,個人,家庭')+ofld('planScope','why','為什麼是這個範圍')+'</div>'+
    '<div data-calc="planScope">'+planScopeHint(c)+'</div></div>'+
-  familyTreeSec(c)+'<div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+
-  '<div class="sec"><h4>誰決定這個家的錢 <span class="hint">六個面向各由誰拍板；方案要說服的是他們</span></h4><div data-calc="decision">'+decisionHint(c)+'</div></div>'+
-  '<div data-calc="nhiSummary">'+nhiSummaryHTML(c)+'</div>'+paramsSec(c);
+  familyTreeSec(c)+
+  // ⚠️ basic 與 bg 共用這一個宿主：「背景與人生事件」住在每一張成員卡裡面（bgBlock），
+  //    不是成員卡的兄弟節點，所以聚焦時兩者指同一塊。
+  '<div data-ivsec="basic" data-ivname="家庭成員與投保"><div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+'</div>'+
+  '<div class="sec" data-ivsec="decide" data-ivname="財務決策分工"><h4>誰決定這個家的錢 <span class="hint">六個面向各由誰拍板；方案要說服的是他們</span></h4><div data-calc="decision">'+decisionHint(c)+'</div></div>'+
+  '<div data-calc="nhiSummary">'+nhiSummaryHTML(c)+'</div>'+
+  '<div data-ivsec="params" data-ivname="規劃參數">'+paramsSec(c)+'</div>';
 }
 // 全家健保費彙總＋支出表同步狀態。⚠️ data-calc 容器內不可以有輸入框，
 //    所以開關做成 button（不是 checkbox input）。
@@ -6604,7 +6663,7 @@ function eduSec(c){
  var manualTbl=manual.length
   ?tableSec('手動列（舊資料）','education',c.education,[['child','子女','text'],['stage','階段','sel:'+eduStageDefs().map(function(s){return s.stage}).join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','money'],['years','供給年數','num'],['startIn','幾年後開始','num']],'自動產生的列請在上方各子女卡片調整；這張表保留手動／舊資料列。')
   :'';
- return '<div class="sec"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
+ return '<div class="sec" data-ivsec="child" data-ivname="子女教養"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
   '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+eduPickSec(c)+birthPlanSec(c)+empty+cards+addBtn+manualTbl+childFundSec(c);
 }
 
@@ -6991,7 +7050,7 @@ function birthPlanSec(c){
   ?'<div style="margin-top:10px"><button class="add" onclick="applyBirthPlan()">產生／更新未出生子女與費用</button>'+
    '<span class="hint" style="margin-left:10px">重按是<b>更新</b>不是複製；金額被你改過的那幾筆不會被蓋掉。</span></div>'
   :'';
- return '<div class="sec"><h4>生育規劃 <span class="hint">訪談題：預計在本人幾歲時生第幾胎？（本人目前 '+pAge+' 歲）</span>'+
+ return '<div class="sec" data-ivsec="birth" data-ivname="生育規劃"><h4>生育規劃 <span class="hint">訪談題：預計在本人幾歲時生第幾胎？（本人目前 '+pAge+' 歲）</span>'+
   '<button class="add" onclick="addBirthKid()">＋ 再加一胎</button></h4>'+
   tbl+apply+birthCostPanel(c)+
   '<div class="hint" style="margin-top:10px;line-height:1.75">按下產生後會做三件事：'+
@@ -8282,7 +8341,8 @@ function planSec(c){
  // 首屏只有「一張圖＋三個數字＋判語＋動作開關」，其餘一律收合。
  // ⚠️ v1 的拉桿／三個處方／該解什麼／方案比較全部保留，只是收進 <details>——
  //    它們仍然是有用的診斷，但不該再佔首屏；首屏要回答的是「做得到嗎、改善多少」。
- return planHeroV2(c)+
+ // planact 的宿主包住方案本體；review 的宿主是「其他方案參數」那一折（下次檢視日在裡面）。
+ return '<div data-ivsec="planact" data-ivname="調整方案">'+planHeroV2(c)+
   foldSec('缺口配額對帳','這條線大概要生出多少錢 vs 動作實際排了多少',quotaV2HTML(c),true)+
   foldSec('調整動作清單','補缺口的手段，一條一條具體動作 — 改任何一格，上面的圖與旗子當場重算',actionsHTML(c),true)+
   foldSec('資金勾稽','客戶到底有沒有錢做這些動作',ledgerV2HTML(c))+
@@ -8293,7 +8353,8 @@ function planSec(c){
   foldSec('缺口組成與即時缺口','缺口是哪些支出造成的，另有保障與預備金要補',gapDetailHTML(c,led))+
   foldSec('建議資產配置','投資型與保障型的配置與對帳',allocSecHTML(c))+
   foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c))+
-  foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>');
+  '</div>'+'<div data-ivsec="review" data-ivname="收斂與下一步">'+
+  foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>')+'</div>';
 }
 
 /* 願景選定：把四張表的 on 旗標集中成一排卡片，教練在方案頁就能勾。
@@ -9275,7 +9336,7 @@ var INTERVIEW_STEPS=[
   has:function(c){return ((c.intent||{}).purposes||[]).length||((c.intent||{}).targets||[]).length}},
  {k:'basic',g:1,name:'基本資料',tab:'family',hint:'本人與配偶：生日／職業／勞保／健保／眷屬',
   has:function(c){return (c.members||[]).some(function(m){return m.name&&n(m.age)>0})}},
- {k:'bg',g:1,nw:1,name:'背景與人生事件',tab:'family',hint:'學經歷／職涯歷程／過去的理財經驗／影響決策的背景',
+ {k:'bg',g:1,nw:1,sec:'basic',name:'背景與人生事件',tab:'family',hint:'學經歷／職涯歷程／過去的理財經驗／影響決策的背景',
   has:function(c){var hit=function(b){return b&&BG_FIELDS.some(function(f){return String(b[f[0]]||'').trim()})};
    return hit((c.profile||{}).bg)||(c.members||[]).some(function(m){return hit(m&&m.bg)})}},
  {k:'values',g:1,nw:1,name:'人生價值環',tab:'intent',a:'[data-ivanchor="values"]',hint:'最在意的事與背後的價值觀／重要程度／對應到哪個規劃模組',
@@ -9301,11 +9362,11 @@ var INTERVIEW_STEPS=[
  {k:'birth',g:2,t:'子女教養規劃',nw:1,name:'生育規劃',tab:'education',hint:'訪談題：預計在本人幾歲時生第幾胎？',
   has:function(c){return (c.birthPlan||[]).length||(c.members||[]).some(function(m){return m&&m.unborn})}}, {k:'parent',g:2,t:'孝親規劃',name:'孝親規劃',tab:'goals',a:'[data-goalanchor="孝親規劃"]',hint:'頻率／每次金額／最低金額／從幾歲開始／對象年齡',
   has:function(c){return (c.goals||[]).some(function(g){return (g.type||'')==='孝親'})}},
- {k:'travel',g:2,t:'旅遊規劃',name:'旅遊規劃',tab:'lifestyle',hint:'國內與國外分開問：起始年齡／頻率／單次預算／到幾歲會滿足',
+ {k:'travel',g:2,t:'旅遊規劃',a:'[data-goalanchor="旅遊規劃"]',name:'旅遊規劃',tab:'lifestyle',hint:'國內與國外分開問：起始年齡／頻率／單次預算／到幾歲會滿足',
   has:function(c){return (c.travel||[]).length||(c.goals||[]).some(function(g){return (g.type||'')==='旅遊'})}},
- {k:'hobby',g:2,t:'休閒興趣規劃',name:'休閒興趣',tab:'lifestyle',hint:'六類可提示：體能／收藏／思考／娛樂創作／社會服務／栽培飼養',
+ {k:'hobby',g:2,t:'休閒興趣規劃',a:'[data-goalanchor="休閒興趣規劃"]',name:'休閒興趣',tab:'lifestyle',hint:'六類可提示：體能／收藏／思考／娛樂創作／社會服務／栽培飼養',
   has:function(c){return (c.hobby||[]).length||(c.goals||[]).some(function(g){return (g.type||'')==='休閒'})}},
- {k:'luxury',g:2,t:'奢侈品購買規劃',name:'奢侈品',tab:'lifestyle',hint:'十六類可提示：豪宅／珠寶／鐘錶／首飾／服裝／化妝品／工藝品／古董／樂器／家電／衛浴／寵物／私人飛機／郵輪／超跑／其他',
+ {k:'luxury',g:2,t:'奢侈品購買規劃',a:'[data-goalanchor="奢侈品購買規劃"]',name:'奢侈品',tab:'lifestyle',hint:'十六類可提示：豪宅／珠寶／鐘錶／首飾／服裝／化妝品／工藝品／古董／樂器／家電／衛浴／寵物／私人飛機／郵輪／超跑／其他',
   has:function(c){return (c.luxury||[]).length||(c.goals||[]).some(function(g){return (g.type||'')==='奢侈品'})}},
  {k:'retire',g:2,t:'退休生活規劃',name:'退休規劃',tab:'retire',hint:'退休年齡／最低標準年齡／每月生活費／最低標準／勞退領取方式',
   has:function(c){return n(c.profile.retireAge)>0&&((c.retireExpenses||[]).length||n((c.retire||{}).monthLiving)>0)}},
@@ -9364,58 +9425,9 @@ function ivProgress(c){
  var done=0;INTERVIEW_STEPS.forEach(function(st){if(ivDone(c,st))done++});
  return {done:done,total:INTERVIEW_STEPS.length};
 }
-// 分頁 key → 檢核清單上顯示的群名。
-var IV_TABNAME={intent:'意圖 / 生涯',family:'家庭 / 參數',risk:'風險屬性',goals:'目標 / 置產',
- education:'子女教育',lifestyle:'生活願望',retire:'退休',finance:'收支資債',
- credit:'信用 / 海外',coverage:'保障中心',tax:'稅賦'};
-/* ===== 訪談檢核清單：依分頁二次分群 =====
-   ⚠️⚠️ INTERVIEW_STEPS 一個字都不動——那是問卷的 know-how（題目順序＝教練實際在問的順序）。
-      這裡只做「渲染時的二次分群」：同一個分頁的題目收攏在一起，**群內維持原始題號**
-      （意圖那一群就是 1. 3. 6. 13. 20.），教練照樣看得到自己在問卷的第幾題。
-      動線因此從 13 次分頁切換降成 9 段 · 8 次切換——客戶在旁邊等的時候畫面不會一直跳。 */
-function interviewSec(c){
- var pr=ivProgress(c),pct=Math.round(pr.done/pr.total*100);
- var order=[],by={};
- INTERVIEW_STEPS.forEach(function(st,i){
-  var t=st.tab||'other';
-  if(!by[t]){by[t]=[];order.push(t);}
-  by[t].push({st:st,no:i+1});
- });
- var switches=Math.max(0,order.length-1);
- var groups=order.map(function(t,gi){
-  var list=by[t],doneN=0;
-  var items=list.map(function(o){
-   var d=ivDone(c,o.st);
-   if(d)doneN++;
-   var mark=d==='manual'?'<span class="ivmk on" title="你手動標記為談過">✓</span>'
-           :d==='auto'  ?'<span class="ivmk auto" title="這一段已經有資料了">✓</span>'
-                        :'<span class="ivmk"></span>';
-   return '<div class="ivrow'+(d?' done':'')+'">'+
-    '<span class="ivno">'+o.no+'</span>'+
-    '<button class="ivchk" onclick="toggleIvStep(\''+o.st.k+'\')" title="談過了但系統偵測不到（例如談完決定不做）就手動勾起來">'+mark+'</button>'+
-    '<div class="ivbody"><div class="ivname">'+esc(o.st.name)+
-      '<button class="ivgo" onclick="ivGoto(\''+o.st.k+'\')">前往 ›</button></div>'+
-     '<div class="ivhint">'+o.st.hint+'</div></div></div>';
-  }).join('');
-  return '<div class="ivgrp"><div class="ivgrphd">'+
-   '<span class="ivgn">'+(gi+1)+'</span><b>'+esc(IV_TABNAME[t]||t)+'</b>'+
-   '<span class="hint">第 '+list.map(function(o){return o.no}).join('、')+' 題 · '+doneN+'/'+list.length+' 有內容</span>'+
-   '<span style="flex:1"></span>'+
-   '<button class="tbtn" onclick="jumpTab(\''+t+'\')">前往這一段 ›</button>'+
-   '</div><div class="ivlist">'+items+'</div></div>';
- }).join('');
- return '<div class="sec"><h4>訪談檢核清單 <span class="hint">照著走就不會漏 · 題號＝教練實際在用的問卷順序（沒有動）</span></h4>'+
-  '<div class="ivbar"><div class="ivbarfill" style="width:'+pct+'%"></div></div>'+
-  '<div class="ivstat"><b>'+pr.done+'</b> / '+pr.total+' 段有內容　<span class="hint">'+
-   (pr.done===pr.total?'全部走過了 · 可以收尾產摘要':'灰色那幾段還沒碰過')+'</span></div>'+
-  '<div class="hint" style="display:block;margin:8px 0 10px">'+
-   '<b style="color:var(--amber2)">問卷順序原封不動，只是把同一個分頁的題目收攏在一起。</b>'+
-   '教練仍然看得到自己在問卷的第幾題（1. 3. 6. 13. 20. 就在群裡），'+
-   '但動線從 <b>13 次分頁切換</b> 變成 <b>'+order.length+' 段 · '+switches+' 次切換</b>——客戶在旁邊等的時候，畫面不會一直跳。</div>'+
-  groups+
-  '<div class="hint" style="margin-top:10px">✓ 是系統依「那一段有沒有資料」自動判定的，不用自己維護。'+
-  '談過但決定不做、系統偵測不到的，點方框手動勾起來。這份清單只是導航——資料一律回各分頁填。</div></div>';
-}
+// ⚠️ interviewSec() 與 IV_TABNAME 已於 2026-09-12 隨訪談浮層一起移除。
+//    「依分頁二次分群」這件事現在由分組列做（dataPane 的 navFacets / navProgress），
+//    而且是照面向的群組分，不再是照分頁——一份清單，住在導航裡。
 // ===== 改變的準備度（moneyStyle.willing / confidence）=====
 // 手冊第 3 章「安全感、阻力與準備度」的最後一題。兩個數字分開問是有意義的：
 // 「想做」與「相信做得到」是兩種不同的缺，缺哪一個決定這一場之後該給什麼。
@@ -11022,8 +11034,9 @@ function shortTermSec(c){
   ['name','需求','text'],['inYears','幾年內','num'],['amount','理想金額','money'],
   ['minAmount','最低金額','money'],['prepared','已備','money'],['alt','可否延後／替代','sel:否,可延後,可替代']],
   '兩年內一定會動用的錢。它不是人生目標（沒有「幾歲」這個尺度），但它決定了可投資資產裡有多少是不能碰的。');
- return '<div class="sec" style="margin-top:14px"><h4>短期資金需求 <span class="hint">兩年內要動用的錢，不能拿去做長期配置</span></h4>'+
-  '<div data-calc="shortTerm">'+shortTermHint(c)+'</div></div>'+tbl;
+ // 宿主包住「判讀 ＋ 表格」兩塊，聚焦時才不會只剩半截。
+ return '<div data-ivsec="shortterm" data-ivname="短期資金需求"><div class="sec" style="margin-top:14px"><h4>短期資金需求 <span class="hint">兩年內要動用的錢，不能拿去做長期配置</span></h4>'+
+  '<div data-calc="shortTerm">'+shortTermHint(c)+'</div></div>'+tbl+'</div>';
 }
 // 缺口（理想−已備）與流動資產的關係，就是這張表唯一要回答的事。
 function shortTermNeed(c){
@@ -11069,10 +11082,10 @@ function financeSec(c){
  '</div>';
  var expNote=(app.ownerView&&app.ownerView!=='全家')?'<div class="finfoot" style="border:0;padding-top:0;color:var(--amber2)">＊ 支出屬家庭層級、不分持有人，仍顯示全部。</div>':'';
  var quad='<div class="finquad">'+
-  '<div class="finpanel inc"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div>'+sortBtn('incomes','income')+'<button class="add" onclick="addRow(\'incomes\')">＋ 新增</button></div><div class="fintbl">'+finIncTable(c)+'</div>'+autoBlockedHTML(c,'salary')+assetIncomeMirrorHTML(c)+'</div>'+
-  '<div class="finpanel exp"><div class="finph"><div class="ic" style="background:rgba(224,138,104,.16);color:var(--warn)">支</div><h4>支出</h4><div class="sub"><div class="sl">年化小計</div><div class="sv neg" id="finSub_exp">'+fmt(t.exp)+'</div></div>'+sortBtn('expenses','expense')+'<button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></div><div class="fintbl">'+finExpTable(c)+'</div>'+expNote+'</div>'+
-  '<div class="finpanel ast"><div class="finph"><div class="ic" style="background:rgba(169,188,207,.16);color:var(--teal)">資</div><h4>資產 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">現值合計</div><div class="sv" style="color:var(--teal)" id="finSub_ast">'+fmt(t.ast)+'</div></div>'+sortBtn('assets','asset')+'<button class="add" onclick="addRow(\'assets\')">＋ 新增</button></div><div class="fintbl">'+finAstTable(c)+'</div><div class="finfoot"><span>原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
-  '<div class="finpanel lia"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">債</div><h4>負債 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">餘額合計</div><div class="sv" style="color:var(--amber2)" id="finSub_lia">'+fmt(t.lia)+'</div></div>'+sortBtn('liabilities','liability')+'<button class="add" onclick="addRow(\'liabilities\')">＋ 新增</button></div><div class="fintbl">'+finLiaTable(c)+'</div><div class="finfoot"><span>餘額原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
+  '<div class="finpanel inc" data-ivsec="income" data-ivname="收入現況"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div>'+sortBtn('incomes','income')+'<button class="add" onclick="addRow(\'incomes\')">＋ 新增</button></div><div class="fintbl">'+finIncTable(c)+'</div>'+autoBlockedHTML(c,'salary')+assetIncomeMirrorHTML(c)+'</div>'+
+  '<div class="finpanel exp" data-ivsec="expense" data-ivname="支出現況"><div class="finph"><div class="ic" style="background:rgba(224,138,104,.16);color:var(--warn)">支</div><h4>支出</h4><div class="sub"><div class="sl">年化小計</div><div class="sv neg" id="finSub_exp">'+fmt(t.exp)+'</div></div>'+sortBtn('expenses','expense')+'<button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></div><div class="fintbl">'+finExpTable(c)+'</div>'+expNote+'</div>'+
+  '<div class="finpanel ast" data-ivsec="asset" data-ivname="資產現況"><div class="finph"><div class="ic" style="background:rgba(169,188,207,.16);color:var(--teal)">資</div><h4>資產 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">現值合計</div><div class="sv" style="color:var(--teal)" id="finSub_ast">'+fmt(t.ast)+'</div></div>'+sortBtn('assets','asset')+'<button class="add" onclick="addRow(\'assets\')">＋ 新增</button></div><div class="fintbl">'+finAstTable(c)+'</div><div class="finfoot"><span>原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
+  '<div class="finpanel lia" data-ivsec="debt" data-ivname="負債現況"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">債</div><h4>負債 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">餘額合計</div><div class="sv" style="color:var(--amber2)" id="finSub_lia">'+fmt(t.lia)+'</div></div>'+sortBtn('liabilities','liability')+'<button class="add" onclick="addRow(\'liabilities\')">＋ 新增</button></div><div class="fintbl">'+finLiaTable(c)+'</div><div class="finfoot"><span>餘額原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
   '<div class="finpanel sav" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">儲</div><h4>儲蓄理財投入 <span class="fintag">不計入支出</span></h4><div class="sub"><div class="sl">年化合計</div><div class="sv" style="color:var(--teal)" id="finSub_sav">'+fmt(t.sav)+'</div></div>'+sortBtn('savings','saving')+'<button class="add" onclick="addRow(\'savings\')">＋ 新增</button></div><div class="fintbl">'+finSavTable(c)+'</div><div class="finfoot"><span>零存整付、儲蓄險保費、定期定額、勞退自提、投資型保單投資保費——這些是「換口袋」不是「花掉」，所以不進總支出，而是「有效儲蓄率」的分子。</span></div></div>'+
   '<div class="finpanel lay" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">布</div><h4>資產布局規劃</h4></div><div class="fintbl">'+assetLayoutTable(c)+'</div></div>'+
  '</div>';
@@ -12368,7 +12381,7 @@ function toggleCoverFirst(k){
 }
 function coverBudgetSec(c){
  var cp=(c&&c.coverPlan)||{};
- return '<div class="sec"><h4>保障預算與取捨 <span class="hint">訪談題：每月可接受的保障預算？預算不夠時最優先補哪一項？</span></h4>'+
+ return '<div class="sec" data-ivsec="coverbudget" data-ivname="保障預算與取捨"><h4>保障預算與取捨 <span class="hint">訪談題：每月可接受的保障預算？預算不夠時最優先補哪一項？</span></h4>'+
   '<div class="fgrid">'+ofld('coverPlan','monthly','每月可接受保障預算','money')+'</div>'+
   '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">預算不夠時最優先（可複選）</div>'+
    chips('coverFirst',KINDS,cp.first,'toggleCoverFirst')+'</div>'+
@@ -12427,11 +12440,11 @@ function coverageHubSec(c){
   propInsSec(c)+
   lifeAssetSec(c)+premiumReportSec(c)+paybackReportSec(c)+masterAnalysisSec(c)+
   policiesSec(c)+
-  '<div class="ppband" style="margin-top:6px">保障需求 · 已備補充 <span class="hint">壽險/醫療缺口反推的輸入</span></div>'+
+  '<div data-ivsec="cover" data-ivname="保障需求"><div class="ppband" style="margin-top:6px">保障需求 · 已備補充 <span class="hint">壽險/醫療缺口反推的輸入</span></div>'+
   // ⚠️ 需求卡的欄位走 sb ＝純 set()，在 data 分頁不 render；「保障年數」改了，
   //    正下方兩公分處那四列自動帶入的責任（生活費／父母奉養／貸款／教育）一動也不動。
   //    掛 data-calc 讓 syncDerived() 當場重畫這一塊（游標由 syncCalcNodes 還原）。
-  '<div data-calc="coverageNeeds">'+parts.needsTbl+'</div>'+parts.covTbl;
+  '<div data-calc="coverageNeeds">'+parts.needsTbl+'</div>'+parts.covTbl+'</div>';
 }
 function trackingSec(c){
  var tbl=tableSec('真實資產追蹤 (Beta) — 逐年實際淨資產','tracking',c.tracking,[['year','西元年','num'],['age','年齡','num'],['net','實際淨資產','money']]);
@@ -15866,25 +15879,6 @@ body{padding-bottom:var(--lnbar-h,52px)}
  border:1px solid var(--amber);color:var(--amber2);padding:9px 18px;border-radius:999px;font-size:13px;
  font-weight:700;z-index:120;opacity:0;pointer-events:none;transition:opacity .2s;max-width:88vw;text-align:center}
 .lntoast.on{opacity:1}
-.ivbar{height:6px;background:color-mix(in srgb, var(--tx) 7%, transparent);border-radius:999px;overflow:hidden;margin:2px 0 8px}
-.ivbarfill{height:100%;background:linear-gradient(90deg,var(--amber),var(--amber2));border-radius:999px;transition:width .25s}
-.ivstat{font-size:12.5px;color:var(--mut);margin-bottom:10px}
-.ivstat b{color:var(--amber2);font-size:15px}
-.ivlist{display:flex;flex-direction:column}
-.ivrow{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:1px solid var(--line)}
-.ivrow:last-child{border-bottom:none}
-.ivno{flex:none;width:20px;text-align:right;font-size:11.5px;color:var(--mut2);font-variant-numeric:tabular-nums;padding-top:3px}
-.ivchk{flex:none;background:none;border:none;padding:4px;margin:-4px;cursor:pointer}
-.ivmk{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;
- border:1px solid var(--line);font-size:12px;font-weight:800;color:transparent}
-.ivmk.auto{border-color:color-mix(in srgb, var(--ok) 60%, transparent);color:var(--ok);background:color-mix(in srgb, var(--ok) 12%, transparent)}
-.ivmk.on{border-color:var(--amber);color:var(--amber2);background:color-mix(in srgb, var(--amber) 16%, transparent)}
-.ivbody{flex:1;min-width:0}
-.ivname{font-size:13px;color:var(--tx);font-weight:700;display:flex;align-items:center;gap:8px}
-.ivrow.done .ivname{color:var(--mut)}
-.ivhint{font-size:11.5px;color:var(--mut2);line-height:1.55;margin-top:2px}
-.ivgo{background:none;border:none;color:var(--teal);font-size:11.5px;cursor:pointer;padding:0 2px;font-family:inherit}
-.ivgo:hover{color:var(--amber2)}
 .lnrp{margin:10px 0 0}
 .lnrpn{border-left:3px solid var(--amber);background:#f7f1e6;padding:8px 12px;border-radius:0 7px 7px 0;
  font-size:12.5px;line-height:1.75;color:#3a3a3a;margin:0 0 6px}
@@ -15945,128 +15939,18 @@ else boot();
 })();
 
 </script>
-<script>
-/* ══════════════════════════════════════════════════════════════════════
-   訪談檢核清單：右下角常駐浮層（2026/08/31 Ray 回饋）
-   ══════════════════════════════════════════════════════════════════════
-   原本它插在「意圖 / 生涯」分頁最上面，跟輸入欄位混在同一頁。
-   Ray：「它跟輸入資料的邏輯不一樣，輸入資料之後才會有這個結果。」
-   → 清單本來就是導航而不是要填的東西，所以改成任何分頁都叫得出來的浮層，
-     不再佔輸入版面。內容仍然是同一支 interviewSec(c)，一份真相。
+<!-- ⚠️⚠️ 訪談檢核浮層已於 2026-09-12 移除（原本在這裡，右下角常駐 + 側邊抽屜）。
+     它的工作整組搬進分組列（dataPane 的下拉）：
+       · 群標籤帶進度（4/12）
+       · 每個面向帶狀態點（auto 綠／manual 空心／未問 灰）
+       · 每項右邊的勾＝手動標記「談過但系統偵測不到」（原本只有浮層做得到，能力沒有消失）
+       · 點面向 → ivGoto 切分頁＋捲到錨點；開了「聚焦」就只顯示那一段
 
-   ⚠️ 零侵入：不改任何 Sec 函式，只 wrap render() 與 jumpTab/ivGoto。
-   ⚠️ 只在教練端的「資料」區出現；客戶端與分析/報告區不掛。
-   ⚠️ .lnbar（註記列）是 z-index 60 的全寬底列，所以按鈕要墊高 74px 才不會被壓住。
-   ══════════════════════════════════════════════════════════════════════ */
-(function(){
-st.id='lnCSS'; st.textContent=CSS;
- document.head.appendChild(st);
- listenParent();
-
- // wrap render：零侵入
- if(typeof window.render==='function'){
-  var orig=window.render;
-  window.render=function(){ var r=orig.apply(this,arguments); try{ mount(); }catch(e){ console.error('[LN]',e); } return r; };
- }
- try{ if(typeof render==='function') render(); else mount(); }catch(e){ mount(); }
-}
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
-else boot();
-
-})();
-
-</script>
-<script>
-/* ══════════════════════════════════════════════════════════════════════
-   訪談檢核清單：右下角常駐浮層（2026/08/31 Ray 回饋）
-   ══════════════════════════════════════════════════════════════════════
-   原本它插在「意圖 / 生涯」分頁最上面，跟輸入欄位混在同一頁。
-   Ray：「它跟輸入資料的邏輯不一樣，輸入資料之後才會有這個結果。」
-   → 清單本來就是導航而不是要填的東西，所以改成任何分頁都叫得出來的浮層，
-     不再佔輸入版面。內容仍然是同一支 interviewSec(c)，一份真相。
-
-   ⚠️ 零侵入：不改任何 Sec 函式，只 wrap render() 與 jumpTab/ivGoto。
-   ⚠️ 只在教練端的「資料」區出現；客戶端與分析/報告區不掛。
-   ⚠️ .lnbar（註記列）是 z-index 60 的全寬底列，所以按鈕要墊高 74px 才不會被壓住。
-   ══════════════════════════════════════════════════════════════════════ */
-(function(){
-var CSS=`
-.ivfab{position:fixed;right:18px;bottom:calc(var(--lnbar-h,52px) + 22px);z-index:60;display:none;align-items:center;gap:8px;
- background:linear-gradient(180deg,var(--card2),var(--card));color:#e9d3ae;border:1px solid color-mix(in srgb, var(--amber) 55%, transparent);
- border-radius:999px;padding:10px 16px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;
- box-shadow:0 8px 22px rgba(var(--sh),.38)}
-.ivfab:hover{border-color:var(--amber,var(--amber))}
-.ivfab .ivfp{font-weight:700;font-size:12px;color:var(--mut)}
-.ivfab.on{display:inline-flex}
-.ivmask{position:fixed;inset:0;background:rgba(4,14,24,.6);z-index:100;display:none}
-.ivmask.on{display:block}
-.ivdrawer{position:fixed;top:0;right:0;bottom:0;width:min(620px,94vw);z-index:110;
- background:var(--field);border-left:1px solid color-mix(in srgb, var(--amber) 35%, transparent);box-shadow:-14px 0 40px rgba(var(--sh),.45);
- display:none;flex-direction:column}
-.ivdrawer.on{display:flex}
-.ivdhd{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid color-mix(in srgb, var(--tx) 10%, transparent)}
-.ivdhd b{font-size:14.5px;color:#e9d3ae}
-.ivdhd .sub{font-size:11.5px;color:var(--mut)}
-/* 抽屜自己已經有標題了，區塊裡那一行 h4 就不要再講一次。 */
-.ivdbody > .sec > h4{display:none}
-.ivdhd .sp{flex:1}
-.ivdx{background:none;border:1px solid color-mix(in srgb, var(--tx) 20%, transparent);color:var(--mut);border-radius:8px;
- padding:5px 11px;font-size:12.5px;font-family:inherit;cursor:pointer}
-.ivdbody{flex:1;overflow:auto;padding:12px 14px 28px}
-.ivdbody .sec{margin:0}
-@media print{.ivfab,.ivmask,.ivdrawer{display:none!important}}
-`;
-var fab,mask,drawer,body,open=false;
-function coachData(){
- try{ return window.app && app.role==='coach' && app.activeTab==='data' && !!activeCase(); }catch(e){ return false; }
-}
-function fill(){
- if(!body)return;
- try{ body.innerHTML=interviewSec(activeCase()); }catch(e){ body.innerHTML=''; }
-}
-function sync(){
- if(!fab)return;
- var ok=coachData();
- fab.classList.toggle('on',ok);
- if(!ok&&open)close();
- if(ok){
-  try{ var pr=ivProgress(activeCase());
-   fab.innerHTML='<span>📋 訪談檢核清單</span><span class="ivfp">'+pr.done+' / '+pr.total+' 段有內容</span>';
-  }catch(e){ fab.innerHTML='<span>📋 訪談檢核清單</span>'; }
- }
- if(open)fill();
-}
-function show(){ open=true;fill();mask.classList.add('on');drawer.classList.add('on'); }
-function close(){ open=false;mask.classList.remove('on');drawer.classList.remove('on'); }
-function boot(){
- var st=document.createElement('style');st.id='ivpCSS';st.textContent=CSS;document.head.appendChild(st);
- fab=document.createElement('button');fab.className='ivfab';fab.onclick=show;
- mask=document.createElement('div');mask.className='ivmask';mask.onclick=close;
- drawer=document.createElement('div');drawer.className='ivdrawer';
- drawer.innerHTML='<div class="ivdhd"><b>訪談檢核清單</b>'+
-  '<span class="sub">照著走就不會漏 · 題號＝教練實際在用的問卷順序（沒有動）</span>'+
-  '<span class="sp"></span><button class="ivdx">關閉 ✕</button></div><div class="ivdbody"></div>';
- drawer.querySelector('.ivdx').onclick=close;
- body=drawer.querySelector('.ivdbody');
- document.body.appendChild(fab);document.body.appendChild(mask);document.body.appendChild(drawer);
- // 點清單裡的「前往」＝要去填資料，浮層自己讓開。
- ['jumpTab','ivGoto','gotoGoal','gotoDataTab'].forEach(function(fn){
-  if(typeof window[fn]!=='function')return;
-  var orig=window[fn];
-  window[fn]=function(){ close(); return orig.apply(this,arguments); };
- });
- if(typeof window.render==='function'){
-  var r=window.render;
-  window.render=function(){ var out=r.apply(this,arguments); try{ sync(); }catch(e){ console.error('[IVP]',e); } return out; };
- }
- document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&open)close(); });
- window.IVP={open:show,close:close,sync:sync,isOpen:function(){return open}};
- sync();
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
-else boot();
-})();
-</script>
+     ⚠️ 為什麼移除而不是並存：同一件事兩個入口，就是這個 codebase 一再吃虧的「兩個家」。
+     ⚠️ 舊註解寫「一份清單，不是第二套欄位」——新的定位是**分組列本身就是那份清單**，
+        不再需要第二個容器來裝它。
+     ⚠️ INTERVIEW_STEPS / ivDone / ivProgress / ivGoto / toggleIvStep 全部保留，
+        它們現在的讀者是 dataPane()。 -->
 
 <script>
 /* ══════════════════════════════════════════════════════════════════════

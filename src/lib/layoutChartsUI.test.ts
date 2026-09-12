@@ -44,10 +44,6 @@ function useSample(role: "coach" | "client", tab: string, dataTab?: string): any
   return c;
 }
 const pane = () => w.document.querySelector("#app").innerHTML as string;
-// 訪談檢核清單 2026/08/31 起改成右下角常駐浮層（不再插在意圖分頁上方），
-// 內容仍然是同一支 interviewSec()——所以斷言改看抽屜，其餘一個字不動。
-const openIv = () => { w.IVP.open(); return w.document.querySelector(".ivdrawer") as Element; };
-const ivHTML = () => (w.document.querySelector(".ivdbody") as Element).innerHTML as string;
 const $ = (sel: string) => w.document.querySelector(sel);
 const $$ = (sel: string) => [...w.document.querySelectorAll(sel)];
 
@@ -290,87 +286,30 @@ describe("⑤ 退休金流與退休分頁首屏", () => {
   });
 });
 
-describe("⑥ 訪談檢核清單：依分頁分群，題號不動", () => {
+describe("⑥ 訪談檢核清單：一份清單，住在導航裡", () => {
   /**
-   * ⚠️⚠️ 2026-09-11：清單從 20 題擴成 35 個面向（補進手冊有、問卷沒有的那幾段）。
+   * ⚠️⚠️ 2026-09-12：右下角的訪談檢核浮層已移除，它的工作整組搬進分組列的下拉。
+   *    原本這一段的断言（浮層依分頁分成幾群、群内題號、那顆常驻按鈕）都跟著失效；
+   *    清單本身的護欄——問卷骨幹 20 題的順序、群組歸屬、面向結構——搬到
+   *    interviewUI.test.ts 的 describe("訪談檢核清單")，因為它們守的是清單而不是版面。
    *
-   * 這條護欄原本寫死「20 題、一個字都不能動」，守的是**問卷順序這個 know-how**——
-   * 題目順序＝教練實際在問的順序，先講夢想、最後問錢。那件事仍然要守，
-   * 但「不准成長」不是守它的正確方式（有意識的擴充與無意識的漂移是兩回事）。
-   *
-   * 改成守真正該守的：**問卷原本那 20 題的相對順序一個字都不能動**。
-   * 新增的面向一律標 nw:1，濾掉之後必須逐字還原成下面這一串。
+   *    留在這裡的只有版面層級的事：**資料區只能有一份清單**。
+   *    同一件事兩個入口，就是這個 codebase 一再吃虧的「兩個家」。
    */
-  it("⚠️ 問卷骨幹 20 題的順序一個字都沒動（新增面向不得插進它們之間打亂順序）", () => {
-    const spine = w.INTERVIEW_STEPS.filter((s: { nw?: number }) => !s.nw);
-    expect(spine.length).toBe(20);
-    expect(spine.map((s: { k: string }) => s.k).join(",")).toBe(
-      "purpose,basic,career,house,car,marry,child,parent,travel,hobby,luxury," +
-      "retire,legacy,income,expense,asset,debt,credit,cover,doc",
-    );
-  });
-
-  it("每個面向都標了群組（①②③＋方案），否則分組列排不出來", () => {
-    const bad = w.INTERVIEW_STEPS.filter((s: { g?: number }) => ![1, 2, 3, 4].includes(s.g as number))
-      .map((s: { k: string }) => s.k);
-    expect(bad, `這些面向沒有群組歸屬：${bad.join(", ")}`).toEqual([]);
-  });
-
-  // ⚠️ 2026-09-11 擴成 35 個面向後，依分頁分群變成 13 群。
-  //    這一組斷言守的是「畫面上寫的群數與實際渲染的一致」，不是某個固定數字——
-  //    所以改成從 INTERVIEW_STEPS 推出期望值，日後再增面向不會再假性失敗。
-  it("群數與切換次數：畫面上寫的要跟實際渲染的一致", () => {
+  it("⚠️ 資料區只有一份清單：分組列。沒有第二個容器，也沒有常驻浮層", () => {
     useSample("coach", "data", "intent");
-    openIv();
-    // 浮層是「依分頁彙整」：同一分頁的面向全部收進同一群，不管它們在清單裡連不連續。
-    const tabs = w.INTERVIEW_STEPS.map((x: { tab: string }) => x.tab);
-    const groups = new Set(tabs).size;
-    const grps = $$(".ivdbody .ivgrp");
-    expect(grps.length).toBe(groups);
-    expect(ivHTML()).toContain(`<b>${groups} 段 · ${groups - 1} 次切換</b>`);
-    expect($$(".ivdbody .ivrow").length, "面向一個都不能少").toBe(w.INTERVIEW_STEPS.length);
+    expect($$("#app .dgrow").length, "分組列本人要在").toBeGreaterThan(0);
+    expect($$("#app .ivgrp").length, "清單不再插在輸入欄位上方").toBe(0);
+    expect($(".ivfab"), "右下角的常驻浮層已經不存在").toBeFalsy();
+    expect($(".ivdrawer"), "側邊抽屜也不存在").toBeFalsy();
   });
 
-  it("⚠️ 清單不再插在意圖分頁的輸入欄位上方（它是導航，不是要填的東西）", () => {
+  it("每一群的進度跟它展開後的面向數對得上", () => {
     useSample("coach", "data", "intent");
-    expect($$("#app .ivgrp").length).toBe(0);
-    // 但那顆常駐按鈕要在，而且帶著進度
-    const fab = $(".ivfab");
-    expect(fab).toBeTruthy();
-    expect(fab.className).toContain("on");
-    expect(fab.textContent).toContain("訪談檢核清單");
-    expect(fab.textContent).toMatch(new RegExp(`/ ${w.INTERVIEW_STEPS.length} 段有內容`));
-  });
-
-  it("⚠️ 客戶端與分析區都不掛這顆按鈕", () => {
-    useSample("client", "analysis");
-    expect($(".ivfab").className).not.toContain("on");
-    useSample("coach", "analysis");
-    expect($(".ivfab").className).not.toContain("on");
-  });
-
-  // ⚠️ 第一群從「意圖 / 生涯」變成「家庭 / 參數」，因為新的第一個面向是
-  //    ①「規劃單位與界線」（會談前調頻）——這是刻意的順序，不是意外。
-  //    這條守的仍是原本那件事：**分群不會把題號打亂**，群內號碼要是它在全清單裡的原始位置。
-  it("群內維持原始題號：分群只是換個排法，不重新編號", () => {
-    useSample("coach", "data", "intent");
-    openIv();
-    const first = $(".ivdbody .ivgrp");
-    const firstTab = w.INTERVIEW_STEPS[0].tab as string;
-    const want = w.INTERVIEW_STEPS
-      .map((x: { tab: string }, i: number) => [x.tab, i + 1] as [string, number])
-      .filter(([t]: [string, number]) => t === firstTab)
-      .map(([, no]: [string, number]) => String(no));
-    expect(first.querySelector(".ivgrphd b").textContent).toBe("家庭 / 參數");
-    expect([...first.querySelectorAll(".ivno")].map((e: Element) => e.textContent)).toEqual(want);
-  });
-
-  it("每一群一顆「前往這一段 ›」，走既有的 jumpTab", () => {
-    useSample("coach", "data", "intent");
-    openIv();
-    const btns = $$(".ivdbody .ivgrphd .tbtn");
-    expect(btns.length).toBe($$(".ivdbody .ivgrp").length);
-    expect(btns.every((b: Element) => /^jumpTab\('\w+'\)$/.test(b.getAttribute("onclick")!))).toBe(true);
+    const labs = $$("#app .dgrow .dglab .dgcnt").map((e: Element) => e.textContent!.trim());
+    const fgs = new Set(w.INTERVIEW_STEPS.map((x: { g: number }) => x.g)).size;
+    expect(labs.length, "有面向的每一群都帶一個進度").toBe(fgs);
+    expect(labs.every((t: string) => /^\d+\/\d+$/.test(t)), labs.join(" ")).toBe(true);
   });
 });
 
