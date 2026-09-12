@@ -291,21 +291,44 @@ describe("⑤ 退休金流與退休分頁首屏", () => {
 });
 
 describe("⑥ 訪談檢核清單：依分頁分群，題號不動", () => {
-  it("⚠️ INTERVIEW_STEPS 一個字都沒動（20 題、順序就是問卷）", () => {
-    expect(w.INTERVIEW_STEPS.length).toBe(20);
-    expect(w.INTERVIEW_STEPS.map((s: { k: string }) => s.k).join(",")).toBe(
+  /**
+   * ⚠️⚠️ 2026-09-11：清單從 20 題擴成 35 個面向（補進手冊有、問卷沒有的那幾段）。
+   *
+   * 這條護欄原本寫死「20 題、一個字都不能動」，守的是**問卷順序這個 know-how**——
+   * 題目順序＝教練實際在問的順序，先講夢想、最後問錢。那件事仍然要守，
+   * 但「不准成長」不是守它的正確方式（有意識的擴充與無意識的漂移是兩回事）。
+   *
+   * 改成守真正該守的：**問卷原本那 20 題的相對順序一個字都不能動**。
+   * 新增的面向一律標 nw:1，濾掉之後必須逐字還原成下面這一串。
+   */
+  it("⚠️ 問卷骨幹 20 題的順序一個字都沒動（新增面向不得插進它們之間打亂順序）", () => {
+    const spine = w.INTERVIEW_STEPS.filter((s: { nw?: number }) => !s.nw);
+    expect(spine.length).toBe(20);
+    expect(spine.map((s: { k: string }) => s.k).join(",")).toBe(
       "purpose,basic,career,house,car,marry,child,parent,travel,hobby,luxury," +
       "retire,legacy,income,expense,asset,debt,credit,cover,doc",
     );
   });
 
-  it("實際是 9 群 · 8 次切換，畫面上照實寫", () => {
+  it("每個面向都標了群組（①②③＋方案），否則分組列排不出來", () => {
+    const bad = w.INTERVIEW_STEPS.filter((s: { g?: number }) => ![1, 2, 3, 4].includes(s.g as number))
+      .map((s: { k: string }) => s.k);
+    expect(bad, `這些面向沒有群組歸屬：${bad.join(", ")}`).toEqual([]);
+  });
+
+  // ⚠️ 2026-09-11 擴成 35 個面向後，依分頁分群變成 13 群。
+  //    這一組斷言守的是「畫面上寫的群數與實際渲染的一致」，不是某個固定數字——
+  //    所以改成從 INTERVIEW_STEPS 推出期望值，日後再增面向不會再假性失敗。
+  it("群數與切換次數：畫面上寫的要跟實際渲染的一致", () => {
     useSample("coach", "data", "intent");
     openIv();
+    // 浮層是「依分頁彙整」：同一分頁的面向全部收進同一群，不管它們在清單裡連不連續。
+    const tabs = w.INTERVIEW_STEPS.map((x: { tab: string }) => x.tab);
+    const groups = new Set(tabs).size;
     const grps = $$(".ivdbody .ivgrp");
-    expect(grps.length).toBe(9);
-    expect(ivHTML()).toContain("<b>9 段 · 8 次切換</b>");
-    expect($$(".ivdbody .ivrow").length, "題目一題都不能少").toBe(20);
+    expect(grps.length).toBe(groups);
+    expect(ivHTML()).toContain(`<b>${groups} 段 · ${groups - 1} 次切換</b>`);
+    expect($$(".ivdbody .ivrow").length, "面向一個都不能少").toBe(w.INTERVIEW_STEPS.length);
   });
 
   it("⚠️ 清單不再插在意圖分頁的輸入欄位上方（它是導航，不是要填的東西）", () => {
@@ -316,7 +339,7 @@ describe("⑥ 訪談檢核清單：依分頁分群，題號不動", () => {
     expect(fab).toBeTruthy();
     expect(fab.className).toContain("on");
     expect(fab.textContent).toContain("訪談檢核清單");
-    expect(fab.textContent).toMatch(/\/ 20 段有內容/);
+    expect(fab.textContent).toMatch(new RegExp(`/ ${w.INTERVIEW_STEPS.length} 段有內容`));
   });
 
   it("⚠️ 客戶端與分析區都不掛這顆按鈕", () => {
@@ -326,21 +349,27 @@ describe("⑥ 訪談檢核清單：依分頁分群，題號不動", () => {
     expect($(".ivfab").className).not.toContain("on");
   });
 
-  it("群內維持原始題號：意圖那一群就是 1. 3. 6. 13. 20.", () => {
+  // ⚠️ 第一群從「意圖 / 生涯」變成「家庭 / 參數」，因為新的第一個面向是
+  //    ①「規劃單位與界線」（會談前調頻）——這是刻意的順序，不是意外。
+  //    這條守的仍是原本那件事：**分群不會把題號打亂**，群內號碼要是它在全清單裡的原始位置。
+  it("群內維持原始題號：分群只是換個排法，不重新編號", () => {
     useSample("coach", "data", "intent");
     openIv();
     const first = $(".ivdbody .ivgrp");
-    expect(first.querySelector(".ivgrphd b").textContent).toBe("意圖 / 生涯");
-    expect([...first.querySelectorAll(".ivno")].map((e: Element) => e.textContent))
-      .toEqual(["1", "3", "6", "13", "20"]);
-    expect(first.querySelector(".ivgrphd .hint").textContent).toContain("第 1、3、6、13、20 題");
+    const firstTab = w.INTERVIEW_STEPS[0].tab as string;
+    const want = w.INTERVIEW_STEPS
+      .map((x: { tab: string }, i: number) => [x.tab, i + 1] as [string, number])
+      .filter(([t]: [string, number]) => t === firstTab)
+      .map(([, no]: [string, number]) => String(no));
+    expect(first.querySelector(".ivgrphd b").textContent).toBe("家庭 / 參數");
+    expect([...first.querySelectorAll(".ivno")].map((e: Element) => e.textContent)).toEqual(want);
   });
 
   it("每一群一顆「前往這一段 ›」，走既有的 jumpTab", () => {
     useSample("coach", "data", "intent");
     openIv();
     const btns = $$(".ivdbody .ivgrphd .tbtn");
-    expect(btns.length).toBe(9);
+    expect(btns.length).toBe($$(".ivdbody .ivgrp").length);
     expect(btns.every((b: Element) => /^jumpTab\('\w+'\)$/.test(b.getAttribute("onclick")!))).toBe(true);
   });
 });
