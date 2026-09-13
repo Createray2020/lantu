@@ -92,6 +92,63 @@ export async function archiveClientAction(clientId: string): Promise<ActionResul
   }
 }
 
+/**
+ * 解除封存。
+ *
+ * ⚠️ 為什麼要補：封存原本是**單向**的——只有寫進 'archived' 的那一支，沒有任何
+ * 寫回去的路徑；而詳情頁的「封存」鈕又只在 status !== 'archived' 時才顯示，
+ * 所以封存完連那顆鈕都不見了，要救回來只能直接改資料庫。
+ *
+ * ⚠️ 會重新佔用一個客戶名額（usedClientCount() 排除的是 archived），
+ * 額度已滿時 requireWritableCoach 擋不到這件事——這裡刻意不擋：
+ * 解除封存是「把誤封的人救回來」，不是新增客戶，擋在這裡只會讓人找不到出路。
+ */
+export async function unarchiveClientAction(clientId: string): Promise<ActionResult> {
+  try {
+    const me = await requireWritableCoach();
+    await Clients.setClientStatus(me.id, clientId, "active");
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clients");
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * 畫面在按下刪除之前就問一次「能不能刪」，理由才講得出口。
+ *
+ * ⚠️ 理由的中文在**這一層**組好再回去。DELETE_BLOCK_MESSAGE 住在 lib/clients.ts，
+ * 那支檔案 import 了 db——客戶端元件一旦 import 它，整個資料層會被拖進瀏覽器 bundle。
+ */
+export type DeletablePreview = { ok: true; name: string; hasLogin: boolean } | { ok: false; error: string };
+
+export async function clientDeletableAction(clientId: string): Promise<DeletablePreview> {
+  const cid = await coachId();
+  const r = await Clients.clientDeletable(cid, clientId);
+  if (r.ok) return { ok: true, name: r.name, hasLogin: r.hasLogin };
+  const base = Clients.DELETE_BLOCK_MESSAGE[r.reason];
+  return { ok: false, error: r.compCases ? `${base}（目前 ${r.compCases} 筆）` : base };
+}
+
+/**
+ * 永久刪除一位客戶。救不回來。三道門檻寫在 lib/clients.ts 的 deleteClient()：
+ * 只准刪已封存的、姓名要打對（**server 端也驗**）、有分潤案件的一律擋。
+ */
+export async function deleteClientAction(clientId: string, confirmName: string): Promise<ActionResult> {
+  try {
+    const me = await requireWritableCoach();
+    const r = await Clients.deleteClient(me.id, clientId, confirmName);
+    if (!r.ok) return { ok: false, error: Clients.DELETE_BLOCK_MESSAGE[r.reason] };
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clients");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 // ── 年度版本 ─────────────────────────────────────────
 export async function savePlanDataAction(planId: string, data: unknown): Promise<{ netWorth: number | null; healthGrade: string | null }> {
   const me = await requireWritableCoach();

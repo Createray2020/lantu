@@ -1,8 +1,8 @@
 // 客戶資料層（教練隔離）。所有查詢都以 coachId 為租戶維度。
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { actionItems, clientCollaborators, clients, coachDisplayName, coaches, plans, reviews } from "@/Shared/db/schema";
+import { actionItems, clientCollaborators, clients, coachDisplayName, coaches, compCases, plans, reviews } from "@/Shared/db/schema";
 import { newCaseData, planSnapshot } from "./snapshot";
 import { allocCode } from "./codeAlloc";
 import { COLLAB_ACCEPTED, ownedClient, readableClient } from "./clientScope";
@@ -247,4 +247,79 @@ export async function updateClient(coachId: string, clientId: string, patch: Par
 
 export async function setClientStatus(coachId: string, clientId: string, status: string): Promise<void> {
   await updateClient(coachId, clientId, { status });
+}
+
+/* ───────── 永久刪除一位客戶 ─────────
+ *
+ * ⚠️⚠️ 封存與刪除是兩件不同的事，不要把這一支當成「比較徹底的封存」：
+ *   封存＝`status='archived'`，資料一個字都沒動，換到的只有額度（usedClientCount()
+ *         排除 archived），列表用篩選照樣找得到。
+ *   刪除＝整列消失，plans / reviews / action_items / client_notes / consult_sessions /
+ *         client_risk_quiz / coach_link_requests / client_collaborators 全部 CASCADE
+ *         跟著走。救不回來。
+ *
+ * 三道門檻是刻意的，比照 lib/templates.ts 的 purgeTemplate()：
+ *   1. 只准刪**已封存**的 —— 要刪得先經過「封存 → 確認真的不再服務 → 再刪」的順序，
+ *      而不是在清單上一鍵消失。
+ *   2. 要打對客戶姓名 —— 而且**這道驗證在 server 端也做**。只擋在 UI 的話，
+ *      門檻等於沒有：任何人繞過畫面直接呼叫 action 就刪掉了。
+ *   3. 有分潤案件（comp_cases）的一律不准刪 —— 那是財務紀錄。comp_cases.client_id
+ *      是 `set null`，刪掉客戶案件會留著卻從此指不到人，稽核時對不出那筆是誰的。
+ *
+ * ⚠️ 自助客戶（人生護照）要知道的事：clients.client_user_id 的 cascade 是**反向**的
+ *    （刪帳號會連帶刪客戶列，刪客戶列不會動帳號），而 clientPlan.ts 的
+ *    ensure 邏輯是「這個帳號找不到客戶列就當場建一筆新的」。所以刪掉這種客戶之後，
+ *    他下次登入會安靜地變成一位全新的空白客戶、拿到新的客戶編號，舊的人生護照資料
+ *    救不回來。這裡刻意**不擋**（擋掉的話最常見的清理對象——自助註冊的測試帳號——
+ *    就永遠刪不掉），由畫面在確認框把這句話講明白。
+ */
+export type DeleteBlock =
+  | "not-found"      // 不是你的客戶，或根本不存在
+  | "template"       // 範本走後台的 purgeTemplate()，不走這條
+  | "not-archived"   // 還沒封存
+  | "name-mismatch"  // 姓名打錯
+  | "has-comp";      // 有分潤案件
+
+export const DELETE_BLOCK_MESSAGE: Record<DeleteBlock, string> = {
+  "not-found": "找不到這位客戶，或你不是他的主責教練。",
+  template: "示範範本不從這裡刪除。",
+  "not-archived": "只能刪除已封存的客戶。請先封存，確認真的不再服務他，再回來刪除。",
+  "name-mismatch": "客戶姓名沒有打對，沒有刪除任何東西。",
+  "has-comp": "這位客戶有分潤案件，不能刪除——那是財務紀錄，案件會留著卻指不到人。只能封存。",
+};
+
+export type Deletable =
+  | { ok: true; name: string; hasLogin: boolean }
+  | { ok: false; reason: DeleteBlock; compCases?: number };
+
+/** 預檢：畫面在按下去之前就能說出「為什麼不能刪」，而不是按了才吐錯。 */
+export async function clientDeletable(coachId: string, clientId: string): Promise<Deletable> {
+  const c = await getClient(coachId, clientId);
+  if (!c) return { ok: false, reason: "not-found" };
+  if (c.isTemplate) return { ok: false, reason: "template" };
+  if (c.status !== "archived") return { ok: false, reason: "not-archived" };
+  const n = await compCaseCount(clientId);
+  if (n > 0) return { ok: false, reason: "has-comp", compCases: n };
+  return { ok: true, name: c.name, hasLogin: !!c.clientUserId };
+}
+
+async function compCaseCount(clientId: string): Promise<number> {
+  const r = await db.select({ n: count() }).from(compCases).where(eq(compCases.clientId, clientId));
+  return Number(r[0]?.n ?? 0);
+}
+
+export type DeleteOutcome = { ok: true } | { ok: false; reason: DeleteBlock };
+
+export async function deleteClient(coachId: string, clientId: string, confirmName: string): Promise<DeleteOutcome> {
+  const pre = await clientDeletable(coachId, clientId);
+  if (!pre.ok) return { ok: false, reason: pre.reason };
+  // ⚠️ 姓名比對在 server 端也做一次（見檔頭第 2 點）。正規化只做前後空白：
+  //    大小寫與全半形刻意不放寬——這一步的用途就是逼人慢下來看清楚刪的是誰。
+  if (confirmName.trim() !== pre.name.trim()) return { ok: false, reason: "name-mismatch" };
+  // ⚠️ WHERE 重帶 status/is_template，不是只靠上面的預檢：兩次查詢之間狀態被改掉
+  //    （另一個分頁解除了封存）時，這一句什麼都不會刪，而不是刪掉一位活著的客戶。
+  await db
+    .delete(clients)
+    .where(and(eq(clients.id, clientId), ownedClient(coachId), eq(clients.status, "archived"), eq(clients.isTemplate, false)));
+  return { ok: true };
 }

@@ -20,6 +20,9 @@ import {
   deleteActionItemAction,
   updateClientAction,
   archiveClientAction,
+  unarchiveClientAction,
+  clientDeletableAction,
+  deleteClientAction,
 } from "../../actions";
 import { StageGuideModal } from "../../StageGuide";
 import Collaborators, { type CollaboratorLite } from "./Collaborators";
@@ -140,7 +143,47 @@ export default function ClientDetail({
         <span className="text-tx2">{client.name}</span>
       </div>
 
-      <ClientHeader client={client} onSave={(patch) => run(() => updateClientAction(client.id, patch))} onArchive={async () => { if (await confirmDialog("確定封存這位客戶？")) run(() => archiveClientAction(client.id)); }} pending={pending} readOnly={readOnly} />
+      <ClientHeader
+        client={client}
+        onSave={(patch) => run(() => updateClientAction(client.id, patch))}
+        onArchive={async () => {
+          if (await confirmDialog("確定封存這位客戶？\n\n資料都會留著，只是不再計入你的客戶數上限。之後可以解除封存。")) {
+            run(() => archiveClientAction(client.id));
+          }
+        }}
+        onUnarchive={() => run(() => unarchiveClientAction(client.id))}
+        /**
+         * 永久刪除。三道門檻：只能刪已封存的、要打對姓名、有分潤案件的擋掉——
+         * ⚠️ 三道在 server 端都會再驗一次（lib/clients.ts 的 deleteClient）。
+         * 這裡先問一次 clientDeletableAction 只是為了「按下去之前就講得出理由」，
+         * 不是授權。
+         */
+        onDelete={async () => {
+          setErr("");
+          const pre = await clientDeletableAction(client.id);
+          if (!pre.ok) { setErr(pre.error); return; }
+          const ok = await confirmDialog(
+            `永久刪除「${pre.name}」。\n\n他的所有年度版本、諮詢紀錄、區塊註記、待辦與風險測驗都會一起消失，救不回來。`
+            + (pre.hasLogin
+              // ⚠️ 這一句非講不可：clients.client_user_id 的 cascade 是反向的，
+              //    而 clientPlan.ts 的邏輯是「帳號找不到客戶列就當場建一筆新的」。
+              ? "\n\n⚠️ 這位客戶有自己的登入帳號。刪除後帳號還在，他下次登入會變成一位全新的空白客戶、拿到新的客戶編號，現在的人生護照資料救不回來。"
+              : ""),
+            {
+              title: "永久刪除客戶",
+              okLabel: "永久刪除",
+              danger: true,
+              requireText: pre.name,
+              requireHint: `請打出客戶姓名「${pre.name}」以確認`,
+            },
+          );
+          if (!ok) return;
+          // 刪完留在一個已經不存在的頁面上會是一片錯誤，所以導回列表而不是 refresh。
+          run(() => deleteClientAction(client.id, pre.name), () => router.push("/dashboard/clients"));
+        }}
+        pending={pending}
+        readOnly={readOnly}
+      />
 
       {isOwner && <Collaborators clientId={client.id} collaborators={collaborators} readOnly={readOnly} />}
 
@@ -212,7 +255,7 @@ export default function ClientDetail({
 }
 
 // ── 客戶標頭（含編輯） ─────────────────────────────
-function ClientHeader({ client, onSave, onArchive, pending, readOnly = false }: { client: ClientLite; onSave: (patch: Partial<ClientLite> & { tags?: string[]; contact?: Contact }) => void; onArchive: () => void; pending: boolean; readOnly?: boolean }) {
+function ClientHeader({ client, onSave, onArchive, onUnarchive, onDelete, pending, readOnly = false }: { client: ClientLite; onSave: (patch: Partial<ClientLite> & { tags?: string[]; contact?: Contact }) => void; onArchive: () => void; onUnarchive: () => void; onDelete: () => void; pending: boolean; readOnly?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(client.name);
   const [source, setSource] = useState((client.source ?? "").startsWith("其他") ? "其他" : (client.source ?? ""));
@@ -279,7 +322,16 @@ function ClientHeader({ client, onSave, onArchive, pending, readOnly = false }: 
       {!readOnly && (
         <div className="flex gap-2">
           <button className={btn + " bg-panel text-tx2 border border-line"} onClick={() => setEditing(true)}>編輯</button>
-          {client.status !== "archived" && <button className={btn + " text-tx3"} onClick={onArchive}>封存</button>}
+          {/* ⚠️ 封存原本是單向的：只有這顆鈕，而它又只在「還沒封存」時出現，
+              所以封存完就沒有任何路徑回得去（只能改資料庫）。解除封存補在這裡。 */}
+          {client.status !== "archived"
+            ? <button className={btn + " text-tx3"} onClick={onArchive}>封存</button>
+            : (
+              <>
+                <button className={btn + " bg-panel text-tx2 border border-line"} onClick={onUnarchive}>解除封存</button>
+                <button className={btn + " text-danger"} onClick={onDelete}>永久刪除</button>
+              </>
+            )}
         </div>
       )}
     </div>
