@@ -15001,8 +15001,17 @@ function fromRow(r){
  return {
   id:r.id, block:r.blockKey, kind:r.kind, text:r.body, visible:!!r.visible,
   by:r.authorName||null, access:r.authorAccess||'owner',
-  sessId:r.sessionId||null, at:fmtAt(r.createdAt)
+  sessId:r.sessionId||null, at:fmtAt(r.createdAt), atMs:msOf(r.createdAt)
  };
+}
+/* ⚠️ at 是給人看的 'MM/DD HH:MM'（沒有年），算不出「30 天內」。
+   要做時間窗就得留原始時戳，所以另外存一個 atMs，不要去解析那串字。 */
+function msOf(v){ try{ var t=new Date(v).getTime(); return isFinite(t)?t:0; }catch(e){ return 0; } }
+/* postMessage 是 structured clone，Date 會原封不動送過來——
+   對 Date 做 .toString().slice(0,10) 會得到 'Sat Sep 13' 這種東西。 */
+function ymd(v){
+ try{ var d=new Date(v); if(!isFinite(d.getTime())) return ''; return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+ catch(e){ return ''; }
 }
 function toInput(n){ return { blockKey:n.block, kind:n.kind, body:n.text, visible:!!n.visible }; }
 function fmtAt(v){
@@ -15449,6 +15458,128 @@ function mountReport(){
  }
 }
 
+/* ───────── 自動開場 ─────────
+   ⚠️⚠️ 這裡補的是系統原本只做了一半的那條原則。
+   「忘記按結束絕不能造成資料損失」早就有配套（隔天自動封場、草稿一定落地），
+   但**忘記按開始**一直沒有：那會少掉還原點與前後指標，而且事後補不回來——
+   開場那一刻的規劃版本與缺口，過了就是過了。
+   而人的行為上，開始比結束更容易漏：諮詢一開頭教練在寒暄、在調畫面，
+   沒有人會先想到去按一顆鈕。
+
+   所以觸發點從「記得按」改成「開始做事」：寫下第一則註記、或使用者真的動過畫面
+   之後的第一次存檔，就自動開場。按鈕保留，變成「提前開場」的手動入口。
+
+   ⚠️ LN_TOUCHED 這道閘不能省：載入時的正規化存檔（migrateCase 之類）也會叫 save()，
+      沒有它的話，教練只是進來看一眼資料就被開了一場諮詢。
+   ⚠️ 自動開場刻意**不吸**任何日常維護註記——要帶什麼進議程是人的決定，
+      改由底列的「帶進這一場」補上。 */
+var LN_AUTO=false;      // 這一場是系統自動開的（只活在這一次載入）
+var LN_STARTING=false;  // 開場已送出、父層還沒把場次推回來
+var LN_TOUCHED=false;   // 使用者真的碰過畫面（不是程式自己觸發的存檔）
+var ADOPT_WINDOW_MS=30*24*3600*1000;
+
+function looseNotes(){ return allNotes().filter(function(x){ return !x.sessId && !x.pending; }); }
+function isRecent(n){ return n.atMs ? (Date.now()-n.atMs)<=ADOPT_WINDOW_MS : true; }
+
+function canAutoStart(){
+ if(!REMOTE) return false;                          // 示範／本機模式不自動開場
+ if(LN.role!=='owner') return false;                // 協作教練與客戶都不行
+ if(LN_REMOTE_STATE.access!=='owner') return false; // 唯讀（到期／共同執案）也不行
+ if(sess()||LN_STARTING) return false;
+ return true;
+}
+function autoStart(quiet){
+ if(!canAutoStart()) return false;
+ LN_STARTING=true; LN_AUTO=true;
+ toParentLN({ type:'lantu:session', op:'start', adopt:[] });
+ if(!quiet) flash('已自動開場：現在這一版被釘成還原點');
+ return true;
+}
+
+function startSess(ids){
+ if(REMOTE){
+  LN_STARTING=true; LN_AUTO=false;
+  toParentLN({ type:'lantu:session', op:'start', adopt:(ids&&ids.length)?ids:[] });
+  flash('正在開場…已釘住目前的規劃版本');
+  return;
+ }
+ var c=C(); if(!c) return;
+ c.sess={ id:'s'+Date.now().toString(36), start:hhmm(), date:today(),
+          before: snapMetrics(c), snap: snapCase(c) };
+ var pick={}; (ids||[]).forEach(function(i){ pick[i]=1; });
+ allNotes().forEach(function(x){ if(!x.sessId && pick[x.id]) x.sessId=c.sess.id; });
+ persist(); redraw(); flash('已釘住目前的規劃版本，這就是還原點');
+}
+
+/* 帶議程：清單勾選。
+   ⚠️ 原本這裡是一句 confirm('要帶進來嗎？')——看不到內容，而且掃的是這位客戶
+   **所有**沒歸場次的註記，三個月前寫的也會一起被吸進今天這一場。 */
+function openAdopt(mode){
+ var loose=looseNotes();
+ if(!loose.length){ if(mode==='start') startSess([]); return; }
+ var m=document.getElementById('lnMask')||mkMask();
+ m.querySelector('.lnmodal').innerHTML=
+  '<h3>'+(mode==='start'?'要把「日常維護」的哪幾則帶進這一場？':'把「日常維護」的哪幾則補進這一場？')+'</h3>'+
+  '<div class="lnhint" style="margin-bottom:14px">諮詢前自己看資料寫下的問題，帶進來就是這一場的議程。'+
+   '預設只勾最近 30 天——再舊的通常已經不是今天要談的事，要帶由你決定。</div>'+
+  loose.map(function(x){
+   var old=!isRecent(x);
+   return '<label class="lnpick"><input type="checkbox" data-nid="'+x.id+'"'+(old?'':' checked')+'>'+
+    '<span>'+esc2(x.text)+'<span class="lnsrc">來自：'+esc2(nameOf(x.block))+'　'+esc2(KN[x.kind]||x.kind)+
+    (x.at?'　'+esc2(x.at):'')+(old?'　· 30 天前':'')+'</span></span></label>';
+  }).join('')+
+  '<div class="lnrow" style="justify-content:flex-end;margin-top:14px">'+
+   '<button class="lnbtn" onclick="LN.closeMask()">取消</button>'+
+   (mode==='start'?'<button class="lnbtn" onclick="LN.adoptGo(\'start\',true)">不帶，直接開始</button>':'')+
+   '<button class="lnbtn pri" onclick="LN.adoptGo(\''+mode+'\')">'+
+    (mode==='start'?'帶進來並開始諮詢':'帶進這一場')+'</button></div>';
+ m.classList.add('on');
+}
+LN.adoptGo=function(mode, none){
+ var m=document.getElementById('lnMask'), ids=[];
+ if(m && !none) [].slice.call(m.querySelectorAll('.lnpick input')).forEach(function(cb){
+  if(cb.checked) ids.push(cb.dataset.nid);
+ });
+ LN.closeMask();
+ if(mode==='start'){ startSess(ids); return; }
+ var s=sess(); if(!s) return;
+ if(!ids.length){ flash('一則都沒勾'); return; }
+ if(REMOTE){ toParentLN({ type:'lantu:session', op:'adopt', sessionId:s.id, noteIds:ids }); flash('帶進來中…'); return; }
+ var pick={}; ids.forEach(function(i){ pick[i]=1; });
+ allNotes().forEach(function(x){ if(!x.sessId && pick[x.id]) x.sessId=s.id; });
+ persist(); redraw(); flash('已帶進這一場');
+};
+
+/* 「這不是諮詢」：把自動開的這一場取消掉。註記回到日常維護，還原點一起取消。 */
+LN.cancelSess=function(){
+ var s=sess(); if(!s) return;
+ var cnt=allNotes().filter(function(x){ return x.sessId===s.id; }).length;
+ if(!confirm('把這一場取消掉？\n'+(cnt?'這一場記下的 '+cnt+' 則註記會回到「日常維護」，不會消失；':'')+'開場釘住的還原點會一起取消。')) return;
+ if(REMOTE){ LN_AUTO=false; toParentLN({ type:'lantu:session', op:'cancel', sessionId:s.id }); flash('取消中…'); return; }
+ var c=C(); if(!c) return;
+ allNotes().forEach(function(x){ if(x.sessId===s.id) x.sessId=null; });
+ c.sess=null; persist(); redraw(); flash('已取消這一場，註記回到「日常維護」');
+};
+
+/* 沒整理過的上一場：自動封場（auto）或被新的一場蓋掉（superseded）、沒存成紀錄、
+   也沒有草稿，而且真的留了註記。沒有這個出口，那一場就永遠沉在資料庫裡。 */
+function unfiledPast(){
+ if(!REMOTE) return null;
+ var past=LN_REMOTE_STATE.past||[];
+ for(var i=0;i<past.length;i++){
+  var x=past[i];
+  if(!x||x.reviewId||x.draftSummary) continue;
+  if(x.closeReason!=='auto'&&x.closeReason!=='superseded') continue;
+  var n=allNotes().filter(function(y){ return y.sessId===x.id; }).length;
+  if(n) return { id:x.id, date:ymd(x.startedAt), notes:n };
+ }
+ return null;
+}
+LN.fixup=function(id){
+ toParentLN({ type:'lantu:session', op:'fixup', sessionId:id });
+ flash('正在整理那一場的草稿…');
+};
+
 /* ───────── 諮詢狀態列 ───────── */
 /* 量出註記列真正佔掉多少高度，寫進 --lnbar-h。桌機是一列（約 52px），
    390px 折成四五列會到 130–170px——寫死的那個 52 就是「底部內容被吃掉」的來源。 */
@@ -15472,17 +15603,27 @@ function mountSessBar(){
  bar.style.display='';
  var s=sess();
  var cnt=s?allNotes().filter(function(x){return x.sessId===s.id}).length:0;
- var loose=allNotes().filter(function(x){return !x.sessId}).length;
+ var loose=looseNotes().length;
+ var un=s?null:unfiledPast();
+ // 「這不是諮詢」只在系統自己開的那一場、或這一場還沒記任何東西時給——
+ // 它會刪掉場次，不該變成一顆隨時都在的鈕。
+ var cancellable=!!s&&(LN_AUTO||cnt===0);
  bar.className='lnbar'+(s?' on':'');
  bar.innerHTML='<div class="lnbarin">'+
   '<span class="lndot'+(s?'':' off')+'"></span>'+
-  '<b>'+(s?'諮詢進行中':'不在諮詢中')+'</b>'+
+  '<b>'+(s?(LN_AUTO?'諮詢進行中（自動開始）':'諮詢進行中'):'不在諮詢中')+'</b>'+
   '<span class="lnhint">'+(s
     ? s.start+' 開始 · 已記 <b>'+cnt+'</b> 則 · 忘了按結束也沒關係，隔天自動封場'
-    : (loose?'日常維護中已記 <b>'+loose+'</b> 則，開場時可帶進來當議程':'註記照樣可寫，會歸到「日常維護」'))+'</span>'+
+    : (un?'上一場 '+esc2(un.date)+' 有 <b>'+un.notes+'</b> 則註記沒整理成紀錄'
+        : (loose?'日常維護中已記 <b>'+loose+'</b> 則，開場時可帶進來當議程'
+            // 自動開場只在真的在編輯器裡（embed）才會發生；示範／本機模式講這句會是空頭支票。
+            :(REMOTE?'寫下第一則註記或改動資料就會自動開場':'註記照樣可寫，會歸到「日常維護」'))))+'</span>'+
   '<span class="lnsp"></span>'+
-  (s?'<button class="lnbtn" onclick="LN.restore(\''+s.id+'\')" title="把資料回到這一場開始時；註記保留">回到開場狀態</button>'+
+  (s?(loose?'<button class="lnbtn" onclick="LN.adopt()" title="把還在「日常維護」的註記收進這一場當議程">帶進這一場（'+loose+'）</button>':'')+
+      (cancellable?'<button class="lnbtn" onclick="LN.cancelSess()" title="取消這一場：註記回到「日常維護」，還原點一起取消">這不是諮詢</button>':'')+
+      '<button class="lnbtn" onclick="LN.restore(\''+s.id+'\')" title="把資料回到這一場開始時；註記保留">回到開場狀態</button>'+
       '<button class="lnbtn" onclick="LN.summary()">看摘要</button>':
+     (un?'<button class="lnbtn" onclick="LN.fixup(\''+un.id+'\')" title="現產一份草稿，接回諮詢紀錄表單">補整理上一場</button>':'')+
      (lastSessionId()?'<button class="lnbtn" onclick="LN.restore(\''+lastSessionId()+'\')">回到上次諮詢開始時</button>':''))+
   '<button class="lnbtn pri" onclick="LN.session()"'+(LN.role!=='owner'?' disabled':'')+'>'+(s?'結束並產摘要':'開始諮詢')+'</button>'+
   '</div>';
@@ -15506,6 +15647,10 @@ LN.openRow=function(k){ d(k).open=true; LN.rowKey=k; redraw(); setTimeout(functi
 LN.add=function(k){
  var st=d(k), txt=(st.text||'').trim();
  if(!txt){ flash('先寫點什麼'); return; }
+ // 寫下第一則註記＝這場諮詢實際上已經開始了。
+ // ⚠️ 先送開場、再送這一則：父層是照收到的順序一則一則處理的（onMessage 的佇列），
+ //    等它回來時 sessionRef 已經有值，這一則就掛在這一場底下而不是掉進日常維護。
+ var justStarted = !sess() && autoStart(true);
  var s=sess();
  var draftNote={ block:k, kind:st.kind, text:txt, visible: canVisible() && !!st.visible };
  if(REMOTE){
@@ -15527,7 +15672,8 @@ LN.add=function(k){
  }
  st.text=''; st.visible=false;
  redraw();
- flash(s?'已記入這一場諮詢':'已記入「日常維護」');
+ flash(s?'已記入這一場諮詢'
+       :(justStarted?'已自動開場並記入這一場（現在這一版已釘成還原點）':'已記入「日常維護」'));
 };
 LN.del=function(id){
  var arr=allNotes(), i=-1;
@@ -15578,7 +15724,11 @@ function handleNoteErr(m){
   if(m.id) delete LN_DELETED[m.id];
   flash(msg);
  }else{
-  // start／end／restore：沒有樂觀狀態要回捲，用既有的 flash() 把父層給的中文理由講出來。
+  // start／adopt／cancel／fixup／end／restore：沒有樂觀狀態要回捲，
+  // 用既有的 flash() 把父層給的中文理由講出來。
+  // ⚠️ 開場失敗一定要把旗標放掉：LN_STARTING 卡住的話，canAutoStart() 之後永遠回 false，
+  //    自動開場就這樣靜默地再也不會發生。
+  if(m.op==='start'){ LN_STARTING=false; LN_AUTO=false; }
   flash(msg);
  }
  try{ if(typeof render==='function') render(); else mount(); }catch(e){}
@@ -15589,37 +15739,39 @@ LN.session=function(){
  if(REMOTE && LN_REMOTE_STATE.access!=='owner'){ flash('只有主責教練能開始／結束諮詢'); return; }
  var c=C(); if(!c) return;
  if(!sess()){
-  var loose=allNotes().filter(function(x){return !x.sessId});
-  var adopt = loose.length ? confirm('上次諮詢後你記了 '+loose.length+' 則，要帶進這一場當議程嗎？') : false;
-  if(REMOTE){
-   toParentLN({ type:'lantu:session', op:'start', adoptLoose:adopt });
-   flash('正在開場…已釘住目前的規劃版本');
-   return;
-  }
-  c.sess={ id:'s'+Date.now().toString(36), start:hhmm(), date:today(),
-           before: snapMetrics(c), snap: snapCase(c) };
-  if(adopt) loose.forEach(function(x){ x.sessId=c.sess.id; });
-  persist(); redraw(); flash('已釘住目前的規劃版本，這就是還原點');
+  LN_AUTO=false;                 // 手動按的就不算自動開場
+  openAdopt('start');            // 沒有日常維護註記時它自己會直接開場
  }else{
   openPick();
  }
 };
+/* 場中補收議程（底列的「帶進這一場」）。 */
+LN.adopt=function(){
+ if(!sess()) return;
+ if(LN.role!=='owner'){ flash('只有主責教練能整理這一場'); return; }
+ openAdopt('adopt');
+};
 
 /* 結束諮詢：批次勾「客戶可見」 */
+/* ⚠️⚠️ 這裡原本是 `if(!ds.length){ finish(); return; }`——這一場只要沒有任何
+   「決定」類註記，整個視窗就不會開：批次勾選跳過（合理），但**收尾那一段也跟著
+   一次都問不到**，直接封場產草稿。而收尾那段人話才是摘要的主體，逐條列的決定與
+   依據是它的佐證。沒有決定，正是最需要教練自己講一句這場談了什麼的時候。 */
 function openPick(){
  var c=C(), s=c.sess;
  var ds=allNotes().filter(function(x){return x.sessId===s.id && x.kind==='decision'});
- if(!ds.length){ finish(); return; }
  var m=document.getElementById('lnMask')||mkMask();
  m.querySelector('.lnmodal').innerHTML=
-  '<h3>這一場的決定，哪幾則要給客戶看？</h3>'+
-  '<div class="lnhint" style="margin-bottom:14px">預設全不勾。勾選放在這一步，是因為你現在正好在整理等下要跟客戶講什麼。</div>'+
+  '<h3>'+(ds.length?'這一場的決定，哪幾則要給客戶看？':'結束這一場諮詢')+'</h3>'+
+  '<div class="lnhint" style="margin-bottom:14px">'+(ds.length
+    ? '預設全不勾。勾選放在這一步，是因為你現在正好在整理等下要跟客戶講什麼。'
+    : '這一場沒有記下「決定」類的註記，所以沒有要勾給客戶看的內容。底下那一段還是可以寫。')+'</div>'+
   ds.map(function(x){
    var lock=x.access!=='owner';
    return '<label class="lnpick"'+(lock?' style="opacity:.5"':'')+'><input type="checkbox" data-nid="'+x.id+'" '+(x.visible?'checked':'')+(lock?' disabled':'')+'>'+
     '<span>'+esc2(x.text)+'<span class="lnsrc">來自：'+esc2(nameOf(x.block))+(lock?'　🔒 '+esc2(x.by)+' 寫的，不可對客戶公開':'')+'</span></span></label>';
   }).join('')+
-  '<div class="lnwarn">⚠️ 勾選的內容會印進帶公司抬頭的客戶文件。<b>不得含商品推薦或投資建議</b>。</div>'+
+  (ds.length?'<div class="lnwarn">⚠️ 勾選的內容會印進帶公司抬頭的客戶文件。<b>不得含商品推薦或投資建議</b>。</div>':'')+
   // 收尾那一段：訪談問卷的最後一題「總結、此次諮詢的心得體驗」。
   // 它排在摘要最前面——逐條列的決定與依據是它的佐證，不是反過來。
   '<div class="lngrp"><h5>◆ 收尾 <span class="lnhint">這一場整體談下來，你想留一句什麼？（會排在摘要最前面）</span></h5>'+
@@ -15906,9 +16058,13 @@ function listenParent(){
   if(Array.isArray(m.notes)) LN_REMOTE_STATE.notes = m.notes.map(fromRow);
   if(m.session!==undefined){
    LN_REMOTE_STATE.session = m.session ? {
-    id:m.session.id, start:fmtAt(m.session.startedAt), date:(m.session.startedAt||'').toString().slice(0,10),
+    id:m.session.id, start:fmtAt(m.session.startedAt), date:ymd(m.session.startedAt),
     before:m.session.metricsBefore||null
    } : null;
+   // 開場送出後就在等這一則。沒有這句，自動開場的旗標會一直卡著，
+   // 第二次觸發（再寫一則註記）就被 canAutoStart() 擋掉、永遠開不了場。
+   LN_STARTING=false;
+   if(!LN_REMOTE_STATE.session) LN_AUTO=false;
   }
   if(Array.isArray(m.past)) LN_REMOTE_STATE.past = m.past;
   if(m.noteAccess) {
@@ -15925,6 +16081,24 @@ function boot(){
  var st=document.createElement('style'); st.id='lnCSS'; st.textContent=CSS;
  document.head.appendChild(st);
  listenParent();
+
+ /* 使用者真的碰過畫面才算數。捕獲階段掛在 document 上——v12 的欄位是整頁重繪出來的，
+    掛在個別元素上每次 render 就沒了。 */
+ ['pointerdown','keydown'].forEach(function(ev){
+  document.addEventListener(ev, function(){ LN_TOUCHED=true; }, true);
+ });
+ /* 第一次「由人造成的存檔」＝諮詢已經開始了。
+    ⚠️ 包在最外層：embed 的 save()（回傳父層）與唯讀的 save()（直接 return）都在這之前
+       接好了，這一層只加判斷、不改它們的行為，回傳值原樣往外送。
+    ⚠️ LN_TOUCHED 那道閘就是「載入時的正規化存檔不算數」——沒有它，教練只是
+       進來看一眼資料就被開了一場諮詢。 */
+ if(typeof window.save==='function'){
+  var origSave=window.save;
+  window.save=function(){
+   try{ if(LN_TOUCHED) autoStart(); }catch(e){}
+   return origSave.apply(this, arguments);
+  };
+ }
 
  // wrap render：零侵入
  if(typeof window.render==='function'){

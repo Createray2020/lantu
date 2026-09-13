@@ -278,7 +278,10 @@ describe("C8：接收父層的註記錯誤回報", () => {
   });
 
   it("start／end／restore → 用既有的 flash() 顯示 message", () => {
-    expect(HTML).toContain("// start／end／restore：沒有樂觀狀態要回捲，用既有的 flash() 把父層給的中文理由講出來。");
+    expect(HTML).toContain("// start／adopt／cancel／fixup／end／restore：沒有樂觀狀態要回捲，");
+    // ⚠️ 2026/09/13：開場失敗還要把自動開場的旗標放掉，否則 canAutoStart() 之後
+    //    永遠回 false——自動開場會安靜地再也不發生，而且沒有任何跡象。
+    expect(HTML).toContain("if(m.op==='start'){ LN_STARTING=false; LN_AUTO=false; }");
   });
 });
 

@@ -304,10 +304,48 @@ export type StartSessionResult =
 export async function startSessionAction(
   clientId: string,
   planId: string | null,
-  adoptLoose: boolean,
+  /** true＝把日常維護的註記全部帶進來；字串陣列＝只帶勾出來的那幾則；false／[]＝不帶。 */
+  adopt: boolean | string[],
 ): Promise<StartSessionResult> {
   const cid = await coachId();
-  const r = await Session.startSession(cid, clientId, planId, adoptLoose);
+  const r = await Session.startSession(cid, clientId, planId, adopt);
+  if (r.ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return r;
+}
+
+/** 場中補收議程：把還在「日常維護」的註記收進進行中的這一場。 */
+export async function adoptNotesAction(
+  clientId: string,
+  sessionId: string,
+  noteIds: string[],
+): Promise<Session.AdoptOutcome> {
+  const cid = await coachId();
+  const r = await Session.adoptNotes(cid, sessionId, noteIds);
+  if (r.ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return r;
+}
+
+/**
+ * 「這不是諮詢」：取消（自動開場的）這一場。註記解綁回日常維護、場次整列刪掉。
+ * 理由見 consultSession.ts 的 cancelSession——留一列取消掉的場次會污染「回到上次諮詢開始時」。
+ */
+export async function cancelSessionAction(
+  clientId: string,
+  sessionId: string,
+): Promise<{ ok: true; released: number } | { ok: false; error: string }> {
+  const cid = await coachId();
+  const r = await Session.cancelSession(cid, sessionId);
+  if (r.ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return r;
+}
+
+/** 補整理一場已封場（多半是 cron 自動封場）的諮詢：現產草稿，接回既有的紀錄表單。 */
+export async function draftForClosedSessionAction(
+  clientId: string,
+  sessionId: string,
+): Promise<Session.ClosedDraftOutcome> {
+  const cid = await coachId();
+  const r = await Session.draftForClosedSession(cid, sessionId);
   if (r.ok) revalidatePath(`/dashboard/clients/${clientId}`);
   return r;
 }

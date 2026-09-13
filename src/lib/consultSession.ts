@@ -8,7 +8,7 @@
 //
 // ⚠️ 開場／結束一律只有主責教練（ownedClient）。協作教練能寫註記，但不能開場。
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { actionItems, clientNotes, clients, consultSessions, planRevisions, plans, reviews } from "@/Shared/db/schema";
 import { ownedClient } from "./clientScope";
@@ -101,16 +101,49 @@ async function latestRevision(planId: string): Promise<string | null> {
 export type StartOutcome = { ok: true; session: SessionRow; adopted: number } | { ok: false; error: string };
 
 /**
+ * 把「日常維護」的註記收進某一場當議程。
+ *
+ * adopt === true         全部收（本機模式與舊呼叫端的語意，保留不動）
+ * adopt === string[]     只收指定的那幾則（教練在清單上勾出來的）
+ *
+ * ⚠️⚠️ 條件永遠要含 clientId + sessionId is null。少了它，一組別人客戶的 note id
+ * 就能被搬進自己的場次——id 是呼叫端給的，不是這裡查出來的。
+ * ⚠️ id 先過 UUID 格式篩：iframe 端樂觀更新會產生 'tmp_xxx' 這種假 id，
+ *    直接丟進 uuid 欄位的 in (...) 會讓整句 SQL 炸在型別轉換上（開場跟著失敗）。
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function adoptLooseNotes(
+  clientId: string,
+  sessionId: string,
+  adopt: boolean | string[],
+): Promise<number> {
+  const base = and(eq(clientNotes.clientId, clientId), isNull(clientNotes.sessionId));
+  let where = base;
+  if (adopt !== true) {
+    const ids = (Array.isArray(adopt) ? adopt : []).filter((x) => UUID_RE.test(x)).slice(0, 500);
+    if (!ids.length) return 0;
+    where = and(base, inArray(clientNotes.id, ids));
+  }
+  const res = await db
+    .update(clientNotes)
+    .set({ sessionId, updatedAt: new Date() })
+    .where(where)
+    .returning({ id: clientNotes.id });
+  return res.length;
+}
+
+/**
  * 開始一場諮詢。
  *
- * @param adoptLoose 把「日常維護」的註記帶進這一場當議程
- *                   （諮詢前一天自己先看資料寫下的問題，開場時一鍵變成議程）。
+ * @param adopt 把「日常維護」的註記帶進這一場當議程（諮詢前一天自己先看資料寫下的
+ *              問題，開場時變成議程）。true＝全部；字串陣列＝教練勾出來的那幾則；
+ *              false／空陣列＝不帶（自動開場走的就是這條，要帶什麼該由人決定）。
  */
 export async function startSession(
   coachId: string,
   clientId: string,
   planId: string | null,
-  adoptLoose: boolean,
+  adopt: boolean | string[],
 ): Promise<StartOutcome> {
   if (!(await assertOwned(coachId, clientId))) return { ok: false, error: "只有主責教練能開始諮詢" };
 
@@ -134,16 +167,100 @@ export async function startSession(
     .values({ clientId, coachId, planId, revisionId, metricsBefore: before })
     .returning(COLS);
 
-  let adopted = 0;
-  if (adoptLoose) {
-    const res = await db
-      .update(clientNotes)
-      .set({ sessionId: row.id, updatedAt: new Date() })
-      .where(and(eq(clientNotes.clientId, clientId), isNull(clientNotes.sessionId)))
-      .returning({ id: clientNotes.id });
-    adopted = res.length;
-  }
+  const adopted = await adoptLooseNotes(clientId, row.id, adopt);
   return { ok: true, session: row, adopted };
+}
+
+export type AdoptOutcome = { ok: true; adopted: number } | { ok: false; error: string };
+
+/**
+ * 場中補收議程：把還在「日常維護」的註記收進**進行中**的這一場。
+ *
+ * 為什麼需要它：自動開場刻意不吸任何日常維護註記（那要人決定），
+ * 沒有這一支的話，「開場時一鍵變議程」這個能力會被自動開場整個吃掉。
+ */
+export async function adoptNotes(
+  coachId: string,
+  sessionId: string,
+  noteIds: string[],
+): Promise<AdoptOutcome> {
+  const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
+  if (!s) return { ok: false, error: "找不到這一場諮詢" };
+  if (!(await assertOwned(coachId, s.clientId))) return { ok: false, error: "只有主責教練能整理這一場" };
+  if (s.endedAt) return { ok: false, error: "這一場已經結束了" };
+  const adopted = await adoptLooseNotes(s.clientId, s.id, noteIds);
+  return { ok: true, adopted };
+}
+
+/**
+ * 「這不是諮詢」——把（多半是自動開場的）這一場取消掉。
+ *
+ * ⚠️⚠️ 刻意是**刪除整列**，不是標一個 closeReason='cancelled'。
+ * 留著一列取消掉的場次，「回到上次諮詢開始時」就會指到一場根本沒發生過的諮詢——
+ * 那是比沒有還原點更糟的還原點。
+ *
+ * ⚠️ 註記先解綁回「日常維護」再刪列。client_notes.session_id 的外鍵雖然是
+ * on delete set null（刪場次不會連帶刪註記），但靠外鍵的副作用做事，
+ * 下一個改 schema 的人看不出這裡依賴它。
+ *
+ * ⚠️ 已經存成正式紀錄（review_id 不為 null）的場次一律不准取消：
+ * 那一列是 reviews 的外鍵來源，而且紀錄已經在客戶的時間軸上了。
+ */
+export async function cancelSession(coachId: string, sessionId: string): Promise<{ ok: true; released: number } | { ok: false; error: string }> {
+  const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
+  if (!s) return { ok: false, error: "找不到這一場諮詢" };
+  if (!(await assertOwned(coachId, s.clientId))) return { ok: false, error: "只有主責教練能取消這一場" };
+  if (s.reviewId) return { ok: false, error: "這一場已經存成諮詢紀錄，不能取消" };
+  const released = await db
+    .update(clientNotes)
+    .set({ sessionId: null, updatedAt: new Date() })
+    .where(eq(clientNotes.sessionId, sessionId))
+    .returning({ id: clientNotes.id });
+  await db.delete(consultSessions).where(and(eq(consultSessions.id, sessionId), isNull(consultSessions.reviewId)));
+  return { ok: true, released: released.length };
+}
+
+/**
+ * 補整理一場**已經封場**的諮詢（多半是 cron 自動封場的那一種）。
+ *
+ * 為什麼需要它：autoCloseStaleSessions() 刻意只封場、不產 review——沒有人整理過的
+ * 東西不該自動變成正式紀錄。但它同時也不產草稿，於是那一場就再也沒有任何出口：
+ * 註記、前後指標、收尾全部沉底，教練連知道都不會知道。
+ *
+ * 這一支把那個出口補回來：現算一份草稿寫進 draft_summary，之後就跟「按了結束沒存」
+ * 的草稿走同一條路（pendingDraft → 諮詢紀錄表單 → saveSessionRecord）。
+ *
+ * ⚠️ 冪等：已經有草稿就直接把那一份回傳，不重算也不覆蓋——
+ *    教練可能已經在表單裡改到一半。
+ */
+export type ClosedDraftOutcome =
+  | { ok: true; sessionId: string; draft: string; todos: string[]; date: string }
+  | { ok: false; error: string };
+
+export async function draftForClosedSession(coachId: string, sessionId: string): Promise<ClosedDraftOutcome> {
+  const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
+  if (!s) return { ok: false, error: "找不到這一場諮詢" };
+  if (!(await assertOwned(coachId, s.clientId))) return { ok: false, error: "只有主責教練能整理這一場" };
+  if (!s.endedAt) return { ok: false, error: "這一場還在進行中——請用「結束並產摘要」" };
+  if (s.reviewId) return { ok: false, error: "這一場的紀錄已經存過了" };
+
+  const fresh = await notesOfSession(sessionId);
+  const todos = fresh.filter((n) => n.kind === "todo").map((n) => n.body.slice(0, 200));
+  const date = ymdTaipei(s.startedAt);
+  if (s.draftSummary) return { ok: true, sessionId: s.id, draft: s.draftSummary, todos, date };
+
+  // 自動封場有存後指標，superseded 沒有——沒有就拿現在的規劃現算一份。
+  let after = (s.metricsAfter as SessionMetrics | null) ?? null;
+  if (!after && s.planId) {
+    const [p] = await db.select({ data: plans.data }).from(plans).where(eq(plans.id, s.planId)).limit(1);
+    if (p) after = sessionMetrics(p.data);
+  }
+  const draft = buildSummary(fresh, s.metricsBefore as SessionMetrics | null, after, s.closingNote);
+  await db
+    .update(consultSessions)
+    .set({ metricsAfter: after, draftSummary: draft })
+    .where(and(eq(consultSessions.id, sessionId), isNull(consultSessions.reviewId)));
+  return { ok: true, sessionId: s.id, draft, todos, date };
 }
 
 export type EndInput = {

@@ -182,7 +182,11 @@ describe("一場諮詢", () => {
 
   it("開場後寫的自動歸屬這一場；結束後產出摘要並保留場次", () => {
     w.confirm = () => true;
+    // ⚠️ 2026/09/13 起「帶不帶日常維護的註記進來」從一句 confirm() 改成清單勾選：
+    //    LN.session() 只負責把清單叫出來，開場是按下去那一刻才發生。
+    //    adoptGo('start') ＝照預設（30 天內全勾）帶進來並開場，等同舊版 confirm 回 true。
     w.LN.session();
+    w.LN.adoptGo("start");
     const sid = w.app.cases[0].sess.id;
     expect(sid).toBeTruthy();
     expect(w.app.cases[0].sess.snap, "開場一定要釘住還原快照").toBeTruthy();

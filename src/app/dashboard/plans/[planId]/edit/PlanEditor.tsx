@@ -10,6 +10,9 @@ import {
   deleteNoteAction,
   listNotesAction,
   startSessionAction,
+  adoptNotesAction,
+  cancelSessionAction,
+  draftForClosedSessionAction,
   endSessionAction,
   saveConsultRecordAction,
   discardDraftAction,
@@ -60,7 +63,10 @@ type NoteAccess = "owner" | "viewer" | "none";
 type NoteMsg =
   | { type: "lantu:note"; op: "add"; input: NoteInput }
   | { type: "lantu:note"; op: "del"; noteId: string }
-  | { type: "lantu:session"; op: "start"; adoptLoose: boolean }
+  | { type: "lantu:session"; op: "start"; adopt: boolean | string[] }
+  | { type: "lantu:session"; op: "adopt"; sessionId: string; noteIds: string[] }
+  | { type: "lantu:session"; op: "cancel"; sessionId: string }
+  | { type: "lantu:session"; op: "fixup"; sessionId: string }
   | { type: "lantu:session"; op: "end"; sessionId: string; input: EndInput }
   | { type: "lantu:session"; op: "restore"; sessionId: string };
 
@@ -79,7 +85,7 @@ type NoteMsg =
  *   blockKey add 專用：那則樂觀註記掛在哪個區塊（父層拿不到 iframe 自己編的 tmp_ id）
  *   body     add 專用：註記內容，配合 blockKey 用來定位要收掉的那一則
  */
-type NoteErrOp = "add" | "del" | "start" | "end" | "restore";
+type NoteErrOp = "add" | "del" | "start" | "adopt" | "cancel" | "fixup" | "end" | "restore";
 const NOTE_ERR_FALLBACK = "沒有存成功。請檢查網路後再試一次。";
 
 // v12 App（/lantu-app.html?embed=1）以 iframe 載入。
@@ -127,7 +133,7 @@ export default function PlanEditor({
   const [state, setState] = useState<SaveState>("idle");
   // ⚠️ 結束諮詢不再直接寫紀錄，而是回一份草稿讓教練當場改（可改日期、類型、貼全文）。
   //    表單跟客戶詳情頁是同一個元件，就地彈出＝不用離開規劃編輯器。
-  const [draft, setDraft] = useState<{ sessionId: string; draft: string; todos: string[] } | null>(null);
+  const [draft, setDraft] = useState<{ sessionId: string; draft: string; todos: string[]; date?: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [draftErr, setDraftErr] = useState<string | null>(null);
   // 存檔輪次：一輪重試還在退避等待時，使用者又動了規劃 → 新的一輪接手，舊的那輪不准再改狀態。
@@ -260,9 +266,29 @@ export default function PlanEditor({
             postErr("del", msg.noteId, "這則註記刪不掉——可能已經被刪除，或你沒有權限。");
           }
         } else if (msg.type === "lantu:session" && msg.op === "start") {
-          const r = await startSessionAction(clientId, planId, msg.adoptLoose);
+          const r = await startSessionAction(clientId, planId, msg.adopt);
           if (r.ok) await reload();
           else postErr("start", null, r.error);
+        } else if (msg.type === "lantu:session" && msg.op === "adopt") {
+          const r = await adoptNotesAction(clientId, msg.sessionId, msg.noteIds);
+          if (r.ok) await reload();
+          else postErr("adopt", msg.sessionId, r.error);
+        } else if (msg.type === "lantu:session" && msg.op === "cancel") {
+          // 取消＝場次整列刪掉、註記解綁回日常維護。reload() 會把 session:null 推回去，
+          // 底列自己變回「不在諮詢中」。
+          const r = await cancelSessionAction(clientId, msg.sessionId);
+          if (r.ok) await reload();
+          else postErr("cancel", msg.sessionId, r.error);
+        } else if (msg.type === "lantu:session" && msg.op === "fixup") {
+          // 補整理一場自動封場的諮詢：現產草稿 → 走的是跟「結束」完全同一個表單。
+          const r = await draftForClosedSessionAction(clientId, msg.sessionId);
+          if (r.ok) {
+            await reload();
+            router.refresh();
+            setDraft({ sessionId: r.sessionId, draft: r.draft, todos: r.todos, date: r.date });
+          } else {
+            postErr("fixup", msg.sessionId, r.error);
+          }
         } else if (msg.type === "lantu:session" && msg.op === "end") {
           const r = await endSessionAction(clientId, msg.sessionId, msg.input);
           if (r.ok) {
@@ -285,12 +311,26 @@ export default function PlanEditor({
         const id = msg.type === "lantu:note"
           ? (msg.op === "del" ? msg.noteId : null)
           : (msg.op === "start" ? null : msg.sessionId);
+
         postErr(op, id, reason(e),
           msg.type === "lantu:note" && msg.op === "add"
             ? { blockKey: msg.input.blockKey, body: msg.input.body }
             : undefined);
       }
     }
+
+    /**
+     * ⚠️⚠️ 註記與場次的訊息一則一則照順序做完，不能並行。
+     *
+     * 自動開場送的是「先 start、緊接著 add」兩則。並行處理的話，add 會在 start 的
+     * reload() 完成之前就去讀 sessionRef.current（那時還是 null）——註記掉進「日常維護」，
+     * 畫面上卻明明顯示諮詢進行中，而且事後看不出哪裡不對。
+     * 順帶也擋掉「連點兩下結束」那一類重入。
+     */
+    let queue: Promise<void> = Promise.resolve();
+    const enqueue = (m: NoteMsg) => {
+      queue = queue.then(() => onNoteMsg(m)).catch(() => {});
+    };
 
     function onMessage(e: MessageEvent) {
       if (e.source !== iframeRef.current?.contentWindow) return;
@@ -300,7 +340,7 @@ export default function PlanEditor({
       if (msg.type === "lantu:ready") {
         postInit();
       } else if (msg.type === "lantu:note" || msg.type === "lantu:session") {
-        void onNoteMsg(msg as unknown as NoteMsg);
+        enqueue(msg as unknown as NoteMsg);
       } else if (msg.type === "lantu:riskinvite") {
         // 教練按「邀請客戶填寫」→ 建一則客戶待辦＋把 client_risk_quiz 的邀請時間戳上去。
         // 客戶填完的答案住他自己的表，教練回來按「套用」才會進 plans.data。
@@ -457,9 +497,13 @@ export default function PlanEditor({
             </div>
             <ConsultRecordForm
               plans={[{ id: planId, year }]}
-              initial={{ planId, summary: draft.draft }}
+              // ⚠️ 補整理舊場次時日期要是**那一天**，不是今天——這正是當初「結束並摘要」
+              //    日期寫死 new Date() 被教練罵的同一個坑。
+              initial={{ planId, summary: draft.draft, ...(draft.date ? { date: draft.date } : {}) }}
               todos={draft.todos}
-              notice="這是依你在各區塊留下的註記與缺口改善產出的草稿。日期、類型、內容都可以改——把整理好的紀錄整段貼上來也可以。現在不存也沒關係，客戶詳情頁會提醒你。"
+              notice={draft.date
+                ? `這一場（${draft.date}）當時沒有按結束，是系統隔天自動封場的。這份草稿是依那一場留下的註記與缺口變化現產的，日期已經填回當天。內容都可以改——把整理好的紀錄整段貼上來也可以。`
+                : "這是依你在各區塊留下的註記與缺口改善產出的草稿。日期、類型、內容都可以改——把整理好的紀錄整段貼上來也可以。現在不存也沒關係，客戶詳情頁會提醒你。"}
               submitLabel="存成諮詢紀錄"
               pending={saving}
               error={draftErr}
