@@ -71,11 +71,7 @@ export default function CoachSpotlight({ coaches }: { coaches: PublicCoach[] }) 
                 比較所有教練
               </Link>
               <div className="flex-1" />
-              {open.code && (
-                <span className="font-mono text-10 tracking-wider text-tx3" title="教練編號">
-                  {open.code}
-                </span>
-              )}
+              {/* 教練編號已經印在卡片名字後面（CoachCard），這裡不再重複一次。 */}
               <button type="button" onClick={() => setOpenId(null)}
                 className="rounded-lg px-3 py-1.5 text-sm border border-line2 text-tx2 hover:bg-panel3">
                 關閉

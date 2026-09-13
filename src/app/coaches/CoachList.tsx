@@ -121,11 +121,7 @@ export default function CoachList({
                   </Link>
                 )}
                 <div className="flex-1" />
-                {c.code && (
-                  <span className="font-mono text-10 tracking-wider text-tx3" title="教練編號">
-                    {c.code}
-                  </span>
-                )}
+                {/* 教練編號已經印在卡片名字後面（CoachCard），這裡不再重複一次。 */}
                 {/* C 階教練照常呈現，只是不給直接指定的按鈕（見檔頭的派案規則）。 */}
                 {!c.pickable ? (
                   <span className="text-11 text-tx3 border border-line rounded-lg px-2.5 py-1.5">

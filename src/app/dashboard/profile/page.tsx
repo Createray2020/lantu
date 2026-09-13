@@ -67,6 +67,7 @@ export default async function ProfilePage() {
           initial={initial}
           specialtyOptions={params.settings.specialties ?? []}
           coachName={me.name}
+          coachCode={me.code ?? null}
           loginName={me.clerkName ?? me.email ?? ""}
           rankLabel={publicRankLabel(me.rankCode)}
           published={p?.published !== false}

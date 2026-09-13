@@ -60,12 +60,14 @@ function loadImage(file: File): Promise<CropSource> {
 }
 
 export default function ProfileEditor({
-  initial, specialtyOptions, coachName, loginName, rankLabel, published,
+  initial, specialtyOptions, coachName, coachCode, loginName, rankLabel, published,
 }: {
   initial: ProfileForm;
   specialtyOptions: string[];
   /** 目前實際會顯示的名字（自填優先）。預覽卡吃它。 */
   coachName: string;
+  /** 教練編號。官網卡片印在名字後面，預覽必須一致（所見即所得不是靠人工同步）。 */
+  coachCode: string | null;
   /** 登入帳號的姓名（Clerk）。當作姓名欄留空時的 placeholder。 */
   loginName: string;
   /** 對外職級。官網卡片印的就是它，預覽必須一致（所見即所得不是靠人工同步）。 */
@@ -312,7 +314,7 @@ export default function ProfileEditor({
       <div className="lg:sticky lg:top-[calc(var(--header-h)+1rem)] h-fit">
         <div className="text-xs text-tx2 mb-2">客戶會看到的樣子</div>
         <CoachCard
-          name={f.displayName.trim() || loginName || coachName} rankLabel={rankLabel}
+          name={f.displayName.trim() || loginName || coachName} code={coachCode} rankLabel={rankLabel}
           headline={f.headline} bio={f.bio} specialties={f.specialties}
           photoUrl={f.photoUrl}
           yearsExp={f.yearsExp === "" ? null : Number(f.yearsExp)}
