@@ -1,6 +1,8 @@
 // 首頁三角色版面（伺服器元件，純呈現）。設計對齊嵐途 v12 深藍＋琥珀金色票。
-import type { HomeView, MemberHome, ManagerHome, OwnerHome } from "@/lib/home";
+import Link from "next/link";
+import type { AgendaItem, HomeView, MemberHome, ManagerHome, OwnerHome } from "@/lib/home";
 import { fmtMoney, fmtNTD, fmtWan } from "@/lib/money";
+import { todayISO } from "@/lib/license";
 
 const nt = fmtNTD;
 
@@ -12,12 +14,17 @@ const TAG: Record<string, string> = {
   mut: "bg-panel2 text-tx2 border border-line",
 };
 
-function Section({ title, more, children }: { title: string; more?: string; children: React.ReactNode }) {
+// ⚠️ `more` 一直只是**一段文字**，不是連結——「公告中心 →」「全部待辦 →」點了都沒反應。
+//    有 moreHref 才真的連出去；沒有的就維持原本那段灰字（那些頁面還不存在，
+//    給一個點了 404 的連結比給一段灰字更糟）。
+function Section({ title, more, moreHref, children }: { title: string; more?: string; moreHref?: string; children: React.ReactNode }) {
   return (
     <div className="bg-panel border border-line rounded-xl px-4 py-4 mb-4 shadow-e1">
       <h4 className="text-sm font-bold text-brand2 flex items-center gap-2 mb-3">
         {title}
-        {more && <span className="ml-auto text-tx2 text-xs font-bold">{more} →</span>}
+        {more && (moreHref
+          ? <Link href={moreHref} className="ml-auto text-tx2 hover:text-brand2 text-xs font-bold transition">{more} →</Link>
+          : <span className="ml-auto text-tx2 text-xs font-bold">{more} →</span>)}
       </h4>
       {children}
     </div>
@@ -201,6 +208,10 @@ function ManagerView({ d }: { d: ManagerHome }) {
         <Kpi icon="✅" label="待審核 / 簽核" value={String(k.pending)} sm="件" top="var(--danger)" />
       </div>
 
+      <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
+        <Agenda items={d.agenda} today={todayISO()} />
+      </Section>
+
       <Section title="🏆 團隊業績排行（本月收益）" more="團隊業績">
         {d.leaderboard.length === 0 ? <Empty>團隊尚無成員業績</Empty> : <Leaderboard rows={d.leaderboard} />}
       </Section>
@@ -267,6 +278,10 @@ function OwnerView({ d }: { d: OwnerHome }) {
         <Kpi icon="🔥" label="活動總量" value={k.activity.toLocaleString("en-US")} sm="次" note="全組織本月" pending={!d.hasMetrics} />
       </div>
 
+      <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
+        <Agenda items={d.agenda} today={todayISO()} />
+      </Section>
+
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <div>
           <Section title="🧭 組織健康度總覽" more="組織儀表">
@@ -321,6 +336,75 @@ function OwnerView({ d }: { d: OwnerHome }) {
   );
 }
 
+// ══════════ 近期行程（公司行事曆 ＋ 我的客戶約訪）══════════
+//
+// 2026/09/14：首頁的分界是「有時間、要出席的」對上「沒時間、要做完的」，
+// 不是「公司的」對上「個人的」。所以公司行程與客戶約訪在同一條時間軸上，
+// 靠左側色條與標籤分開，而不是拆成兩塊要教練自己拼。
+const AGENDA_COLOR: Record<string, string> = {
+  meeting: "var(--info)",
+  training: "var(--brand)",
+  activity: "var(--c5)",
+  ops: "var(--tx2)",
+  appt: "var(--ok)",
+};
+const WD = ["日", "一", "二", "三", "四", "五", "六"];
+
+function dayLabel(iso: string, todayISO: string): { dd: string; wd: string; isToday: boolean } {
+  // 純字串 → UTC 取星期，不經過本地時區（伺服器在 UTC，使用者在台北）。
+  const d = new Date(iso + "T00:00:00Z");
+  const diff = Math.round((d.getTime() - new Date(todayISO + "T00:00:00Z").getTime()) / 86400000);
+  return {
+    dd: `${d.getUTCMonth() + 1}/${d.getUTCDate()}`,
+    wd: diff === 0 ? "今天" : diff === 1 ? "明天" : `週${WD[d.getUTCDay()]}`,
+    isToday: diff === 0,
+  };
+}
+
+function Agenda({ items, today }: { items: AgendaItem[]; today: string }) {
+  if (items.length === 0) {
+    return <Empty>未來七天沒有排定的行程</Empty>;
+  }
+  // 依日期分組，日期當左軸。
+  const groups: { date: string; rows: AgendaItem[] }[] = [];
+  for (const it of items) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === it.date) last.rows.push(it);
+    else groups.push({ date: it.date, rows: [it] });
+  }
+  return (
+    <div className="flex flex-col">
+      {groups.map((g) => {
+        const d = dayLabel(g.date, today);
+        return (
+          <div key={g.date} className="flex gap-3 py-2 border-t border-line first:border-0 first:pt-0">
+            <div className="shrink-0 w-[58px] pt-0.5">
+              <div className={`font-serif text-lg font-bold leading-tight tabular-nums ${d.isToday ? "text-brand2" : "text-tx"}`}>{d.dd}</div>
+              <div className={`text-11 font-semibold tracking-wide ${d.isToday ? "text-brand" : "text-tx3"}`}>{d.wd}</div>
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+              {g.rows.map((r) => (
+                <Link
+                  key={r.id}
+                  href={r.href}
+                  className="flex items-baseline gap-2.5 flex-wrap px-2.5 py-1.5 rounded-lg bg-panel2 hover:bg-field border-l-2 transition"
+                  style={{ borderLeftColor: AGENDA_COLOR[r.kind] ?? "var(--tx3)" }}
+                >
+                  <span className="shrink-0 text-xs font-semibold text-tx2 tabular-nums min-w-[38px]">{r.timeLabel}</span>
+                  <span className="text-13 text-tx">{r.title}</span>
+                  <span className="shrink-0 text-10 font-bold px-1.5 py-px rounded" style={{ color: AGENDA_COLOR[r.kind], background: "color-mix(in srgb, var(--panel) 40%, transparent)" }}>{r.kindLabel}</span>
+                  {r.visLabel && <span className="shrink-0 text-10 font-bold px-1.5 py-px rounded border border-line text-tx3">{r.visLabel}</span>}
+                  {r.place && <span className="text-11 text-tx3">{r.place}</span>}
+                </Link>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="text-tx3 text-sm bg-panel2 border border-line rounded-lg px-3 py-6 text-center shadow-e1">{children}</div>;
 }
@@ -369,8 +453,13 @@ function MemberBody({ d }: { d: MemberHome }) {
       </div>
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <div>
-          <Section title="📌 今日待辦與提醒" more="全部待辦">
-            {d.todos.length === 0 ? <Empty>今天沒有待辦</Empty> : d.todos.map((t, i) => (
+          <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
+            <Agenda items={d.agenda} today={todayISO()} />
+          </Section>
+          {/* ⚠️ 這塊只剩 action_items。約訪已經搬到「近期行程」——兩邊都放的話
+              同一場約訪會在首頁出現兩次。改這塊之前先看 lib/home.ts 的註解。 */}
+          <Section title="✅ 待辦動作" more="全部待辦">
+            {d.todos.length === 0 ? <Empty>沒有待辦動作</Empty> : d.todos.map((t, i) => (
               <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
                 <span className="text-brand2 font-extrabold text-13 w-11 tabular-nums">{t.time}</span>
                 <div className="w-[18px] h-[18px] rounded border-2 border-tx3 shrink-0" />

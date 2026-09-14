@@ -2,15 +2,12 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { actionItems, clients, plans, reviews } from "@/Shared/db/schema";
+// ⚠️ 今天是哪一天一律用 license.ts 那一支（Asia/Taipei）。
+//    這裡原本自己寫了一版 `new Date().toISOString().slice(0,10)` —— 那是 **UTC**，
+//    台北時間 00:00~08:00 之間會算成「昨天」：每天有八小時，今日約訪少一場、
+//    本週區間整個左移、剛過期的待辦還沒被標逾期。改版前這個 bug 從沒噴過錯。
+import { todayISO, addDaysISO } from "./license";
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-function addDaysISO(iso: string, days: number): string {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 function ts(d: Date | null): number {
   return d ? d.getTime() : 0;
 }

@@ -1178,3 +1178,41 @@ export const clientRiskQuiz = pgTable('client_risk_quiz', {
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+
+// ────────────────────────────────────────────────────────────
+// 公司行事曆（2026/09/14 Ray）：讓教練知道公司的日期排程，以及活動與會議紀錄。
+// ────────────────────────────────────────────────────────────
+//
+// ⚠️⚠️ 教育訓練場次**不進這張表**。`comp_training_sessions` 已經是一張
+//    「日期＋主題＋形式＋講師」的公司場次表，而且出席＝時數、時數＝維持資格，
+//    整條分潤制度綁在它上面。行事曆把它**唯讀投影**進來顯示（見 lib/orgEvents.ts），
+//    要改仍然回 /admin/training。把兩張表合併等於為了一個顯示功能去動分潤計算。
+//
+// ⚠️ 時間用 text 存 'HH:MM'，不用 Postgres 的 `time`：
+//    `time` 取回來是 '19:30:00'，全站每個顯示點都要 slice(0,5)，少切一處就露出秒數。
+//    'HH:MM' 的字串排序與時間排序一致，而且寫入前一律過 normalizeTime() 正規化。
+//    null ＝全天事件（畫面顯示「全天」而不是某個時間）。
+//
+// ⚠️⚠️ visibility 是**往上包含**：'manager' 代表主管與核心成員看得到，教練看不到。
+//    這個過濾**一定要下推到 SQL**（見 lib/orgEvents.ts 的 visibleWhere）。
+//    只在畫面上藏等於沒藏——RSC payload 裡撈得到標題。
+export const orgEvents = pgTable('org_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  eventDate: date('event_date').notNull(),
+  startTime: text('start_time'),                    // 'HH:MM'；null＝全天
+  endTime: text('end_time'),                        // 'HH:MM'；null＝不標結束
+  kind: text('kind').default('meeting').notNull(),  // meeting（會議）/ activity（活動）/ ops（公司行程）
+  title: text('title').notNull(),
+  place: text('place'),
+  visibility: text('visibility').default('all').notNull(), // all / manager / owner
+  body: text('body'),                               // 說明、議程
+  minutes: text('minutes'),                         // 會議紀錄，事後補。null＝未補。
+  createdBy: text('created_by').references(() => coaches.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  // 月曆、近期行程、過往紀錄三種查法全部以日期為起點，而且都帶 visibility 條件。
+  index('org_events_date_idx').on(t.eventDate),
+  index('org_events_visibility_date_idx').on(t.visibility, t.eventDate),
+]);

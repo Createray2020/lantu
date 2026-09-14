@@ -21,6 +21,7 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin", label: "教練帳號" },
       { href: "/admin/apply", label: "報聘設定" },
       { href: "/admin/profiles", label: "對外檔案" },
+      { href: "/admin/calendar", label: "公司行事曆" },
       { href: "/admin/training", label: "訓練時數" },
       { href: "/admin/learn", label: "學習區" },
       // 外部客戶（官網自己註冊的那群）與教練帳號是兩批人，刻意排在同一組的最後：

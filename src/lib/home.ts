@@ -11,6 +11,9 @@ import { and, inArray, eq, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { memberMetrics, recruits, announcements, coaches, clients, reviews } from "@/Shared/db/schema";
 import { getCoachDashboard } from "./dashboard";
+// ⚠️ 同 dashboard.ts：今天是哪一天用 Asia/Taipei 那一支，不要用 UTC 的 toISOString()。
+import { todayISO, addDaysISO } from "./license";
+import { upcomingEvents, KIND_LABEL, VIS_LABEL, type EventKind } from "./orgEvents";
 import {
   listActiveCoaches, teamsUnder, downlineIds, visibleCoachIds, rankOf,
   type CoachRow, type OrgRank,
@@ -39,7 +42,6 @@ export function todayLabel(d = new Date()): string {
   const wd = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${wd}`;
 }
-function todayISO(d = new Date()): string { return d.toISOString().slice(0, 10); }
 
 export type Metric = typeof memberMetrics.$inferSelect;
 export type Announcement = typeof announcements.$inferSelect;
@@ -61,6 +63,88 @@ async function listAnnouncements(): Promise<Announcement[]> {
   return rows.slice(0, 5);
 }
 
+// ---------- 近期行程（公司行事曆 + 我的客戶約訪）----------
+//
+// 2026/09/14 Ray 拍板：首頁分成「有時間、要出席的」與「沒時間、要做完的」兩塊，
+// 而不是「公司的」與「個人的」。教練早上的問題只有兩個——幾點要去哪、我還欠什麼沒做。
+// 用公司／個人切，兩個問題都要讀兩塊才拼得出答案。
+//
+// ⚠️⚠️ 所以 todos **不再包含約訪**。併進近期行程卻沒從 todos 拿掉的話，
+//    同一場約訪會在首頁出現兩次——這是改這塊時最容易漏的一件事。
+// ⚠️ 視窗固定 7 天，跟 getCoachDashboard() 的 thisWeek 同寬；兩邊不同寬的話會出現
+//    「近期行程看得到、今日約訪數字沒算到」這種對不起來的狀況。
+export type AgendaItem = {
+  id: string;
+  date: string;
+  /** 時間欄顯示的字：'14:00'／'全天'／'—'（約訪只有日期沒有時間）。 */
+  timeLabel: string;
+  title: string;
+  place: string | null;
+  kind: EventKind | "appt";
+  kindLabel: string;
+  /** 'all' 與約訪回 null＝畫面不用標可見層級。 */
+  visLabel: string | null;
+  /** 點下去要去哪；約訪連到客戶頁。 */
+  href: string;
+};
+
+export const AGENDA_DAYS = 7;
+
+async function agendaFor(
+  rank: OrgRank,
+  appts: { clientId: string; clientName: string; date: string; type: string }[] = [],
+): Promise<AgendaItem[]> {
+  const today = todayISO();
+  const until = addDaysISO(today, AGENDA_DAYS);
+  const events = await upcomingEvents(rank, AGENDA_DAYS);
+
+  // 同一天內的排序鍵：全天（整天都算）'00:00' → 有時間的依時間 → 沒指定時間的約訪 '99:99'。
+  // reviews.next_appt 只有日期沒有時間，硬把它排在最前面會蓋掉真的整天事件。
+  const rows: { key: string; item: AgendaItem }[] = events.map((e) => ({
+    key: e.start ?? "00:00",
+    item: {
+      id: e.id,
+      date: e.date,
+      timeLabel: e.start ?? "全天",
+      title: e.title,
+      place: e.place,
+      kind: e.kind,
+      kindLabel: KIND_LABEL[e.kind],
+      visLabel: e.visibility === "all" ? null : VIS_LABEL[e.visibility],
+      href: `/dashboard/calendar?e=${encodeURIComponent(e.id)}`,
+    },
+  }));
+
+  for (const a of appts) {
+    // upcomingEvents 已經把區間切好了，約訪這邊要自己切——thisWeek 是 7 天沒錯，
+    // 但它不含「今天之前」的判斷以外的東西，邊界還是自己守著比較安全。
+    if (a.date < today || a.date > until) continue;
+    rows.push({
+      key: "99:99",
+      item: {
+        id: `appt:${a.clientId}:${a.date}`,
+        date: a.date,
+        timeLabel: "—",
+        title: `${a.clientName} · ${a.type}`,
+        place: null,
+        kind: "appt",
+        kindLabel: "客戶約訪",
+        visLabel: null,
+        href: `/dashboard/clients/${a.clientId}`,
+      },
+    });
+  }
+
+  rows.sort((x, y) =>
+    x.item.date !== y.item.date
+      ? (x.item.date < y.item.date ? -1 : 1)
+      : x.key === y.key
+        ? x.item.title.localeCompare(y.item.title, "zh-Hant")
+        : (x.key < y.key ? -1 : 1),
+  );
+  return rows.map((r) => r.item);
+}
+
 // ---------- 教練（member）----------
 export type MemberHome = {
   coach: { name: string; title: string | null };
@@ -68,6 +152,9 @@ export type MemberHome = {
   hasMetrics: boolean;
   kpis: { income: number; incomeGoal: number; deals: number; dealsGoal: number; newClients: number; openItems: number; todayAppts: number };
   progressPct: number;
+  /** 近期行程（7 天）：公司行事曆 ＋ 我的客戶約訪，合併成一條時間軸。 */
+  agenda: AgendaItem[];
+  /** ⚠️ 只剩 action_items。約訪已經移到 agenda，這裡再放一次就是重複。 */
   todos: { time: string; title: string; sub: string; tag: string; tagKind: string }[];
   watch: { name: string; note: string; tag: string; tagKind: string; dot: string }[];
   goals: { label: string; cur: number; goal: number; unit: string; kind: string }[];
@@ -82,11 +169,9 @@ export async function getMemberHome(coach: CoachRow, period: string): Promise<Me
   const income = m?.income ?? 0, incomeGoal = m?.incomeGoal || 1;
   const kycPending = Object.entries(d.byStatus).find(([k]) => k === "pending")?.[1] ?? 0;
 
+  // ⚠️ 這裡刻意**不放約訪**——約訪在 agenda 那一塊。兩邊都放＝首頁同一場出現兩次。
   const todos: MemberHome["todos"] = [];
-  for (const a of d.thisWeek.slice(0, 3)) {
-    todos.push({ time: a.date === today ? "今天" : a.date.slice(5).replace("-", "/"), title: `${a.clientName} · ${a.type}`, sub: "約訪 / 諮詢", tag: "約訪", tagKind: "blue" });
-  }
-  for (const it of d.openItems.slice(0, 3)) {
+  for (const it of d.openItems.slice(0, 6)) {
     todos.push({ time: it.dueDate ? it.dueDate.slice(5).replace("-", "/") : "—", title: `${it.clientName} · ${it.title}`, sub: it.owner ? `負責：${it.owner}` : "待辦動作", tag: it.overdue ? "逾期" : "待辦", tagKind: it.overdue ? "warn" : "amber" });
   }
 
@@ -110,6 +195,7 @@ export async function getMemberHome(coach: CoachRow, period: string): Promise<Me
       todayAppts: d.thisWeek.filter((a) => a.date === today).length,
     },
     progressPct: Math.min(100, Math.round((income / incomeGoal) * 100)),
+    agenda: await agendaFor(rankOf(coach), d.thisWeek),
     todos,
     watch,
     goals: [
@@ -133,6 +219,8 @@ export type ManagerHome = {
   activity: { visits: number; calls: number; proposals: number; closes: number };
   funnel: { label: string; value: number }[];
   pending: { title: string; sub: string; tag: string; tagKind: string }[];
+  /** 近期行程（7 天）：主管看得到「主管以上」層級的事件。 */
+  agenda: AgendaItem[];
   weekly: number[];
   announcements: Announcement[];
 };
@@ -216,6 +304,7 @@ export async function getManagerHome(manager: CoachRow, all: CoachRow[], period:
     activity: { visits, calls, proposals, closes },
     funnel,
     pending,
+    agenda: await agendaFor(rankOf(manager)),
     weekly: await teamWeeklyAppts(memberIds),
     announcements: await listAnnouncements(),
   };
@@ -232,6 +321,8 @@ export type OwnerHome = {
   teams: { name: string; income: number; headcount: number; achievePct: number }[];
   trend: { period: string; value: number }[];
   top5: { name: string; income: number }[];
+  /** 近期行程（7 天）：核心成員看得到全部三個層級。 */
+  agenda: AgendaItem[];
   announcements: Announcement[];
 };
 
@@ -304,6 +395,7 @@ export async function getOwnerHome(owner: CoachRow, all: CoachRow[], period: str
       { label: "提案", value: proposals }, { label: "成交", value: closes },
     ],
     teams, trend, top5,
+    agenda: await agendaFor("owner"),
     announcements: await listAnnouncements(),
   };
 }

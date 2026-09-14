@@ -153,6 +153,12 @@ export function todayISO(now: Date = new Date(), timeZone = "Asia/Taipei"): stri
   return p; // en-CA 就是 YYYY-MM-DD
 }
 
+/** YYYY-MM-DD 加減天數。純 UTC 運算，不受伺服器時區影響。 */
+export function addDaysISO(iso: string, days: number): string {
+  const ms = Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) + days * 86400000;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
 /** 兩個 YYYY-MM-DD 相差幾天（b - a）。純日期運算，不受時區影響。 */
 export function diffDays(a: string, b: string): number {
   const ms = Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10))
