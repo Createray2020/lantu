@@ -5310,10 +5310,14 @@ function memberByMid(c,mid){return (c.members||[]).filter(function(m){return m.m
 function primaryIdx(c){var ms=c.members||[];for(var i=0;i<ms.length;i++)if(ms[i].role==='本人')return i;return 0;}
 function spouseMember(c){return (c.members||[]).filter(function(m){return m.role==='配偶'})[0]||null;}
 function memberLabel(c,m,i){var nm=(i===primaryIdx(c))?((c.profile||{}).name||m.name||'本人'):(m.name||'（未命名）');return nm;}
+function firstRole(c,r){return (c.members||[]).filter(function(x){return x&&x.role===r})[0]||null;}
 function effParents(c,m){
  var out=[];
+ var ms=c.members||[],isSelf=(ms[primaryIdx(c)]===m);
  if(m.parentA){var a=memberByMid(c,m.parentA);if(a&&a!==m)out.push(a);}
+ else if(isSelf){var fa=firstRole(c,'父');if(fa&&fa!==m)out.push(fa);}
  if(m.parentB){var b=memberByMid(c,m.parentB);if(b&&b!==m&&out.indexOf(b)<0)out.push(b);}
+ else if(isSelf){var mo=firstRole(c,'母');if(mo&&mo!==m&&out.indexOf(mo)<0)out.push(mo);}
  if(!m.parentA&&!m.parentB&&m.role==='子女'){
   var ms=c.members||[],pm=ms[primaryIdx(c)],sp=spouseMember(c);
   if(pm&&pm!==m)out.push(pm);
@@ -5328,16 +5332,101 @@ function familyGenerations(c){
   var r=(i===pi)?'本人':(m.role||'其他');
   gen[m.mid]=(r==='父'||r==='母'||r==='長輩')?0:(r==='子女')?2:1;
  });
- for(var pass=0;pass<3;pass++){
+ // ⚠️ 配偶一律跟本人同一代：補了祖父母之後本人會被往下推一代，配偶若還照角色留在第 1 代，
+ //    兩個人就錯開一層（族譜上看起來像配偶是本人的長輩）。
+ var self=ms[pi],sp=spouseMember(c);
+ for(var pass=0;pass<4;pass++){
+  if(self&&sp&&sp!==self){var gg=Math.max(gen[self.mid]||0,gen[sp.mid]||0);gen[self.mid]=gen[sp.mid]=gg;}
   ms.forEach(function(m){
    var ps=effParents(c,m);if(!ps.length)return;
    var mx=0;ps.forEach(function(x){mx=Math.max(mx,gen[x.mid]||0)});
    if(gen[m.mid]<=mx)gen[m.mid]=mx+1;
   });
  }
+ if(self&&sp&&sp!==self){var g2=Math.max(gen[self.mid]||0,gen[sp.mid]||0);gen[self.mid]=gen[sp.mid]=g2;}
  return gen;
 }
-function familyTreeSVG(c,theme){
+// ===== 族譜上直接新增（2026/09/25）=====
+// 空位卡（虛線）：本人身邊常駐；其他成員要先點選才長出來，避免整張圖被虛線塞滿。
+// ⚠️ 只在教練端深色版、非唯讀時出現——報告書（theme='light'）永遠是乾淨的族譜。
+// 選取狀態 app.treeSel 只活在記憶體裡，不進 case、不存檔。
+function treeSlots(c,m){
+ var ms=c.members||[],pi=primaryIdx(c),isSelf=(ms[pi]===m);
+ var hasA,hasB;
+ if(isSelf){hasA=!!(memberByMid(c,m.parentA)||firstRole(c,'父'));hasB=!!(memberByMid(c,m.parentB)||firstRole(c,'母'));}
+ else if(!m.parentA&&!m.parentB&&m.role==='子女'){hasA=hasB=effParents(c,m).length>0;}
+ else{hasA=!!memberByMid(c,m.parentA);hasB=!!memberByMid(c,m.parentB);}
+ var out=[];
+ if(!hasA)out.push('pA');
+ if(!hasB)out.push('pB');
+ if(isSelf&&!spouseMember(c))out.push('sp');
+ out.push('ch');
+ return out;
+}
+// 新成員的角色＋要掛哪一條線。角色只用既有的六種（配偶/父/母/子女/長輩/其他），世代由父母連結推出來。
+function treeAddSpec(c,target,kind){
+ var ms=c.members||[],pi=primaryIdx(c),isSelf=(ms[pi]===target);
+ var tr=isSelf?'本人':(target.role||'');
+ var tn=memberLabel(c,target,ms.indexOf(target));
+ if(kind==='sp')return {role:'配偶',gender:(target.gender==='女'?'男':'女'),title:'新增 '+tn+' 的配偶'};
+ if(kind==='pA'||kind==='pB'){
+  var slot=(kind==='pA')?'parentA':'parentB',word=(kind==='pA')?'父親':'母親';
+  var role=isSelf?(kind==='pA'?'父':'母'):((tr==='配偶'||tr==='父'||tr==='母'||tr==='長輩')?'長輩':'其他');
+  return {role:role,gender:(kind==='pA'?'男':'女'),title:'新增 '+tn+' 的'+word,link:function(nm){target[slot]=nm.mid;}};
+ }
+ // 子女：本人／配偶的孩子走既有預設（本人＋配偶），其他人的孩子掛在那一位身上
+ if(isSelf||tr==='配偶')return {role:'子女',gender:'男',title:'新增子女'};
+ return {role:'其他',gender:'男',title:'新增 '+tn+' 的子女',link:function(nm){nm[target.gender==='女'?'parentB':'parentA']=target.mid;}};
+}
+function treeSel(mid){app.treeSel=(app.treeSel===mid)?'':mid;render();}
+function treeGoCard(mid){var el=document.getElementById('pc-'+mid);if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});}
+function treeAddOpen(mid,kind){
+ var c=activeCase();if(!c)return;ensureMemberIds(c);
+ var t=memberByMid(c,mid);if(!t)return;
+ var sp=treeAddSpec(c,t,kind);
+ window._treeAdd={mid:mid,kind:kind};
+ treeAddClose();
+ var mk=document.createElement('div');mk.id='treeAddMask';mk.className='lnmask on';
+ // 樣式寫在行內：.lnmask 是諮詢場次那支腳本啟動時才注入的，不能假設它一定在。
+ mk.style.cssText='position:fixed;inset:0;background:rgba(4,14,24,.76);display:flex;align-items:center;justify-content:center;z-index:80;padding:20px';
+ mk.onclick=function(e){if(e.target===mk)treeAddClose();};
+ mk.innerHTML='<div class="lnmodal" style="max-width:380px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;color:var(--tx)"><h3>'+esc(sp.title)+'</h3>'+
+  '<div class="hint" style="margin-bottom:12px">角色：<b>'+esc(sp.role)+'</b>　其他欄位（投保、分攤…）加入後到下方成員卡片補</div>'+
+  '<div class="fgrid" style="grid-template-columns:1fr">'+
+  '<div class="f"><label>姓名</label><input id="treeAddName" placeholder="可先留空"></div>'+
+  '<div class="f"><label>性別</label><select id="treeAddGender"><option'+(sp.gender==='男'?' selected':'')+'>男</option><option'+(sp.gender==='女'?' selected':'')+'>女</option></select></div>'+
+  '<div class="f"><label>年齡</label><input id="treeAddAge" type="number" min="0" max="120" placeholder="可先留空"></div></div>'+
+  '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'+
+  '<button class="tbtn" onclick="treeAddClose()">取消</button><button class="tbtn amber" id="treeAddOk" onclick="treeAddCommit()">加入</button></div></div>';
+ document.body.appendChild(mk);
+ mk.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();treeAddCommit();}else if(e.key==='Escape')treeAddClose();});
+ var f=document.getElementById('treeAddName');if(f)f.focus();
+}
+function treeAddClose(){var mk=document.getElementById('treeAddMask');if(mk&&mk.parentNode)mk.parentNode.removeChild(mk);}
+// 也可直接帶參數呼叫（測試用）：treeAddCommit({name,gender,age})
+function treeAddCommit(v){
+ var st=window._treeAdd;if(!st)return;
+ var c=activeCase();if(!c)return;ensureMemberIds(c);
+ var t=memberByMid(c,st.mid);if(!t){treeAddClose();return;}
+ if(!v){var g=function(id){var el=document.getElementById(id);return el?el.value:'';};v={name:g('treeAddName'),gender:g('treeAddGender'),age:g('treeAddAge')};}
+ var sp=treeAddSpec(c,t,st.kind);
+ var tpl={name:'',role:'',gender:'男',age:'',unborn:false,bornAt:'',worked:0,insStart:'',pensionStart:'',pensionYears:0,pensionBalance:0,insType:'健保眷屬',insSalary:0,nhiCat:'眷屬(依附投保)',nhiSalary:0,nhiDeps:0,depRatio:0,expRatio:0,indepAge:26};
+ var nm=tpl;nm.mid=newMid();
+ nm.name=String(v.name||'').trim();
+ nm.role=sp.role;
+ nm.gender=(v.gender==='女'||v.gender==='男')?v.gender:sp.gender;
+ nm.age=(v.age===''||v.age==null)?'':n(v.age);
+ // 長輩與配偶不會「財務獨立」；只有子女／其他晚輩保留預設 26 歲
+ if(sp.role!=='子女'&&sp.role!=='其他')nm.indepAge='';
+ if(sp.role==='配偶'&&typeof ensureMemberJob==='function')ensureMemberJob(nm);
+ c.members=c.members||[];c.members.push(nm);
+ if(sp.link)sp.link(nm);
+ window._treeAdd=null;treeAddClose();
+ app.treeSel=nm.mid;
+ stampNeeds(c,'members');save();render();
+ return nm;
+}
+function familyTreeSVG(c,theme,interactive){
  ensureMemberIds(c);
  var ms=c.members||[];
  if(!ms.length)return theme==='light'?'<p style="color:#5a6b72">尚未登錄家庭成員。</p>':'<div class="hint">尚未登錄家庭成員，新增後這裡會自動長出族譜。</div>';
@@ -5346,7 +5435,29 @@ function familyTreeSVG(c,theme){
  var cardBg=dark?TPAL.card:'#f4f7f9',cardBd=dark?TPAL.track:'rgba(0,0,0,.12)';
  var selfBd=dark?TPAL.amber:'#a3814a',spouseBd=dark?TPAL.c2:'#4e7a72';
  var W=150,H=64,GX=20,GY=58,PAD=14;
+ var live=!!interactive&&dark&&!window.LANTU_RO;
+ var sel=live?(memberByMid(c,app.treeSel)||null):null;
  var rows={};ms.forEach(function(m,i){var g=gen[m.mid]||0;(rows[g]=rows[g]||[]).push({m:m,i:i});});
+ // 空位卡：本人常駐＋目前選取的那一位
+ var ghosts=[];
+ if(live){
+  var tg=[ms[pi]];if(sel&&sel!==ms[pi])tg.push(sel);
+  tg.forEach(function(t){
+   if(!t||!t.mid)return;
+   var tgen=gen[t.mid]||0;
+   treeSlots(c,t).forEach(function(k){
+    // 配偶的「＋子女」跟本人那一格是同一件事（子女預設掛本人＋配偶），只留本人那格，免得出現兩個。
+    if(k==='ch'&&t!==ms[pi]&&t===spouseMember(c))return;
+    var g=(k==='pA'||k==='pB')?tgen-1:(k==='ch'?tgen+1:tgen);
+    var lab={pA:'＋ 父',pB:'＋ 母',sp:'＋ 配偶',ch:'＋ 子女'}[k];
+    var o={ghost:true,t:t,k:k,lab:lab,m:{mid:'g-'+t.mid+'-'+k}};
+    ghosts.push(o);
+    var row=(rows[g]=rows[g]||[]);
+    if(k==='sp'){var at=-1;row.forEach(function(r,ri){if(r.m===t)at=ri;});row.splice(at+1,0,o);}
+    else row.push(o);
+   });
+  });
+ }
  var gks=Object.keys(rows).map(Number).sort(function(a,b){return a-b});
  var maxCols=0;gks.forEach(function(g){maxCols=Math.max(maxCols,rows[g].length)});
  var totalW=PAD*2+maxCols*W+(maxCols-1)*GX;
@@ -5371,6 +5482,26 @@ function familyTreeSVG(c,theme){
    if(xs.length>1)links+='<line x1="'+Math.min.apply(null,xs)+'" y1="'+py.toFixed(1)+'" x2="'+Math.max.apply(null,xs)+'" y2="'+py.toFixed(1)+'" stroke="'+line+'" stroke-width="1.4"/>';
   }
  });
+ // 空位卡的虛線：父母空位 → 目標；目標（本人有配偶時取兩人中點）→ 子女空位
+ ghosts.forEach(function(o){
+  var q=pos[o.m.mid],tp=pos[o.t.mid];if(!q||!tp)return;
+  var dash='stroke-dasharray="4 4" stroke-width="1.2" fill="none" stroke="'+line+'"';
+  if(o.k==='pA'||o.k==='pB'){var my=(q.y+H+tp.y)/2;
+   links+='<path d="M'+(q.x+W/2)+' '+(q.y+H)+' V'+my+' H'+(tp.x+W/2)+' V'+tp.y+'" '+dash+'/>';}
+  else if(o.k==='ch'){var sx=tp.x+W/2,spm=spouseMember(c);
+   if(o.t===ms[pi]&&spm&&pos[spm.mid]&&pos[spm.mid].y===tp.y)sx=(sx+pos[spm.mid].x+W/2)/2;
+   var my2=(tp.y+H+q.y)/2;
+   links+='<path d="M'+sx+' '+(tp.y+H)+' V'+my2+' H'+(q.x+W/2)+' V'+q.y+'" '+dash+'/>';}
+  else if(o.k==='sp'&&q.y===tp.y){var x1=Math.min(tp.x,q.x)+W,x2=Math.max(tp.x,q.x);
+   links+='<line x1="'+x1+'" y1="'+(q.y+H/2)+'" x2="'+x2+'" y2="'+(q.y+H/2)+'" '+dash+'/>';}
+ });
+ var ghostCards=ghosts.map(function(o){
+  var q=pos[o.m.mid];if(!q)return '';
+  return '<g class="ftghost" style="cursor:pointer" onclick="treeAddOpen(\''+esc(o.t.mid)+'\',\''+o.k+'\')">'+
+   '<title>'+esc(o.lab.replace('＋ ','新增'))+'</title>'+
+   '<rect x="'+q.x+'" y="'+q.y+'" width="'+W+'" height="'+H+'" rx="10" fill="transparent" stroke="'+sub+'" stroke-width="1.2" stroke-dasharray="5 4"/>'+
+   '<text x="'+(q.x+W/2)+'" y="'+(q.y+H/2+5)+'" fill="'+sub+'" font-size="13" font-weight="700" text-anchor="middle">'+o.lab+'</text></g>';
+ }).join('');
  var cards=ms.map(function(m,i){
   var q=pos[m.mid];if(!q)return '';
   var isSelf=(i===pi),role=isSelf?'本人':(m.role||'未指定');
@@ -5383,15 +5514,20 @@ function familyTreeSVG(c,theme){
   var l2=[role,ageTxt].filter(Boolean).join(' · ');
   var l3=jt||m.insType||'';
   var bd=isSelf?selfBd:(role==='配偶'?spouseBd:cardBd);
-  return '<g><rect x="'+q.x+'" y="'+q.y+'" width="'+W+'" height="'+H+'" rx="10" fill="'+cardBg+'" stroke="'+bd+'" stroke-width="'+(isSelf||role==='配偶'?'1.8':'1')+'"/>'+
+  var on=(sel===m);
+  var gAttr=live?' class="ftnode" style="cursor:pointer" onclick="treeSel(\''+esc(m.mid)+'\')"':'';
+  var goCard=on?'<text x="'+(q.x+W-10)+'" y="'+(q.y+18)+'" fill="'+selfBd+'" font-size="11" font-weight="700" text-anchor="end" style="cursor:pointer" onclick="event.stopPropagation();treeGoCard(\''+esc(m.mid)+'\')">↓ 資料卡</text>':'';
+  return '<g'+gAttr+'><rect x="'+q.x+'" y="'+q.y+'" width="'+W+'" height="'+H+'" rx="10" fill="'+cardBg+'" stroke="'+(on?selfBd:bd)+'" stroke-width="'+(on?'2.6':(isSelf||role==='配偶'?'1.8':'1'))+'"/>'+goCard+
    '<text x="'+(q.x+12)+'" y="'+(q.y+22)+'" fill="'+txt+'" font-size="13" font-weight="800">'+esc(String(nm).slice(0,9))+'</text>'+
    '<text x="'+(q.x+12)+'" y="'+(q.y+39)+'" fill="'+sub+'" font-size="11">'+esc(l2)+'</text>'+
    '<text x="'+(q.x+12)+'" y="'+(q.y+54)+'" fill="'+sub+'" font-size="11">'+esc(String(l3).slice(0,12))+'</text></g>';
  }).join('');
- return '<div style="overflow-x:auto"><svg viewBox="0 0 '+Math.round(totalW)+' '+Math.round(totalH)+'" width="100%" style="max-width:'+Math.round(totalW)+'px;height:auto;display:block;margin:0 auto">'+links+cards+'</svg></div>';
+ return '<div style="overflow-x:auto"><svg viewBox="0 0 '+Math.round(totalW)+' '+Math.round(totalH)+'" width="100%" style="max-width:'+Math.round(totalW)+'px;height:auto;display:block;margin:0 auto">'+links+ghostCards+cards+'</svg></div>';
 }
 function familyTreeSec(c){
- return '<div class="sec"><h4>家族族譜 <span class="hint">依家庭成員的角色與父母設定自動生成；可在下方每張成員卡片的「族譜關係」改指定</span></h4>'+familyTreeSVG(c)+'</div>';
+ return '<div class="sec"><h4>家族族譜 <span class="hint">點虛線空位直接新增家庭成員；點任一位成員可替他加父母、子女</span>'+
+  // ⚠️ hint 裡的「家庭成員」四個字不能拿掉：註記掛點 family.people 靠標題比對「家庭成員」掛在這一區（notesUI.test 守著）
+  '</h4>'+familyTreeSVG(c,'dark',true)+'</div>';
 }
 function personCard(c,m,idx,isPrimary){
  var p=c.profile;
@@ -5514,7 +5650,7 @@ function personCard(c,m,idx,isPrimary){
   ?'<div class="note" style="border-color:rgba(224,138,104,.5);color:var(--warn)">⚠️ 還沒指定<b>角色</b>（卡片標題右邊的下拉）。'
    +'未指定角色的成員<b>不會列入子女教育、保障需求與健保計算</b>——選了角色才會開始算。</div>'
   :'';
- return '<div class="pcard '+cls+'">'+hd+'<div class="pbody">'+roleWarn+idBlock+workBlock+ratioBlock+kinBlock(c,m,idx,isPrimary)+bgBlock(c,m,idx,isPrimary)+'</div></div>';
+ return '<div class="pcard '+cls+'" id="pc-'+esc(m.mid||'')+'">'+hd+'<div class="pbody">'+roleWarn+idBlock+workBlock+ratioBlock+kinBlock(c,m,idx,isPrimary)+bgBlock(c,m,idx,isPrimary)+'</div></div>';
 }
 // 背景補充：這些沒有欄位可以放，但它們是判斷「這個人接下來會怎麼決定」的脈絡。
 // 一個換過三次產業的業務、跟一個待了二十年的公務員，同樣的數字要給的建議完全不同。
@@ -14772,6 +14908,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
   var RO_NOTE_DEFAULT='唯讀模式：使用期限已到期，這份規劃目前的修改不會被儲存。請聯繫管理員延長期限。';
   function applyReadOnly(on,note){
     READONLY=!!on;
+    window.LANTU_RO=READONLY;   // 族譜空位卡看這個：唯讀時不給新增入口
     // 唯讀時 save() 直接 return，按鈕按了不會有任何事發生 → 收起來，狀態也清掉。
     var sb=document.getElementById('saveBtn');if(sb)sb.style.display=READONLY?'none':'';
     if(READONLY)setSaveState('','');
