@@ -251,6 +251,12 @@ h1,h2,h3,h4{margin:0}
    ⚠️ 顏色從 --amber2 換成 --amber：淺色主題下 --amber2(#c08f3c) 對白底只有
       約 2.9:1，15px 的標題未達 AA；--amber(#9a6f22) 約 4.5:1。深色版兩者都夠。 */
 .sec h4{font-size:15px;font-weight:700;margin-bottom:10px;color:var(--amber);display:flex;align-items:center;gap:8px;flex-wrap:wrap;letter-spacing:.01em}
+.addtr td{padding:6px 0 2px!important;border:none!important;background:transparent!important}
+.addtr:hover td{background:transparent!important}
+.addline{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:1px dashed var(--line);color:var(--teal);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer}
+.addline:hover{border-color:var(--teal);background:color-mix(in srgb, var(--teal) 7%, transparent)}
+.addline .addmsg{color:var(--mut2);font-weight:400}
+.addline .addmsg::before{content:'·';margin-right:8px}
 .sec h4 .add{margin-left:auto;background:var(--card);border:1px solid var(--line);color:var(--teal);border-radius:8px;padding:4px 11px;font-size:12px;font-weight:700}
 /* ⚠️⚠️ 改版前 .hint 只有下面那條 `.sec .hint`，**沒有基底規則**。任何不在 .sec 裡的
    提示（成員卡 .pcard、保單卡…全站 380 個 class="hint" 有一大半在這種位置）就
@@ -5996,7 +6002,7 @@ function incomesSec(c){
   }).join('');
   return '<tr><td colspan="10" style="background:var(--field);color:var(--amber2);font-weight:700">'+esc(o)+' <span class="muted" style="font-weight:400">· 年化小計 '+fmt(sub)+'</span></td></tr>'+rows;
  }).join('');
- return '<div class="sec"><h4>收入 <button class="add" onclick="addRow(\'incomes\')">＋ 新增</button></h4><table>'+head+(body||'<tr><td colspan="10" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table><div class="hint">依持有人自動分組並顯示年化小計；金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。子類別僅供分類與報告，不影響稅務大類（工作/理財/其他）。</div></div>'+incomeCeilingSec(c);
+ return '<div class="sec"><h4>收入</h4><table>'+head+(body||'')+addTr('incomes',10,body?'':'尚無資料')+'</table><div class="hint">依持有人自動分組並顯示年化小計；金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。子類別僅供分類與報告，不影響稅務大類（工作/理財/其他）。</div></div>'+incomeCeilingSec(c);
 }
 function expensesSec(c){
  var head='<tr><th>項目</th><th>分類</th><th>週期</th><th>金額</th><th>年化</th><th>通膨</th><th>起</th><th>訖</th><th>可刪減%</th><th></th></tr>';
@@ -6017,7 +6023,7 @@ function expensesSec(c){
     '<td><button class="del" onclick="delRow(\'expenses\','+idx+')">✕</button></td></tr>';
  }).join('');
  var note=(app.ownerView&&app.ownerView!=='全家')?'<div class="hint" style="margin-bottom:6px;color:var(--amber2)">目前為「'+esc(app.ownerView)+'」視角；支出屬家庭層級、不分持有人，以下仍顯示全部。</div>':'';
- return '<div class="sec"><h4>支出 <button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></h4>'+note+'<table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table><div class="hint">金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。</div></div>';
+ return '<div class="sec"><h4>支出</h4>'+note+'<table>'+head+(rows||'')+addTr('expenses',10,rows?'':'尚無資料')+'</table><div class="hint">金額可切「年/月」，選「月」會自動年化計入試算（資料一律存年額）。</div></div>';
 }
 // ===== 退休分頁 =====
 // ① 退休時點（每位賺薪成員各一個）② 退休期支出明細表 ③ 三段對照
@@ -6092,7 +6098,7 @@ function retireExpTable(c){
  var tot=sum(c.retireExpenses,function(x){return n(x.amount);});
  // ⚠️ 一定要包 .tw：九欄的輸入表在 1100px 以下比容器寬，沒有自己的橫向捲動框
  //    就會把整頁撐出橫向捲軸（.main 已經不再是捲動容器，接不住了）。
- return '<div class="tw"><table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:12px">尚無資料。按「依工作期帶入」一鍵複製，或點「＋ 新增」逐列填。留空時系統會退回上面的「期望退休月生活費」。</td></tr>')+'</table></div>'+
+ return '<div class="tw"><table>'+head+(rows||'')+addTr('retireExpenses',10,rows?'':'尚無資料。可按「依工作期帶入」一鍵複製，或從這裡逐列填；留空時系統會退回上面的「期望退休月生活費」')+'</table></div>'+
   '<div class="hint" style="margin-top:6px">合計 <b>'+fmt(tot)+'</b> 元/年（現值）。起歲留空＝從本人退休（'+(ra||'—')+' 歲）起、訖歲留空＝到預估壽命（'+(le||'—')+' 歲）。照護費 80 歲後才上來、旅遊只到 75 歲，就逐列設起訖歲。</div>';
 }
 // 一鍵把工作期的生活＋消費列複製過來乘上取代率。不自動觸發，免得洗掉已經調好的。
@@ -6113,7 +6119,7 @@ function retireExpSec(c){
  var r=c.retire||{};
  var rate=n(r.replaceRate)||75;
  return '<div class="sec"><h4>退休期支出明細 <span class="hint">賺薪成員都退休後的家庭年支出；混合期系統自動按權重取比例</span>'+
-  '<button class="add" onclick="addRow(\'retireExpenses\')">＋ 新增</button>'+sortBtn('retireExpenses','expense')+
+  sortBtn('retireExpenses','expense')+
   // A5：這裡原本寫 '</div>'，把 <h4> 和外層 .sec 一起提前關掉，
   //     結尾那個 </div> 就變成多的一個、直接關掉 .main
   //     → laborPensionBox / laborDetailHTML / prep 三塊被擠進 262px 的側欄格子。
@@ -10306,7 +10312,7 @@ function bizCompSec(c){
   '<td class="bad">'+fmt(r.incomeTax)+'<div class="muted" style="font-size:11px">'+(r.dividend>0?(r.mergedBetter?'合併計稅較優':'分開計稅較優'):'—')+'</div></td>'+
   '<td class="bad">'+fmt(r.nhi)+'</td><td><b>'+fmt(r.netCost)+'</b></td><td>'+fmt(r.takeHome)+'</td>'+
   '<td>'+fmt(r.pension)+'</td><td>'+fmt(r.loanCapacity)+'</td></tr>'}).join('')
-  ||'<tr><td colspan="12" class="muted" style="padding:14px">尚無組合，點「＋ 新增」建一個情境（建議至少三個：薪資為主／股利為主／混合）。</td></tr>';
+  ||'<tr><td colspan="12" class="muted" style="padding:14px">尚無組合，在上方「報酬組合情境」表格新增一個情境（建議至少三個：薪資為主／股利為主／混合）。</td></tr>';
  var tbl=tableSec('報酬組合情境','compScenarios',c.compScenarios,[['name','情境名稱','text'],['salary','薪資(年)','money'],['dividend','股利(年)','money'],['rent','租金(年)','money']],
   '建議至少建三個：<b>薪資為主</b>（退休年資與貸款條件最好，但綜所稅與勞健保成本最高）、<b>股利為主</b>（不負擔勞健保，但要先被公司課 '+(PROFIT_TAX_RATE*100)+'%，而且完全不累積年資）、<b>混合</b>。每年五月前重算一次，不要沿用去年。');
  return '<div class="folded" style="border-style:solid;border-color:rgba(143,192,163,.32);color:var(--mut);display:block">'+
@@ -10599,7 +10605,7 @@ function groupedTable(c,title,arr,list,cols,ownerKey,valFn,hint){
   }).join('');
   return '<tr><td colspan="'+ncol+'" style="background:var(--field);color:var(--amber2);font-weight:700">'+esc(o)+' <span class="muted" style="font-weight:400">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
  }).join('');
- return '<div class="sec"><h4>'+title+' <button class="add" onclick="addRow(\''+arr+'\')">＋ 新增</button></h4><div class="tw"><table>'+head+(body||'<tr><td colspan="'+ncol+'" class="muted" style="padding:14px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table></div>'+(hint?'<div class="hint">'+hint+'</div>':'')+'</div>';
+ return '<div class="sec"><h4>'+title+'</h4><div class="tw"><table>'+head+(body||'')+addTr(arr,ncol,body?'':'此視角無資料')+'</table></div>'+(hint?'<div class="hint">'+hint+'</div>':'')+'</div>';
 }
 function assetsSec(c){
  var tbl=groupedTable(c,'資產','assets',c.assets,[['name','名稱','text'],['owner','持有人','memsel'],['mainCat','主分類','sel:自用資產,可投資資產'],['type','次分類','sel:現金,定存,股票,基金,債券,不動產,其他'],['cls','流動性','sel:流動,固定'],['region','地區','sel:台灣,美國,韓國,其他海外'],['currency','幣別','sel:台幣,美金,人民幣,日圓,港幣,其他'],['fxRate','匯率','num'],['cost','購入價(原幣)','money'],['value','現值(原幣)','money'],['ret','報酬率%','num'],['income','被動現金流(原幣/年)','money'],['movable','可變動','bool']],'owner',aVal,'依持有人分組、小計為台幣現值；現值/購入價/被動現金流以原幣輸入，依匯率換算統計。');
@@ -10846,7 +10852,7 @@ function finIncTable(c){
   }).join('');
   return '<tr class="grp"><td colspan="11" data-fingrp="incomes|'+esc(o)+'">'+esc(o)+' <span class="gm">· 年化小計 '+fmt(sub)+'</span></td></tr>'+rows;
  }).join('');
- return '<table>'+head+(body||'<tr><td colspan="11" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
+ return '<table>'+head+(body||'')+addTr('incomes',11,body?'':'此視角無資料')+'</table>';
 }
 
 // 本人月薪投影過來的收入列。與 premRowHTML／nhiRowHTML 同一套：鎖住、標來源、給一顆關閉。
@@ -10897,7 +10903,7 @@ function finExpTable(c){
     '</div></td></tr>':'';
    return main+detail;
  }).join('');
- return expLoanBlock(c)+'<table>'+head+(rows||'<tr><td colspan="10" class="muted" style="padding:12px">尚無資料，點「＋ 新增」。</td></tr>')+'</table>';
+ return expLoanBlock(c)+'<table>'+head+(rows||'')+addTr('expenses',10,rows?'':'尚無資料')+'</table>';
 }
 
 // 手動貸款列撞到負債表已有的同類貸款 → 標一下。
@@ -10956,7 +10962,7 @@ function finSavTable(c){
  var span='<div class="hint" style="margin-top:8px;line-height:1.7">「起／訖」是這一列<b>實際在投入的年齡區間</b>：'
   +'有效儲蓄率只算<b>現齡（'+nowAge(c)+' 歲）落在起訖之內</b>的列，與投影同一個口徑。'
   +'<b>留空或 0 ＝ 沒有設這個界線</b>（不是 0 歲），代表全期間都在投入。</div>';
- return '<table>'+head+(rows||'<tr><td colspan="8" class="muted" style="padding:12px">尚無資料，點「＋ 新增」。零存整付、儲蓄險保費、定期定額、勞退自提都填在這裡。</td></tr>')+'</table>'+span;
+ return '<table>'+head+(rows||'')+addTr('savings',8,rows?'':'尚無資料。零存整付、儲蓄險保費、定期定額、勞退自提都填在這裡')+'</table>'+span;
 }
 
 function finAstTable(c){
@@ -11005,7 +11011,7 @@ function finAstTable(c){
   }).join('');
   return '<tr class="grp"><td colspan="8" data-fingrp="assets|'+esc(o)+'">'+esc(o)+' <span class="gm">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
  }).join('');
- return '<table>'+head+(body||'<tr><td colspan="8" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
+ return '<table>'+head+(body||'')+addTr('assets',8,body?'':'此視角無資料')+'</table>';
 }
 
 function finLiaTable(c){
@@ -11058,7 +11064,7 @@ function finLiaTable(c){
   }).join('');
   return '<tr class="grp"><td colspan="8" data-fingrp="liabilities|'+esc(o)+'">'+esc(o)+' <span class="gm">· 小計(台幣) '+fmt(sub)+'</span></td></tr>'+rows;
  }).join('');
- return '<table>'+head+(body||'<tr><td colspan="8" class="muted" style="padding:12px">此視角無資料，點「＋ 新增」。</td></tr>')+'</table>';
+ return '<table>'+head+(body||'')+addTr('liabilities',8,body?'':'此視角無資料')+'</table>';
 }
 
 function finTotals(c){
@@ -11218,11 +11224,11 @@ function financeSec(c){
  '</div>';
  var expNote=(app.ownerView&&app.ownerView!=='全家')?'<div class="finfoot" style="border:0;padding-top:0;color:var(--amber2)">＊ 支出屬家庭層級、不分持有人，仍顯示全部。</div>':'';
  var quad='<div class="finquad">'+
-  '<div class="finpanel inc" data-ivsec="income" data-ivname="收入現況"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div>'+sortBtn('incomes','income')+'<button class="add" onclick="addRow(\'incomes\')">＋ 新增</button></div><div class="fintbl">'+finIncTable(c)+'</div>'+autoBlockedHTML(c,'salary')+assetIncomeMirrorHTML(c)+'</div>'+
-  '<div class="finpanel exp" data-ivsec="expense" data-ivname="支出現況"><div class="finph"><div class="ic" style="background:rgba(224,138,104,.16);color:var(--warn)">支</div><h4>支出</h4><div class="sub"><div class="sl">年化小計</div><div class="sv neg" id="finSub_exp">'+fmt(t.exp)+'</div></div>'+sortBtn('expenses','expense')+'<button class="add" onclick="addRow(\'expenses\')">＋ 新增</button></div><div class="fintbl">'+finExpTable(c)+'</div>'+expNote+'</div>'+
-  '<div class="finpanel ast" data-ivsec="asset" data-ivname="資產現況"><div class="finph"><div class="ic" style="background:rgba(169,188,207,.16);color:var(--teal)">資</div><h4>資產 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">現值合計</div><div class="sv" style="color:var(--teal)" id="finSub_ast">'+fmt(t.ast)+'</div></div>'+sortBtn('assets','asset')+'<button class="add" onclick="addRow(\'assets\')">＋ 新增</button></div><div class="fintbl">'+finAstTable(c)+'</div><div class="finfoot"><span>原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
-  '<div class="finpanel lia" data-ivsec="debt" data-ivname="負債現況"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">債</div><h4>負債 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">餘額合計</div><div class="sv" style="color:var(--amber2)" id="finSub_lia">'+fmt(t.lia)+'</div></div>'+sortBtn('liabilities','liability')+'<button class="add" onclick="addRow(\'liabilities\')">＋ 新增</button></div><div class="fintbl">'+finLiaTable(c)+'</div><div class="finfoot"><span>餘額原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
-  '<div class="finpanel sav" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">儲</div><h4>儲蓄理財投入 <span class="fintag">不計入支出</span></h4><div class="sub"><div class="sl">年化合計</div><div class="sv" style="color:var(--teal)" id="finSub_sav">'+fmt(t.sav)+'</div></div>'+sortBtn('savings','saving')+'<button class="add" onclick="addRow(\'savings\')">＋ 新增</button></div><div class="fintbl">'+finSavTable(c)+'</div><div class="finfoot"><span>零存整付、儲蓄險保費、定期定額、勞退自提、投資型保單投資保費——這些是「換口袋」不是「花掉」，所以不進總支出，而是「有效儲蓄率」的分子。</span></div></div>'+
+  '<div class="finpanel inc" data-ivsec="income" data-ivname="收入現況"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div>'+sortBtn('incomes','income')+'</div><div class="fintbl">'+finIncTable(c)+'</div>'+autoBlockedHTML(c,'salary')+assetIncomeMirrorHTML(c)+'</div>'+
+  '<div class="finpanel exp" data-ivsec="expense" data-ivname="支出現況"><div class="finph"><div class="ic" style="background:rgba(224,138,104,.16);color:var(--warn)">支</div><h4>支出</h4><div class="sub"><div class="sl">年化小計</div><div class="sv neg" id="finSub_exp">'+fmt(t.exp)+'</div></div>'+sortBtn('expenses','expense')+'</div><div class="fintbl">'+finExpTable(c)+'</div>'+expNote+'</div>'+
+  '<div class="finpanel ast" data-ivsec="asset" data-ivname="資產現況"><div class="finph"><div class="ic" style="background:rgba(169,188,207,.16);color:var(--teal)">資</div><h4>資產 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">現值合計</div><div class="sv" style="color:var(--teal)" id="finSub_ast">'+fmt(t.ast)+'</div></div>'+sortBtn('assets','asset')+'</div><div class="fintbl">'+finAstTable(c)+'</div><div class="finfoot"><span>原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
+  '<div class="finpanel lia" data-ivsec="debt" data-ivname="負債現況"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">債</div><h4>負債 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">餘額合計</div><div class="sv" style="color:var(--amber2)" id="finSub_lia">'+fmt(t.lia)+'</div></div>'+sortBtn('liabilities','liability')+'</div><div class="fintbl">'+finLiaTable(c)+'</div><div class="finfoot"><span>餘額原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
+  '<div class="finpanel sav" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">儲</div><h4>儲蓄理財投入 <span class="fintag">不計入支出</span></h4><div class="sub"><div class="sl">年化合計</div><div class="sv" style="color:var(--teal)" id="finSub_sav">'+fmt(t.sav)+'</div></div>'+sortBtn('savings','saving')+'</div><div class="fintbl">'+finSavTable(c)+'</div><div class="finfoot"><span>零存整付、儲蓄險保費、定期定額、勞退自提、投資型保單投資保費——這些是「換口袋」不是「花掉」，所以不進總支出，而是「有效儲蓄率」的分子。</span></div></div>'+
   '<div class="finpanel lay" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">布</div><h4>資產布局規劃</h4></div><div class="fintbl">'+assetLayoutTable(c)+'</div></div>'+
  '</div>';
  return ownerBar(c)+summary+incomeCeilingSec(c)+shortTermSec(c)+'<div class="finhint">💡 一個介面同時填完：左上收入、右上支出＝現金流；左下資產、右下負債＝資產負債表；下方儲蓄理財投入與資產布局。任一格輸入，頂部年結餘、淨值即時更新。每列左側的 ⠿ 可拖曳排序，「⇅ 自動整理」把同分類的項目收攏在一起。</div>'+quad;
@@ -12709,6 +12715,13 @@ function houseCalcSec(c){
  if(!cards)return '';
  return '<div class="sec"><h4>購置試算 <span class="hint">利率與年期填了，這筆貸款就會真的進一生金流：那一年只扣頭期款，之後逐年扣月付，房子進固定資產。三個欄位（成數／利率／年期）缺一個就退回「那一年一次付清」</span></h4>'+cards+'</div>';
 }
+// 表格最後一列固定是「＋ 新增一列」（2026/09/25 Ray）：新增入口就在新列會長出來的位置，
+// 不用抬頭找右上角。空表時這一列本身兼「尚無資料」提示。
+// ⚠️ 保留 class="add"：planChartsUI.test 用 button.add 找新增鈕。
+function addTr(arr,ncol,msg,fn){
+ var on=fn||('addRow(\''+arr+'\')');
+ return '<tr class="addtr"><td colspan="'+ncol+'"><button type="button" class="add addline" onclick="'+on+'">＋ 新增一列'+(msg?'<span class="addmsg">'+msg+'</span>':'')+'</button></td></tr>';
+}
 function tableSec(title,arr,list,cols,hint){var c=activeCase();
  var head='<tr>'+cols.map(function(cl){return '<th>'+cl[1]+'</th>'}).join('')+'<th></th></tr>';
  var rows=(list||[]).map(function(row,i){var tds=cols.map(function(cl){var k=cl[0],ty=cl[2],id=arr+':'+i;
@@ -12721,7 +12734,7 @@ function tableSec(title,arr,list,cols,hint){var c=activeCase();
    var tt=(ty==='num'?'num':'txt');
    return '<td><input '+(ty==='num'?'type="number"':'')+' value="'+esc(row[k])+'" oninput="setLive(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')"></td>';
   }).join('');return '<tr>'+tds+'<td><button class="del" onclick="delRow(\''+arr+'\','+i+')">✕</button></td></tr>';}).join('');
- return '<div class="sec"><h4>'+title+'<button class="add" onclick="addRow(\''+arr+'\')">＋ 新增</button></h4>'+(hint?'<div class="hint" style="margin:-4px 0 9px">'+hint+'</div>':'')+'<div class="tw"><table>'+head+(rows||'<tr><td colspan="12" class="muted" style="padding:14px">尚無資料，點「＋ 新增」。</td></tr>')+'</table></div></div>';
+ return '<div class="sec"><h4>'+title+'</h4>'+(hint?'<div class="hint" style="margin:-4px 0 9px">'+hint+'</div>':'')+'<div class="tw"><table>'+head+(rows||'')+addTr(arr,cols.length+1,rows?'':'尚無資料')+'</table></div></div>';
 }
 
 function financeNavHTML(){
