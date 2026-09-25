@@ -154,3 +154,71 @@ describe("不重複的空位", () => {
     expect(g.filter((k) => k === "ch")).toHaveLength(1);
   });
 });
+
+describe("點人員框＝編輯小視窗", () => {
+  const edit = (mid: string, v: Record<string, unknown>) => {
+    w._treeEdit = { mid };
+    w.treeEditCommit({ name: null, gender: null, age: null, role: null, ...v });
+  };
+
+  it("點下去會選取並跳出編輯視窗，欄位帶入現值；關掉後仍是選取", () => {
+    const sp = add(self().mid, "sp", { name: "太太", age: "39" });
+    w.treeSel(sp.mid);
+    expect(w.app.treeSel).toBe(sp.mid);
+    const mk = w.document.getElementById("treeAddMask");
+    expect(mk).toBeTruthy();
+    expect(w.document.getElementById("treeAddName").value).toBe("太太");
+    expect(w.document.getElementById("treeAddAge").value).toBe("39");
+    expect(w.document.getElementById("treeAddRole").value).toBe("配偶");
+    expect(mk.textContent).toContain("刪除");
+    w.treeAddClose();
+    expect(w.document.getElementById("treeAddMask")).toBeNull();
+    expect(w.app.treeSel).toBe(sp.mid);
+  });
+
+  it("本人：寫進 c.profile、角色鎖定、沒有刪除鈕", () => {
+    w.treeSel(self().mid);
+    const mk = w.document.getElementById("treeAddMask");
+    expect(w.document.getElementById("treeAddRole")).toBeNull();
+    expect(mk.textContent).not.toContain("刪除");
+    w.treeAddClose();
+    edit(self().mid, { name: "王大明", gender: "男", age: "42" });
+    expect(c().profile.name).toBe("王大明");
+    expect(c().profile.age).toBe(42);
+  });
+
+  it("改名會連帶更新以姓名為外鍵的欄位（走 set() 的 renameMemberRefs）", () => {
+    const sp = add(self().mid, "sp", { name: "太太" });
+    c().incomes = [{ name: "薪資", owner: "太太", type: "工作", amount: 100 }];
+    edit(sp.mid, { name: "林小美", gender: "女", age: "38", role: "配偶" });
+    expect(sp.name).toBe("林小美");
+    expect(sp.age).toBe(38);
+    expect(c().incomes[0].owner).toBe("林小美");
+  });
+
+  it("可以改角色", () => {
+    const k = add(self().mid, "ch", { name: "小孩" });
+    edit(k.mid, { role: "其他" });
+    expect(k.role).toBe("其他");
+  });
+
+  it("有生日的人年齡鎖住（由生日換算）", () => {
+    const sp = add(self().mid, "sp", { name: "太太" });
+    sp.birth = "1987-03-01";
+    w.treeEditOpen(sp.mid);
+    expect(w.document.getElementById("treeAddAge")).toBeNull();
+    expect(w.document.getElementById("treeAddMask").textContent).toContain("由生日");
+    w.treeAddClose();
+  });
+
+  it("刪除：成員消失、指向他的父母連線一併解除；本人刪不掉", () => {
+    const fa = add(self().mid, "pA", { name: "爸" });
+    expect(self().parentA).toBe(fa.mid);
+    w.confirm = () => true;
+    w.treeDelete(fa.mid);
+    expect(c().members.find((m: { mid: string }) => m.mid === fa.mid)).toBeUndefined();
+    expect(self().parentA).toBe("");
+    w.treeDelete(self().mid);
+    expect(c().members).toHaveLength(1);
+  });
+});

@@ -5384,29 +5384,39 @@ function treeAddSpec(c,target,kind){
  if(isSelf||tr==='配偶')return {role:'子女',gender:'男',title:'新增子女'};
  return {role:'其他',gender:'男',title:'新增 '+tn+' 的子女',link:function(nm){nm[target.gender==='女'?'parentB':'parentA']=target.mid;}};
 }
-function treeSel(mid){app.treeSel=(app.treeSel===mid)?'':mid;render();}
-function treeGoCard(mid){var el=document.getElementById('pc-'+mid);if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});}
-function treeAddOpen(mid,kind){
- var c=activeCase();if(!c)return;ensureMemberIds(c);
- var t=memberByMid(c,mid);if(!t)return;
- var sp=treeAddSpec(c,t,kind);
- window._treeAdd={mid:mid,kind:kind};
+// 點人員框＝選取＋跳出編輯小視窗（2026/09/25 Ray）。關掉視窗後仍是選取狀態，身邊的空位照樣可點。
+function treeSel(mid){app.treeSel=mid;render();treeEditOpen(mid);}
+function treeGoCard(mid){treeAddClose();var el=document.getElementById('pc-'+mid);if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});}
+// 新增與編輯共用同一款小視窗
+function treeModal(title,hint,fields,leftBtns,okLabel,okFn){
  treeAddClose();
  var mk=document.createElement('div');mk.id='treeAddMask';mk.className='lnmask on';
  // 樣式寫在行內：.lnmask 是諮詢場次那支腳本啟動時才注入的，不能假設它一定在。
  mk.style.cssText='position:fixed;inset:0;background:rgba(4,14,24,.76);display:flex;align-items:center;justify-content:center;z-index:80;padding:20px';
  mk.onclick=function(e){if(e.target===mk)treeAddClose();};
- mk.innerHTML='<div class="lnmodal" style="max-width:380px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;color:var(--tx)"><h3>'+esc(sp.title)+'</h3>'+
-  '<div class="hint" style="margin-bottom:12px">角色：<b>'+esc(sp.role)+'</b>　其他欄位（投保、分攤…）加入後到下方成員卡片補</div>'+
-  '<div class="fgrid" style="grid-template-columns:1fr">'+
-  '<div class="f"><label>姓名</label><input id="treeAddName" placeholder="可先留空"></div>'+
-  '<div class="f"><label>性別</label><select id="treeAddGender"><option'+(sp.gender==='男'?' selected':'')+'>男</option><option'+(sp.gender==='女'?' selected':'')+'>女</option></select></div>'+
-  '<div class="f"><label>年齡</label><input id="treeAddAge" type="number" min="0" max="120" placeholder="可先留空"></div></div>'+
-  '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'+
-  '<button class="tbtn" onclick="treeAddClose()">取消</button><button class="tbtn amber" id="treeAddOk" onclick="treeAddCommit()">加入</button></div></div>';
+ mk.innerHTML='<div class="lnmodal" style="max-width:380px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;color:var(--tx)"><h3>'+esc(title)+'</h3>'+
+  '<div class="hint" style="margin-bottom:12px">'+hint+'</div>'+
+  '<div class="fgrid" style="grid-template-columns:1fr">'+fields+'</div>'+
+  '<div style="display:flex;gap:8px;align-items:center;margin-top:14px">'+(leftBtns||'')+'<span style="flex:1"></span>'+
+  '<button class="tbtn" onclick="treeAddClose()">取消</button><button class="tbtn amber" id="treeAddOk" onclick="'+okFn+'">'+okLabel+'</button></div></div>';
  document.body.appendChild(mk);
- mk.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();treeAddCommit();}else if(e.key==='Escape')treeAddClose();});
+ mk.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target&&e.target.tagName!=='BUTTON'){e.preventDefault();var fn=window[String(okFn).replace(/\(\)$/,'')];if(typeof fn==='function')fn();}else if(e.key==='Escape')treeAddClose();});
  var f=document.getElementById('treeAddName');if(f)f.focus();
+}
+function treeFields(name,gender,age,ageLock){
+ return '<div class="f"><label>姓名</label><input id="treeAddName" value="'+esc(name||'')+'" placeholder="可先留空"></div>'+
+  '<div class="f"><label>性別</label><select id="treeAddGender"><option'+(gender!=='女'?' selected':'')+'>男</option><option'+(gender==='女'?' selected':'')+'>女</option></select></div>'+
+  (ageLock?'<div class="f"><label>年齡</label><div class="hint" style="padding-top:6px">'+ageLock+'</div></div>'
+   :'<div class="f"><label>年齡</label><input id="treeAddAge" type="number" min="0" max="120" value="'+esc(age==null?'':age)+'" placeholder="可先留空"></div>');
+}
+function treeFormVals(){var g=function(id){var el=document.getElementById(id);return el?el.value:null;};return {name:g('treeAddName'),gender:g('treeAddGender'),age:g('treeAddAge'),role:g('treeAddRole')};}
+function treeAddOpen(mid,kind){
+ var c=activeCase();if(!c)return;ensureMemberIds(c);
+ var t=memberByMid(c,mid);if(!t)return;
+ var sp=treeAddSpec(c,t,kind);
+ window._treeAdd={mid:mid,kind:kind};
+ treeModal(sp.title,'角色：<b>'+esc(sp.role)+'</b>　其他欄位（投保、分攤…）加入後到下方成員卡片補',
+  treeFields('',sp.gender,''),'','加入','treeAddCommit()');
 }
 function treeAddClose(){var mk=document.getElementById('treeAddMask');if(mk&&mk.parentNode)mk.parentNode.removeChild(mk);}
 // 也可直接帶參數呼叫（測試用）：treeAddCommit({name,gender,age})
@@ -5414,7 +5424,7 @@ function treeAddCommit(v){
  var st=window._treeAdd;if(!st)return;
  var c=activeCase();if(!c)return;ensureMemberIds(c);
  var t=memberByMid(c,st.mid);if(!t){treeAddClose();return;}
- if(!v){var g=function(id){var el=document.getElementById(id);return el?el.value:'';};v={name:g('treeAddName'),gender:g('treeAddGender'),age:g('treeAddAge')};}
+ if(!v)v=treeFormVals();
  var sp=treeAddSpec(c,t,st.kind);
  var tpl={name:'',role:'',gender:'男',age:'',unborn:false,bornAt:'',worked:0,insStart:'',pensionStart:'',pensionYears:0,pensionBalance:0,insType:'健保眷屬',insSalary:0,nhiCat:'眷屬(依附投保)',nhiSalary:0,nhiDeps:0,depRatio:0,expRatio:0,indepAge:26};
  var nm=tpl;nm.mid=newMid();
@@ -5431,6 +5441,60 @@ function treeAddCommit(v){
  app.treeSel=nm.mid;
  stampNeeds(c,'members');save();render();
  return nm;
+}
+// ===== 編輯既有成員 =====
+// 本人：姓名／性別／年齡寫進 c.profile（全系統讀的是那裡），角色鎖定、不能刪。
+// 其他人：改名一律走 set()——它會連帶把收入/資產/保單等以姓名為外鍵的欄位一起換掉（renameMemberRefs），
+//         直接寫 m.name 的話那些列會靜靜地失聯。
+// 生日有填的人，年齡由生日換算，這裡不給改（改了下一次生日一動又被蓋回去）；未出生子女同理。
+var TREE_ROLES=['配偶','父','母','子女','長輩','其他'];
+function treeEditOpen(mid){
+ var c=activeCase();if(!c)return;ensureMemberIds(c);
+ var ms=c.members||[],m=memberByMid(c,mid);if(!m)return;
+ var idx=ms.indexOf(m),isSelf=(idx===primaryIdx(c)),p=c.profile||{};
+ window._treeEdit={mid:mid};
+ var name=isSelf?(p.name||m.name||''):(m.name||''),gender=isSelf?(p.gender||m.gender):m.gender,age=isSelf?p.age:m.age;
+ var birth=isSelf?p.birth:m.birth;
+ var lock=m.unborn&&!isSelf?'未出生（到「子女教育／生育規劃」調整）':(birth?('由生日 '+esc(birth)+' 換算：'+esc(age)+' 歲（要改請到資料卡改生日）'):'');
+ var role=isSelf?'':(m.role||'');
+ var roleF=isSelf?'<div class="f"><label>角色</label><div class="hint" style="padding-top:6px">本人（不可更改）</div></div>'
+  :'<div class="f"><label>角色</label><select id="treeAddRole">'+(role?'':'<option value="" selected>（請選擇）</option>')+
+    TREE_ROLES.map(function(o){return '<option'+(o===role?' selected':'')+'>'+o+'</option>'}).join('')+'</select></div>';
+ var left='<button class="tbtn" onclick="treeGoCard(\''+esc(mid)+'\')">完整資料卡 ↓</button>'+
+  (isSelf?'':'<button class="tbtn" style="color:var(--danger)" onclick="treeDelete(\''+esc(mid)+'\')">刪除</button>');
+ treeModal('編輯 '+(name||'（未命名）'),'投保、分攤、工作等其他欄位在下方完整資料卡',
+  treeFields(name,gender,age,lock)+roleF,left,'儲存','treeEditCommit()');
+}
+function treeEditCommit(v){
+ var st=window._treeEdit;if(!st)return;
+ var c=activeCase();if(!c)return;
+ var ms=c.members||[],m=memberByMid(c,st.mid);if(!m){treeAddClose();return;}
+ if(!v)v=treeFormVals();
+ var idx=ms.indexOf(m),isSelf=(idx===primaryIdx(c));
+ var nm=(v.name==null)?null:String(v.name).trim();
+ if(isSelf){
+  if(nm!=null)set('profile','name',nm);
+  if(v.gender==='男'||v.gender==='女')set('profile','gender',v.gender);
+  if(v.age!=null&&v.age!=='')set('profile','age',v.age,'num');
+ }else{
+  if(nm!=null&&nm!==(m.name||''))set('members:'+idx,'name',nm);
+  if(v.gender==='男'||v.gender==='女')m.gender=v.gender;
+  if(v.age!=null)m.age=(v.age==='')?'':n(v.age);
+  if(v.role!=null&&v.role!==(m.role||'')){m.role=v.role;if(v.role==='配偶')ensureMemberJob(m);}
+  stampNeeds(c,'members');
+ }
+ window._treeEdit=null;treeAddClose();
+ save();render();
+}
+function treeDelete(mid){
+ var c=activeCase();if(!c)return;
+ var ms=c.members||[],m=memberByMid(c,mid);if(!m)return;
+ var idx=ms.indexOf(m);if(idx===primaryIdx(c))return;
+ if(!confirm('刪除「'+(m.name||'（未命名）')+'」？\n以他為父母的族譜連線會一併解除；其他表格裡寫著他名字的列不會被刪。'))return;
+ ms.forEach(function(x){if(x.parentA===mid)x.parentA='';if(x.parentB===mid)x.parentB='';});
+ if(app.treeSel===mid)app.treeSel='';
+ window._treeEdit=null;treeAddClose();
+ delRow('members',idx);
 }
 function familyTreeSVG(c,theme,interactive){
  ensureMemberIds(c);
