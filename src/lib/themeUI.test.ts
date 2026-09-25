@@ -131,8 +131,16 @@ describe("③ 規劃器（獨立文件）也跟得上", () => {
 describe("④ 切換鈕掛在教練走得到的地方", () => {
   it("教練端頂欄、後台頂欄、客戶端、官網都有", () => {
     for (const f of ["app/dashboard/DashboardHeader.tsx", "app/admin/AdminHeader.tsx",
-                     "app/portal/page.tsx", "components/LandingView.tsx"]) {
+                     "components/DisplayPrefsFab.tsx"]) {
       expect(readFileSync(join(SRC, f), "utf8"), `${f} 沒有掛主題切換`).toContain("ThemeToggle");
+    }
+  });
+
+  it("官網與客戶端改用側邊懸浮鈕（2026/09/25），不再放頂欄", () => {
+    for (const f of ["app/portal/page.tsx", "components/LandingView.tsx"]) {
+      const src = readFileSync(join(SRC, f), "utf8");
+      expect(src, `${f} 要掛 DisplayPrefsFab`).toContain("<DisplayPrefsFab />");
+      expect(src, `${f} 頂欄不該再直接放切換`).not.toContain("<ThemeToggle");
     }
   });
 

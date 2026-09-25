@@ -9,6 +9,7 @@ import UiScaleToggle from "@/components/UiScaleToggle";
 import ThemeToggle from "@/components/ThemeToggle";
 import { DEFAULT_THEME, type ThemeName } from "@/lib/theme";
 import LicenseBadge from "./LicenseBadge";
+import BrandMark from "@/components/BrandMark";
 
 // 各頁共用頂欄：品牌 + 首頁/客戶/儀表板/學習區切換 + 字級 + 剩餘天數 + 後台 + Clerk 頭貼。
 export default function DashboardHeader({
@@ -85,10 +86,7 @@ export default function DashboardHeader({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt="嵐途" className="h-[26px] w-auto max-w-[150px] object-contain" />
         ) : (
-          <svg width="26" height="26" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-            <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" fill="none" />
-          </svg>
+          <BrandMark size={26} className="rounded-md" />
         )}
         <span className="font-serif tracking-[0.14em] text-tx text-lg">嵐途</span>
       </Link>

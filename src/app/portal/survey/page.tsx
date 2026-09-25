@@ -5,6 +5,7 @@ import { ensureClientUser } from "@/lib/clientUser";
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import { listClientCases, listSurveys, questionsOf } from "@/lib/comp/survey";
 import SurveyForm, { type SurveyCase } from "./SurveyForm";
+import BrandMark from "@/components/BrandMark";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +40,7 @@ export default async function SurveyPage() {
     <div className="min-h-screen bg-canvas text-tx flex flex-col">
       <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-line">
         <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-          <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
-            <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-              <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
-            </svg>
-          </span>
+          <BrandMark />
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
         <div className="flex items-center gap-3">

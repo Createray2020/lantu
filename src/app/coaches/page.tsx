@@ -3,6 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { listPublicCoaches } from "@/lib/coachProfile";
 import { getClientLinkStatus } from "@/lib/coachLink";
 import CoachList, { type LinkState } from "./CoachList";
+import BrandMark from "@/components/BrandMark";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +28,7 @@ export default async function CoachesPage() {
     <div className="min-h-screen bg-canvas text-tx flex flex-col">
       <header className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-line">
         <Link href="/home" className="flex items-center gap-3">
-          <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
-            <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-              <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
-            </svg>
-          </span>
+          <BrandMark />
           <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
         </Link>
         <nav className="flex items-center gap-4 text-sm">

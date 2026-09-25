@@ -3,6 +3,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { applySteps, routeMeta } from "@/lib/coachApply";
 import ApplyStepList from "@/components/ApplyStepList";
+import BrandMark from "@/components/BrandMark";
 
 export type ApplyProgress = {
   route: string;
@@ -33,12 +34,7 @@ export default function PendingNotice({
   return (
     <main className="flex-1 grid place-items-center bg-canvas text-tx px-6">
       <div className="max-w-md text-center">
-        <div className="mx-auto mb-6 w-14 h-14 rounded-2xl border border-brand grid place-items-center">
-          <svg width="34" height="34" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-            <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
-          </svg>
-        </div>
+        <BrandMark size={56} className="mx-auto mb-6 rounded-2xl" />
         <h1 className="font-serif text-2xl tracking-[0.1em] mb-3">
           {suspended ? "帳號已停權" : "報聘審核中"}
         </h1>

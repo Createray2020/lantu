@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BrandMark from "@/components/BrandMark";
 
 export const dynamic = "force-static";
 
@@ -22,12 +23,7 @@ export default function JoinPage() {
       <header className="sticky top-0 z-30 backdrop-blur bg-canvas/85 border-b border-line">
         <div className="max-w-5xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
           <Link href="/home" className="flex items-center gap-3" title="回官網首頁">
-            <span className="grid place-items-center w-9 h-9 rounded-xl border border-brand">
-              <svg width="22" height="22" viewBox="0 0 48 48" fill="none" aria-label="嵐途">
-                <path d="M15 12 L15 33 L34 33" className="stroke-tx2" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M13 24 A13 13 0 0 1 36 16" className="stroke-brand" strokeWidth="2.6" strokeLinecap="round" />
-              </svg>
-            </span>
+            <BrandMark />
             <span className="flex flex-col leading-tight min-w-0">
               <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-13 sm:text-15 whitespace-nowrap">嵐途 LAN TU</span>
               <span className="hidden sm:block text-10 tracking-[0.3em] text-brand">JOIN US</span>
