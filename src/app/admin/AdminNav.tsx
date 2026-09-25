@@ -46,6 +46,7 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin/analysis", label: "分析模組" },
       { href: "/admin/client-view", label: "客戶端顯示" },
       { href: "/admin/brand", label: "品牌設定" },
+      { href: "/admin/site-nav", label: "官網頂欄" },
       { href: "/admin/modules", label: "模組開關" },
     ],
   },

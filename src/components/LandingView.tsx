@@ -4,7 +4,7 @@ import DisplayPrefsFab from "./DisplayPrefsFab";
 import { getLandingStats } from "@/lib/landing";
 import { listPublicCoaches } from "@/lib/coachProfile";
 import CoachSpotlight from "./CoachSpotlight";
-import BrandMark from "./BrandMark";
+import SiteHeader from "./SiteHeader";
 
 const LINE_ID = "@088janyq";
 const LINE_URL = "https://line.me/R/ti/p/%40088janyq";
@@ -22,27 +22,8 @@ export default async function LandingView() {
   return (
     <div className="min-h-screen bg-canvas text-tx">
       <DisplayPrefsFab />
-      {/* 頂欄：4 項以內。主 CTA 是「免費試算」而不是「客戶登入」—— */}
-      {/* 登入是給老客戶的，第一次來的人按不下去。 */}
-      <header className="sticky top-0 z-30 backdrop-blur bg-canvas/85 border-b border-line">
-        {/* 深淺色／字級切換 2026/09/25 移出頂欄，收進右側懸浮鈕（DisplayPrefsFab）：頂欄只留品牌與動作。
-            ⚠️ 手機 390px：品牌＋登入＋免費試算一列排得下（「認識教練」手機隱藏）；
-            以前擠不下是因為兩組切換也在這一列（Ray 2026/09/06 回報的疊字）。 */}
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between gap-3">
-          <Link href="/home" className="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink-0" title="回官網首頁">
-            <BrandMark />
-            <span className="flex flex-col leading-tight min-w-0">
-              <span className="font-serif tracking-[0.12em] sm:tracking-[0.16em] text-13 sm:text-15 whitespace-nowrap">嵐途 LAN TU</span>
-              <span className="hidden sm:block text-10 tracking-[0.3em] text-brand">FINANCIAL PLANNING</span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <Link href="/coaches" className="hidden sm:inline text-sm text-tx2 hover:text-tx px-3 py-2 rounded-lg whitespace-nowrap">認識教練</Link>
-            <Link href="/login" className="text-13 sm:text-sm text-tx2 hover:text-tx px-2 sm:px-3 py-2 rounded-lg sm:border sm:border-line2 whitespace-nowrap">登入</Link>
-            <Link href="/passport" className="text-13 sm:text-sm font-bold text-onbrand bg-brand hover:bg-brand2 px-3.5 sm:px-4 py-2 rounded-lg whitespace-nowrap">免費試算</Link>
-          </div>
-        </div>
-      </header>
+      {/* 頂欄項目由後台「官網頂欄」編輯（SiteHeader）。登入是給老客戶的，主 CTA 預設是「免費試算」。 */}
+      <SiteHeader />
 
       {/* Hero：標語 ＋ 差異化一行 ＋ 可以馬上動的試算 */}
       <section className="relative overflow-hidden">

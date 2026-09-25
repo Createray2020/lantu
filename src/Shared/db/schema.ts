@@ -1216,3 +1216,16 @@ export const orgEvents = pgTable('org_events', {
   index('org_events_date_idx').on(t.eventDate),
   index('org_events_visibility_date_idx').on(t.visibility, t.eventDate),
 ]);
+
+// ── 官網設定（2026/09/26 Ray）───────────────────────────────────────
+// 「官網後台要有一個模塊可以讓我們做前端設計：放連結網址出去、自己編輯字。」
+// 第一個住進來的是官網頂欄（key='header_nav'）。做成 key → jsonb 的通用表，
+// 之後官網公告、講座區塊等要讓後台改的內容都放這裡，不用每一種再開一張表。
+// ⚠️ value 的形狀由 lib/ 的 sanitize 函式把關（讀和寫都過一次）；DB 不信任、畫面也不信任。
+// ⚠️ 沒有列＝官網顯示程式端預設值（與改版前一模一樣），部署當下官網不會變。
+export const siteSettings = pgTable('site_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: text('updated_by').references(() => coaches.id, { onDelete: 'set null' }),
+});
