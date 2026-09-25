@@ -7095,8 +7095,10 @@ function sideJobsHTML(c,m,isPrimary,idx){
   return '<tr>'+
    '<td><input value="'+esc(x.name||'')+'" placeholder="例：週末家教、接案設計" oninput="setLive(\'incomes:'+i+'\',\'name\',this.value)" onchange="set(\'incomes:'+i+'\',\'name\',this.value)"></td>'+
    '<td><select onchange="set(\'incomes:'+i+'\',\'subType\',this.value)">'+selOpts(SIDE_JOB_KINDS,x.subType)+'</select></td>'+
-   '<td>'+moneyCell('onchange="setSideMonthly('+i+',this.value)"',monthly)+'</td>'+
-   '<td class="calc">'+fmt(n(x.amount))+'</td>'+
+   '<td>'+moneyCell('oninput="setSideMonthly('+i+',this.value)" onchange="setSideMonthly('+i+',this.value)"',monthly)+'</td>'+
+   // ⚠️ data-fincalc：月收入打字時年化要跟著動（syncDerived 會逐格刷新），否則要等整頁重畫才看得到，
+   //    新增的那幾列會一直停在 0（Ray 0925 回報）。
+   '<td class="calc" data-fincalc="incomes:'+i+'">'+fmt(n(x.amount))+'</td>'+
    '<td><input type="number" style="width:64px" value="'+esc(x.start==null?'':x.start)+'" onchange="set(\'incomes:'+i+'\',\'start\',this.value,\'num\')"></td>'+
    '<td><input type="number" style="width:64px" value="'+esc(x.end==null?'':x.end)+'" onchange="set(\'incomes:'+i+'\',\'end\',this.value,\'num\')"></td>'+
    '<td><button class="del" onclick="delRow(\'incomes\','+i+')">✕</button></td></tr>';
@@ -8975,6 +8977,33 @@ function chipsOther(field,it){
 function setChipOther(field,i,v){var c=activeCase();var it=c.intent=c.intent||{};var a=chipOthers(it,field).slice();while(a.length<=i)a.push('');a[i]=v;it[field+'Other']=a;save();syncDerived();}
 function addChipOther(field){var c=activeCase();var it=c.intent=c.intent||{};var a=chipOthers(it,field).slice();if(!a.length)a.push('');a.push('');it[field+'Other']=a;save();render();}
 function delChipOther(field,i){var c=activeCase();var it=c.intent=c.intent||{};var a=chipOthers(it,field).slice();a.splice(i,1);it[field+'Other']=a;save();render();}
+// 關注議題：自行新增（2026/09/25 Ray）。
+// ⚠️ 存在 intent.purposesCustom，不能塞進 intent.purposes——normalizeIntent（html 與 src/lib/intent.ts 兩份）
+//    會把不在 PURPOSES 清單裡的字串當成舊資料濾掉，自訂的議題下一輪就消失了。
+//    自訂議題不帶任何主體／目標連動，純粹記下客戶想解決什麼，進報告與註記。
+function customPurposes(it){var a=(it||{}).purposesCustom;return Array.isArray(a)?a.filter(function(x){return x&&String(x).trim()}):[];}
+function allPurposes(it){return ((it||{}).purposes||[]).concat(customPurposes(it));}
+function customPurposesHTML(it){
+ var list=customPurposes(it);
+ var tags=list.map(function(v,i){
+  return '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--amber);color:var(--onbrand);border:1px solid var(--amber);border-radius:999px;padding:6px 8px 6px 12px;font-size:13px;font-weight:700">✓ '+esc(v)+
+   '<button title="移除" onclick="delCustomPurpose('+i+')" style="background:transparent;border:none;color:inherit;cursor:pointer;font-size:13px;padding:0 2px;opacity:.75">✕</button></span>';
+ }).join('');
+ return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px">'+tags+
+  '<span style="display:inline-flex;gap:6px;align-items:center"><input id="purposeCustomIn" placeholder="自行新增議題，例：想處理家族信託" style="width:240px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addCustomPurpose(this.value)}">'+
+  '<button class="tbtn" onclick="addCustomPurpose(document.getElementById(\'purposeCustomIn\').value)">＋ 加入</button></span></div>';
+}
+function addCustomPurpose(v){
+ v=String(v==null?'':v).trim();if(!v)return;
+ var c=activeCase();if(!c)return;var it=c.intent=c.intent||{};
+ var a=customPurposes(it).slice();
+ // 跟內建議題同名＝直接勾那一顆（走原本的主體／目標連動），不另外長一顆一樣的
+ if(PURPOSES.indexOf(v)>=0){if((it.purposes||[]).indexOf(v)<0)togglePurpose(v);return;}
+ if(a.indexOf(v)>=0)return;
+ a.push(v);it.purposesCustom=a;save();render();
+ var el=document.getElementById('purposeCustomIn');if(el)el.focus();
+}
+function delCustomPurpose(i){var c=activeCase();if(!c)return;var it=c.intent=c.intent||{};var a=customPurposes(it).slice();a.splice(i,1);it.purposesCustom=a;save();render();}
 function chips(field,opts,sel,handler){return '<div style="display:flex;flex-wrap:wrap;gap:8px">'+opts.map(function(o){var on=(sel||[]).indexOf(o)>=0;
  var call=handler?handler+'(\''+o.replace(/'/g,"")+'\')':'toggleIntent(\''+field+'\',\''+o.replace(/'/g,"")+'\')';
  return '<button onclick="'+call+'" style="background:'+(on?'var(--amber)':'var(--card)')+';color:'+(on?'var(--onbrand)':'var(--mut)')+';border:1px solid '+(on?'var(--amber)':'var(--line)')+';border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer">'+(on?'✓ ':'')+o+'</button>'}).join('')+'</div>'}
@@ -9539,7 +9568,7 @@ function ivNoted(c,keys){
 var INTERVIEW_STEPS=[
  {k:'scope',g:1,nw:1,name:'規劃單位與界線',tab:'family',hint:'個人或家庭？為什麼是這個範圍？有沒有不希望觸碰的議題',
   has:function(c){var ps=c.planScope||{};return !!(ps.unit&&ps.unit!=='未指定')}}, {k:'purpose',g:1,name:'這次想解決什麼',tab:'intent',a:'[data-ivanchor="purpose"]',hint:'規劃目的、要處理哪幾個目標',
-  has:function(c){return ((c.intent||{}).purposes||[]).length||((c.intent||{}).targets||[]).length}},
+  has:function(c){return allPurposes(c.intent).length||((c.intent||{}).targets||[]).length}},
  {k:'basic',g:1,name:'基本資料',tab:'family',hint:'本人與配偶：生日／職業／勞保／健保／眷屬',
   has:function(c){return (c.members||[]).some(function(m){return m.name&&n(m.age)>0})}},
  {k:'bg',g:1,nw:1,sec:'basic',name:'背景與人生事件',tab:'family',hint:'學經歷／職涯歷程／過去的理財經驗／影響決策的背景',
@@ -9661,7 +9690,7 @@ function intentSec(c){var it=c.intent||{};
   '自由填寫客戶「最在意的事」與背後的價值觀；對應模組做軟連結，於報告呈現。這張清單捕捉「為什麼」，下方的人生目標捕捉「做什麼」，實際運算仍由各模組（退休/教育/置產…）負責。');
  return '<div class="lgwrap">'+lifeTbl+
   '<div class="sec" data-ivanchor="values"><h4>人生價值環 <span class="hint">由左側清單的價值觀與重要度即時生成</span></h4><div id="valuesWheel">'+valuesWheelSVG(c)+'</div></div></div>'+
-  '<div class="sec" data-ivanchor="purpose"><h4>關注議題 <span class="owner">客戶填寫 · 教練可代填</span> <span class="hint">客戶於人生護照選的「這次想解決什麼」，不含有時間軸的人生目標；勾「人生模擬」＝目標全選</span></h4>'+chips('purposes',PURPOSES,it.purposes,'togglePurpose')+'</div>'+
+  '<div class="sec" data-ivanchor="purpose"><h4>關注議題 <span class="owner">客戶填寫 · 教練可代填</span> <span class="hint">客戶於人生護照選的「這次想解決什麼」，不含有時間軸的人生目標；勾「人生模擬」＝目標全選</span></h4>'+chips('purposes',PURPOSES,it.purposes,'togglePurpose')+customPurposesHTML(it)+'</div>'+
   entitySec(c)+
   goalsSec(c)+
   (targetOn(c,'傳承規劃')
@@ -14764,7 +14793,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
    '<tr><td>工作</td><td>'+jobLineText(c,null,true)+'</td></tr>'+
    (String((p.jobNote||'')).trim()?'<tr><td>工作摘要</td><td style="white-space:pre-wrap;line-height:1.7">'+esc(p.jobNote)+'</td></tr>':'')+
    ((p.jobType==='企業主')?'<tr><td>公司概況</td><td>'+esc((c.company||{}).industry||'—')+' ｜ 持股 '+n((c.company||{}).sharePct)+'% ｜ 年營收 '+fmt((c.company||{}).annualRevenue)+' ｜ 年淨利 '+fmt((c.company||{}).netProfit)+((c.company||{}).ownerLoan?' ｜ 負責人往來 '+fmt(c.company.ownerLoan):'')+'</td></tr>':'')+
-   '<tr><td>關注議題</td><td>'+esc(((c.intent||{}).purposes||[]).join('、')||'—')+'</td></tr><tr><td>必須達成 · 優先序</td><td>'+(orderedMustText(c)||'—')+'</td></tr><tr><td>淨資產 / 年收入 / 年支出</td><td>'+fmt(m.net)+' ／ '+fmt(m.incTotal)+' ／ '+fmt(m.expTotal)+'</td></tr></table>'+
+   '<tr><td>關注議題</td><td>'+esc(allPurposes(c.intent).join('、')||'—')+'</td></tr><tr><td>必須達成 · 優先序</td><td>'+(orderedMustText(c)||'—')+'</td></tr><tr><td>淨資產 / 年收入 / 年支出</td><td>'+fmt(m.net)+' ／ '+fmt(m.incTotal)+' ／ '+fmt(m.expTotal)+'</td></tr></table>'+
 
   (((c.lifeGoals||[]).length)?'<div style="margin-top:12px;color:#0d2b45;font-weight:700;font-size:13px">這些目標對你的意義</div><table style="margin-top:4px"><tr><th>目標</th><th>價值觀／重要原因</th><th>對應模組</th></tr>'+(c.lifeGoals||[]).map(function(g){return '<tr><td>'+esc(g.name)+'</td><td>'+esc(g.value)+'</td><td>'+esc(g.linkModule||'')+'</td></tr>'}).join('')+'</table>':'')+
   '<h2>§、收支與資產結構</h2>'+
@@ -15383,7 +15412,7 @@ var preTax = safe(function(c){
 },'稅賦試算。');
 
 var preIntent = safe(function(c){
- var it=c.intent||{}, t=(it.targets||[]).length, p=(it.purposes||[]).length;
+ var it=c.intent||{}, t=(it.targets||[]).length, p=allPurposes(it).length;
  return '已勾選 '+B(p+' 項')+'關注議題、'+B(t+' 項')+'人生目標。';
 },'關注議題與人生目標。');
 
@@ -15462,7 +15491,7 @@ var preEstate = safe(function(c){
 
 var preIssues = safe(function(c){
  var it=c.intent||{};
- return '客戶勾選了 '+B(((it.purposes||[]).length)+' 項')+'關注議題。';
+ return '客戶勾選了 '+B((allPurposes(it).length)+' 項')+'關注議題。';
 },'客戶這次想解決什麼。');
 
 var prePlanVision = safe(function(c){

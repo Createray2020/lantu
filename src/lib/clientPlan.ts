@@ -269,7 +269,9 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
   c.assets = ast > 0 ? [{ name: "總資產", owner: who, mainCat: "可投資資產", type: "現金", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: ast, value: ast, ret: 1, income: 0, movable: true }] : [];
   c.liabilities = lia > 0 ? [{ name: "總負債", owner: who, mainCat: "其他", currency: "台幣", fxRate: 1, balance: lia, rate: 2, repay: "本息攤還", pay: 0, months: 240, grace: 0, startAge: age }] : [];
   // 規劃意圖：客戶選的關注議題與人生目標優先序，寫進教練端讀的同一個欄位。
-  if (intent) c.intent = normalizeIntent({ ...intent });
+  // ⚠️ 疊在既有 intent 上：客戶端只送 purposes/targets/mustHave/entities，
+  //    直接整包取代會洗掉教練端存在同一個物件裡的欄位（自訂關注議題 purposesCustom、投資經驗…）。
+  if (intent) c.intent = normalizeIntent({ ...(c.intent || {}), ...intent });
   c.setup = { basics, cross, savedAt: new Date().toISOString() };
   const snap = planSnapshot(c);
   await db.update(plans)
