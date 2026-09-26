@@ -87,7 +87,7 @@ describe("KYC：已答題收成一行", () => {
 describe("foldKeep：收起且記得展開狀態", () => {
   const cases: [string, string, string][] = [
     ["finance", "finCeil", "收入的彈性上限"], ["finance", "finShort", "短期資金需求"],
-    ["family", "tree", "家族族譜"], ["intent", "money", "理財模式評估"], ["intent", "pending", "待補齊清單"],
+["intent", "money", "理財模式評估"], ["intent", "pending", "待補齊清單"],
     ["retire", "prepared", "已準備退休金"],
   ];
   for (const [tab, key, title] of cases) {
@@ -118,5 +118,29 @@ describe("調整方案：首屏之外全收", () => {
     go("plan");
     expect($$('[data-ivsec="planact"] details[open]').length).toBe(0);
     expect($("#app").textContent).toContain("調整動作清單（");
+  });
+});
+
+describe("家庭／參數：族譜當主體，底下只出點到的那一位", () => {
+  it("族譜常駐（不折疊）；預設選本人；點別人底下就換卡；＋新增家庭成員自動選到新的人", () => {
+    w.app.treeSel = "";
+    go("family");
+    expect($('details[data-fk="tree"]'), "族譜不再折疊").toBeNull();
+    expect($(".sec h4")?.textContent ?? $("#app").textContent).toBeTruthy();
+    const c = w.activeCase();
+    const self = c.members.find((m: { role: string }) => m.role === "本人");
+    expect($$(".pcard").length).toBe(1);
+    expect($$(".pcard")[0].id).toBe("pc-" + self.mid);
+    const other = c.members.find((m: { role: string }) => m.role !== "本人");
+    w.treeSel(other.mid);
+    expect($$(".pcard").length).toBe(1);
+    expect($$(".pcard")[0].id).toBe("pc-" + other.mid);
+    expect($("#app").textContent).toContain("目前顯示");
+    const n0 = c.members.length;
+    w.addRow("members");
+    expect(c.members.length).toBe(n0 + 1);
+    expect(w.app.treeSel).toBe(c.members[n0].mid);
+    expect($$(".pcard")[0].id).toBe("pc-" + c.members[n0].mid);
+    w.app.treeSel = "";
   });
 });

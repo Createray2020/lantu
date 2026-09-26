@@ -161,10 +161,15 @@ describe("點人員框＝編輯小視窗", () => {
     w.treeEditCommit({ name: null, gender: null, age: null, role: null, ...v });
   };
 
-  it("點下去會選取並跳出編輯視窗，欄位帶入現值；關掉後仍是選取", () => {
+  it("點下去＝選取＋底下換成他的資料卡（2026/09/26 起不再跳小視窗）；編輯視窗仍可直接開", () => {
     const sp = add(self().mid, "sp", { name: "太太", age: "39" });
+    w.app.activeTab = "data"; w.app.dataTab = "family";
     w.treeSel(sp.mid);
     expect(w.app.treeSel).toBe(sp.mid);
+    expect(w.document.getElementById("treeAddMask"), "點人不再跳小視窗").toBeNull();
+    expect(w.document.querySelector(".pcard")?.id).toBe("pc-" + sp.mid);
+    expect(w.document.querySelectorAll(".pcard").length, "底下只出一張卡").toBe(1);
+    w.treeEditOpen(sp.mid);
     const mk = w.document.getElementById("treeAddMask");
     expect(mk).toBeTruthy();
     expect(w.document.getElementById("treeAddName").value).toBe("太太");
@@ -177,7 +182,7 @@ describe("點人員框＝編輯小視窗", () => {
   });
 
   it("本人：寫進 c.profile、角色鎖定、沒有刪除鈕", () => {
-    w.treeSel(self().mid);
+    w.treeEditOpen(self().mid);
     const mk = w.document.getElementById("treeAddMask");
     expect(w.document.getElementById("treeAddRole")).toBeNull();
     expect(mk.textContent).not.toContain("刪除");

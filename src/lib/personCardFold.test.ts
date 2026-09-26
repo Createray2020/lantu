@@ -21,15 +21,17 @@ beforeAll(async () => {
 beforeEach(() => {
   w.app.cases = [w.migrateCase(w.sampleCase())];
   w.app.activeId = w.app.cases[0].id;
-  w.PC_OPEN = {};
+  w.PC_OPEN = {}; w.app.treeSel = "";
   w.app.activeTab = "data"; w.app.dataTab = "family"; w.render();
 });
 
 const $$ = (sel: string) => [...w.document.querySelectorAll(sel)] as HTMLElement[];
 
 describe("人物卡折疊", () => {
-  it("每張卡預設只攤身分資料，其餘四塊收在「更多」裡", () => {
-    const cards = $$(".pcard");
+  it("卡片預設只攤身分資料，其餘四塊收在「更多」裡（族譜選誰就看誰的卡）", () => {
+    const c0 = w.activeCase();
+    const cards: HTMLElement[] = [];
+    for (const m of c0.members) { w.app.treeSel = m.mid; w.render(); cards.push($$(".pcard")[0]); }
     expect(cards.length).toBeGreaterThan(1);
     for (const c of cards) {
       const more = c.querySelector("details.pcmore") as HTMLDetailsElement;
@@ -58,15 +60,20 @@ describe("人物卡折疊", () => {
     expect(Object.keys(w.PC_OPEN).length).toBe(1);
     w.render();
     expect(($$(".pcard.self")[0].querySelector("details.pcmore") as HTMLDetailsElement).open).toBe(true);
-    // 別張卡不受影響
-    expect(($$(".pcard.other, .pcard.spouse")[0].querySelector("details.pcmore") as HTMLDetailsElement).open).toBe(false);
+    // 別的人不受影響
+    const other = w.activeCase().members.find((m: { role: string }) => m.role !== "本人");
+    w.app.treeSel = other.mid; w.render();
+    expect(($$(".pcard")[0].querySelector("details.pcmore") as HTMLDetailsElement).open).toBe(false);
+    w.app.treeSel = "";
   });
 
   it("角色未指定的警示留在外面，不被收進去", () => {
     const c = w.activeCase();
     c.members.push({ name: "新成員", role: "", gender: "男", age: 10, expRatio: 0, indepAge: "" });
+    w.ensureMemberIds(c); w.app.treeSel = c.members[c.members.length - 1].mid;
     w.render();
-    const card = $$(".pcard").pop()!;
+    const card = $$(".pcard").pop()!; // 新增的人自動被選到
+    expect(card.textContent).toContain("新成員");
     const warn = card.querySelector(".pbody > .note");
     expect(warn?.textContent).toContain("還沒指定");
   });

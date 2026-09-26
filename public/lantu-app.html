@@ -4959,6 +4959,7 @@ function addRow(arr){var c=activeCase();if(!c)return;
  else if(PLAN_ARRS[arr]){listOf(c,arr).push(tpl)}
  else{c[arr]=c[arr]||[];c[arr].push(tpl)}
  ensureRowIds(c);   // 新的支出/資產列當場發 eid/aid，才立刻能被 actions[].ref 指到
+ if(arr==='members'){ensureMemberIds(c);app.treeSel=tpl.mid||'';}   // 新家人直接選到，底下的卡就是他
  stampNeeds(c,arr);save();render()}
 function delRow(arr,i){var c=activeCase();
  // 刪成員：如果他是生育規劃長出來的「未出生子女」，那一胎也要一起刪掉，
@@ -5534,7 +5535,9 @@ function treeAddSpec(c,target,kind){
  return {role:'其他',gender:'男',title:'新增 '+tn+' 的子女',link:function(nm){nm[target.gender==='女'?'parentB':'parentA']=target.mid;}};
 }
 // 點人員框＝選取＋跳出編輯小視窗（2026/09/25 Ray）。關掉視窗後仍是選取狀態，身邊的空位照樣可點。
-function treeSel(mid){app.treeSel=mid;render();treeEditOpen(mid);}
+// 2026/09/26 起：點人＝選取＋底下換成他的資料卡（不再跳小視窗；改名／角色／刪除卡片上都有）。
+function treeSel(mid){app.treeSel=mid;render();
+ var el=document.getElementById('pc-'+mid);if(el&&el.scrollIntoView)try{el.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){}}
 function treeGoCard(mid){treeAddClose();var el=document.getElementById('pc-'+mid);if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});}
 // 新增與編輯共用同一款小視窗
 function treeModal(title,hint,fields,leftBtns,okLabel,okFn){
@@ -5744,7 +5747,7 @@ function familyTreeSVG(c,theme,interactive){
  return '<div style="overflow-x:auto"><svg viewBox="0 0 '+Math.round(totalW)+' '+Math.round(totalH)+'" width="100%" style="max-width:'+Math.round(totalW)+'px;height:auto;display:block;margin:0 auto">'+links+ghostCards+cards+'</svg></div>';
 }
 function familyTreeSec(c){
- return '<div class="sec"><h4>家族族譜 <span class="hint">點虛線空位直接新增家庭成員；點任一位成員可替他加父母、子女</span>'+
+ return '<div class="sec"><h4>家族族譜 <span class="hint">點任一位成員，底下就出他的資料卡；點虛線空位直接新增家庭成員</span>'+
   // ⚠️ hint 裡的「家庭成員」四個字不能拿掉：註記掛點 family.people 靠標題比對「家庭成員」掛在這一區（notesUI.test 守著）
   '</h4>'+familyTreeSVG(c,'dark',true)+'</div>';
 }
@@ -6024,17 +6027,23 @@ function peopleSec(c){
  var members=c.members||[];
  var pi=members.findIndex(function(m){return m.role==='本人';});if(pi<0)pi=0;
  var primary=members[pi]||{name:c.profile.name,role:'本人',depRatio:100,expRatio:100};
- var cards=personCard(c,primary,pi,true);
- members.forEach(function(m,i){if(i===pi)return;cards+=personCard(c,m,i,false);});
+ // 2026/09/26 Ray：族譜當主體，底下只出「點到的那一位」的資料卡，不再一次列出全部。
+ // 選取狀態＝app.treeSel（只在記憶體）；沒選到任何人就回落到本人，所以底下永遠有一張卡。
+ var selM=memberByMid(c,app.treeSel)||null;
+ var si=selM?members.indexOf(selM):-1;
+ if(si<0){si=pi;selM=primary;app.treeSel=(members[pi]||{}).mid||'';}
+ var cards=personCard(c,selM,si,si===pi);
+ var selName=si===pi?(c.profile.name||selM.name||'本人'):(selM.name||'（未命名）');
+ var pickHint='<div class="hint" style="margin:-4px 0 10px">目前顯示：<b style="color:var(--amber2)">'+esc(selName)+'</b>　點上方族譜的任何一位，底下就換成他的資料卡。</div>';
  var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'members\')">＋ 新增家庭成員</button></div>';
  return bizOwnerWarnHTML(c)+
   '<div class="sec" data-ivsec="scope" data-ivname="規劃單位與界線"><h4>規劃單位 <span class="hint">這份規劃算誰的收支、資產與責任</span></h4><div class="fgrid">'+
    ofld('planScope','unit','規劃單位','sel:未指定,個人,家庭')+ofld('planScope','why','為什麼是這個範圍')+'</div>'+
    '<div data-calc="planScope">'+planScopeHint(c)+'</div></div>'+
-  foldKeep('tree','家族族譜',(c.members||[]).length+' 位成員 · 點開可直接新增家人',familyTreeSec(c))+
+  familyTreeSec(c)+
   // ⚠️ basic 與 bg 共用這一個宿主：「背景與人生事件」住在每一張成員卡裡面（bgBlock），
   //    不是成員卡的兄弟節點，所以聚焦時兩者指同一塊。
-  '<div data-ivsec="basic" data-ivname="家庭成員與投保"><div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+'</div>'+
+  '<div data-ivsec="basic" data-ivname="家庭成員與投保"><div class="ppband">家庭成員 <span class="hint">點族譜選人；本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+pickHint+cards+addBtn+'</div>'+
   '<div class="sec" data-ivsec="decide" data-ivname="財務決策分工"><h4>誰決定這個家的錢 <span class="hint">六個面向各由誰拍板；方案要說服的是他們</span></h4><div data-calc="decision">'+decisionHint(c)+'</div></div>'+
   '<div data-calc="nhiSummary">'+nhiSummaryHTML(c)+'</div>'+
   '<div data-ivsec="params" data-ivname="規劃參數">'+paramsSec(c)+'</div>';
