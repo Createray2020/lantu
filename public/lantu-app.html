@@ -246,6 +246,12 @@ h1,h2,h3,h4{margin:0}
 .gband .vd{margin-left:auto;font-size:12px;color:var(--mut2)}
 .gband .vd b{color:var(--tx);font-weight:600}
 .anchips .chipgrp{flex:1 0 100%}
+/* 人物卡：基本資訊之外收進「更多」 */
+.pcmore{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.pcmore>summary.foldln{flex-wrap:wrap}
+.pcmore .pcsum{margin-left:auto;font-weight:400;color:var(--tx);font-size:12px;letter-spacing:0}
+.pcmore .pcsum.muted{color:var(--mut2)}
+.pcmore[open]>summary.foldln{margin-bottom:6px}
 /* 共用表格的「細節」列 */
 td.moretd{white-space:nowrap}
 .morebtn{background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:8px;padding:4px 9px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.02em}
@@ -5832,8 +5838,28 @@ function personCard(c,m,idx,isPrimary){
   ?'<div class="note" style="border-color:rgba(224,138,104,.5);color:var(--warn)">⚠️ 還沒指定<b>角色</b>（卡片標題右邊的下拉）。'
    +'未指定角色的成員<b>不會列入子女教育、保障需求與健保計算</b>——選了角色才會開始算。</div>'
   :'';
- return '<div class="pcard '+cls+'" id="pc-'+esc(m.mid||'')+'">'+hd+'<div class="pbody">'+roleWarn+idBlock+workBlock+ratioBlock+kinBlock(c,m,idx,isPrimary)+bgBlock(c,m,idx,isPrimary)+'</div></div>';
+ // 2026/09/26 Ray：人物卡拉太長，留基本資訊、其餘點開再展開。
+ // 卡片只攤「標題列＋身分資料」；工作與投保／家庭分攤／族譜／背景收進一條折疊列，
+ // 折疊列上帶一行摘要（不點開也知道填了什麼）。展開狀態按成員記在 PC_OPEN，重畫不會關回去。
+ var pcKey=String(m.mid||('i'+idx));
+ var sumParts=[];
+ if(isEarner){
+  sumParts.push(esc(jt||'一般就業者'));
+  var sal0=isPrimary?n(p.monthlySalary):n(m.monthlySalary);
+  if(sal0>0)sumParts.push('月薪 '+fmt(sal0));
+ }
+ if(m.insType)sumParts.push(esc(m.insType));
+ if(n(m.depRatio)>0)sumParts.push('家計 '+n(m.depRatio)+'%');
+ if(!isEarner&&n(m.expRatio)>0)sumParts.push('支出 '+n(m.expRatio)+'%');
+ if(!isEarner&&m.indepAge!==''&&m.indepAge!=null)sumParts.push('獨立歲 '+esc(m.indepAge));
+ var more='<details class="pcmore"'+(PC_OPEN[pcKey]?' open':'')+' ontoggle="pcToggled(this,\''+pcKey+'\')">'+
+  '<summary class="foldln">更多 <span class="hint" style="font-weight:400">工作與投保 · 家庭分攤 · 族譜 · 背景</span>'+
+  (sumParts.length?'<span class="pcsum">'+sumParts.join(' · ')+'</span>':'<span class="pcsum muted">尚未填</span>')+'</summary>'+
+  '<div class="pcmorebody">'+workBlock+ratioBlock+kinBlock(c,m,idx,isPrimary)+bgBlock(c,m,idx,isPrimary)+'</div></details>';
+ return '<div class="pcard '+cls+'" id="pc-'+esc(m.mid||'')+'">'+hd+'<div class="pbody">'+roleWarn+idBlock+more+'</div></div>';
 }
+var PC_OPEN={};
+function pcToggled(el,key){if(el.open)PC_OPEN[key]=1;else delete PC_OPEN[key];}
 // 背景補充：這些沒有欄位可以放，但它們是判斷「這個人接下來會怎麼決定」的脈絡。
 // 一個換過三次產業的業務、跟一個待了二十年的公務員，同樣的數字要給的建議完全不同。
 // 純文字、不進任何計算，會被帶進報告書的客戶側寫。
