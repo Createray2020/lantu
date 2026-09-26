@@ -144,3 +144,46 @@ describe("家庭／參數：族譜當主體，底下只出點到的那一位", (
     w.app.treeSel = "";
   });
 });
+
+describe("目標／置產：上面點群，底下只出那一群", () => {
+  it("四張群卡；底下只有選到那一群的列；購屋群帶持有成本與購置試算；群內新增直接帶型別", () => {
+    w.GOAL_SEL = "";
+    const c = w.activeCase();
+    c.goals = [
+      { on: true, name: "換屋", type: "購屋", present: 12000000, start: 50, end: 50, freq: 0, growth: "固定", imp: 4 },
+      { on: true, name: "購車", type: "購車", present: 1000000, start: 45, end: 45, freq: 0, growth: "通膨", imp: 3 },
+      { on: true, name: "創業金", type: "創業", present: 500000, start: 48, end: 48, freq: 0, growth: "通膨", imp: 2 },
+    ];
+    go("goals");
+    expect($$("#goalNav .grp").map((e) => e.dataset.g)).toEqual(["house", "car", "care", "other"]);
+    expect($$("#goalNav .grp.on").map((e) => e.dataset.g)).toEqual(["house"]);
+    const rowsIn = () => $$('.goalgrp table tr:not(.addtr) td:nth-child(2) input').map((e: HTMLInputElement) => e.value);
+    expect(rowsIn()).toEqual(["換屋"]);
+    expect($("#app").textContent).toContain("買房之後的持有成本");
+    expect($("#app").textContent).toContain("購置試算");
+    expect($("#app").textContent).not.toContain("買車之後的持有成本");
+    w.goalPick("car");
+    expect(rowsIn()).toEqual(["購車"]);
+    expect($("#app").textContent).toContain("買車之後的持有成本");
+    w.goalPick("other");
+    expect(rowsIn()).toEqual(["創業金"]);
+    // 群內改欄位寫到正確的那一列（索引是原陣列的）
+    const nameInput = $('.goalgrp table td:nth-child(2) input') as HTMLInputElement;
+    nameInput.value = "開店"; nameInput.dispatchEvent(new w.Event("change"));
+    expect(c.goals[2].name).toBe("開店");
+    w.addGoalInGroup("care");
+    expect(c.goals[3].type).toBe("孝親");
+    expect(w.GOAL_SEL).toBe("care");
+    expect(rowsIn().length).toBe(1);
+    w.GOAL_SEL = "";
+  });
+
+  it("gotoGoal／addGoalRowFor 會先切到該目標的群", () => {
+    w.GOAL_SEL = "";
+    w.gotoGoal("購車規劃");
+    expect(w.GOAL_SEL).toBe("car");
+    w.addGoalRowFor("孝親規劃");
+    expect(w.GOAL_SEL).toBe("care");
+    w.GOAL_SEL = "";
+  });
+});

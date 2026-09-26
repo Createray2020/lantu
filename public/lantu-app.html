@@ -253,6 +253,8 @@ h1,h2,h3,h4{margin:0}
 .secfold[open]>summary::before{content:'\25BE'}
 .secfold .ckfoldbody>.sec{border:0;background:transparent;box-shadow:none;padding:4px 0 0;margin-bottom:8px}
 .covtab{display:none}.covtab.on{display:block}
+.goalnav{margin-bottom:14px}
+.grp.dim{opacity:.6}.grp.dim.on{opacity:1}
 .covnav{margin-bottom:14px}
 details.riskq>summary{list-style:none;cursor:pointer}
 details.riskq>summary::-webkit-details-marker{display:none}
@@ -5215,7 +5217,7 @@ function dataPane(c){
  else if(app.dataTab==='liabilities')body=liabilitiesSec(c);
  else if(app.dataTab==='retire')body=(targetOn(c,'退休生活規劃')?goalHead(c,'退休生活規劃')+retireSec(c):foldedGoal(c,'退休生活規劃',tabFilled(c,'retire')?'（先前已填的退休參數保留、仍列入模擬）':''));
  else if(app.dataTab==='education')body=(targetOn(c,'子女教養規劃')?goalHead(c,'子女教養規劃')+eduSec(c):foldedGoal(c,'子女教養規劃',tabFilled(c,'education')?'（先前已填的教育金資料保留、仍列入模擬）':''));
- else if(app.dataTab==='goals')body=goalsTabHead(c)+tableSec('目標 / 置產 / 願望','goals',c.goals,[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['latest','最晚完成歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']],'',['minPresent','end','latest','freq','growth','appreciation','loanRatio','prepared'])+'<div data-calc="defer">'+deferHint(c)+'</div>'+detailSec(c,'house')+detailSec(c,'car')+houseCalcSec(c);
+ else if(app.dataTab==='goals')body=goalsTabBody(c);
  else if(app.dataTab==='lifestyle')body=lifestyleSec(c);
  else if(app.dataTab==='needs')body=needsSec(c);
  else if(app.dataTab==='coverages')body='<div class="sec"><h4 style="color:var(--mut)">簡易保障輸入 <span class="hint">若已於「現有保單」逐張登錄，此處通常留空；系統會自動彙總。員工團體保險也可登錄於此（計入已備）。</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外傷殘,住院醫療,醫療雜費,薪資補償（日）,薪資補償（月）,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','money'],['social','已備社會','money']]);
@@ -9113,18 +9115,21 @@ function seedGoalRow(c,t){
 }
 // 跳到指定資料子分頁（未選目標的收合列「展開並納入」用）
 function gotoDataTab(t){var c=activeCase();if(!targetOn(c,t))toggleTarget(t);var m=targetMeta(t);
+ if(m&&m[1]==='goals')GOAL_SEL=goalGroupOfTarget(t)||GOAL_SEL;
  if(m&&m[1]!=='intent'){app.activeTab='data';app.dataTab=m[1]}render()}
 function jumpTab(tab){app.activeTab='data';app.dataTab=tab;render()}
 // 必達優先序的「填細節 →」：跳到該目標所屬分頁並捲到該區塊（同頁的三個目標也會捲＋閃一下）
 function gotoGoal(t){var c=activeCase();var m=targetMeta(t);if(!m)return;
  if(!targetOn(c,t))toggleTarget(t);
+ if(m[1]==='goals'){GOAL_SEL=goalGroupOfTarget(t)||GOAL_SEL;}
  if(m[4])seedGoalRow(c,t);          // goals 類：確保表裡有一列可填
  app.activeTab='data';app.dataTab=m[1];save();render();
  setTimeout(function(){var el=document.querySelector('[data-goalanchor="'+t+'"]');if(!el)return;revealEl(el);
   if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
   el.classList.add('goalflash');setTimeout(function(){el.classList.remove('goalflash')},1700);},40);}
 // 已選為必達、但 goals 表裡沒有對應列（舊資料或「全選」進來的）→ 補一列
-function addGoalRowFor(t){var c=activeCase();seedGoalRow(c,t);save();render();}
+function addGoalRowFor(t){var c=activeCase();seedGoalRow(c,t);GOAL_SEL=goalGroupOfTarget(t)||GOAL_SEL;save();render();}
+function goalGroupOfTarget(t){for(var i=0;i<GOAL_GROUPS.length;i++)if(GOAL_GROUPS[i].t===t)return GOAL_GROUPS[i].k;return '';}
 function goalRowMissing(c,t){var m=targetMeta(t);if(!m||!m[4])return false;
  return !(c.goals||[]).some(function(g){return g.type===m[4]});}
 // 舊資料可能把布林存成 'true'/'false' 字串（見 ofld 的註解）。讀取一律過這支。
@@ -9345,6 +9350,58 @@ function mustBadge(c,t){var i=((c.intent||{}).mustHave||[]).indexOf(t);
 // 已選目標分頁的頁首（顯示順位）
 function goalHead(c,t){return '<div class="folded" data-goalanchor="'+esc(t)+'" style="border-style:solid;border-color:rgba(143,192,163,.32);color:var(--mut)">'+t+' '+mustBadge(c,t)+'<span>依「意圖 / 生涯」的優先序排定；資源不足時，順位在後的會先被調整。</span></div>'}
 // 目標/置產分頁的頁首：這頁一次容納多種目標類型，逐一列出已選／未選
+// 2026/09/26 Ray：目標規劃也一樣——上面點到哪一群，底下才展開那一群，不要整頁拉太長。
+// 群＝購屋（含置產）／購車／孝親／其他；上面一排群卡（帶順位、列數），底下只出選到那一群的
+// 目標列＋該群專屬的區塊（購屋：買房後持有成本、購置試算；購車：買車後持有成本）。
+var GOAL_GROUPS=[
+ {k:'house',nm:'購屋',t:'購屋規劃',types:['購屋','置產'],seedType:'購屋'},
+ {k:'car',nm:'購車',t:'購車規劃',types:['購車'],seedType:'購車'},
+ {k:'care',nm:'孝親',t:'孝親規劃',types:['孝親'],seedType:'孝親'},
+ {k:'other',nm:'其他',t:'',types:[],seedType:'其他'}
+];
+var GOAL_SEL='',GOAL_SEL_ID='';   // 選到的群只跟著這一位客戶；換客戶就重來
+var GOAL_COLS=[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['latest','最晚完成歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']];
+var GOAL_MORE=['minPresent','end','latest','freq','growth','appreciation','loanRatio','prepared'];
+function goalGroupOf(type){
+ for(var i=0;i<GOAL_GROUPS.length-1;i++)if(GOAL_GROUPS[i].types.indexOf(type)>=0)return GOAL_GROUPS[i].k;
+ return 'other';
+}
+function goalGroupRows(c,k){
+ var out=[];(c.goals||[]).forEach(function(g,i){if(goalGroupOf(g.type)===k)out.push(i)});return out;
+}
+function goalPick(k){var c=activeCase();GOAL_SEL=k;GOAL_SEL_ID=c?c.id:'';render();}
+// 在選到的那一群裡新增一列（型別直接帶好），不用再去下拉選類型。
+function addGoalInGroup(k){
+ var c=activeCase();if(!c)return;var G=GOAL_GROUPS.filter(function(x){return x.k===k})[0];if(!G)return;
+ var age=n((c.profile||{}).age)||30;
+ c.goals=c.goals||[];
+ c.goals.push({on:true,name:G.k==='other'?'':G.nm,type:G.seedType,present:0,minPresent:0,start:age+3,end:age+3,freq:0,growth:'通膨',appreciation:0,loanRatio:0,imp:3,prepared:0});
+ GOAL_SEL=k;GOAL_SEL_ID=c.id;stampNeeds(c,'goals');save();render();
+}
+function goalsTabBody(c){
+ var must=((c.intent||{}).mustHave||[]);
+ // 預設停在：第一個有列的群；都沒有就第一個已選為必達的群；再沒有就購屋。
+ if(GOAL_SEL_ID!==c.id){GOAL_SEL='';GOAL_SEL_ID=c.id;}
+ var cur=GOAL_SEL;
+ if(!cur){GOAL_GROUPS.some(function(G){if(goalGroupRows(c,G.k).length){cur=G.k;return true}});}
+ if(!cur){GOAL_GROUPS.some(function(G){if(G.t&&targetOn(c,G.t)){cur=G.k;return true}});}
+ if(!cur)cur='house';GOAL_SEL=cur;
+ var nav='<div class="grpnav goalnav" id="goalNav" style="grid-template-columns:repeat('+GOAL_GROUPS.length+',1fr)">'+GOAL_GROUPS.map(function(G){
+  var rows=goalGroupRows(c,G.k),on=G.t?targetOn(c,G.t):rows.length>0,ord=G.t?must.indexOf(G.t):-1;
+  var vd=(G.t?(on?(ord>=0?'必達 · 第 '+(ord+1)+' 順位':'已納入'):'未選'):'不屬於前三類的目標')+' · '+rows.length+' 列';
+  var sumAmt=rows.reduce(function(a,i){return a+n(c.goals[i].present)},0);
+  if(sumAmt>0)vd+=' · '+cfAxis(sumAmt);
+  return '<div class="grp'+(cur===G.k?' on':'')+(G.t&&!on?' dim':'')+'" data-g="'+G.k+'"'+(G.t?' data-goalanchor="'+esc(G.t)+'"':'')+' onclick="goalPick(\''+G.k+'\')" role="tab"><div class="nm">'+G.nm+'</div><div class="vd">'+vd+'</div></div>';
+ }).join('')+'</div>';
+ var G=GOAL_GROUPS.filter(function(x){return x.k===cur})[0];
+ var idx=goalGroupRows(c,cur),list=idx.map(function(i){return c.goals[i]});
+ var offNote=(G.t&&!targetOn(c,G.t))?'<div class="hint" style="margin:-6px 0 10px">這一類還沒選為規劃目標。<button class="tbtn" style="padding:2px 9px;font-size:12px" onclick="gotoDataTab(\''+esc(G.t)+'\')">納入規劃</button>　既有資料仍保留、仍列入模擬。</div>':'';
+ var tbl=tableSec('目標 / 置產 / 願望 · '+G.nm,'goals',list,GOAL_COLS,'',GOAL_MORE,idx,'addGoalInGroup(\''+cur+'\')');
+ var extra='';
+ if(cur==='house')extra=detailSec(c,'house')+houseCalcSec(c);
+ if(cur==='car')extra=detailSec(c,'car');
+ return nav+'<div class="goalgrp" data-g="'+cur+'">'+offNote+tbl+'<div data-calc="defer">'+deferHint(c)+'</div>'+extra+'</div>';
+}
 function goalsTabHead(c){
  var rows=TARGET_META.filter(function(x){return x[1]==='goals'});
  var onList=rows.filter(function(x){return targetOn(c,x[0])});
@@ -13040,12 +13097,15 @@ function tblCell(c,arr,i,cl,row){var k=cl[0],ty=cl[2],id=arr+':'+i;
    var tt=(ty==='num'?'num':'txt');
    return '<input '+(ty==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(row[k])+'" oninput="setLive(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')">';
 }
-function tableSec(title,arr,list,cols,hint,more){var c=activeCase();
+// 第 7 個參數 idxMap：list 是原陣列的子集時，每一列在原陣列裡的真實索引（set()/delRow 都用它）；
+// 第 8 個參數 addFn：「＋ 新增一列」要呼叫的函式字串（預設 addRow(arr)）。目標分頁分群顯示用。
+function tableSec(title,arr,list,cols,hint,more,idxMap,addFn){var c=activeCase();
  var moreSet={};(more||[]).forEach(function(k){moreSet[k]=1});
  var main=cols.filter(function(cl){return !moreSet[cl[0]]}),det=cols.filter(function(cl){return moreSet[cl[0]]});
  var ncol=main.length+(det.length?1:0)+1;
  var head='<tr>'+main.map(function(cl){return '<th>'+cl[1]+'</th>'}).join('')+(det.length?'<th></th>':'')+'<th></th></tr>';
- var rows=(list||[]).map(function(row,i){
+ var rows=(list||[]).map(function(row,li){
+  var i=idxMap?idxMap[li]:li;
   var tds=main.map(function(cl){return '<td>'+tblCell(c,arr,i,cl,row)+'</td>'}).join('');
   var moreTd='';
   if(det.length){
@@ -13060,7 +13120,7 @@ function tableSec(title,arr,list,cols,hint,more){var c=activeCase();
   }
   return tr;
  }).join('');
- return '<div class="sec"><h4>'+title+'</h4>'+(hint?'<div class="hint" style="margin:-4px 0 9px">'+hint+'</div>':'')+'<div class="tw"><table>'+head+(rows||'')+addTr(arr,ncol,rows?'':'尚無資料')+'</table></div></div>';
+ return '<div class="sec"><h4>'+title+'</h4>'+(hint?'<div class="hint" style="margin:-4px 0 9px">'+hint+'</div>':'')+'<div class="tw"><table>'+head+(rows||'')+addTr(arr,ncol,rows?'':'尚無資料',addFn)+'</table></div></div>';
 }
 
 function financeNavHTML(){

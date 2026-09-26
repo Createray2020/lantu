@@ -77,6 +77,7 @@ describe("tableSec 的主欄／細節欄", () => {
 describe("五張 8 欄以上的表都收了", () => {
   it("目標表：列上只剩 納入／名稱／類型／金額(理想)／起始歲／重要度，其餘在細節", () => {
     w.app.activeTab = "data"; w.app.dataTab = "goals"; w.render();
+    w.GOAL_SEL = "house"; w.render();
     const sec = [...w.document.querySelectorAll(".sec h4")].find((h) => h.textContent.startsWith("目標 / 置產 / 願望")).parentElement;
     const ths = [...sec.querySelectorAll("th")].map((e) => e.textContent).filter(Boolean);
     expect(ths).toEqual(["納入", "名稱", "類型", "金額(理想)", "起始歲", "重要度（5最高）"]);
@@ -92,6 +93,7 @@ describe("五張 8 欄以上的表都收了", () => {
   });
 
   it("旅遊／休閒／奢侈品／連帶保證 都有細節鈕", () => {
+    expect(HTML).toContain("var GOAL_MORE=['minPresent','end','latest','freq','growth','appreciation','loanRatio','prepared'];");
     expect(HTML).toContain("'travel',c.travel,");
     expect(HTML).toContain(",'',['latest','end','freq','minAmount']);");
     expect(HTML.match(/,'',\['end','freq','minAmount'\]\);/g)?.length, "休閒與奢侈品").toBe(2);

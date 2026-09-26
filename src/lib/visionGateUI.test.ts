@@ -88,7 +88,9 @@ describe("四張願景表都看得到「納入」欄", () => {
   it("目標／置產分頁有納入欄與勾選框", () => {
     useCase(w.migrateCase(w.sampleCase()));
     w.app.dataTab = "goals";
+    // 2026/09/26 起目標分頁分群顯示：示範客戶的 goals[0] 是購車，要切到購車群才看得到那一列
     w.render();
+    w.goalPick(w.goalGroupOf(w.activeCase().goals[0].type));
     const html = w.document.querySelector("#app").innerHTML as string;
     expect(html).toContain("納入");
     expect(html).toContain("'goals:0','on'");

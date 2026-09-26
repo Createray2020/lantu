@@ -132,6 +132,7 @@ describe("goals 的 freq 改成兩段式（填 52 想表達每週的坑）", () 
 
   it("預設是「只發生一次」＝freq 0（全庫 94.9% 都是這種）", () => {
     withGoal();
+    w.GOAL_SEL = ""; // 2026/09/26 起目標分頁分群顯示；重設讓它落到有列的那一群
     go("goals");
     w.tblMore("goals", 0); // 2026/09/26 起頻率收在「細節」裡，要先展開
     const html = w.document.querySelector("#app")!.innerHTML as string;
@@ -192,6 +193,7 @@ describe("購置試算：參數齊全，但只算給人看", () => {
 
   it("算得出頭期、貸款、月付、總利息", () => {
     withHouse();
+    w.GOAL_SEL = "house"; // 2026/09/26 起目標分頁分群顯示；購置試算在購屋群
     go("goals");
     const txt = w.document.querySelector("#app")!.textContent as string;
     expect(txt).toContain("購置試算");
