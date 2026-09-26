@@ -5,10 +5,9 @@
  * 使用者得先切成英數才能在金額／年齡／比例欄打數字。瀏覽器沒有「強制關輸入法」的正規做法
  * （inputmode 只影響手機鍵盤），所以這裡在文件層掛一個攔截層，三道保險：
  *
- *  1. keydown：實體數字鍵被輸入法接走（e.code 是 Digit/Numpad 但 e.key 不是數字）時，
- *     preventDefault 讓輸入法拿不到這一鍵，自己把數字塞進欄位。macOS 的 Chrome／Safari 走這條。
- *  2. compositionend：Windows 的輸入法在 keydown 之前就先吃掉按鍵、攔不住，
- *     所以組字結束時把注音鍵位對應回數字（ㄅ→1 … ㄢ→0、全形→半形），其他字元丟掉。
+ *  1. 組字一開始（compositionupdate）就強制收掉：blur → 用組字前的值＋對應後的數字覆寫 → focus 回來，
+ *     注音鍵位對應回數字（ㄅ→1 … ㄢ→0、全形→半形），其他字元丟掉。macOS／Windows 同一條路。
+ *  2. 組字若是自己結束（compositionend）也走同一套對應。
  *  3. 手機／平板靠 inputmode="numeric|decimal" 直接彈數字鍵盤，不會碰到輸入法。
  *
  * 適用欄位：<input type="number">、inputmode="numeric"（金額）、inputmode="decimal"。
@@ -75,51 +74,61 @@
     return { v: v, s: s, e: e };
   }
 
-  function insert(el, ch) {
-    var sel = selection(el);
-    setValue(el, sel.v.slice(0, sel.s) + ch + sel.v.slice(sel.e), sel.s + ch.length);
-  }
-
-  function onKeydown(e) {
-    var el = e.target, kind = fieldKind(el);
-    if (!kind) return;
-    if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
-    var code = e.code || '', ch = null;
-    var m = /^(?:Digit|Numpad)([0-9])$/.exec(code);
-    if (m) { if (e.shiftKey && code.charAt(0) === 'D') return; ch = m[1]; }
-    else if (code === 'Period' || code === 'NumpadDecimal') { if (e.shiftKey) return; ch = '.'; }
-    else if (code === 'Minus' || code === 'NumpadSubtract') { if (e.shiftKey) return; ch = '-'; }
-    else return;
-    var k = e.key;
-    // 輸入法接走的訊號：key 是 Process／keyCode 229，或 key 已經是注音符號之類的非 ASCII 字元。
-    var imeTook = k === 'Process' || e.keyCode === 229 ||
-      (typeof k === 'string' && k.length >= 1 && k.charCodeAt(0) > 127);
-    if (!imeTook) return;
-    e.preventDefault();
-    if (ch === '.' && !allowDot(kind)) return;
-    insert(el, ch);
-  }
-
+  /* 組字流程：輸入法一開始組字（compositionstart）就記下「組字前的值與游標」，
+     第一個組字更新（compositionupdate）一到就強制收掉組字：blur 讓輸入法交出控制權、
+     用「組字前的值 ＋ 對應後的數字」覆寫、再 focus 回來。
+     為什麼不在 keydown 攔：macOS Chrome 的第一個按鍵在 keydown 時看起來就是普通的「1」，
+     preventDefault 也擋不住輸入法接著開組字；Windows 的輸入法更是在 keydown 之前就吃掉按鍵。
+     只認組字事件，三個平台一條路。 */
   function onCompositionStart(e) {
     var el = e.target, kind = fieldKind(el);
     if (!kind) return;
-    el.__nfComp = selection(el);
+    var st = selection(el);
+    st.last = '';
+    el.__nfComp = st;
+  }
+  function onCompositionUpdate(e) {
+    var el = e.target, st = el.__nfComp;
+    if (!st) return;
+    st.last = e.data || st.last;
+    if (!st.scheduled) { st.scheduled = true; root.setTimeout(function () { forceEnd(el); }, 0); }
   }
   function onCompositionEnd(e) {
-    var el = e.target, prev = el.__nfComp;
-    if (!prev) return;
+    var el = e.target, st = el.__nfComp;
+    if (!st) return;
+    if (e.data) st.last = e.data;
+    finish(el);
+  }
+  function finish(el) {
+    var st = el.__nfComp;
+    if (!st) return;
     el.__nfComp = null;
     var kind = fieldKind(el);
     if (!kind) return;
-    var mapped = mapText(e.data, kind);
-    setValue(el, prev.v.slice(0, prev.s) + mapped + prev.v.slice(prev.e), prev.s + mapped.length);
+    var mapped = mapText(st.last, kind);
+    setValue(el, st.v.slice(0, st.s) + mapped + st.v.slice(st.e), st.s + mapped.length);
+  }
+  function forceEnd(el) {
+    var st = el.__nfComp;
+    if (!st) return;
+    var kind = fieldKind(el), mapped = mapText(st.last, kind || 'number');
+    var caret = st.s + mapped.length;
+    el.__nfSilent = true;            // blur 是我們自己做的，focusout 別補發 change
+    try { el.blur(); } catch { /* ignore */ }
+    if (el.__nfComp) finish(el);     // blur 沒帶出 compositionend 的話自己收
+    try { el.focus(); } catch { /* ignore */ }
+    // lantu-app.html 聚焦後會 setTimeout 全選（初值 0 的欄位打第一個字直接取代），排在它後面把游標放回去
+    root.setTimeout(function () {
+      el.__nfSilent = false;
+      if (root.document.activeElement === el) { try { el.setSelectionRange(caret, caret); } catch { /* number 型 */ } }
+    }, 0);
   }
 
   // 程式塞值不會讓瀏覽器在離開欄位時發原生 change；只靠 onchange 綁定的欄位會漏存，所以補發。
   function onChange(e) { if (e.target) e.target.__nfDirty = false; }
   function onFocusOut(e) {
     var el = e.target;
-    if (el && el.__nfDirty) {
+    if (el && el.__nfDirty && !el.__nfSilent) {
       el.__nfDirty = false;
       el.dispatchEvent(new root.Event('change', { bubbles: true }));
     }
@@ -136,9 +145,9 @@
     doc = doc || root.document;
     if (!doc || doc.__nfInstalled) return;
     doc.__nfInstalled = true;
-    doc.addEventListener('keydown', onKeydown, true);
     doc.addEventListener('keydown', onEnter, true);
     doc.addEventListener('compositionstart', onCompositionStart, true);
+    doc.addEventListener('compositionupdate', onCompositionUpdate, true);
     doc.addEventListener('compositionend', onCompositionEnd, true);
     doc.addEventListener('change', onChange, true);
     doc.addEventListener('focusout', onFocusOut, true);

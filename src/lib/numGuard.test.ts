@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 /**
  * 數字欄守衛（public/numguard.js）：注音輸入法開著也能直接在數字欄打數字。
  *
- * 三道保險各守一條：keydown 攔截（macOS）、compositionend 對應回數字（Windows）、
+ * 組字一開始就收掉並對應回數字（macOS／Windows 同一條路）、compositionend 自己來也對應、
  * inputmode 讓手機直接彈數字鍵盤。另外守「兩側都有掛」——lantu-app.html 的 <script src>
  * 與 layout 的 next/script，漏一邊就有一邊的使用者又得切輸入法。
  */
@@ -29,11 +29,6 @@ function mk(attrs: string) {
   el.addEventListener("input", () => log.push("input:" + el.value));
   el.addEventListener("change", () => log.push("change:" + el.value));
   return { el, log };
-}
-function key(el: HTMLInputElement, init: Record<string, unknown>) {
-  const ev = new w.KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
-  el.dispatchEvent(ev);
-  return ev.defaultPrevented;
 }
 
 describe("mapText：注音鍵位對應回數字", () => {
@@ -62,84 +57,98 @@ describe("fieldKind：哪些欄位歸守衛管", () => {
   });
 });
 
-describe("keydown 攔截（macOS：輸入法把數字鍵接走）", () => {
-  it("key=Process 的 Digit3 → 擋掉輸入法、塞 3、派 input", () => {
-    const { el, log } = mk('type="text" inputmode="numeric" value="12"');
-    el.focus();
-    el.setSelectionRange(2, 2);
-    expect(key(el, { code: "Digit3", key: "Process", keyCode: 229 })).toBe(true);
-    expect(el.value).toBe("123");
-    expect(log).toEqual(["input:123"]);
-  });
-  it("key 已經是注音符號也算被接走；插在游標處", () => {
-    const { el } = mk('type="text" inputmode="decimal" value="19"');
-    el.focus();
-    el.setSelectionRange(1, 1);
-    expect(key(el, { code: "Digit5", key: "ㄓ" })).toBe(true);
-    expect(el.value).toBe("159");
-  });
-  it("key 本來就是數字（英數模式）不插手", () => {
-    const { el, log } = mk('type="text" inputmode="numeric" value="1"');
-    expect(key(el, { code: "Digit2", key: "2" })).toBe(false);
-    expect(el.value).toBe("1");
-    expect(log).toEqual([]);
-  });
-  it("有 Ctrl/Cmd、或非數字欄，不插手", () => {
-    const a = mk('type="text" inputmode="numeric" value=""');
-    expect(key(a.el, { code: "Digit1", key: "Process", metaKey: true })).toBe(false);
-    const b = mk('type="text" value=""');
-    expect(key(b.el, { code: "Digit1", key: "Process" })).toBe(false);
-    expect(b.el.value).toBe("");
-  });
-  it("小數點鍵：金額欄擋掉不塞、decimal 欄塞「.」", () => {
-    const a = mk('type="text" inputmode="numeric" value="1"');
-    expect(key(a.el, { code: "Period", key: "ㄡ" })).toBe(true);
-    expect(a.el.value).toBe("1");
-    const b = mk('type="text" inputmode="decimal" value="1"');
-    b.el.focus(); b.el.setSelectionRange(1, 1);
-    key(b.el, { code: "Period", key: "ㄡ" });
-    expect(b.el.value).toBe("1.");
-  });
-  it("type=number 也接得住（塞在尾端）", () => {
-    const { el } = mk('type="number" value="4"');
-    key(el, { code: "Numpad2", key: "Process", keyCode: 229 });
-    expect(el.value).toBe("42");
-  });
-});
+function comp(el: HTMLInputElement, type: string, data: string) {
+  el.dispatchEvent(new w.CompositionEvent(type, { bubbles: true, data }));
+}
+const tick = () => new Promise<void>((r) => setTimeout(r, 5));
 
-describe("compositionend 回填（Windows：輸入法在 keydown 前就吃掉按鍵）", () => {
-  it("組字結束時用組字前的值 ＋ 對應後的數字重寫，並派 input", () => {
+describe("組字一開始就收掉（macOS／Windows 同一條路）", () => {
+  it("compositionupdate 帶 ㄅ → 下一拍 blur/focus、值變成組字前＋1、派 input、游標在數字後", async () => {
     const { el, log } = mk('type="text" inputmode="numeric" value="1,000"');
     el.focus();
     el.setSelectionRange(5, 5);
-    el.dispatchEvent(new w.CompositionEvent("compositionstart", { bubbles: true, data: "" }));
+    comp(el, "compositionstart", "");
     expect(G.isComposing(el)).toBe(true);
-    el.value = "1,000ㄅㄉ"; // 瀏覽器在組字期間把注音塞進欄位
-    el.dispatchEvent(new w.CompositionEvent("compositionend", { bubbles: true, data: "ㄅㄉ" }));
+    el.value = "1,000ㄅ"; // 瀏覽器在組字期間把注音塞進欄位
+    comp(el, "compositionupdate", "ㄅ");
+    await tick();
+    expect(G.isComposing(el)).toBe(false);
+    expect(el.value).toBe("1,0001");
+    expect(log).toEqual(["input:1,0001"]);
+    expect(w.document.activeElement).toBe(el);
+    await tick();
+    expect(el.selectionStart).toBe(6);
+  });
+  it("強制收掉時的 blur 不會補發 change（那不是使用者離開欄位）", async () => {
+    const { el, log } = mk('type="number" value=""');
+    el.focus();
+    comp(el, "compositionstart", "");
+    comp(el, "compositionupdate", "ㄉ");
+    await tick();
+    expect(el.value).toBe("2");
+    expect(log).toEqual(["input:2"]);
+  });
+  it("組字中間插入：游標在中間時數字插在游標處", async () => {
+    const { el } = mk('type="text" inputmode="decimal" value="19"');
+    el.focus();
+    el.setSelectionRange(1, 1);
+    comp(el, "compositionstart", "");
+    comp(el, "compositionupdate", "ㄓ");
+    await tick();
+    expect(el.value).toBe("159");
+  });
+  it("金額欄不收小數點；組出來全是非數字 → 值回到組字前", async () => {
+    const a = mk('type="text" inputmode="numeric" value="1"');
+    a.el.focus(); a.el.setSelectionRange(1, 1);
+    comp(a.el, "compositionstart", "");
+    comp(a.el, "compositionupdate", "ㄡ");
+    await tick();
+    expect(a.el.value).toBe("1");
+    const b = mk('type="text" inputmode="numeric" value="7"');
+    b.el.focus(); b.el.setSelectionRange(1, 1);
+    comp(b.el, "compositionstart", "");
+    b.el.value = "7你好";
+    comp(b.el, "compositionupdate", "你好");
+    await tick();
+    expect(b.el.value).toBe("7");
+  });
+  it("非數字欄不插手", async () => {
+    const { el, log } = mk('type="text" value="ab"');
+    el.focus();
+    comp(el, "compositionstart", "");
+    comp(el, "compositionupdate", "ㄅ");
+    await tick();
+    expect(G.isComposing(el)).toBe(false);
+    expect(log).toEqual([]);
+  });
+});
+
+describe("compositionend 自己來（例如 Enter 送出組字）", () => {
+  it("用組字前的值 ＋ 對應後的數字重寫，並派 input", () => {
+    const { el, log } = mk('type="text" inputmode="numeric" value="1,000"');
+    el.focus();
+    el.setSelectionRange(5, 5);
+    comp(el, "compositionstart", "");
+    el.value = "1,000ㄅㄉ";
+    comp(el, "compositionend", "ㄅㄉ");
     expect(G.isComposing(el)).toBe(false);
     expect(el.value).toBe("1,00012");
     expect(log).toEqual(["input:1,00012"]);
-  });
-  it("組出來全是非數字 → 清掉、值回到組字前", () => {
-    const { el } = mk('type="text" inputmode="numeric" value="7"');
-    el.focus(); el.setSelectionRange(1, 1);
-    el.dispatchEvent(new w.CompositionEvent("compositionstart", { bubbles: true, data: "" }));
-    el.value = "7你好";
-    el.dispatchEvent(new w.CompositionEvent("compositionend", { bubbles: true, data: "你好" }));
-    expect(el.value).toBe("7");
   });
 });
 
 describe("onchange 欄位不漏存", () => {
   it("守衛塞過值、離開欄位時原生 change 沒來 → 補發一次 change", () => {
     const { el, log } = mk('type="number" value=""');
-    key(el, { code: "Digit8", key: "Process", keyCode: 229 });
+    comp(el, "compositionstart", "");
+    comp(el, "compositionend", "ㄚ");
     el.dispatchEvent(new w.FocusEvent("focusout", { bubbles: true }));
     expect(log).toEqual(["input:8", "change:8"]);
   });
   it("原生 change 已經來過就不重複", () => {
     const { el, log } = mk('type="number" value=""');
-    key(el, { code: "Digit8", key: "Process", keyCode: 229 });
+    comp(el, "compositionstart", "");
+    comp(el, "compositionend", "ㄚ");
     el.dispatchEvent(new w.Event("change", { bubbles: true }));
     el.dispatchEvent(new w.FocusEvent("focusout", { bubbles: true }));
     expect(log).toEqual(["input:8", "change:8"]);
