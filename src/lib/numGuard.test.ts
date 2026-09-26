@@ -123,6 +123,56 @@ describe("組字一開始就收掉（macOS／Windows 同一條路）", () => {
   });
 });
 
+describe("被輸入法吞掉的鍵（注音聲調鍵 3ˇ 4ˋ 6ˊ 7˙）", () => {
+  function key(el: HTMLInputElement, init: Record<string, unknown>) {
+    el.dispatchEvent(new w.KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init }));
+  }
+  it("keydown 之後什麼事件都沒來 → 下一拍自己塞數字、派 input", async () => {
+    const { el, log } = mk('type="text" inputmode="numeric" value="12"');
+    el.focus(); el.setSelectionRange(2, 2);
+    key(el, { code: "Digit3", key: "Process", keyCode: 229 });
+    await tick();
+    expect(el.value).toBe("123");
+    expect(log).toEqual(["input:123"]);
+  });
+  it("輸入法關著：原生 input 先來 → 不重複塞", async () => {
+    const { el, log } = mk('type="text" inputmode="numeric" value="1"');
+    el.focus(); el.setSelectionRange(1, 1);
+    key(el, { code: "Digit4", key: "4" });
+    el.value = "14"; // 瀏覽器原生輸入
+    el.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await tick();
+    expect(el.value).toBe("14");
+    expect(log).toEqual(["input:14"]);
+  });
+  it("鍵開了組字（ㄅ 那類）→ 交給組字那條，不重複塞", async () => {
+    const { el } = mk('type="text" inputmode="numeric" value=""');
+    el.focus();
+    key(el, { code: "Digit1", key: "Process", keyCode: 229 });
+    comp(el, "compositionstart", "");
+    comp(el, "compositionupdate", "ㄅ");
+    await tick();
+    expect(el.value).toBe("1");
+  });
+  it("number 型：塞出不合法字串就不塞；有修飾鍵、非數字欄不插手", async () => {
+    const a = mk('type="number" value="5"');
+    a.el.focus();
+    key(a.el, { code: "Minus", key: "Process", keyCode: 229 });
+    await tick();
+    expect(a.el.value).toBe("5"); // "5-" 不合法
+    const b = mk('type="text" inputmode="numeric" value=""');
+    b.el.focus();
+    key(b.el, { code: "Digit7", key: "Process", metaKey: true });
+    await tick();
+    expect(b.el.value).toBe("");
+    const c = mk('type="text" value=""');
+    c.el.focus();
+    key(c.el, { code: "Digit7", key: "Process", keyCode: 229 });
+    await tick();
+    expect(c.el.value).toBe("");
+  });
+});
+
 describe("compositionend 自己來（例如 Enter 送出組字）", () => {
   it("用組字前的值 ＋ 對應後的數字重寫，並派 input", () => {
     const { el, log } = mk('type="text" inputmode="numeric" value="1,000"');

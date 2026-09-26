@@ -8,6 +8,7 @@
  *  1. 組字一開始（compositionupdate）就強制收掉：blur → 用組字前的值＋對應後的數字覆寫 → focus 回來，
  *     注音鍵位對應回數字（ㄅ→1 … ㄢ→0、全形→半形），其他字元丟掉。macOS／Windows 同一條路。
  *  2. 組字若是自己結束（compositionend）也走同一套對應。
+ *     注音的聲調鍵（3ˇ 4ˋ 6ˊ 7˙）前面沒符號時會被輸入法吞掉、不開組字——keydown 記下、下一拍沒事件就自己塞。
  *  3. 手機／平板靠 inputmode="numeric|decimal" 直接彈數字鍵盤，不會碰到輸入法。
  *
  * 適用欄位：<input type="number">、inputmode="numeric"（金額）、inputmode="decimal"。
@@ -82,6 +83,7 @@
      只認組字事件，三個平台一條路。 */
   function onCompositionStart(e) {
     var el = e.target, kind = fieldKind(el);
+    el.__nfSeen = true;
     if (!kind) return;
     var st = selection(el);
     st.last = '';
@@ -124,6 +126,31 @@
     }, 0);
   }
 
+  /* 被輸入法「吞掉」的鍵：注音的聲調鍵 3ˇ 4ˋ 6ˊ 7˙ 前面沒有注音符號時，輸入法直接吃掉、
+     不開組字、也不產生任何事件——上面那條接不到。所以 keydown 先記下這一鍵，下一拍看
+     有沒有任何 input／組字事件跟著來：都沒有＝被吞了，自己把數字塞進去。
+     輸入法關著時原生輸入會先發生（input 事件會來），就不重複塞。 */
+  function onKeydown(e) {
+    var el = e.target, kind = fieldKind(el);
+    if (!kind || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.repeat) return;
+    var code = e.code || '', ch = null, m = /^(?:Digit|Numpad)([0-9])$/.exec(code);
+    if (m) { if (e.shiftKey && code.charAt(0) === 'D') return; ch = m[1]; }
+    else if (code === 'Period' || code === 'NumpadDecimal') { if (e.shiftKey || !allowDot(kind)) return; ch = '.'; }
+    else if (code === 'Minus' || code === 'NumpadSubtract') { if (e.shiftKey) return; ch = '-'; }
+    else return;
+    var before = el.value;
+    el.__nfSeen = false;
+    root.setTimeout(function () {
+      if (el.__nfSeen || el.__nfComp || el.value !== before || root.document.activeElement !== el) return;
+      if (fieldKind(el) !== kind) return;
+      var sel = selection(el), v = sel.v.slice(0, sel.s) + ch + sel.v.slice(sel.e);
+      if (kind === 'number' && !/^-?\d*\.?\d*$/.test(v)) return;   // number 型塞出不合法字串會被瀏覽器清空
+      if (el.maxLength > 0 && v.length > el.maxLength) return;
+      setValue(el, v, sel.s + 1);
+    }, 0);
+  }
+  function onSeen(e) { if (e.target) e.target.__nfSeen = true; }
+
   // 程式塞值不會讓瀏覽器在離開欄位時發原生 change；只靠 onchange 綁定的欄位會漏存，所以補發。
   function onChange(e) { if (e.target) e.target.__nfDirty = false; }
   function onFocusOut(e) {
@@ -145,7 +172,10 @@
     doc = doc || root.document;
     if (!doc || doc.__nfInstalled) return;
     doc.__nfInstalled = true;
+    doc.addEventListener('keydown', onKeydown, true);
     doc.addEventListener('keydown', onEnter, true);
+    doc.addEventListener('input', onSeen, true);
+    doc.addEventListener('beforeinput', onSeen, true);
     doc.addEventListener('compositionstart', onCompositionStart, true);
     doc.addEventListener('compositionupdate', onCompositionUpdate, true);
     doc.addEventListener('compositionend', onCompositionEnd, true);
