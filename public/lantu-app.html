@@ -16399,7 +16399,14 @@ document.addEventListener('focusin',function(e){
  setTimeout(function(){ if(document.activeElement===el){ try{ el.select(); }catch(err){} } },0);
 });
 document.addEventListener('mouseup',function(e){
- if(pending&&e.target===pending){ e.preventDefault(); }
+ if(pending&&e.target===pending){
+  /* ⚠️ type=number 不能 preventDefault：滑鼠按在步進器（▲▼）上時 input 會先聚焦，
+     放開的 mouseup 目標就是這個 input——擋掉預設行為等於瀏覽器永遠收不到「放開」，
+     步進器的自動重複計時器就一路跑（Ray 2026/09/26：點一下優先序從 3 跑到 164）。
+     改成放開之後再全選，效果一樣（打第一個字直接取代整格），步進器照常停。 */
+  if(pending.type==='number'){ var el=pending; setTimeout(function(){ if(document.activeElement===el){ try{ el.select(); }catch(err){} } },0); }
+  else e.preventDefault();
+ }
  pending=null;
 },true);
 document.addEventListener('focusout',function(){ pending=null; });
