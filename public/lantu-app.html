@@ -517,7 +517,7 @@ html.embed .shell,html.embed-single .shell{grid-template-columns:minmax(0,1fr)!i
 .finph{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .finph h4{font-size:15px;color:var(--tx);margin:0}
 .finph .ic{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
-.finph .sub{margin-left:auto;text-align:right}.finph .sub .sl{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.06em}.finph .sub .sv{font-family:var(--serif);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.finph .sub{margin-left:auto;text-align:right}.finph .sub+.sub{margin-left:18px}.finph .sub .sv:not(.pos):not(.neg){color:var(--mut)}.finph .sub .sl{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.06em}.finph .sub .sv{font-family:var(--serif);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
 .finph .add{margin-left:10px}
 .fintag{font-size:11px;color:var(--mut2);border:1px solid var(--line);border-radius:8px;padding:1px 6px;font-weight:400}
 .fintbl{overflow-x:auto;flex:1}
@@ -11563,7 +11563,7 @@ function syncFinSummary(){var c=activeCase();if(!c)return;
  function S(id,v){var e=document.getElementById(id);if(e){e.textContent=fmt(v);e.className='v big '+(v>=0?'pos':'neg');}}
  T('finSum_inc',t.inc);T('finSum_exp',t.exp);S('finSum_bal',t.bal);
  T('finSum_ast',t.ast);T('finSum_lia',t.lia);S('finSum_net',t.net);
- T('finSub_inc',t.inc);T('finSub_exp',t.exp);T('finSub_ast',t.ast);T('finSub_lia',t.lia);T('finSub_sav',t.sav);T('finSum_sav',t.sav);
+ T('finSub_inc',t.inc);T('finSub_exp',t.exp);T('finSubM_inc',Math.round(t.inc/12));T('finSubM_exp',Math.round(t.exp/12));T('finSub_ast',t.ast);T('finSub_lia',t.lia);T('finSub_sav',t.sav);T('finSum_sav',t.sav);
  // 依持有人分組的小計
  document.querySelectorAll('[data-fingrp]').forEach(function(el){var q=el.getAttribute('data-fingrp').split('|');
   var arr=q[0],own=q[1],s=0;
@@ -11702,8 +11702,8 @@ function financeSec(c){
  '</div>';
  var expNote=(app.ownerView&&app.ownerView!=='全家')?'<div class="finfoot" style="border:0;padding-top:0;color:var(--amber2)">＊ 支出屬家庭層級、不分持有人，仍顯示全部。</div>':'';
  var quad='<div class="finquad">'+
-  '<div class="finpanel inc" data-ivsec="income" data-ivname="收入現況"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div>'+sortBtn('incomes','income')+'</div><div class="fintbl">'+finIncTable(c)+'</div>'+autoBlockedHTML(c,'salary')+assetIncomeMirrorHTML(c)+'</div>'+
-  '<div class="finpanel exp" data-ivsec="expense" data-ivname="支出現況"><div class="finph"><div class="ic" style="background:rgba(224,138,104,.16);color:var(--warn)">支</div><h4>支出</h4><div class="sub"><div class="sl">年化小計</div><div class="sv neg" id="finSub_exp">'+fmt(t.exp)+'</div></div>'+sortBtn('expenses','expense')+'</div><div class="fintbl">'+finExpTable(c)+'</div>'+expNote+'</div>'+
+  '<div class="finpanel inc" data-ivsec="income" data-ivname="收入現況"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">收</div><h4>收入</h4><div class="sub"><div class="sl">月收入</div><div class="sv" id="finSubM_inc">'+fmt(Math.round(t.inc/12))+'</div></div><div class="sub"><div class="sl">年化小計</div><div class="sv pos" id="finSub_inc">'+fmt(t.inc)+'</div></div>'+sortBtn('incomes','income')+'</div><div class="fintbl">'+finIncTable(c)+'</div>'+autoBlockedHTML(c,'salary')+assetIncomeMirrorHTML(c)+'</div>'+
+  '<div class="finpanel exp" data-ivsec="expense" data-ivname="支出現況"><div class="finph"><div class="ic" style="background:rgba(224,138,104,.16);color:var(--warn)">支</div><h4>支出</h4><div class="sub"><div class="sl">月支出</div><div class="sv" id="finSubM_exp">'+fmt(Math.round(t.exp/12))+'</div></div><div class="sub"><div class="sl">年化小計</div><div class="sv neg" id="finSub_exp">'+fmt(t.exp)+'</div></div>'+sortBtn('expenses','expense')+'</div><div class="fintbl">'+finExpTable(c)+'</div>'+expNote+'</div>'+
   '<div class="finpanel ast" data-ivsec="asset" data-ivname="資產現況"><div class="finph"><div class="ic" style="background:rgba(169,188,207,.16);color:var(--teal)">資</div><h4>資產 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">現值合計</div><div class="sv" style="color:var(--teal)" id="finSub_ast">'+fmt(t.ast)+'</div></div>'+sortBtn('assets','asset')+'</div><div class="fintbl">'+finAstTable(c)+'</div><div class="finfoot"><span>原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
   '<div class="finpanel lia" data-ivsec="debt" data-ivname="負債現況"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">債</div><h4>負債 <span class="fintag">換算台幣</span></h4><div class="sub"><div class="sl">餘額合計</div><div class="sv" style="color:var(--amber2)" id="finSub_lia">'+fmt(t.lia)+'</div></div>'+sortBtn('liabilities','liability')+'</div><div class="fintbl">'+finLiaTable(c)+'</div><div class="finfoot"><span>餘額原幣輸入依匯率換算；進階欄點 ▸ 展開</span></div></div>'+
   '<div class="finpanel sav" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">儲</div><h4>儲蓄理財投入 <span class="fintag">不計入支出</span></h4><div class="sub"><div class="sl">年化合計</div><div class="sv" style="color:var(--teal)" id="finSub_sav">'+fmt(t.sav)+'</div></div>'+sortBtn('savings','saving')+'</div><div class="fintbl">'+finSavTable(c)+'</div><div class="finfoot"><span>零存整付、儲蓄險保費、定期定額、勞退自提、投資型保單投資保費——這些是「換口袋」不是「花掉」，所以不進總支出，而是「有效儲蓄率」的分子。</span></div></div>'+

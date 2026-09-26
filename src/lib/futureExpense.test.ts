@@ -64,3 +64,18 @@ describe("未來才開始的支出：不進「現在」的數字", () => {
     expect(w.document.getElementById("finSum_exp")!.textContent).toBe(w.fmt(w.finTotals(c).exp));
   });
 });
+
+describe("收支面板：年化小計前面也有月收入／月支出（Ray 2026-09-26）", () => {
+  it("月＝年÷12，四捨五入；改一格支出後兩個都跟著變", () => {
+    const c = w.activeCase();
+    w.app.dataTab = "finance"; w.render();
+    const t = w.finTotals(c);
+    expect(w.document.getElementById("finSubM_inc")!.textContent).toBe(w.fmt(Math.round(t.inc / 12)));
+    expect(w.document.getElementById("finSubM_exp")!.textContent).toBe(w.fmt(Math.round(t.exp / 12)));
+    const before = w.document.getElementById("finSubM_exp")!.textContent;
+    c.expenses.push({ name: "新支出", cat: "生活", subCat: "其他", period: "年", amount: 120000, infl: true, cut: 0, start: c.profile.age, end: 90 });
+    w.syncFinSummary();
+    expect(w.document.getElementById("finSubM_exp")!.textContent).not.toBe(before);
+    expect(w.document.getElementById("finSubM_exp")!.textContent).toBe(w.fmt(Math.round(w.finTotals(c).exp / 12)));
+  });
+});
