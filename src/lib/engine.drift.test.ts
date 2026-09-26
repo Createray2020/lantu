@@ -433,6 +433,41 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(after.members[after.members.length - 1].retireAge).toBe(65);
   });
 
+  it("延後退休：工作收入的結束歲跟著退休歲走，兩個方向都要對（2026/09/26）", () => {
+    // 真因：分析頁首屏拉桿只改 profile.retireAge、沒動工作收入 end，
+    // 拉到 73 之後 66～73 變成「薪水已停、生活費還是工作期全額」的一段假紅柱。
+    // 首屏拉桿從此走 applyRetireDelay()，跟調整方案那根槓桿共用同一份推法。
+    expect(HTML).toContain("applyRetireDelay(b,AN_TUNE.age-n(c.profile.retireAge));");
+    expect(HTML).not.toContain("b.profile.retireAge=AN_TUNE.age;");
+    // 同一類的坑：報酬率拉桿要關掉 useAllocReturn，起始值用 effReturn(c)，否則配置模式下拉了沒反應
+    expect(HTML).toContain("b.plan=b.plan||{};b.plan.useAllocReturn=false;");
+    expect(HTML).toContain("AN_TUNE={id:c.id,ret:effReturn(c),age:n(c.profile.retireAge)};");
+    expect(HTML).not.toContain("AN_TUNE={id:c.id,ret:n(c.params.invReturn)");
+    expect(HTML).toContain("else if(n(i.end)===oldRA)i.end=newRA;");
+
+    const mk = () => {
+      const c = E.sampleCase();
+      c.profile.retireAge = 65;
+      c.incomes = [
+        { name: "薪資", type: "工作", amount: 1200000, start: 40, end: 65 },   // 綁退休歲
+        { name: "顧問費", type: "工作", amount: 200000, start: 60, end: 70 },  // 刻意退休後才停
+        { name: "早期副業", type: "工作", amount: 100000, start: 40, end: 50 },
+        { name: "租金", type: "理財", amount: 240000, start: 40, end: 85 },
+      ];
+      return c;
+    };
+    // 往後推 8 年：結束歲早於 73 的工作收入全部延到 73（原規則）
+    const late = E.applyRetireDelay(mk(), 8);
+    expect(late.profile.retireAge).toBe(73);
+    expect(late.incomes.map((i: any) => E.n(i.end))).toEqual([73, 73, 73, 85]);
+    // 往前拉 5 年：只有原本 end===65 的那列跟到 60；顧問費 70、副業 50 不動
+    const early = E.applyRetireDelay(mk(), -5);
+    expect(early.profile.retireAge).toBe(60);
+    expect(early.incomes.map((i: any) => E.n(i.end))).toEqual([60, 70, 50, 85]);
+    // 0 年：原件原樣
+    expect(E.applyRetireDelay(mk(), 0).incomes.map((i: any) => E.n(i.end))).toEqual([65, 70, 50, 85]);
+  });
+
   it("現值缺口的封閉解：兩邊是同一條公式", () => {
     // shortPV = max over t ( −raw_t ÷ (1+r)^(t+1) )
     // ⚠️ 2026/08/24 起缺口看的是「主池＋分離池」的合計（rawTot），不是只看主池。

@@ -1725,9 +1725,17 @@ function leverRange(c,id,gate){
 // scenario() 與 applyLevers() 共用同一份，避免兩邊各推各的。
 function applyRetireDelay(c,years){
  years=n(years);if(!years)return c;
- c.profile.retireAge=n(c.profile.retireAge)+years;
+ var oldRA=n(c.profile.retireAge),newRA=oldRA+years;
+ c.profile.retireAge=newRA;
  (c.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&n(m.retireAge)>0)m.retireAge=n(m.retireAge)+years});
- (c.incomes||[]).forEach(function(i){if(i.type==='工作'&&n(i.end)<n(c.profile.retireAge))i.end=n(c.profile.retireAge)});
+ // 往後推：結束歲早於新退休歲的工作收入一律延長到新退休歲（原規則）。
+ // 往前拉（years<0，只有分析頁首屏拉桿會走到）：只把「原本綁在退休歲」的工作收入列
+ // （end===舊退休歲）一起拉前；刻意填到退休後才結束的顧問費之類不動。
+ (c.incomes||[]).forEach(function(i){
+  if(i.type!=='工作')return;
+  if(years>0){if(n(i.end)<newRA)i.end=newRA;}
+  else if(n(i.end)===oldRA)i.end=newRA;
+ });
  return c;
 }
 
