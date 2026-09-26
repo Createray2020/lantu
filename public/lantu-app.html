@@ -246,6 +246,18 @@ h1,h2,h3,h4{margin:0}
 .gband .vd{margin-left:auto;font-size:12px;color:var(--mut2)}
 .gband .vd b{color:var(--tx);font-weight:600}
 .anchips .chipgrp{flex:1 0 100%}
+/* 共用表格的「細節」列 */
+td.moretd{white-space:nowrap}
+.morebtn{background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:8px;padding:4px 9px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.02em}
+.morebtn:hover{border-color:var(--amber2);color:var(--amber2)}
+.morebtn.on{border-color:var(--amber);color:var(--amber2);background:var(--card)}
+.morebtn .mcnt{color:var(--mut2);font-weight:400;margin-left:2px}
+tr.hasmore>td{border-bottom:0}
+tr.moretr>td{background:var(--field);padding:10px 14px 12px;border-left:2px solid var(--amber)}
+.moregrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px 16px}
+.morefld{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut)}
+.morefld>input,.morefld>select,.morefld>span+*{width:100%}
+.morefld>span{white-space:nowrap}
 /* 全生涯財務流：圖＋右側年度明細卡 */
 .cfwrap{display:flex;gap:14px;align-items:flex-start}
 .cfleft{flex:1 1 0;min-width:0}
@@ -5165,7 +5177,7 @@ function dataPane(c){
  else if(app.dataTab==='liabilities')body=liabilitiesSec(c);
  else if(app.dataTab==='retire')body=(targetOn(c,'退休生活規劃')?goalHead(c,'退休生活規劃')+retireSec(c):foldedGoal(c,'退休生活規劃',tabFilled(c,'retire')?'（先前已填的退休參數保留、仍列入模擬）':''));
  else if(app.dataTab==='education')body=(targetOn(c,'子女教養規劃')?goalHead(c,'子女教養規劃')+eduSec(c):foldedGoal(c,'子女教養規劃',tabFilled(c,'education')?'（先前已填的教育金資料保留、仍列入模擬）':''));
- else if(app.dataTab==='goals')body=goalsTabHead(c)+tableSec('目標 / 置產 / 願望','goals',c.goals,[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['latest','最晚完成歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']])+'<div data-calc="defer">'+deferHint(c)+'</div>'+detailSec(c,'house')+detailSec(c,'car')+houseCalcSec(c);
+ else if(app.dataTab==='goals')body=goalsTabHead(c)+tableSec('目標 / 置產 / 願望','goals',c.goals,[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['latest','最晚完成歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']],'',['minPresent','end','latest','freq','growth','appreciation','loanRatio','prepared'])+'<div data-calc="defer">'+deferHint(c)+'</div>'+detailSec(c,'house')+detailSec(c,'car')+houseCalcSec(c);
  else if(app.dataTab==='lifestyle')body=lifestyleSec(c);
  else if(app.dataTab==='needs')body=needsSec(c);
  else if(app.dataTab==='coverages')body='<div class="sec"><h4 style="color:var(--mut)">簡易保障輸入 <span class="hint">若已於「現有保單」逐張登錄，此處通常留空；系統會自動彙總。員工團體保險也可登錄於此（計入已備）。</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外傷殘,住院醫療,醫療雜費,薪資補償（日）,薪資補償（月）,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','money'],['social','已備社會','money']]);
@@ -10263,7 +10275,7 @@ function linkageSec(c){
  var loans=tableSec('股東往來','ownerLoans',c.ownerLoans,[['dir','方向','sel:我借公司,公司借我'],['amount','餘額','money'],['hasNote','有借據','sel:否,是'],['interest','有計息','sel:否,是'],['crossYear','跨年度掛帳','sel:是,否'],['note','說明','text']],
   '方向決定後果，完全不同：<b>「公司借我」（掛資產方）</b>稅法上可能要設算利息課稅，銀行也會解讀成「公司的錢被老闆拿走」而扣授信分數；<b>「我借公司」（掛負債方）</b>則是老闆的個人資金被鎖在公司裡，個人流動性通常已經很差。');
  var gua=tableSec('個人連帶保證','guarantees',c.guarantees,[['owner','保證人','memsel'],['bank','銀行 / 債權人','text'],['item','項目','sel:公司借款,租賃,票貼,信保基金,其他'],['limit','額度','money'],['balance','目前餘額','money'],['due','到期日','text'],['coGuarantor','共同保證人','text'],['note','備註','text']],
-  '這是<b>或有負債</b>——不一定會發生，一旦發生就是全額。不列進來，個人負債會被嚴重低估、壽險額度也會算錯。');
+  '這是<b>或有負債</b>——不一定會發生，一旦發生就是全額。不列進來，個人負債會被嚴重低估、壽險額度也會算錯。',['due','coGuarantor','note']);
  var ba=tableSec('公司名下非營運資產','bizAssets',c.bizAssets,[['name','項目','text'],['type','類型','sel:不動產,車輛,保單,投資,其他'],['value','市值','money'],['user','實際使用人','sel:公司營運,本人,配偶,子女,其他'],['note','備註','text']],
   '名義上是公司的、實質上誰在用？非供本業使用者，進項不得扣抵、費用也會被剔除，金額大時可能被認定為變相盈餘分配。');
  var ch=tableSec('五條資金通道','channels',c.channels,[['kind','通道','sel:薪資,董監酬勞,盈餘分配(股利),租金,借款,費用報銷'],['annual','年金額','money'],['withhold','扣繳','sel:已辦,未辦,不適用'],['doc','書面憑證','sel:齊全,部分,無'],['note','備註','text']],
@@ -11428,9 +11440,9 @@ function financeSec(c){
 }
 
 function lifestyleSec(c){
- var travel=tableSec('旅遊規劃','travel',c.travel,[['on','納入','bool'],['cat','國內/外','sel:國內,國外'],['sub','類型','sel:認知旅遊,體育旅遊,消費旅遊,鄉村旅遊,宗教旅遊'],['start','開始歲','num'],['latest','最晚起始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','每次預算(理想)','money'],['minAmount','每次(最低)','money'],['imp','重要度（5最高）','imp']]);
- var hobby=tableSec('休閒興趣','hobby',c.hobby,[['on','納入','bool'],['sub','類型','sel:體能類,收藏類,思考類,娛樂創作類,社會服務類,栽培飼養類,其他類'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','平均花費(每次)','money'],['minAmount','最低','money'],['imp','重要度（5最高）','imp']]);
- var luxury=tableSec('奢侈品購買','luxury',c.luxury,[['on','納入','bool'],['sub','類別','sel:豪宅,珠寶寶石黃金,鐘錶,首飾配件,服裝精品,化妝品,工藝品,古董,樂器,家用電器,衛浴設施,寵物,私人飛機,郵輪遊艇,超跑豪華車,其他'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','價格','money'],['minAmount','最低','money'],['imp','重要度（5最高）','imp']]);
+ var travel=tableSec('旅遊規劃','travel',c.travel,[['on','納入','bool'],['cat','國內/外','sel:國內,國外'],['sub','類型','sel:認知旅遊,體育旅遊,消費旅遊,鄉村旅遊,宗教旅遊'],['start','開始歲','num'],['latest','最晚起始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','每次預算(理想)','money'],['minAmount','每次(最低)','money'],['imp','重要度（5最高）','imp']],'',['latest','end','freq','minAmount']);
+ var hobby=tableSec('休閒興趣','hobby',c.hobby,[['on','納入','bool'],['sub','類型','sel:體能類,收藏類,思考類,娛樂創作類,社會服務類,栽培飼養類,其他類'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','平均花費(每次)','money'],['minAmount','最低','money'],['imp','重要度（5最高）','imp']],'',['end','freq','minAmount']);
+ var luxury=tableSec('奢侈品購買','luxury',c.luxury,[['on','納入','bool'],['sub','類別','sel:豪宅,珠寶寶石黃金,鐘錶,首飾配件,服裝精品,化妝品,工藝品,古董,樂器,家用電器,衛浴設施,寵物,私人飛機,郵輪遊艇,超跑豪華車,其他'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','價格','money'],['minAmount','最低','money'],['imp','重要度（5最高）','imp']],'',['end','freq','minAmount']);
  // ⚠️ 掛 data-goalanchor：訪談檢核清單與「填細節 →」都靠它捲到對應的表。
  travel='<div data-goalanchor="旅遊規劃">'+travel+'</div>';
  hobby='<div data-goalanchor="休閒興趣規劃">'+hobby+'</div>';
@@ -12915,19 +12927,42 @@ function addTr(arr,ncol,msg,fn){
  var on=fn||('addRow(\''+arr+'\')');
  return '<tr class="addtr"><td colspan="'+ncol+'"><button type="button" class="add addline" onclick="'+on+'">＋ 新增一列'+(msg?'<span class="addmsg">'+msg+'</span>':'')+'</button></td></tr>';
 }
-function tableSec(title,arr,list,cols,hint){var c=activeCase();
- var head='<tr>'+cols.map(function(cl){return '<th>'+cl[1]+'</th>'}).join('')+'<th></th></tr>';
- var rows=(list||[]).map(function(row,i){var tds=cols.map(function(cl){var k=cl[0],ty=cl[2],id=arr+':'+i;
-   if(ty==='bool')return '<td><input type="checkbox" '+(row[k]?'checked':'')+' onchange="set(\''+id+'\',\''+k+'\',this.checked,\'bool\')"></td>';
-   if(ty==='memsel'){var opts=memSelOpts(c,row[k]);return '<td><select onchange="set(\''+id+'\',\''+k+'\',this.value)">'+opts+'</select></td>'}
-   if(ty==='imp')return '<td>'+impSelect('onchange="set(\''+id+'\',\''+k+'\',this.value,\'num\')"',row[k])+'</td>';
-   if(ty==='freqx')return '<td>'+freqCell(arr,i,row[k])+'</td>';
-   if(ty==='money')return '<td>'+moneyCell('oninput="setLive(\''+id+'\',\''+k+'\',this.value,\'num\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\'num\')"',row[k])+'</td>';
-   if(ty&&ty.indexOf('sel:')===0){var opts=selOpts(ty.slice(4).split(','),row[k]);return '<td><select onchange="set(\''+id+'\',\''+k+'\',this.value)">'+opts+'</select></td>'}
+// 共用表格。第 6 個參數 more＝要收進「細節」的欄位 key（2026/09/26 Ray：格子太小擠在一起，
+// 把重點留在列上，其他點開再填）。主欄留在列上；細節欄收進每列尾端的「細節 k/N」鈕，
+// 點了在那一列正下方展開一塊填寫區（同一列、不跳頁、不開彈窗）。展開狀態記在 TBL_MORE，重畫不會關掉。
+var TBL_MORE={};
+function tblMore(arr,i){var k=arr+':'+i;if(TBL_MORE[k])delete TBL_MORE[k];else TBL_MORE[k]=1;render();}
+function tblCell(c,arr,i,cl,row){var k=cl[0],ty=cl[2],id=arr+':'+i;
+   if(ty==='bool')return '<input type="checkbox" '+(row[k]?'checked':'')+' onchange="set(\''+id+'\',\''+k+'\',this.checked,\'bool\')">';
+   if(ty==='memsel'){var opts=memSelOpts(c,row[k]);return '<select onchange="set(\''+id+'\',\''+k+'\',this.value)">'+opts+'</select>'}
+   if(ty==='imp')return impSelect('onchange="set(\''+id+'\',\''+k+'\',this.value,\'num\')"',row[k]);
+   if(ty==='freqx')return freqCell(arr,i,row[k]);
+   if(ty==='money')return moneyCell('oninput="setLive(\''+id+'\',\''+k+'\',this.value,\'num\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\'num\')"',row[k]);
+   if(ty&&ty.indexOf('sel:')===0){var opts2=selOpts(ty.slice(4).split(','),row[k]);return '<select onchange="set(\''+id+'\',\''+k+'\',this.value)">'+opts2+'</select>'}
    var tt=(ty==='num'?'num':'txt');
-   return '<td><input '+(ty==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(row[k])+'" oninput="setLive(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')"></td>';
-  }).join('');return '<tr>'+tds+'<td><button class="del" onclick="delRow(\''+arr+'\','+i+')">✕</button></td></tr>';}).join('');
- return '<div class="sec"><h4>'+title+'</h4>'+(hint?'<div class="hint" style="margin:-4px 0 9px">'+hint+'</div>':'')+'<div class="tw"><table>'+head+(rows||'')+addTr(arr,cols.length+1,rows?'':'尚無資料')+'</table></div></div>';
+   return '<input '+(ty==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(row[k])+'" oninput="setLive(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')">';
+}
+function tableSec(title,arr,list,cols,hint,more){var c=activeCase();
+ var moreSet={};(more||[]).forEach(function(k){moreSet[k]=1});
+ var main=cols.filter(function(cl){return !moreSet[cl[0]]}),det=cols.filter(function(cl){return moreSet[cl[0]]});
+ var ncol=main.length+(det.length?1:0)+1;
+ var head='<tr>'+main.map(function(cl){return '<th>'+cl[1]+'</th>'}).join('')+(det.length?'<th></th>':'')+'<th></th></tr>';
+ var rows=(list||[]).map(function(row,i){
+  var tds=main.map(function(cl){return '<td>'+tblCell(c,arr,i,cl,row)+'</td>'}).join('');
+  var moreTd='';
+  if(det.length){
+   var filled=det.filter(function(cl){var v=row[cl[0]];return v!==''&&v!=null&&v!==false}).length;
+   var open=!!TBL_MORE[arr+':'+i];
+   moreTd='<td class="moretd"><button type="button" class="morebtn'+(open?' on':'')+'" onclick="tblMore(\''+arr+'\','+i+')" title="'+(open?'收起細節':'展開這一列的其他欄位')+'">'+(open?'▾':'▸')+' 細節 <span class="mcnt">'+filled+'／'+det.length+'</span></button></td>';
+  }
+  var tr='<tr'+(det.length&&TBL_MORE[arr+':'+i]?' class="hasmore"':'')+'>'+tds+moreTd+'<td><button class="del" onclick="delRow(\''+arr+'\','+i+')">✕</button></td></tr>';
+  if(det.length&&TBL_MORE[arr+':'+i]){
+   tr+='<tr class="moretr"><td colspan="'+ncol+'"><div class="moregrid">'+det.map(function(cl){
+    return '<label class="morefld"><span>'+cl[1]+'</span>'+tblCell(c,arr,i,cl,row)+'</label>'}).join('')+'</div></td></tr>';
+  }
+  return tr;
+ }).join('');
+ return '<div class="sec"><h4>'+title+'</h4>'+(hint?'<div class="hint" style="margin:-4px 0 9px">'+hint+'</div>':'')+'<div class="tw"><table>'+head+(rows||'')+addTr(arr,ncol,rows?'':'尚無資料')+'</table></div></div>';
 }
 
 function financeNavHTML(){

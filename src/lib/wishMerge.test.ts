@@ -133,6 +133,7 @@ describe("goals 的 freq 改成兩段式（填 52 想表達每週的坑）", () 
   it("預設是「只發生一次」＝freq 0（全庫 94.9% 都是這種）", () => {
     withGoal();
     go("goals");
+    w.tblMore("goals", 0); // 2026/09/26 起頻率收在「細節」裡，要先展開
     const html = w.document.querySelector("#app")!.innerHTML as string;
     expect(html).toContain("只發生一次");
     expect(html).toContain("每隔幾年一次");
