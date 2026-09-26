@@ -53,7 +53,8 @@ describe("① 分析分頁首屏：一張圖 ＋ 兩根拉桿 ＋ 三個數字",
     expect($("#anHero"), "分析分頁第一塊要是英雄圖").toBeTruthy();
     expect($("#anHeroChart svg"), "英雄圖要真的畫得出 SVG").toBeTruthy();
     const kpis = $$("#anHero .kpi").map((e: Element) => e.querySelector(".lb")!.textContent);
-    expect(kpis).toEqual(["淨資產", "退休缺口", "可投資資產轉負"]);
+    // 2026/09/26 換成三層口徑（流量→存量→缺口）；淨資產、退休缺口搬進 ①③ 段的結論句
+    expect(kpis).toEqual(["首次入不敷出", "存量用完", "現值缺口"]);
     expect(kpis, "年結餘已經是圖上那一根一根的柱子，不重複列一格").not.toContain("年結餘");
   });
 
