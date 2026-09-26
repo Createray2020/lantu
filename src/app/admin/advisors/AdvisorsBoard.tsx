@@ -319,7 +319,7 @@ function AdvisorDetail({
           </label>
           <div />
           <label className="text-xs text-tx2">期初案數（同業帶入）
-            <input type="number" value={f.initialCases} onChange={(e) => setF({ ...f, initialCases: e.target.value })}
+            <input type="number" inputMode="decimal" value={f.initialCases} onChange={(e) => setF({ ...f, initialCases: e.target.value })}
               className={`${INPUT} w-full mt-0.5`} />
           </label>
           <label className="text-xs text-tx2">期初顧問費

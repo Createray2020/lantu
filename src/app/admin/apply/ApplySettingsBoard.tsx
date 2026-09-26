@@ -97,7 +97,7 @@ export default function ApplySettingsBoard({
             />
             <span className="text-xs">核准時一併開通</span>
             <input
-              type="number"
+              type="number" inputMode="decimal"
               min={1}
               max={120}
               className={`${field} w-16`}

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_TC, Noto_Serif_TC } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import Script from "next/script";
 import VersionWatcher from "./VersionWatcher";
 import { UI_SCALE_BOOT_SCRIPT } from "@/lib/uiScale";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -51,6 +52,8 @@ export default function RootLayout({
         </head>
         <body className="min-h-full flex flex-col">
           <VersionWatcher />
+          {/* 數字欄守衛：注音開著也能直接打數字（與 lantu-app.html 共用同一支）。 */}
+          <Script src="/numguard.js" strategy="afterInteractive" />
           {children}
         </body>
       </html>

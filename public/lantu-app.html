@@ -921,6 +921,7 @@ input:disabled,select:disabled,textarea:disabled,button:disabled{opacity:.45;cur
   <button class="tbtn amber" onclick="printReport()">列印報告</button>
 </div>
 <div id="app"></div>
+<script src="numguard.js"></script>
 <script>
 // 保障險種。2026/08 對齊需求分析三大塊（責任／重病重殘／醫療）：
 // 「意外險」更名「意外傷殘」（需求分析問的是傷殘失能）、補「醫療雜費」與「薪資補償」。
@@ -1978,6 +1979,7 @@ function amtFmt(v){
 }
 function amtRaw(v){return String(v==null?'':v).replace(/,/g,'');}
 function amtKey(el){
+ if(el.__nfComp)return; // 組字中（注音）別重排，numguard.js 會在組字結束時把值修回數字
  var before=el.value,pos=(el.selectionStart==null?before.length:el.selectionStart);
  var keep=before.slice(0,pos).replace(/[^\d]/g,'').length;
  var after=amtFmt(before);
@@ -5207,7 +5209,7 @@ function seniorityBlock(m,idx,isLabor){
  var mb=function(k,ty){return 'onchange="set(\'members:'+idx+'\',\''+k+'\',this.value'+(ty==='num'?',\'num\'':'')+')"';};
  var derived=ymYears(m.insStart),shown=n(m.worked);
  var fields=ymField('勞保起保年月',m.insStart,'onchange="setInsStart('+idx+',this.value)"','填了會自動換算成下面的已投保年資')+
-  '<div class="f"><label>已投保年資（年）</label><input type="number" step="0.1" value="'+esc(m.worked==null?'':m.worked)+'" '+mb('worked','num')+'></div>';
+  '<div class="f"><label>已投保年資（年）</label><input type="number" inputmode="decimal" step="0.1" value="'+esc(m.worked==null?'':m.worked)+'" '+mb('worked','num')+'></div>';
  if(isLabor){
   fields+=ymField('勞退新制（6%）提繳起始年月',m.pensionStart,'onchange="setPensionStart('+idx+',this.value)"','民國 94 年 7 月新制上路；更早的年資屬舊制，不在新制專戶裡')+
    '<div class="f"><label>勞退新制（6%）專戶現有累積</label>'+moneyCell(mb('pensionBalance','num')+' placeholder="勞保局 App 可查"',m.pensionBalance)+'</div>';
@@ -5224,7 +5226,7 @@ function birthField(v,attr){
 function ageField(age,birth,attr,label,key){
  var auto=ageFromBirth(birth);
  var note=(auto!=null)?'<div class="hint" style="margin-top:3px">由出生日期自動計算（'+auto+' 歲）'+((n(age)!==auto)?'，目前手動覆寫為 '+n(age)+' 歲':'')+'</div>':'<div class="hint" style="margin-top:3px">可直接填年齡，或改填上方出生日期自動換算</div>';
- return '<div class="f"><label>'+(label||'目前年齡')+'</label><input type="number" data-ageof="'+esc(key||'')+'" value="'+esc(age==null?'':age)+'" '+attr+'>'+note+'</div>';
+ return '<div class="f"><label>'+(label||'目前年齡')+'</label><input type="number" inputmode="decimal" data-ageof="'+esc(key||'')+'" value="'+esc(age==null?'':age)+'" '+attr+'>'+note+'</div>';
 }
 // ── 月投保薪資：下拉選公告級距 ＋ 仍可手填 ──
 function insLabelOf(insType){return insType==='國民年金'?'月投保金額':'月投保薪資';}
@@ -5263,7 +5265,7 @@ function fFld(bindAttr,label,val,type,opts){
  //    成員投保類型、性別、保單職業等級、保費折扣都吃這一條路）。
  if(opts){var os=selOpts(opts,val);
   return '<div class="f"><label>'+label+'</label><select '+bindAttr+'>'+os+'</select></div>';}
- return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(val==null?'':val)+'" '+bindAttr+'></div>';
+ return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(val==null?'':val)+'" '+bindAttr+'></div>';
 }
 // 家庭/參數頁不再內嵌公司欄位——同一份資料兩個編輯口會打架。這裡只給摘要＋跳頁。
 // 家庭＝個人財務的範疇，公司資料一律住在第 ④ 群「企業」。
@@ -5289,7 +5291,7 @@ function companyLinkHTML(c){
 function companyGridHTML(co,onAttr){
  function cf(k,label,type){
   if(type==='money')return '<div class="f"><label>'+label+'</label>'+moneyCell(onAttr(k,'num'),co[k])+'</div>';
-  return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(co[k]==null?'':co[k])+'" '+onAttr(k,type||'text')+'></div>';}
+  return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(co[k]==null?'':co[k])+'" '+onAttr(k,type||'text')+'></div>';}
  return '<div class="bizbox"><div class="bh">🏢 公司基本 · 概略財務 <span class="hint" style="font-weight:400">完整公司財報之後由專屬介面處理</span></div>'+
   '<div class="fgrid">'+cf('name','公司名稱')+cf('taxId','統一編號')+
   '<div class="f"><label>行業別</label><input list="industryList" value="'+esc(co.industry==null?'':co.industry)+'" '+onAttr('industry','text')+'><datalist id="industryList"><option value="批發/零售"></option><option value="餐飲/住宿"></option><option value="製造"></option><option value="營建/工程"></option><option value="資訊/科技"></option><option value="金融/保險"></option><option value="醫療/生技"></option><option value="教育/文創"></option><option value="農林漁牧"></option><option value="專業服務(法律/會計/顧問)"></option></datalist></div>'+
@@ -5407,7 +5409,7 @@ function treeFields(name,gender,age,ageLock){
  return '<div class="f"><label>姓名</label><input id="treeAddName" value="'+esc(name||'')+'" placeholder="可先留空"></div>'+
   '<div class="f"><label>性別</label><select id="treeAddGender"><option'+(gender!=='女'?' selected':'')+'>男</option><option'+(gender==='女'?' selected':'')+'>女</option></select></div>'+
   (ageLock?'<div class="f"><label>年齡</label><div class="hint" style="padding-top:6px">'+ageLock+'</div></div>'
-   :'<div class="f"><label>年齡</label><input id="treeAddAge" type="number" min="0" max="120" value="'+esc(age==null?'':age)+'" placeholder="可先留空"></div>');
+   :'<div class="f"><label>年齡</label><input id="treeAddAge" type="number" inputmode="decimal" min="0" max="120" value="'+esc(age==null?'':age)+'" placeholder="可先留空"></div>');
 }
 function treeFormVals(){var g=function(id){var el=document.getElementById(id);return el?el.value:null;};return {name:g('treeAddName'),gender:g('treeAddGender'),age:g('treeAddAge'),role:g('treeAddRole')};}
 function treeAddOpen(mid,kind){
@@ -5629,11 +5631,11 @@ function personCard(c,m,idx,isPrimary){
    fFld('oninput="setMeta(\'profile\',\'retireAge\',this.value,\'num\')"','預計退休年齡',p.retireAge,'num')+
    fFld('oninput="setLifeExp(this.value)"','預估壽命',p.lifeExp,'num')+
    fFld('oninput="setMeta(\'profile\',\'residence\',this.value)"','現居地',p.residence)+
-   '<div class="f"><label>聯徵信用評分(200-800)</label><input type="number" data-creditinput value="'+esc(creditScoreOf(c)||'')+'" oninput="setCreditScore(this.value)"></div>';
+   '<div class="f"><label>聯徵信用評分(200-800)</label><input type="number" inputmode="decimal" data-creditinput value="'+esc(creditScoreOf(c)||'')+'" oninput="setCreditScore(this.value)"></div>';
  }else if(m.unborn){
   // 未出生子女：出生日期與年齡都不適用，改填「預計在本人幾歲時出生」，右邊即時換算成幾年後。
   idFields=fFld(mb('name'),'稱呼',m.name)+fFld(mb('gender'),'性別',m.gender,null,['男','女'])+
-   '<div class="f"><label>預計在<b>本人</b>幾歲時出生</label><input type="number" value="'+esc(m.bornAt==null?'':m.bornAt)+'" onchange="setBornAt('+idx+',this.value)"></div>'+
+   '<div class="f"><label>預計在<b>本人</b>幾歲時出生</label><input type="number" inputmode="decimal" value="'+esc(m.bornAt==null?'':m.bornAt)+'" onchange="setBornAt('+idx+',this.value)"></div>'+
    '<div class="f"><label>換算</label><div class="calc" style="padding-top:7px">'+
     (eduAgeKnown(m)?('<b>'+eduDueIn(m,c)+'</b> 年後'):'<span class="muted">填了歲數就會算出來</span>')+'</div></div>';
  }else{
@@ -5914,7 +5916,7 @@ function paramsSec(c){var pa=c.params;
  function fld(k,label,type){
   var bind='oninput="setMeta(\'params\',\''+k+'\',this.value,\''+(type==='money'?'num':(type||'text'))+'\')"';
   if(type==='money')return '<div class="f"><label>'+label+'</label>'+moneyCell(bind,pa[k])+'</div>';
-  return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(pa[k]==null?'':pa[k])+'" '+bind+'></div>';}
+  return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(pa[k]==null?'':pa[k])+'" '+bind+'></div>';}
  // 13 個欄位原本全倒進同一格網格，於是「這一年會漲多少」的成長假設，和只有跑
  // 蒙地卡羅才會用到的三個標準差，長得一模一樣——教練得逐欄讀標籤才分得出來。
  // 拆成三組，每組一條小標；分組本身就是說明，不必再寫一段文字。
@@ -5941,8 +5943,8 @@ function paramsSec(c){var pa=c.params;
 function horizonFld(c){
  var manual=horizonManual(c),eff=effHorizon(c),le=n(c.profile.lifeExp);
  var box=manual
-  ? '<input type="number" value="'+esc(c.params.horizon==null?'':c.params.horizon)+'" oninput="setMeta(\'params\',\'horizon\',this.value,\'num\')">'
-  : '<input type="number" value="'+eff+'" disabled title="跟著「家庭」分頁的預估壽命走；要自己指定請勾下方的「自己設定」">';
+  ? '<input type="number" inputmode="decimal" value="'+esc(c.params.horizon==null?'':c.params.horizon)+'" oninput="setMeta(\'params\',\'horizon\',this.value,\'num\')">'
+  : '<input type="number" inputmode="decimal" value="'+eff+'" disabled title="跟著「家庭」分頁的預估壽命走；要自己指定請勾下方的「自己設定」">';
  var note=manual
   ? '手動覆寫中：投影只跑到 '+eff+' 歲，不跟「預估壽命」'+(le?le+' 歲':'（未填）')+'連動。'
   : '跟著「家庭」分頁的預估壽命走（目前 '+eff+' 歲）。';
@@ -6059,9 +6061,9 @@ function incomesSec(c){
     '<td><select onchange="setAmtPeriod(\'incomes\','+idx+',this.value)">'+pSel+'</select></td>'+
     '<td>'+finAmt('incomes',idx,shownAmt(x))+'</td>'+
     '<td class="muted">'+fmt(n(x.amount))+'</td>'+
-    '<td><input type="number" value="'+esc(x.growth)+'" onchange="set(\'incomes:'+idx+'\',\'growth\',this.value,\'num\')"></td>'+
-    '<td><input type="number" value="'+esc(x.start)+'" onchange="set(\'incomes:'+idx+'\',\'start\',this.value,\'num\')"></td>'+
-    '<td><input type="number" value="'+esc(x.end)+'" onchange="set(\'incomes:'+idx+'\',\'end\',this.value,\'num\')"></td>'+
+    '<td><input type="number" inputmode="decimal" value="'+esc(x.growth)+'" onchange="set(\'incomes:'+idx+'\',\'growth\',this.value,\'num\')"></td>'+
+    '<td><input type="number" inputmode="decimal" value="'+esc(x.start)+'" onchange="set(\'incomes:'+idx+'\',\'start\',this.value,\'num\')"></td>'+
+    '<td><input type="number" inputmode="decimal" value="'+esc(x.end)+'" onchange="set(\'incomes:'+idx+'\',\'end\',this.value,\'num\')"></td>'+
     '<td><button class="del" onclick="delRow(\'incomes\','+idx+')">✕</button></td></tr>';
   }).join('');
   return '<tr><td colspan="10" style="background:var(--field);color:var(--amber2);font-weight:700">'+esc(o)+' <span class="muted" style="font-weight:400">· 年化小計 '+fmt(sub)+'</span></td></tr>'+rows;
@@ -6081,9 +6083,9 @@ function expensesSec(c){
     '<td>'+finAmt('expenses',idx,shownAmt(x))+'</td>'+
     '<td class="muted">'+fmt(n(x.amount))+'</td>'+
     '<td><input type="checkbox" '+(x.infl?'checked':'')+' onchange="set(\'expenses:'+idx+'\',\'infl\',this.checked,\'bool\')"></td>'+
-    '<td><input type="number" value="'+esc(x.start)+'" onchange="set(\'expenses:'+idx+'\',\'start\',this.value,\'num\')"></td>'+
-    '<td><input type="number" value="'+esc(x.end)+'" onchange="set(\'expenses:'+idx+'\',\'end\',this.value,\'num\')"></td>'+
-    '<td><input type="number" value="'+esc(x.cut)+'" onchange="set(\'expenses:'+idx+'\',\'cut\',this.value,\'num\')"></td>'+
+    '<td><input type="number" inputmode="decimal" value="'+esc(x.start)+'" onchange="set(\'expenses:'+idx+'\',\'start\',this.value,\'num\')"></td>'+
+    '<td><input type="number" inputmode="decimal" value="'+esc(x.end)+'" onchange="set(\'expenses:'+idx+'\',\'end\',this.value,\'num\')"></td>'+
+    '<td><input type="number" inputmode="decimal" value="'+esc(x.cut)+'" onchange="set(\'expenses:'+idx+'\',\'cut\',this.value,\'num\')"></td>'+
     '<td><button class="del" onclick="delRow(\'expenses\','+idx+')">✕</button></td></tr>';
  }).join('');
  var note=(app.ownerView&&app.ownerView!=='全家')?'<div class="hint" style="margin-bottom:6px;color:var(--amber2)">目前為「'+esc(app.ownerView)+'」視角；支出屬家庭層級、不分持有人，以下仍顯示全部。</div>':'';
@@ -6146,7 +6148,7 @@ function retireExpTable(c){
  var rows=c.retireExpenses.map(function(x,i){var per=x.period||'年';
   var cSel=CATS.map(function(ct){return '<option '+((x.cat||'生活')===ct?'selected':'')+'>'+ct+'</option>'}).join('');
   var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
-  var ageIn=function(k,ph){return '<input type="number" placeholder="'+ph+'" value="'+esc(x[k]==null?'':x[k])+'" onchange="set(\'retireExpenses:'+i+'\',\''+k+'\',this.value,\'num\');render()">';};
+  var ageIn=function(k,ph){return '<input type="number" inputmode="decimal" placeholder="'+ph+'" value="'+esc(x[k]==null?'':x[k])+'" onchange="set(\'retireExpenses:'+i+'\',\''+k+'\',this.value,\'num\');render()">';};
   return '<tr '+dropAttrs('retireExpenses',i)+'>'+
    '<td>'+finName('retireExpenses',i,'expense',x)+'</td>'+
    '<td><select onchange="set(\'retireExpenses:'+i+'\',\'cat\',this.value)">'+cSel+'</select></td>'+
@@ -6311,7 +6313,7 @@ function retireAgeBoxHTML(c){
    ? 'onchange="setMeta(\'profile\',\'retireAge\',this.value,\'num\');render()"'
    : 'onchange="set(\'members:'+i+'\',\'retireAge\',this.value,\'num\');render()"';
   rows.push('<div class="f"><label>'+esc(m.name||(isP?'本人':'成員'))+(isP?'（本人）':'')+' 預計退休年齡</label>'+
-   '<input type="number" value="'+esc(ra||'')+'" '+bind+'>'+
+   '<input type="number" inputmode="decimal" value="'+esc(ra||'')+'" '+bind+'>'+
    '<div class="hint" style="margin-top:3px">'+(ma>0?('目前 '+ma+' 歲 · 對應到 '+at):'先填年齡才算得出時點')+'</div></div>');
  });
  if(!rows.length)return '';
@@ -6357,7 +6359,7 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
    // ⚠️ 逐項模式下這一格不參與計算，就不要讓它看起來還能填——這正是 Ray 回報的問題。
    var box=(x[0]==='monthLiving'&&detail)
     ? '<div class="romoney" title="目前採用逐項明細表，這一格不列入計算">'+fmt(n(r.monthLiving))+' <span class="hint">元/月 · 未採用</span></div>'
-    : ((x[2]==='money')?moneyCell(bind,r[x[0]]):'<input type="number" value="'+esc(r[x[0]])+'" '+bind+'>');
+    : ((x[2]==='money')?moneyCell(bind,r[x[0]]):'<input type="number" inputmode="decimal" value="'+esc(r[x[0]])+'" '+bind+'>');
    return '<div class="f"><label>'+x[1]+'</label>'+box+'</div>';}).join('');
  var srcNote=retireModeBox(c);
  // ⚠️ 「方式」補上「自提」（庫內 6 筆在用，之前靠 selOpts 的舊值相容才沒被靜靜改掉）。
@@ -6741,7 +6743,7 @@ function eduChildCard(c,m,mi){
  var idBlock=unborn
   ?'<div class="fgrid" data-educhild="'+esc(m.mid||'')+'">'+
     fFld('oninput="set(\'members:'+mi+'\',\'name\',this.value)"','稱呼（例：第一胎）',m.name)+
-    '<div class="f"><label>預計在<b>本人</b>幾歲時出生</label><input type="number" value="'+esc(m.bornAt==null?'':m.bornAt)+'" onchange="setBornAt('+mi+',this.value)"></div>'+
+    '<div class="f"><label>預計在<b>本人</b>幾歲時出生</label><input type="number" inputmode="decimal" value="'+esc(m.bornAt==null?'':m.bornAt)+'" onchange="setBornAt('+mi+',this.value)"></div>'+
     '<div class="f"><label>換算</label><div class="calc" style="padding-top:7px">'+
       (known?('<b>'+due+'</b> 年後'+(due===0?'（今年）':'')):'<span class="muted">填了歲數就會算出來</span>')+
     '</div></div>'+
@@ -6773,8 +6775,8 @@ function eduChildCard(c,m,mi){
   '<div class="f"><label>期望最高學歷</label><select onchange="setEduOpt('+mi+',\'eduTop\',this.value)">'+
    eduStageDefs().filter(function(s){return ['高中職','大學','研究所','博士班'].indexOf(s.stage)>=0}).map(function(s){
     return '<option '+(top===s.stage?'selected':'')+'>'+esc(s.stage)+'</option>'}).join('')+'</select></div>'+
-  '<div class="f"><label>支付學雜費至幾歲（留空＝供給到畢業）</label><input type="number" value="'+esc(m.eduPayTo==null?'':m.eduPayTo)+'" onchange="setEduOpt('+mi+',\'eduPayTo\',this.value,\'num\')"></div>'+
-  '<div class="f"><label>重要程度 1-5</label><input type="number" min="1" max="5" value="'+esc(m.eduImp==null?3:m.eduImp)+'" onchange="setEduOpt('+mi+',\'eduImp\',this.value,\'num\')"></div>'+
+  '<div class="f"><label>支付學雜費至幾歲（留空＝供給到畢業）</label><input type="number" inputmode="decimal" value="'+esc(m.eduPayTo==null?'':m.eduPayTo)+'" onchange="setEduOpt('+mi+',\'eduPayTo\',this.value,\'num\')"></div>'+
+  '<div class="f"><label>重要程度 1-5</label><input type="number" inputmode="decimal" min="1" max="5" value="'+esc(m.eduImp==null?3:m.eduImp)+'" onchange="setEduOpt('+mi+',\'eduImp\',this.value,\'num\')"></div>'+
   '</div>'+
   '<div class="edutog">'+
    '<label><input type="checkbox" '+(m.eduExtra?'checked':'')+' onchange="setEduOpt('+mi+',\'eduExtra\',this.checked,\'bool\')"> 補習／才藝費列入教育金</label>'+
@@ -7099,8 +7101,8 @@ function sideJobsHTML(c,m,isPrimary,idx){
    // ⚠️ data-fincalc：月收入打字時年化要跟著動（syncDerived 會逐格刷新），否則要等整頁重畫才看得到，
    //    新增的那幾列會一直停在 0（Ray 0925 回報）。
    '<td class="calc" data-fincalc="incomes:'+i+'">'+fmt(n(x.amount))+'</td>'+
-   '<td><input type="number" style="width:64px" value="'+esc(x.start==null?'':x.start)+'" onchange="set(\'incomes:'+i+'\',\'start\',this.value,\'num\')"></td>'+
-   '<td><input type="number" style="width:64px" value="'+esc(x.end==null?'':x.end)+'" onchange="set(\'incomes:'+i+'\',\'end\',this.value,\'num\')"></td>'+
+   '<td><input type="number" inputmode="decimal" style="width:64px" value="'+esc(x.start==null?'':x.start)+'" onchange="set(\'incomes:'+i+'\',\'start\',this.value,\'num\')"></td>'+
+   '<td><input type="number" inputmode="decimal" style="width:64px" value="'+esc(x.end==null?'':x.end)+'" onchange="set(\'incomes:'+i+'\',\'end\',this.value,\'num\')"></td>'+
    '<td><button class="del" onclick="delRow(\'incomes\','+i+')">✕</button></td></tr>';
  }).join('');
  var head='<tr><th>項目</th><th>型態</th><th>月收入</th><th>年化</th><th>起</th><th>訖</th><th></th></tr>';
@@ -7210,8 +7212,8 @@ function detailSec(c,tag){
    '<td>'+moneyCell('onchange="set(\''+id+'\',\''+(isGoal?'present':'amount')+'\',this.value,\'num\')"',amt)+'</td>'+
    (isGoal?('<td>'+moneyCell('onchange="set(\''+id+'\',\'minPresent\',this.value,\'num\')"',n(x.minPresent))+'</td>'):
            ('<td class="muted" style="font-size:12px">'+esc(x.cat||'')+' / '+esc(x.subCat||'')+'</td>'))+
-   '<td><input type="number" style="width:64px" value="'+esc(x.start==null?'':x.start)+'" onchange="set(\''+id+'\',\'start\',this.value,\'num\')"></td>'+
-   '<td><input type="number" style="width:64px" value="'+esc(x.end==null?'':x.end)+'" onchange="set(\''+id+'\',\'end\',this.value,\'num\')"></td>'+
+   '<td><input type="number" inputmode="decimal" style="width:64px" value="'+esc(x.start==null?'':x.start)+'" onchange="set(\''+id+'\',\'start\',this.value,\'num\')"></td>'+
+   '<td><input type="number" inputmode="decimal" style="width:64px" value="'+esc(x.end==null?'':x.end)+'" onchange="set(\''+id+'\',\'end\',this.value,\'num\')"></td>'+
    '<td><button class="del" onclick="delRow(\''+sp.arr+'\','+i+')">✕</button></td></tr>';
  }).join('');
  var head='<tr><th>項目</th><th>'+(isGoal?'金額(理想)':'年金額')+'</th><th>'+(isGoal?'金額(最低)':'記在哪一類')+'</th><th>起</th><th>訖</th><th></th></tr>';
@@ -7244,11 +7246,11 @@ function birthPlanSec(c){
   var noCare=(k.care==='家人照顧（不另計）');
   return '<tr>'+
    '<td class="muted">第 '+(i+1)+' 胎</td>'+
-   '<td><input type="number" value="'+esc(k.atAge)+'" onchange="setBirthKid('+i+',\'atAge\',this.value,\'num\')" style="width:80px"></td>'+
+   '<td><input type="number" inputmode="decimal" value="'+esc(k.atAge)+'" onchange="setBirthKid('+i+',\'atAge\',this.value,\'num\')" style="width:80px"></td>'+
    '<td class="calc">'+(at>0?('<b>'+due+'</b> 年後'+(due===0?'（今年）':'')):'<span class="muted">—</span>')+'</td>'+
    '<td>'+sel(i,'delivery',BIRTH_DELIVERY,k.delivery)+'</td>'+
    '<td>'+sel(i,'care',BIRTH_CARE,k.care)+'</td>'+
-   '<td><input type="number" min="0" value="'+esc(k.careMonths)+'" onchange="setBirthKid('+i+',\'careMonths\',this.value,\'num\')" style="width:64px"'+(noCare?' title="家人照顧時這個月數只用來算月子餐"':'')+'></td>'+
+   '<td><input type="number" inputmode="decimal" min="0" value="'+esc(k.careMonths)+'" onchange="setBirthKid('+i+',\'careMonths\',this.value,\'num\')" style="width:64px"'+(noCare?' title="家人照顧時這個月數只用來算月子餐"':'')+'></td>'+
    '<td class="calc">'+fmt(cost)+detailBox('明細',birthBreakdownTbl(k,c))+'</td>'+
    '<td><button class="del" onclick="delBirthKid('+i+')">✕</button></td></tr>';
  }).join('');
@@ -7334,7 +7336,7 @@ function flashChildFund(msg){
 }
 function taxSec(c){var t=c.taxParams||{},it=incomeTax(c),es=estateTax(c);
  var f='<div class="f"><label>婚姻</label><select onchange="setTax(\'married\',this.value===\'true\',\'bool\')"><option value="false" '+(!t.married?'selected':'')+'>單身</option><option value="true" '+(t.married?'selected':'')+'>有偶</option></select></div>'+
-  '<div class="f"><label>扶養親屬人數</label><input type="number" value="'+esc(t.dependents)+'" onchange="setTax(\'dependents\',this.value,\'num\')"></div>'+
+  '<div class="f"><label>扶養親屬人數</label><input type="number" inputmode="decimal" value="'+esc(t.dependents)+'" onchange="setTax(\'dependents\',this.value,\'num\')"></div>'+
   '<div class="f"><label>其他扣除額</label>'+moneyCell('onchange="setTax(\'otherDeduction\',this.value,\'num\')"',t.otherDeduction)+'</div>'+
   '<div class="f"><label>執業職業別（費用率標準）</label><select onchange="setProfOccupation(this.value)">'+
    '<option value="" '+(!t.profOccupation?'selected':'')+'>— 未指定（預設 20%）—</option>'+
@@ -7342,7 +7344,7 @@ function taxSec(c){var t=c.taxParams||{},it=incomeTax(c),es=estateTax(c);
    '</select></div>'+
   '<div class="f"><label>費用率 %'+(function(){var s=profStdRate(t.profOccupation);
      return (s!=null&&n(t.profRate)!==s)?'<span style="color:var(--warn)">（已覆寫標準 '+s+'%）</span>':'（可覆寫）';})()+
-   '</label><input type="number" value="'+esc(profExpenseRate(t))+'" onchange="setTax(\'profRate\',this.value,\'num\')"></div>'+
+   '</label><input type="number" inputmode="decimal" value="'+esc(profExpenseRate(t))+'" onchange="setTax(\'profRate\',this.value,\'num\')"></div>'+
   '<div class="f"><label>房屋課稅現值(合計)</label>'+moneyCell('onchange="setTax(\'houseAssessed\',this.value,\'num\')"',t.houseAssessed)+'</div>'+
   '<div class="f"><label>地價(合計)</label>'+moneyCell('onchange="setTax(\'landAssessed\',this.value,\'num\')"',t.landAssessed)+'</div>'+
   '<div class="f"><label>汽機車牌照+燃料稅(年)</label>'+moneyCell('onchange="setTax(\'carTax\',this.value,\'num\')"',t.carTax)+'</div>';
@@ -7832,7 +7834,7 @@ function leverSliderHTML(c,id,gate){
   '<div style="display:flex;align-items:center;gap:8px">'+
    '<span style="font-weight:700;font-size:13px;min-width:92px;color:'+(on?'var(--amber2)':'var(--tx)')+'">'+esc(L.name)+'</span>'+
    '<input type="range" min="'+r.lo+'" max="'+r.hi+'" step="'+step+'" value="'+cur+'" onchange="setLever(\''+id+'\',this.value)" style="flex:1;min-width:90px;accent-color:var(--amber)"'+dis+'>'+
-   '<input type="number" step="'+step+'" min="'+r.lo+'" max="'+r.hi+'" value="'+(+cur.toFixed(2))+'" onchange="setLever(\''+id+'\',this.value)" style="width:72px;background:#0b2136;border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:3px 6px;text-align:right"'+dis+'>'+
+   '<input type="number" inputmode="decimal" step="'+step+'" min="'+r.lo+'" max="'+r.hi+'" value="'+(+cur.toFixed(2))+'" onchange="setLever(\''+id+'\',this.value)" style="width:72px;background:#0b2136;border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:3px 6px;text-align:right"'+dis+'>'+
    '<span class="hint" style="width:20px">'+esc(L.unit)+'</span>'+
   '</div>'+
   (gate.block[id]?'<div class="hint" style="display:block;margin-left:100px;color:var(--mut2)">'+esc(gate.reason[id]||'已鎖住')+'</div>':'')+
@@ -8125,7 +8127,7 @@ function actSrcOpts(a,idx){
 }
 
 function actNum(i,k,v,ph){
- return '<input type="number" class="actyr" placeholder="'+(ph||'')+'" value="'+esc(v==null?'':v)+
+ return '<input type="number" inputmode="decimal" class="actyr" placeholder="'+(ph||'')+'" value="'+esc(v==null?'':v)+
   '" onchange="setAction('+i+',\'' + k + '\',this.value,\'num\')">';
 }
 function actMoney(i,k,v){
@@ -9339,7 +9341,7 @@ function ofld(obj,k,label,type){var c=activeCase(),v=(c[obj]||{})[k];
   return '<div class="f"><label>'+label+'</label><select onchange="setObj(\''+obj+'\',\''+k+'\',this.value)">'+opts+'</select></div>'}
  // 金額欄走 moneyCell（存進去仍是 'num'），與 fFld / coF / tableSec 同一套規格。
  if(type==='money')return '<div class="f"><label>'+label+'</label>'+moneyCell('onchange="setObj(\''+obj+'\',\''+k+'\',this.value,\'num\')"',v)+'</div>';
- return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(v==null?'':v)+'" onchange="setObj(\''+obj+'\',\''+k+'\',this.value,\''+(type||'text')+'\')"></div>'}
+ return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(v==null?'':v)+'" onchange="setObj(\''+obj+'\',\''+k+'\',this.value,\''+(type||'text')+'\')"></div>'}
 var SAVING_EXP=['跟會','零存整付','定存','外幣存款','儲蓄型保單','年金保險'];
 var INVEST_EXP=['共同基金','股票','債券','ETF','選擇權','期貨','不動產','黃金','其他'];
 var DOC_LIST=['人壽險保單','產險保單(車險/住宅火險)','薪資單','支出明細表','銀行對帳單(車貸/房貸)','股票投資對帳單','基金投資對帳單','信用卡分期帳單','財產清冊/國稅局'];
@@ -9543,7 +9545,7 @@ function pendingAddHTML(){
 }
 function docChecklistHTML(c){var d=c.docCheck||{};
  var rows=DOC_LIST.map(function(name){return '<tr><td class="k">'+name+'</td>'+
-   '<td><input type="number" style="width:70px" value="'+esc(d[name+'_n']==null?'':d[name+'_n'])+'" onchange="setObj(\'docCheck\',\''+name+'_n\',this.value,\'num\')"></td>'+
+   '<td><input type="number" inputmode="decimal" style="width:70px" value="'+esc(d[name+'_n']==null?'':d[name+'_n'])+'" onchange="setObj(\'docCheck\',\''+name+'_n\',this.value,\'num\')"></td>'+
    '<td><input value="'+esc(d[name+'_note']==null?'':d[name+'_note'])+'" onchange="setObj(\'docCheck\',\''+name+'_note\',this.value)"></td></tr>';}).join('');
  return '<table class="rtable"><tr><th>項目</th><th>數量</th><th>說明 / 備註</th></tr>'+rows+'</table>';}
 /* ══════════════════════════════════════════════════════════════════════
@@ -10102,7 +10104,7 @@ function coF(co,k,label,type,opts){
   return '<div class="f"><label>'+label+'</label><select onchange="setCo(\''+k+'\',this.value)">'+o+'</select></div>';}
  // 金額欄走 moneyCell（存進去的仍是 'num'）；% / 年度 / 倍數維持 type=number。
  if(type==='money')return '<div class="f"><label>'+label+'</label>'+moneyCell('onchange="setCo(\''+k+'\',this.value,\'num\')"',co[k])+'</div>';
- return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number"':'')+' value="'+esc(co[k]==null?'':co[k])+'" onchange="setCo(\''+k+'\',this.value,\''+(type||'text')+'\')"></div>';}
+ return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(co[k]==null?'':co[k])+'" onchange="setCo(\''+k+'\',this.value,\''+(type||'text')+'\')"></div>';}
 
 // 股權估值三法對照。只給一個數字會讓遺贈稅試算失真，所以三法並列、標明採用哪一個。
 function equityDetailHTML(co){
@@ -10513,7 +10515,7 @@ function bizExitSec(c){
   '<div class="sec"><h4>退場路徑 <span class="hint">必須先選定，因為準備方式完全不同</span></h4>'+
    '<div class="tw"><table class="rtable"><tr><th>路徑</th><th>關鍵準備</th><th>需要的時間</th></tr>'+pathRows+'</table></div>'+
    '<div class="fgrid" style="margin-top:10px">'+
-    '<div class="f"><label>預計退場年齡</label><input type="number" value="'+esc(x.age==null?'':x.age)+'" onchange="setExit(\'age\',this.value,\'num\')"></div>'+
+    '<div class="f"><label>預計退場年齡</label><input type="number" inputmode="decimal" value="'+esc(x.age==null?'':x.age)+'" onchange="setExit(\'age\',this.value,\'num\')"></div>'+
     '<div class="f"><label>接班人 / 買方</label><input value="'+esc(x.successor||'')+'" onchange="setExit(\'successor\',this.value)"></div>'+
     '<div class="f"><label>期望變現金額</label>'+moneyCell('onchange="setExit(\'targetValue\',this.value,\'num\')"',x.targetValue)+'</div></div>'+
    (x.path?'<div class="hint" style="margin-top:8px">已選「'+esc(x.path)+'」，建議準備期 '+esc((EXIT_PATHS.filter(function(p){return p[0]===x.path})[0]||[])[2]||'')+'。'+
@@ -10653,7 +10655,7 @@ function creditSec(c){
  return '<div class="sec"><h4>信用現況</h4><div class="fgrid">'+
   ofld('credit','cards','信用卡家數','num')+ofld('credit','payFull','每期全額繳清','sel:是,否')+ofld('credit','firstCardOver1yr','第一張卡>1年','sel:是,否')+
   ofld('credit','installment','信用卡分期','sel:無,有')+ofld('credit','badRecord5yr','5年內不良紀錄','sel:否,是')+ofld('credit','recentApply','近三月辦卡/貸款','sel:無,有辦卡,有貸款')+
-  '<div class="f"><label>聯徵信用評分(200-800)</label><input type="number" data-creditinput value="'+esc(creditScoreOf(c)||'')+'" oninput="setCreditScore(this.value)"></div>'+
+  '<div class="f"><label>聯徵信用評分(200-800)</label><input type="number" inputmode="decimal" data-creditinput value="'+esc(creditScoreOf(c)||'')+'" oninput="setCreditScore(this.value)"></div>'+
   '</div><div class="hint" style="margin-top:8px">請填聯徵中心信用報告的真實分數（範圍 200–800；資料不足或有不良紀錄另有其他揭露方式，見下方級距對照）。此分數同步影響財務健康度的「信用」加權（(分數−200)/600 正規化）；與「家庭/參數」那一格雙向同步，改任一處均即時生效。</div>'+creditBandBox(creditScoreOf(c))+'</div>'+
   '<div class="sec"><h4>海外資產 / 身份</h4><div class="fgrid">'+
   ofld('overseas','hasAssets','是否有海外資產','sel:否,是')+ofld('overseas','identity','是否有海外身份','sel:否,是')+ofld('overseas','purpose','海外置產/移民用途')+ofld('overseas','assetTypes','海外資產分類')+
@@ -10675,7 +10677,7 @@ function cellInput(arr,idx,col,row,c){var k=col[0],ty=col[2];
  // 少了這一步 Number('1,200') = NaN 會靜默存成 0。
  if(ty==='money')return '<td>'+moneyCell('oninput="setLive(\''+arr+':'+idx+'\',\''+k+'\',this.value,\'num\')" onchange="set(\''+arr+':'+idx+'\',\''+k+'\',this.value,\'num\')"',row[k])+'</td>';
  var tt=(ty==='num'?'num':'txt');
- return '<td><input '+(ty==='num'?'type="number"':'')+' value="'+esc(row[k])+'" oninput="setLive(\''+arr+':'+idx+'\',\''+k+'\',this.value,\''+tt+'\')" onchange="set(\''+arr+':'+idx+'\',\''+k+'\',this.value,\''+tt+'\')"></td>';
+ return '<td><input '+(ty==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(row[k])+'" oninput="setLive(\''+arr+':'+idx+'\',\''+k+'\',this.value,\''+tt+'\')" onchange="set(\''+arr+':'+idx+'\',\''+k+'\',this.value,\''+tt+'\')"></td>';
 }
 // 依持有人(ownerKey)分組、可依 app.ownerView 過濾；valFn 回台幣值供小計。以原始索引呼叫 set/delRow。
 function groupedTable(c,title,arr,list,cols,ownerKey,valFn,hint){
@@ -10795,7 +10797,7 @@ function finMatch(o){var cur=app.ownerView||'全家';return cur==='全家'||(o||
 function finMem(c,arr,i,k,val){var o=memSelOpts(c,val);return '<select onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value)">'+o+'</select>';}
 function finSel(arr,i,k,val,list){return '<select onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value)">'+selOpts(list,val)+'</select>';}
 function finMoney(arr,i,k,val){return moneyCell('oninput="setLive(\''+arr+':'+i+'\',\''+k+'\',this.value,\'num\')" onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value,\'num\')"',val);}
-function finNum(arr,i,k,val){return '<input type="number" value="'+esc(val)+'" oninput="setLive(\''+arr+':'+i+'\',\''+k+'\',this.value,\'num\')" onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value,\'num\')">';}
+function finNum(arr,i,k,val){return '<input type="number" inputmode="decimal" value="'+esc(val)+'" oninput="setLive(\''+arr+':'+i+'\',\''+k+'\',this.value,\'num\')" onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value,\'num\')">';}
 function finTxt(arr,i,k,val){return '<input value="'+esc(val)+'" onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.value)">';}
 function finAmt(arr,i,val){return moneyCell('oninput="setAmtByPeriodLive(\''+arr+'\','+i+',this.value)" onchange="setAmtByPeriod(\''+arr+'\','+i+',this.value)"',val);}
 function finBool(arr,i,k,val){return '<input type="checkbox" '+(val?'checked':'')+' onchange="set(\''+arr+':'+i+'\',\''+k+'\',this.checked,\'bool\')">';}
@@ -10846,11 +10848,11 @@ function setOnce(arr,i,on){var c=activeCase();var x=c[arr][i];
 function setOnceStart(arr,i,v){var c=activeCase();var x=c[arr][i];x.start=n(v);x.end=n(v);save();render();}
 function finStart(arr,i,x){
  return isOnce(x)
-  ? '<input type="number" value="'+esc(x.start)+'" onchange="setOnceStart(\''+arr+'\','+i+',this.value)" title="一次性：訖會跟著走">'
+  ? '<input type="number" inputmode="decimal" value="'+esc(x.start)+'" onchange="setOnceStart(\''+arr+'\','+i+',this.value)" title="一次性：訖會跟著走">'
   : finNum(arr,i,'start',x.start);}
 function finEnd(arr,i,x){
  return isOnce(x)
-  ? '<input type="number" value="'+esc(n(x.start))+'" disabled title="一次性：只發生在起始那一歲">'
+  ? '<input type="number" inputmode="decimal" value="'+esc(n(x.start))+'" disabled title="一次性：只發生在起始那一歲">'
   : finNum(arr,i,'end',x.end);}
 function finOnceField(arr,i,x){
  return finDF('一次性','<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)">'+
@@ -10901,7 +10903,7 @@ function setTerm(i,k,val){
  else { if(t>0)x.paidTerms=Math.max(0,t-r); else if(p>0)x.totalTerms=p+r; }
  save();render();
 }
-function finTerm(i,k,val){return '<input type="number" value="'+esc(val)+'" onchange="setTerm('+i+',\''+k+'\',this.value)">';}
+function finTerm(i,k,val){return '<input type="number" inputmode="decimal" value="'+esc(val)+'" onchange="setTerm('+i+',\''+k+'\',this.value)">';}
 function termMark(x){
  var t=n(x.totalTerms),p=n(x.paidTerms);
  if(!(t>0))return '';
@@ -11893,7 +11895,7 @@ function polSubTable(c,p,pi){
  function inp(key,si,field,val,type){
   var bind='onchange="setPolSub('+pi+',\''+key+'\','+si+',\''+field+'\',this.value'+(type==='num'?',\'num\'':'')+')"';
   if(type==='money')return moneyCell(bind,val);
-  return '<input '+(type==='num'?'type="number"':'')+' value="'+esc(val==null?'':val)+'" '+bind+'>';
+  return '<input '+(type==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(val==null?'':val)+'" '+bind+'>';
  }
  function sel(key,si,field,val,opts){
   return '<select onchange="setPolSub('+pi+',\''+key+'\','+si+',\''+field+'\',this.value)">'+
@@ -11962,7 +11964,7 @@ function propInsSec(c){
   return '<div class="f"><label>'+label+'</label>'+
    moneyCell('onchange="setPropNeed(\''+k+'\',this.value,\'num\')"'+(ph?' placeholder="'+esc(ph)+'"':''),val)+'</div>';};
  var num=function(k,label,val,hint){
-  return '<div class="f"><label>'+label+'</label><input type="number" value="'+esc(val==null||val===0?'':val)+'" onchange="setPropNeed(\''+k+'\',this.value,\'num\')">'+
+  return '<div class="f"><label>'+label+'</label><input type="number" inputmode="decimal" value="'+esc(val==null||val===0?'':val)+'" onchange="setPropNeed(\''+k+'\',this.value,\'num\')">'+
    (hint?'<div class="hint" style="margin-top:3px">'+hint+'</div>':'')+'</div>';};
  // ⚠️ 輸入框一律放在 data-calc 容器**外面**（容器會 innerHTML 重畫，把正在打字的框換掉）。
  var inputs='<div class="sec"><h4>產險需求參數 <span class="hint">留空＝用系統自動帶的估算值；填了就是覆寫</span></h4>'+
@@ -12289,7 +12291,7 @@ function covFld(i,f){
  var bind='oninput="setLive(\'needs:'+i+'\',\''+k+'\',this.value,\'num\')" onchange="set(\'needs:'+i+'\',\''+k+'\',this.value,\'num\')"';
  var nd=(activeCase().needs||[])[i]||{};
  if(f[2]==='money')return '<div class="cwf"><label>'+lb+'</label>'+moneyCell(bind,nd[k])+'</div>';
- return '<div class="cwf"><label>'+lb+'</label><input type="number" value="'+esc(nd[k]==null?'':nd[k])+'" '+bind+'></div>';
+ return '<div class="cwf"><label>'+lb+'</label><input type="number" inputmode="decimal" value="'+esc(nd[k]==null?'':nd[k])+'" '+bind+'></div>';
 }
 function covNums(need,have,gap,unit,src,tag){
  var cls=gap>0?'cwgap':(gap<0?'cwhigh':'cwok');
@@ -12739,7 +12741,7 @@ function freqCell(arr,i,val){
  var sel='<select onchange="setFreqMode(\''+arr+'\','+i+',this.value)">'+
   '<option value="once"'+(once?' selected':'')+'>只發生一次</option>'+
   '<option value="every"'+(once?'':' selected')+'>每隔幾年一次</option></select>';
- var yrs=once?'':'<input type="number" min="1" max="20" step="1" style="width:58px;margin-left:6px" value="'+esc(n(val))+'"'+
+ var yrs=once?'':'<input type="number" inputmode="decimal" min="1" max="20" step="1" style="width:58px;margin-left:6px" value="'+esc(n(val))+'"'+
   ' onchange="setFreqYears(\''+arr+'\','+i+',this.value)" title="每隔幾年發生一次（1–20）"> 年';
  return '<div style="display:flex;align-items:center;white-space:nowrap">'+sel+yrs+'</div>';
 }
@@ -12825,7 +12827,7 @@ function tableSec(title,arr,list,cols,hint){var c=activeCase();
    if(ty==='money')return '<td>'+moneyCell('oninput="setLive(\''+id+'\',\''+k+'\',this.value,\'num\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\'num\')"',row[k])+'</td>';
    if(ty&&ty.indexOf('sel:')===0){var opts=selOpts(ty.slice(4).split(','),row[k]);return '<td><select onchange="set(\''+id+'\',\''+k+'\',this.value)">'+opts+'</select></td>'}
    var tt=(ty==='num'?'num':'txt');
-   return '<td><input '+(ty==='num'?'type="number"':'')+' value="'+esc(row[k])+'" oninput="setLive(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')"></td>';
+   return '<td><input '+(ty==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(row[k])+'" oninput="setLive(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')" onchange="set(\''+id+'\',\''+k+'\',this.value,\''+tt+'\')"></td>';
   }).join('');return '<tr>'+tds+'<td><button class="del" onclick="delRow(\''+arr+'\','+i+')">✕</button></td></tr>';}).join('');
  return '<div class="sec"><h4>'+title+'</h4>'+(hint?'<div class="hint" style="margin:-4px 0 9px">'+hint+'</div>':'')+'<div class="tw"><table>'+head+(rows||'')+addTr(arr,cols.length+1,rows?'':'尚無資料')+'</table></div></div>';
 }
@@ -13721,7 +13723,7 @@ function toolsPane(c){var L=app.tools.loan,R=app.tools.ret;
 function toolF(g,defs){return defs.map(function(x){
  var bind='oninput="setTool(\''+g+'\',\''+x[0]+'\',this.value)"';
  var box=(x[2]==='num')
-  ? '<input type="number" value="'+esc(app.tools[g][x[0]])+'" '+bind+'>'
+  ? '<input type="number" inputmode="decimal" value="'+esc(app.tools[g][x[0]])+'" '+bind+'>'
   : moneyCell(bind,app.tools[g][x[0]]);
  return '<div class="f"><label>'+x[1]+'</label>'+box+'</div>';
 }).join('');}

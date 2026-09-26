@@ -87,7 +87,7 @@ export default function TrainingBoard({
             </select>
           </label>
           <label className="text-xs text-tx2">認列時數
-            <input type="number" step="any" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })}
+            <input type="number" inputMode="decimal" step="any" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })}
               placeholder={perSession != null ? String(perSession) : "未設定"}
               className={`${form.hours ? INPUT : EMPTY} w-24 block mt-0.5`} />
           </label>
@@ -168,7 +168,7 @@ export default function TrainingBoard({
               className={`${ext.title ? INPUT : EMPTY} w-full block mt-0.5`} />
           </label>
           <label className="text-xs text-tx2">時數
-            <input type="number" step="any" value={ext.hours} onChange={(e) => setExt({ ...ext, hours: e.target.value })}
+            <input type="number" inputMode="decimal" step="any" value={ext.hours} onChange={(e) => setExt({ ...ext, hours: e.target.value })}
               className={`${ext.hours ? INPUT : EMPTY} w-24 block mt-0.5`} />
           </label>
           <button type="button" disabled={pending || !ext.title || !ext.hours} className={BTN}

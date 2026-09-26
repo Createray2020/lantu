@@ -206,7 +206,7 @@ function CatTable({
                   <td className="px-2 py-1.5 w-16">
                     {isEdit ? (
                       <input
-                        type="number"
+                        type="number" inputMode="decimal"
                         className={inputCls}
                         value={draft!.sortOrder}
                         onChange={(e) => patch({ sortOrder: Number(e.target.value) })}
@@ -379,7 +379,7 @@ function CatTable({
           <label className="text-xs text-tx2">
             排序
             <input
-              type="number"
+              type="number" inputMode="decimal"
               className={inputCls + " mt-1 w-20"}
               value={nw.sortOrder}
               onChange={(e) => setNw({ ...nw, sortOrder: Number(e.target.value) })}
@@ -450,7 +450,7 @@ function EduTable({
 
   const num = (r: EduCostRow, key: keyof EduCostRow) => (
     <input
-      type="number"
+      type="number" inputMode="decimal"
       className={inputCls + " w-24"}
       value={String(val(r)[key] ?? 0)}
       onChange={(e) => patch(r, { [key]: Number(e.target.value) } as Partial<EduCostRow>)}

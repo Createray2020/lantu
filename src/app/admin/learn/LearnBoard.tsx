@@ -184,7 +184,7 @@ function CourseCard({
             <label className="block">
               <span className="text-xs text-tx2">完課認列訓練時數（留空＝不認列）</span>
               <input
-                type="number" step="0.5" min="0" className={F}
+                type="number" inputMode="decimal" step="0.5" min="0" className={F}
                 value={p.trainingHours ?? ""}
                 onChange={(e) => setP({ ...p, trainingHours: e.target.value === "" ? null : Number(e.target.value) })}
               />
@@ -192,7 +192,7 @@ function CourseCard({
             <label className="block">
               <span className="text-xs text-tx2">排序（小的在前）</span>
               <input
-                type="number" className={F}
+                type="number" inputMode="decimal" className={F}
                 value={p.sortOrder}
                 onChange={(e) => setP({ ...p, sortOrder: Number(e.target.value) })}
               />
@@ -364,7 +364,7 @@ function LessonEditor({
             <label className="block">
               <span className="text-xs text-tx2">時長（分鐘，選填）</span>
               <input
-                type="number" min="0" className={F}
+                type="number" inputMode="decimal" min="0" className={F}
                 value={p.durationMin ?? ""}
                 onChange={(e) => setP({ ...p, durationMin: e.target.value === "" ? null : Number(e.target.value) })}
               />

@@ -257,7 +257,7 @@ export default function ProfileEditor({
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="block text-xs text-tx2 mb-1">從業年資</span>
-              <input type="number" min={0} max={80} value={f.yearsExp} disabled={pending}
+              <input type="number" inputMode="decimal" min={0} max={80} value={f.yearsExp} disabled={pending}
                 onChange={(e) => set("yearsExp", e.target.value)} placeholder="未填"
                 className={`${f.yearsExp ? INPUT : EMPTY} w-28`} />
             </label>

@@ -135,7 +135,7 @@ export default function LicenseCell({
             <label className="flex-1">
               <span className="text-tx3">期間</span>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 min={1}
                 value={effQty}
                 disabled={isIntern}
@@ -174,7 +174,7 @@ export default function LicenseCell({
               <span className="text-tx3">客戶上限覆寫（留空＝依級別 {capFromRank ?? "不限"}）</span>
               <div className="flex gap-1.5 mt-0.5">
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   min={0}
                   value={cap}
                   placeholder={capFromRank == null ? "不限" : String(capFromRank)}

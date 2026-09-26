@@ -388,7 +388,7 @@ function FieldRow({
     return (
       <div className="flex items-center gap-1">
         <input
-          type="number"
+          type="number" inputMode="decimal"
           step="any"
           value={value === undefined || value === null ? "" : String(value)}
           disabled={disabled}
@@ -576,13 +576,13 @@ function ModulesTable({
                       {(m.splitMode ?? "chain") === "chain" ? (
                         <div className="flex flex-wrap items-end gap-3">
                           <label className="text-xs text-tx2">推廣端 %
-                            <input type="number" step="any" value={fmtInt(m.splitPromoPct)} disabled={disabled}
+                            <input type="number" inputMode="decimal" step="any" value={fmtInt(m.splitPromoPct)} disabled={disabled}
                               placeholder="沿用全域"
                               onChange={(e) => upd(i, { splitPromoPct: e.target.value === "" ? null : Number(e.target.value) })}
                               className={`${numCls(m.splitPromoPct)} block mt-0.5`} />
                           </label>
                           <label className="text-xs text-tx2">執案端 %
-                            <input type="number" step="any" value={fmtInt(m.splitExecPct)} disabled={disabled}
+                            <input type="number" inputMode="decimal" step="any" value={fmtInt(m.splitExecPct)} disabled={disabled}
                               placeholder="沿用全域"
                               onChange={(e) => upd(i, { splitExecPct: e.target.value === "" ? null : Number(e.target.value) })}
                               className={`${numCls(m.splitExecPct)} block mt-0.5`} />
@@ -595,13 +595,13 @@ function ModulesTable({
                       ) : (
                         <div className="flex flex-wrap items-end gap-3">
                           <label className="text-xs text-tx2">執行者固定 %
-                            <input type="number" step="any" value={fmtInt(m.flatExecPct)} disabled={disabled}
+                            <input type="number" inputMode="decimal" step="any" value={fmtInt(m.flatExecPct)} disabled={disabled}
                               placeholder="未設定"
                               onChange={(e) => upd(i, { flatExecPct: e.target.value === "" ? null : Number(e.target.value) })}
                               className={`${numCls(m.flatExecPct)} block mt-0.5`} />
                           </label>
                           <label className="text-xs text-tx2">推廣者固定 %
-                            <input type="number" step="any" value={fmtInt(m.flatPromoPct)} disabled={disabled}
+                            <input type="number" inputMode="decimal" step="any" value={fmtInt(m.flatPromoPct)} disabled={disabled}
                               placeholder="未設定"
                               onChange={(e) => upd(i, { flatPromoPct: e.target.value === "" ? null : Number(e.target.value) })}
                               className={`${numCls(m.flatPromoPct)} block mt-0.5`} />
@@ -723,19 +723,19 @@ function RanksTable({
                       className={`${r.code ? FILLED : EMPTY} w-20 font-mono`} />
                   </td>
                   <td className={cell}>
-                    <input type="number" step="any" value={fmtInt(r.promoPct)} disabled={disabled} placeholder="未設定"
+                    <input type="number" inputMode="decimal" step="any" value={fmtInt(r.promoPct)} disabled={disabled} placeholder="未設定"
                       onChange={(e) => upd(i, { promoPct: e.target.value === "" ? null : Number(e.target.value) })}
                       className={`${r.promoPct == null ? EMPTY : FILLED} w-20`} />
                   </td>
                   <td className={cell}>
-                    <input type="number" step="any" value={fmtInt(r.execPct)} disabled={disabled} placeholder="未設定"
+                    <input type="number" inputMode="decimal" step="any" value={fmtInt(r.execPct)} disabled={disabled} placeholder="未設定"
                       onChange={(e) => upd(i, { execPct: e.target.value === "" ? null : Number(e.target.value) })}
                       className={`${r.execPct == null ? EMPTY : FILLED} w-20`} />
                   </td>
                   <td className={`${cell} text-tx2`}>{both ? `${total}%` : "—"}</td>
                   {isDefault && (
                     <td className={cell}>
-                      <input type="number" step="1" min="0" value={fmtInt(r.clientCap)} disabled={disabled} placeholder="不限"
+                      <input type="number" inputMode="decimal" step="1" min="0" value={fmtInt(r.clientCap)} disabled={disabled} placeholder="不限"
                         onChange={(e) => upd(i, { clientCap: e.target.value === "" ? null : Number(e.target.value) })}
                         className={`${r.clientCap == null ? EMPTY : FILLED} w-20`} />
                     </td>
@@ -851,7 +851,7 @@ function ThresholdTable({
                   </select>
                 </td>
                 <td className={cell}>
-                  <input type="number" value={fmtInt(r.cases)} disabled={disabled} placeholder="未設定"
+                  <input type="number" inputMode="decimal" value={fmtInt(r.cases)} disabled={disabled} placeholder="未設定"
                     onChange={(e) => upd(idx, { cases: e.target.value === "" ? null : Number(e.target.value) })}
                     className={numCls(r.cases)} />
                 </td>
@@ -862,7 +862,7 @@ function ThresholdTable({
                 </td>
                 {cols.team && (
                   <td className={cell}>
-                    <input type="number" value={fmtInt(r.teamCases)} disabled={disabled} placeholder="未設定"
+                    <input type="number" inputMode="decimal" value={fmtInt(r.teamCases)} disabled={disabled} placeholder="未設定"
                       onChange={(e) => upd(idx, { teamCases: e.target.value === "" ? null : Number(e.target.value) })}
                       className={numCls(r.teamCases)} />
                   </td>
@@ -870,7 +870,7 @@ function ThresholdTable({
                 {cols.mentor && (
                   <td className={cell}>
                     <div className="flex items-center gap-1">
-                      <input type="number" value={fmtInt(r.mentorCount)} disabled={disabled} placeholder="—"
+                      <input type="number" inputMode="decimal" value={fmtInt(r.mentorCount)} disabled={disabled} placeholder="—"
                         onChange={(e) => upd(idx, { mentorCount: e.target.value === "" ? null : Number(e.target.value) })}
                         className={`${r.mentorCount == null ? EMPTY : FILLED} w-14`} />
                       <span className="text-xs text-tx2">位</span>

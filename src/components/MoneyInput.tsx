@@ -70,6 +70,12 @@ export default function MoneyInput({
       className={className}
       onChange={(e) => {
         const el = e.target;
+        // 注音組字中（numguard.js 會在 compositionend 把值修回數字再派 input）別重排、別回寫，
+        // 否則第一個注音符號一進來就被 amtCaret 剝掉，組字被打斷。
+        if ((el as HTMLInputElement & { __nfComp?: unknown }).__nfComp) {
+          setDraft(el.value);
+          return;
+        }
         const next = amtCaret(el.value, el.selectionStart ?? el.value.length);
         caretRef.current = next.caret;
         setDraft(next.value);
