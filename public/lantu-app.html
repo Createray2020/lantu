@@ -9314,30 +9314,36 @@ function entitySec(c){
 var CAREER_ROWS=[['switch','轉換期預備金','職涯轉換','switchFund'],
                  ['startup','創業投入本金','創業','startupBudget']];
 function careerAge(c){var a=n((c.career||{}).switchAge);return a>0?a:null;}
+// 2026-09-26 Ray：轉職跟創業有可能同時發生（先轉職、幾年後創業）→ 計畫多一個「轉職與創業都有」，
+// 創業可以有自己的年齡 startupAge；沒填就跟轉職同一年（舊資料的行為不變）。
+function careerHasSwitch(plan){return plan==='考慮轉職'||plan==='考慮創業'||plan==='轉職與創業都有';}
+function careerHasStartup(plan){return plan==='考慮創業'||plan==='轉職與創業都有';}
+function startupAge(c){var a=n((c.career||{}).startupAge);return a>0?a:careerAge(c);}
 function applyCareerPlan(c){
  if(!c)return;
  if(!Array.isArray(c.goals))c.goals=[];
  var ca=c.career||{},age=careerAge(c),plan=ca.plan||'無';
  CAREER_ROWS.forEach(function(r){
   var key=r[0],amt=n(ca[r[3]]);
-  var want=(age!=null)&&amt>0&&(key==='switch'?(plan==='考慮轉職'||plan==='考慮創業'):(plan==='考慮創業'));
+  var at=(key==='switch')?age:startupAge(c);
+  var want=(at!=null)&&amt>0&&(key==='switch'?careerHasSwitch(plan):careerHasStartup(plan));
   var idx=-1;
   for(var i=0;i<c.goals.length;i++){if(c.goals[i]&&c.goals[i].careerAuto===key){idx=i;break;}}
   if(!want){if(idx>=0)c.goals.splice(idx,1);return;}
   var g=(idx>=0)?c.goals[idx]:{on:true,careerAuto:key,growth:'固定',freq:0,prepared:0,loanRatio:0,appreciation:0};
-  g.name=r[1];g.type=r[2];g.present=amt;g.start=age;g.end=age;g.imp=n(ca.importance)||3;
+  g.name=r[1];g.type=r[2];g.present=amt;g.start=at;g.end=at;g.imp=n(ca.importance)||3;
   if(idx<0)c.goals.push(g);
  });
 }
 // 職涯欄位旁邊的即時換算：填完馬上看得到它變成現金流的哪一筆。
 function careerCalcHTML(c){
  var ca=c.career||{},age=careerAge(c),plan=ca.plan||'無';
- if(plan==='無')return '<div class="hint" style="margin-top:8px">選了「考慮轉職」或「考慮創業」之後，下面兩筆錢會自動變成「目標 / 置產」裡的一次性支出，並進入現金流與缺口計算。</div>';
- if(age==null)return '<div class="hint" style="margin-top:8px;color:var(--amber2)">還沒填「預計幾歲轉換」——沒有年齡就落不到時間軸上，這兩筆錢暫時不進計算。</div>';
+ if(plan==='無')return '<div class="hint" style="margin-top:8px">選了「考慮轉職」「考慮創業」或「轉職與創業都有」之後，下面兩筆錢會自動變成「目標 / 置產」裡的一次性支出，並進入現金流與缺口計算。</div>';
+ if(age==null&&startupAge(c)==null)return '<div class="hint" style="margin-top:8px;color:var(--amber2)">還沒填「預計幾歲轉職」——沒有年齡就落不到時間軸上，這兩筆錢暫時不進計算。</div>';
  var rows=(c.goals||[]).filter(function(g){return g&&g.careerAuto});
  if(!rows.length)return '<div class="hint" style="margin-top:8px;color:var(--amber2)">兩筆金額都還是 0，目前沒有任何一筆進入現金流。</div>';
- return '<div class="hint" style="margin-top:8px">已在「目標 / 置產」自動產生 '+rows.length+' 筆，落在 <b>'+age+' 歲</b>：'+
-  rows.map(function(g){return esc(g.name)+' '+fmt(g.present)+' 元';}).join('、')+
+ return '<div class="hint" style="margin-top:8px">已在「目標 / 置產」自動產生 '+rows.length+' 筆：'+
+  rows.map(function(g){return esc(g.name)+' '+fmt(g.present)+' 元（<b>'+n(g.start)+' 歲</b>）';}).join('、')+
   '。這兩筆已經進入現金流與缺口計算，可以到那張表微調金額或最低標準。</div>';
 }
 // ===== 最晚實現（goals[].latest / marriage.latestAge / travel[].latest）=====
@@ -10067,7 +10073,7 @@ function legacySec(c){return (targetOn(c,'傳承規劃')
      '<div data-calc="legacyArrange">'+legacyArrangeHint(c)+'</div><div class="hint" style="margin-top:6px">傳承總需求(現金)＝繼承人數 × 每人現金傳承，會列入建議與缺口總表。<br>傳承是願景的一部分，客戶若決定這次不處理，把「納入本次規劃」設為 false 即可，資料仍會保留。</div></div>'
    :foldedGoal(c,'傳承規劃',n((c.legacy||{}).heirs)>0?'（先前已填 '+n(c.legacy.heirs)+' 位繼承人，資料保留、仍列入模擬）':''));}
 function careerSec(c){return (targetOn(c,'職涯規劃')
-   ?'<div class="sec" data-goalanchor="職涯規劃"><h4>職涯 / 創業規劃 '+mustBadge(c,'職涯規劃')+'</h4><div class="fgrid">'+ofld('career','plan','是否轉換或創業','sel:無,考慮轉職,考慮創業')+ofld('career','switchAge','預計幾歲轉換','num')+ofld('career','switchFund','轉換期預備金（空窗期生活費）','money')+ofld('career','startupType','創業類別')+ofld('career','startupBudget','創業投入本金（一次性）','money')+ofld('career','importance','重要度（5最高）','imp')+'</div>'+
+   ?'<div class="sec" data-goalanchor="職涯規劃"><h4>職涯 / 創業規劃 '+mustBadge(c,'職涯規劃')+'</h4><div class="fgrid">'+ofld('career','plan','是否轉換或創業','sel:無,考慮轉職,考慮創業,轉職與創業都有')+ofld('career','switchAge','預計幾歲轉職','num')+ofld('career','switchFund','轉換期預備金（空窗期生活費）','money')+ofld('career','startupType','創業類別')+ofld('career','startupAge','預計幾歲創業（空白＝與轉職同年）','num')+ofld('career','startupBudget','創業投入本金（一次性）','money')+ofld('career','importance','重要度（5最高）','imp')+'</div>'+
       '<div class="hint" style="margin-top:6px;display:block"><b>兩筆錢不是同一件事</b>：<b>轉換期預備金</b>是沒有薪水的那幾個月要活下去的現金（收入暫停）；<b>創業投入本金</b>是一次投進事業的錢（本金支出）。考慮轉職只會有前者，考慮創業通常兩者都有——開店那段期間一樣沒有薪水。</div>'+
       '<div data-calc="career">'+careerCalcHTML(c)+'</div></div>'
    :foldedGoal(c,'職涯規劃',(c.career||{}).plan&&c.career.plan!=='無'?'（先前已填「'+esc(c.career.plan)+'」，資料保留、仍列入模擬）':''));}

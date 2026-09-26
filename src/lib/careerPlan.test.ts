@@ -62,6 +62,25 @@ describe("兩筆錢是兩件事，落點也不同", () => {
     expect(rows.every((g: { start: number }) => g.start === 42)).toBe(true);
   });
 
+  it("轉職與創業都有（Ray 2026-09-26：兩件事可能同時發生）：轉職 43 歲、創業 50 歲各落各的年", () => {
+    const c = fresh();
+    c.career = { plan: "轉職與創業都有", switchAge: 43, switchFund: 500_000, startupType: "餐飲", startupAge: 50, startupBudget: 2_000_000, importance: 4 };
+    w.applyCareerPlan(c);
+    const rows = careerRows(c);
+    expect(rows.find((g: { careerAuto: string }) => g.careerAuto === "switch").start).toBe(43);
+    expect(rows.find((g: { careerAuto: string }) => g.careerAuto === "startup").start).toBe(50);
+    expect(w.careerCalcHTML(c)).toContain("43 歲");
+    expect(w.careerCalcHTML(c)).toContain("50 歲");
+    // 創業年齡留空 → 跟轉職同一年（舊資料的行為不變）
+    c.career.startupAge = "";
+    w.applyCareerPlan(c);
+    expect(careerRows(c).every((g: { start: number }) => g.start === 43)).toBe(true);
+    // 只填創業年齡、沒填轉職年齡：創業那筆照落，轉職那筆沒有年齡就不進
+    c.career = { plan: "轉職與創業都有", switchAge: "", switchFund: 500_000, startupAge: 50, startupBudget: 2_000_000, importance: 4 };
+    w.applyCareerPlan(c);
+    expect(careerRows(c).map((g: { careerAuto: string }) => g.careerAuto)).toEqual(["startup"]);
+  });
+
   it("⚠️ 轉職不會冒出「創業投入本金」——這正是 Ray 問的那個差別", () => {
     const c = fresh();
     c.career = { plan: "考慮轉職", switchAge: 50, switchFund: 500_000, startupBudget: 9_999_999, importance: 3 };
@@ -164,6 +183,6 @@ describe("欄位語意講清楚（Ray 問「差在哪裡」的正解寫在畫面
   it("沒填年齡時要說出來，而不是安靜地不算", () => {
     const c = fresh();
     c.career = { plan: "考慮創業", switchAge: "", switchFund: 0, startupBudget: 1_500_000, importance: 3 };
-    expect(w.careerCalcHTML(c)).toContain("還沒填「預計幾歲轉換」");
+    expect(w.careerCalcHTML(c)).toContain("還沒填「預計幾歲轉職」");
   });
 });
