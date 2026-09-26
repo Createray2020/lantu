@@ -13332,17 +13332,25 @@ function anTuneCase(c){
  //    退休金還沒開始領」的一段假紅柱（2026/09/26 Ray：延後退休為什麼缺口更多？）。
  //    走 applyRetireDelay() 跟調整方案那根槓桿共用同一份推法。
  applyRetireDelay(b,AN_TUNE.age-n(c.profile.retireAge));
+ // 壽命：投影的地平線走 effHorizon()——手動指定 horizon 時它只看 params.horizon，兩個一起改才有效。
+ if(AN_TUNE.le!=null&&AN_TUNE.le!==effHorizon(c)){b.profile.lifeExp=AN_TUNE.le;if(horizonManual(b))b.params.horizon=AN_TUNE.le;}
  return b;
 }
 function anTuned(c){return !!(AN_TUNE&&c&&AN_TUNE.id===c.id&&
- (AN_TUNE.ret!==effReturn(c)||AN_TUNE.age!==n(c.profile.retireAge)));}
+ (AN_TUNE.ret!==effReturn(c)||AN_TUNE.age!==n(c.profile.retireAge)||(AN_TUNE.le!=null&&AN_TUNE.le!==effHorizon(c))));}
 function anTuneHTML(c){
- var t=AN_TUNE&&AN_TUNE.id===c.id?AN_TUNE:{ret:effReturn(c),age:n(c.profile.retireAge)};
+ var le0=effHorizon(c);
+ var t=AN_TUNE&&AN_TUNE.id===c.id?AN_TUNE:{ret:effReturn(c),age:n(c.profile.retireAge),le:le0};
+ if(t.le==null)t.le=le0;
+ // 壽命拉桿：起始＝存檔的預期壽命，最多拉到存檔值＋10 歲（2026/09/26 Ray）；報酬率上限放到 100%。
+ var leMin=Math.max(n(c.profile.retireAge)+1,le0-10),leMax=le0+10;
  return '<div class="antune">'+
   '<label>投資報酬率 <b id="anTuneV_ret">'+t.ret.toFixed(1)+'%</b>'+
-   '<input type="range" min="0" max="10" step="0.5" value="'+t.ret+'" oninput="anTune(\'ret\',this.value)"></label>'+
+   '<input type="range" min="0" max="100" step="0.5" value="'+t.ret+'" oninput="anTune(\'ret\',this.value)"></label>'+
   '<label>退休年齡 <b id="anTuneV_age">'+t.age+' 歲</b>'+
    '<input type="range" min="50" max="75" step="1" value="'+t.age+'" oninput="anTune(\'age\',this.value)"></label>'+
+  '<label>預期壽命 <b id="anTuneV_le">'+t.le+' 歲</b>'+
+   '<input type="range" min="'+leMin+'" max="'+leMax+'" step="1" value="'+t.le+'" oninput="anTune(\'le\',this.value)"></label>'+
   '<button class="tbtn" onclick="anTuneReset()">重設</button>'+
   '<span class="hint">拉一下，上面的柱與線當場重畫——現場就能指著說「延兩年，這一段就不紅了」。'+
    '這是假設，<b>不會寫回客戶的資料</b>；要真的改請到「家庭 / 參數」分頁。</span>'+
@@ -13357,11 +13365,12 @@ function anHeroRefresh(){
  var kp=document.getElementById('anHeroKpis');
  if(kp)kp.innerHTML=anKpiHTML(t);
  var fl=document.getElementById('anHeroFlag');
- if(fl)fl.innerHTML=anTuned(c)?'<span style="color:var(--amber2)">目前顯示的是假設值（報酬率 '+AN_TUNE.ret.toFixed(1)+'%、退休 '+AN_TUNE.age+' 歲），不是存檔值。</span>':'';
+ if(fl)fl.innerHTML=anTuned(c)?'<span style="color:var(--amber2)">目前顯示的是假設值（報酬率 '+AN_TUNE.ret.toFixed(1)+'%、退休 '+AN_TUNE.age+' 歲、壽命 '+(AN_TUNE.le!=null?AN_TUNE.le:effHorizon(c))+' 歲），不是存檔值。</span>':'';
 }
 function anTune(kind,val){
  var c=activeCase();if(!c)return;
- if(!AN_TUNE||AN_TUNE.id!==c.id)AN_TUNE={id:c.id,ret:effReturn(c),age:n(c.profile.retireAge)};
+ if(!AN_TUNE||AN_TUNE.id!==c.id)AN_TUNE={id:c.id,ret:effReturn(c),age:n(c.profile.retireAge),le:effHorizon(c)};
+ if(kind==='le'){AN_TUNE.le=n(val);var e3=document.getElementById('anTuneV_le');if(e3)e3.textContent=AN_TUNE.le+' 歲';}
  if(kind==='ret'){AN_TUNE.ret=n(val);var e1=document.getElementById('anTuneV_ret');if(e1)e1.textContent=AN_TUNE.ret.toFixed(1)+'%';}
  if(kind==='age'){AN_TUNE.age=n(val);var e2=document.getElementById('anTuneV_age');if(e2)e2.textContent=AN_TUNE.age+' 歲';}
  anHeroRefresh();
@@ -13374,7 +13383,7 @@ function anHeroHTML(c){
   '缺口是常態，不是異常——要看的是存量哪一年用完、之後差多少，以及調整之後有沒有更晚、更淺。</span></h4>'+
   '<div id="anHeroChart">'+annualBalanceSVG(metrics(t).proj,'dark')+'</div>'+
   anTuneHTML(c)+
-  '<div id="anHeroFlag" style="font-size:12px;margin:2px 0 6px">'+(anTuned(c)?'<span style="color:var(--amber2)">目前顯示的是假設值（報酬率 '+AN_TUNE.ret.toFixed(1)+'%、退休 '+AN_TUNE.age+' 歲），不是存檔值。</span>':'')+'</div>'+
+  '<div id="anHeroFlag" style="font-size:12px;margin:2px 0 6px">'+(anTuned(c)?'<span style="color:var(--amber2)">目前顯示的是假設值（報酬率 '+AN_TUNE.ret.toFixed(1)+'%、退休 '+AN_TUNE.age+' 歲、壽命 '+(AN_TUNE.le!=null?AN_TUNE.le:effHorizon(c))+' 歲），不是存檔值。</span>':'')+'</div>'+
   '<div id="anHeroKpis">'+anKpiHTML(t)+'</div>'+
   '</div>';
 }

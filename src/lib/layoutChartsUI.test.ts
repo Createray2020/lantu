@@ -63,7 +63,7 @@ describe("① 分析分頁首屏：一張圖 ＋ 兩根拉桿 ＋ 三個數字",
     const tune = $("#anHero .antune");
     expect(tune).toBeTruthy();
     const ranges = [...tune.querySelectorAll('input[type="range"]')];
-    expect(ranges.length).toBe(2);
+    expect(ranges.length, "報酬率、退休年齡、預期壽命（2026/09/26 加）").toBe(3);
     expect(tune.textContent).toContain("投資報酬率");
     expect(tune.textContent).toContain("退休年齡");
     expect(tune.textContent).toContain("重設");
@@ -84,6 +84,19 @@ describe("① 分析分頁首屏：一張圖 ＋ 兩根拉桿 ＋ 三個數字",
     expect($("#anHeroKpis").innerHTML, "三個數字也要跟著換").not.toBe(kpi0);
     expect($("#anTuneV_age").textContent).toBe("72 歲");
     expect($("#anTuneV_ret").textContent).toBe("9.0%");
+    // 2026/09/26：報酬率上限 100%、多一根預期壽命（存檔值～存檔值＋10）
+    expect($('input[oninput*="anTune(\'ret\'"]').getAttribute("max")).toBe("100");
+    const le0 = w.effHorizon(c);
+    const leSl = $('input[oninput*="anTune(\'le\'"]');
+    expect(leSl, "要有預期壽命拉桿").toBeTruthy();
+    expect(+leSl.getAttribute("max")).toBe(le0 + 10);
+    expect(+leSl.value).toBe(le0);
+    const rowsBefore = w.metrics(w.anTuneCase(c)).proj.rows.length;
+    w.anTune("le", String(le0 + 10));
+    expect($("#anTuneV_le").textContent).toBe(le0 + 10 + " 歲");
+    expect(w.metrics(w.anTuneCase(c)).proj.rows.length, "壽命拉長，投影要跟著算到新的壽命").toBeGreaterThan(rowsBefore);
+    expect(c.profile.lifeExp, "壽命假設不寫回客戶資料").toBe(le0);
+    expect(pane()).toContain("壽命 " + (le0 + 10) + " 歲");
     expect(c.params.invReturn, "現場假設不可以悄悄存成客戶的參數").toBe(ret0);
     expect(c.profile.retireAge).toBe(age0);
     expect(pane()).toContain("目前顯示的是假設值");

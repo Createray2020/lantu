@@ -441,7 +441,7 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(HTML).not.toContain("b.profile.retireAge=AN_TUNE.age;");
     // 同一類的坑：報酬率拉桿要關掉 useAllocReturn，起始值用 effReturn(c)，否則配置模式下拉了沒反應
     expect(HTML).toContain("b.plan=b.plan||{};b.plan.useAllocReturn=false;");
-    expect(HTML).toContain("AN_TUNE={id:c.id,ret:effReturn(c),age:n(c.profile.retireAge)};");
+    expect(HTML).toContain("AN_TUNE={id:c.id,ret:effReturn(c),age:n(c.profile.retireAge),le:effHorizon(c)};");
     expect(HTML).not.toContain("AN_TUNE={id:c.id,ret:n(c.params.invReturn)");
     expect(HTML).toContain("else if(n(i.end)===oldRA)i.end=newRA;");
 
