@@ -63,6 +63,7 @@ describe("分頁順序＝問卷順序", () => {
     const nowRow = rows.find((r) => (r.querySelector(".dglab")?.textContent ?? "").includes("現在的狀況"))!;
     const names = [...nowRow.querySelectorAll(".dtab")]
       .map((b: Element) => b.textContent!.trim().replace(/新$/, ""));
+    // 2026/09/26 起下拉分組顯示（收支／資產負債／稅賦／風險與保障），組的順序仍照手冊 4→5→6 章
     expect(names).toEqual([
       "收入現況", "支出現況", "短期資金需求", "資產現況", "負債現況",
       "信用與海外", "稅賦", "風險屬性對話", "保障需求", "保障預算與取捨",

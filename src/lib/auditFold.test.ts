@@ -187,3 +187,24 @@ describe("目標／置產：上面點群，底下只出那一群", () => {
     w.GOAL_SEL = "";
   });
 });
+
+describe("資料分頁下拉：項目分組顯示（純顯示層）", () => {
+  it("①②③ 各有小標題，項目一個不少、順序照分組；方案·追蹤不分", () => {
+    go("family");
+    const menus = $$("#app .dmenu");
+    const catsOf = (i: number) => [...menus[i].querySelectorAll(".dmcat")].map((e) => e.textContent);
+    expect(catsOf(0)).toEqual(["這個家", "想法與習慣", "參數"]);
+    expect(catsOf(1)).toEqual(["人生階段", "置產", "家庭", "生活願望"]);
+    expect(catsOf(2)).toEqual(["收支", "資產負債", "稅賦", "風險與保障"]);
+    for (let g = 1; g <= 3; g++) {
+      const shown = [...menus[g - 1].querySelectorAll(".ivt")].map((e) => (e as HTMLElement).dataset.ivk);
+      const all = w.INTERVIEW_STEPS.filter((s: { g: number }) => s.g === g).map((s: { k: string }) => s.k);
+      expect(shown.sort()).toEqual(all.sort());
+      expect(menus[g - 1].querySelector(".dmcat")?.textContent).not.toBe("其他");
+    }
+    const names2 = [...menus[1].querySelectorAll(".ivt")].map((e) => e.textContent?.replace("新", ""));
+    expect(names2.slice(0, 3)).toEqual(["職涯規劃", "退休規劃", "傳承規劃"]);
+    const last = menus[menus.length - 1];
+    expect(last.querySelectorAll(".dmcat").length).toBe(0);
+  });
+});

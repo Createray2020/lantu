@@ -107,6 +107,9 @@ h1,h2,h3,h4{margin:0}
 .dglab.exec .dgn{color:var(--mut2)}
 .dmenu{position:absolute;top:calc(100% + 6px);left:0;min-width:194px;z-index:60;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:6px;box-shadow:0 12px 30px rgba(var(--sh),.34)}
 .dmenu[hidden]{display:none}
+.dmenu .dmcat{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut);padding:8px 10px 3px;margin-top:2px}
+.dmenu .dmcat:first-child{margin-top:0}
+.dmenu .dmcat+.ivline{margin-top:0}
 .dgcur{margin-left:auto;font-size:12px;color:var(--mut2);white-space:nowrap;padding-right:2px}
 /* 分組列即檢核清單（2026-09-11）：群標籤帶進度，下拉每一項帶狀態點。 */
 .dgcnt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.7;padding:0 5px;border-radius:999px;background:var(--field);border:1px solid var(--line2);color:var(--mut2)}
@@ -5124,6 +5127,24 @@ function bindIvFold(){
  });
 }
 function navStep(k){var r=null;INTERVIEW_STEPS.forEach(function(s){if(s.k===k)r=s});return r;}
+// 2026/09/26 Ray：下拉裡的項目太多全擺一起——分組顯示（小標題），點了照樣跳到後面的分頁。
+// 純顯示層：INTERVIEW_STEPS 與訪談步驟的定義一個字都不動；沒列在這裡的面向排在「其他」。
+var NAV_CATS={
+ 1:[['這個家',['scope','basic','bg','decide']],['想法與習慣',['purpose','values','money','ready']],['參數',['params']]],
+ 2:[['人生階段',['career','retire','legacy']],['置產',['house','car']],['家庭',['marry','birth','child','parent']],['生活願望',['travel','hobby','luxury']]],
+ 3:[['收支',['income','expense','shortterm']],['資產負債',['asset','debt','credit']],['稅賦',['tax']],['風險與保障',['risk','cover','coverbudget']]]   // 順序照手冊 4→5→6 章（interviewUI 守著）
+};
+// 把一群的面向依 NAV_CATS 分堆；回 [{cat, items}]，沒分組的群回單一堆（cat 空字串）。
+function navGrouped(c,fg){
+ var fs=navFacets(c,fg),cats=NAV_CATS[fg];
+ if(!cats)return [{cat:'',items:fs}];
+ var byK={};fs.forEach(function(x){byK[x.st.k]=x});
+ var used={},out=[];
+ cats.forEach(function(ct){var items=ct[1].map(function(k){used[k]=1;return byK[k]}).filter(Boolean);if(items.length)out.push({cat:ct[0],items:items});});
+ var rest=fs.filter(function(x){return !used[x.st.k]});
+ if(rest.length)out.push({cat:'其他',items:rest});
+ return out;
+}
 /** 某一群的面向清單，帶「客戶沒勾這個目標」與「問過了沒」兩個旗標。 */
 function navFacets(c,fg){
  return INTERVIEW_STEPS.filter(function(s){return s.g===fg}).map(function(st){
@@ -5181,7 +5202,7 @@ function dataPane(c){
   if(g.fg){
    var fs=navFacets(c,g.fg);
    isCur=fs.some(function(x){return x.st.k===curFacet});
-   btns=fs.map(function(x){
+   var lineOf=function(x){
     // ⚠️ 淡出（客戶沒勾這個目標）仍然可點——沿用「取消勾選不刪資料」的既有語意。
     // 兩顆鈕：左邊＝去填（ivGoto），右邊的勾＝手動標記「談過但系統偵測不到」（例如談完決定不做）。
     // ⚠️ 手動標記本來只有訪談浮層做得到，浮層移除後這個能力必須留在這裡，不能一起消失。
@@ -5194,6 +5215,9 @@ function dataPane(c){
      '<button type="button" class="ivtick'+(x.state==='manual'?' on':'')+'" data-ivtick="'+x.st.k+'"'+
      ' title="'+(x.state==='auto'?'這一段系統偵測到有資料了':'談過但系統偵測不到？點一下手動標記')+'"'+
      (x.state==='auto'?' disabled':'')+' aria-label="手動標記已談過">✓</button></span>';
+   };
+   btns=navGrouped(c,g.fg).map(function(grp){
+    return (grp.cat?'<div class="dmcat">'+esc(grp.cat)+'</div>':'')+grp.items.map(lineOf).join('');
    }).join('');
    var pr=navProgress(c,g.fg);
    cnt='<span class="dgcnt'+((pr.total&&pr.done>=pr.total)?' full':'')+'" title="這一群已經問過的面向數">'+pr.done+'/'+pr.total+'</span>';
