@@ -246,6 +246,20 @@ h1,h2,h3,h4{margin:0}
 .gband .vd{margin-left:auto;font-size:12px;color:var(--mut2)}
 .gband .vd b{color:var(--tx);font-weight:600}
 .anchips .chipgrp{flex:1 0 100%}
+/* 全站盤查：記得展開狀態的折疊卡、保障中心分頁籤、KYC 已答題收合 */
+.secfold>summary{list-style:none;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.secfold>summary::-webkit-details-marker{display:none}
+.secfold>summary::before{content:'\25B8';color:var(--amber);font-size:11px}
+.secfold[open]>summary::before{content:'\25BE'}
+.secfold .ckfoldbody>.sec{border:0;background:transparent;box-shadow:none;padding:4px 0 0;margin-bottom:8px}
+.covtab{display:none}.covtab.on{display:block}
+.covnav{margin-bottom:14px}
+details.riskq>summary{list-style:none;cursor:pointer}
+details.riskq>summary::-webkit-details-marker{display:none}
+details.riskq>summary h4{margin-bottom:0}
+details.riskq:not([open])>summary h4{color:var(--mut)}
+details.riskq .riskans{color:var(--amber2);font-weight:600}
+details.riskq[open]>summary h4{margin-bottom:10px}
 /* 人物卡：基本資訊之外收進「更多」 */
 .pcmore{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
 .pcmore>summary.foldln{flex-wrap:wrap}
@@ -2010,6 +2024,23 @@ function svgFitCSS(W){return 'max-width:'+n(W)+'px;--svgw:'+n(W)+'px;height:auto
 function svgFit(W){return ' style="'+svgFitCSS(W)+'"';}
 // 收合區塊：畫面先講結論（圖），「逐項數字」那種表格一律收在圖底下。
 // ⚠️ 只放衍生顯示，不要拿它包輸入框（<details> 收起來時裡面的框拿不到焦點）。
+// 2026/09/26 全站盤查（Ray：留基本資訊、其餘點開再展開）——記得展開狀態的折疊卡。
+// 跟 foldHTML 的差別：有 key，開關記在 FOLD_OPEN，render() 之後不會關回去；標題可帶一行摘要。
+var FOLD_OPEN={};
+function foldToggled(el,key){if(el.open)FOLD_OPEN[key]=1;else delete FOLD_OPEN[key];}
+function foldKeep(key,title,hint,inner,defaultOpen){
+ var open=FOLD_OPEN.hasOwnProperty(key)?!!FOLD_OPEN[key]:!!defaultOpen;
+ return '<details class="ckfold secfold" data-fk="'+key+'"'+(open?' open':'')+' ontoggle="foldToggled(this,\''+key+'\')"><summary>'+title+
+  (hint?'<span class="hint">'+hint+'</span>':'')+'</summary><div class="ckfoldbody">'+inner+'</div></details>';
+}
+// 要捲到某個元素之前先把它露出來：打開所有收著的祖先 details（並記住），切到它所在的分頁籤。
+function revealEl(el){
+ if(!el)return;
+ var d=el.closest?el.closest('details'):null;
+ while(d){if(!d.open){d.open=true;var fk=d.getAttribute('data-fk');if(fk)FOLD_OPEN[fk]=1;}d=d.parentElement?d.parentElement.closest('details'):null;}
+ var tab=el.closest?el.closest('.covtab'):null;
+ if(tab&&!tab.classList.contains('on'))covTabPick(tab.getAttribute('data-t'));
+}
 function foldHTML(title,inner,open){
  return '<details class="foldbox"'+(open?' open':'')+'><summary>'+title+'</summary>'+
   '<div class="foldboxbody">'+inner+'</div></details>';
@@ -6000,7 +6031,7 @@ function peopleSec(c){
   '<div class="sec" data-ivsec="scope" data-ivname="規劃單位與界線"><h4>規劃單位 <span class="hint">這份規劃算誰的收支、資產與責任</span></h4><div class="fgrid">'+
    ofld('planScope','unit','規劃單位','sel:未指定,個人,家庭')+ofld('planScope','why','為什麼是這個範圍')+'</div>'+
    '<div data-calc="planScope">'+planScopeHint(c)+'</div></div>'+
-  familyTreeSec(c)+
+  foldKeep('tree','家族族譜',(c.members||[]).length+' 位成員 · 點開可直接新增家人',familyTreeSec(c))+
   // ⚠️ basic 與 bg 共用這一個宿主：「背景與人生事件」住在每一張成員卡裡面（bgBlock），
   //    不是成員卡的兄弟節點，所以聚焦時兩者指同一塊。
   '<div data-ivsec="basic" data-ivname="家庭成員與投保"><div class="ppband">家庭成員 <span class="hint">本人與配偶為完整工作卡；子女／長輩含財務獨立歲</span></div>'+cards+addBtn+'</div>'+
@@ -6515,7 +6546,7 @@ function retireSec(c){var r=c.retire||{},rn=retireNeed(c);
   foldHTML('退休時點 · 各成員退休順序與混合期權重',retirePhaseHTML(c))+
   (retireMode(c)==='detail'?retireExpSec(c):foldHTML('退休期支出明細（目前未採用）',retireExpSec(c)))+
   foldHTML('勞保 / 勞退 / 國民年金 概算（自動計入已備）',laborPensionBox(c)+laborDetailHTML(c))+autoBlockedHTML(c,'labor')+
-  prep+'<div data-calc="preparedConv">'+preparedConvHTML(c)+'</div>';
+  foldKeep('prepared','已準備退休金',(r.prepared||[]).length+' 列 · 合計 '+fmt(sum(r.prepared||[],function(x){return n(x.amount)})),prep+'<div data-calc="preparedConv">'+preparedConvHTML(c)+'</div>');
 }
 // ===== C5：已準備退休金「領取方式」的換算說明 =====
 // ⚠️ 教練一定要看得懂每一列被當成什麼在算，尤其是月領那幾列。
@@ -8689,8 +8720,9 @@ function planSec(c){
  //    它們仍然是有用的診斷，但不該再佔首屏；首屏要回答的是「做得到嗎、改善多少」。
  // planact 的宿主包住方案本體；review 的宿主是「其他方案參數」那一折（下次檢視日在裡面）。
  return '<div data-ivsec="planact" data-ivname="調整方案">'+planHeroV2(c)+
-  foldSec('缺口配額對帳','這條線大概要生出多少錢 vs 動作實際排了多少',quotaV2HTML(c),true)+
-  foldSec('調整動作清單','補缺口的手段，一條一條具體動作 — 改任何一格，上面的圖與旗子當場重算',actionsHTML(c),true)+
+  // 2026/09/26 全站盤查：首屏只留主圖＋數字，其餘一律收（含這兩塊，之前預設開）。
+  foldSec('缺口配額對帳','這條線大概要生出多少錢 vs 動作實際排了多少',quotaV2HTML(c),false)+
+  foldSec('調整動作清單（'+planActionsOn(c).length+' 個）','補缺口的手段，一條一條具體動作 — 改任何一格，上面的圖與旗子當場重算',actionsHTML(c),false)+
   foldSec('資金勾稽','客戶到底有沒有錢做這些動作',ledgerV2HTML(c))+
   foldSec('動作流程','定案後輸出到調整方案書的執行時序',actionFlowHTML(c))+
   foldSec('願景選定','先決定要執行哪些願景，選定的當中按時間先到先付',visionPickHTML(c))+
@@ -9079,7 +9111,7 @@ function gotoGoal(t){var c=activeCase();var m=targetMeta(t);if(!m)return;
  if(!targetOn(c,t))toggleTarget(t);
  if(m[4])seedGoalRow(c,t);          // goals 類：確保表裡有一列可填
  app.activeTab='data';app.dataTab=m[1];save();render();
- setTimeout(function(){var el=document.querySelector('[data-goalanchor="'+t+'"]');if(!el)return;
+ setTimeout(function(){var el=document.querySelector('[data-goalanchor="'+t+'"]');if(!el)return;revealEl(el);
   if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
   el.classList.add('goalflash');setTimeout(function(){el.classList.remove('goalflash')},1700);},40);}
 // 已選為必達、但 goals 表裡沒有對應列（舊資料或「全選」進來的）→ 補一列
@@ -9779,7 +9811,7 @@ function ivGoto(k){
  if(!st)return;
  app.activeTab='data';app.dataTab=st.tab;app.ivFacet=k;render();
  if(!st.a)return;
- setTimeout(function(){var el=document.querySelector(st.a);if(!el)return;
+ setTimeout(function(){var el=document.querySelector(st.a);if(!el)return;revealEl(el);
   if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
   el.classList.add('goalflash');setTimeout(function(){el.classList.remove('goalflash')},1700);},40);
 }
@@ -9846,13 +9878,13 @@ function intentSec(c){var it=c.intent||{};
   (targetOn(c,'婚姻規劃')
    ?'<div class="sec" data-goalanchor="婚姻規劃"><h4>婚姻規劃 '+mustBadge(c,'婚姻規劃')+'</h4><div class="fgrid">'+ofld('marriage','plan','是否結婚','sel:否,是')+ofld('marriage','age','理想結婚年齡','num')+ofld('marriage','latestAge','最晚結婚年齡','num')+ofld('marriage','budget','婚禮預算(理想)','money')+ofld('marriage','minBudget','婚禮預算(最低)','money')+ofld('marriage','importance','重要度（5最高）','imp')+'</div><div class="hint" style="margin-top:8px">旅遊/休閒/奢侈品/傳承 於「目標/置產」分頁以對應類型新增，並可填理想與最低雙檔。</div></div>'+detailSec(c,'wedding')
    :foldedGoal(c,'婚姻規劃',(c.marriage||{}).plan==='是'?'（先前已填婚姻規劃，資料保留、仍列入模擬）':''))+
-  '<div class="sec" data-ivanchor="money"><h4>理財模式評估 <span class="hint">記帳、儲蓄與投資經驗，判讀理財習慣</span></h4><div class="fgrid">'+ofld('moneyStyle','bookkeep','記帳經驗','sel:無,曾記帳但中斷,持續記帳中')+ofld('moneyStyle','budgeting','收支管理','sel:未管理,有記錄無計劃,有計劃管理')+ofld('moneyStyle','emergency','緊急預備金','sel:尚未準備,已準備')+ofld('moneyStyle','emergencyAmt','預備金金額','money')+'</div>'+
+  foldKeep('money','理財模式評估 · 改變的準備度','記帳、儲蓄與投資經驗；改變意願與信心','<div class="sec" data-ivanchor="money"><h4>理財模式評估 <span class="hint">記帳、儲蓄與投資經驗，判讀理財習慣</span></h4><div class="fgrid">'+ofld('moneyStyle','bookkeep','記帳經驗','sel:無,曾記帳但中斷,持續記帳中')+ofld('moneyStyle','budgeting','收支管理','sel:未管理,有記錄無計劃,有計劃管理')+ofld('moneyStyle','emergency','緊急預備金','sel:尚未準備,已準備')+ofld('moneyStyle','emergencyAmt','預備金金額','money')+'</div>'+
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">儲蓄經驗（可複選）</div>'+chips('savingExp',SAVING_EXP,it.savingExp)+'</div>'+
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">投資經驗（可複選）</div>'+chips('investExp',INVEST_EXP,it.investExp)+chipsOther('investExp',it)+'</div>'+
    '<div class="subhd" data-ivanchor="ready" style="margin-top:12px">改變的準備度 <span class="hint">訪談題：這件事你想做的程度 0–10？你相信自己做得到的程度 0–10？</span></div>'+
    '<div class="fgrid">'+ofld('moneyStyle','willing','改變意願 0–10','num')+ofld('moneyStyle','confidence','改變信心 0–10','num')+'</div>'+
-   '<div data-calc="readiness">'+readinessHint(c)+'</div></div>'+
-  pendingSec(c);
+   '<div data-calc="readiness">'+readinessHint(c)+'</div></div>')+
+  foldKeep('pending','待補齊清單',pendingItems(c).length+' 項',pendingSec(c));
 }
 // ⚠️⚠️ 2026/08/31 Ray 回報：第 2 題起有五題把「您現在有一筆錢要投資」當成前提，
 //    但客戶並沒有說他現在要投資——測驗會問不下去。
@@ -9899,7 +9931,9 @@ function setRiskAns(qi,oi){var c=activeCase();if(!c.riskQuiz)c.riskQuiz={ans:{}}
   L.sort(function(x,y){return x-y});c.riskQuiz.ans[qi]=L;}
  else c.riskQuiz.ans[qi]=oi;
  save();render();}
-function focusRiskQ(qi){var el=document.getElementById('riskq_'+qi);if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});}
+var RISK_OPEN={};
+function riskToggled(el,qi){if(el.open)RISK_OPEN[qi]=1;else delete RISK_OPEN[qi];}
+function focusRiskQ(qi){var el=document.getElementById('riskq_'+qi);if(!el)return;if(el.tagName==='DETAILS'&&!el.open){el.open=true;RISK_OPEN[qi]=1;}if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});}
 // 防呆：金融機構 KYC 常見的自我矛盾組合。只提示、不偷改分數，由教練當面釐清。
 function riskConflicts(c){var a=(c.riskQuiz&&c.riskQuiz.ans)||{};var out=[];
  function one(qi){var L=riskAnsList(a,qi);return L.length&&!RISK_Q[qi].multi?L[0]:null;}
@@ -9981,14 +10015,18 @@ function riskSec(c){
   var opts=Q.o.map(function(op,oi){var on=sel.indexOf(oi)>=0;
    return '<button onclick="setRiskAns('+qi+','+oi+')" style="text-align:left;background:'+(on?'var(--amber)':'var(--card)')+';color:'+(on?'var(--onbrand)':'var(--tx)')+';border:1px solid '+(on?'var(--amber)':'var(--line)')+';border-radius:9px;padding:8px 11px;font-size:13px;font-weight:'+(on?'700':'500')+';font-family:inherit;cursor:pointer;display:block;width:100%;margin-bottom:5px">'+(Q.multi?(on?'☑ ':'☐ '):(on?'● ':'○ '))+esc(op[0])+'</button>';
   }).join('');
-  return '<div class="sec" id="riskq_'+qi+'"'+(blank?' style="border-color:rgba(224,138,104,.55)"':'')+'>'+
-   '<h4 style="font-size:14px">'+(qi+1)+'. '+esc(Q.q)+
+  // 2026/09/26 全站盤查：12 題全攤 4,300px。已作答的題收成一行「題目 · 所選答案」，
+  //    只攤未答的；點標題可再打開改答案（RISK_OPEN 記住）。
+  var openQ=blank||!!RISK_OPEN[qi];
+  var ansTxt=blank?'':sel.map(function(oi){return esc(String(Q.o[oi]||''))}).join('、');
+  return '<details class="sec riskq" id="riskq_'+qi+'"'+(openQ?' open':'')+' ontoggle="riskToggled(this,'+qi+')"'+(blank?' style="border-color:rgba(224,138,104,.55)"':'')+'>'+
+   '<summary><h4 style="font-size:14px;margin:0">'+(qi+1)+'. '+esc(Q.q)+
    (Q.multi?'<span class="hint" style="color:var(--teal)">複選</span>':'')+
-   (blank?'<span class="hint" style="color:var(--warn)">尚未作答</span>':'')+
-   (qi===11&&q12IsLegacy(c)?'<span class="hint" style="color:var(--warn)">此題已改版</span>':'')+'</h4>'+
+   (blank?'<span class="hint" style="color:var(--warn)">尚未作答</span>':'<span class="hint riskans">'+ansTxt+'</span>')+
+   (qi===11&&q12IsLegacy(c)?'<span class="hint" style="color:var(--warn)">此題已改版</span>':'')+'</h4></summary>'+
    (qi===11&&q12IsLegacy(c)?'<div class="hint" style="margin:-6px 0 8px 0;color:var(--warn);border-left:3px solid var(--warn);padding-left:9px">這一份的第 12 題是改版前的舊題（原本問「臨時需要動用這筆資金的可能性」）作答。分數與分級照舊有效，但兩題問的不是同一件事——<b>下次見到客戶時順口問一次、重選一個選項</b>，這行提示就會消失。</div>':'')+
    (Q.hint?'<div class="hint" style="margin:-6px 0 8px 0">'+esc(Q.hint)+'</div>':'')+
-   '<div style="margin-top:8px">'+opts+'</div></div>';
+   '<div style="margin-top:8px">'+opts+'</div></details>';
  }).join('');
  var pctDone=Math.round(rs.answered/rs.total*100);
  // ⚠️ top 讓開釘住的表頭（--nav-h 由 syncNavH() 實測）。改版前寫死 0，
@@ -11462,7 +11500,10 @@ function financeSec(c){
   '<div class="finpanel sav" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(143,192,163,.16);color:var(--ok)">儲</div><h4>儲蓄理財投入 <span class="fintag">不計入支出</span></h4><div class="sub"><div class="sl">年化合計</div><div class="sv" style="color:var(--teal)" id="finSub_sav">'+fmt(t.sav)+'</div></div>'+sortBtn('savings','saving')+'</div><div class="fintbl">'+finSavTable(c)+'</div><div class="finfoot"><span>零存整付、儲蓄險保費、定期定額、勞退自提、投資型保單投資保費——這些是「換口袋」不是「花掉」，所以不進總支出，而是「有效儲蓄率」的分子。</span></div></div>'+
   '<div class="finpanel lay" style="grid-column:1/-1"><div class="finph"><div class="ic" style="background:rgba(201,154,91,.16);color:var(--amber2)">布</div><h4>資產布局規劃</h4></div><div class="fintbl">'+assetLayoutTable(c)+'</div></div>'+
  '</div>';
- return ownerBar(c)+summary+incomeCeilingSec(c)+shortTermSec(c)+'<div class="finhint">💡 一個介面同時填完：左上收入、右上支出＝現金流；左下資產、右下負債＝資產負債表；下方儲蓄理財投入與資產布局。任一格輸入，頂部年結餘、淨值即時更新。每列左側的 ⠿ 可拖曳排序，「⇅ 自動整理」把同分類的項目收攏在一起。</div>'+quad;
+ return ownerBar(c)+summary+
+  foldKeep('finCeil','收入的彈性上限','再拚一年月收入可以到多少',incomeCeilingSec(c))+
+  foldKeep('finShort','短期資金需求（2 年內）','這筆錢要先扣掉，剩的才能長期配置',shortTermSec(c))+
+  '<div class="finhint">💡 一個介面同時填完：左上收入、右上支出＝現金流；左下資產、右下負債＝資產負債表；下方儲蓄理財投入與資產布局。任一格輸入，頂部年結餘、淨值即時更新。每列左側的 ⠿ 可拖曳排序，「⇅ 自動整理」把同分類的項目收攏在一起。</div>'+quad;
 }
 
 function lifestyleSec(c){
@@ -12801,23 +12842,45 @@ function coverageHubSec(c){
  var parts=coverageHubParts(c);
  // 版面順序＝結論在前、原料在後：先給保單檢查報告（一張主圖＋3 個數字＋三張比對表），
  // 地圖／產險／生命資產表／保費與領回報表全部收合，最後才是逐張保單與需求的輸入表。
+ // 2026/09/26 全站盤查：這一頁 13 個區塊、34 張表一路攤到 12,000px。改成頁內四個分頁籤——
+ // 健檢報告／保單／需求／產險，賓士圖固定在最上面。四段的 DOM 都在（只是 display:none），
+ // 所以 data-calc 即時重算、註記掛點、既有測試的字串比對全部照舊；順序只是重排到各段裡。
+ var nPol=(c.policies||[]).length,nNeed=(c.needs||[]).length;
+ var cur=COV_TAB;
+ var tab=function(k,html){return '<div class="covtab'+(cur===k?' on':'')+'" data-t="'+k+'">'+html+'</div>';};
+ var pick=function(k,nm,vd){return '<div class="grp'+(cur===k?' on':'')+'" data-t="'+k+'" onclick="covTabPick(\''+k+'\')" role="tab"><div class="nm">'+nm+'</div>'+(vd?'<div class="vd">'+vd+'</div>':'')+'</div>';};
  return '<div class="ppband">保障中心 <span class="hint">保單檢查報告 · 逐張保單 · 需求反推</span></div>'+
   // ⚠️ 賓士圖擺最上面＝諮詢的切口在前、完整結構在後。它只是既有需求卡與缺口的
   //    另一個入口與另一種畫法，下面九個區塊的位置與功能一律不動。
   coverageWheelHTML(c)+
-  policyCheckupSec(c)+
-  '<div data-calc="coverageDerived">'+parts.derived+'</div>'+
-  coverBudgetSec(c)+
+  '<div class="grpnav covnav" id="covNav" style="grid-template-columns:repeat(4,1fr)">'+
+   pick('check','健檢報告','保單檢查報告 · 保障地圖 · 五面向診斷')+
+   pick('policies','保單','逐張保單 '+nPol+' 張 · 保費 · 領回')+
+   pick('needs','需求','需求卡 '+nNeed+' 位 · 已備補充 · 預算取捨')+
+   pick('prop','產險','需求參數 · 保額覆寫 · 比對')+'</div>'+
+  '<div id="covBodies">'+
+  tab('check',policyCheckupSec(c)+
+   '<div data-calc="coverageDerived">'+parts.derived+'</div>'+masterAnalysisSec(c))+
+  tab('policies',policiesSec(c)+lifeAssetSec(c)+premiumReportSec(c)+paybackReportSec(c))+
+  tab('needs',coverBudgetSec(c)+
+   '<div data-ivsec="cover" data-ivname="保障需求"><div class="ppband" style="margin-top:6px">保障需求 · 已備補充 <span class="hint">壽險/醫療缺口反推的輸入</span></div>'+
+   // ⚠️ 需求卡的欄位走 sb ＝純 set()，在 data 分頁不 render；「保障年數」改了，
+   //    正下方兩公分處那四列自動帶入的責任（生活費／父母奉養／貸款／教育）一動也不動。
+   //    掛 data-calc 讓 syncDerived() 當場重畫這一塊（游標由 syncCalcNodes 還原）。
+   '<div data-calc="coverageNeeds">'+parts.needsTbl+'</div>'+parts.covTbl+'</div>')+
   // ⚠️ 產險比對放在 coverageDerived 容器**外面**：它自己帶輸入框（需求參數／保額覆寫），
   //    包進會被 innerHTML 重畫的容器裡會把正在打字的框換掉。
-  propInsSec(c)+
-  lifeAssetSec(c)+premiumReportSec(c)+paybackReportSec(c)+masterAnalysisSec(c)+
-  policiesSec(c)+
-  '<div data-ivsec="cover" data-ivname="保障需求"><div class="ppband" style="margin-top:6px">保障需求 · 已備補充 <span class="hint">壽險/醫療缺口反推的輸入</span></div>'+
-  // ⚠️ 需求卡的欄位走 sb ＝純 set()，在 data 分頁不 render；「保障年數」改了，
-  //    正下方兩公分處那四列自動帶入的責任（生活費／父母奉養／貸款／教育）一動也不動。
-  //    掛 data-calc 讓 syncDerived() 當場重畫這一塊（游標由 syncCalcNodes 還原）。
-  '<div data-calc="coverageNeeds">'+parts.needsTbl+'</div>'+parts.covTbl+'</div>';
+  tab('prop',propInsSec(c))+
+  '</div>';
+}
+var COV_TAB='check';
+// 切段只切 class、不重 render（正在打字的框不會被換掉）。
+function covTabPick(k){
+ var found=false;
+ document.querySelectorAll('#covNav .grp').forEach(function(el){var on=el.getAttribute('data-t')===k;el.classList.toggle('on',on);if(on)found=true;});
+ if(!found)return;
+ document.querySelectorAll('#covBodies .covtab').forEach(function(el){el.classList.toggle('on',el.getAttribute('data-t')===k);});
+ COV_TAB=k;
 }
 function trackingSec(c){
  var tbl=tableSec('真實資產追蹤 (Beta) — 逐年實際淨資產','tracking',c.tracking,[['year','西元年','num'],['age','年齡','num'],['net','實際淨資產','money']]);
