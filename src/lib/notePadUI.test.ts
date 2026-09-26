@@ -150,3 +150,27 @@ describe("客戶端沒有記事本", () => {
     expect(w.document.querySelector("#lnPad").style.display).toBe("none");
   });
 });
+
+describe("embed（真正的編輯器）：結束並產摘要按得下去", () => {
+  it("⚠️ 場次住在父層推來的狀態裡，不在 c.sess——按「結束」要開得出視窗（2026/09/27 Ray 回報按不動）", async () => {
+    const w = await boot("https://lantu.test/?embed=1");
+    const sent: Record<string, unknown>[] = [];
+    w.postMessage = (m: Record<string, unknown>) => { sent.push(m); };
+    w.dispatchEvent(new w.MessageEvent("message", {
+      data: { type: "lantu:notes", noteAccess: "owner",
+        session: { id: "11111111-1111-4111-8111-111111111111", startedAt: new Date().toISOString(), metricsBefore: null },
+        notes: [{ id: "22222222-2222-4222-8222-222222222222", blockKey: "page:goals|給長輩的錢", kind: "basis", body: "每月孝親金降到 8,000", visible: false,
+          sessionId: "11111111-1111-4111-8111-111111111111", authorAccess: "owner", authorName: "Ray", createdAt: new Date().toISOString() }] },
+      source: w, origin: "https://lantu.test" }));
+    w.render();
+    expect(w.document.getElementById("lnSessBar").textContent).toContain("諮詢進行中");
+    w.LN.session();
+    const mask = w.document.getElementById("lnMask");
+    expect(mask && mask.className, "視窗要開").toContain("on");
+    expect(mask.textContent).toContain("先標一下");
+    expect(mask.querySelector("#lnClosing")).toBeTruthy();
+    // 改分類走 op:'kind' 送給父層
+    w.LN.setKind("22222222-2222-4222-8222-222222222222", "decision");
+    expect(sent.some((m) => m.type === "lantu:note" && m.op === "kind" && m.kind === "decision")).toBe(true);
+  });
+});

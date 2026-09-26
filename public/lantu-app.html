@@ -16807,7 +16807,10 @@ LN.adopt=function(){
    一次都問不到**，直接封場產草稿。而收尾那段人話才是摘要的主體，逐條列的決定與
    依據是它的佐證。沒有決定，正是最需要教練自己講一句這場談了什麼的時候。 */
 function openPick(){
- var c=C(), s=c.sess;
+ // ⚠️ 2026/09/27 Ray：「右下角的『結束並產摘要』沒辦法按」——這裡原本讀 c.sess，
+ //    但 embed（真正的編輯器）的場次住在 LN_REMOTE_STATE，c.sess 永遠是 undefined → s.id 直接 TypeError，
+ //    按下去一聲不響。一律走 sess()（finish() 本來就是這樣寫的）。
+ var c=C(), s=sess(); if(!c||!s) return;
  LN._pickOpen=true;
  var all=allNotes().filter(function(x){return x.sessId===s.id && !x.pending});
  var ds=all.filter(function(x){return x.kind==='decision'});
