@@ -3912,9 +3912,20 @@ function rowCutPct(e,leverPct){
 //    實際只砍得到 10%，二分法會在 10~30 之間收斂到一個「做得到」但其實毫無作用的答案，
 //    處方箋會開出一個假的方案（"求解器以為砍得到、實際砍不到"）。
 // ⚠️ 完全沒有生活/消費列時回 0 → solveLever 的 lo=hi=0，直接判 infeasible，這是對的。
+// ===== 孝親列的保護線（expenses[].minAmount，2026/09/27 Ray）=====
+// ⚠️ 語意跟生活／消費**相反**：給爸媽的錢預設不動——沒填「最低」＝不可削；
+//    填了最低才進「減少支出」槓桿，而且砍到最低就停（還原舊模板 goalFloor 的行為）。
+//    可削的比例＝(1 − 最低／金額)，不讀 e.cut（那一欄對孝親列沒有意義）。
+function careCutCap(e){
+ if(!e||e.cat!=='孝親')return 0;
+ var amt=n(e.amount),mn=n(e.minAmount);
+ if(!(amt>0)||!(mn>0)||mn>=amt)return 0;
+ return (1-mn/amt)*100;
+}
 function expenseCutCap(c){
  var cap=0;
  ((c||{}).expenses||[]).forEach(function(e){
+  if(e&&e.cat==='孝親'){var cc=careCutCap(e);if(cc>0)cap=Math.max(cap,Math.min(cc,CAP_EXPENSE_CUT));return;}
   if(!isLivingCat(e.cat)||!(n(e.amount)>0))return;
   var rc=n(e.cut);
   cap=Math.max(cap,rc>0?Math.min(rc,CAP_EXPENSE_CUT):CAP_EXPENSE_CUT);
@@ -3958,7 +3969,11 @@ function applyLevers(c,set){
  if(inc)(a.incomes||[]).forEach(function(i){if(i.type==='工作')i.amount=n(i.amount)*(1+inc/100)});
  var cut=n(set.expense);
  // ⚠️ 每一列取 min(槓桿要求的%, 該列的可刪減%)——教練設的保護線不能被槓桿蓋過去。見 rowCutPct。
- if(cut)(a.expenses||[]).forEach(function(e){if(isLivingCat(e.cat))e.amount=n(e.amount)*(1-rowCutPct(e,cut)/100)});
+ if(cut)(a.expenses||[]).forEach(function(e){
+  if(isLivingCat(e.cat)){e.amount=n(e.amount)*(1-rowCutPct(e,cut)/100);return;}
+  // 孝親：有填最低才砍，砍到最低就停（careCutCap）
+  var cc=careCutCap(e);if(cc>0)e.amount=n(e.amount)*(1-Math.min(cut,cc)/100);
+ });
  if(set.rate!==undefined&&set.rate!==null&&set.rate!==''){
   a.params=a.params||{};a.params.invReturn=n(set.rate);
   a.plan=a.plan||{};a.plan.useAllocReturn=false;   // 手動指定報酬率就不再跟著配置走
@@ -7544,11 +7559,14 @@ function setCarePay(i,v){
  stampNeeds(c,'expenses');save();render();
 }
 function setCareStart(i,v){var c=activeCase();var x=c.expenses[i];if(!x)return;x.start=n(v);if(x.once)x.end=x.start;stampNeeds(c,'expenses');save();render();}
+// 「最低」存年額 minAmount，畫面依給付顯示（月／年）。沒填＝不可削（見引擎 careCutCap）。
+function careShownMin(x){var mn=n(x.minAmount);if(!(mn>0))return 0;return (x.period==='月')?Math.round(mn/12):mn;}
+function setCareMin(i,val){var c=activeCase();var x=c.expenses[i];if(!x)return;var v=n(amtRaw(val));x.minAmount=(x.period==='月')?v*12:v;stampNeeds(c,'expenses');save();syncDerived();}
 function carePayOf(x){return x.once?'一次':((x.period||'年')==='月'?'月':'年');}
 function careTotals(c){
- var yr=0,once=0,onceN=0;
- careRows(c).forEach(function(p){var x=p.x;if(x.once){once+=n(x.amount);onceN++;}else yr+=n(x.amount);});
- return {year:yr,month:Math.round(yr/12),once:once,onceN:onceN};
+ var yr=0,once=0,onceN=0,minYr=0,minN=0;
+ careRows(c).forEach(function(p){var x=p.x;if(x.once){once+=n(x.amount);onceN++;}else{yr+=n(x.amount);var mn=n(x.minAmount);if(mn>0&&mn<n(x.amount)){minYr+=mn;minN++;}else minYr+=n(x.amount);}});
+ return {year:yr,month:Math.round(yr/12),once:once,onceN:onceN,minYear:minYr,minN:minN};
 }
 // 舊資料：目標表裡 type＝孝親 的列（沒 tag 的才是教練手填的）搬到支出表。
 // 金額(理想)當年額（沒填就拿最低）；頻率「只發生一次」或起訖同年 → 一次性；成長依據≠固定 → 隨通膨。
@@ -7559,12 +7577,13 @@ function migrateParentGoals(c){
  gs.forEach(function(g){
   if(!g||g.type!=='孝親'||g.tag){keep.push(g);return;}
   if(g.on===false)return;
-  var amt=n(g.present)||n(g.minPresent),st=n(g.start)||nowAge(c),en=n(g.end);
+  var amt=n(g.present)||n(g.minPresent),mn=(n(g.present)>0)?n(g.minPresent):0,st=n(g.start)||nowAge(c),en=n(g.end);
   var once=(n(g.freq)===0&&!(en>st))||(en>0&&en<=st);
   c.expenses=c.expenses||[];
   var row=careNewRow(c,g.name||'孝親',amt,'年','孝親金',null,once);
   row.start=st;row.end=once?st:(en>st?en:careEndAge(c,row.who));
   row.infl=(g.growth||'通膨')!=='固定';
+  if(mn>0&&mn<amt)row.minAmount=mn;
   c.expenses.push(row);moved++;
  });
  if(moved){c.goals=keep;ensureRowIds(c);}
@@ -7585,14 +7604,16 @@ function careSec(c){
    '<td>'+subSel+'</td>'+
    '<td>'+paySel+'</td>'+
    '<td>'+finAmt('expenses',i,shownAmt(x))+'</td>'+
+   '<td>'+moneyCell('onchange="setCareMin('+i+',this.value)"',careShownMin(x))+'</td>'+
    '<td><input type="number" inputmode="decimal" style="width:64px" value="'+esc(x.start==null?'':x.start)+'" onchange="setCareStart('+i+',this.value)"></td>'+
    '<td>'+(x.once?'<span class="muted" style="font-size:12px">— 一次</span>':'<input type="number" inputmode="decimal" style="width:64px" value="'+esc(x.end==null?'':x.end)+'" onchange="set(\''+id+'\',\'end\',this.value,\'num\')">')+'</td>'+
    '<td style="text-align:center">'+finBool('expenses',i,'infl',x.infl)+'</td>'+
    '<td><button class="del" onclick="delRow(\'expenses\','+i+')">✕</button></td></tr>';
  }).join('');
- var head='<tr><th>對象</th><th>項目</th><th>記在哪一類</th><th>給付</th><th>金額</th><th>從幾歲</th><th>到幾歲</th><th>隨通膨</th><th></th></tr>';
+ var head='<tr><th>對象</th><th>項目</th><th>記在哪一類</th><th>給付</th><th>金額(理想)</th><th>金額(最低)</th><th>從幾歲</th><th>到幾歲</th><th>隨通膨</th><th></th></tr>';
  var t=careTotals(c);
  var sum=rows.length?'<div class="hint" style="margin-top:6px">每年合計 <b style="color:var(--amber2)">'+fmt(t.year)+'</b> 元（每月約 '+fmt(t.month)+'）'+
+   (t.minN?'　·　最低 <b>'+fmt(t.minYear)+'</b> 元／年（'+t.minN+' 列可削）':'　·　沒填最低＝全部不可削')+
    (t.onceN?'　·　一次性 <b style="color:var(--amber2)">'+fmt(t.once)+'</b> 元（'+t.onceN+' 筆，見下方贈與稅檢核）':'')+'</div>':'';
  var tbl=rows.length
   ? '<div class="tw"><table class="rtable caretbl">'+head+body+'</table>'+sum+'</div>'
@@ -7605,7 +7626,8 @@ function careSec(c){
   '</div>'+noTg+
   '<div class="hint" style="margin-top:8px">這幾列住在<b>「收支資債」的支出表（分類：孝親）</b>，那邊也看得到同一批、改的是同一筆。'+
   '壽險需求的「父母奉養費」、撫養壓力比、損益表的撫育／孝親列都讀它。'+
-  '每月生活費與醫藥費屬<b>扶養</b>，遺贈稅法不算贈與；<b>一次性</b>的大額給付才會撞免稅額——見下方檢核。</div></div>';
+  '每月生活費與醫藥費屬<b>扶養</b>，遺贈稅法不算贈與；<b>一次性</b>的大額給付才會撞免稅額——見下方檢核。'+
+  '<br><b>最低</b>＝資源不足時最多能退到哪：沒填就當<b>不可削</b>（給爸媽的錢預設不動），填了才進「減少支出」槓桿，砍到最低就停。</div></div>';
 }
 
 /* ══ 贈與稅檢核（孝親一次性給付 ＋ 子女一次性準備金）══
@@ -11568,12 +11590,17 @@ function finExpTable(c){
     '<td class="acts">'+finCaret('expenses',i,open)+'<button class="del" onclick="delRow(\'expenses\','+i+')">✕</button></td></tr>';
    var detail=open?'<tr class="drow"><td colspan="10"><div class="dhead">進階欄</div><div class="dform">'+
     finDF('通膨調整',finBool('expenses',i,'infl',x.infl))+
-    finDF('可刪減 %',finNum('expenses',i,'cut',x.cut))+
+    (x.cat==='孝親'
+     ? finDF('金額(最低)',moneyCell('onchange="setCareMin('+i+',this.value)"',careShownMin(x)))+
+       finDFNote(n(x.minAmount)>0
+        ?('\u2705 孝親列的保護線＝<b>最低金額</b>：「減少支出」槓桿最多砍到 '+fmt(n(x.minAmount))+' 元／年就停（可削 '+Math.round(careCutCap(x))+'%）。可刪減 % 對孝親列不生效。')
+        :('<b>沒填最低 ＝ 不可削</b>（給爸媽的錢預設不動）。填了最低才會進「減少支出」槓桿，砍到最低就停。孝親規劃頁也能填。'))
+     : finDF('可刪減 %',finNum('expenses',i,'cut',x.cut))+
     finDFNote(n(x.cut)>0
       ?('\u2705 這一列的<b>保護線</b>已設 '+n(x.cut)+'%：「減少支出」槓桿最多只會把它砍 '+n(x.cut)+'%，'
         +'就算槓桿拉到 '+CAP_EXPENSE_CUT+'% 也一樣（實際砍幅 ＝ min(槓桿%, 本列可刪減%)）。')
       :('<b>留空或 0 ＝ 沒有設上限</b>，這一列會吃到「減少支出」槓桿要求的全額（上限 '+CAP_EXPENSE_CUT+'%）。'
-        +'要保護這一列，就填一個它最多能被砍的百分比。'))+
+        +'要保護這一列，就填一個它最多能被砍的百分比。')))+
     finOnceField('expenses',i,x)+
     finNoteField('expenses',i,x)+
     '</div></td></tr>':'';

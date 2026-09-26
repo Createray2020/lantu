@@ -1701,9 +1701,20 @@ function rowCutPct(e,leverPct){
 //    實際只砍得到 10%，二分法會在 10~30 之間收斂到一個「做得到」但其實毫無作用的答案，
 //    處方箋會開出一個假的方案（"求解器以為砍得到、實際砍不到"）。
 // ⚠️ 完全沒有生活/消費列時回 0 → solveLever 的 lo=hi=0，直接判 infeasible，這是對的。
+// ===== 孝親列的保護線（expenses[].minAmount，2026/09/27 Ray）=====
+// ⚠️ 語意跟生活／消費**相反**：給爸媽的錢預設不動——沒填「最低」＝不可削；
+//    填了最低才進「減少支出」槓桿，而且砍到最低就停（還原舊模板 goalFloor 的行為）。
+//    可削的比例＝(1 − 最低／金額)，不讀 e.cut（那一欄對孝親列沒有意義）。
+function careCutCap(e){
+ if(!e||e.cat!=='孝親')return 0;
+ var amt=n(e.amount),mn=n(e.minAmount);
+ if(!(amt>0)||!(mn>0)||mn>=amt)return 0;
+ return (1-mn/amt)*100;
+}
 function expenseCutCap(c){
  var cap=0;
  ((c||{}).expenses||[]).forEach(function(e){
+  if(e&&e.cat==='孝親'){var cc=careCutCap(e);if(cc>0)cap=Math.max(cap,Math.min(cc,CAP_EXPENSE_CUT));return;}
   if(!isLivingCat(e.cat)||!(n(e.amount)>0))return;
   var rc=n(e.cut);
   cap=Math.max(cap,rc>0?Math.min(rc,CAP_EXPENSE_CUT):CAP_EXPENSE_CUT);
@@ -1747,7 +1758,11 @@ function applyLevers(c,set){
  if(inc)(a.incomes||[]).forEach(function(i){if(i.type==='工作')i.amount=n(i.amount)*(1+inc/100)});
  var cut=n(set.expense);
  // ⚠️ 每一列取 min(槓桿要求的%, 該列的可刪減%)——教練設的保護線不能被槓桿蓋過去。見 rowCutPct。
- if(cut)(a.expenses||[]).forEach(function(e){if(isLivingCat(e.cat))e.amount=n(e.amount)*(1-rowCutPct(e,cut)/100)});
+ if(cut)(a.expenses||[]).forEach(function(e){
+  if(isLivingCat(e.cat)){e.amount=n(e.amount)*(1-rowCutPct(e,cut)/100);return;}
+  // 孝親：有填最低才砍，砍到最低就停（careCutCap）
+  var cc=careCutCap(e);if(cc>0)e.amount=n(e.amount)*(1-Math.min(cut,cc)/100);
+ });
  if(set.rate!==undefined&&set.rate!==null&&set.rate!==''){
   a.params=a.params||{};a.params.invReturn=n(set.rate);
   a.plan=a.plan||{};a.plan.useAllocReturn=false;   // 手動指定報酬率就不再跟著配置走
@@ -2774,6 +2789,7 @@ export {
   graceMonths,
   debtPayAt,
   rowCutPct,
+  careCutCap,
   expenseCutCap,
   horizonManual,
   effHorizon,

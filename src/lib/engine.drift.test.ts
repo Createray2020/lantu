@@ -849,13 +849,21 @@ describe("雙實作對拍：死欄位接線（C1–C11）", () => {
     expect(HTML).toContain("function rowCutPct(e,leverPct){");
     expect(HTML).toContain(" var cap=n(e&&e.cut);\n return cap>0?Math.min(leverPct,cap):leverPct;");
     expect(HTML).toContain("cap=Math.max(cap,rc>0?Math.min(rc,CAP_EXPENSE_CUT):CAP_EXPENSE_CUT);");
-    expect(HTML).toContain("if(cut)(a.expenses||[]).forEach(function(e){if(isLivingCat(e.cat))e.amount=n(e.amount)*(1-rowCutPct(e,cut)/100)});");
+    // 2026/09/27：孝親列走 careCutCap（有填最低才砍、砍到最低就停），生活／消費照舊
+    expect(HTML).toContain("  if(isLivingCat(e.cat)){e.amount=n(e.amount)*(1-rowCutPct(e,cut)/100);return;}");
+    expect(HTML).toContain("  var cc=careCutCap(e);if(cc>0)e.amount=n(e.amount)*(1-Math.min(cut,cc)/100);");
+    expect(HTML).toContain("if(e&&e.cat==='孝親'){var cc=careCutCap(e);if(cc>0)cap=Math.max(cap,Math.min(cc,CAP_EXPENSE_CUT));return;}");
+    expect(HTML).toContain(" if(!(amt>0)||!(mn>0)||mn>=amt)return 0;\n return (1-mn/amt)*100;");
     expect(HTML).toContain("if(id==='expense')return {lo:0,hi:expenseCutCap(c)};");
 
     const c = E.sampleCase();
     expect(w.expenseCutCap(JSON.parse(JSON.stringify(c)))).toBe(E.expenseCutCap(c));
+    // 孝親列有最低 → 兩邊都砍到最低就停
+    c.expenses.push({ name: "孝親金", cat: "孝親", amount: 120_000, minAmount: 100_000, infl: true, start: 40, end: 70, cut: 0 });
+    expect(w.expenseCutCap(JSON.parse(JSON.stringify(c)))).toBe(E.expenseCutCap(c));
     const a = E.applyLevers(c, { expense: 30 });
     const b = w.applyLevers(JSON.parse(JSON.stringify(c)), { expense: 30 });
+    expect(a.expenses[a.expenses.length - 1].amount).toBe(100_000);
     expect(b.expenses.map((e: { amount: number }) => e.amount))
       .toEqual(a.expenses.map((e: { amount: number }) => e.amount));
   });

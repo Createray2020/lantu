@@ -36,16 +36,15 @@ const care = () => C().expenses.filter((e: { cat: string }) => e.cat === "孝親
 const text = () => w.document.querySelector("#app").textContent as string;
 
 describe("孝親規劃頁＝支出表 cat 孝親 的專屬視圖", () => {
-  it("欄位是 對象／項目／類別／給付／金額／從幾歲／到幾歲／隨通膨——沒有貸款成數、理想最低、最晚完成歲", () => {
+  it("欄位是 對象／項目／類別／給付／金額(理想／最低)／從幾歲／到幾歲／隨通膨——沒有貸款成數、最晚完成歲", () => {
     fresh();
     w.addCareRow();
     w.render();
     const ths = [...w.document.querySelectorAll(".caretbl th")].map((e: Element) => e.textContent);
-    expect(ths).toEqual(["對象", "項目", "記在哪一類", "給付", "金額", "從幾歲", "到幾歲", "隨通膨", ""]);
+    expect(ths).toEqual(["對象", "項目", "記在哪一類", "給付", "金額(理想)", "金額(最低)", "從幾歲", "到幾歲", "隨通膨", ""]);
     const sec = w.document.querySelector('[data-goalanchor-detail="care"]').textContent as string;
     expect(sec).not.toContain("貸款成數");
     expect(sec).not.toContain("最晚完成歲");
-    expect(sec).not.toContain("金額(理想)");
   });
 
   it("帶入預設項目：每月孝親金 10,000 存年額 120,000；每年合計對得上，goals 一列都不長", () => {
@@ -214,5 +213,38 @@ describe("贈與稅檢核：孝親一次性 ＋ 子女一次性準備金", () =>
     w.app.dataTab = "education";
     w.render();
     expect(text()).toContain("贈與稅檢核");
+  });
+});
+
+describe("孝親的「最低」：保護線進槓桿（2026/09/27 Ray 追加）", () => {
+  it("最低存年額、畫面依給付顯示；沒填＝不可削，填了才進「減少支出」槓桿、砍到最低就停", () => {
+    const c = fresh();
+    w.addCareRow("每月孝親金", 10_000, "月");
+    const i = C().expenses.length - 1;
+    // 沒填最低 → 槓桿完全不碰
+    expect(w.careCutCap(C().expenses[i])).toBe(0);
+    expect(w.applyLevers(C(), { expense: 30 }).expenses[i].amount).toBe(120_000);
+    w.setCareMin(i, "6,000");
+    expect(C().expenses[i].minAmount).toBe(72_000);
+    expect(w.careShownMin(C().expenses[i])).toBe(6_000);
+    expect(w.careCutCap(C().expenses[i])).toBe(40);
+    // 槓桿要砍 60%，最多只能砍到最低（72,000）
+    expect(w.applyLevers(C(), { expense: 60 }).expenses[i].amount).toBe(72_000);
+    expect(w.applyLevers(C(), { expense: 10 }).expenses[i].amount).toBe(108_000);
+    // 求解器的上限跟著算進來（受 CAP_EXPENSE_CUT 封頂）
+    expect(w.expenseCutCap(C())).toBe(Math.min(40, w.CAP_EXPENSE_CUT));
+    w.render();
+    const sec = w.document.querySelector('[data-goalanchor-detail="care"]').textContent as string;
+    expect(sec).toContain("金額(最低)");
+    expect(sec).toContain("最低 72,000");
+  });
+
+  it("舊目標表的 minPresent 搬過來變 minAmount", () => {
+    const c = fresh();
+    c.goals.push({ on: true, name: "孝親", type: "孝親", present: 120_000, minPresent: 60_000, start: 44, end: 60, freq: 12, growth: "通膨", appreciation: 0, loanRatio: 0, imp: 3, prepared: 0 });
+    const m = w.migrateCase(c);
+    const r = m.expenses.find((e: { cat: string; name: string }) => e.cat === "孝親" && e.name === "孝親");
+    expect(r.amount).toBe(120_000);
+    expect(r.minAmount).toBe(60_000);
   });
 });
