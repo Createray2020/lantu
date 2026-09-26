@@ -652,6 +652,7 @@ tr.actnote td{padding-top:0;border-top:0}
 .dfield{display:flex;flex-direction:column;gap:2px}.dfield label{color:var(--mut);font-size:11px}
 .dfield input,.dfield select{width:auto;background:var(--field);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:5px 7px;font-size:12px;min-width:118px}
 .dhead{width:100%;color:var(--mut2);font-size:11px;letter-spacing:.06em;margin-bottom:2px}
+.futrow td{opacity:.55}.futrow td.acts{opacity:1}
 .finfoot{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;font-size:12px;color:var(--mut2)}
 /* 家庭成員：全員卡片化 */
 .ppband{font-size:15px;font-weight:700;color:var(--amber2);margin:2px 0 12px;display:flex;align-items:center;gap:8px}
@@ -2187,9 +2188,12 @@ function annualDebtInterest(c){var a0=n(c.profile.age);return sum(c.liabilities,
 // 年應付本息。⚠️ 走 debtPayAt()，攤還方式與寬限期在這裡生效。
 function annualDebtPay(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){return debtPayAt(l,a0,a0)})}
 
-function familyAnnualLiving(c){return sum(c.expenses,function(e){return (e.cat==='生活'||e.cat==='消費')?n(e.amount):0})}
+// ⚠️ 2026-09-26（Ray：買車明細 43 歲才開始，現在的支出表就出現了）：這裡與下面的孝親、finTotals、
+//    調整方案的 expNow 一律只算「現齡有效」的列（activeNow）——跟稅賦／保險／貸款小計同一把尺。
+//    未來才開始的列（買車後持有成本、未來孝親）只進逐年投影，不進任何「現在」的數字。
+function familyAnnualLiving(c){return sum(c.expenses,function(e){return ((e.cat==='生活'||e.cat==='消費')&&activeNow(c,e))?n(e.amount):0})}
 // 父母奉養費：責任遞減圖本來就算它，需求反推卻漏了 → 2026/08 補進 lifeNeed。
-function familyAnnualParentSupport(c){return sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0})}
+function familyAnnualParentSupport(c){return sum(c.expenses,function(e){return (e.cat==='孝親'&&activeNow(c,e))?n(e.amount):0})}
 // 支出側手動登錄的貸款（大類「貸款」）。負債表那邊走 annualDebtPay()，相加＝家庭貸款總支出。
 // ⚠️ 與 annualDebtPay 一樣只算現齡有效的列（貸款壓力比的分子，口徑要跟分母一致）。
 function manualLoanPay(c){return sum(c.expenses,function(e){return (e.cat==='貸款'&&activeNow(c,e))?n(e.amount):0})}
@@ -2938,7 +2942,7 @@ function responsibilityProjection(c,nd){var a0=n(c.profile.age),g=n(c.params.tui
  var py=Math.max(1,n(nd.protectYears)||20);
  var depR=n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100;
  var livingShare=depR*familyAnnualLiving(c);
- var parentAnnual=sum(c.expenses,function(e){return e.cat==='孝親'?n(e.amount):0});
+ var parentAnnual=familyAnnualParentSupport(c);
  // 連帶保證是「不隨時間遞減」的一層責任——債務沒清償前，簽下去的金額一直都在。
  // 併進 funeral 這一條水平線，圖上就看得出責任遞減之後仍然墊高的那一段。
  var funeral=n(nd.funeral)+n(nd.estateTax)+guaranteeFor(c,nd.member);
@@ -4315,7 +4319,7 @@ function planActions(c,set){
    detail:'整體調升 '+(+n(set.income).toFixed(1))+'％＝每年多 '+fmt(incAdd)+' 元（每月 '+fmt(incAdd/12)+' 元）',
    note:'目前工作收入合計 '+fmt(incNow)+' 元/年'});
  }
- var expNow=sum(c.expenses,function(e){return isLivingCat(e.cat)?n(e.amount):0});
+ var expNow=familyAnnualLiving(c);
  if(n(set.expense)){
   var expCut=expNow*n(set.expense)/100;
   acts.push({axis:'支出',title:'降低生活與消費支出',
@@ -11348,9 +11352,10 @@ function finExpTable(c){
    var open=!!finOpenMap('expenses')[i];
    var cSel=CATS.map(function(ct){return '<option '+((x.cat||'生活')===ct?'selected':'')+'>'+ct+'</option>'}).join('');
    var pSel=['年','月'].map(function(q){return '<option '+(per===q?'selected':'')+'>'+q+'</option>'}).join('');
-   var main='<tr '+dropAttrs('expenses',i)+'>'+
+   var fut=n(x.start)>nowAge(c);   // 未來才開始的列：淡化＋標記，不進「現在」的年支出
+   var main='<tr '+dropAttrs('expenses',i)+(fut?' class="futrow"':'')+'>'+
     dragCell('expenses',i)+
-    '<td>'+finName('expenses',i,'expense',x)+loanDupWarn(c,x)+(n(x.cut)>0?'<span class="rowmk" title="可刪減 '+n(x.cut)+'%">−'+n(x.cut)+'%</span>':'')+'</td>'+
+    '<td>'+finName('expenses',i,'expense',x)+(fut?'<span class="rowmk fut" title="'+n(x.start)+' 歲才開始，未計入現在的年支出；逐年投影會算">'+n(x.start)+' 歲起</span>':'')+loanDupWarn(c,x)+(n(x.cut)>0?'<span class="rowmk" title="可刪減 '+n(x.cut)+'%">−'+n(x.cut)+'%</span>':'')+'</td>'+
     '<td><select onchange="set(\'expenses:'+i+'\',\'cat\',this.value)">'+cSel+'</select></td>'+
     '<td>'+catCell('expenses',i,'expense',x)+'</td>'+
     '<td><select onchange="setAmtPeriod(\'expenses\','+i+',this.value)">'+pSel+'</select></td>'+
@@ -11372,7 +11377,9 @@ function finExpTable(c){
     '</div></td></tr>':'';
    return main+detail;
  }).join('');
- return expLoanBlock(c)+'<table>'+head+(rows||'')+addTr('expenses',10,rows?'':'尚無資料')+'</table>';
+ var t=finTotals(c);
+ var futFoot=t.futN?'<div class="finfoot"><span>另有 '+t.futN+' 列未來才開始的支出（'+fmt(t.futExp)+' 元/年），未計入現在的年支出；到那一歲會自動進現金流投影。</span></div>':'';
+ return expLoanBlock(c)+'<table>'+head+(rows||'')+addTr('expenses',10,rows?'':'尚無資料')+'</table>'+futFoot;
 }
 
 // 手動貸款列撞到負債表已有的同類貸款 → 標一下。
@@ -11538,11 +11545,13 @@ function finLiaTable(c){
 
 function finTotals(c){
  var inc=0;(c.incomes||[]).forEach(function(x){if(finMatch(x.owner))inc+=n(x.amount)});
- var exp=sum(c.expenses,function(e){return n(e.amount)});
+ var exp=sum(c.expenses,function(e){return activeNow(c,e)?n(e.amount):0});
+ var fut=(c.expenses||[]).filter(function(e){return e&&!activeNow(c,e)&&n(e.start)>nowAge(c)});
+ var futExp=sum(fut,function(e){return n(e.amount)});
  var ast=0;(c.assets||[]).forEach(function(a){if(finMatch(a.owner))ast+=aVal(a)});
  var lia=0;(c.liabilities||[]).forEach(function(l){if(finMatch(l.owner))lia+=lBal(l)});
  var sav=sum(c.savings,function(x){return n(x.amount)});
- return {inc:inc,exp:exp,sav:sav,ast:ast,lia:lia,bal:inc-exp-sav,net:ast-lia};
+ return {inc:inc,exp:exp,sav:sav,ast:ast,lia:lia,bal:inc-exp-sav,net:ast-lia,futN:fut.length,futExp:futExp};
 }
 function syncFinSummary(){var c=activeCase();if(!c)return;
  // 逐列衍生欄（年化 / 台幣值）先做——退休期支出表不在四合一面板裡，
