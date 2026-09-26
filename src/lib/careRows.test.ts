@@ -248,3 +248,25 @@ describe("孝親的「最低」：保護線進槓桿（2026/09/27 Ray 追加）"
     expect(r.minAmount).toBe(60_000);
   });
 });
+
+describe("每一張 tableSec 表都要有 addRow 範本（2026/09/27 Ray：短期資金需求按「新增一列」沒反應）", () => {
+  it("短期資金需求／真實追蹤 按新增就多一列", () => {
+    const c = fresh();
+    w.addRow("shortTerm");
+    expect(C().shortTerm.length).toBe(1);
+    expect(C().shortTerm[0].alt).toBe("否");
+    w.addRow("tracking");
+    expect(C().tracking.length).toBe(1);
+    expect(C().tracking[0].age).toBe(c.profile.age);
+  });
+  it("HTML 裡每個 tableSec(...,'arr',...) 的 arr 都在 addRow 的範本表裡", () => {
+    const arrs = [...HTML.matchAll(/tableSec\('[^']*','([a-zA-Z]+)'/g)].map((m) => m[1]);
+    const missing = [...new Set(arrs)].filter((a) => {
+      const c = fresh();
+      const before = (w.listOf(c, a) || []).length;
+      w.addRow(a);
+      return (w.listOf(C(), a) || []).length !== before + 1;
+    });
+    expect(missing).toEqual([]);
+  });
+});

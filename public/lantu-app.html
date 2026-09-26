@@ -4986,6 +4986,10 @@ function addRow(arr){var c=activeCase();if(!c)return;
  hobby:function(){return {on:true,sub:'體能類',start:A,end:75,freq:1,amount:0,minAmount:0,imp:3}},
  luxury:function(){return {on:true,sub:'首飾配件',start:A,end:A,freq:1,amount:0,minAmount:0,imp:2}},
  prepared:function(){return {item:'',age:65,amount:0,method:'一次領'}},
+ // 2026/09/27 Ray：短期資金需求與真實追蹤的「＋ 新增一列」按了沒反應——這兩張表一直沒有範本，
+ // addRow 只會 console.warn 就 return。範本缺了 UI 是靜靜失效的，新增 tableSec 表要記得補這裡（有測試守）。
+ shortTerm:function(){return {name:'',inYears:1,amount:0,minAmount:0,prepared:0,alt:'否'}},
+ tracking:function(){var y=new Date().getFullYear();return {year:y,age:A,net:0}},
  allocations:function(){return {name:'',pct:0,ret:0,benefit:''}},
  // 商品名稱一律留空：嵐途不做商品推薦，這兩張表登錄的是結構與條件。
  planInvest:function(){return {name:'',src:'新增投入',principal:0,yearly:0,years:'',ret:n(c.params.invReturn)||5,note:''}},
