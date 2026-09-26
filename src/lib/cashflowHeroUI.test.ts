@@ -15,6 +15,7 @@ beforeAll(async () => {
   const html = readFileSync(new URL("../../public/lantu-app.html", import.meta.url), "utf8");
   const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://lantu.test/" });
   w = dom.window;
+  w.HTMLElement.prototype.scrollIntoView = () => {};
   await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
   w.app.role = "coach";
   w.app.cases = [w.migrateCase(w.sampleCase())];
@@ -65,5 +66,77 @@ describe("全生涯財務流：流量 → 存量 → 缺口", () => {
   it("滑鼠讀數會標「靠存量撐」或「缺口」", () => {
     const d = w.__charts.cf;
     expect(d.tn).toBe(w.metrics(w.activeCase()).proj.turnNeg);
+  });
+});
+
+// 圖右側的年度明細卡（2026/09/26 Ray：「移動到哪一歲，那一年的收入、支出、資產負債、為什麼是正或負直接跟著跑出來」）
+describe("年度明細卡：滑到哪一歲就換、點一下鎖住", () => {
+  const svgOf = () => {
+    const svg = $("#anHeroChart svg");
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 760, height: 250, right: 760, bottom: 250, x: 0, y: 0, toJSON() {} });
+    return svg;
+  };
+  const evAt = (i: number) => {
+    const d = w.__charts.cf;
+    const x = d.pad + (i / (d.n - 1)) * (d.W - d.pad * 2);
+    return { currentTarget: svgOf(), clientX: x } as unknown as MouseEvent;
+  };
+  const cardAge = () => Number(($("#cfDetail .cfhd b").textContent as string).replace(/\D/g, ""));
+
+  it("預設停在第一個入不敷出的年份，卡片有收入／支出／存量／為什麼", () => {
+    w.render();
+    const proj = w.metrics(w.activeCase()).proj;
+    const firstNeg = proj.rows.find((r: { bal: number }) => r.bal < 0);
+    expect($("#cfDetail"), "圖右側要有明細卡").toBeTruthy();
+    expect(cardAge()).toBe(firstNeg.age);
+    const txt = $("#cfDetail").textContent as string;
+    for (const k of ["收入", "支出", "存量", "為什麼", "可投資資產"]) expect(txt).toContain(k);
+    expect(txt, "負的那一年要講原因").toMatch(/支出 [\d,]+ ＞ 收入/);
+  });
+
+  it("projection 的 row 帶著拆項：日常／教育／退休生活／方案動作／剩餘負債／固定資產", () => {
+    const r = w.metrics(w.activeCase()).proj.rows[0];
+    for (const k of ["base", "edu", "retire", "act", "liab", "fixed"]) expect(r, k).toHaveProperty(k);
+    // 合計欄 expense 仍舊等於三項相加，既有消費者不受影響
+    expect(Math.round(r.expense)).toBe(Math.round(r.base + r.edu + r.retire));
+  });
+
+  it("滑鼠滑到第 10 年，卡片換成那一歲", () => {
+    w.render();
+    w.hoverChart(evAt(10), "cf");
+    expect(cardAge()).toBe(w.__charts.cf.a0 + 10);
+    expect($("#cfReadout").textContent).toContain(String(w.__charts.cf.a0 + 10) + " 歲");
+  });
+
+  it("點一下鎖住那一歲：滑鼠再動卡片不跟；再點一下解鎖", () => {
+    w.render();
+    w.cfLockToggle(evAt(12), "cf");
+    expect(w.__charts.cf.lockAge).toBe(w.__charts.cf.a0 + 12);
+    expect(cardAge()).toBe(w.__charts.cf.a0 + 12);
+    expect($("#cfDetail").textContent).toContain("已鎖定");
+    w.hoverChart(evAt(20), "cf");
+    expect(cardAge(), "鎖住時不跟滑鼠").toBe(w.__charts.cf.a0 + 12);
+    w.cfLockToggle(evAt(20), "cf");
+    expect(w.__charts.cf.lockAge).toBeNull();
+    expect(cardAge(), "解鎖後直接跳到滑鼠所在那一歲").toBe(w.__charts.cf.a0 + 20);
+  });
+
+  it("鎖住的那一歲跨拉桿重畫保留：拉報酬率，卡片還停在同一歲", () => {
+    w.render();
+    w.cfLockToggle(evAt(15), "cf");
+    const age = w.__charts.cf.a0 + 15;
+    w.anTune("ret", "9");
+    expect(w.__charts.cf.lockAge).toBe(age);
+    expect(cardAge()).toBe(age);
+    w.anTuneReset();
+    w.__charts.cf.lockAge = null;
+  });
+
+  it("首屏與「一生現金流投影」模組各自一把 key，不互相蓋掉", () => {
+    w.render();
+    w.anJump("cashflow");
+    expect(w.__charts.cf2, "模組那張用 cf2").toBeTruthy();
+    expect($("#cf2Detail")).toBeTruthy();
+    expect($("#cfDetail")).toBeTruthy();
   });
 });

@@ -246,6 +246,24 @@ h1,h2,h3,h4{margin:0}
 .gband .vd{margin-left:auto;font-size:12px;color:var(--mut2)}
 .gband .vd b{color:var(--tx);font-weight:600}
 .anchips .chipgrp{flex:1 0 100%}
+/* 全生涯財務流：圖＋右側年度明細卡 */
+.cfwrap{display:flex;gap:14px;align-items:flex-start}
+.cfleft{flex:1 1 0;min-width:0}
+.cfleft>svg{margin:0!important;max-width:none!important}
+.cfcard{flex:0 0 280px;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;overflow:auto;max-height:420px}
+.cfhd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.cfhd b{font-family:var(--serif);font-size:18px;color:var(--amber2)}
+.cfhd span{font-weight:600}
+.cfhd em{font-style:normal;font-size:11px;color:var(--mut2);margin-left:auto}
+.cfsec{margin:6px 0 8px}
+.cfst{display:flex;justify-content:space-between;font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut);margin-bottom:2px}
+.cfst b{color:var(--tx);font-size:12px;letter-spacing:0;font-variant-numeric:tabular-nums}
+.cfli{display:grid;grid-template-columns:1fr auto;gap:0 8px;color:var(--mut2);padding:1px 0;position:relative}
+.cfli b{font-weight:400;color:var(--tx);font-variant-numeric:tabular-nums}
+.cfli i{grid-column:1/3;height:2px;background:var(--line2);display:block}
+.cfwhy{border-top:1px solid var(--line);padding-top:6px;color:var(--tx);font-size:12px}
+.cfwhy .cfst{display:block;margin-bottom:2px}
+@media (max-width:760px){.cfwrap{flex-direction:column}.cfcard{flex:0 0 auto;max-height:none}}
 .chipgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
 .chipgrp .gl{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--amber);min-width:64px}
 @media (max-width:760px){.grpnav{grid-template-columns:repeat(2,1fr)!important}.gband .vd{margin-left:0;flex:1 0 100%}}
@@ -3594,7 +3612,9 @@ function projection(c,lump,rateOverride){
   planBal=(planBal>0?planBal*(1+planRet):planBal)+planYr;
   var planDraw=Math.max(0,Math.min(planBal,planOut));
   planBal-=planDraw; if(planBal<0)planBal=0; var freeCap=Math.max(0,invest); if(planBal>freeCap)planBal=freeCap;
-  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst,planBal:planBal,planDraw:planDraw,planOut:planOut});
+  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst,planBal:planBal,planDraw:planDraw,planOut:planOut,
+   // 年度明細卡用的拆項（2026/09/26）：expense 那一欄是「日常＋教育＋退休生活」的合計，卡片要分開講。
+   base:expense,edu:edu,retire:retireDraw,act:actIn-actOut-actPay,liab:remDebt,fixed:fixedAt});
  }
  // 子女教育是連續好幾年的支出，不是單一事件——逐年插旗會在圖上排出六支「子女教育」，
  // 把整張時間軸擠爆。合併成一個區段：起於第一個繳費年，全程不轉負才算做得到。
@@ -4309,7 +4329,53 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  var bands=[];for(var y=0;y<years;y++){var col=matrix.map(function(m){return m[y]});bands.push([pctile(col,0.1),pctile(col,0.5),pctile(col,0.9)])}
  return {N:N,years:years,a0:a0,pSuccess:(N-neg)/N,finalP10:pctile(finals,0.1),finalP50:pctile(finals,0.5),finalP90:pctile(finals,0.9),bands:bands};
 }
+// 點圖鎖住某一歲：手移開卡片不會跳掉，講給客戶聽的時候不用一直按著。再點一下解鎖。
+function cfLockToggle(evt,key){
+ key=key||'cf';var d=(window.__charts||{})[key];if(!d)return;
+ if(d.lockAge!=null){d.lockAge=null;hoverChart(evt,key);return;}
+ var i=cfIndexFromEvent(evt,d);d.lockAge=d.a0+i;
+ var cd=document.getElementById(key+'Detail');if(cd&&d.full)cd.innerHTML=cfDetailHTML(d,i);
+}
+function cfIndexFromEvent(evt,d){
+ var svg=evt.currentTarget,rect=svg.getBoundingClientRect();
+ var cx=(evt.touches&&evt.touches[0])?evt.touches[0].clientX:evt.clientX;
+ var vbX=(cx-rect.left)/(rect.width||1)*d.W;
+ var i=Math.round((vbX-d.pad)/(d.W-d.pad*2)*(d.n-1));return Math.max(0,Math.min(d.n-1,i));
+}
+// 年度明細卡：那一年的收入拆項、支出拆項、存量，以及一句「為什麼是正的／負的」。
+// 全部讀 projection 的 row（已經算好），不再算任何東西。
+function cfDetailHTML(d,i){
+ var r=d.full&&d.full[i];if(!r)return '';
+ var neg=r.bal<0,gapY=neg&&d.tn&&r.age>=d.tn;
+ var st=!neg?['結餘 +'+fmt(r.bal),'var(--amber2)']:gapY?['缺口 −'+fmt(-r.bal)+' · 存量已用完','#ef6f6f']:['入不敷出 −'+fmt(-r.bal)+' · 靠存量撐','#c8873f'];
+ var inc=[['工作收入',r.work],['理財收入',r.fin],['其他收入',r.other]].filter(function(x){return x[1]>0.5});
+ var goalNames=(d.evts||[]).filter(function(e){return e.kind==='goal'&&e.age===r.age}).map(function(e){return e.name}).join('、');
+ var out=[['日常生活',r.base],['退休生活',r.retire],['子女教育',r.edu],['目標支出'+(goalNames?'：'+goalNames:''),r.goal],['旅遊／嗜好',r.life],['負債償還',r.debt]].filter(function(x){return x[1]>0.5});
+ if(r.act&&Math.abs(r.act)>0.5)(r.act>0?inc:out).push(['方案動作'+(r.act>0?'（淨流入）':'（淨投入）'),Math.abs(r.act)]);
+ var outTot=r.base+r.retire+r.edu+r.goal+r.life+r.debt+(r.act<0?-r.act:0),incTot=r.income+(r.act>0?r.act:0);
+ var li=function(rows,tot){return rows.map(function(x){var pc=tot>0?Math.round(x[1]/tot*100):0;return '<div class="cfli"><span>'+x[0]+'</span><b>'+fmt(x[1])+'</b><i style="width:'+pc+'%"></i></div>'}).join('')};
+ // 為什麼：規則產生，講人話。
+ var why=[];
+ if(!neg){why.push('收入 '+fmt(incTot)+' ＞ 支出 '+fmt(outTot)+'，多出來的 '+fmt(r.bal)+' 進存量。');
+  if(r.work<0.5&&r.fin>0.5)why.push('工作收入已結束，靠理財收入撐住。');}
+ else{
+  var top=out.slice().sort(function(a,b){return b[1]-a[1]}).slice(0,2);
+  why.push('支出 '+fmt(outTot)+' ＞ 收入 '+fmt(incTot)+'，差 '+fmt(-r.bal)+'。');
+  if(top.length)why.push('最重的是'+top.map(function(x){return x[0].split('：')[0]+' '+fmt(x[1])}).join('、')+'。');
+  if(r.work<0.5)why.push('工作收入已結束'+(r.fin>0.5?'，理財收入 '+fmt(r.fin)+' 補不滿。':'。'));
+  if(goalNames)why.push('今年有大額目標：'+goalNames+'。');
+  why.push(r.total>=0?'存量還有 '+fmt(r.total)+'，撐得住。':'存量已經用完，這 '+fmt(-r.bal)+' 要靠借貸或變現。');
+ }
+ return '<div class="cfhd"><b>'+r.age+' 歲</b><span style="color:'+st[1]+'">'+st[0]+'</span>'+(d.lockAge!=null?'<em title="點圖解鎖">🔒 已鎖定</em>':'')+'</div>'+
+  '<div class="cfsec"><div class="cfst"><span>收入</span><b>'+fmt(incTot)+'</b></div>'+li(inc,incTot)+'</div>'+
+  '<div class="cfsec"><div class="cfst"><span>支出</span><b>'+fmt(outTot)+'</b></div>'+li(out,outTot)+'</div>'+
+  '<div class="cfsec"><div class="cfst"><span>存量</span></div>'+
+   '<div class="cfli"><span>可投資資產</span><b style="color:'+(r.total<0?'#ef6f6f':'var(--tx)')+'">'+fmt(r.total)+'</b></div>'+
+   '<div class="cfli"><span>淨資產（含固定資產−負債）</span><b style="color:'+(r.net<0?'#ef6f6f':'var(--tx)')+'">'+fmt(r.net)+'</b></div></div>'+
+  '<div class="cfwhy"><span class="cfst"><span>為什麼</span></span>'+why.join(' ')+'</div>';
+}
 function hoverChart(evt,key){var d=(window.__charts||{})[key];if(!d)return;
+ if(d.full&&d.lockAge!=null)return;
  var svg=evt.currentTarget,rect=svg.getBoundingClientRect();
  var cx=(evt.touches&&evt.touches[0])?evt.touches[0].clientX:evt.clientX;
  var vbX=(cx-rect.left)/rect.width*d.W;
@@ -4322,7 +4388,7 @@ function hoverChart(evt,key){var d=(window.__charts||{})[key];if(!d)return;
   var bal=d.bals?(' ｜ 年度結餘 <b style="color:'+(d.bals[i]>=0?'var(--amber2)':'#ef6f6f')+'">'+fmt(d.bals[i])+'</b>'):'';
   ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b>'+bal+' ｜ 未調整 <b>'+fmt(d.rows[i])+'</b>'+af;}
  else if(key==='tk'){var act=d.actual[age];ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b> ｜ 模擬淨資產 <b>'+fmt(d.rows[i])+'</b>'+(act!=null?' ｜ 實際 <b style="color:#fff">'+fmt(act)+'</b>（差 '+fmt(act-d.rows[i])+'）':'')}
- else if(key==='blp'){ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b> ｜ 收入 <b style="color:var(--amber2)">'+fmt(d.incs[i])+'</b> ｜ 支出 <b style="color:var(--mut)">'+fmt(d.exps[i])+'</b> ｜ 累積資產 <b>'+fmt(d.nets[i])+'</b>'} else{var neg=d.bals&&d.bals[i]<0,gapY=neg&&d.tn&&age>=d.tn;var exb=d.bals?(' ｜ 年度結餘 <b style="color:'+(!neg?'var(--amber2)':gapY?'#ef6f6f':'#c8873f')+'">'+fmt(d.bals[i])+'</b>'+(neg?(gapY?' <span style="color:#ef6f6f">缺口</span>':' <span style="color:#c8873f">靠存量撐</span>'):'')):'';ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b>'+exb+' ｜ 可投資資產 <b>'+fmt(d.rows[i])+'</b>'}
+ else if(key==='blp'){ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b> ｜ 收入 <b style="color:var(--amber2)">'+fmt(d.incs[i])+'</b> ｜ 支出 <b style="color:var(--mut)">'+fmt(d.exps[i])+'</b> ｜ 累積資產 <b>'+fmt(d.nets[i])+'</b>'} else{var neg=d.bals&&d.bals[i]<0,gapY=neg&&d.tn&&age>=d.tn;var exb=d.bals?(' ｜ 年度結餘 <b style="color:'+(!neg?'var(--amber2)':gapY?'#ef6f6f':'#c8873f')+'">'+fmt(d.bals[i])+'</b>'+(neg?(gapY?' <span style="color:#ef6f6f">缺口</span>':' <span style="color:#c8873f">靠存量撐</span>'):'')):'';ro.innerHTML='<b style="color:var(--amber2)">'+age+' 歲</b>'+exb+' ｜ 可投資資產 <b>'+fmt(d.rows[i])+'</b>';var cd=document.getElementById(key+'Detail');if(cd&&d.full)cd.innerHTML=cfDetailHTML(d,i);}
 }
 function fanSVG(mc){var W=760,H=230,pad=40,years=mc.years;
  window.__charts=window.__charts||{};window.__charts.mc={a0:mc.a0,bands:mc.bands,W:W,pad:pad,n:years};
@@ -13518,7 +13584,9 @@ function expenseSourceSVG(proj,theme){var rows=proj.rows;if(!rows.length)return 
   '<div style="margin-top:6px;font-size:12px;line-height:1.9;color:'+HINT+'">'+leg+'</div>'+
   '<div style="margin-top:4px;font-size:12px;color:'+HINT+'">每根柱＝當年家庭總支出，依序由 收入→計劃儲蓄→可投資資產→缺口 支應。'+(hasGap?'⚠ 出現<span style="color:#ef6f6f">紅色缺口</span>的年度代表資金已不足，需降低目標或變現資產。':'✓ 期間內各年支出皆由收入與資產支應，無缺口。')+'</div>';
 }
-function annualBalanceSVG(proj,theme){var rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
+function annualBalanceSVG(proj,theme,key){var rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
+ // 首屏與「一生現金流投影」模組各自一把 key（cf／cf2），滑鼠讀數、鎖定、明細卡才不會互相蓋掉。
+ var K=key||'cf';
  var dark=theme!=='light',AX=dark?TPAL.mut2:'#5a6b72',GRID=dark?TPAL.grid:'rgba(0,0,0,.08)',HINT=dark?TPAL.mut:'#5a6b72',TICK=dark?TPAL.mut2:'#8a9aa2',ZERO=dark?TPAL.zero:'rgba(0,0,0,.22)',DOTC=dark?TPAL.panel:'#ffffff';
  var W=760,H=250,pL=52,pR=52,pT=16,pB=28,plotW=W-pL-pR,plotH=H-pT-pB;
  function X(i){return pL+(rows.length>1?i/(rows.length-1):0)*plotW}
@@ -13548,15 +13616,25 @@ function annualBalanceSVG(proj,theme){var rows=proj.rows;if(!rows.length)return 
  var ticks='';for(var i3=0;i3<rows.length;i3+=5)ticks+='<text x="'+X(i3).toFixed(1)+'" y="'+(H-9)+'" fill="'+TICK+'" font-size="9" text-anchor="middle">'+rows[i3].age+'</text>';
  var tn=proj.turnNeg,tni=tn?rows.findIndex(function(r){return r.age===tn;}):-1,tnx=tni>=0?X(tni):null;
  var legArr=[['var(--amber2)','年度結餘為正(左軸)'],['#c8873f','入不敷出·靠存量撐'],['#ef6f6f','存量用完後·缺口'],['#5cc08a',hasPlan?'自由儲蓄累積(右軸)':'可投資資產累積(右軸)'],['rgba(239,111,111,.5)','缺口面積']];if(hasPlan)legArr.push(['#7fb0e6','計劃儲蓄累積(右軸)']);var leg=legArr.map(function(l){return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px"><span style="width:11px;height:11px;border-radius:2px;background:'+l[0]+';display:inline-block"></span>'+l[1]+'</span>';}).join('');
- var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+(dark?';cursor:crosshair;touch-action:pan-y':'')+'"'+(dark?' onmousemove="hoverChart(event,\'cf\')" ontouchmove="hoverChart(event,\'cf\')"':'')+'>'+grid+
+ var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="'+svgFitCSS(W)+(dark?';cursor:crosshair;touch-action:pan-y':'')+'"'+(dark?' onmousemove="hoverChart(event,\''+K+'\')" ontouchmove="hoverChart(event,\''+K+'\')" onclick="cfLockToggle(event,\''+K+'\')"':'')+'>'+grid+
   '<line x1="'+pL+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+zeroY.toFixed(1)+'" stroke="'+ZERO+'" stroke-dasharray="4 4"/>'+bars+
   gapArea+'<path d="'+line+'" fill="none" stroke="#5cc08a" stroke-width="2.2"/>'+pline+dots+gL+gR+ticks+
   (tnx!==null?'<line x1="'+tnx.toFixed(1)+'" y1="'+pT+'" x2="'+tnx.toFixed(1)+'" y2="'+(H-pB)+'" stroke="var(--warn)" stroke-dasharray="3 3"/><text x="'+tnx.toFixed(1)+'" y="12" fill="var(--warn)" font-size="10" text-anchor="middle">存量用完 '+tn+'歲</text>':'')+
-  (dark?'<line id="cfCursor" x1="0" y1="'+pT+'" x2="0" y2="'+(H-pB)+'" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" style="display:none"/>':'')+'</svg>';
- window.__charts=window.__charts||{};if(dark)window.__charts.cf={a0:rows[0].age,rows:invs,bals:bals,W:W,pad:pL,n:rows.length,tn:tn};
- return (dark?'<div id="cfReadout" style="background:var(--field);border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:13px;color:var(--mut)">移動滑鼠／手指到圖上任一年齡，即時顯示該年結餘與可投資資產</div>':'')+svg+
-  '<div style="margin-top:6px;font-size:12px;color:'+HINT+'">'+leg+'</div>'+
+  (dark?'<line id="'+K+'Cursor" x1="0" y1="'+pT+'" x2="0" y2="'+(H-pB)+'" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" style="display:none"/>':'')+'</svg>';
+ window.__charts=window.__charts||{};
+ if(dark){
+  // 鎖定的年齡跨重畫保留：拉桿一拉，卡片還停在同一歲，客戶看得到「那一年」的數字怎麼變。
+  var prev=window.__charts[K],lockAge=(prev&&prev.lockAge!=null)?prev.lockAge:null;
+  var lockI=lockAge!=null?rows.findIndex(function(r){return r.age===lockAge}):-1;
+  window.__charts[K]={a0:rows[0].age,rows:invs,bals:bals,W:W,pad:pL,n:rows.length,tn:tn,full:rows,evts:proj.events||[],lockAge:lockI>=0?lockAge:null};
+ }
+ // 預設先停在第一個入不敷出的年份（鎖定的優先）——那是客戶第一個會問「為什麼」的地方。
+ var firstNegI=rows.findIndex(function(r){return r.bal<0});
+ var legHint='<div style="margin-top:6px;font-size:12px;color:'+HINT+'">'+leg+'</div>'+
   '<div style="margin-top:4px;font-size:12px;color:'+HINT+'">柱＝年度收支結餘（流量）；綠線＝可投資資產累積（存量）。收支負只是動用存量，綠線掉到零線以下那一塊才是缺口。'+(tn?'⚠ 存量於 '+tn+' 歲用完。':'✓ 存量期間內沒有用完。')+'</div>';
+ var card=dark?('<div class="cfcard" id="'+K+'Detail">'+cfDetailHTML(window.__charts[K],lockI>=0?lockI:(firstNegI>=0?firstNegI:0))+'</div>'):'';
+ return (dark?'<div id="'+K+'Readout" style="background:var(--field);border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:13px;color:var(--mut)">移動滑鼠／手指到圖上任一年齡，右側明細卡跟著換；點一下鎖住那一年，再點一下解鎖</div>':'')+
+  (dark?'<div class="cfwrap"><div class="cfleft">'+svg+legHint+'</div>'+card+'</div>':svg+legHint);
 }
 function careerBlueprint(c,proj,theme){var rows=proj.rows;if(!rows||!rows.length)return '';
  var dark=theme!=='light';
@@ -13619,7 +13697,7 @@ function careerBlueprint(c,proj,theme){var rows=proj.rows;if(!rows||!rows.length
 }
 function cashflowCharts(proj,theme,c){var dark=theme!=='light',hc=dark?'var(--amber2)':'#0d2b45',sub=dark?TPAL.mut2:'#5a6b72',wrapC=dark?' class="chart"':'',wrapS=dark?'':' style="margin:12px 0"';
  return (c?'<div'+wrapC+wrapS+'><h4 style="color:'+hc+';margin-bottom:8px;font-size:15px">生涯資產模擬藍圖 <span style="font-weight:400;font-size:12px;color:'+sub+'">收入・支出・累積資產總額一圖綜覽</span></h4>'+careerBlueprint(c,proj,theme)+'</div>':'')+'<div'+wrapC+wrapS+'><h4 style="color:'+hc+';margin-bottom:8px;font-size:15px">支出來源圖 <span style="font-weight:400;font-size:12px;color:'+sub+'">每年支出如何被支應，紅色為資金缺口</span></h4>'+expenseSourceSVG(proj,theme)+'</div>'+
-  '<div'+wrapC+wrapS+'><h4 style="color:'+hc+';margin-bottom:8px;font-size:15px">年度收支結餘圖 <span style="font-weight:400;font-size:12px;color:'+sub+'">結餘柱＋可投資資產累積</span></h4>'+annualBalanceSVG(proj,theme)+'</div>';}
+  '<div'+wrapC+wrapS+'><h4 style="color:'+hc+';margin-bottom:8px;font-size:15px">年度收支結餘圖 <span style="font-weight:400;font-size:12px;color:'+sub+'">結餘柱＋可投資資產累積</span></h4>'+annualBalanceSVG(proj,theme,'cf2')+'</div>';}
 function deathProjection(c,mb){var base=projection(c),a0=n(c.profile.age),infl=n(c.params.inflation)/100,ret=n(c.params.invReturn)/100;
  var liquid0=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
  var lump=existingCover(c,mb.name,'壽險');
