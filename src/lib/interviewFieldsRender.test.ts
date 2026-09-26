@@ -169,3 +169,20 @@ describe("訪談欄位：實際渲染", () => {
     expect(intent).toContain("改變的準備度");
   });
 });
+
+describe("0–10 的分數欄要夾在範圍內（Ray 2026-09-26：信心打成 12 還被收下）", () => {
+  it("ofld 'num:0,10' 畫 min/max；clampNum 把 12 夾成 10、-3 夾成 0、空字串維持空", async () => {
+    const html = readFileSync("public/lantu-app.html", "utf8");
+    const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://lantu.test/lantu-app.html?embed=1" });
+    const w = dom.window as any;
+    await new Promise((r) => w.addEventListener("load", r));
+    const c = w.migrateCase(w.newCase()); w.app.cases = [c]; w.app.activeId = c.id;
+    const h = w.ofld("moneyStyle", "confidence", "改變信心 0–10", "num:0,10");
+    expect(h).toContain('min="0"');
+    expect(h).toContain('max="10"');
+    expect(w.clampNum("12", 0, 10)).toBe(10);
+    expect(w.clampNum("-3", 0, 10)).toBe(0);
+    expect(w.clampNum("7", 0, 10)).toBe(7);
+    expect(w.clampNum("", 0, 10)).toBe("");
+  });
+});

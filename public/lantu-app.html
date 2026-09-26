@@ -9699,7 +9699,12 @@ function ofld(obj,k,label,type){var c=activeCase(),v=(c[obj]||{})[k];
   return '<div class="f"><label>'+label+'</label><select onchange="setObj(\''+obj+'\',\''+k+'\',this.value)">'+opts+'</select></div>'}
  // 金額欄走 moneyCell（存進去仍是 'num'），與 fFld / coF / tableSec 同一套規格。
  if(type==='money')return '<div class="f"><label>'+label+'</label>'+moneyCell('onchange="setObj(\''+obj+'\',\''+k+'\',this.value,\'num\')"',v)+'</div>';
+ // 'num:0,10'＝有範圍的數字欄：畫 min/max，onchange 先夾回範圍再存（0–10 的分數打成 12 就是這樣漏的）。
+ if(type&&type.indexOf('num:')===0){var rg=type.slice(4).split(',');
+  return '<div class="f"><label>'+label+'</label><input type="number" inputmode="decimal" min="'+rg[0]+'" max="'+rg[1]+'" value="'+esc(v==null?'':v)+'" onchange="this.value=clampNum(this.value,'+rg[0]+','+rg[1]+');setObj(\''+obj+'\',\''+k+'\',this.value,\'num\')"></div>'}
  return '<div class="f"><label>'+label+'</label><input '+(type==='num'?'type="number" inputmode="decimal"':'')+' value="'+esc(v==null?'':v)+'" onchange="setObj(\''+obj+'\',\''+k+'\',this.value,\''+(type||'text')+'\')"></div>'}
+// 空字串維持空（沒答＝沒答，不是 0）；其餘夾進 [lo,hi]。
+function clampNum(v,lo,hi){if(v===''||v==null)return '';var x=Number(v);if(!isFinite(x))return '';return Math.max(lo,Math.min(hi,x));}
 var SAVING_EXP=['跟會','零存整付','定存','外幣存款','儲蓄型保單','年金保險'];
 var INVEST_EXP=['共同基金','股票','債券','ETF','選擇權','期貨','不動產','黃金','其他'];
 var DOC_LIST=['人壽險保單','產險保單(車險/住宅火險)','薪資單','支出明細表','銀行對帳單(車貸/房貸)','股票投資對帳單','基金投資對帳單','信用卡分期帳單','財產清冊/國稅局'];
@@ -10077,7 +10082,7 @@ function intentSec(c){var it=c.intent||{};
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">儲蓄經驗（可複選）</div>'+chips('savingExp',SAVING_EXP,it.savingExp)+'</div>'+
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">投資經驗（可複選）</div>'+chips('investExp',INVEST_EXP,it.investExp)+chipsOther('investExp',it)+'</div>'+
    '<div class="subhd" data-ivanchor="ready" style="margin-top:12px">改變的準備度 <span class="hint">訪談題：這件事你想做的程度 0–10？你相信自己做得到的程度 0–10？</span></div>'+
-   '<div class="fgrid">'+ofld('moneyStyle','willing','改變意願 0–10','num')+ofld('moneyStyle','confidence','改變信心 0–10','num')+'</div>'+
+   '<div class="fgrid">'+ofld('moneyStyle','willing','改變意願 0–10','num:0,10')+ofld('moneyStyle','confidence','改變信心 0–10','num:0,10')+'</div>'+
    '<div data-calc="readiness">'+readinessHint(c)+'</div></div>')+
   foldKeep('pending','待補齊清單',pendingItems(c).length+' 項',pendingSec(c));
 }

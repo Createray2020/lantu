@@ -45,8 +45,8 @@ describe("訪談欄位：手冊相對於問卷新增的", () => {
   });
 
   it("改變的準備度：意願與信心兩欄分開（缺哪一邊決定之後要給方案還是給動機）", () => {
-    expect(HTML).toContain("ofld('moneyStyle','willing','改變意願 0–10','num')");
-    expect(HTML).toContain("ofld('moneyStyle','confidence','改變信心 0–10','num')");
+    expect(HTML).toContain("ofld('moneyStyle','willing','改變意願 0–10','num:0,10')");
+    expect(HTML).toContain("ofld('moneyStyle','confidence','改變信心 0–10','num:0,10')");
   });
 
   it("⚠️ 過往理財經驗不另開欄位：成員卡片的 BG_FIELDS.finExp 已經是它", () => {
