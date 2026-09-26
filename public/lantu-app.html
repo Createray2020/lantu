@@ -7010,7 +7010,7 @@ function eduChildCard(c,m,mi){
    eduStageDefs().filter(function(s){return ['高中職','大學','研究所','博士班'].indexOf(s.stage)>=0}).map(function(s){
     return '<option '+(top===s.stage?'selected':'')+'>'+esc(s.stage)+'</option>'}).join('')+'</select></div>'+
   '<div class="f"><label>支付學雜費至幾歲（留空＝供給到畢業）</label><input type="number" inputmode="decimal" value="'+esc(m.eduPayTo==null?'':m.eduPayTo)+'" onchange="setEduOpt('+mi+',\'eduPayTo\',this.value,\'num\')"></div>'+
-  '<div class="f"><label>重要程度 1-5</label><input type="number" inputmode="decimal" min="1" max="5" value="'+esc(m.eduImp==null?3:m.eduImp)+'" onchange="setEduOpt('+mi+',\'eduImp\',this.value,\'num\')"></div>'+
+  '<div class="f"><label>重要程度（5最高）</label>'+impSelect('onchange="setEduOpt('+mi+',\'eduImp\',this.value,\'num\')"',m.eduImp==null?3:m.eduImp)+'</div>'+
   '</div>'+
   '<div class="edutog">'+
    '<label><input type="checkbox" '+(m.eduExtra?'checked':'')+' onchange="setEduOpt('+mi+',\'eduExtra\',this.checked,\'bool\')"> 補習／才藝費列入教育金</label>'+

@@ -281,3 +281,11 @@ describe("頂列儲存鍵", () => {
     expect(el.className).toContain("bad");
   });
 });
+
+describe("子女卡的重要程度（Ray 2026-09-26：1 到 5 要說明哪一端是重要）", () => {
+  it("跟其他表一樣用帶文字的下拉（5 · 非做不可 … 1 · 可放棄），不再是光禿禿的 1-5 數字框", () => {
+    const html = readFileSync(new URL("../../public/lantu-app.html", import.meta.url), "utf8");
+    expect(html).not.toContain("重要程度 1-5");
+    expect(html).toContain("<label>重要程度（5最高）</label>'+impSelect(");
+  });
+});
