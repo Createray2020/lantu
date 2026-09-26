@@ -344,6 +344,11 @@ export async function deleteNoteAction(clientId: string, noteId: string): Promis
   return ok;
 }
 
+export async function setNoteKindAction(clientId: string, noteId: string, kind: string): Promise<boolean> {
+  const cid = await coachId();
+  return Notes.setNoteKind(cid, clientId, noteId, kind);
+}
+
 export async function setNoteVisibleAction(clientId: string, noteId: string, visible: boolean): Promise<boolean> {
   const cid = await coachId();
   return Notes.setNoteVisible(cid, clientId, noteId, visible);

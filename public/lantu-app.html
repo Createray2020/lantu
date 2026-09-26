@@ -16312,6 +16312,11 @@ function prefillOf(key){
 function byKey(k){ var M=MOUNTS(); for(var i=0;i<M.length;i++) if(M[i].key===k) return M[i]; return null; }
 function nameOf(k){
  var m=byKey(k); if(m) return m.name;
+ if(k.indexOf('page:')===0){   // 側邊記事本記的、沒有掛點的區塊：'page:<tab>|<區塊標題>'
+  var q=k.slice(5).split('|'), tb=q[0], tt=q.slice(1).join('|');
+  var lb=''; try{ lb=(tb==='needhub')?'未來的需求':((typeof DTAB_LABEL!=='undefined'&&DTAB_LABEL[tb])||tb); }catch(e){ lb=tb; }
+  return tt&&tt!==lb ? lb+' › '+tt : lb;
+ }
  if(k.indexOf('policy:')===0){ var c=C(),p=(c&&(c.policies||[]).filter(function(x){return 'policy:'+(x.pid||x.id)===k})[0]); return '保單 · '+((p&&p.name)||'單張'); }
  return k;
 }
@@ -16370,7 +16375,7 @@ function barHTML(key){
    }).join('')+'</div>';
   }
  }
- return '<div class="lnwrap'+(alert?' alert':'')+'">'+head+'<div class="lnopen'+(st.open?'':' hide')+'">'+body+'</div></div>';
+ return '<div class="lnwrap'+(alert?' alert':'')+'" data-k="'+esc2(key)+'">'+head+'<div class="lnopen'+(st.open?'':' hide')+'">'+body+'</div></div>';
 }
 function strip(s){ return String(s||'').replace(/<[^>]+>/g,''); }
 function isAlert(key){
@@ -16388,8 +16393,8 @@ function mount(){
  var root=document.getElementById('app'); if(!root) return;
  LN.mountedKeys=[];
  var tab=(window.app&&app.dataTab)||'';
- if(window.app&&app.activeTab==='report'){ try{ mountReport(); }catch(e){} mountSessBar(); return; }
- if(!(window.app&&app.activeTab==='data')) { mountSessBar(); return; }
+ if(window.app&&app.activeTab==='report'){ try{ mountReport(); }catch(e){} mountSessBar(); try{ mountPad(); }catch(e){} return; }
+ if(!(window.app&&app.activeTab==='data')) { mountSessBar(); try{ mountPad(); }catch(e){} return; }
 
  var secs=[].slice.call(root.querySelectorAll('.sec'));
  MOUNTS().forEach(function(m){
@@ -16415,6 +16420,7 @@ function mount(){
  // 保單列級：在保單分頁替每張保單加一顆 ✎
  if(tab==='coverage') mountPolicyRows();
  mountSessBar();
+ try{ mountPad(); }catch(e){ console.error('[LN pad]',e); }
  restoreFocus();
 }
 function mountPolicyRows(){
@@ -16681,25 +16687,24 @@ LN.vis=function(k,v){ d(k).visible=v; };
 LN.typing=function(k,v){ d(k).text=v; };
 LN.openRow=function(k){ d(k).open=true; LN.rowKey=k; redraw(); setTimeout(function(){var e=document.getElementById('lnta_'+k); if(e)e.focus()},30); };
 
-LN.add=function(k){
- var st=d(k), txt=(st.text||'').trim();
- if(!txt){ flash('先寫點什麼'); return; }
+// 寫入一則註記的共同路徑（區塊註記帶與側邊記事本都走這裡）。
+function addNoteRaw(k,kind,txt,visible){
  // 寫下第一則註記＝這場諮詢實際上已經開始了。
  // ⚠️ 先送開場、再送這一則：父層是照收到的順序一則一則處理的（onMessage 的佇列），
  //    等它回來時 sessionRef 已經有值，這一則就掛在這一場底下而不是掉進日常維護。
  var justStarted = !sess() && autoStart(true);
  var s=sess();
- var draftNote={ block:k, kind:st.kind, text:txt, visible: canVisible() && !!st.visible };
+ var draftNote={ block:k, kind:kind, text:txt, visible: canVisible() && !!visible };
  if(REMOTE){
   // 樂觀更新：先畫出來，父層存完會用 lantu:notes 把真的那一列推回來覆蓋。
   toParentLN({ type:'lantu:note', op:'add', input: toInput(draftNote) });
   LN_REMOTE_STATE.notes = LN_REMOTE_STATE.notes.concat([{
-   id:'tmp_'+nid(), block:k, kind:st.kind, text:txt,
+   id:'tmp_'+nid(), block:k, kind:kind, text:txt,
    visible:draftNote.visible, by:meName(), access:LN.role, sessId:s?s.id:null, at:stamp(), pending:true
   }]);
  }else{
   allNotes().push({
-   id:nid(), block:k, kind:st.kind, text:txt,
+   id:nid(), block:k, kind:kind, text:txt,
    visible: draftNote.visible,                 // 非主責一律 false（資料層強制）
    by: meName(), access: LN.role,
    sessId: s?s.id:null,
@@ -16707,10 +16712,15 @@ LN.add=function(k){
   });
   persist();
  }
- st.text=''; st.visible=false;
  redraw();
  flash(s?'已記入這一場諮詢'
        :(justStarted?'已自動開場並記入這一場（現在這一版已釘成還原點）':'已記入「日常維護」'));
+}
+LN.add=function(k){
+ var st=d(k), txt=(st.text||'').trim();
+ if(!txt){ flash('先寫點什麼'); return; }
+ addNoteRaw(k, st.kind, txt, st.visible);
+ st.text=''; st.visible=false;
 };
 LN.del=function(id){
  var arr=allNotes(), i=-1;
@@ -16754,6 +16764,8 @@ function handleNoteErr(m){
   });
   if(hit){ hit.pending=false; hit.failed=msg; }
   else flash(msg);
+ }else if(m.op==='kind'){
+  flash(msg);   // 分類沒改成：父層會把真的那一批 notes 推回來，畫面自己會退回
  }else if(m.op==='del'){
   var back=m.id?LN_DELETED[m.id]:null;
   var here=m.id&&LN_REMOTE_STATE.notes.some(function(x){return x.id===m.id});
@@ -16796,9 +16808,18 @@ LN.adopt=function(){
    依據是它的佐證。沒有決定，正是最需要教練自己講一句這場談了什麼的時候。 */
 function openPick(){
  var c=C(), s=c.sess;
- var ds=allNotes().filter(function(x){return x.sessId===s.id && x.kind==='decision'});
+ LN._pickOpen=true;
+ var all=allNotes().filter(function(x){return x.sessId===s.id && !x.pending});
+ var ds=all.filter(function(x){return x.kind==='decision'});
+ var others=all.filter(function(x){return x.kind!=='decision'});
  var m=document.getElementById('lnMask')||mkMask();
- m.querySelector('.lnmodal').innerHTML=
+ // 2026/09/27：側邊記事本記的都是「依據」，結束時在這裡先標一下——哪幾則其實是決定／待辦。
+ var retag=others.length?'<div class="lngrp"><h5>◆ 先標一下 <span class="lnhint">這一場記下的 '+others.length+' 則——是決定或待辦的點一下改</span></h5>'+
+  others.map(function(x){
+   return '<div class="lnpaditem"><span class="lnkset">'+KIND_CYCLE.map(function(k){return '<button type="button" class="lntag'+(x.kind===k?' on':'')+'" onclick="LN.setKind(\''+x.id+'\',\''+k+'\')">'+KN[k]+'</button>'}).join('')+'</span>'+
+    '<span class="lnpadtx">'+esc2(x.text)+'<span class="lnsrc">'+esc2(nameOf(x.block))+'</span></span></div>';
+  }).join('')+'</div>':'';
+ m.querySelector('.lnmodal').innerHTML=retag+
   '<h3>'+(ds.length?'這一場的決定，哪幾則要給客戶看？':'結束這一場諮詢')+'</h3>'+
   '<div class="lnhint" style="margin-bottom:14px">'+(ds.length
     ? '預設全不勾。勾選放在這一步，是因為你現在正好在整理等下要跟客戶講什麼。'
@@ -16861,7 +16882,7 @@ function finish(){
  LN.summary(s);
  flash('摘要已產生；待辦已進追蹤');
 }
-LN.closeMask=function(){ var m=document.getElementById('lnMask'); if(m) m.classList.remove('on'); };
+LN.closeMask=function(){ LN._pickOpen=false; var m=document.getElementById('lnMask'); if(m) m.classList.remove('on'); };
 
 /* ───────── 摘要 ───────── */
 LN.summary=function(s){
@@ -16940,6 +16961,138 @@ LN.setRole=function(r){ LN.role=r; redraw(); flash(
  :'客戶端：只看得到勾了可見的，只能在事實層區塊寫'); };
 
 /* ───────── 工具 ───────── */
+/* ───────── 側邊記事本（2026/09/27 Ray）─────────
+   「開始諮詢的時候，側邊跳出一個像記事本的結構，收合在側邊，點開就可以記錄；
+    它會根據我現在所在的頁面移動它的標題，隨時可以記錄。順序通常會很亂，後面再一起摘要。」
+   ⚠️ 不開新資料：抽屜寫的每一則就是一筆 client_notes（block＝當時看到的區塊；有掛點就掛那個
+      掛點的 key，沒有就 'page:<tab>|<區塊標題>'），sessionId 跟著進行中的那一場——
+      自動開場、帶議程、結束時勾可見、產摘要、進報告書全部沿用。
+   ⚠️ 抽屜不分類（預設「依據」），結束諮詢的視窗多一段「先標一下」把這一場記的東西改成決定／待辦。
+      改分類走 op:'kind'（embed）／直接改列（本機）。 */
+var PAD_OPEN_KEY='ln_pad_open';
+var LN_PAD={open:false,title:'',block:'',text:''};
+try{ LN_PAD.open = localStorage.getItem(PAD_OPEN_KEY)==='1'; }catch(e){}
+function tabLabel(){
+ var a=window.app||{};
+ if(a.activeTab==='data'){
+  var t=a.dataTab||'';
+  if(t==='needhub'){ var st=null; try{ st=(typeof navStep==='function'&&typeof NEED_SEL!=='undefined')?navStep(NEED_SEL):null; }catch(e){} return '未來的需求'+(st&&st.name?' › '+st.name:''); }
+  try{ if(typeof DTAB_LABEL!=='undefined'&&DTAB_LABEL[t]) return DTAB_LABEL[t]; }catch(e){}
+  return t||'資料';
+ }
+ return {analysis:'分析',report:'報告書',advice:'建議',plan:'調整方案',tools:'工具'}[a.activeTab]||(a.activeTab||'');
+}
+// 目前畫面裡「看得到的那個區塊」：最後一個標題已經捲過頂端線（120px）的 .sec；都還沒捲到就取第一個。
+function currentSec(){
+ var root=document.getElementById('app'); if(!root) return null;
+ var secs=[].slice.call(root.querySelectorAll('.sec')), pick=null, first=null;
+ for(var i=0;i<secs.length;i++){
+  var h=secs[i].querySelector('h4, summary'); if(!h) continue;
+  if(!first) first=secs[i];
+  var r=secs[i].getBoundingClientRect();
+  if(!r.height&&!r.top){ pick=null; break; }        // 沒有版面（測試環境）：取第一個
+  if(r.top<=120) pick=secs[i]; else if(!pick){ pick=secs[i]; break; } else break;
+ }
+ return pick||first;
+}
+function secTitle(sec){
+ var h=sec&&sec.querySelector('h4, summary'); if(!h) return '';
+ var t=(h.childNodes[0]&&h.childNodes[0].nodeType===3)?h.childNodes[0].textContent:h.textContent;   // 只取標題本文，不含 .hint
+ return String(t||'').replace(/\s+/g,' ').trim().slice(0,40);
+}
+function secKey(sec){
+ if(!sec) return '';
+ var w=sec.querySelector('.lnwrap[data-k]');
+ if(w) return w.getAttribute('data-k');                       // 有掛點：記進那個區塊的註記帶
+ var t=secTitle(sec); if(!t) return '';
+ return 'page:'+((window.app&&app.dataTab)||(window.app&&app.activeTab)||'')+'|'+t;
+}
+function padContext(){
+ var sec=(window.app&&app.activeTab==='data')?currentSec():null;
+ var tl=tabLabel(), st=sec?secTitle(sec):'';
+ return { block: secKey(sec)||('page:'+((window.app&&app.activeTab)||'')+'|'+tl), title: tl+(st&&st!==tl?' › '+st:'') };
+}
+function padNotes(){
+ var s=sess();
+ return allNotes().filter(function(x){ return s ? x.sessId===s.id : !x.sessId; }).slice().reverse();
+}
+function padListHTML(){
+ var notes=padNotes(), s=sess();
+ if(!notes.length) return '<div class="lnpadempty">'+(s?'這一場還沒記任何東西。':'還沒開場——寫下第一則就會自動開場。')+'<br>順序亂沒關係，結束時一起整理。</div>';
+ var groups=[], idx={};
+ notes.forEach(function(x){ var nm=nameOf(x.block); if(idx[nm]==null){ idx[nm]=groups.length; groups.push({nm:nm,items:[]}); } groups[idx[nm]].items.push(x); });
+ return groups.map(function(g){
+  return '<div class="lnpadgrp"><div class="lnpadgh">'+esc2(g.nm)+'</div>'+g.items.map(function(x){
+   var del=(x.access===LN.role||(LN.role==='owner'&&x.access==='owner'))?'<button class="lnx" title="刪除" onclick="LN.del(\''+x.id+'\')">✕</button>':'';
+   return '<div class="lnpaditem'+(x.pending?' pend':'')+(x.failed?' fail':'')+'"><span class="lnk k-'+x.kind+'" title="點一下換分類" onclick="LN.cycleKind(\''+x.id+'\')">'+(KN[x.kind]||x.kind)+'</span><span class="lnpadtx">'+esc2(x.text)+'</span><span class="lnat">'+esc2(x.at||'')+'</span>'+del+'</div>';
+  }).join('')+'</div>';
+ }).join('');
+}
+function mountPad(){
+ var c=C();
+ var pad=document.getElementById('lnPad');
+ if(LN.role==='client'){ if(pad) pad.style.display='none'; return; }   // 客戶端沒有記事本（角色可能是掛上之後才切的）
+ if(!pad){
+  pad=document.createElement('div'); pad.id='lnPad'; document.body.appendChild(pad);
+  pad.innerHTML=
+   '<button type="button" class="lnpadtab" onclick="LN.padToggle()" title="記事本（⌘/Ctrl+J）"><span class="lnpadtabt">記事</span><span class="lnpadcnt" id="lnPadCnt"></span></button>'+
+   '<div class="lnpadbody">'+
+    '<div class="lnpadhead"><div class="lnpadwhere"><span class="lnpadlbl">正在看</span><b id="lnPadTitle"></b></div>'+
+     '<button type="button" class="lnx" style="font-size:14px" onclick="LN.padToggle()" title="收合">✕</button></div>'+
+    '<textarea class="lnta lnpadta" id="lnPadTa" placeholder="隨手記——Enter 存、Shift+Enter 換行" oninput="LN.padTyping(this.value)" onkeydown="LN.padKey(event)"></textarea>'+
+    '<div class="lnrow" style="justify-content:space-between;margin-top:6px"><span class="lnhint" id="lnPadHint"></span><button class="lnbtn pri" onclick="LN.padAdd()">記下</button></div>'+
+    '<div class="lnpadlist" id="lnPadList"></div>'+
+   '</div>';
+  // 捲動時標題跟著換（.main 是自己的捲動容器，所以用捕獲階段掛在 document 上）
+  var _st=null;
+  document.addEventListener('scroll',function(){ if(_st) return; _st=setTimeout(function(){ _st=null; padSync(); },120); },true);
+  document.addEventListener('keydown',function(e){ if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&!e.altKey&&String(e.key).toLowerCase()==='j'){ e.preventDefault(); LN.padToggle(); } });
+ }
+ pad.style.display=c?'':'none';
+ pad.classList.toggle('on',!!LN_PAD.open);
+ padSync(true);
+}
+function padSync(full){
+ var pad=document.getElementById('lnPad'); if(!pad||pad.style.display==='none') return;
+ var ctx=padContext(); LN_PAD.title=ctx.title; LN_PAD.block=ctx.block;
+ var t=document.getElementById('lnPadTitle'); if(t) t.textContent=ctx.title||'—';
+ var cnt=document.getElementById('lnPadCnt'), k=padNotes().length; if(cnt){ cnt.textContent=k?String(k):''; cnt.style.display=k?'':'none'; }
+ if(!full) return;
+ var s=sess(), hint=document.getElementById('lnPadHint');
+ if(hint) hint.textContent = s ? '記入這一場 · 已 '+k+' 則' : (REMOTE?'寫下第一則會自動開場':'會歸到「日常維護」');
+ var list=document.getElementById('lnPadList'); if(list) list.innerHTML=padListHTML();
+ var ta=document.getElementById('lnPadTa'); if(ta&&ta.value!==LN_PAD.text&&document.activeElement!==ta) ta.value=LN_PAD.text;
+}
+LN.padToggle=function(){
+ LN_PAD.open=!LN_PAD.open;
+ try{ localStorage.setItem(PAD_OPEN_KEY,LN_PAD.open?'1':'0'); }catch(e){}
+ var pad=document.getElementById('lnPad'); if(pad) pad.classList.toggle('on',LN_PAD.open);
+ if(LN_PAD.open){ padSync(true); var ta=document.getElementById('lnPadTa'); if(ta) setTimeout(function(){ ta.focus(); },50); }
+};
+LN.padTyping=function(v){ LN_PAD.text=v; };
+LN.padKey=function(e){ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); LN.padAdd(); } };
+LN.padAdd=function(){
+ var txt=(LN_PAD.text||'').trim(); if(!txt){ flash('先寫點什麼'); return; }
+ var ctx=padContext();
+ addNoteRaw(ctx.block,'basis',txt,false);
+ LN_PAD.text=''; var ta=document.getElementById('lnPadTa'); if(ta){ ta.value=''; ta.focus(); }
+};
+// 改分類：本機直接改列；embed 送 op:'kind'，父層存好會把整批 notes 推回來。
+var KIND_CYCLE=['basis','decision','todo'];
+LN.setKind=function(id,kind){
+ if(KIND_CYCLE.indexOf(kind)<0) return;
+ var arr=allNotes(), x=null; for(var i=0;i<arr.length;i++) if(arr[i].id===id) x=arr[i];
+ if(!x||x.pending) return;
+ x.kind=kind;
+ if(REMOTE) toParentLN({ type:'lantu:note', op:'kind', noteId:id, kind:kind }); else persist();
+ redraw();
+ var m=document.getElementById('lnMask'); if(m&&m.classList.contains('on')&&LN._pickOpen) openPick();
+};
+LN.cycleKind=function(id){
+ var arr=allNotes(), x=null; for(var i=0;i<arr.length;i++) if(arr[i].id===id) x=arr[i];
+ if(!x) return; LN.setKind(id, KIND_CYCLE[(KIND_CYCLE.indexOf(x.kind)+1)%KIND_CYCLE.length]);
+};
+LN.padContext=padContext;   // 測試用
 function redraw(){
  var act=document.activeElement;
  if(act && act.id && act.id.indexOf('lnta_')===0) _focusKey=act.id.slice(5);
@@ -17026,6 +17179,35 @@ var CSS = `
 .lnat{color:var(--mut2);font-size:10.5px;margin-left:6px;opacity:.7}
 .lnx{background:none;border:none;color:var(--mut2);cursor:pointer;font-size:11px;padding:0 2px;flex:none}
 .lnx:hover{color:var(--gap2)}
+
+/* 側邊記事本（2026/09/27）：右緣收合把手＋抽屜，底端讓開諮詢狀態列 */
+#lnPad{position:fixed;right:0;top:64px;bottom:calc(var(--lnbar-h,0px) + 8px);z-index:60;pointer-events:none}
+.lnpadtab{pointer-events:auto;position:absolute;right:0;top:120px;writing-mode:vertical-rl;background:var(--card);color:var(--amber2);
+ border:1px solid var(--amber);border-right:none;border-radius:8px 0 0 8px;padding:12px 6px;font-size:12.5px;font-weight:700;letter-spacing:2px;
+ cursor:pointer;box-shadow:-3px 0 12px rgba(var(--sh),.25);display:flex;align-items:center;gap:6px}
+.lnpadcnt{writing-mode:horizontal-tb;background:var(--amber);color:var(--bg,#111);border-radius:999px;font-size:10.5px;min-width:18px;padding:1px 5px;text-align:center;letter-spacing:0}
+.lnpadbody{pointer-events:auto;position:absolute;right:0;top:0;bottom:0;width:340px;max-width:92vw;background:var(--panel);border-left:1px solid var(--line);
+ box-shadow:-8px 0 24px rgba(var(--sh),.35);transform:translateX(105%);transition:transform .18s ease;display:flex;flex-direction:column;padding:12px 14px;gap:6px}
+#lnPad.on .lnpadbody{transform:none}
+#lnPad.on .lnpadtab{right:340px;border-color:var(--line);color:var(--mut)}
+.lnpadhead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.lnpadwhere{min-width:0}
+.lnpadlbl{display:block;font-size:10.5px;color:var(--mut2);letter-spacing:1px}
+.lnpadwhere b{display:block;font-size:13px;color:var(--amber2);line-height:1.4;word-break:break-all}
+.lnpadta{min-height:72px;resize:vertical}
+.lnpadlist{flex:1;overflow:auto;margin-top:8px;padding-right:2px}
+.lnpadempty{color:var(--mut2);font-size:12px;line-height:1.7;padding:10px 2px}
+.lnpadgrp{margin-bottom:10px}
+.lnpadgh{font-size:11px;color:var(--mut);letter-spacing:.5px;padding:4px 0;border-bottom:1px dashed var(--line);margin-bottom:4px}
+.lnpaditem{display:flex;align-items:flex-start;gap:6px;padding:5px 2px;border-bottom:1px solid color-mix(in srgb, var(--line) 50%, transparent);font-size:12.5px;line-height:1.5}
+.lnpaditem.pend{opacity:.6}
+.lnpaditem.fail{color:var(--gap2)}
+.lnpadtx{flex:1;min-width:0;white-space:pre-wrap;word-break:break-word}
+.lnk{flex:none;font-size:10.5px;border-radius:4px;padding:1px 5px;cursor:pointer;border:1px solid var(--line);color:var(--mut);margin-top:2px}
+.lnk.k-decision{border-color:var(--amber);color:var(--amber2)}
+.lnk.k-todo{border-color:var(--teal);color:var(--teal)}
+.lnkset{flex:none;display:flex;gap:3px}
+@media (max-width:640px){ #lnPad{top:52px} .lnpadtab{top:80px;padding:10px 5px} #lnPad.on .lnpadtab{right:min(340px,92vw)} }
 
 /* 諮詢狀態列 */
 .lnbar{position:fixed;left:0;right:0;bottom:0;z-index:70;background:linear-gradient(0deg,var(--panel),var(--card));

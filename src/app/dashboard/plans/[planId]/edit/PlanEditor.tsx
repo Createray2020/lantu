@@ -8,6 +8,7 @@ import {
   savePlanDataAction,
   addNoteAction,
   deleteNoteAction,
+  setNoteKindAction,
   listNotesAction,
   startSessionAction,
   adoptNotesAction,
@@ -63,6 +64,7 @@ type NoteAccess = "owner" | "viewer" | "none";
 type NoteMsg =
   | { type: "lantu:note"; op: "add"; input: NoteInput }
   | { type: "lantu:note"; op: "del"; noteId: string }
+  | { type: "lantu:note"; op: "kind"; noteId: string; kind: string }
   | { type: "lantu:session"; op: "start"; adopt: boolean | string[] }
   | { type: "lantu:session"; op: "adopt"; sessionId: string; noteIds: string[] }
   | { type: "lantu:session"; op: "cancel"; sessionId: string }
@@ -85,7 +87,7 @@ type NoteMsg =
  *   blockKey add 專用：那則樂觀註記掛在哪個區塊（父層拿不到 iframe 自己編的 tmp_ id）
  *   body     add 專用：註記內容，配合 blockKey 用來定位要收掉的那一則
  */
-type NoteErrOp = "add" | "del" | "start" | "adopt" | "cancel" | "fixup" | "end" | "restore";
+type NoteErrOp = "add" | "del" | "kind" | "start" | "adopt" | "cancel" | "fixup" | "end" | "restore";
 const NOTE_ERR_FALLBACK = "沒有存成功。請檢查網路後再試一次。";
 
 // v12 App（/lantu-app.html?embed=1）以 iframe 載入。
@@ -264,6 +266,16 @@ export default function PlanEditor({
             pushNotes();
           } else {
             postErr("del", msg.noteId, "這則註記刪不掉——可能已經被刪除，或你沒有權限。");
+          }
+        } else if (msg.type === "lantu:note" && msg.op === "kind") {
+          // 側邊記事本：結束諮詢前把「依據」改標成決定／待辦。改不成就把真的那一批推回去，iframe 的樂觀狀態自己退回。
+          const ok = await setNoteKindAction(clientId, msg.noteId, msg.kind);
+          if (ok) {
+            notesRef.current = notesRef.current.map((x) => (x.id === msg.noteId ? { ...x, kind: msg.kind } : x));
+            pushNotes();
+          } else {
+            pushNotes();
+            postErr("kind", msg.noteId, "這則註記的分類改不了——可能已經被刪除，或不是你寫的。");
           }
         } else if (msg.type === "lantu:session" && msg.op === "start") {
           const r = await startSessionAction(clientId, planId, msg.adopt);

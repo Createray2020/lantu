@@ -215,6 +215,19 @@ export async function deleteNote(coachId: string, clientId: string, noteId: stri
   return res.length > 0;
 }
 
+/** 改分類（2026/09/27 側邊記事本：先隨手記成「依據」，結束諮詢時再標成決定／待辦）。
+ *  跟 deleteNote 同一把尺：只能改自己寫的那一列。 */
+export async function setNoteKind(coachId: string, clientId: string, noteId: string, kind: string): Promise<boolean> {
+  const access = await accessOf(coachId, clientId);
+  if (!access) return false;
+  const res = await db
+    .update(clientNotes)
+    .set({ kind: normKind(kind), updatedAt: new Date() })
+    .where(and(eq(clientNotes.id, noteId), eq(clientNotes.clientId, clientId), eq(clientNotes.authorId, coachId)))
+    .returning({ id: clientNotes.id });
+  return res.length > 0;
+}
+
 /** 一場諮詢期間記下的註記（產摘要用）。 */
 export async function notesOfSession(sessionId: string): Promise<NoteRow[]> {
   return db
