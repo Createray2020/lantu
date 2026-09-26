@@ -123,7 +123,7 @@ describe("聚焦模式", () => {
     const missing: string[] = [];
     for (const st of w.INTERVIEW_STEPS) {
       if (!tabs.has(st.tab)) continue;
-      go(st.tab);
+      if (st.g === 2) w.ivGoto(st.k); else go(st.tab);   // 第 2 群的畫面在需求中樞
       const sel = w.ivSecSel(st);
       if (!w.document.querySelector(`#app ${sel}`)) missing.push(`${st.k}(${sel})`);
     }
@@ -355,10 +355,10 @@ describe("訪談檢核清單", () => {
     expect(threw, `這些面向的偵測在空白新案會爆：${threw.join(", ")}`).toEqual([]);
   });
 
-  it("四群的面向數：①9 ②12 ③10 ④4", () => {
+  it("四群的面向數：①9 ②13 ③10 ④4", () => {
     const n = (g: number) => w.INTERVIEW_STEPS.filter((s: { g: number }) => s.g === g).length;
-    expect([n(1), n(2), n(3), n(4)]).toEqual([9, 12, 10, 4]);
-    expect(w.INTERVIEW_STEPS.length).toBe(35);
+    expect([n(1), n(2), n(3), n(4)]).toEqual([9, 13, 10, 4]);
+    expect(w.INTERVIEW_STEPS.length).toBe(36);
   });
 
   it("自動偵測「這一段有沒有東西」，教練不用自己維護", () => {
@@ -384,6 +384,7 @@ describe("訪談檢核清單", () => {
     const sameTab = w.INTERVIEW_STEPS.filter((s: { tab: string }) => s.tab === "intent");
     expect(sameTab.map((s: { k: string }) => s.k))
       .toEqual(["purpose", "values", "money", "ready", "career", "marry", "legacy", "doc"]);
+    // ⚠️ 2026-09-26：career／marry／legacy 的資料仍屬 intent，但畫面已搬到需求中樞（ivGoto 會導過去）
     const noAnchor = sameTab.filter((s: { a?: string }) => !s.a).map((s: { k: string }) => s.k);
     expect(noAnchor, `這些步驟按「前往」會沒有任何反應：${noAnchor.join(", ")}`).toEqual([]);
   });
@@ -394,7 +395,8 @@ describe("訪談檢核清單", () => {
     expect(withAnchor.length).toBeGreaterThanOrEqual(8);
     const missing: string[] = [];
     for (const st of withAnchor) {
-      go(st.tab);
+      // 第 2 群走需求中樞：ivGoto 之後該項目一定展開，錨點就在裡面
+      if (st.g === 2) w.ivGoto(st.k); else go(st.tab);
       if (!w.document.querySelector(`#app ${st.a}`)) missing.push(`${st.k}(${st.a})`);
     }
     expect(missing, `這些錨點捲不到：${missing.join(", ")}`).toEqual([]);
@@ -404,7 +406,8 @@ describe("訪談檢核清單", () => {
     fresh();
     go("intent");
     w.ivGoto("house");
-    expect(w.app.dataTab).toBe("goals");
+    expect(w.app.dataTab).toBe("needhub");   // 未來的需求 → 需求中樞
+    expect(w.NEED_SEL).toBe("house");
     w.ivGoto("purpose");
     expect(w.app.dataTab).toBe("intent");
   });
@@ -412,7 +415,7 @@ describe("訪談檢核清單", () => {
   it("每一段都指得到一個真的分頁", () => {
     const known = new Set([
       ...w.BASE_TABS.map((b: string[]) => b[0]),
-      "intent", "risk", "retire", "education", "goals", "lifestyle", "plan", "tracking",
+      "intent", "risk", "retire", "education", "goals", "lifestyle", "needhub", "plan", "tracking",
     ]);
     const bad = w.INTERVIEW_STEPS.filter((s: { tab: string }) => !known.has(s.tab)).map((s: { k: string }) => s.k);
     expect(bad, `這些段落的「前往」會跳到不存在的分頁：${bad.join(", ")}`).toEqual([]);

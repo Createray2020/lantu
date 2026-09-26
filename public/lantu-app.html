@@ -229,6 +229,32 @@ h1,h2,h3,h4{margin:0}
 .anbody>.sec{background:transparent;border:none;border-left:2px solid var(--line);border-radius:0;padding:0 0 0 13px;margin-bottom:18px;box-shadow:none}
 .anbody>.sec:last-child{margin-bottom:0}
 /* 分析頁分段：段卡片（分頁籤）、段標題列、導覽晶片分行 */
+.needcats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.needcats .cat{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:var(--r);padding:12px 14px;cursor:pointer;position:relative;transition:background .15s}
+.needcats .cat:hover{background:var(--card)}
+.needcats .cat.on{background:var(--card);box-shadow:0 0 0 1px var(--c) inset}
+.needcats .cat .nm{font-family:var(--serif);font-size:15px;font-weight:700;letter-spacing:.03em}
+.needcats .cat.on .nm{color:var(--c)}
+.needcats .cat .sub{font-size:12px;color:var(--mut2);margin-top:2px}
+.needcats .cat .st{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--mut);margin-top:6px}
+.needcats .cat .st b{color:var(--tx);font-weight:600}
+.needcats .cat .st .must{color:var(--ok)}
+.needitems{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;background:color-mix(in srgb,var(--c) 8%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);border-radius:var(--r);margin-bottom:14px}
+.needitems .lbl{font-size:12px;font-weight:600;letter-spacing:.07em;color:var(--c);margin-right:2px}
+.needitems .nitem{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 14px 6px 10px;cursor:pointer;font-size:12px;font-weight:600}
+.needitems .nitem:hover{border-color:var(--c)}
+.needitems .nitem.on{background:var(--c);color:var(--onbrand);border-color:var(--c)}
+.needitems .nitem .dot{width:8px;height:8px;border-radius:999px;background:var(--line2);flex:none}
+.needitems .nitem .dot.must{background:var(--ok)}
+.needitems .nitem.on .dot{background:var(--onbrand)}
+.needitems .nitem .ord{font-size:12px;font-weight:600;letter-spacing:.04em;opacity:.8}
+.needitems .nitem.dim{opacity:.5}.needitems .nitem.dim:hover{opacity:.85}
+.needdetail{border-left:3px solid var(--c);padding-left:14px}
+.needdetail .dhd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.needdetail .dhd .t{font-family:var(--serif);font-size:19px;font-weight:700;letter-spacing:.03em;color:var(--c)}
+.needdetail .dhd .must{border:1px solid var(--ok);color:var(--ok);border-radius:999px;font-size:12px;padding:1px 9px;font-weight:600}
+.needdetail .dhd .crumb{margin-left:auto;font-size:12px;color:var(--mut2)}
+@media(max-width:760px){.needcats{grid-template-columns:repeat(2,1fr)}}
 .grpnav{display:grid;gap:8px;margin-bottom:14px}
 .grp{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;position:relative;border-top:3px solid var(--line2);transition:border-color .15s,background .15s}
 .grp:hover{background:var(--card)}
@@ -5131,7 +5157,7 @@ function navStep(k){var r=null;INTERVIEW_STEPS.forEach(function(s){if(s.k===k)r=
 // 純顯示層：INTERVIEW_STEPS 與訪談步驟的定義一個字都不動；沒列在這裡的面向排在「其他」。
 var NAV_CATS={
  1:[['這個家',['scope','basic','bg','decide']],['想法與習慣',['purpose','values','money','ready']],['參數',['params']]],
- 2:[['人生階段',['career','retire','legacy']],['置產',['house','car']],['家庭',['marry','birth','child','parent']],['生活願望',['travel','hobby','luxury']]],
+ 2:[['人生階段',['career','retire','legacy']],['置產',['house','car','land']],['家庭',['marry','birth','child','parent']],['生活願望',['travel','hobby','luxury']]],
  3:[['收支',['income','expense','shortterm']],['資產負債',['asset','debt','credit']],['稅賦',['tax']],['風險與保障',['risk','cover','coverbudget']]]   // 順序照手冊 4→5→6 章（interviewUI 守著）
 };
 // 把一群的面向依 NAV_CATS 分堆；回 [{cat, items}]，沒分組的群回單一堆（cat 空字串）。
@@ -5159,6 +5185,7 @@ function navProgress(c,fg){
 /** 目前停在哪個面向。教練直接點分頁（不經下拉）時退回該分頁的第一個面向。 */
 function navCurFacet(c){
  var k=app.ivFacet||'',st=navStep(k);
+ if(app.dataTab==='needhub'){var nc=(NEED_SEL_ID===c.id&&NEED_SEL)?NEED_SEL:'';return (st&&st.g===2)?k:(nc||'career');}
  if(st&&st.tab===app.dataTab)return k;
  var f=INTERVIEW_STEPS.filter(function(s){return s.tab===app.dataTab})[0];
  return f?f.k:'';
@@ -5242,6 +5269,7 @@ function dataPane(c){
  else if(app.dataTab==='retire')body=(targetOn(c,'退休生活規劃')?goalHead(c,'退休生活規劃')+retireSec(c):foldedGoal(c,'退休生活規劃',tabFilled(c,'retire')?'（先前已填的退休參數保留、仍列入模擬）':''));
  else if(app.dataTab==='education')body=(targetOn(c,'子女教養規劃')?goalHead(c,'子女教養規劃')+eduSec(c):foldedGoal(c,'子女教養規劃',tabFilled(c,'education')?'（先前已填的教育金資料保留、仍列入模擬）':''));
  else if(app.dataTab==='goals')body=goalsTabBody(c);
+ else if(app.dataTab==='needhub')body=needHubSec(c);
  else if(app.dataTab==='lifestyle')body=lifestyleSec(c);
  else if(app.dataTab==='needs')body=needsSec(c);
  else if(app.dataTab==='coverages')body='<div class="sec"><h4 style="color:var(--mut)">簡易保障輸入 <span class="hint">若已於「現有保單」逐張登錄，此處通常留空；系統會自動彙總。員工團體保險也可登錄於此（計入已備）。</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外傷殘,住院醫療,醫療雜費,薪資補償（日）,薪資補償（月）,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','money'],['social','已備社會','money']]);
@@ -7055,8 +7083,9 @@ function markAsChild(i){
  if(m.indepAge===''||m.indepAge==null)m.indepAge=26;   // 財務獨立歲：沒填過才給預設
  ensureMemberIds(c);save();render();
 }
-function eduSec(c){
+function eduSec(c,part){
  syncEduAll(c);
+ if(part==='birth')return birthPlanSec(c);
  var kids=eduChildren(c);
  var manual=(c.education||[]).filter(function(e){return e.auto!==true});
  var cards=kids.map(function(x){return eduChildCard(c,x.m,x.i)}).join('');
@@ -7074,7 +7103,7 @@ function eduSec(c){
   ?tableSec('手動列（舊資料）','education',c.education,[['child','子女','text'],['stage','階段','sel:'+eduStageDefs().map(function(s){return s.stage}).join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','money'],['years','供給年數','num'],['startIn','幾年後開始','num']],'自動產生的列請在上方各子女卡片調整；這張表保留手動／舊資料列。')
   :'';
  return '<div class="sec" data-ivsec="child" data-ivname="子女教養"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
-  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+eduPickSec(c)+birthPlanSec(c)+empty+cards+addBtn+manualTbl+childFundSec(c);
+  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+eduPickSec(c)+(part==='child'?'':birthPlanSec(c))+empty+cards+addBtn+manualTbl+childFundSec(c);
 }
 
 /* ── 生育規劃（2026/08/26）─────────────────────────────────────────────
@@ -8968,6 +8997,7 @@ var TARGET_META=[
  ['職涯規劃','intent','意圖/生涯','轉職・創業'],
  ['購屋規劃','goals','目標/置產','房價・成數','購屋'],
  ['購車規劃','goals','目標/置產','車價・貸款','購車'],
+ ['土地規劃','goals','目標/置產','地價・持有','土地'],
  ['婚姻規劃','intent','意圖/生涯','年齡・預算'],
  ['子女教養規劃','education','子女教育','學程・學費'],
  ['孝親規劃','goals','目標/置產','奉養・醫療','孝親'],
@@ -9140,14 +9170,18 @@ function seedGoalRow(c,t){
 // 跳到指定資料子分頁（未選目標的收合列「展開並納入」用）
 function gotoDataTab(t){var c=activeCase();if(!targetOn(c,t))toggleTarget(t);var m=targetMeta(t);
  if(m&&m[1]==='goals')GOAL_SEL=goalGroupOfTarget(t)||GOAL_SEL;
- if(m&&m[1]!=='intent'){app.activeTab='data';app.dataTab=m[1]}render()}
+ var nk=needStepOfTarget(t);
+ if(nk){NEED_SEL=nk;NEED_SEL_ID=c.id;app.ivFacet=nk;app.activeTab='data';app.dataTab='needhub';}
+ else if(m&&m[1]!=='intent'){app.activeTab='data';app.dataTab=m[1]}render()}
 function jumpTab(tab){app.activeTab='data';app.dataTab=tab;render()}
 // 必達優先序的「填細節 →」：跳到該目標所屬分頁並捲到該區塊（同頁的三個目標也會捲＋閃一下）
 function gotoGoal(t){var c=activeCase();var m=targetMeta(t);if(!m)return;
  if(!targetOn(c,t))toggleTarget(t);
  if(m[1]==='goals'){GOAL_SEL=goalGroupOfTarget(t)||GOAL_SEL;}
  if(m[4])seedGoalRow(c,t);          // goals 類：確保表裡有一列可填
- app.activeTab='data';app.dataTab=m[1];save();render();
+ var nk=needStepOfTarget(t);          // 未來的需求 → 需求中樞
+ if(nk){NEED_SEL=nk;NEED_SEL_ID=c.id;app.ivFacet=nk;}
+ app.activeTab='data';app.dataTab=nk?'needhub':m[1];save();render();
  setTimeout(function(){var el=document.querySelector('[data-goalanchor="'+t+'"]');if(!el)return;revealEl(el);
   if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
   el.classList.add('goalflash');setTimeout(function(){el.classList.remove('goalflash')},1700);},40);}
@@ -9380,11 +9414,12 @@ function goalHead(c,t){return '<div class="folded" data-goalanchor="'+esc(t)+'" 
 var GOAL_GROUPS=[
  {k:'house',nm:'購屋',t:'購屋規劃',types:['購屋','置產'],seedType:'購屋'},
  {k:'car',nm:'購車',t:'購車規劃',types:['購車'],seedType:'購車'},
+ {k:'land',nm:'土地',t:'土地規劃',types:['土地'],seedType:'土地'},
  {k:'care',nm:'孝親',t:'孝親規劃',types:['孝親'],seedType:'孝親'},
  {k:'other',nm:'其他',t:'',types:[],seedType:'其他'}
 ];
 var GOAL_SEL='',GOAL_SEL_ID='';   // 選到的群只跟著這一位客戶；換客戶就重來
-var GOAL_COLS=[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['latest','最晚完成歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']];
+var GOAL_COLS=[['on','納入','bool'],['name','名稱','text'],['type','類型','sel:購屋,置產,購車,土地,婚姻,生育,孝親,職涯轉換,創業,傳承,其他'],['present','金額(理想)','money'],['minPresent','金額(最低)','money'],['start','起始歲','num'],['end','結束歲','num'],['latest','最晚完成歲','num'],['freq','頻率','freqx'],['growth','成長依據','sel:通膨,薪資,固定'],['appreciation','年漲幅%','num'],['loanRatio','貸款成數%','num'],['imp','重要度（5最高）','imp'],['prepared','已備','money']];
 var GOAL_MORE=['minPresent','end','latest','freq','growth','appreciation','loanRatio','prepared'];
 function goalGroupOf(type){
  for(var i=0;i<GOAL_GROUPS.length-1;i++)if(GOAL_GROUPS[i].types.indexOf(type)>=0)return GOAL_GROUPS[i].k;
@@ -9402,10 +9437,11 @@ function addGoalInGroup(k){
  c.goals.push({on:true,name:G.k==='other'?'':G.nm,type:G.seedType,present:0,minPresent:0,start:age+3,end:age+3,freq:0,growth:'通膨',appreciation:0,loanRatio:0,imp:3,prepared:0});
  GOAL_SEL=k;GOAL_SEL_ID=c.id;stampNeeds(c,'goals');save();render();
 }
-function goalsTabBody(c){
+function goalsTabBody(c,fixed){
  var must=((c.intent||{}).mustHave||[]);
  // 預設停在：第一個有列的群；都沒有就第一個已選為必達的群；再沒有就購屋。
  if(GOAL_SEL_ID!==c.id){GOAL_SEL='';GOAL_SEL_ID=c.id;}
+ if(fixed){GOAL_SEL=fixed;GOAL_SEL_ID=c.id;}   // 需求中樞指定一群：不畫群導覽
  var cur=GOAL_SEL;
  if(!cur){GOAL_GROUPS.some(function(G){if(goalGroupRows(c,G.k).length){cur=G.k;return true}});}
  if(!cur){GOAL_GROUPS.some(function(G){if(G.t&&targetOn(c,G.t)){cur=G.k;return true}});}
@@ -9424,7 +9460,71 @@ function goalsTabBody(c){
  var extra='';
  if(cur==='house')extra=detailSec(c,'house')+houseCalcSec(c);
  if(cur==='car')extra=detailSec(c,'car');
- return nav+'<div class="goalgrp" data-g="'+cur+'">'+offNote+tbl+'<div data-calc="defer">'+deferHint(c)+'</div>'+extra+'</div>';
+ return (fixed?'':nav)+'<div class="goalgrp" data-g="'+cur+'"'+(fixed&&G.t?' data-goalanchor="'+esc(G.t)+'"':'')+'>'+offNote+tbl+'<div data-calc="defer">'+deferHint(c)+'</div>'+extra+'</div>';
+}
+// ===== 需求規劃中樞（2026-09-26）=====
+// 「未來的需求」的 12 個面向原本散在 5 個分頁、一個接一個往下疊。改成三層：
+// 類別色塊 → 2～4 個項目 → 只展開一個詳細區。舊分頁（goals / lifestyle / education / retire）
+// 的函式全部沿用（只加參數），資料與計算一位不動。
+var NEED_CATS=[
+ {k:'stage',nm:'人生階段',sub:'職涯 · 退休 · 傳承',c:'#c99a5b',items:['career','retire','legacy']},
+ {k:'asset',nm:'置產',sub:'購屋 · 購車 · 土地',c:'#8fbfc8',items:['house','car','land']},
+ {k:'family',nm:'家庭',sub:'婚姻 · 生育 · 子女 · 孝親',c:'#b7c6b0',items:['marry','birth','child','parent']},
+ {k:'wish',nm:'生活願望',sub:'旅遊 · 休閒 · 奢侈品',c:'#c8a2c8',items:['travel','hobby','luxury']}
+];
+var NEED_SEL='',NEED_SEL_ID='';   // 選到的項目只跟著這一位客戶
+function needCatOf(k){return NEED_CATS.filter(function(ct){return ct.items.indexOf(k)>=0})[0]||null}
+// 目標名 → 中樞項目鍵（生育與子女教養共用同一個目標名，一律回子女教養）
+function needStepOfTarget(t){var st=INTERVIEW_STEPS.filter(function(x){return x.g===2&&x.t===t&&x.k!=='birth'})[0];return st?st.k:''}
+function needPick(k){var c=activeCase();NEED_SEL=k;NEED_SEL_ID=c?c.id:'';app.ivFacet=k;render();
+ setTimeout(function(){var el=document.getElementById('needDetail');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'nearest'})},20);}
+function needPickCat(ck){var c=activeCase(),ct=NEED_CATS.filter(function(x){return x.k===ck})[0];if(!ct)return;
+ var first=ct.items.filter(function(k){var st=navStep(k);return st&&st.t&&targetOn(c,st.t)})[0]||ct.items[0];
+ NEED_SEL=first;NEED_SEL_ID=c?c.id:'';app.ivFacet=first;render();}
+function needDetailHTML(c,k){
+ switch(k){
+  case 'career':return careerSec(c);
+  case 'legacy':return legacySec(c);
+  case 'marry':return marriageSec(c);
+  case 'retire':return targetOn(c,'退休生活規劃')?retireSec(c):foldedGoal(c,'退休生活規劃',tabFilled(c,'retire')?'（先前已填的退休參數保留、仍列入模擬）':'');
+  case 'child':return targetOn(c,'子女教養規劃')?eduSec(c,'child'):foldedGoal(c,'子女教養規劃',tabFilled(c,'education')?'（先前已填的教育金資料保留、仍列入模擬）':'');
+  case 'birth':return eduSec(c,'birth');
+  case 'house':return goalsTabBody(c,'house');
+  case 'car':return goalsTabBody(c,'car');
+  case 'land':return goalsTabBody(c,'land');
+  case 'parent':return goalsTabBody(c,'care');
+  case 'travel':case 'hobby':case 'luxury':return lifestyleSec(c,k);
+ }
+ return '';
+}
+function needHubSec(c){
+ var must=((c.intent||{}).mustHave||[]);
+ if(NEED_SEL_ID!==c.id){NEED_SEL='';NEED_SEL_ID=c.id;}
+ var cur=NEED_SEL;
+ if(!cur||!needCatOf(cur)){
+  // 預設：第一個必達的項目；沒有就第一個已選的；再沒有就職涯
+  var ks=[];NEED_CATS.forEach(function(ct){ks=ks.concat(ct.items)});
+  cur=ks.filter(function(k){var st=navStep(k);return st&&st.t&&must.indexOf(st.t)>=0})[0]
+   ||ks.filter(function(k){var st=navStep(k);return st&&st.t&&targetOn(c,st.t)})[0]||'career';
+ }
+ NEED_SEL=cur;NEED_SEL_ID=c.id;
+ var cat=needCatOf(cur);
+ var info=function(k){var st=navStep(k)||{};var on=!!(st.t&&targetOn(c,st.t)),ord=st.t?must.indexOf(st.t):-1;return {st:st,on:on,ord:ord}};
+ var tiles='<div class="needcats" id="needCats">'+NEED_CATS.map(function(ct){
+  var xs=ct.items.map(info),on=xs.filter(function(x){return x.on}),seen={},mu=xs.filter(function(x){if(x.ord<0||seen[x.ord])return false;seen[x.ord]=1;return true});   // 生育／子女教養共用一個目標，順位只列一次
+  return '<div class="cat'+(ct.k===cat.k?' on':'')+'" style="--c:'+ct.c+'" data-cat="'+ct.k+'" onclick="needPickCat(\''+ct.k+'\')" role="tab"><div class="nm">'+ct.nm+'</div><div class="sub">'+ct.sub+'</div>'+
+   '<div class="st">已選 <b>'+on.length+'</b>／'+ct.items.length+' 項'+(mu.length?' · <span class="must">必達 '+mu.map(function(x){return '第 '+(x.ord+1)}).join('、')+'</span>':'')+'</div></div>';
+ }).join('')+'</div>';
+ var chips='<div class="needitems" id="needItems" style="--c:'+cat.c+'"><span class="lbl">'+cat.nm+'</span>'+cat.items.map(function(k){
+  var x=info(k),nm=x.st.name||k;
+  return '<span class="nitem'+(k===cur?' on':'')+(x.st.t&&!x.on?' dim':'')+'" data-k="'+k+'" onclick="needPick(\''+k+'\')" role="tab"><span class="dot'+(x.ord>=0?' must':'')+'"></span>'+esc(nm)+
+   (x.ord>=0?'<span class="ord">第 '+(x.ord+1)+' 順位</span>':(x.st.t&&!x.on?'<span class="ord">未選</span>':''))+'</span>';
+ }).join('')+'</div>';
+ var x=info(cur),nm=x.st.name||cur;
+ var detail='<div class="needdetail" id="needDetail" style="--c:'+cat.c+'" data-k="'+cur+'"><div class="dhd"><span class="t">'+esc(nm)+'</span>'+
+  (x.ord>=0?'<span class="must">必須達成 · 第 '+(x.ord+1)+' 順位</span>':'')+'<span class="crumb">未來的需求 › '+cat.nm+' › '+esc(nm)+'</span></div>'+
+  needDetailHTML(c,cur)+'</div>';
+ return tiles+chips+detail;
 }
 function goalsTabHead(c){
  var rows=TARGET_META.filter(function(x){return x[1]==='goals'});
@@ -9850,6 +9950,8 @@ var INTERVIEW_STEPS=[
   has:function(c){return (c.goals||[]).some(function(g){return (g.type||'')==='購屋'})}},
  {k:'car',g:2,t:'購車規劃',name:'購車規劃',tab:'goals',a:'[data-goalanchor="購車規劃"]',hint:'廠牌／車型／預算／最低預算／新車或中古／換車頻率／貸款',
   has:function(c){return (c.goals||[]).some(function(g){return (g.type||'')==='購車'})}},
+ {k:'land',g:2,nw:1,t:'土地規劃',name:'土地規劃',tab:'goals',a:'[data-goalanchor="土地規劃"]',hint:'用途（自用／持有）／地區／坪數／預算／最低預算／預計幾歲買／貸款',
+  has:function(c){return (c.goals||[]).some(function(g){return (g.type||'')==='土地'})}},
  {k:'marry',g:2,t:'婚姻規劃',name:'婚姻規劃',tab:'intent',a:'[data-goalanchor="婚姻規劃"]',hint:'結婚年齡／最晚年齡／婚禮預算／最低限度／婚後每月支出',
   has:function(c){return targetOn(c,'婚姻規劃')||(c.goals||[]).some(function(g){return (g.type||'')==='婚姻'})}},
  {k:'child',g:2,t:'子女教養規劃',name:'子女教養',tab:'education',hint:'各學段撫養費與學雜費／期望學歷／結婚買車買房創業基金',
@@ -9899,7 +10001,10 @@ var INTERVIEW_STEPS=[
 function ivGoto(k){
  var st=null;INTERVIEW_STEPS.forEach(function(x){if(x.k===k)st=x});
  if(!st)return;
- app.activeTab='data';app.dataTab=st.tab;app.ivFacet=k;render();
+ var c=activeCase();
+ // 「未來的需求」（第 2 群）一律進需求中樞，該項目直接展開
+ if(st.g===2){NEED_SEL=k;NEED_SEL_ID=c?c.id:'';app.activeTab='data';app.dataTab='needhub';app.ivFacet=k;render();}
+ else{app.activeTab='data';app.dataTab=st.tab;app.ivFacet=k;render();}
  if(!st.a)return;
  setTimeout(function(){var el=document.querySelector(st.a);if(!el)return;revealEl(el);
   if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
@@ -9945,6 +10050,21 @@ function readinessHint(c){
  return '<div class="hint" style="margin-top:8px;display:block;border-left:3px solid '+tone+';padding-left:10px;line-height:1.8">'+
   '意願 <b>'+W+'</b> / 信心 <b>'+F+'</b> — '+txt+'</div>';
 }
+function legacySec(c){return (targetOn(c,'傳承規劃')
+   ?'<div class="sec" data-goalanchor="傳承規劃"><h4>傳承規劃 '+mustBadge(c,'傳承規劃')+'</h4><div class="fgrid">'+ofld('legacy','on','納入本次規劃','bool')+ofld('legacy','heirs','繼承人數','num')+ofld('legacy','perHeirCash','每人現金傳承(理想)','money')+ofld('legacy','perHeirMin','每人現金傳承(最低)','money')+ofld('legacy','perHeirNote','每人其他(如一間房)')+ofld('legacy','feedEstate','納入遺產稅考量','bool')+'</div>'+
+     '<div class="subhd" style="margin-top:12px">法律安排 <span class="hint">傳承真正的爭議多半不在金額，在這四件有沒有做</span></div><div class="fgrid">'+
+     ofld('legacy','will','遺囑','sel:未處理,規劃中,已完成')+ofld('legacy','trust','信託','sel:未處理,規劃中,已完成')+
+     ofld('legacy','beneficiaryDone','保單受益人指定','sel:未處理,規劃中,已完成')+ofld('legacy','guardian','未成年子女監護安排','sel:未處理,規劃中,已完成')+'</div>'+
+     '<div data-calc="legacyArrange">'+legacyArrangeHint(c)+'</div><div class="hint" style="margin-top:6px">傳承總需求(現金)＝繼承人數 × 每人現金傳承，會列入建議與缺口總表。<br>傳承是願景的一部分，客戶若決定這次不處理，把「納入本次規劃」設為 false 即可，資料仍會保留。</div></div>'
+   :foldedGoal(c,'傳承規劃',n((c.legacy||{}).heirs)>0?'（先前已填 '+n(c.legacy.heirs)+' 位繼承人，資料保留、仍列入模擬）':''));}
+function careerSec(c){return (targetOn(c,'職涯規劃')
+   ?'<div class="sec" data-goalanchor="職涯規劃"><h4>職涯 / 創業規劃 '+mustBadge(c,'職涯規劃')+'</h4><div class="fgrid">'+ofld('career','plan','是否轉換或創業','sel:無,考慮轉職,考慮創業')+ofld('career','switchAge','預計幾歲轉換','num')+ofld('career','switchFund','轉換期預備金（空窗期生活費）','money')+ofld('career','startupType','創業類別')+ofld('career','startupBudget','創業投入本金（一次性）','money')+ofld('career','importance','重要度（5最高）','imp')+'</div>'+
+      '<div class="hint" style="margin-top:6px;display:block"><b>兩筆錢不是同一件事</b>：<b>轉換期預備金</b>是沒有薪水的那幾個月要活下去的現金（收入暫停）；<b>創業投入本金</b>是一次投進事業的錢（本金支出）。考慮轉職只會有前者，考慮創業通常兩者都有——開店那段期間一樣沒有薪水。</div>'+
+      '<div data-calc="career">'+careerCalcHTML(c)+'</div></div>'
+   :foldedGoal(c,'職涯規劃',(c.career||{}).plan&&c.career.plan!=='無'?'（先前已填「'+esc(c.career.plan)+'」，資料保留、仍列入模擬）':''));}
+function marriageSec(c){return (targetOn(c,'婚姻規劃')
+   ?'<div class="sec" data-goalanchor="婚姻規劃"><h4>婚姻規劃 '+mustBadge(c,'婚姻規劃')+'</h4><div class="fgrid">'+ofld('marriage','plan','是否結婚','sel:否,是')+ofld('marriage','age','理想結婚年齡','num')+ofld('marriage','latestAge','最晚結婚年齡','num')+ofld('marriage','budget','婚禮預算(理想)','money')+ofld('marriage','minBudget','婚禮預算(最低)','money')+ofld('marriage','importance','重要度（5最高）','imp')+'</div><div class="hint" style="margin-top:8px">旅遊/休閒/奢侈品/傳承 於「目標/置產」分頁以對應類型新增，並可填理想與最低雙檔。</div></div>'+detailSec(c,'wedding')
+   :foldedGoal(c,'婚姻規劃',(c.marriage||{}).plan==='是'?'（先前已填婚姻規劃，資料保留、仍列入模擬）':''));}
 function intentSec(c){var it=c.intent||{};
  var lifeTbl=tableSec('人生財務目標清單','lifeGoals',c.lifeGoals||[],[['name','目標','text'],['priority','優先序','num'],['value','價值觀 / 重要原因','text'],['importance','重要程度（5最高）','imp'],['linkModule','對應模組','sel:退休,教育,置產,購車,傳承,婚姻,創業,其他'],['note','備註','text']],
   '自由填寫客戶「最在意的事」與背後的價值觀；對應模組做軟連結，於報告呈現。這張清單捕捉「為什麼」，下方的人生目標捕捉「做什麼」，實際運算仍由各模組（退休/教育/置產…）負責。');
@@ -9953,21 +10073,6 @@ function intentSec(c){var it=c.intent||{};
   '<div class="sec" data-ivanchor="purpose"><h4>關注議題 <span class="owner">客戶填寫 · 教練可代填</span> <span class="hint">客戶於人生護照選的「這次想解決什麼」，不含有時間軸的人生目標；勾「人生模擬」＝目標全選</span></h4>'+chips('purposes',PURPOSES,it.purposes,'togglePurpose')+customPurposesHTML(it)+'</div>'+
   entitySec(c)+
   goalsSec(c)+
-  (targetOn(c,'傳承規劃')
-   ?'<div class="sec" data-goalanchor="傳承規劃"><h4>傳承規劃 '+mustBadge(c,'傳承規劃')+'</h4><div class="fgrid">'+ofld('legacy','on','納入本次規劃','bool')+ofld('legacy','heirs','繼承人數','num')+ofld('legacy','perHeirCash','每人現金傳承(理想)','money')+ofld('legacy','perHeirMin','每人現金傳承(最低)','money')+ofld('legacy','perHeirNote','每人其他(如一間房)')+ofld('legacy','feedEstate','納入遺產稅考量','bool')+'</div>'+
-     '<div class="subhd" style="margin-top:12px">法律安排 <span class="hint">傳承真正的爭議多半不在金額，在這四件有沒有做</span></div><div class="fgrid">'+
-     ofld('legacy','will','遺囑','sel:未處理,規劃中,已完成')+ofld('legacy','trust','信託','sel:未處理,規劃中,已完成')+
-     ofld('legacy','beneficiaryDone','保單受益人指定','sel:未處理,規劃中,已完成')+ofld('legacy','guardian','未成年子女監護安排','sel:未處理,規劃中,已完成')+'</div>'+
-     '<div data-calc="legacyArrange">'+legacyArrangeHint(c)+'</div><div class="hint" style="margin-top:6px">傳承總需求(現金)＝繼承人數 × 每人現金傳承，會列入建議與缺口總表。<br>傳承是願景的一部分，客戶若決定這次不處理，把「納入本次規劃」設為 false 即可，資料仍會保留。</div></div>'
-   :foldedGoal(c,'傳承規劃',n((c.legacy||{}).heirs)>0?'（先前已填 '+n(c.legacy.heirs)+' 位繼承人，資料保留、仍列入模擬）':''))+
-  (targetOn(c,'職涯規劃')
-   ?'<div class="sec" data-goalanchor="職涯規劃"><h4>職涯 / 創業規劃 '+mustBadge(c,'職涯規劃')+'</h4><div class="fgrid">'+ofld('career','plan','是否轉換或創業','sel:無,考慮轉職,考慮創業')+ofld('career','switchAge','預計幾歲轉換','num')+ofld('career','switchFund','轉換期預備金（空窗期生活費）','money')+ofld('career','startupType','創業類別')+ofld('career','startupBudget','創業投入本金（一次性）','money')+ofld('career','importance','重要度（5最高）','imp')+'</div>'+
-      '<div class="hint" style="margin-top:6px;display:block"><b>兩筆錢不是同一件事</b>：<b>轉換期預備金</b>是沒有薪水的那幾個月要活下去的現金（收入暫停）；<b>創業投入本金</b>是一次投進事業的錢（本金支出）。考慮轉職只會有前者，考慮創業通常兩者都有——開店那段期間一樣沒有薪水。</div>'+
-      '<div data-calc="career">'+careerCalcHTML(c)+'</div></div>'
-   :foldedGoal(c,'職涯規劃',(c.career||{}).plan&&c.career.plan!=='無'?'（先前已填「'+esc(c.career.plan)+'」，資料保留、仍列入模擬）':''))+
-  (targetOn(c,'婚姻規劃')
-   ?'<div class="sec" data-goalanchor="婚姻規劃"><h4>婚姻規劃 '+mustBadge(c,'婚姻規劃')+'</h4><div class="fgrid">'+ofld('marriage','plan','是否結婚','sel:否,是')+ofld('marriage','age','理想結婚年齡','num')+ofld('marriage','latestAge','最晚結婚年齡','num')+ofld('marriage','budget','婚禮預算(理想)','money')+ofld('marriage','minBudget','婚禮預算(最低)','money')+ofld('marriage','importance','重要度（5最高）','imp')+'</div><div class="hint" style="margin-top:8px">旅遊/休閒/奢侈品/傳承 於「目標/置產」分頁以對應類型新增，並可填理想與最低雙檔。</div></div>'+detailSec(c,'wedding')
-   :foldedGoal(c,'婚姻規劃',(c.marriage||{}).plan==='是'?'（先前已填婚姻規劃，資料保留、仍列入模擬）':''))+
   foldKeep('money','理財模式評估 · 改變的準備度','記帳、儲蓄與投資經驗；改變意願與信心','<div class="sec" data-ivanchor="money"><h4>理財模式評估 <span class="hint">記帳、儲蓄與投資經驗，判讀理財習慣</span></h4><div class="fgrid">'+ofld('moneyStyle','bookkeep','記帳經驗','sel:無,曾記帳但中斷,持續記帳中')+ofld('moneyStyle','budgeting','收支管理','sel:未管理,有記錄無計劃,有計劃管理')+ofld('moneyStyle','emergency','緊急預備金','sel:尚未準備,已準備')+ofld('moneyStyle','emergencyAmt','預備金金額','money')+'</div>'+
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">儲蓄經驗（可複選）</div>'+chips('savingExp',SAVING_EXP,it.savingExp)+'</div>'+
    '<div style="margin-top:10px"><div class="hint" style="margin-bottom:5px">投資經驗（可複選）</div>'+chips('investExp',INVEST_EXP,it.investExp)+chipsOther('investExp',it)+'</div>'+
@@ -11596,7 +11701,7 @@ function financeSec(c){
   '<div class="finhint">💡 一個介面同時填完：左上收入、右上支出＝現金流；左下資產、右下負債＝資產負債表；下方儲蓄理財投入與資產布局。任一格輸入，頂部年結餘、淨值即時更新。每列左側的 ⠿ 可拖曳排序，「⇅ 自動整理」把同分類的項目收攏在一起。</div>'+quad;
 }
 
-function lifestyleSec(c){
+function lifestyleSec(c,only){
  var travel=tableSec('旅遊規劃','travel',c.travel,[['on','納入','bool'],['cat','國內/外','sel:國內,國外'],['sub','類型','sel:認知旅遊,體育旅遊,消費旅遊,鄉村旅遊,宗教旅遊'],['start','開始歲','num'],['latest','最晚起始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','每次預算(理想)','money'],['minAmount','每次(最低)','money'],['imp','重要度（5最高）','imp']],'',['latest','end','freq','minAmount']);
  var hobby=tableSec('休閒興趣','hobby',c.hobby,[['on','納入','bool'],['sub','類型','sel:體能類,收藏類,思考類,娛樂創作類,社會服務類,栽培飼養類,其他類'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','平均花費(每次)','money'],['minAmount','最低','money'],['imp','重要度（5最高）','imp']],'',['end','freq','minAmount']);
  var luxury=tableSec('奢侈品購買','luxury',c.luxury,[['on','納入','bool'],['sub','類別','sel:豪宅,珠寶寶石黃金,鐘錶,首飾配件,服裝精品,化妝品,工藝品,古董,樂器,家用電器,衛浴設施,寵物,私人飛機,郵輪遊艇,超跑豪華車,其他'],['start','開始歲','num'],['end','持續到歲','num'],['freq','頻率(次/年)','num'],['amount','價格','money'],['minAmount','最低','money'],['imp','重要度（5最高）','imp']],'',['end','freq','minAmount']);
@@ -11604,6 +11709,7 @@ function lifestyleSec(c){
  travel='<div data-goalanchor="旅遊規劃">'+travel+'</div>';
  hobby='<div data-goalanchor="休閒興趣規劃">'+hobby+'</div>';
  luxury='<div data-goalanchor="奢侈品購買規劃">'+luxury+'</div>';
+ if(only==='travel')return travel; if(only==='hobby')return hobby; if(only==='luxury')return luxury;
  var now=lifestyleAnnualNow(c);
  return '<div class="sec"><h4>生活願望總覽 <span class="hint">旅遊/休閒/奢侈品皆為週期性支出，會計入現金流投影</span></h4><div class="big3"><div class="b"><div class="l">現值年支出(合計)</div><div class="v" style="color:var(--amber2)" data-calc="lifestyleNow">'+fmt(now)+'</div></div><div class="b"><div class="l">項目數</div><div class="v">'+((c.travel||[]).length+(c.hobby||[]).length+(c.luxury||[]).length)+'</div></div></div><div class="hint" style="margin-top:8px">年支出＝每次預算 × 頻率(次/年)，隨通膨調整。</div></div>'+travel+hobby+luxury;
 }

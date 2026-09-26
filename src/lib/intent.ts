@@ -57,6 +57,7 @@ export const TARGET_META: TargetMeta[] = [
   { name: "職涯規劃", tab: "intent", tabName: "意圖/生涯", hint: "轉職・創業" },
   { name: "購屋規劃", tab: "goals", tabName: "目標/置產", hint: "房價・成數", goalType: "購屋" },
   { name: "購車規劃", tab: "goals", tabName: "目標/置產", hint: "車價・貸款", goalType: "購車" },
+  { name: "土地規劃", tab: "goals", tabName: "目標/置產", hint: "地價・持有", goalType: "土地" },
   { name: "婚姻規劃", tab: "intent", tabName: "意圖/生涯", hint: "年齡・預算" },
   { name: "子女教養規劃", tab: "education", tabName: "子女教育", hint: "學程・學費" },
   { name: "孝親規劃", tab: "goals", tabName: "目標/置產", hint: "奉養・醫療", goalType: "孝親" },

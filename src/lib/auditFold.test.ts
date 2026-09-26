@@ -155,7 +155,7 @@ describe("目標／置產：上面點群，底下只出那一群", () => {
       { on: true, name: "創業金", type: "創業", present: 500000, start: 48, end: 48, freq: 0, growth: "通膨", imp: 2 },
     ];
     go("goals");
-    expect($$("#goalNav .grp").map((e) => e.dataset.g)).toEqual(["house", "car", "care", "other"]);
+    expect($$("#goalNav .grp").map((e) => e.dataset.g)).toEqual(["house", "car", "land", "care", "other"]);
     expect($$("#goalNav .grp.on").map((e) => e.dataset.g)).toEqual(["house"]);
     const rowsIn = () => $$('.goalgrp table tr:not(.addtr) td:nth-child(2) input').map((e: HTMLInputElement) => e.value);
     expect(rowsIn()).toEqual(["換屋"]);
@@ -182,6 +182,9 @@ describe("目標／置產：上面點群，底下只出那一群", () => {
     w.GOAL_SEL = "";
     w.gotoGoal("購車規劃");
     expect(w.GOAL_SEL).toBe("car");
+    expect(w.app.dataTab).toBe("needhub");   // 置產類目標 → 需求中樞，項目＝購車
+    expect(w.NEED_SEL).toBe("car");
+    go("goals");
     w.addGoalRowFor("孝親規劃");
     expect(w.GOAL_SEL).toBe("care");
     w.GOAL_SEL = "";
@@ -206,5 +209,67 @@ describe("資料分頁下拉：項目分組顯示（純顯示層）", () => {
     expect(names2.slice(0, 3)).toEqual(["職涯規劃", "退休規劃", "傳承規劃"]);
     const last = menus[menus.length - 1];
     expect(last.querySelectorAll(".dmcat").length).toBe(0);
+  });
+});
+
+describe("需求規劃中樞：類別色塊 → 項目 → 只展開一個詳細區", () => {
+  const catKeys = () => $$("#needCats .cat").map((e) => e.dataset.cat);
+  const itemKeys = () => $$("#needItems .nitem").map((e) => e.dataset.k);
+  const cur = () => ($("#needDetail") as HTMLElement).dataset.k;
+
+  it("四個類別；置產含土地；一次只有一個項目亮、一個詳細區", () => {
+    w.NEED_SEL = ""; w.NEED_SEL_ID = "";
+    go("needhub");
+    expect(catKeys()).toEqual(["stage", "asset", "family", "wish"]);
+    expect($$("#needCats .cat.on").length).toBe(1);
+    expect($$("#needItems .nitem.on").length).toBe(1);
+    expect($$("#needDetail").length).toBe(1);
+    w.needPickCat("asset");
+    expect(itemKeys()).toEqual(["house", "car", "land"]);
+    expect($$("#needCats .cat.on").map((e) => e.dataset.cat)).toEqual(["asset"]);
+    w.needPick("land");
+    expect(cur()).toBe("land");
+    expect($("#needDetail .dhd .t").textContent).toBe("土地規劃");
+    expect($("#needDetail .crumb").textContent).toContain("置產 › 土地規劃");
+    // 中樞內指定一群：不再畫 goals 的群導覽
+    expect($("#needDetail #goalNav")).toBeNull();
+    expect($('#needDetail .goalgrp[data-g="land"]')).toBeTruthy();
+  });
+
+  it("每個項目都接到對的內容（沿用舊分頁的函式）", () => {
+    w.NEED_SEL = ""; w.NEED_SEL_ID = "";
+    const c = w.activeCase();
+    c.intent.targets = Array.from(new Set([...(c.intent.targets || []), "職涯規劃", "婚姻規劃", "傳承規劃", "退休生活規劃", "子女教養規劃", "旅遊規劃"]));
+    go("needhub");
+    const txt = () => $("#needDetail").textContent as string;
+    w.needPick("career"); expect(txt()).toContain("職涯 / 創業規劃");
+    w.needPick("legacy"); expect(txt()).toContain("法律安排");
+    w.needPick("marry"); expect(txt()).toContain("婚姻規劃");
+    w.needPick("retire"); expect(txt()).toContain("想幾歲退休");
+    w.needPick("child"); expect(txt()).toContain("教育金總需求"); expect($('#needDetail [data-ivsec="birth"]')).toBeNull();
+    w.needPick("birth"); expect($('#needDetail [data-ivsec="birth"]')).toBeTruthy(); expect(txt()).not.toContain("教育金總需求");
+    w.needPick("parent"); expect($('#needDetail .goalgrp[data-g="care"]')).toBeTruthy();
+    w.needPick("travel"); expect($('#needDetail [data-goalanchor="旅遊規劃"]')).toBeTruthy(); expect(txt()).not.toContain("休閒興趣");
+    w.needPick("hobby"); expect($('#needDetail [data-goalanchor="休閒興趣規劃"]')).toBeTruthy();
+    w.needPick("luxury"); expect($('#needDetail [data-goalanchor="奢侈品購買規劃"]')).toBeTruthy();
+    expect($$("#needDetail").length).toBe(1);
+  });
+
+  it("意圖/生涯 不再堆傳承／職涯／婚姻三塊；下拉 ② 的項目與「填細節」都導到中樞", () => {
+    go("intent");
+    expect($('#app [data-goalanchor="傳承規劃"]')).toBeNull();
+    expect($('#app [data-goalanchor="職涯規劃"]')).toBeNull();
+    expect($('#app [data-goalanchor="婚姻規劃"]')).toBeNull();
+    w.ivGoto("marry");
+    expect(w.app.dataTab).toBe("needhub");
+    expect(cur()).toBe("marry");
+    expect($$("#needCats .cat.on").map((e) => e.dataset.cat)).toEqual(["family"]);
+    // 下拉 ② 標成目前所在的面向
+    expect($$("#app .ivt.on").map((e) => e.dataset.ivk)).toEqual(["marry"]);
+    w.gotoDataTab("旅遊規劃");
+    expect(w.app.dataTab).toBe("needhub");
+    expect(cur()).toBe("travel");
+    w.gotoGoal("傳承規劃");
+    expect(cur()).toBe("legacy");
   });
 });
