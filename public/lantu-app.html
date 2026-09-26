@@ -1988,6 +1988,7 @@ function syncAutoRows(c){
  syncSalaryIncome(c);
  syncPolicyAsset(c);
  applyMarriagePlan(c);
+ migrateParentGoals(c);   // 2026/09/27：目標表裡的孝親列搬到支出表（引擎只讀支出表）
  syncLaborPrepared(c);
 }
 /** 教練關掉／打開某一條自動同步。 */
@@ -4773,6 +4774,7 @@ function set(id,field,val,type){var c=activeCase();var t=id.split(':'),arr=t[0],
  // 來源一改，自動列當場跟上（不用等下一次 migrateCase）。
  if(arr==='profile'||arr==='incomes')syncSalaryIncome(c);
  if(arr==='marriage'||arr==='goals')applyMarriagePlan(c);
+ if(arr==='goals')migrateParentGoals(c);
  if(arr==='members'||arr==='profile'||arr==='prepared')syncLaborPrepared(c);
  if(arr==='assets')syncPolicyAsset(c);
  // 健保費那一列吃「成員的投保薪資/眷口/類別」與「收入列的所得細類」，兩邊動了都要重算。
@@ -7107,7 +7109,7 @@ function eduSec(c,part){
   ?tableSec('手動列（舊資料）','education',c.education,[['child','子女','text'],['stage','階段','sel:'+eduStageDefs().map(function(s){return s.stage}).join(',')],['schoolType','學別','sel:公立,私立,海外'],['annual','年費用(現值)','money'],['years','供給年數','num'],['startIn','幾年後開始','num']],'自動產生的列請在上方各子女卡片調整；這張表保留手動／舊資料列。')
   :'';
  return '<div class="sec" data-ivsec="child" data-ivname="子女教養"><h4>教育金總需求 <span class="hint">依學費上漲率 '+n(c.params.tuitionGrowth)+'% 計終值</span></h4>'+
-  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+eduPickSec(c)+(part==='child'?'':birthPlanSec(c))+empty+cards+addBtn+manualTbl+childFundSec(c);
+  '<div data-calc="eduTotal">'+eduDerivedHTML(c)+'</div></div>'+eduPickSec(c)+(part==='child'?'':birthPlanSec(c))+empty+cards+addBtn+manualTbl+childFundSec(c)+giftTaxSec(c);
 }
 
 /* ── 生育規劃（2026/08/26）─────────────────────────────────────────────
@@ -7468,6 +7470,195 @@ function detailSec(c,tag){
   (tag==='car'?'牌照稅與燃料費依排氣量、保費依車齡與車主年齡差很多，':'')+
   (tag==='house'?'管理費依坪數與社區、房屋稅與地價稅依現值與地段差很多，':'')+
   '一定要跟客戶對過再用。這幾列'+(isGoal?'住在「目標 / 置產」':'住在「收支資債」的支出表')+'，那邊也看得到同一批。</div></div>';
+}
+/* ══════════════════════════════════════════════════════════════════════
+   孝親規劃（2026/09/27 Ray：「孝親的部分整個不對的模板」）
+   ══════════════════════════════════════════════════════════════════════
+   ⚠️⚠️ 孝親不是一次性的置產目標。引擎讀的一直都是**支出表 cat＝'孝親' 的列**
+      （壽險需求的父母奉養費、撫養壓力比、損益表的撫育／孝親列、逐年投影）；
+      目標表裡 type＝孝親 的列從來沒進任何計算。所以這一頁改成支出表的專屬視圖，
+      跟買房後／買車後持有成本同一套「過濾視圖」——不開新陣列，引擎一個字不動。
+   ⚠️ 列＝c.expenses（cat 孝親、tag 'care'）。舊資料沒 tag 也算——cat 才是真相。
+   ⚠️ 沒有貸款成數、理想／最低、最晚完成歲、已備——那些是置產目標的欄位，孝親用不到。
+   給付三種：每月（period 月）、每年（period 年）、一次（once:true，start===end，
+   引擎把它當「只有那一年的年支出」，不用另接）。
+   贈與：每月生活費、醫藥費屬扶養，遺贈稅法不算贈與；只有**一次性**給付進 giftTaxSec。
+   舊 goals 的孝親列：migrateParentGoals 在載入與動 goals 時自動搬過來。
+   ══════════════════════════════════════════════════════════════════════ */
+var CARE_ROLES=['父','母','長輩'];
+var CARE_SUBCATS=['孝親金','長輩生活費','長輩醫療/照護'];
+var CARE_TARGET_LIFE=85;   // 「到幾歲」的預設：對象活到 85 歲那一年，本人幾歲
+var CARE_PRESETS=[
+ ['每月孝親金',10000,'月','孝親金'],
+ ['過年紅包',12000,'年','孝親金'],
+ ['三節・生日紅包',6000,'年','孝親金'],
+ ['長輩醫療準備',24000,'年','長輩醫療/照護']
+];
+function careRows(c){return (c.expenses||[]).map(function(x,i){return {x:x,i:i}}).filter(function(p){return p.x&&p.x.cat==='孝親'});}
+function careTargets(c){return (c.members||[]).filter(function(m){return m&&CARE_ROLES.indexOf(m.role)>=0&&String(m.name||'').trim()});}
+function careEndAge(c,who){
+ var a0=nowAge(c),m=careTargets(c).filter(function(m){return m.name===who})[0];
+ var ma=m?n(m.birth?ageFromBirth(m.birth):m.age):0;
+ if(ma>0)return Math.max(a0,a0+(CARE_TARGET_LIFE-ma));
+ return n((c.profile||{}).lifeExp)||effHorizon(c)||85;
+}
+function careNewRow(c,name,amount,period,subCat,who,once){
+ var a0=nowAge(c),w=(who!=null)?who:((careTargets(c)[0]||{}).name||'');
+ var per=(period==='月')?'月':'年',amt=n(amount);
+ return {tag:'care',who:w,name:name||'',cat:'孝親',subCat:subCat||'孝親金',period:per,
+  amount:per==='月'?amt*12:amt,infl:true,cut:0,once:!!once,start:a0,end:once?a0:careEndAge(c,w)};
+}
+function addCareRow(name,amount,period,subCat,who,once){
+ var c=activeCase();if(!c)return;
+ c.expenses=c.expenses||[];
+ c.expenses.push(careNewRow(c,name,amount,period,subCat,who,once));
+ ensureRowIds(c);stampNeeds(c,'expenses');save();render();
+}
+function addCarePresets(){
+ var c=activeCase();if(!c)return;var have={};careRows(c).forEach(function(p){have[p.x.name]=1});
+ c.expenses=c.expenses||[];
+ CARE_PRESETS.forEach(function(q){if(!have[q[0]])c.expenses.push(careNewRow(c,q[0],q[1],q[2],q[3]));});
+ ensureRowIds(c);stampNeeds(c,'expenses');save();render();
+}
+// 勾「孝親規劃」時帶一列空白（每月孝親金 0）；取消時只收走金額 0 的列。
+function seedCareRow(c){
+ if(careRows(c).length)return;
+ c.expenses=c.expenses||[];
+ c.expenses.push(careNewRow(c,'每月孝親金',0,'月','孝親金'));
+ ensureRowIds(c);
+}
+function unseedCare(c){
+ var kept=[],filled=0;
+ (c.expenses||[]).forEach(function(x){
+  if(!x||x.cat!=='孝親'){kept.push(x);return;}
+  if(n(x.amount)>0){kept.push(x);filled++;return;}
+ });
+ c.expenses=kept;return filled;
+}
+function setCareWho(i,v){var c=activeCase();var x=c.expenses[i];if(!x)return;x.who=v;if(!x.once)x.end=careEndAge(c,v);stampNeeds(c,'expenses');save();render();}
+// 給付方式：月／年只換 period（年額不動，畫面數字自己換算）；一次＝那一年的年支出。
+function setCarePay(i,v){
+ var c=activeCase();var x=c.expenses[i];if(!x)return;
+ if(v==='一次'){x.once=true;x.period='年';x.end=n(x.start)||nowAge(c);}
+ else{x.once=false;x.period=v;if(!(n(x.end)>n(x.start)))x.end=careEndAge(c,x.who);}
+ stampNeeds(c,'expenses');save();render();
+}
+function setCareStart(i,v){var c=activeCase();var x=c.expenses[i];if(!x)return;x.start=n(v);if(x.once)x.end=x.start;stampNeeds(c,'expenses');save();render();}
+function carePayOf(x){return x.once?'一次':((x.period||'年')==='月'?'月':'年');}
+function careTotals(c){
+ var yr=0,once=0,onceN=0;
+ careRows(c).forEach(function(p){var x=p.x;if(x.once){once+=n(x.amount);onceN++;}else yr+=n(x.amount);});
+ return {year:yr,month:Math.round(yr/12),once:once,onceN:onceN};
+}
+// 舊資料：目標表裡 type＝孝親 的列（沒 tag 的才是教練手填的）搬到支出表。
+// 金額(理想)當年額（沒填就拿最低）；頻率「只發生一次」或起訖同年 → 一次性；成長依據≠固定 → 隨通膨。
+// on===false 的列本來就不在計算裡，直接丟。搬完舊列刪掉，類型下拉再選到「孝親」也會在 set() 被搬走。
+function migrateParentGoals(c){
+ var gs=c.goals||[];if(!gs.length)return 0;
+ var keep=[],moved=0;
+ gs.forEach(function(g){
+  if(!g||g.type!=='孝親'||g.tag){keep.push(g);return;}
+  if(g.on===false)return;
+  var amt=n(g.present)||n(g.minPresent),st=n(g.start)||nowAge(c),en=n(g.end);
+  var once=(n(g.freq)===0&&!(en>st))||(en>0&&en<=st);
+  c.expenses=c.expenses||[];
+  var row=careNewRow(c,g.name||'孝親',amt,'年','孝親金',null,once);
+  row.start=st;row.end=once?st:(en>st?en:careEndAge(c,row.who));
+  row.infl=(g.growth||'通膨')!=='固定';
+  c.expenses.push(row);moved++;
+ });
+ if(moved){c.goals=keep;ensureRowIds(c);}
+ return moved;
+}
+function careSec(c){
+ var rows=careRows(c),tg=careTargets(c);
+ var body=rows.map(function(p){
+  var x=p.x,i=p.i,id='expenses:'+i,pay=carePayOf(x);
+  var whoOpts=[''].concat(tg.map(function(m){return m.name}));
+  if(x.who&&whoOpts.indexOf(x.who)<0)whoOpts.push(x.who);
+  var whoSel='<select onchange="setCareWho('+i+',this.value)">'+whoOpts.map(function(o){return '<option value="'+esc(o)+'" '+((x.who||'')===o?'selected':'')+'>'+(o?esc(o):'（未指定）')+'</option>'}).join('')+'</select>';
+  var subSel='<select onchange="set(\''+id+'\',\'subCat\',this.value)">'+selOpts(CARE_SUBCATS,x.subCat||'孝親金')+'</select>';
+  var paySel='<select onchange="setCarePay('+i+',this.value)">'+['月','年','一次'].map(function(o){return '<option value="'+o+'" '+(pay===o?'selected':'')+'>'+(o==='一次'?'一次（某一歲）':'每'+o)+'</option>'}).join('')+'</select>';
+  return '<tr'+(x.once?' class="careonce"':'')+'>'+
+   '<td>'+whoSel+'</td>'+
+   '<td><input value="'+esc(x.name||'')+'" oninput="setLive(\''+id+'\',\'name\',this.value)" onchange="set(\''+id+'\',\'name\',this.value)"></td>'+
+   '<td>'+subSel+'</td>'+
+   '<td>'+paySel+'</td>'+
+   '<td>'+finAmt('expenses',i,shownAmt(x))+'</td>'+
+   '<td><input type="number" inputmode="decimal" style="width:64px" value="'+esc(x.start==null?'':x.start)+'" onchange="setCareStart('+i+',this.value)"></td>'+
+   '<td>'+(x.once?'<span class="muted" style="font-size:12px">— 一次</span>':'<input type="number" inputmode="decimal" style="width:64px" value="'+esc(x.end==null?'':x.end)+'" onchange="set(\''+id+'\',\'end\',this.value,\'num\')">')+'</td>'+
+   '<td style="text-align:center">'+finBool('expenses',i,'infl',x.infl)+'</td>'+
+   '<td><button class="del" onclick="delRow(\'expenses\','+i+')">✕</button></td></tr>';
+ }).join('');
+ var head='<tr><th>對象</th><th>項目</th><th>記在哪一類</th><th>給付</th><th>金額</th><th>從幾歲</th><th>到幾歲</th><th>隨通膨</th><th></th></tr>';
+ var t=careTotals(c);
+ var sum=rows.length?'<div class="hint" style="margin-top:6px">每年合計 <b style="color:var(--amber2)">'+fmt(t.year)+'</b> 元（每月約 '+fmt(t.month)+'）'+
+   (t.onceN?'　·　一次性 <b style="color:var(--amber2)">'+fmt(t.once)+'</b> 元（'+t.onceN+' 筆，見下方贈與稅檢核）':'')+'</div>':'';
+ var tbl=rows.length
+  ? '<div class="tw"><table class="rtable caretbl">'+head+body+'</table>'+sum+'</div>'
+  : '<div class="hint">還沒有任何一列。按「帶入預設項目」起手（每月孝親金、過年與三節紅包、長輩醫療準備），金額全部可以改。</div>';
+ var noTg=tg.length?'':'<div class="hint" style="margin-top:8px;color:var(--amber2)">「家庭」分頁還沒有父／母／長輩成員——加了之後這裡可以選對象，「到幾歲」會自動算到對方 '+CARE_TARGET_LIFE+' 歲那一年。</div>';
+ return '<div class="sec" data-goalanchor-detail="care"><h4>給長輩的錢 <span class="hint">每月給、每年給（紅包）、或一次性的大額——分開列，才問得下去。</span></h4>'+tbl+
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">'+
+   '<button class="add" onclick="addCarePresets()">＋ 帶入預設項目</button>'+
+   '<button class="tbtn" onclick="addCareRow()">＋ 空白列</button>'+
+  '</div>'+noTg+
+  '<div class="hint" style="margin-top:8px">這幾列住在<b>「收支資債」的支出表（分類：孝親）</b>，那邊也看得到同一批、改的是同一筆。'+
+  '壽險需求的「父母奉養費」、撫養壓力比、損益表的撫育／孝親列都讀它。'+
+  '每月生活費與醫藥費屬<b>扶養</b>，遺贈稅法不算贈與；<b>一次性</b>的大額給付才會撞免稅額——見下方檢核。</div></div>';
+}
+
+/* ══ 贈與稅檢核（孝親一次性給付 ＋ 子女一次性準備金）══
+   遺產及贈與稅法：每位贈與人每年免稅額 244 萬（2022 起）；子女婚嫁時父母各再 +100 萬（§20 第 1 項第 6 款）；
+   受扶養人的生活費、教育費、醫藥費不計入贈與（§20 第 1 項第 7 款）。稅率 10%／超過 2,500 萬 15%／超過 5,000 萬 20%。
+   ⚠️ 只檢核不改資料（跟企業財報驗算層同原則）。贈與人＝本人＋配偶（家庭有配偶成員時免稅額 ×2）。
+   ⚠️ 免稅額會隨物價調整，數字在這裡改一次全站跟著走。 */
+var GIFT_EXEMPT=2440000, GIFT_MARRIAGE_EXTRA=1000000;
+var GIFT_BRACKETS=[[25000000,0.10],[50000000,0.15],[Infinity,0.20]];
+function giftTax(net){
+ net=n(net);if(net<=0)return 0;var t=0,prev=0;
+ for(var i=0;i<GIFT_BRACKETS.length;i++){var cap=GIFT_BRACKETS[i][0],part=Math.min(net,cap)-prev;if(part>0)t+=part*GIFT_BRACKETS[i][1];prev=cap;if(net<=cap)break;}
+ return Math.round(t);
+}
+function giftDonors(c){return 1+((c.members||[]).some(function(m){return m&&m.role==='配偶'})?1:0);}
+// 一次性贈與事件：孝親一次性列（支出表）＋ 子女準備基金（goals 裡 childFundFor 的列）。
+function giftEvents(c){
+ var ev=[];
+ careRows(c).forEach(function(p){var x=p.x;if(x.once&&n(x.amount)>0)ev.push({age:n(x.start),name:(x.who?x.who+'・':'')+(x.name||'孝親'),amt:n(x.amount),kind:'care',marry:false,kid:''});});
+ (c.goals||[]).forEach(function(g){
+  if(!g||!g.childFundFor||g.on===false||!(n(g.present)>0))return;
+  ev.push({age:n(g.start),name:g.name||(g.childFundFor+'的準備金'),amt:n(g.present),kind:'child',marry:(g.name||'').indexOf('結婚')>=0,kid:g.childFundFor});
+ });
+ return ev;
+}
+function giftYears(c){
+ var by={},donors=giftDonors(c);
+ giftEvents(c).forEach(function(e){var y=by[e.age]=by[e.age]||{age:e.age,total:0,items:[],marryKids:{}};y.total+=e.amt;y.items.push(e);if(e.marry)y.marryKids[e.kid]=1;});
+ return Object.keys(by).map(function(k){return by[k]}).sort(function(a,b){return a.age-b.age}).map(function(y){
+  var marryN=Object.keys(y.marryKids).length;
+  y.exempt=donors*GIFT_EXEMPT+donors*GIFT_MARRIAGE_EXTRA*marryN;
+  y.over=Math.max(0,y.total-y.exempt);y.tax=giftTax(y.over);
+  y.splitYears=y.over>0?Math.ceil(y.total/(donors*GIFT_EXEMPT)):1;
+  return y;
+ });
+}
+function giftTaxSec(c){
+ var ys=giftYears(c),donors=giftDonors(c);
+ var base='贈與人 '+donors+' 位（本人'+(donors>1?'＋配偶':'')+'）× 每年免稅額 '+cfAxis(GIFT_EXEMPT)+(donors>1?'＝ '+cfAxis(donors*GIFT_EXEMPT):'')+'；子女婚嫁那一年每位父母再 +'+cfAxis(GIFT_MARRIAGE_EXTRA)+'。';
+ if(!ys.length)return '<div class="sec" data-goalanchor-detail="gift"><h4>贈與稅檢核 <span class="hint">孝親的一次性給付、子女的結婚／買房等準備金</span></h4>'+
+  '<div class="hint">目前沒有一次性贈與。每月孝親金、學費、醫藥費屬扶養，不算贈與，不用擔心。'+base+'</div></div>';
+ var bad=ys.filter(function(y){return y.over>0}),taxSum=bad.reduce(function(a,y){return a+y.tax},0);
+ var verdict=bad.length
+  ? '<div class="hint" style="color:var(--warn);font-weight:600;margin-bottom:6px">'+bad.length+' 個年份超過免稅額，合計要繳贈與稅約 '+fmt(taxSum)+' 元——分年給就進得了免稅額。</div>'
+  : '<div class="hint" style="color:var(--teal);font-weight:600;margin-bottom:6px">全部年份都在免稅額內，不用繳贈與稅。</div>';
+ var rows=ys.map(function(y){
+  var items=y.items.map(function(e){return esc(e.name)+' '+cfAxis(e.amt)}).join('、');
+  var rx=y.over>0?'分 '+y.splitYears+' 年給（每年 ≤ '+cfAxis(donors*GIFT_EXEMPT)+'）':'—';
+  return '<tr'+(y.over>0?' style="color:var(--warn)"':'')+'><td>'+y.age+' 歲</td><td class="muted" style="font-size:12px">'+items+'</td><td class="calc">'+fmt(y.total)+'</td><td class="calc">'+fmt(y.exempt)+'</td><td class="calc">'+(y.over>0?fmt(y.over):'—')+'</td><td class="calc">'+(y.tax?fmt(y.tax):'—')+'</td><td class="muted" style="font-size:12px">'+rx+'</td></tr>';
+ }).join('');
+ return '<div class="sec" data-goalanchor-detail="gift"><h4>贈與稅檢核 <span class="hint">孝親的一次性給付、子女的結婚／買房等準備金，按「本人幾歲那一年」加總</span></h4>'+verdict+
+  '<div class="tw"><table class="rtable"><tr><th>本人</th><th>那一年給了什麼</th><th>合計</th><th>免稅額</th><th>超過</th><th>應納贈與稅</th><th>處方</th></tr>'+rows+'</table></div>'+
+  '<div class="hint" style="margin-top:8px">'+base+'只檢核不改資料；每月給付與學費、醫藥費屬扶養，不在這張表裡。</div></div>';
 }
 function birthPlanSec(c){
  var list=c.birthPlan||[];
@@ -9004,7 +9195,7 @@ var TARGET_META=[
  ['土地規劃','goals','目標/置產','地價・持有','土地'],
  ['婚姻規劃','intent','意圖/生涯','年齡・預算'],
  ['子女教養規劃','education','子女教育','學程・學費'],
- ['孝親規劃','goals','目標/置產','奉養・醫療','孝親'],
+ ['孝親規劃','goals','目標/置產','奉養・醫療'],   // 2026/09/27：列住在支出表（cat 孝親），不再 seed goals
  // ⚠️⚠️ 2026/08/28：旅遊／休閒／奢侈品**整併到生活願望**，不再 seed goals 列。
  //    真因：這三類原本有兩個家（c.goals 與 c.travel/hobby/luxury），而**兩張表都進引擎**
  //    （goalOut vs lifestyleFactor），教練以為「目標填了生活願望沒帶入」是漏做，
@@ -9104,6 +9295,7 @@ function seededRowEmpty(x){return n(x.present)===0&&n(x.minPresent)===0&&n(x.pre
 //    這就是誤點孝親／休閒興趣之後要走三步驟才刪得掉的根治：
 //    空列自己消失，填過的留下（不替教練決定要不要丟掉他打過的數字）。
 function unseedTarget(c,t){
+ if(t==='孝親規劃')return unseedCare(c);
  var m=targetMeta(t);if(!m)return 0;
  var wk=WISH_ARR[t];
  var arr=wk?wk:(m[4]?'goals':'');
@@ -9164,6 +9356,7 @@ function seedWishRow(c,k){
  c[k].push(WISH_TPL[k](n((c.profile||{}).age)||30));
 }
 function seedGoalRow(c,t){
+ if(t==='孝親規劃'){seedCareRow(c);return;}
  var wk=WISH_ARR[t];if(wk){seedWishRow(c,wk);return;}
  var m=targetMeta(t);if(!m||!m[4])return;
  c.goals=c.goals||[];
@@ -9182,7 +9375,7 @@ function jumpTab(tab){app.activeTab='data';app.dataTab=tab;render()}
 function gotoGoal(t){var c=activeCase();var m=targetMeta(t);if(!m)return;
  if(!targetOn(c,t))toggleTarget(t);
  if(m[1]==='goals'){GOAL_SEL=goalGroupOfTarget(t)||GOAL_SEL;}
- if(m[4])seedGoalRow(c,t);          // goals 類：確保表裡有一列可填
+ if(m[4]||t==='孝親規劃')seedGoalRow(c,t);          // goals 類：確保表裡有一列可填
  var nk=needStepOfTarget(t);          // 未來的需求 → 需求中樞
  if(nk){NEED_SEL=nk;NEED_SEL_ID=c.id;app.ivFacet=nk;}
  app.activeTab='data';app.dataTab=nk?'needhub':m[1];save();render();
@@ -9436,12 +9629,14 @@ function goalGroupOf(type){
  return 'other';
 }
 function goalGroupRows(c,k){
+ if(k==='care')return careRows(c).map(function(p){return p.i});   // 孝親列住在支出表
  var out=[];(c.goals||[]).forEach(function(g,i){if(goalGroupOf(g.type)===k)out.push(i)});return out;
 }
 function goalPick(k){var c=activeCase();GOAL_SEL=k;GOAL_SEL_ID=c?c.id:'';render();}
 // 在選到的那一群裡新增一列（型別直接帶好），不用再去下拉選類型。
 function addGoalInGroup(k){
- var c=activeCase();if(!c)return;var G=GOAL_GROUPS.filter(function(x){return x.k===k})[0];if(!G)return;
+ var c=activeCase();if(!c)return;
+ if(k==='care'){GOAL_SEL='care';GOAL_SEL_ID=c.id;addCareRow();return;}var G=GOAL_GROUPS.filter(function(x){return x.k===k})[0];if(!G)return;
  var age=n((c.profile||{}).age)||30;
  c.goals=c.goals||[];
  c.goals.push({on:true,name:G.k==='other'?'':G.nm,type:G.seedType,present:0,minPresent:0,start:age+3,end:age+3,freq:0,growth:'通膨',appreciation:0,loanRatio:0,imp:3,prepared:0});
@@ -9459,18 +9654,19 @@ function goalsTabBody(c,fixed){
  var nav='<div class="grpnav goalnav" id="goalNav" style="grid-template-columns:repeat('+GOAL_GROUPS.length+',1fr)">'+GOAL_GROUPS.map(function(G){
   var rows=goalGroupRows(c,G.k),on=G.t?targetOn(c,G.t):rows.length>0,ord=G.t?must.indexOf(G.t):-1;
   var vd=(G.t?(on?(ord>=0?'必達 · 第 '+(ord+1)+' 順位':'已納入'):'未選'):'不屬於前三類的目標')+' · '+rows.length+' 列';
-  var sumAmt=rows.reduce(function(a,i){return a+n(c.goals[i].present)},0);
+  var sumAmt=(G.k==='care')?careTotals(c).year:rows.reduce(function(a,i){return a+n(c.goals[i].present)},0);
   if(sumAmt>0)vd+=' · '+cfAxis(sumAmt);
   return '<div class="grp'+(cur===G.k?' on':'')+(G.t&&!on?' dim':'')+'" data-g="'+G.k+'"'+(G.t?' data-goalanchor="'+esc(G.t)+'"':'')+' onclick="goalPick(\''+G.k+'\')" role="tab"><div class="nm">'+G.nm+'</div><div class="vd">'+vd+'</div></div>';
  }).join('')+'</div>';
  var G=GOAL_GROUPS.filter(function(x){return x.k===cur})[0];
  var idx=goalGroupRows(c,cur),list=idx.map(function(i){return c.goals[i]});
  var offNote=(G.t&&!targetOn(c,G.t))?'<div class="hint" style="margin:-6px 0 10px">這一類還沒選為規劃目標。<button class="tbtn" style="padding:2px 9px;font-size:12px" onclick="gotoDataTab(\''+esc(G.t)+'\')">納入規劃</button>　既有資料仍保留、仍列入模擬。</div>':'';
- var tbl=tableSec('目標 / 置產 / 願望 · '+G.nm,'goals',list,GOAL_COLS,'',GOAL_MORE,idx,'addGoalInGroup(\''+cur+'\')');
+ var tbl=(cur==='care')?careSec(c):tableSec('目標 / 置產 / 願望 · '+G.nm,'goals',list,GOAL_COLS,'',GOAL_MORE,idx,'addGoalInGroup(\''+cur+'\')');
  var extra='';
+ if(cur==='care')extra=giftTaxSec(c);
  if(cur==='house')extra=detailSec(c,'house')+houseCalcSec(c);
  if(cur==='car')extra=detailSec(c,'car');
- return (fixed?'':nav)+'<div class="goalgrp" data-g="'+cur+'"'+(fixed&&G.t?' data-goalanchor="'+esc(G.t)+'"':'')+'>'+offNote+tbl+'<div data-calc="defer">'+deferHint(c)+'</div>'+extra+'</div>';
+ return (fixed?'':nav)+'<div class="goalgrp" data-g="'+cur+'"'+(fixed&&G.t?' data-goalanchor="'+esc(G.t)+'"':'')+'>'+offNote+tbl+(cur==='care'?'':'<div data-calc="defer">'+deferHint(c)+'</div>')+extra+'</div>';
 }
 // ===== 需求規劃中樞（2026-09-26）=====
 // 「未來的需求」的 12 個面向原本散在 5 個分頁、一個接一個往下疊。改成三層：
@@ -9972,8 +10168,8 @@ var INTERVIEW_STEPS=[
  {k:'child',g:2,t:'子女教養規劃',name:'子女教養',tab:'education',hint:'各學段撫養費與學雜費／期望學歷／結婚買車買房創業基金',
   has:function(c){return (c.education||[]).length||(c.goals||[]).some(function(g){return !!g.childFundFor})}},
  {k:'birth',g:2,t:'子女教養規劃',nw:1,name:'生育規劃',tab:'education',hint:'訪談題：預計在本人幾歲時生第幾胎？',
-  has:function(c){return (c.birthPlan||[]).length||(c.members||[]).some(function(m){return m&&m.unborn})}}, {k:'parent',g:2,t:'孝親規劃',name:'孝親規劃',tab:'goals',a:'[data-goalanchor="孝親規劃"]',hint:'頻率／每次金額／最低金額／從幾歲開始／對象年齡',
-  has:function(c){return (c.goals||[]).some(function(g){return (g.type||'')==='孝親'})}},
+  has:function(c){return (c.birthPlan||[]).length||(c.members||[]).some(function(m){return m&&m.unborn})}}, {k:'parent',g:2,t:'孝親規劃',name:'孝親規劃',tab:'goals',a:'[data-goalanchor="孝親規劃"]',hint:'對象／每月給或每年給（紅包）或一次性／金額／從幾歲到幾歲；一次性大額會做贈與稅檢核',
+  has:function(c){return careRows(c).length>0}},
  {k:'travel',g:2,t:'旅遊規劃',a:'[data-goalanchor="旅遊規劃"]',name:'旅遊規劃',tab:'lifestyle',hint:'國內與國外分開問：起始年齡／頻率／單次預算／到幾歲會滿足',
   has:function(c){return (c.travel||[]).length||(c.goals||[]).some(function(g){return (g.type||'')==='旅遊'})}},
  {k:'hobby',g:2,t:'休閒興趣規劃',a:'[data-goalanchor="休閒興趣規劃"]',name:'休閒興趣',tab:'lifestyle',hint:'六類可提示：體能／收藏／思考／娛樂創作／社會服務／栽培飼養',

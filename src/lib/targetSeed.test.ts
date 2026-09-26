@@ -41,38 +41,43 @@ const goalsOf = (type: string) =>
 
 beforeEach(() => { fresh(); });
 
+// 2026/09/27：孝親列住在支出表（cat 孝親）——引擎只讀那裡，goals 的 type＝孝親 從沒進計算。
+const careOf = () =>
+  (w.activeCase().expenses || []).filter((e: { cat: string }) => e.cat === "孝親");
+
 describe("勾選目標會帶出一列可填的空白", () => {
-  it("勾「孝親規劃」→ goals 多一列 type='孝親'", () => {
-    expect(goalsOf("孝親").length).toBe(0);
+  it("勾「孝親規劃」→ 支出表多一列 cat='孝親'（不是 goals）", () => {
+    expect(careOf().length).toBe(0);
     w.toggleTarget("孝親規劃");
-    expect(goalsOf("孝親").length).toBe(1);
-    expect(goalsOf("孝親")[0].present).toBe(0);
+    expect(careOf().length).toBe(1);
+    expect(careOf()[0].amount).toBe(0);
+    expect(careOf()[0].period).toBe("月");
+    expect(goalsOf("孝親").length).toBe(0);
   });
 
   it("已經有那個類型的列就不再重複帶", () => {
     w.toggleTarget("孝親規劃");
     w.toggleTarget("孝親規劃"); // 取消
     w.toggleTarget("孝親規劃"); // 再勾
-    expect(goalsOf("孝親").length).toBe(1);
+    expect(careOf().length).toBe(1);
   });
 });
 
 describe("取消勾選：空列自動收走，填過的留下", () => {
   it("誤點後取消 → 那一列自己消失（不必再走三步驟）", () => {
     w.toggleTarget("孝親規劃");
-    expect(goalsOf("孝親").length).toBe(1);
+    expect(careOf().length).toBe(1);
     w.toggleTarget("孝親規劃");
-    expect(goalsOf("孝親").length, "空的 seed 列應該被收走").toBe(0);
+    expect(careOf().length, "空的 seed 列應該被收走").toBe(0);
     expect(alerts.length, "沒填過東西就不要打擾教練").toBe(0);
   });
 
   it("填過金額的不會被誤刪，而且會明講留在哪裡", () => {
     w.toggleTarget("孝親規劃");
-    const c = w.activeCase();
-    c.goals.find((g: { type: string }) => g.type === "孝親").present = 1200000;
+    careOf()[0].amount = 1200000;
     w.toggleTarget("孝親規劃");
-    expect(goalsOf("孝親").length, "有金額就不能動它").toBe(1);
-    expect(goalsOf("孝親")[0].present).toBe(1200000);
+    expect(careOf().length, "有金額就不能動它").toBe(1);
+    expect(careOf()[0].amount).toBe(1200000);
     expect(alerts.length).toBe(1);
     expect(alerts[0]).toContain("孝親規劃");
     expect(alerts[0]).toContain("1 筆");
@@ -91,10 +96,10 @@ describe("取消勾選：空列自動收走，填過的留下", () => {
   it("只動被取消的那個目標，別的類型一列都不能碰", () => {
     w.toggleTarget("孝親規劃");
     w.toggleTarget("購車規劃");
-    expect(goalsOf("孝親").length).toBe(1);
+    expect(careOf().length).toBe(1);
     expect(goalsOf("購車").length).toBe(1);
     w.toggleTarget("孝親規劃");
-    expect(goalsOf("孝親").length).toBe(0);
+    expect(careOf().length).toBe(0);
     expect(goalsOf("購車").length, "購車不該受影響").toBe(1);
   });
 

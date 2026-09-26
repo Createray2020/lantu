@@ -171,10 +171,13 @@ describe("目標／置產：上面點群，底下只出那一群", () => {
     const nameInput = $('.goalgrp table td:nth-child(2) input') as HTMLInputElement;
     nameInput.value = "開店"; nameInput.dispatchEvent(new w.Event("change"));
     expect(c.goals[2].name).toBe("開店");
+    // 2026/09/27：孝親群加的是支出表的列（cat 孝親），goals 不長新列
+    const goalsBefore = c.goals.length, careBefore = c.expenses.filter((e: { cat: string }) => e.cat === "孝親").length;
     w.addGoalInGroup("care");
-    expect(c.goals[3].type).toBe("孝親");
+    expect(c.goals.length).toBe(goalsBefore);
+    expect(c.expenses.filter((e: { cat: string }) => e.cat === "孝親").length).toBe(careBefore + 1);
     expect(w.GOAL_SEL).toBe("care");
-    expect(rowsIn().length).toBe(1);
+    expect($("#app").textContent).toContain("給長輩的錢");
     w.GOAL_SEL = "";
   });
 

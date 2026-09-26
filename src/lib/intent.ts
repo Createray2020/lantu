@@ -60,7 +60,8 @@ export const TARGET_META: TargetMeta[] = [
   { name: "土地規劃", tab: "goals", tabName: "目標/置產", hint: "地價・持有", goalType: "土地" },
   { name: "婚姻規劃", tab: "intent", tabName: "意圖/生涯", hint: "年齡・預算" },
   { name: "子女教養規劃", tab: "education", tabName: "子女教育", hint: "學程・學費" },
-  { name: "孝親規劃", tab: "goals", tabName: "目標/置產", hint: "奉養・醫療", goalType: "孝親" },
+  // 2026/09/27：孝親列住在支出表（cat 孝親），不再 seed goals，所以沒有 goalType。
+  { name: "孝親規劃", tab: "goals", tabName: "目標/置產", hint: "奉養・醫療" },
   // ⚠️⚠️ 2026/08/28：這三類整併到生活願望（見 lantu-app.html 的 TARGET_META 註解）。
   // 兩張表都進引擎，留兩個家＝同一筆旅遊被算兩次。
   { name: "旅遊規劃", tab: "lifestyle", tabName: "生活願望", hint: "國內外・頻率・單次預算" },
