@@ -14,7 +14,7 @@ import { reorder } from "@/lib/anDefaults";
 // ⚠️ 拖曳不自動存檔：拖完先看整體順序，滿意再按一次儲存。
 //    每拖一下就寫 DB 等於把排到一半的中間狀態推給全公司教練。
 
-export type BoardRow = { k: string; t: string; cond?: string; hidden: boolean };
+export type BoardRow = { k: string; t: string; g: string; cond?: string; hidden: boolean };
 
 const btn =
   "rounded-lg border border-line2 px-2.5 py-1 text-sm text-tx2 hover:bg-panel3 disabled:opacity-30 disabled:hover:bg-transparent";
@@ -126,6 +126,7 @@ export default function AnalysisDefaultBoard({ rows, builtin }: { rows: BoardRow
               <span className="w-6 text-right text-xs text-tx3 tabular-nums">{i + 1}</span>
               <span className="flex-1 min-w-0">
                 <span className="text-sm">{r.t}</span>
+                <span className="ml-2 text-11 text-tx3" title="分析頁依段分頁顯示；段是模組的固定屬性，這裡的順序只在段內生效">{r.g}</span>
                 {r.cond && <span className="ml-2 text-11 text-tx3">（{r.cond}）</span>}
                 {r.hidden && <span className="ml-2 text-11 text-brand2">預設收起</span>}
               </span>

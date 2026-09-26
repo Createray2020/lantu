@@ -26,6 +26,7 @@ export default async function AnalysisDefaultsPage() {
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             決定教練打開客戶分析頁時，那一排模組<b className="text-brand2">第一時間</b>怎麼排、哪些先收起來。
             排在前面的是你希望大家一坐下來就先談的東西。
+            分析頁依段（現況／保障／目標／投影／處方）分頁顯示，段是模組的固定屬性；這裡的順序只在各段之內生效。
           </p>
         </div>
         <AnalysisDefaultBoard rows={anBoardRows(payload)} builtin={[...AN_MODULE_KEYS]} />

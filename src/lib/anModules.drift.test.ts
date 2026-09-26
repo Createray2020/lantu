@@ -14,16 +14,16 @@ import { AN_MODULES } from "./analysisModules";
 
 const html = readFileSync(join(process.cwd(), "public", "lantu-app.html"), "utf8");
 
-function htmlModules(): { k: string; t: string }[] {
+function htmlModules(): { k: string; t: string; g: string }[] {
   const start = html.indexOf("function analysisModules(c){");
   expect(start, "html 裡找不到 analysisModules(c)").toBeGreaterThan(0);
   const end = html.indexOf("\nvar AN_VIEW=null;", start);
   expect(end, "html 裡找不到 analysisModules 的結尾").toBeGreaterThan(start);
   const body = html.slice(start, end);
-  const out: { k: string; t: string }[] = [];
-  const re = /^ {2}\{k:'([a-z_]+)',t:'([^']*)'/gm;
+  const out: { k: string; t: string; g: string }[] = [];
+  const re = /^ {2}\{k:'([a-z_]+)',t:'([^']*)',g:'([a-z]+)'/gm;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(body))) out.push({ k: m[1], t: m[2] });
+  while ((m = re.exec(body))) out.push({ k: m[1], t: m[2], g: m[3] });
   return out;
 }
 
@@ -39,12 +39,17 @@ describe("分析模組登錄表與 lantu-app.html 同步", () => {
     expect(fromHtml.map((x) => x.t)).toEqual(AN_MODULES.map((x) => x.t));
   });
 
+  it("所屬段一字不差（每個模組都要有 g）", () => {
+    const fromHtml = htmlModules();
+    expect(fromHtml.map((x) => x.g)).toEqual(AN_MODULES.map((x) => x.g));
+  });
+
   it("html 端有 when 的模組，鏡像這邊要標註 cond", () => {
     const start = html.indexOf("function analysisModules(c){");
     const end = html.indexOf("\nvar AN_VIEW=null;", start);
     const body = html.slice(start, end);
     const withWhen = new Set<string>();
-    const re = /^ {2}\{k:'([a-z_]+)',t:'[^']*',(?:hint:[^\n]*\n\s*)?when:/gm;
+    const re = /^ {2}\{k:'([a-z_]+)',t:'[^']*',g:'[a-z]+',(?:hint:[^\n]*\n\s*)?when:/gm;
     let m: RegExpExecArray | null;
     while ((m = re.exec(body))) withWhen.add(m[1]);
     // hint 是函式時 when 會落到下一行，補一輪寬鬆比對

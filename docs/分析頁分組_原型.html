@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>分析頁分組原型</title>
+<style>
+:root{
+ --bg:#081a2b;--panel:#0d2b45;--card:#12334f;--card2:#17406a;
+ --field:#0a1a2b;--line:#1c3a58;--line2:#2a4d73;
+ --tx:#eef2f7;--mut:#a9bccf;--mut2:#8296ab;
+ --amber:#c99a5b;--amber2:#e0bd8b;--onbrand:#08202a;
+ --teal:#8fbfc8;--blue:#8fb8ff;
+ --ok:#8fc0a3;--warn:#e08a68;--danger:#ff9d9f;--gap2:#ef6f6f;
+ --serif:"Noto Serif TC","Songti TC","PingFang TC",serif;--r:12px;--sh:0,0,0;
+}
+:root[data-theme="light"]{
+ --bg:#f4f6f8;--panel:#ffffff;--card:#eaeef3;--card2:#dfe6ee;
+ --field:#fbfcfd;--line:#e3e8ee;--line2:#c9d2dc;
+ --tx:#14212e;--mut:#4a5c6e;--mut2:#75838f;
+ --amber:#9a6f22;--amber2:#c08f3c;--onbrand:#ffffff;
+ --teal:#2a6f7a;--blue:#2c6fb5;
+ --ok:#2f7d57;--warn:#a8681a;--danger:#c0362f;--gap2:#c2453e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6;font-size:14px}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 16px 80px}
+.tbtn{background:var(--card);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.tbtn:hover{background:var(--card2)}.tbtn.amber{background:var(--amber);color:var(--onbrand);border-color:var(--amber)}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:20px;box-shadow:0 1px 2px rgba(var(--sh),.22)}
+.sec h4{font-size:15px;font-weight:700;margin:0 0 10px;color:var(--amber);display:flex;align-items:center;gap:8px;flex-wrap:wrap;letter-spacing:.01em}
+.sec h4 .hint{flex:1 0 100%;margin-top:2px}
+.hint{font-size:12px;font-weight:400;color:var(--mut2);line-height:1.6}
+.muted{color:var(--mut2)}
+
+/* ── 原型專用：頂部切換列 ── */
+.proto{position:sticky;top:0;z-index:9;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.proto b{font-size:12px;color:var(--mut);letter-spacing:.07em}
+.proto .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.proto .seg button{background:transparent;border:0;color:var(--mut);padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.proto .seg button.on{background:var(--amber);color:var(--onbrand)}
+.proto .sp{flex:1}
+
+/* ── 首屏（不動） ── */
+.big3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+.big3 .b{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:12px}
+.big3 .b .l{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em}
+.big3 .b .v{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:3px;line-height:1.15;font-variant-numeric:tabular-nums}
+.big3 .b .v small{font-size:12px;color:var(--mut2);font-weight:400;margin-left:2px}
+.tune{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--mut)}
+.tune label{display:flex;align-items:center;gap:8px}
+.tune input[type=range]{width:160px;accent-color:var(--amber)}
+.tune .v{font-family:var(--serif);color:var(--amber2);font-weight:700;font-size:13px;min-width:52px}
+
+/* ── 段（group）── */
+.grpnav{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:18px}
+.grp{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;position:relative;border-top:3px solid var(--line2);transition:border-color .15s}
+.grp:hover{background:var(--card)}
+.grp .no{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut)}
+.grp .nm{font-family:var(--serif);font-size:16px;font-weight:700;margin-top:1px;letter-spacing:.03em}
+.grp .vd{font-size:12px;color:var(--mut2);margin-top:4px;line-height:1.45}
+.grp .vd b{font-weight:600}
+.grp .cnt{position:absolute;right:12px;top:10px;font-size:11px;color:var(--mut2)}
+.grp.on{border-top-color:var(--amber);background:var(--card)}
+.grp.on .nm{color:var(--amber2)}
+.grp.risk{border-top-color:var(--warn)}.grp.risk.on{border-top-color:var(--warn)}
+.grp .vd .ok{color:var(--ok)}.grp .vd .warn{color:var(--warn)}
+.grpbody{display:none}.grpbody.on{display:block}
+
+/* 段標題列（A 案的色帶＋B 案分頁內首行）*/
+.gband{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.gband .no{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut)}
+.gband .nm{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--amber2);letter-spacing:.03em}
+.gband .q{font-size:13px;color:var(--mut)}
+.gband .vd{margin-left:auto;font-size:12px;color:var(--mut2)}
+.gband .vd b{color:var(--tx);font-weight:600}
+
+/* A 案：手風琴 */
+details.gacc{background:transparent;border:0;margin-bottom:14px}
+details.gacc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line2);border-radius:var(--r);padding:12px 16px}
+details.gacc>summary::-webkit-details-marker{display:none}
+details.gacc>summary::before{content:'▸';color:var(--amber2);font-size:12px;transition:transform .15s}
+details.gacc[open]>summary::before{transform:rotate(90deg)}
+details.gacc[open]>summary{border-radius:var(--r) var(--r) 0 0;border-left-color:var(--amber)}
+details.gacc.risk>summary{border-left-color:var(--warn)}
+details.gacc>summary .no{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut)}
+details.gacc>summary .nm{font-family:var(--serif);font-size:19px;font-weight:700;letter-spacing:.03em}
+details.gacc>summary .q{font-size:13px;color:var(--mut)}
+details.gacc>summary .vd{margin-left:auto;font-size:12px;color:var(--mut2)}
+details.gacc>summary .vd b{color:var(--tx);font-weight:600}
+details.gacc>summary .vd .warn{color:var(--warn)}details.gacc>summary .vd .ok{color:var(--ok)}
+details.gacc .gaccbody{border:1px solid var(--line);border-top:0;border-radius:0 0 var(--r) var(--r);padding:12px 14px 4px;background:color-mix(in srgb,var(--panel) 50%,transparent)}
+
+/* 模組（沿用正式版 .anmod）*/
+.anmod{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.anmod>summary{list-style:none;cursor:pointer;padding:12px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.anmod>summary::-webkit-details-marker{display:none}
+.anmod>summary::before{content:'▸';color:var(--amber2);font-size:12px;transition:transform .15s}
+.anmod[open]>summary::before{transform:rotate(90deg)}
+.anmod>summary:hover{background:color-mix(in srgb,var(--tx) 2%,transparent)}
+.anmod>summary .ant{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--tx);letter-spacing:.03em}
+.anmod[open]>summary{border-bottom:1px solid var(--line)}
+.anbody{padding:14px 18px 16px}
+.ph{border:1px dashed var(--line2);border-radius:10px;padding:26px 14px;text-align:center;color:var(--mut2);font-size:12px;background:var(--field)}
+
+/* 導覽（只在 B 案分頁內顯示這一段的模組列）*/
+.antools{margin:6px 0 12px}
+.antools>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--mut);padding:3px 0}
+.antools>summary::-webkit-details-marker{display:none}
+.antools>summary::before{content:'▸';color:var(--amber)}
+.antools[open]>summary::before{content:'▾'}
+.anchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.anchip{display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px 5px 3px 11px;cursor:grab;user-select:none;font-size:12px}
+.anchip b{font-weight:700}
+.anchip i{font-style:normal;width:22px;height:22px;line-height:21px;text-align:center;border-radius:50%;border:1px solid var(--line);color:var(--mut2);font-size:12px}
+.anchip.off{opacity:.45}.anchip.off b{text-decoration:line-through}
+.chipgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chipgrp .gl{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--amber);min-width:64px}
+
+.note{background:color-mix(in srgb,var(--amber) 10%,transparent);border:1px solid color-mix(in srgb,var(--amber) 40%,transparent);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--mut);margin-bottom:16px;line-height:1.7}
+.note b{color:var(--amber2)}
+@media (max-width:760px){.grpnav{grid-template-columns:repeat(2,1fr)}.big3{grid-template-columns:1fr 1fr}.gband .vd,details.gacc>summary .vd{margin-left:0;flex:1 0 100%}}
+</style>
+</head>
+<body>
+<div class="proto">
+ <b>原型 · 呈現方式</b>
+ <span class="seg"><button id="btnB" class="on" onclick="setMode('B')">B 子分頁</button><button id="btnA" onclick="setMode('A')">A 分段手風琴</button></span>
+ <span class="sp"></span>
+ <button class="tbtn" onclick="toggleTheme()">深／淺</button>
+</div>
+<div class="wrap">
+
+<div class="note"><b>這是原型，數字是假的。</b> 首屏那張圖與拉桿完全不動；差別只在底下 21 個模組怎麼分段呈現。模組點開之後的內容照現在的，這裡用虛線框代替。</div>
+
+<!-- ───────── 首屏：不動 ───────── -->
+<div class="sec" id="anHero">
+ <h4>這一生，哪一年開始不夠用
+  <span class="hint">紅柱＝那一年入不敷出。缺口是常態，不是異常——要看的是它從哪一年開始、有多深，以及調整之後有沒有比原本更晚、更淺。</span></h4>
+ <div id="heroChart"></div>
+ <div class="tune">
+  <label>報酬率 <input type="range" min="0" max="10" step=".5" value="4"><span class="v">4.0%</span></label>
+  <label>退休年齡 <input type="range" min="50" max="70" value="62"><span class="v">62 歲</span></label>
+  <button class="tbtn" style="padding:4px 10px;font-size:12px">回到存檔值</button>
+ </div>
+ <div class="big3">
+  <div class="b"><div class="l">第一個不夠用的年份</div><div class="v">2047<small>· 63 歲</small></div></div>
+  <div class="b"><div class="l">最深的一年</div><div class="v">−48<small>萬</small></div></div>
+  <div class="b"><div class="l">缺口年數</div><div class="v">17<small>／ 45 年</small></div></div>
+ </div>
+</div>
+
+<!-- ───────── B 案：子分頁 ───────── -->
+<div id="modeB">
+ <div class="grpnav" id="grpnav"></div>
+ <div id="grpbodies"></div>
+</div>
+
+<!-- ───────── A 案：手風琴 ───────── -->
+<div id="modeA" style="display:none"></div>
+
+</div>
+
+<script>
+// 分組定義（與提案表一致）。vd = 段標題列上自動算出的一句話結論（原型寫死）。
+var GROUPS=[
+ {k:'now',   no:'①',nm:'現況體檢',q:'你現在站在哪裡',
+  vd:'財務階段 <b>前行</b> · 健康度 <b>72</b> 分 · 指標 <span class="warn">3 項</span> 待留意',
+  mods:['財務健康度與財務階段','財務三表與資產布局','現況財務指標 · 收支流量','現況財務指標 · 資產負債','財務十字表','稅賦分析']},
+ {k:'risk',  no:'②',nm:'保障結構',q:'萬一發生什麼',risk:true,
+  vd:'壽險缺口 <b class="warn">320 萬</b> · 醫療、意外足額 · 可支撐 <b>6.2</b> 年',
+  mods:['保障準備度','保障缺口（毛需求 − 已備）','責任遞減缺口圖','壽險需求圖']},
+ {k:'goal',  no:'③',nm:'人生目標',q:'你要去哪裡',
+  vd:'必達 <b>3</b> 項 · 退休需求 <b>2,860 萬</b>，已備 <b>41%</b> · 緊急預備 <span class="ok">足夠</span>',
+  mods:['短期目標與緊急預備','置產缺口','退休需求','退休三段式金流']},
+ {k:'future',no:'④',nm:'未來投影',q:'走不走得到',
+  vd:'資產轉負 <b class="warn">2047 年（63 歲）</b> · 蒙地卡羅成功率 <b>58%</b>',
+  mods:['一生現金流投影','財務目標歷程','蒙地卡羅機率模擬']},
+ {k:'rx',    no:'⑤',nm:'調整處方',q:'該怎麼調',
+  vd:'現值缺口 <b class="warn">410 萬</b> · 加權報酬 <b>4.8%</b> · 方案動作 <b>3</b> 個',
+  mods:['缺口帳與該解什麼','建議資產配置','規劃前 / 後對照']}
+];
+// 企業主：有開企業主體才出現，插在最前面（原型示範：關閉）
+var BIZ_ON=false;
+
+function esc(s){return String(s)}
+function modHTML(t){
+ return '<details class="anmod"><summary><span class="ant">'+t+'</span><span class="hint">（提示文字照現在的）</span></summary>'+
+  '<div class="anbody"><div class="ph">'+t+' 的內容不變，照現在的</div></div></details>';
+}
+function chipsHTML(g){
+ return '<div class="chipgrp"><span class="gl">'+g.no+' '+g.nm+'</span>'+g.mods.map(function(t,i){
+  return '<span class="anchip'+(i===g.mods.length-1&&g.k==='now'?' off':'')+'" draggable="true"><b>'+t+'</b><i>'+(i===g.mods.length-1&&g.k==='now'?'＋':'−')+'</i></span>'}).join('')+'</div>';
+}
+
+/* ── B 案 ── */
+var CUR='risk';
+function renderB(){
+ var nav=document.getElementById('grpnav'),bod=document.getElementById('grpbodies');
+ var gs=(BIZ_ON?[{k:'biz',no:'企業',nm:'企業主診斷',q:'先看可信度',vd:'合規閘 <b class="ok">綠燈</b>',mods:['企業主診斷']}]:[]).concat(GROUPS);
+ nav.style.gridTemplateColumns='repeat('+gs.length+',1fr)';
+ nav.innerHTML=gs.map(function(g){
+  return '<div class="grp'+(g.k===CUR?' on':'')+(g.risk?' risk':'')+'" onclick="pick(\''+g.k+'\')">'+
+   '<div class="no">'+g.no+'</div><div class="nm">'+g.nm+'</div><div class="vd">'+g.vd+'</div><span class="cnt">'+g.mods.length+' 個</span></div>';
+ }).join('');
+ bod.innerHTML=gs.map(function(g){
+  return '<div class="grpbody'+(g.k===CUR?' on':'')+'" id="gb_'+g.k+'">'+
+   '<div class="gband"><span class="no">'+g.no+'</span><span class="nm">'+g.nm+'</span><span class="q">'+g.q+'</span><span class="vd">'+g.vd+'</span></div>'+
+   '<details class="antools"><summary>這一段 '+g.mods.length+' 個模組（拖曳排序 · −／＋ 隱藏 · 全部展開／收合 · 恢復預設）</summary>'+chipsHTML(g)+'</details>'+
+   g.mods.map(modHTML).join('')+'</div>';
+ }).join('');
+}
+function pick(k){CUR=k;renderB();try{document.getElementById('grpnav').scrollIntoView({behavior:'smooth',block:'start'})}catch(e){}}
+
+/* ── A 案 ── */
+function renderA(){
+ var gs=(BIZ_ON?[{k:'biz',no:'企業',nm:'企業主診斷',q:'先看可信度',vd:'合規閘 <b class="ok">綠燈</b>',mods:['企業主診斷']}]:[]).concat(GROUPS);
+ document.getElementById('modeA').innerHTML=
+  '<details class="antools" style="margin-bottom:14px"><summary>分析模組導覽 · 21 個模組（依段分組 · 段內拖曳排序 · −／＋ 隱藏）</summary>'+gs.map(chipsHTML).join('')+'</details>'+
+  gs.map(function(g,i){
+  return '<details class="gacc'+(g.risk?' risk':'')+'"'+(i===1?' open':'')+'>'+
+   '<summary><span class="no">'+g.no+'</span><span class="nm">'+g.nm+'</span><span class="q">'+g.q+'</span><span class="vd">'+g.vd+' · '+g.mods.length+' 個模組</span></summary>'+
+   '<div class="gaccbody">'+g.mods.map(modHTML).join('')+'</div></details>';
+ }).join('');
+}
+
+function setMode(m){
+ document.getElementById('modeA').style.display=m==='A'?'':'none';
+ document.getElementById('modeB').style.display=m==='B'?'':'none';
+ document.getElementById('btnA').className=m==='A'?'on':'';
+ document.getElementById('btnB').className=m==='B'?'on':'';
+}
+function toggleTheme(){var r=document.documentElement;r.setAttribute('data-theme',r.getAttribute('data-theme')==='light'?'dark':'light');hero();}
+
+/* 首屏假圖：逐年結餘柱狀，紅柱＝入不敷出 */
+function hero(){
+ var W=980,H=190,pL=44,pR=10,pT=12,pB=26,pw=W-pL-pR,ph=H-pT-pB;
+ var yrs=[];for(var y=2026;y<=2070;y++)yrs.push(y);
+ var vals=yrs.map(function(y,i){var age=42+i;var v=age<62?38-i*0.9+Math.sin(i)*6:(age<=79?-(age-60)*2.6+Math.cos(i)*5:-12);return v;});
+ var mx=Math.max.apply(null,vals.map(Math.abs));
+ var zero=pT+ph*(mx/(2*mx));
+ var bw=pw/yrs.length*.68;
+ var light=document.documentElement.getAttribute('data-theme')==='light';
+ var grid=light?'rgba(0,0,0,.08)':'#1c3a58',tick=light?'#8a9aa2':'#8296ab';
+ var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">';
+ s+='<line x1="'+pL+'" x2="'+(W-pR)+'" y1="'+zero+'" y2="'+zero+'" stroke="'+tick+'" stroke-width="1"/>';
+ vals.forEach(function(v,i){
+  var x=pL+i/yrs.length*pw+(pw/yrs.length-bw)/2;
+  var h=Math.abs(v)/mx*(ph/2);
+  var y=v>=0?zero-h:zero;
+  s+='<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+h+'" rx="1.5" fill="'+(v>=0?'var(--teal)':'var(--gap2)')+'" opacity="'+(v>=0?.85:.9)+'"/>';
+  if(i%5===0)s+='<text x="'+(x+bw/2)+'" y="'+(H-8)+'" font-size="10" fill="'+tick+'" text-anchor="middle">'+yrs[i]+'</text>';
+ });
+ s+='<text x="'+(pL-6)+'" y="'+(pT+8)+'" font-size="10" fill="'+tick+'" text-anchor="end">+'+Math.round(mx)+'萬</text>';
+ s+='<text x="'+(pL-6)+'" y="'+(H-pB)+'" font-size="10" fill="'+tick+'" text-anchor="end">−'+Math.round(mx)+'萬</text>';
+ var fx=pL+21/yrs.length*pw;
+ s+='<line x1="'+fx+'" x2="'+fx+'" y1="'+pT+'" y2="'+(H-pB)+'" stroke="var(--amber2)" stroke-dasharray="3 3"/>';
+ s+='<text x="'+(fx+5)+'" y="'+(pT+11)+'" font-size="11" fill="var(--amber2)">2047 · 63 歲開始不夠用</text>';
+ s+='</svg>';
+ document.getElementById('heroChart').innerHTML=s;
+}
+hero();renderB();renderA();
+</script>
+</body>
+</html>

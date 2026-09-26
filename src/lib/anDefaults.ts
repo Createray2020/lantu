@@ -10,7 +10,7 @@ import { unstable_cache, updateTag } from "next/cache";
 import { asc, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { anModuleDefaults } from "@/Shared/db/schema";
-import { AN_MODULES, AN_MODULE_KEYS } from "./analysisModules";
+import { AN_MODULES, AN_MODULE_KEYS, anGroupName } from "./analysisModules";
 
 export const AN_DEFAULTS_TAG = "an-defaults";
 
@@ -105,11 +105,11 @@ export function reorder<T>(list: T[], from: number, to: number): T[] {
 }
 
 /** 後台頁用：合併後的完整清單，附標題與是否隱藏 */
-export function anBoardRows(payload: AnDefaultPayload): { k: string; t: string; cond?: string; hidden: boolean }[] {
+export function anBoardRows(payload: AnDefaultPayload): { k: string; t: string; g: string; cond?: string; hidden: boolean }[] {
   const hidden = new Set(payload.hidden);
   const byK = new Map(AN_MODULES.map((m) => [m.k, m]));
   return payload.order
     .map((k) => byK.get(k))
     .filter((m): m is NonNullable<typeof m> => !!m)
-    .map((m) => ({ k: m.k, t: m.t, cond: m.cond, hidden: hidden.has(m.k) }));
+    .map((m) => ({ k: m.k, t: m.t, g: anGroupName(m.g), cond: m.cond, hidden: hidden.has(m.k) }));
 }

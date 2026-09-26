@@ -56,7 +56,9 @@ describe("沒調過的客戶：吃後台預設", () => {
     const moved = base[5];
     setDefault([moved, ...base.filter((k) => k !== moved)]);
     expect(order()[0]).toBe(moved);
-    expect(chipKeys()[0]).toBe(moved);
+    // 晶片列依段分行（2026/09/26）：它會排在自己那一段的第一顆，不一定是整列第一顆
+    const row = w.document.querySelector(`#anChips .anchip[data-k="${moved}"]`).closest(".chipgrp");
+    expect(row.querySelector(".anchip").dataset.k).toBe(moved);
   });
 
   it("後台設「預設收起」的模組不出現在卡片區，但模組列還在（教練按 ＋ 可叫回來）", () => {

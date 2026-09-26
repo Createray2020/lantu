@@ -15,32 +15,51 @@ export type AnModuleDef = {
   k: string;
   /** 模組標題，與 html 的 {t:'…'} 一致 */
   t: string;
+  /** 所屬段（html 端的 g）：分析頁依段分頁顯示，段是模組的固定屬性，不是排序 */
+  g: AnGroupKey;
   /** 有條件才出現的模組（html 端的 when），後台照列但標註出來 */
   cond?: string;
 };
 
+export type AnGroupKey = "biz" | "now" | "risk" | "goal" | "future" | "rx";
+
+/** 段的顯示名稱，與 html 的 AN_GROUPS 一致（順序＝分頁籤順序） */
+export const AN_GROUPS: { k: AnGroupKey; no: string; nm: string }[] = [
+  { k: "biz", no: "企業", nm: "企業主診斷" },
+  { k: "now", no: "①", nm: "現況體檢" },
+  { k: "risk", no: "②", nm: "保障結構" },
+  { k: "goal", no: "③", nm: "人生目標" },
+  { k: "future", no: "④", nm: "未來投影" },
+  { k: "rx", no: "⑤", nm: "調整處方" },
+];
+
+export function anGroupName(g: AnGroupKey): string {
+  const G = AN_GROUPS.find((x) => x.k === g);
+  return G ? `${G.no} ${G.nm}` : g;
+}
+
 export const AN_MODULES: AnModuleDef[] = [
-  { k: "biz", t: "企業主診斷", cond: "只在客戶開啟「企業」主體時出現" },
-  { k: "tables", t: "財務三表與資產布局" },
-  { k: "health", t: "財務健康度與財務階段" },
-  { k: "ratio_flow", t: "現況財務指標 · 收支流量" },
-  { k: "ratio_bs", t: "現況財務指標 · 資產負債" },
-  { k: "retire", t: "退休需求" },
-  { k: "coverage", t: "保障準備度" },
-  { k: "gap", t: "保障缺口（毛需求 − 已備）" },
-  { k: "respgap", t: "責任遞減缺口圖" },
-  { k: "lifeneed", t: "壽險需求圖" },
-  { k: "property", t: "置產缺口", cond: "只在有置產目標時出現" },
-  { k: "cross", t: "財務十字表" },
-  { k: "timeline", t: "財務目標歷程" },
-  { k: "tax", t: "稅賦分析" },
-  { k: "alloc", t: "建議資產配置" },
-  { k: "gapledger", t: "缺口帳與該解什麼" },
-  { k: "beforeafter", t: "規劃前 / 後對照" },
-  { k: "shortterm", t: "短期目標與緊急預備" },
-  { k: "retireflow", t: "退休三段式金流" },
-  { k: "mc", t: "蒙地卡羅機率模擬" },
-  { k: "cashflow", t: "一生現金流投影" },
+  { k: "biz", t: "企業主診斷", g: "biz", cond: "只在客戶開啟「企業」主體時出現" },
+  { k: "tables", t: "財務三表與資產布局", g: "now" },
+  { k: "health", t: "財務健康度與財務階段", g: "now" },
+  { k: "ratio_flow", t: "現況財務指標 · 收支流量", g: "now" },
+  { k: "ratio_bs", t: "現況財務指標 · 資產負債", g: "now" },
+  { k: "retire", t: "退休需求", g: "goal" },
+  { k: "coverage", t: "保障準備度", g: "risk" },
+  { k: "gap", t: "保障缺口（毛需求 − 已備）", g: "risk" },
+  { k: "respgap", t: "責任遞減缺口圖", g: "risk" },
+  { k: "lifeneed", t: "壽險需求圖", g: "risk" },
+  { k: "property", t: "置產缺口", g: "goal", cond: "只在有置產目標時出現" },
+  { k: "cross", t: "財務十字表", g: "now" },
+  { k: "timeline", t: "財務目標歷程", g: "future" },
+  { k: "tax", t: "稅賦分析", g: "now" },
+  { k: "alloc", t: "建議資產配置", g: "rx" },
+  { k: "gapledger", t: "缺口帳與該解什麼", g: "rx" },
+  { k: "beforeafter", t: "規劃前 / 後對照", g: "rx" },
+  { k: "shortterm", t: "短期目標與緊急預備", g: "goal" },
+  { k: "retireflow", t: "退休三段式金流", g: "goal" },
+  { k: "mc", t: "蒙地卡羅機率模擬", g: "future" },
+  { k: "cashflow", t: "一生現金流投影", g: "future" },
 ];
 
 export const AN_MODULE_KEYS: string[] = AN_MODULES.map((m) => m.k);

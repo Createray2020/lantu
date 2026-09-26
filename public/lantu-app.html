@@ -225,6 +225,30 @@ h1,h2,h3,h4{margin:0}
 .anbody{padding:14px 18px 16px}
 .anbody>.sec{background:transparent;border:none;border-left:2px solid var(--line);border-radius:0;padding:0 0 0 13px;margin-bottom:18px;box-shadow:none}
 .anbody>.sec:last-child{margin-bottom:0}
+/* 分析頁分段：段卡片（分頁籤）、段標題列、導覽晶片分行 */
+.grpnav{display:grid;gap:8px;margin-bottom:14px}
+.grp{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;position:relative;border-top:3px solid var(--line2);transition:border-color .15s,background .15s}
+.grp:hover{background:var(--card)}
+.grp .no{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut)}
+.grp .nm{font-family:var(--serif);font-size:16px;font-weight:700;margin-top:1px;letter-spacing:.03em}
+.grp .vd{font-size:12px;color:var(--mut2);margin-top:4px;line-height:1.45}
+.grp .vd b{font-weight:600;color:var(--tx)}
+.grp .cnt{position:absolute;right:12px;top:10px;font-size:11px;color:var(--mut2)}
+.grp.on{border-top-color:var(--amber);background:var(--card)}
+.grp.on .nm{color:var(--amber2)}
+.grp.warn{border-top-color:var(--warn)}
+.grp .vd b.w,.gband .vd b.w{color:var(--warn)}.grp .vd b.o,.gband .vd b.o{color:var(--ok)}
+.grpbody{display:none}.grpbody.on{display:block}
+.gband{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.gband .no{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--mut)}
+.gband .nm{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--amber2);letter-spacing:.03em}
+.gband .q{font-size:13px;color:var(--mut)}
+.gband .vd{margin-left:auto;font-size:12px;color:var(--mut2)}
+.gband .vd b{color:var(--tx);font-weight:600}
+.anchips .chipgrp{flex:1 0 100%}
+.chipgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chipgrp .gl{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--amber);min-width:64px}
+@media (max-width:760px){.grpnav{grid-template-columns:repeat(2,1fr)!important}.gband .vd{margin-left:0;flex:1 0 100%}}
 /* ── 資料分頁：一個分頁＝一個模組（一張卡），裡面的小節只用左框線 ──────────
    這個做法分析頁的 .anbody>.sec 早就在用了，這裡推廣到資料分頁。
    間距本身在講親疏：模組之間 28px、模組內小節之間 18px。
@@ -12931,7 +12955,8 @@ function anPref(c){
  return {
   order:(Array.isArray(raw.order)&&raw.order.length)?raw.order:d.order,
   hidden:Array.isArray(raw.hidden)?raw.hidden:d.hidden,
-  open:Array.isArray(raw.open)?raw.open:[]
+  open:Array.isArray(raw.open)?raw.open:[],
+  grp:typeof raw.grp==='string'?raw.grp:''
  };
 }
 function anSave(c,p){try{localStorage.setItem(anPrefKey(c),JSON.stringify(p));}catch(e){}}
@@ -13062,13 +13087,13 @@ function analysisModules(c){
  var rtCount=function(gn){var rr=r();return Object.keys(rr).filter(function(k){return rr[k].group===gn}).length};
 
  var L=[
-  {k:'biz',t:'企業主診斷',hint:'合規閘燈號 · 整合式個人資產負債表 · 十二個財報訊號',
+  {k:'biz',t:'企業主診斷',g:'biz',hint:'合規閘燈號 · 整合式個人資產負債表 · 十二個財報訊號',
    when:entityOn(c,'company'),html:function(){return bizAnalysisHTML(c)}},
 
-  {k:'tables',t:'財務三表與資產布局',hint:'資產負債表 · 現金流量表 · 資產布局',
+  {k:'tables',t:'財務三表與資產布局',g:'now',hint:'資產負債表 · 現金流量表 · 資產布局',
    html:function(){return threeTablesHTML(ct())}},
 
-  {k:'health',t:'財務健康度與財務階段',hint:'安全度 / 自由度 / 願景達成度',
+  {k:'health',t:'財務健康度與財務階段',g:'now',hint:'安全度 / 自由度 / 願景達成度',
    html:function(){
     var hh=h();
     var gau=[['財務安全度',hh.safety],['財務自由度',hh.freedom],['願景達成度',hh.vision]].map(function(g){return gauge(g[0],g[1])}).join('');
@@ -13078,22 +13103,22 @@ function analysisModules(c){
      '<div class="muted" style="flex:1;min-width:220px">當前課題：<b style="color:var(--amber2)">'+stageTask(hh.grade)+'</b><div style="font-size:12px;margin-top:4px">'+stageReason(hh)+'</div>'+stageDetailHTML(hh)+'</div></div><table style="margin-top:14px">'+parts+'</table>'+healthDetailHTML(c)+'</div>';
    }},
 
-  {k:'ratio_flow',t:'現況財務指標 · 收支流量',hint:function(){return '協會標準 '+rtCount('收支流量')+' 項 · 燈號＝綠達標/黃待留意/紅需改善'},
+  {k:'ratio_flow',t:'現況財務指標 · 收支流量',g:'now',hint:function(){return '協會標準 '+rtCount('收支流量')+' 項 · 燈號＝綠達標/黃待留意/紅需改善'},
    html:function(){return flowScopeHTML(c)+ratioBulletBlock(r(),'收支流量',ratioTbl('收支流量'))}},
 
-  {k:'ratio_bs',t:'現況財務指標 · 資產負債',hint:function(){return '協會標準 '+rtCount('資產負債')+' 項'},
+  {k:'ratio_bs',t:'現況財務指標 · 資產負債',g:'now',hint:function(){return '協會標準 '+rtCount('資產負債')+' 項'},
    html:function(){return ratioBulletBlock(r(),'資產負債',ratioTbl('資產負債'))+metricsDetailHTML(c)}},
 
-  {k:'retire',t:'退休需求',hint:'總需求 · 已準備 · 缺口',
+  {k:'retire',t:'退休需求',g:'goal',hint:'總需求 · 已準備 · 缺口',
    html:function(){var x=rn();
     if(x.valid===false)return retireInvalidHTML(c);
     return retireAssumedHTML(c)+'<div class="big3"><div class="b"><div class="l">退休總需求</div><div class="v">'+fmt(x.total)+'</div></div><div class="b"><div class="l">已準備</div><div class="v">'+fmt(x.prepared)+'</div></div><div class="b"><div class="l" style="color:var(--warn)">缺口</div><div class="v" style="color:'+(x.gap>0?'var(--warn)':'var(--ok)')+'">'+fmt(x.gap)+'</div></div></div>'+retireDetailHTML(c);
    }},
 
-  {k:'coverage',t:'保障準備度',hint:'各險種「已備 ÷ 毛需求」；100% 即足額',
+  {k:'coverage',t:'保障準備度',g:'risk',hint:'各險種「已備 ÷ 毛需求」；100% 即足額',
    html:function(){return '<div id="an-gap">'+coverageReadinessHTML(c)+lifeNeedDetailHTML(c)+'</div>'}},
 
-  {k:'gap',t:'保障缺口（毛需求 − 已備）',hint:'需求與上方「保障準備度」是同一個數字；已備含逐張保單、已備補充、方案動作，本人壽險再加家庭可變現資產',
+  {k:'gap',t:'保障缺口（毛需求 − 已備）',g:'risk',hint:'需求與上方「保障準備度」是同一個數字；已備含逐張保單、已備補充、方案動作，本人壽險再加家庭可變現資產',
    html:function(){
     var gt=gaps().map(function(g){return '<tr><td class="k">'+g.member+'</td><td>'+g.kind+'</td><td class="muted" style="font-size:11.5px">'+kindUnit(g.kind)+'</td><td>'+fmt(g.need)+'</td><td>'+fmt(g.have)+'</td><td class="'+(g.gap>0?'bad':'good')+'">'+fmt(g.gap)+'</td></tr>'}).join('');
     var T=gapTotals(c),TT=gapTotalsText(c,T);
@@ -13106,44 +13131,44 @@ function analysisModules(c){
     return tot+coverageGapBarsHTML(gaps())+foldHTML('逐列數字（需求 / 已備 / 缺口）',tbl);
    }},
 
-  {k:'respgap',t:'責任遞減缺口圖',hint:'身故責任逐年遞減，對照已備保障',
+  {k:'respgap',t:'責任遞減缺口圖',g:'risk',hint:'身故責任逐年遞減，對照已備保障',
    html:function(){return respGapCharts(c)}},
 
-  {k:'lifeneed',t:'壽險需求圖',hint:'身故情境下家庭保障可支撐幾年',
+  {k:'lifeneed',t:'壽險需求圖',g:'risk',hint:'身故情境下家庭保障可支撐幾年',
    html:function(){return lifeNeedCharts(c)}},
 
-  {k:'property',t:'置產缺口',when:props().length>0,
+  {k:'property',t:'置產缺口',g:'goal',when:props().length>0,
    html:function(){
     var pt=props().map(function(p){return '<tr><td class="k">'+esc(p.name)+'</td><td>'+fmt(p.fv)+'</td><td>'+fmt(p.loan)+'</td><td class="'+(p.gap>0?'bad':'good')+'">'+fmt(p.gap)+'</td></tr>'}).join('');
     return '<table class="rtable"><tr><th>項目</th><th>需求終值</th><th>可貸款</th><th>缺口</th></tr>'+pt+'</table>';
    }},
 
-  {k:'cross',t:'財務十字表',html:function(){return crossTableHTML(ct(),crossTableAfter(c))}},
+  {k:'cross',t:'財務十字表',g:'now',html:function(){return crossTableHTML(ct(),crossTableAfter(c))}},
 
-  {k:'timeline',t:'財務目標歷程',html:function(){return timelineSVG(c)}},
+  {k:'timeline',t:'財務目標歷程',g:'future',html:function(){return timelineSVG(c)}},
 
-  {k:'tax',t:'稅賦分析',
+  {k:'tax',t:'稅賦分析',g:'now',
    html:function(){var i=it(),e=es();
     return '<div id="an-tax"><table class="rtable"><tr><td class="k">綜合所得淨額</td><td>'+fmt(i.net)+'</td></tr><tr><td class="k">綜所稅(年)</td><td class="bad">'+fmt(i.tax)+'（稅率 '+(i.rate*100)+'%）</td></tr><tr><td class="k">課稅遺產淨額</td><td>'+fmt(e.base)+'</td></tr><tr><td class="k">預估遺產稅</td><td class="bad">'+fmt(e.tax)+'（稅率 '+(e.rate*100)+'%）</td></tr></table>'+taxDetailHTML(c)+'</div>';
    }},
 
-  {k:'alloc',t:'建議資產配置',hint:function(){return '加權報酬 '+al().wRet.toFixed(2)+'%'},
+  {k:'alloc',t:'建議資產配置',g:'rx',hint:function(){return '加權報酬 '+al().wRet.toFixed(2)+'%'},
    html:function(){return pieSVG(al().list)}},
 
-  {k:'gapledger',t:'缺口帳與該解什麼',hint:function(){var g=gapPV(c);return g>0.5?'現值缺口 '+fmt(g)+' 元':'無現金流缺口'},
+  {k:'gapledger',t:'缺口帳與該解什麼',g:'rx',hint:function(){var g=gapPV(c);return g>0.5?'現值缺口 '+fmt(g)+' 元':'無現金流缺口'},
    html:function(){
     var led=gapLedger(c),solo=soloSolve(c);
     return '<div id="an-gap">'+gapLedgerHTML(c,led)+soloHTML(c,solo,true)+
      '<div class="hint" style="display:block;margin-top:6px">要動手調整、比較方案，請到「資料 → 調整方案」分頁。這裡只呈現診斷結果。</div></div>';
    }},
 
-  {k:'beforeafter',t:'規劃前 / 後對照',html:function(){return beforeAfterHTML(c)}},
+  {k:'beforeafter',t:'規劃前 / 後對照',g:'rx',html:function(){return beforeAfterHTML(c)}},
 
-  {k:'shortterm',t:'短期目標與緊急預備',html:function(){return shortTermHTML(c)}},
+  {k:'shortterm',t:'短期目標與緊急預備',g:'goal',html:function(){return shortTermHTML(c)}},
 
-  {k:'retireflow',t:'退休三段式金流',html:function(){return retireCashflowHTML(c)}},
+  {k:'retireflow',t:'退休三段式金流',g:'goal',html:function(){return retireCashflowHTML(c)}},
 
-  {k:'mc',t:'蒙地卡羅機率模擬',hint:function(){return mc().N+' 條路徑'},
+  {k:'mc',t:'蒙地卡羅機率模擬',g:'future',hint:'1000 條路徑',
    html:function(){var x=mc();
     return '<div id="an-mc"><div class="big3"><div class="b"><div class="l">資產不破產機率</div><div class="v" style="color:'+(x.pSuccess>=0.7?'var(--ok)':x.pSuccess>=0.4?'var(--amber)':'var(--warn)')+'">'+(x.pSuccess*100).toFixed(0)+'%</div></div>'+
      '<div class="b"><div class="l">最終可投資資產 P50</div><div class="v">'+fmt(x.finalP50)+'</div></div>'+
@@ -13151,7 +13176,7 @@ function analysisModules(c){
      '<div style="margin-top:12px">'+fanSVG(x)+'</div></div>';
    }},
 
-  {k:'cashflow',t:'一生現金流投影',hint:'逐年資產、收支與資產轉負年',
+  {k:'cashflow',t:'一生現金流投影',g:'future',hint:'逐年資產、收支與資產轉負年',
    html:function(){return cashflowCharts(m().proj,null,c)}},
  ];
  return L.filter(function(x){return x.when!==false});
@@ -13249,44 +13274,120 @@ function anHeroHTML(c){
   '</div>';
 }
 
+/* ===== 分析頁分段（2026/09/26）=====
+   21 個模組平鋪成一長串，捲到中間就不知道自己在看哪一段。照諮詢的講法切成五段：
+   現況 → 保障 → 目標 → 投影 → 處方（企業主體開著時多一段擺最前面）。
+   ⚠️ 段是模組的固定屬性（模組表的 g），不是另一套排序：後台預設順序與教練拖過的順序照舊，
+   段只是把同一份順序「過濾」出來顯示，所以拖曳只在段內有效，跨段拖會被忽略。
+   當前段記在 lantu.an2.<id> 的 grp 這一維，走 anPatch 只寫這一維——不影響「調過／沒調過」的判斷。 */
+var AN_GROUPS=[
+ {k:'biz',   no:'企業',nm:'企業主診斷',q:'先看可信度'},
+ {k:'now',   no:'①',nm:'現況體檢',q:'你現在站在哪裡'},
+ {k:'risk',  no:'②',nm:'保障結構',q:'萬一發生什麼'},
+ {k:'goal',  no:'③',nm:'人生目標',q:'你要去哪裡'},
+ {k:'future',no:'④',nm:'未來投影',q:'走不走得到'},
+ {k:'rx',    no:'⑤',nm:'調整處方',q:'該怎麼調'}
+];
+// 段標題列上那一句自動算出來的結論。全部走已經 memo 過的便宜計算，刻意不碰蒙地卡羅。
+// 用的是存檔值，不是首屏拉桿的假設值——拉桿是現場試算，段結論要回答「這位客戶現在怎麼樣」。
+// 回 {text,warn}；任何一段算掛了就回空字串，不能讓整頁跟著壞。
+function anGroupVerdict(g,c){
+ try{
+  if(g==='biz'){var gl=gateLevel(c),L=GATE_LAMP[gl.lv];return {text:'規劃可信度 <b style="color:'+L[1]+'">'+L[0]+'</b>',warn:gl.lv==='na'||gl.lv==='red'};}
+  if(g==='now'){var h=health(c),rr=ratios(c),bad=0;Object.keys(rr).forEach(function(k){if(rr[k].status==='bad')bad++;});
+   return {text:'財務階段 <b>'+stageName(h.grade)+'</b> · 安全度 <b>'+h.safety+'</b> 分'+(bad>0?' · 指標 <b class="w">'+bad+'</b> 項需改善':' · 指標全數達標'),warn:h.grade==='D'};}
+  if(g==='risk'){var gt=gapTotals(c),tx=gapTotalsText(c,gt);
+   return {text:(gt.lump>0?'一次性給付缺口 <b class="w">'+cfAxis(gt.lump)+'</b>':'一次性給付 <b class="o">足額</b>')+(tx.hasPeriod?' · 定期給付缺口 '+tx.periodText:''),warn:gt.lump>0||tx.hasPeriod};}
+  if(g==='goal'){var rn=retireNeed(c),m=metrics(c),pct=rn.total>0?Math.round(rn.prepared/rn.total*100):0;
+   var mo=m.monthExp>0?m.liquid/m.monthExp:0,need=n(c.params.emergencyMonths||6),emOk=mo>=need;
+   return {text:'退休需求 <b>'+cfAxis(rn.total)+'</b>，已備 <b>'+pct+'%</b> · 緊急預備 '+(emOk?'<b class="o">足夠</b>':'<b class="w">不足</b>（'+mo.toFixed(1)+'／'+need+' 個月）'),warn:!emOk};}
+  if(g==='future'){var pj=metrics(c).proj;
+   return {text:pj.turnNeg?'可投資資產轉負 <b class="w">'+pj.turnNeg+' 歲</b>':'期間內資產 <b class="o">未轉負</b>',warn:!!pj.turnNeg};}
+  if(g==='rx'){var gp=gapPV(c),na=(c.actions||[]).length;
+   return {text:(gp>0.5?'現值缺口 <b class="w">'+cfAxis(gp)+'</b>':'<b class="o">無現金流缺口</b>')+' · 方案動作 <b>'+na+'</b> 個',warn:gp>0.5};}
+ }catch(e){}
+ return {text:'',warn:false};
+}
+// 把排好序的模組依段分堆；只回有模組的段（企業主體關著時 biz 那段根本不會出現）。
+function anGrouped(mods){
+ var by={};mods.forEach(function(x){var g=x.g||'now';(by[g]=by[g]||[]).push(x);});
+ return AN_GROUPS.filter(function(G){return by[G.k]&&by[G.k].length}).map(function(G){return {g:G,mods:by[G.k]};});
+}
+function anCurGroup(pref,groups){
+ var ks=groups.map(function(x){return x.g.k});
+ if(pref.grp&&ks.indexOf(pref.grp)>=0)return pref.grp;
+ return ks[0]||'';
+}
+
 function analysisPane(c){
  var pref=anPref(c);
  var mods=anOrdered(analysisModules(c),pref);
  var hidden={};(pref.hidden||[]).forEach(function(k){hidden[k]=1});
  var open={};(pref.open||[]).forEach(function(k){open[k]=1});
+ var groups=anGrouped(mods);
+ var cur=anCurGroup(pref,groups);
 
- AN_VIEW={map:{},order:mods.map(function(x){return x.k})};
- mods.forEach(function(x){AN_VIEW.map[x.k]=x.html;});
+ AN_VIEW={map:{},order:mods.map(function(x){return x.k}),gmap:{},grp:cur};
+ mods.forEach(function(x){AN_VIEW.map[x.k]=x.html;AN_VIEW.gmap[x.k]=x.g||'now';});
 
- var cards=mods.map(function(x){
-  if(hidden[x.k])return '';
-  var hint=typeof x.hint==='function'?x.hint():x.hint;
-  return '<details class="anmod" id="anmod_'+x.k+'" data-k="'+x.k+'"'+(open[x.k]?' open':'')+' ontoggle="anToggled(this)">'+
-   '<summary><span class="ant">'+x.t+'</span>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</summary>'+
-   '<div class="anbody" id="anbody_'+x.k+'"></div></details>';
+ var nav='<div class="grpnav" id="anGrpNav" style="grid-template-columns:repeat('+groups.length+',1fr)">'+groups.map(function(G){
+  var v=anGroupVerdict(G.g.k,c),shown=G.mods.filter(function(x){return !hidden[x.k]}).length;
+  return '<div class="grp'+(G.g.k===cur?' on':'')+(v.warn?' warn':'')+'" data-g="'+G.g.k+'" onclick="anPickGroup(\''+G.g.k+'\')" role="tab">'+
+   '<div class="no">'+G.g.no+'</div><div class="nm">'+G.g.nm+'</div>'+
+   (v.text?'<div class="vd">'+v.text+'</div>':'')+'<span class="cnt">'+shown+' 個</span></div>';
+ }).join('')+'</div>';
+
+ var bodies=groups.map(function(G){
+  var v=anGroupVerdict(G.g.k,c);
+  var cards=G.mods.map(function(x){
+   if(hidden[x.k])return '';
+   var hint=typeof x.hint==='function'?x.hint():x.hint;
+   return '<details class="anmod" id="anmod_'+x.k+'" data-k="'+x.k+'" data-g="'+G.g.k+'"'+(open[x.k]?' open':'')+' ontoggle="anToggled(this)">'+
+    '<summary><span class="ant">'+x.t+'</span>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</summary>'+
+    '<div class="anbody" id="anbody_'+x.k+'"></div></details>';
+  }).join('');
+  return '<div class="grpbody'+(G.g.k===cur?' on':'')+'" id="angrp_'+G.g.k+'" data-g="'+G.g.k+'">'+
+   '<div class="gband"><span class="no">'+G.g.no+'</span><span class="nm">'+G.g.nm+'</span><span class="q">'+G.g.q+'</span>'+
+   (v.text?'<span class="vd">'+v.text+'</span>':'')+'</div>'+
+   (cards||'<div class="hint" style="padding:8px 0 14px">這一段的模組都收起來了——到「分析模組導覽」按 ＋ 叫回來。</div>')+'</div>';
  }).join('');
 
- return anHeroHTML(c)+
-  '<details class="antools"><summary>分析模組導覽 · '+mods.length+' 個模組（拖曳排序 · 隱藏 · 快速跳轉）</summary>'+
+ return anHeroHTML(c)+nav+
+  '<details class="antools"><summary>分析模組導覽 · '+mods.length+' 個模組（依段分行 · 段內拖曳排序 · 隱藏 · 快速跳轉）</summary>'+
    '<div class="foldboxbody">'+anBarHTML(mods,hidden)+financeNavHTML()+'</div></details>'+
-  cards;
+  '<div id="anGrpBodies">'+bodies+'</div>';
 }
 
-// 模組列：可拖曳排序、點一下跳到該模組並展開、眼睛圖示可隱藏。
+// 切段只切 class，不重 render：首屏那張圖不會閃，已展開的模組內容也不會被清掉。
+function anPickGroup(g){
+ var found=false;
+ document.querySelectorAll('#anGrpNav .grp').forEach(function(el){var on=el.getAttribute('data-g')===g;el.classList.toggle('on',on);if(on)found=true;});
+ if(!found)return;
+ document.querySelectorAll('#anGrpBodies .grpbody').forEach(function(el){el.classList.toggle('on',el.getAttribute('data-g')===g);});
+ if(AN_VIEW)AN_VIEW.grp=g;
+ anPatch('grp',g);
+}
+
+// 模組列：依段分行；段內可拖曳排序、點一下跳到該模組並展開、−／＋ 可隱藏。
+// data-i 仍是「整份順序」裡的索引，anMove 才能直接搬同一份 order。
 function anBarHTML(mods,hidden){
- var chips=mods.map(function(x,i){
-  var off=hidden[x.k]?' off':'';
-  return '<span class="anchip'+off+'" draggable="true" data-i="'+i+'" data-k="'+x.k+'" title="拖曳可調整順序；點標題跳到該模組">'+
-   '<b onclick="anJump(\''+x.k+'\')">'+x.t+'</b>'+
-   '<i onclick="anToggleHide(\''+x.k+'\')" title="'+(hidden[x.k]?'顯示':'隱藏')+'">'+(hidden[x.k]?'＋':'−')+'</i></span>';
+ var idx={};mods.forEach(function(x,i){idx[x.k]=i});
+ var rows=anGrouped(mods).map(function(G){
+  var chips=G.mods.map(function(x){
+   var i=idx[x.k],off=hidden[x.k]?' off':'';
+   return '<span class="anchip'+off+'" draggable="true" data-i="'+i+'" data-k="'+x.k+'" data-g="'+G.g.k+'" title="拖曳可調整段內順序；點標題跳到該模組">'+
+    '<b onclick="anJump(\''+x.k+'\')">'+x.t+'</b>'+
+    '<i onclick="anToggleHide(\''+x.k+'\')" title="'+(hidden[x.k]?'顯示':'隱藏')+'">'+(hidden[x.k]?'＋':'−')+'</i></span>';
+  }).join('');
+  return '<div class="chipgrp" data-g="'+G.g.k+'"><span class="gl">'+G.g.no+' '+G.g.nm+'</span>'+chips+'</div>';
  }).join('');
  return '<div class="sec anbar"><div class="anbarhead">'+
-  '<b>分析模組</b><span class="hint">拖曳排序 · 標題可跳轉 · −／＋ 隱藏或顯示。起手順序來自後台預設；你自己調過的只記在這台電腦、逐客戶各自記憶。</span>'+
+  '<b>分析模組</b><span class="hint">段內拖曳排序 · 標題可跳轉 · −／＋ 隱藏或顯示。起手順序來自後台預設；你自己調過的只記在這台電腦、逐客戶各自記憶。</span>'+
   '<span style="flex:1"></span>'+
   '<button class="tbtn" onclick="anExpandAll(true)">全部展開</button>'+
   '<button class="tbtn" onclick="anExpandAll(false)">全部收合</button>'+
   '<button class="tbtn" onclick="anResetPref()" title="清掉這位客戶的個人排序，回到後台設定的預設順序與顯示狀態">恢復預設</button>'+
-  '</div><div class="anchips" id="anChips">'+chips+'</div></div>';
+  '</div><div class="anchips" id="anChips">'+rows+'</div></div>';
 }
 
 // 展開才算：內容第一次展開時才呼叫 html()。
@@ -13318,6 +13419,8 @@ function anExpandAll(on){
 function anJump(k){
  var d=document.getElementById('anmod_'+k);
  if(!d)return;
+ var g=d.getAttribute('data-g');
+ if(g&&AN_VIEW&&AN_VIEW.grp!==g)anPickGroup(g);
  if(!d.open){d.open=true;anFill(k);}
  try{d.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){d.scrollIntoView();}
 }
@@ -13355,6 +13458,8 @@ function bindAnalysisDrag(){
 function anMove(from,to){
  if(!AN_VIEW||from===to)return;
  var order=AN_VIEW.order.slice();
+ // 段是固定屬性，跨段拖等於把模組搬到不屬於它的段——忽略。
+ if(AN_VIEW.gmap&&AN_VIEW.gmap[order[from]]!==AN_VIEW.gmap[order[to]])return;
  var moved=order.splice(from,1)[0];
  order.splice(to,0,moved);
  anPatch('order',order);
