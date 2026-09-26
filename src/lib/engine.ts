@@ -739,11 +739,15 @@ function needCoversParents(c,nd){
  var r=needRoleOf(c,nd&&nd.member);
  return r===null?true:isEarnerRole(r);
 }
+// 2026/09/27 Ray：賓士圖責任環的四格自動帶入（生活費／貸款／教育費／父母孝養）可以手動覆寫——
+// 客戶可能想保得比算出來的高。留空（null／''）＝用自動值；填了就直接取代那一格（可高可低）。
+// ⚠️ 0 是合法的覆寫值（「這一項我不保」），所以判的是 null／空字串，不是 falsy。
+function needOvr(nd,key,auto){var v=nd&&nd[key];return (v==null||v==='')?auto:n(v);}
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
- return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd)
-  +(needCoversParents(c,nd)?familyAnnualParentSupport(c)*n(nd.protectYears):0)
-  +(needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0)
-  +(needCoversEdu(c,nd)?eduTotal(c):0)+n(nd.funeral)+n(nd.estateTax)
+ return needOvr(nd,'livingOverride',n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd))
+  +(needCoversParents(c,nd)?needOvr(nd,'parentOverride',familyAnnualParentSupport(c)*n(nd.protectYears)):0)
+  +(needCoversDebt(c,nd)?needOvr(nd,'loanOverride',sum(c.liabilities,function(l){return lBal(l)})):0)
+  +(needCoversEdu(c,nd)?needOvr(nd,'eduOverride',eduTotal(c)):0)+n(nd.funeral)+n(nd.estateTax)
   +guaranteeFor(c,nd.member);}
 
 
@@ -2790,6 +2794,7 @@ export {
   debtPayAt,
   rowCutPct,
   careCutCap,
+  needOvr,
   expenseCutCap,
   horizonManual,
   effHorizon,

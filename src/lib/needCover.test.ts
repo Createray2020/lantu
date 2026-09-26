@@ -172,9 +172,9 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(HTML).toContain("function needCoversDebt(c,nd){");
     expect(HTML).toContain("function needCoversEdu(c,nd){");
     expect(HTML).toContain("function needCoversParents(c,nd){");
-    expect(HTML).toContain("  +(needCoversParents(c,nd)?familyAnnualParentSupport(c)*n(nd.protectYears):0)");
+    expect(HTML).toContain("  +(needCoversParents(c,nd)?needOvr(nd,'parentOverride',familyAnnualParentSupport(c)*n(nd.protectYears)):0)");
     expect(HTML).toContain(" if(typeof (nd&&nd.payDebt)==='boolean')return nd.payDebt;");
-    expect(HTML).toContain("  +(needCoversEdu(c,nd)?eduTotal(c):0)+n(nd.funeral)+n(nd.estateTax)");
+    expect(HTML).toContain("  +(needCoversEdu(c,nd)?needOvr(nd,'eduOverride',eduTotal(c)):0)+n(nd.funeral)+n(nd.estateTax)");
   });
 
   it.each([0, 1, 2, 3])("第 %i 位被保人：兩邊的毛需求相同", (i) => {

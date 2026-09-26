@@ -793,6 +793,9 @@ details[open]>.foldln::before{content:'\25BE'}
 .cwauto .a{font-family:var(--serif);font-size:16px;font-weight:800;color:var(--tx);font-variant-numeric:tabular-nums}
 .cwauto .s{font-size:11px;color:var(--mut2);line-height:1.65;margin-top:3px}
 .cwauto.off{border-left-color:var(--mut2);opacity:.72}
+.cwauto.ovr{border-left-color:var(--amber)}
+.cwovrtag{font-size:11px;color:var(--amber2);border:1px solid var(--amber);border-radius:4px;padding:0 5px;margin-left:6px;font-weight:600}
+.cwovr input.amtin{width:100%}
 .cwgo{background:none;border:none;color:var(--teal);font:inherit;font-size:11px;cursor:pointer;padding:2px 0;margin-top:2px}
 .cwgo:hover{color:var(--amber2)}
 .cwck{display:flex;align-items:flex-start;gap:8px;font-size:11px;color:var(--mut2);padding:6px 0;line-height:1.55;cursor:pointer}
@@ -2911,11 +2914,15 @@ function needCoversParents(c,nd){
  var r=needRoleOf(c,nd&&nd.member);
  return r===null?true:isEarnerRole(r);
 }
+// 2026/09/27 Ray：賓士圖責任環的四格自動帶入（生活費／貸款／教育費／父母孝養）可以手動覆寫——
+// 客戶可能想保得比算出來的高。留空（null／''）＝用自動值；填了就直接取代那一格（可高可低）。
+// ⚠️ 0 是合法的覆寫值（「這一項我不保」），所以判的是 null／空字串，不是 falsy。
+function needOvr(nd,key,auto){var v=nd&&nd[key];return (v==null||v==='')?auto:n(v);}
 function grossLifeNeed(c,nd){var famLiving=familyAnnualLiving(c);
- return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd)
-  +(needCoversParents(c,nd)?familyAnnualParentSupport(c)*n(nd.protectYears):0)
-  +(needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0)
-  +(needCoversEdu(c,nd)?eduTotal(c):0)+n(nd.funeral)+n(nd.estateTax)
+ return needOvr(nd,'livingOverride',n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*famLiving*protectYearsEff(c,nd))
+  +(needCoversParents(c,nd)?needOvr(nd,'parentOverride',familyAnnualParentSupport(c)*n(nd.protectYears)):0)
+  +(needCoversDebt(c,nd)?needOvr(nd,'loanOverride',sum(c.liabilities,function(l){return lBal(l)})):0)
+  +(needCoversEdu(c,nd)?needOvr(nd,'eduOverride',eduTotal(c)):0)+n(nd.funeral)+n(nd.estateTax)
   +guaranteeFor(c,nd.member);}
 function coverageReadiness(c){var out=[],pm=(primaryMember(c)||{}).name;
  (c.needs||[]).forEach(function(nd){
@@ -12733,27 +12740,28 @@ var COV_WHEEL=[
  {ring:'責任',tone:'resp',kind:'壽險',
   note:'走了，誰接手。這一環的五格是壽險需求的<b>組成</b>，缺口在「責任」這一層一起看。',
   cells:[
-   {key:'living',lb:'生活費',part:'壽險',go:'finance',goLb:'收支資債 · 支出表',
-    calc:function(c,nd){return n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*familyAnnualLiving(c)*protectYearsEff(c,nd);},
+   // ovr＝這一格的手動覆寫欄（needs[].xxxOverride）：留空用自動、填了直接取代（見引擎 needOvr）。
+   {key:'living',lb:'生活費',part:'壽險',go:'finance',goLb:'收支資債 · 支出表',ovr:'livingOverride',
+    calc:function(c,nd){return needOvr(nd,'livingOverride',n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))/100*familyAnnualLiving(c)*protectYearsEff(c,nd));},
     src:function(c,nd){
      var py=n(nd.protectYears),pyE=protectYearsEff(c,nd);
      var s='家計負擔 <b>'+n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))+'%</b> × 家庭年生活費 <b>'+fmt(familyAnnualLiving(c))+'</b> × 保障 <b>'+py+'</b> 年';
      if(Math.abs(pyE-py)>0.005)s+='<br>✅ 責任遞減：'+indepDeps(c,nd.member).map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立（支出比例 '+n(d.expRatio)+'%）';}).join('、')+'，等效 <b>'+pyE.toFixed(2)+'</b> 年';
      return s;}},
-   {key:'loan',lb:'貸款',part:'壽險',go:'finance',goLb:'收支資債 · 負債表',
+   {key:'loan',lb:'貸款',part:'壽險',go:'finance',goLb:'收支資債 · 負債表',ovr:'loanOverride',
     tg:'payDebt',tgLb:'身故要清償家庭負債',tgHint:'預設依角色：本人／配偶列入，子女／父母不列入',
     on:function(c,nd){return needCoversDebt(c,nd);},
-    calc:function(c,nd){return needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0;},
+    calc:function(c,nd){return needCoversDebt(c,nd)?needOvr(nd,'loanOverride',sum(c.liabilities,function(l){return lBal(l)})):0;},
     src:function(c){return '負債表餘額合計 <b>'+fmt(sum(c.liabilities,function(l){return lBal(l)}))+'</b>';}},
-   {key:'edu',lb:'教育費',part:'壽險',go:'education',goLb:'子女教育',
+   {key:'edu',lb:'教育費',part:'壽險',go:'education',goLb:'子女教育',ovr:'eduOverride',
     tg:'fundEdu',tgLb:'身故要備妥子女教育金',tgHint:'預設依角色，同上',
     on:function(c,nd){return needCoversEdu(c,nd);},
-    calc:function(c,nd){return needCoversEdu(c,nd)?eduTotal(c):0;},
+    calc:function(c,nd){return needCoversEdu(c,nd)?needOvr(nd,'eduOverride',eduTotal(c)):0;},
     src:function(c){return '子女教育分頁（終值）<b>'+fmt(eduTotal(c))+'</b>';}},
-   {key:'parent',lb:'父母孝養',part:'壽險',go:'finance',goLb:'收支資債 · 支出表',
+   {key:'parent',lb:'父母孝養',part:'壽險',go:'finance',goLb:'收支資債 · 支出表',ovr:'parentOverride',
     tg:'supportParents',tgLb:'身故要接續父母奉養',tgHint:'預設依角色，同上',
     on:function(c,nd){return needCoversParents(c,nd);},
-    calc:function(c,nd){return needCoversParents(c,nd)?familyAnnualParentSupport(c)*n(nd.protectYears):0;},
+    calc:function(c,nd){return needCoversParents(c,nd)?needOvr(nd,'parentOverride',familyAnnualParentSupport(c)*n(nd.protectYears)):0;},
     src:function(c,nd){return '支出表「孝親」年額 <b>'+fmt(familyAnnualParentSupport(c))+'</b> × 保障 <b>'+n(nd.protectYears)+'</b> 年';}},
    {key:'funeral',lb:'生命禮儀費',part:'壽險',
     fields:[['funeral','生命禮儀費（喪葬費）','money']]}
@@ -12913,6 +12921,24 @@ function covFld(i,f){
  if(f[2]==='money')return '<div class="cwf"><label>'+lb+'</label>'+moneyCell(bind,nd[k])+'</div>';
  return '<div class="cwf"><label>'+lb+'</label><input type="number" inputmode="decimal" value="'+esc(nd[k]==null?'':nd[k])+'" '+bind+'></div>';
 }
+// 自動帶入格的「這位客戶要保到」覆寫欄（2026/09/27 Ray：客戶可能會想拉得更高）。
+// ⚠️ 輸入框住在靜態外殼（不進 data-calc）；留空＝回到自動，0 是合法覆寫，所以不能走 set(...,'num')（'' 會變 0）。
+function covOvrFld(i,cl,nd){
+ var v=nd[cl.ovr];var has=(v!=null&&v!=='');
+ var bind='oninput="covSetOverrideLive('+i+',\''+cl.ovr+'\',this.value)" onchange="covSetOverride('+i+',\''+cl.ovr+'\',this.value)"';
+ return '<div class="cwf cwovr"><label>這位客戶要保到（留空＝用自動帶入的數字）</label>'+
+  '<input type="text" inputmode="numeric" class="amtin" placeholder="例如 '+esc(amtFmt(Math.round(covAutoAmt(activeCase(),nd,cl)*1.2)))+'" value="'+esc(has?amtFmt(v):'')+'" '+bind+'>'+
+  '<div class="cwhint" style="margin-top:4px">填了就直接取代這一格，圖、圓心、整條壽險缺口、五欄表與報告書都跟著變。</div></div>';
+}
+// 這一格「不看覆寫」的自動值（覆寫卡上要並列給教練看差多少）。
+function covAutoAmt(c,nd,cl){
+ if(!cl.ovr)return covCellAmt(c,nd,cl);
+ var keep=nd[cl.ovr];nd[cl.ovr]=null;var a=0;try{a=covCellAmt(c,nd,cl);}finally{nd[cl.ovr]=keep;}return a;
+}
+function covOvrVal(val){var v=amtRaw(val).trim();return v===''?null:n(v);}
+function covSetOverrideLive(i,key,val){var c=activeCase();var nd=(c.needs||[])[i];if(!nd)return;nd[key]=covOvrVal(val);stampNeeds(c,'needs');syncDerived();liveSave();}
+function covSetOverride(i,key,val){var c=activeCase();var nd=(c.needs||[])[i];if(!nd)return;nd[key]=covOvrVal(val);stampNeeds(c,'needs');save();syncDerived();}
+function covClearOverride(i,key){var c=activeCase();var nd=(c.needs||[])[i];if(!nd)return;nd[key]=null;stampNeeds(c,'needs');save();covRedraw();}
 function covNums(need,have,gap,unit,src,tag){
  var cls=gap>0?'cwgap':(gap<0?'cwhigh':'cwok');
  var gv=gap>0?fmt(gap):(gap<0?'－'+fmt(-gap):'0');
@@ -12968,7 +12994,8 @@ function covPadHTML(c,nd,i){
  if(cl.calc){
   // 自動帶入的格子沒有輸入框：金額與來源都是衍生的，開關才是靜態的。
   var on=cl.on?cl.on(c,nd):true;
-  body='<div class="cwsec">自動帶入 · 不用手填</div>'+deriv+
+  body='<div class="cwsec">自動帶入 · 可手動覆寫</div>'+deriv+
+   (cl.ovr?covOvrFld(i,cl,nd):'')+
    (cl.tg?'<label class="cwck"><input type="checkbox" '+(on?'checked ':'')+
     'onchange="set(\''+'needs:'+i+'\',\''+cl.tg+'\',this.checked);covRedraw()"><span><b>'+
     esc(cl.tgLb)+'</b><br>'+esc(cl.tgHint)+'</span></label>':'')+
@@ -13019,9 +13046,12 @@ function covDerivHTML(c){
  var cl=s.cell;
  if(cl.calc){
   var on=cl.on?cl.on(c,nd):true;
-  out+='<div class="cwauto'+(on?'':' off')+'"><div class="t"><span class="n">'+esc(cl.lb)+'</span><span class="a">'+
-   fmt(covCellAmt(c,nd,cl))+'</span></div><div class="s">'+(on?cl.src(c,nd):'此項目未列入（下方開關關閉）')+'</div>'+
-   (cl.go?'<button class="cwgo" onclick="jumpTab(\''+cl.go+'\')">→ 前往「'+esc(cl.goLb||cl.go)+'」修改來源數字</button>':'')+'</div>';
+  var ov=cl.ovr&&nd[cl.ovr]!=null&&nd[cl.ovr]!=='';
+  var autoAmt=ov?covAutoAmt(c,nd,cl):covCellAmt(c,nd,cl);
+  out+='<div class="cwauto'+(on?'':' off')+(ov?' ovr':'')+'"><div class="t"><span class="n">'+esc(cl.lb)+(ov?' <span class="cwovrtag">已手動覆寫</span>':'')+'</span><span class="a">'+
+   fmt(covCellAmt(c,nd,cl))+'</span></div><div class="s">'+(ov?'自動算出來是 <b>'+fmt(autoAmt)+'</b>（':'')+(on?cl.src(c,nd):'此項目未列入（下方開關關閉）')+(ov?'）— 現在用的是手填的 <b>'+fmt(covCellAmt(c,nd,cl))+'</b>':'')+'</div>'+
+   (cl.go?'<button class="cwgo" onclick="jumpTab(\''+cl.go+'\')">→ 前往「'+esc(cl.goLb||cl.go)+'」修改來源數字</button>':'')+
+   (ov?'<button class="cwgo" onclick="covClearOverride('+s.i+',\''+cl.ovr+'\')">↺ 回到自動值 '+fmt(autoAmt)+'</button>':'')+'</div>';
  }
  if(cl.multiKind){
   out+='<div class="cwsec mt">這一格涵蓋 '+covCellKinds(cl).length+' 條獨立缺口</div>'+

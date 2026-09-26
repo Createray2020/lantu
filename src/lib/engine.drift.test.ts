@@ -599,7 +599,9 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
 
   it("負債一律換匯（lBal），不可直接讀 l.balance", () => {
     // 兩邊的 grossLifeNeed 都要用 lBal，否則外幣房貸在「缺口」與「準備度」兩頁會差一個匯率
-    expect(HTML).toContain("+(needCoversDebt(c,nd)?sum(c.liabilities,function(l){return lBal(l)}):0)");
+    // 2026/09/27：貸款那一格可手動覆寫（needOvr），但換匯仍走 lBal
+    expect(HTML).toContain("+(needCoversDebt(c,nd)?needOvr(nd,'loanOverride',sum(c.liabilities,function(l){return lBal(l)})):0)");
+    expect(HTML).toContain("function needOvr(nd,key,auto){var v=nd&&nd[key];return (v==null||v==='')?auto:n(v);}");
 
     const c = E.sampleCase();
     c.liabilities = [{ name: "美金房貸", currency: "美金", fxRate: 32, balance: 100000, rate: 2, pay: 500, months: 240, startAge: 38 }];

@@ -292,3 +292,55 @@ describe("輸入框不能住在會被 innerHTML 換掉的容器裡", () => {
     w.covRedraw();
   });
 });
+
+describe("自動帶入格可手動覆寫（2026/09/27 Ray：客戶可能想拉得更高）", () => {
+  it("填了覆寫就直接取代那一格；五格加總仍 ＝ grossLifeNeed；留空回到自動；0 是合法覆寫；開關關掉一律 0", () => {
+    const c = cur();
+    const nd = c.needs[0];
+    const ring = w.COV_WHEEL[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const loan = ring.cells.find((x: any) => x.key === "loan");
+    nd.payDebt = true;
+    const autoLoan = w.covCellAmt(c, nd, loan);
+    const before = w.grossLifeNeed(c, nd);
+    nd.loanOverride = autoLoan + 5_000_000;
+    expect(w.covCellAmt(c, nd, loan)).toBe(autoLoan + 5_000_000);
+    expect(w.covAutoAmt(c, nd, loan)).toBe(autoLoan);
+    expect(w.grossLifeNeed(c, nd)).toBeCloseTo(before + 5_000_000, 6);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const five = ring.cells.reduce((a: number, cl: any) => a + w.covCellAmt(c, nd, cl), 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const auto = ring.advAuto.reduce((a: number, x: any) => a + x.calc(c, nd), 0);
+    expect(five + Number(nd.estateTax || 0) + auto).toBeCloseTo(w.grossLifeNeed(c, nd), 6);
+    nd.loanOverride = 0;
+    expect(w.covCellAmt(c, nd, loan)).toBe(0);
+    nd.loanOverride = "";
+    expect(w.covCellAmt(c, nd, loan)).toBe(autoLoan);
+    nd.loanOverride = 1;
+    nd.payDebt = false;
+    expect(w.covCellAmt(c, nd, loan), "開關關掉＝這一項不列入，覆寫也不算").toBe(0);
+    nd.payDebt = true; nd.loanOverride = null;
+  });
+
+  it("紀錄框：覆寫欄住在靜態外殼、不在 data-calc 裡；填了之後卡上標「已手動覆寫」並可回到自動", () => {
+    const c = cur();
+    const i = w.covNeedIdx(c);
+    w.app.covCell = "責任|loan";
+    w.covRedraw();
+    const ovr = w.document.querySelector(".cwovr input");
+    expect(ovr, "覆寫輸入框要在").toBeTruthy();
+    expect(ovr.closest("[data-calc]"), "輸入框不能住在 data-calc 容器裡").toBeNull();
+    w.covSetOverride(i, "loanOverride", "12,000,000");
+    expect(c.needs[i].loanOverride).toBe(12_000_000);
+    w.covRedraw();
+    const card = w.document.querySelector('[data-calc="cwDeriv"]');
+    expect(card.textContent).toContain("已手動覆寫");
+    expect(card.textContent).toContain("12,000,000");
+    w.covClearOverride(i, "loanOverride");
+    expect(c.needs[i].loanOverride).toBeNull();
+    expect(w.document.querySelector('[data-calc="cwDeriv"]').textContent).not.toContain("已手動覆寫");
+    w.covSetOverride(i, "loanOverride", "");
+    expect(c.needs[i].loanOverride).toBeNull();
+    w.app.covCell = "";
+  });
+});
