@@ -160,10 +160,19 @@ export type MemberHome = {
   goals: { label: string; cur: number; goal: number; unit: string; kind: string }[];
   compliance: { ceHours: number; ceHoursGoal: number; licenseNote: string | null; kycPending: number };
   announcements: Announcement[];
+  /** 願景處理流程：本期回訪對帳（consult_sessions.checkin）依等級計數。 */
+  checkins: { done: number; partial: number; none: number; total: number };
 };
 
 export async function getMemberHome(coach: CoachRow, period: string): Promise<MemberHome> {
   const d = await getCoachDashboard(coach.id);
+  // 願景處理流程的回訪對帳計數。動態載入：consultSession 一載入就會碰 schema 的 consultSessions，
+  // 首頁的既有測試只 mock 了 home 用到的幾張表；統計失敗也不該讓首頁掛掉，退回全 0。
+  let checkins: MemberHome["checkins"] = { done: 0, partial: 0, none: 0, total: 0 };
+  try {
+    const { checkinStats } = await import("@/lib/consultSession");
+    checkins = await checkinStats(coach.id, new Date(`${period}-01T00:00:00+08:00`));
+  } catch { /* 統計不影響首頁 */ }
   const m = (await metricsFor(period, [coach.id])).get(coach.id);
   const today = todayISO();
   const income = m?.income ?? 0, incomeGoal = m?.incomeGoal || 1;
@@ -198,6 +207,7 @@ export async function getMemberHome(coach: CoachRow, period: string): Promise<Me
     agenda: await agendaFor(rankOf(coach), d.thisWeek),
     todos,
     watch,
+    checkins,
     goals: [
       { label: "收益月目標", cur: income, goal: m?.incomeGoal ?? 0, unit: "money", kind: "amber" },
       { label: "案件月目標", cur: m?.deals ?? 0, goal: m?.dealsGoal ?? 0, unit: " 案", kind: "teal" },

@@ -5,7 +5,7 @@
 //    整個模組變成「沒有任何 export」，而且只有 next build 抓得到。
 import { revalidatePath } from "next/cache";
 import { ensureClientUser } from "@/lib/clientUser";
-import { getClientPlanCase } from "@/lib/clientPlan";
+import { getClientPlanCase, setClientActionStatus } from "@/lib/clientPlan";
 import { setClientTodoDone } from "@/lib/clientTodos";
 import { submitClientQuiz } from "@/lib/clientRiskQuiz";
 import { RISK_QUIZ_TODO } from "@/lib/riskQuizTodo";
@@ -25,6 +25,18 @@ export async function toggleMyTodoAction(itemId: string, done: boolean): Promise
   const plan = await getClientPlanCase(user.id);
   if (!plan) return { ok: false };
   const ok = await setClientTodoDone(plan.clientId, itemId, done);
+  if (ok) revalidatePath("/portal");
+  return { ok };
+}
+
+/**
+ * 願景處理流程：客戶自己標行動清單的狀態（待／到位／部分／沒動）。
+ * clientId 從登入身分反查；只動 c.actions[i].status，教練回訪對帳時拿來當佐證。
+ */
+export async function setMyActionStatusAction(actionId: string, state: string): Promise<{ ok: boolean }> {
+  const user = await ensureClientUser();
+  if (!user) return { ok: false };
+  const ok = await setClientActionStatus(user.id, actionId, state);
   if (ok) revalidatePath("/portal");
   return { ok };
 }

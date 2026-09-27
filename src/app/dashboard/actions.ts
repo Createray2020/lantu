@@ -375,6 +375,18 @@ export async function startSessionAction(
   return r;
 }
 
+/** 願景處理流程 Step 8：把回訪對帳結果記到這一場（consult_sessions.checkin）。 */
+export async function saveCheckinAction(
+  clientId: string,
+  sessionId: string,
+  checkin: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const cid = await coachId();
+  const r = await Session.saveCheckin(cid, sessionId, checkin);
+  if (r.ok) revalidatePath(`/dashboard/clients/${clientId}`);
+  return r;
+}
+
 /** 場中補收議程：把還在「日常維護」的註記收進進行中的這一場。 */
 export async function adoptNotesAction(
   clientId: string,

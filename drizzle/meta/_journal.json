@@ -295,6 +295,13 @@
       "when": 1790502533159,
       "tag": "0041_car_params",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790516870981,
+      "tag": "0042_flow_checkin",
+      "breakpoints": true
     }
   ]
 }

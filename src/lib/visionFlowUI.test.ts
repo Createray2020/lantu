@@ -294,6 +294,21 @@ describe("餘裕線 P1–P3′", () => {
   });
 });
 
+describe("底列：執行期入口", () => {
+  it("客戶在 S7 而人不在方案頁 → 底列多一顆「回訪對帳」；按下去跳到方案頁 S8", () => {
+    const c = cur();
+    c.flow.step = "S7";
+    w.app.dataTab = "family"; w.render();
+    const bar = () => (w.document.getElementById("lnSessBar")?.innerHTML ?? "") as string;
+    expect(bar()).toContain("回訪對帳");
+    w.LN.checkin();
+    expect(w.app.dataTab).toBe("plan");
+    expect(c.flow.step).toBe("S8");
+    expect(bar()).not.toContain("回到對帳");   // 人已經在方案頁，不再重複給入口
+    c.flow.step = "S6x"; w.render();
+  });
+});
+
 describe("方案書與拉桿改標", () => {
   it("方案書多一章「零、我們是怎麼走到這份方案的」，含決定、階段、行動清單", () => {
     const h = w.planReportHTML(cur()) as string;

@@ -377,3 +377,28 @@ export async function saveBizCheck(clientUserId: string, ans: Record<number, str
     .set({ data: c, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })
     .where(eq(plans.id, plan.id));
 }
+
+
+/* ============================================================
+   願景處理流程：客戶自勾行動清單的狀態（2026/09/27）
+   ------------------------------------------------------------
+   讀的是 getClientPlanCase 選出的那一份（教練軌優先），只動 c.actions[i].status，
+   其他一個欄位都不碰——狀態不是規劃內容，教練回訪對帳（Step 8）會拿它當佐證。
+   ⚠️ clientId 從登入身分反查；actionId 對不到就回 false，不寫。
+   ============================================================ */
+const ACTION_STATES = new Set(["planned", "done", "partial", "none"]);
+export async function setClientActionStatus(clientUserId: string, actionId: string, state: string): Promise<boolean> {
+  if (!ACTION_STATES.has(state)) return false;
+  const pc = await getClientPlanCase(clientUserId);
+  if (!pc) return false;
+  const rows = await db.select({ id: plans.id, data: plans.data }).from(plans).where(eq(plans.id, pc.planId)).limit(1);
+  const plan = rows[0];
+  if (!plan) return false;
+  const c = (plan.data && typeof plan.data === "object" ? plan.data : {}) as Record<string, unknown>;
+  const acts = Array.isArray(c.actions) ? (c.actions as Record<string, unknown>[]) : [];
+  const a = acts.find((x) => x && x.id === actionId);
+  if (!a) return false;
+  a.status = { state, checkedAt: new Date().toISOString(), by: "client" };
+  await db.update(plans).set({ data: c, updatedAt: new Date() }).where(eq(plans.id, plan.id));
+  return true;
+}

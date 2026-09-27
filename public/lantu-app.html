@@ -9829,6 +9829,8 @@ function checkin(c){
 }
 function flowD4(grade){
  var c=activeCase();var f=flowOf(c);if(!f)return;var K=checkin(c);
+ // 落表：這一場諮詢的 consult_sessions.checkin（教練首頁統計用）。沒在諮詢中就只留在 c.flow。
+ try{if(typeof REMOTE!=='undefined'&&REMOTE&&typeof toParentLN==='function')toParentLN({type:'lantu:checkin',checkin:{grade:grade,actual:K.actual,planned:K.planned,ratio:K.ratio,cnt:K.cnt,total:K.total,at:new Date().toISOString()}})}catch(e){}
  var txt='回訪對帳：'+(grade==='done'?'到位':grade==='partial'?'動了但不夠':'完全沒動')+
   (K.planned!=null?'（可投資資產 '+cfAxis(K.actual)+' vs 規劃線 '+cfAxis(K.planned)+'，'+Math.round((K.ratio||0)*100)+'%）':'')+'，動作 '+K.cnt.done+' 到位／'+K.cnt.partial+' 部分／'+K.cnt.none+' 沒動';
  if(grade==='done'){
@@ -18503,6 +18505,15 @@ function mountSessBar(){
      (lastSessionId()?'<button class="lnbtn" onclick="LN.restore(\''+lastSessionId()+'\')">回到上次諮詢開始時</button>':''))+
   '<button class="lnbtn pri" onclick="LN.session()"'+(LN.role!=='owner'?' disabled':'')+'>'+(s?'結束並產摘要':'開始諮詢')+'</button>'+
   '</div>';
+ // 願景處理流程：客戶在執行期（S7）或對帳中（S8）而人不在方案頁 → 底列直接給一顆入口。
+ // 開場時教練第一件事應該是回訪對帳，不是從資料分頁一路找到方案頁。
+ try{
+  var fc=(typeof flowOf==='function')?flowOf(c):null;
+  if(fc&&(fc.step==='S7'||fc.step==='S8')&&!(app.activeTab==='data'&&app.dataTab==='plan')){
+   var host=bar.querySelector('.lnbarin');
+   if(host)host.insertAdjacentHTML('beforeend','<button class="lnbtn pri" onclick="LN.checkin()" title="願景處理流程：先對上次的行動清單">'+(fc.step==='S7'?'執行期中 · 回訪對帳':'對帳進行中 · 回到對帳')+'</button>');
+  }
+ }catch(e){}
  syncLnBarH(bar);
 }
 
@@ -18519,6 +18530,7 @@ LN.kind=function(k,v){ d(k).kind=v; redraw(); };
 LN.vis=function(k,v){ d(k).visible=v; };
 LN.typing=function(k,v){ d(k).text=v; };
 LN.openRow=function(k){ d(k).open=true; LN.rowKey=k; redraw(); setTimeout(function(){var e=document.getElementById('lnta_'+k); if(e)e.focus()},30); };
+LN.checkin=function(){ var c=C(); var f=(c&&typeof flowOf==='function')?flowOf(c):null; app.activeTab='data'; app.dataTab='plan'; if(f&&f.step==='S7')flowGo('S8'); else render(); };
 
 // 寫入一則註記的共同路徑（區塊註記帶與側邊記事本都走這裡）。
 function addNoteRaw(k,kind,txt,visible){

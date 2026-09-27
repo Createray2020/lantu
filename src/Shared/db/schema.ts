@@ -1026,6 +1026,9 @@ export const consultSessions = pgTable('consult_sessions', {
   // （違反「忘記按結束絕不能造成資料損失」那條原則）。有 draft_summary 而 review_id 還是
   // null 的場次＝「摘要還沒存」，客戶詳情頁與規劃編輯器都會跳提醒。
   draftSummary: text('draft_summary'),
+  // 願景處理流程 Step 8 回訪對帳的結果（2026/09/27）：{grade, actual, planned, ratio, cnt, total, at}。
+  // 同一份也記在 plans.data 的 c.flow.decisions.d4；這裡落表是為了跨客戶統計（教練首頁「回訪到位」）。
+  checkin: jsonb('checkin'),
 }, (t) => [
   index('consult_sessions_client_started_idx').on(t.clientId, t.startedAt.desc()),
   // 一位客戶同時只能有一場未結束的諮詢。少了這條，忘記按結束又開新的一場，

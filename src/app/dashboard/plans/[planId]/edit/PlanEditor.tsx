@@ -21,6 +21,7 @@ import {
   listSessionsAction,
   restoreToSessionAction,
   createActionItemsAction,
+  saveCheckinAction,
   inviteRiskQuizAction,
 } from "../../../actions";
 import type { NoteRow, NoteInput } from "@/lib/notes";
@@ -353,6 +354,12 @@ export default function PlanEditor({
         postInit();
       } else if (msg.type === "lantu:note" || msg.type === "lantu:session") {
         enqueue(msg as unknown as NoteMsg);
+      } else if (msg.type === "lantu:checkin") {
+        // 願景處理流程 Step 8：對帳結果落到這一場（沒在諮詢中就只留在 c.flow，不另開場次）。
+        const sid = sessionRef.current?.id;
+        if (!sid || readOnly) return;
+        const ck = (msg as unknown as { checkin?: unknown }).checkin;
+        void saveCheckinAction(clientId, sid, ck);
       } else if (msg.type === "lantu:riskinvite") {
         // 教練按「邀請客戶填寫」→ 建一則客戶待辦＋把 client_risk_quiz 的邀請時間戳上去。
         // 客戶填完的答案住他自己的表，教練回來按「套用」才會進 plans.data。

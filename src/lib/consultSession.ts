@@ -8,7 +8,7 @@
 //
 // ⚠️ 開場／結束一律只有主責教練（ownedClient）。協作教練能寫註記，但不能開場。
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { actionItems, clientNotes, clients, consultSessions, planRevisions, plans, reviews } from "@/Shared/db/schema";
 import { ownedClient } from "./clientScope";
@@ -206,6 +206,56 @@ export async function adoptNotes(
  * ⚠️ 已經存成正式紀錄（review_id 不為 null）的場次一律不准取消：
  * 那一列是 reviews 的外鍵來源，而且紀錄已經在客戶的時間軸上了。
  */
+/**
+ * 願景處理流程 Step 8：把這一場的回訪對帳結果落表。
+ * ⚠️ 只有主責教練能寫；資料本身也記在 c.flow，這裡是為了跨客戶統計。冪等：重按就覆蓋。
+ */
+export type CheckinRecord = {
+  grade: "done" | "partial" | "none";
+  actual: number;
+  planned: number | null;
+  ratio: number | null;
+  cnt: Record<string, number>;
+  total: number;
+  at: string;
+};
+const CHECKIN_GRADES = new Set(["done", "partial", "none"]);
+export function normCheckin(raw: unknown): CheckinRecord | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const grade = String(r.grade ?? "");
+  if (!CHECKIN_GRADES.has(grade)) return null;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const cnt: Record<string, number> = {};
+  if (r.cnt && typeof r.cnt === "object") for (const [k, v] of Object.entries(r.cnt as Record<string, unknown>)) cnt[k] = num(v) ?? 0;
+  return { grade: grade as CheckinRecord["grade"], actual: num(r.actual) ?? 0, planned: num(r.planned), ratio: num(r.ratio), cnt, total: num(r.total) ?? 0, at: typeof r.at === "string" ? r.at : new Date().toISOString() };
+}
+export async function saveCheckin(coachId: string, sessionId: string, raw: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const checkin = normCheckin(raw);
+  if (!checkin) return { ok: false, error: "對帳資料格式不對" };
+  const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
+  if (!s) return { ok: false, error: "找不到這一場諮詢" };
+  if (!(await assertOwned(coachId, s.clientId))) return { ok: false, error: "只有主責教練能記回訪對帳" };
+  await db.update(consultSessions).set({ checkin }).where(eq(consultSessions.id, sessionId));
+  return { ok: true };
+}
+/** 教練首頁「回訪到位」：某段期間內有對帳的場次，依等級計數。 */
+export async function checkinStats(coachId: string, since: Date): Promise<{ done: number; partial: number; none: number; total: number }> {
+  // ⚠️ 除了 coach_id，還要 innerJoin(clients)＋ownedClient：客戶轉手之後舊教練不該再統計到那位客戶。
+  const rows = await db
+    .select({ checkin: consultSessions.checkin })
+    .from(consultSessions)
+    .innerJoin(clients, eq(clients.id, consultSessions.clientId))
+    .where(and(eq(consultSessions.coachId, coachId), ownedClient(coachId), isNotNull(consultSessions.checkin), gte(consultSessions.startedAt, since)));
+  const out = { done: 0, partial: 0, none: 0, total: 0 };
+  for (const r of rows) {
+    const c = normCheckin(r.checkin);
+    if (!c) continue;
+    out[c.grade]++; out.total++;
+  }
+  return out;
+}
+
 export async function cancelSession(coachId: string, sessionId: string): Promise<{ ok: true; released: number } | { ok: false; error: string }> {
   const [s] = await db.select(COLS).from(consultSessions).where(eq(consultSessions.id, sessionId)).limit(1);
   if (!s) return { ok: false, error: "找不到這一場諮詢" };

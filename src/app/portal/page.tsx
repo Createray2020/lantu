@@ -4,6 +4,8 @@ import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
 import { listClientCases } from "@/lib/comp/survey";
 import { getClientOwnPlan, getClientPlanCase, getClientSetup } from "@/lib/clientPlan";
+import { flowActionsOf } from "@/lib/flowActions";
+import FlowActions from "./FlowActions";
 import { listClientTodos } from "@/lib/clientTodos";
 import { pendingInvite } from "@/lib/clientRiskQuiz";
 import Todos from "./Todos";
@@ -41,6 +43,7 @@ export default async function Portal() {
   // ⚠️ 客戶還沒被教練建成 clients 的一列時沒有待辦，這一段就整塊不出現（Todos 自己回 null）。
   const planCase = await getClientPlanCase(client.id);
   const todos = planCase ? await listClientTodos(planCase.clientId) : [];
+  const flowActions = planCase ? flowActionsOf(planCase.data) : [];
   // 教練按了「邀請客戶填寫」而客戶還沒送出 → 一進首頁就跳浮動框（關掉還能從橫幅再開）。
   const quizInvited = planCase ? await pendingInvite(planCase.clientId) : false;
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
@@ -168,6 +171,7 @@ export default async function Portal() {
         )}
         <RiskQuizGate invited={quizInvited} />
         <Todos items={todos} />
+        <FlowActions items={flowActions} />
         {r ? (
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-8">

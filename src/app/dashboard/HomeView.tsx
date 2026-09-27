@@ -450,6 +450,7 @@ function MemberBody({ d }: { d: MemberHome }) {
         <Kpi icon="🌱" label="新增客戶" value={String(k.newClients)} sm="位" top="var(--ok)" />
         <Kpi icon="✅" label="待辦事項" value={String(k.openItems)} sm="項" top="var(--danger)" />
         <Kpi icon="📅" label="今日約訪" value={String(k.todayAppts)} sm="場" top="var(--c5)" />
+        <Kpi icon="🧭" label="本月回訪到位" value={`${d.checkins.done}/${d.checkins.total}`} sm="場" note={d.checkins.total ? `部分 ${d.checkins.partial}・沒動 ${d.checkins.none}` : "本月還沒有回訪對帳"} top="var(--brand)" />
       </div>
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <div>
