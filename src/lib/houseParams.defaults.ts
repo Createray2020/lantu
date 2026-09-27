@@ -36,11 +36,12 @@ export type HousePayTemplate = {
   decoRatio: number;      // 裝修起手值 %（總價）
   loanRatio: number;      // 貸款成數起手值 %
   loanYears: number;      // 貸款年期起手值
+  graceYears: number;     // 寬限期（年）起手值：只繳息、本金不動；之後本金攤在剩餘年期
 };
 export const HOUSE_PAY_DEFAULT: Record<HouseCondition, HousePayTemplate> = {
-  "預售":   { deposit: 15, progress: 10, progressYears: 3, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 75, loanYears: 30 },
-  "新成屋": { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 80, loanYears: 30 },
-  "中古":   { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 2, closingFee: 1.5, decoRatio: 10, loanRatio: 75, loanYears: 30 },
+  "預售":   { deposit: 15, progress: 10, progressYears: 3, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 75, loanYears: 30, graceYears: 3 },
+  "新成屋": { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 80, loanYears: 30, graceYears: 2 },
+  "中古":   { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 2, closingFee: 1.5, decoRatio: 10, loanRatio: 75, loanYears: 30, graceYears: 0 },
 };
 
 /** 問卷的「最低標準」起手：電梯大樓・3 房・30 坪・5–10 年 */

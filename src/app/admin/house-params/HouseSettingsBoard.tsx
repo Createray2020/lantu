@@ -19,6 +19,7 @@ const PAY_FIELDS: [keyof HousePayTemplate, string, string][] = [
   ["decoRatio", "裝修起手 %", "占總價"],
   ["loanRatio", "貸款成數起手 %", ""],
   ["loanYears", "貸款年期起手", ""],
+  ["graceYears", "寬限期（年）", "只繳息、本金不動；之後本金攤在剩餘年期"],
 ];
 
 export default function HouseSettingsBoard({ settings }: { settings: Settings }) {

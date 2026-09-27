@@ -162,7 +162,7 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     // 2026/09/27：交屋年才進房子、交屋前已付期款當固定資產（預售）
     expect(HTML).toContain(" var fixedAt=fixedAssets-sum(c.assets,function(a){return (!aLiquid(c,a)&&soldAsset(hSales,a,age))?aVal(a):0})+sum(gLoans,function(L){return age>=L.handoverAge?L.price:housePaidBy(L,age)});".trim());
     expect(HTML).toContain("function housePaySchedule(g,buyAge,price,loan){");
-    expect(HTML).toContain(" if(!cond)return {deposit:0,progress:0,progressYears:0,agentFee:0,closingFee:0};");
+    expect(HTML).toContain(" if(!cond)return {deposit:0,progress:0,progressYears:0,agentFee:0,closingFee:0,graceYears:0};");
   });
 
   it.each([

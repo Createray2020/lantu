@@ -211,10 +211,10 @@ describe("購置試算：參數齊全，但只算給人看", () => {
   it("利率與年期會改變一生金流——而且三個欄位缺一個就完全不生效", () => {
     const c = withHouse();
     const full = w.metrics(c).proj;
-    // 50 歲那一年只扣頭期款（總價 1,200 萬 × 1.02^10 × 30%），不是全額
+    // 50 歲那一年只扣頭期款（總價 1,200 萬 × 1.02^10 × 30%）＋ 裝修自備（170 萬 × 1.02^10；2026/09/27 起不併總價、交屋年付），不是全額
     const buy = full.rows.find((r: { age: number }) => r.age === 50);
     const price = 12_000_000 * Math.pow(1.02, 10);
-    expect(buy.goal).toBeCloseTo(price * 0.3, 2);
+    expect(buy.goal).toBeCloseTo(price * 0.3 + 1_700_000 * Math.pow(1.02, 10), 2);
 
     // 利率拉高 → 月付變重 → 缺口變大
     const c2 = withHouse();
@@ -228,14 +228,16 @@ describe("購置試算：參數齊全，但只算給人看", () => {
     expect(b3.goal).toBeCloseTo(price, 2);
   });
 
-  it("裝修款要按了才併進總價，而且不會重複按", () => {
+  it("裝修款不併進總價（2026/09/27 Ray：成數只算屋價）：交屋年自備付；舊資料已併入的（decoIn）不再算第二次", () => {
     const c = withHouse();
     expect(c.goals[0].present).toBe(12_000_000);
-    w.addDecoToPrice(0);
-    expect(w.activeCase().goals[0].present).toBe(13_700_000);
-    expect(w.activeCase().goals[0].minPresent, "最低標準也要跟著加").toBe(11_700_000);
-    w.addDecoToPrice(0);
-    expect(w.activeCase().goals[0].present, "重複按不能再加一次").toBe(13_700_000);
+    expect(w.addDecoToPrice, "「併進總價」那顆按鈕已經拿掉").toBeUndefined();
+    const L = w.goalLoans(c)[0];
+    const g10 = Math.pow(1.02, 10);   // 40→50 歲，appreciation 2%
+    expect(L.liab.balance, "貸款只用屋價算").toBeCloseTo(12_000_000 * g10 * 0.7, 2);
+    expect(L.pays.find((p: { label: string }) => p.label === "裝修（自備）")?.amount).toBeCloseTo(1_700_000 * g10, 2);
+    c.goals[0].decoIn = true;
+    expect(w.goalLoans(c)[0].pays.find((p: { label: string }) => p.label === "裝修（自備）")).toBeUndefined();
   });
 
   it("沒有購屋／置產目標時不出現這一區", () => {

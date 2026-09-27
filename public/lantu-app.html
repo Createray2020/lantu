@@ -3462,24 +3462,41 @@ function propGapTotals(c){
 //       ＋雜費，貸款從交屋年起算。新成屋：購置年付頭期＋雜費。中古：頭期＋仲介費＋雜費。
 // 比例來源：後台範本（HOUSE_PAY_LIVE，前端才有）→ 程式端 HOUSE_PAY_DEFAULT；每筆目標可用 g.pay 覆寫（每個建案不一樣）。
 // ⚠️ 工程期款與訂簽開都是「已付的自備款」，交屋自備＝總價−貸款−已付；貸款成數不會把期款再算一次。
+// graceYears＝寬限期（年）起手值（2026/09/27 Ray：寬限期都沒算進去）：寬限期內只繳息、本金不動，之後本金攤在剩餘年期。
 var HOUSE_PAY_DEFAULT_ENGINE={
- '預售':  {deposit:15,progress:10,progressYears:3,agentFee:0,closingFee:1.0},
- '新成屋':{deposit:0, progress:0, progressYears:0,agentFee:0,closingFee:1.0},
- '中古':  {deposit:0, progress:0, progressYears:0,agentFee:2,closingFee:1.5}
+ '預售':  {deposit:15,progress:10,progressYears:3,agentFee:0,closingFee:1.0,graceYears:3},
+ '新成屋':{deposit:0, progress:0, progressYears:0,agentFee:0,closingFee:1.0,graceYears:2},
+ '中古':  {deposit:0, progress:0, progressYears:0,agentFee:2,closingFee:1.5,graceYears:0}
 };
 function housePayTpl(g){
  var cond=(g&&g.condition)||'';
  // ⚠️ 沒選屋況的舊目標：沒有訂簽開、沒有費用——頭期＝總價−貸款，跟 2026/08/30 版一模一樣（既有客戶數字一位不動）。
- if(!cond)return {deposit:0,progress:0,progressYears:0,agentFee:0,closingFee:0};
+ if(!cond)return {deposit:0,progress:0,progressYears:0,agentFee:0,closingFee:0,graceYears:0};
  var live=(typeof HOUSE_PAY_LIVE==='function')?HOUSE_PAY_LIVE(cond):null;
  var base=Object.assign({},HOUSE_PAY_DEFAULT_ENGINE[cond]||HOUSE_PAY_DEFAULT_ENGINE['新成屋'],live||{});
  var ov=(g&&g.pay&&typeof g.pay==='object')?g.pay:{};
- var t={};['deposit','progress','progressYears','agentFee','closingFee'].forEach(function(k){t[k]=(ov[k]==null||ov[k]==='')?n(base[k]):n(ov[k]);});
+ var t={};['deposit','progress','progressYears','agentFee','closingFee','graceYears'].forEach(function(k){t[k]=(ov[k]==null||ov[k]==='')?n(base[k]):n(ov[k]);});
  if(cond!=='預售'){t.deposit=0;t.progress=0;t.progressYears=0;}
  if(cond!=='中古')t.agentFee=0;
  t.progressYears=Math.max(0,Math.round(t.progressYears));
+ t.graceYears=Math.max(0,Math.round(t.graceYears));
  return t;
 }
+// ═══ 裝修款（2026/09/27 Ray）：不併進總價——成數是用屋價算的，裝修是獨立的裝修貸款 ═══
+// 裝修在交屋年發生：自備部分那一年直接扣；有填裝修貸（成數／利率／年期都 > 0）的部分合成第二筆虛擬負債
+// （同一套 debtPayAt／lRemain，無寬限）。裝修不進固定資產（不保值）。
+// ⚠️ 舊資料按過「併進總價」（g.decoIn）的：那筆裝修已經在總價裡，這裡不再算第二次。
+function houseDeco(g,handoverAge,growth){
+ if(!g||g.decoIn)return null;
+ var deco=n(g.decoCost)*growth;if(!(deco>0))return null;
+ var ratio=Math.min(100,n(g.decoLoanRatio)),rate=n(g.decoLoanRate),yrs=n(g.decoLoanYears);
+ var loan=(ratio>0&&rate>0&&yrs>0)?deco*ratio/100:0,months=Math.round(yrs*12);
+ return {cost:deco,cash:deco-loan,loan:loan,
+  liab:loan>0?{balance:loan,rate:rate,pay:pmt(loan,rate,months),months:months,startAge:handoverAge,grace:0,repay:'本息攤還',fxRate:1}:null};
+}
+// 一筆購屋目標某一年的負債現金流／剩餘本金＝房貸＋裝修貸。投影、蒙地卡羅、淨值三邊一律走這兩支。
+function goalLoanPayAt(L,age,a0){return debtPayAt(L.liab,age,a0)+(L.decoLiab?debtPayAt(L.decoLiab,age,a0):0);}
+function goalLoanRemain(L,age,a0){return lRemain(L.liab,age,a0)+(L.decoLiab?lRemain(L.decoLiab,age,a0):0);}
 /** 一筆購屋目標的付款時程。回 {pays:[{age,amount,label}],handoverAge,down} —— down＝所有自備款合計（含費用）。 */
 function housePaySchedule(g,buyAge,price,loan){
  var tp=housePayTpl(g),pays=[];
@@ -3520,12 +3537,16 @@ function goalLoans(c){
   var loan=price*Math.min(100,ratio)/100;
   var months=Math.round(yrs*12);
   var sch=housePaySchedule(g,buyAge,price,loan);
-  out.push({idx:idx,buyAge:buyAge,handoverAge:sch.handoverAge,price:price,loan:loan,down:sch.down,pays:sch.pays,
+  // 寬限期：範本／每筆覆寫（g.pay.graceYears）→ 月數；寬限後本金攤在剩餘年期（pay 用 months−grace 算，跟負債列同一條規則）
+  var graceM=Math.round(housePayTpl(g).graceYears*12);if(graceM>=months)graceM=0;
+  var dc=houseDeco(g,sch.handoverAge,Math.pow(1+gr,t));
+  if(dc&&dc.cash>0){sch.pays.push({age:sch.handoverAge,amount:dc.cash,label:'裝修（自備）'});sch.down+=dc.cash;}
+  out.push({idx:idx,buyAge:buyAge,handoverAge:sch.handoverAge,price:price,loan:loan,down:sch.down,pays:sch.pays,graceM:graceM,deco:dc,decoLiab:dc?dc.liab:null,
    // pay 是**月付**（debtPayAt 回 lPay(l)*12）。startAge＝交屋年（新成屋／中古＝購置年；預售＝簽約＋工程年數）：
    // 那一年自備款與第一年還款一起發生，比「隔年才開始還」保守，也不會讓
    // 淨值曲線在交屋當年只看到房子、看不到貸款。
-   liab:{balance:loan,rate:rate,pay:pmt(loan,rate,months),months:months,
-         startAge:sch.handoverAge,grace:0,repay:'本息攤還',fxRate:1}});
+   liab:{balance:loan,rate:rate,pay:pmt(loan,rate,months-graceM),months:months,
+         startAge:sch.handoverAge,grace:graceM,repay:'本息攤還',fxRate:1}});
  });
  return out;
 }
@@ -3708,7 +3729,7 @@ function projection(c,lump,rateOverride){
   var inflF=Math.pow(1+infl,t);
   var w=retiredWeight(c,age);
   var expense=workPhaseExpense(c,age,inflF,w);
-  var debt=sum(c.liabilities,function(l){return soldLiab(hSales,l,age)?0:debtPayAt(l,age,a0)})+sum(gLoans,function(L){return debtPayAt(L.liab,age,a0)});
+  var debt=sum(c.liabilities,function(l){return soldLiab(hSales,l,age)?0:debtPayAt(l,age,a0)})+sum(gLoans,function(L){return goalLoanPayAt(L,age,a0)});
   var saleIn=houseSaleIn(hSales,age);
   // 有貸款計畫的那幾筆只扣頭期款，貸款那一段走上面的 debt。
   // 有貸款計畫的目標走付款時程（可能跨好幾年：預售的訂簽開→工程期款→交屋）；其餘照舊在目標那一年一次扣。
@@ -3767,7 +3788,7 @@ function projection(c,lump,rateOverride){
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
   var totalInv=invest+potSum;
   if(turnNeg===null&&totalInv<0)turnNeg=age;
-  var remDebt=sum(c.liabilities,function(l){return soldLiab(hSales,l,age)?0:lRemain(l,age,a0)})+sum(gLoans,function(L){return lRemain(L.liab,age,a0)});
+  var remDebt=sum(c.liabilities,function(l){return soldLiab(hSales,l,age)?0:lRemain(l,age,a0)})+sum(gLoans,function(L){return goalLoanRemain(L,age,a0)});
   // 買下來的房子從購置年起進固定資產。⚠️ 以購置當年的價格計、之後不再增值——
   // 保守，也避免「房價自己漲出淨值」這種一被問就站不住的數字。
   // 交屋前已付的期款也是資產（預付給建商的錢），淨值不會憑空少一塊。
@@ -4496,7 +4517,7 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
    var income=work+other+fin;
    var wMC=retiredWeight(c,age);
    var expense=workPhaseExpense(c,age,cumI,wMC);
-   var debt=sum(c.liabilities,function(l){return soldLiab(hSalesMC,l,age)?0:debtPayAt(l,age,a0)})+sum(gLoansMC,function(L){return debtPayAt(L.liab,age,a0)});
+   var debt=sum(c.liabilities,function(l){return soldLiab(hSalesMC,l,age)?0:debtPayAt(l,age,a0)})+sum(gLoansMC,function(L){return goalLoanPayAt(L,age,a0)});
    var goalOut=sum(gLoansMC,function(L){return housePayAt(L,age)});
    (c.goals||[]).forEach(function(gg,gi){
     if(!visionOn(gg))return;
@@ -12872,9 +12893,9 @@ var HOUSE_TYPES=["電梯大樓","華廈","公寓","透天"];
 var HOUSE_TYPE_RATIO_DEFAULT={ "電梯大樓": 1.0, "華廈": 0.9, "公寓": 0.7, "透天": 1.15 };
 var HOUSE_AGE_RATIO_DEFAULT=[[5, 1.0], [15, 0.9], [30, 0.8], [Infinity, 0.7]];
 var HOUSE_PAY_DEFAULT={
-  "預售":   { deposit: 15, progress: 10, progressYears: 3, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 75, loanYears: 30 },
-  "新成屋": { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 80, loanYears: 30 },
-  "中古":   { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 2, closingFee: 1.5, decoRatio: 10, loanRatio: 75, loanYears: 30 },
+  "預售":   { deposit: 15, progress: 10, progressYears: 3, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 75, loanYears: 30, graceYears: 3 },
+  "新成屋": { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 80, loanYears: 30, graceYears: 2 },
+  "中古":   { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 2, closingFee: 1.5, decoRatio: 10, loanRatio: 75, loanYears: 30, graceYears: 0 },
 };
 var HOUSE_MIN_SPEC_DEFAULT={ type: "電梯大樓", rooms: 3, ping: 30, parking: 0, age: 10 };
 function defaultHousePrices(){
@@ -13611,15 +13632,8 @@ function freqCell(arr,i,val){
 //    原本的決定是「只算給人看」，理由是引擎級改動會動到所有含購屋目標的既有客戶；
 //    正式站清空之後那個理由消失，就趁沒有真實客戶的時候把它改對。
 //    ⚠️ 觸發要三個欄位（成數／利率／年期）都有值，缺一個就退回「那一年一次付清」。
-// ⚠️ 裝修款不自動併進總價——教練很可能已經把裝修含在房價裡了，自動加會重複。
-//    給一顆按鈕，按了才加，並記 decoIn 防止重複按。
-function addDecoToPrice(i){
- var c=activeCase();var g=c.goals[i];if(!g)return;
- if(g.decoIn){alert('這筆的裝修款已經併進總價了。');return;}
- g.present=n(g.present)+n(g.decoCost);
- if(n(g.minPresent)>0)g.minPresent=n(g.minPresent)+n(g.decoCost);
- g.decoIn=true;save();render();
-}
+// ⚠️ 裝修款**不併進總價**（2026/09/27 Ray）：貸款成數是用屋價算的，裝修是獨立的裝修貸款——
+//    見引擎 houseDeco()。舊資料按過「併進總價」的（g.decoIn）保留原樣、卡上標「已併入總價」，引擎不再算第二次。
 // 卡片本體抽成獨立函式並掛 data-calc="houseCalc"：
 // 利率／年期／裝修款走 finNum（oninput=setLive、onchange=set），兩條路徑在 data 分頁都不 render，
 // 舊版因此「把利率從 2.0 調到 2.1，月付・頭期・總利息一動也不動」——
@@ -13756,15 +13770,24 @@ function houseCalcCardsHTML(c){
    '<div class="dform">'+
     f('房貸利率 %',finNum('goals',i,'loanRate',g.loanRate))+
     f('貸款年期',finNum('goals',i,'loanYears',g.loanYears))+
-    f('裝修款'+(g.decoIn?'（已併入總價）':''),moneyCell('onchange="set(\'goals:'+i+'\',\'decoCost\',this.value,\'num\')"',g.decoCost))+
-    (deco>0&&!g.decoIn?'<div class="dfield"><label>&nbsp;</label><button class="tbtn" onclick="addDecoToPrice('+i+')">把裝修款併進總價</button></div>':'')+
+    (g.decoIn
+     ?f('裝修款（已併入總價）',moneyCell('onchange="set(\'goals:'+i+'\',\'decoCost\',this.value,\'num\')"',g.decoCost))
+     :f('裝修款 <span class="hint">交屋年付，不併總價</span>',moneyCell('onchange="set(\'goals:'+i+'\',\'decoCost\',this.value,\'num\')"',g.decoCost))+
+      (deco>0?'':'<div class="dfield"><label>&nbsp;</label><button class="tbtn" onclick="houseDecoSeed('+i+')">帶入起手值（總價 × '+houseDecoRatio(g)+'%）</button></div>')+
+      (deco>0?f('裝修貸成數 % <span class="hint">空＝現金付</span>','<input type="text" inputmode="decimal" value="'+esc(g.decoLoanRatio==null?'':g.decoLoanRatio)+'" onchange="setHouseDeco('+i+',\'decoLoanRatio\',this.value)">')+
+              f('裝修貸利率 %','<input type="text" inputmode="decimal" value="'+esc(g.decoLoanRate==null?'':g.decoLoanRate)+'" onchange="setHouseDeco('+i+',\'decoLoanRate\',this.value)">')+
+              f('裝修貸年期','<input type="text" inputmode="decimal" placeholder="7" value="'+esc(g.decoLoanYears==null?'':g.decoLoanYears)+'" onchange="setHouseDeco('+i+',\'decoLoanYears\',this.value)">'):''))+
    '</div>'+
    housePayFieldsHTML(c,g,i)+
    '<div data-calc="houseCalc:'+i+'">'+houseCalcDerivedHTML(c,i)+'</div></div>';
  }).join('');
 }
 // 付款時程的比例欄位（2026/09/27 Ray：範本是預設，每個建案不一樣所以每筆可覆寫）。只顯示該屋況用得到的；留空＝用後台範本。
-var HOUSE_PAY_FIELDS=[['deposit','訂簽開 %','預售'],['progress','工程期款合計 %','預售'],['progressYears','工程期款分幾年（＝交屋延後年數）','預售'],['agentFee','仲介費 %','中古'],['closingFee','雜費 %（代書・契稅・印花）','*']];
+var HOUSE_PAY_FIELDS=[['deposit','訂簽開 %','預售'],['progress','工程期款合計 %','預售'],['progressYears','工程期款分幾年（＝交屋延後年數）','預售'],['agentFee','仲介費 %','中古'],['closingFee','雜費 %（代書・契稅・印花）','*'],['graceYears','寬限期（年）','*']];
+// 裝修貸（2026/09/27 Ray：裝修不併總價，成數只算屋價；裝修走獨立的裝修貸款）。留空＝現金付。
+function setHouseDeco(i,key,val){var c=activeCase();var g=(c.goals||[])[i];if(!g)return;var v=amtRaw(val).trim();g[key]=(v==='')?null:n(v);stampNeeds(c,'goals');save();syncDerived();}
+function houseDecoRatio(g){return n((houseData().settings.pay[(g&&g.condition)||'新成屋']||{}).decoRatio);}
+function houseDecoSeed(i){var c=activeCase();var g=(c.goals||[])[i];if(!g)return;g.decoCost=Math.round(n(g.present)*houseDecoRatio(g)/100);save();render();}
 function setHousePay(i,key,val){var c=activeCase();var g=(c.goals||[])[i];if(!g)return;g.pay=g.pay||{};var v=amtRaw(val).trim();g.pay[key]=(v==='')?null:n(v);stampNeeds(c,'goals');save();syncDerived();}
 function housePayFieldsHTML(c,g,i){
  var cond=g.condition||'';
@@ -13783,19 +13806,26 @@ function houseCalcDerivedHTML(c,i){
  var price=n(g.present),ratio=n(g.loanRatio),rate=n(g.loanRate),yrs=n(g.loanYears);
  var loan=Math.round(price*ratio/100),down=price-loan;
  var months=yrs*12,mp=months>0?Math.round(pmt(loan,rate,months)):0;
- var totInt=mp>0?Math.round(mp*months-loan):0;
+ // 寬限期（跟 goalLoans 同一條規則）：只繳息 gm 個月，之後本金攤在剩餘 months−gm 個月
+ var gm=Math.round(housePayTpl(g).graceYears*12);if(gm>=months)gm=0;
+ var mpG=gm>0?Math.round(loan*rate/100/12):0,mpA=gm>0?Math.round(pmt(loan,rate,months-gm)):mp;
+ var totInt=mp>0?Math.round(gm>0?(mpG*gm+mpA*(months-gm)-loan):(mp*months-loan)):0;
  // 付款時程（用今日現值畫；投影裡是以購置年的價格算，比例一樣）
  var tl='';
  if(g.condition&&n(g.start)>0){
   var sch=housePaySchedule(g,n(g.start),price,loan);
+  var dc=houseDeco(g,sch.handoverAge,1);if(dc&&dc.cash>0){sch.pays.push({age:sch.handoverAge,amount:dc.cash,label:'裝修（自備）'});sch.down+=dc.cash;}
   tl='<div style="margin-top:6px">時程：'+sch.pays.map(function(p){return p.age+' 歲 '+esc(p.label)+' <b>'+fmt(Math.round(p.amount))+'</b>'}).join('　→　')+
-   (mp>0?'　→　'+sch.handoverAge+' 歲起月付 <b>'+fmt(mp)+'</b>×'+yrs+' 年':'')+
+   (mp>0?(gm>0?'　→　'+sch.handoverAge+' 歲起寬限期月付 <b>'+fmt(mpG)+'</b>×'+(gm/12)+' 年（只繳息）　→　寬限後月付 <b>'+fmt(mpA)+'</b>×'+((months-gm)/12)+' 年'
+                :'　→　'+sch.handoverAge+' 歲起月付 <b>'+fmt(mp)+'</b>×'+yrs+' 年'):'')+
+   (dc&&dc.liab?'　→　裝修貸 <b>'+fmt(Math.round(dc.loan))+'</b> 月付 <b>'+fmt(Math.round(dc.liab.pay))+'</b>×'+n(g.decoLoanYears)+' 年':'')+
    '<br>自備款合計（含費用）<b style="color:var(--amber2)">'+fmt(Math.round(sch.down))+'</b>'+(sch.handoverAge>n(g.start)?'　·　交屋 '+sch.handoverAge+' 歲（貸款從交屋年起算，工程期款不會被成數再算一次）':'')+'</div>';
  }
  return '<div class="hint" style="margin-top:8px;line-height:1.9">'+tl+
   '頭期款（總價 × '+(100-ratio)+'%）<b style="color:var(--amber2)">'+fmt(down)+'</b>　·　'+
   '貸款金額 <b>'+fmt(loan)+'</b>　·　'+
-  (mp>0?('月付 <b style="color:var(--amber2)">'+fmt(mp)+'</b>　·　總利息 <b>'+fmt(totInt)+'</b>')
+  (mp>0?(gm>0?('寬限期月付 <b style="color:var(--amber2)">'+fmt(mpG)+'</b>（'+(gm/12)+' 年只繳息）　·　寬限後月付 <b style="color:var(--amber2)">'+fmt(mpA)+'</b>　·　總利息 <b>'+fmt(totInt)+'</b>')
+              :('月付 <b style="color:var(--amber2)">'+fmt(mp)+'</b>　·　總利息 <b>'+fmt(totInt)+'</b>'))
        :'<span style="color:var(--warn)">填了利率與年期才算得出月付——也才會進一生金流；現在這筆是「'+n(g.start)+' 歲那一年一次付清 '+fmt(price)+'」</span>')+
   '</div>';
 }
