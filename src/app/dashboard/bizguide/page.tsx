@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 // 所有法規數字一律從 @/lib/bizTax 讀，不在本頁寫死。
 
 const money = fmtMoney;
-const pct = (v: number) => `${+(v * 100).toFixed(2)}%`;
+const pct = (v: number) => `${+(v * 100).toFixed(1)}%`;
 
 function Card({ id, title, sub, children }: { id?: string; title: string; sub?: string; children: React.ReactNode }) {
   return (

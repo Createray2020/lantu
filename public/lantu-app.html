@@ -2184,7 +2184,8 @@ function autoSortRows(arr,kind){
 }
 function sortBtn(arr,kind){return '<button class="sortbtn" onclick="autoSortRows(\''+arr+'\',\''+kind+'\')" title="把同一個分類的項目收攏在一起">⇅ 自動整理</button>';}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
-function pct(x){return (x*100).toFixed(2)+'%'}
+function pct(x){return (x*100).toFixed(1)+'%'}
+function r1(v){v=Number(v);return isFinite(v)?Math.round(v*10)/10:0}
 // 年利息負擔＝現齡當年的應計利息。⚠️ 刻意維持「原始餘額 × 年利率」的既有口徑
 // （不改成 lRemain，那會動到每一個既有個案的利息數字，是另一件事）。
 // 只付利息 → 這正好就是實付；暫緩還款 → 利息照樣發生，只是沒付、滾進本金。
@@ -3102,7 +3103,7 @@ function lifeNeedDetailHTML(c){var nds=c.needs||[];if(!nds.length)return '';var 
    var living=depR*famLiving*pyEff,parents=needCoversParents(c,nd)?parentAnnual*py:0,gtee=guaranteeFor(c,nd.member);
    var indepN=indepDeps(c,nd.member).filter(function(d){return n(d.age)<n(d.indepAge);});
    var pyLabel=(Math.abs(pyEff-py)>0.005)
-    ?('保障 '+py+' 年（'+indepN.map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立';}).join('、')+'後責任遞減，等效 '+pyEff.toFixed(2)+' 年）')
+    ?('保障 '+py+' 年（'+indepN.map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立';}).join('、')+'後責任遞減，等效 '+pyEff.toFixed(1)+' 年）')
     :('保障 '+py+' 年');
    var existing=existingCover(c,nd.member,'壽險'),liq=nd.member===pm?liquidMovable(c):0;
    var gross=grossLifeNeed(c,nd);
@@ -4413,7 +4414,7 @@ function planActions(c,set){
   acts.push({axis:'累積',title:'把缺口補起來',
    detail:(led.years<=1
      ? '現金流最快在 '+led.negAge+' 歲轉負，'+fmt(led.total)+' 元的缺口沒有攤提空間，必須立即處理'
-     : '在 '+led.years+' 年內每年存入 '+fmt(led.annual)+' 元，以 '+(+led.rate.toFixed(2))+'% 複利累積'),
+     : '在 '+led.years+' 年內每年存入 '+fmt(led.annual)+' 元，以 '+(+led.rate.toFixed(1))+'% 複利累積'),
    note:'現值缺口 '+fmt(led.total)+' 元（保守情境 '+fmt(led.conservative)+' 元）'});
  }
 
@@ -4434,8 +4435,8 @@ function planActions(c,set){
  if(set.rate!==undefined&&set.rate!==null&&set.rate!==''&&n(set.rate)>effReturn(c)){
   var al=allocInfo(c);
   acts.push({axis:'效率',title:'調整資產配置以提高長期報酬',
-   detail:'報酬率假設由 '+(+effReturn(c).toFixed(2))+'％ 提高到 '+(+n(set.rate).toFixed(2))+'％',
-   note:(al.totalPct>0?'目前建議配置的加權報酬為 '+al.wRet.toFixed(2)+'％，需要重新檢視配置':'尚未填建議資產配置')+
+   detail:'報酬率假設由 '+(+effReturn(c).toFixed(1))+'％ 提高到 '+(+n(set.rate).toFixed(1))+'％',
+   note:(al.totalPct>0?'目前建議配置的加權報酬為 '+al.wRet.toFixed(1)+'％，需要重新檢視配置':'尚未填建議資產配置')+
         '；規劃上限 '+CAP_RATE+'％，此為假設不是承諾'});
  }
  if(n(set.retire)){
@@ -8110,7 +8111,7 @@ function leverBarsHTML(c,solo,theme,withAct){
   else if(r.blocked){st='⚪';col=K.MUT;txt='現階段不建議動用';frac=0;}
   else if(r.feasible){st='🟢';col=K.OK;
    frac=Math.max(0.02,Math.min(1,(r.cap-r.lo)>0?(r.x-r.lo)/(r.cap-r.lo):1));
-   txt=(r.id==='rate'?('拉到 '+r.x.toFixed(2)+'%'):((r.id==='retire'||r.id==='defer')?('延後 '+Math.round(r.x)+' 年'):((r.id==='income'?'增加':r.id==='expense'?'削減':r.id==='vision'?'壓縮':'調降')+' '+r.x.toFixed(1)+'%')));}
+   txt=(r.id==='rate'?('拉到 '+r.x.toFixed(1)+'%'):((r.id==='retire'||r.id==='defer')?('延後 '+Math.round(r.x)+' 年'):((r.id==='income'?'增加':r.id==='expense'?'削減':r.id==='vision'?'壓縮':'調降')+' '+r.x.toFixed(1)+'%')));}
   else {st='🔴';col=K.GAP;frac=1;
    txt='拉到上限仍差 '+cfAxis(r.gap);}
   var capTxt=(r.id==='retire'?r.cap+' 年':(+r.cap.toFixed(1))+'%');
@@ -8192,7 +8193,7 @@ function delTrial(i){var c=activeCase();(c.plan.trials||[]).splice(i,1);save();r
 function renameTrial(i,v){var c=activeCase();var t=(c.plan.trials||[])[i];if(t){t.label=v;save();}}
 function setUseAlloc(v){var c=activeCase();c.plan=c.plan||{};c.plan.useAllocReturn=!!v;save();render();}
 function useAllocRate(){var c=activeCase();var al=allocInfo(c);if(!(al.totalPct>0))return;
- c.params.invReturn=+al.wRet.toFixed(2);save();render();}
+ c.params.invReturn=+al.wRet.toFixed(1);save();render();}
 
 // ===== 調整方案：畫面 =====
 // 排版原則（2026/08/23 第二輪重排）：首屏只有「一張圖 ＋ 三個數字 ＋ 拉桿」，
@@ -8205,7 +8206,7 @@ function foldSec(title,hint,inner,open){
   '<div style="margin-top:12px">'+inner+'</div></details></div>';
 }
 function leverLabel(id,v){
- if(id==='rate')return (v===''||v==null)?'未指定':(+v).toFixed(2)+'%';
+ if(id==='rate')return (v===''||v==null)?'未指定':(+v).toFixed(1)+'%';
  if(id==='retire'||id==='defer')return Math.round(n(v))+' 年';
  return (+n(v)).toFixed(1)+'%';
 }
@@ -8323,7 +8324,7 @@ function gapHeroHTML(c,ledBase,gate){
  }
  var money=function(v){return fmt(v)},pct1=function(v){return v+'%'};
  var big='<div class="big3">'+
-  '<div class="b"><div class="l">現值缺口<span class="hint"> 假設報酬 '+(+led.rate.toFixed(2))+'%'+(hasDraft?' · 調整後':'')+'</span></div>'+
+  '<div class="b"><div class="l">現值缺口<span class="hint"> 假設報酬 '+(+led.rate.toFixed(1))+'%'+(hasDraft?' · 調整後':'')+'</span></div>'+
    was(ledBase.total,led.total,money)+
    '<div class="v" style="color:'+(ok?'var(--ok)':'var(--warn)')+'">'+fmt(led.total)+'</div>'+
    '<div class="hint" style="display:block">'+(ok?'一生現金流不會轉負':'今天要多放進去的金額')+'</div></div>'+
@@ -8342,12 +8343,12 @@ function gapHeroHTML(c,ledBase,gate){
   : '';
 
  var warn='';
- if(led.rateOverCap)warn+='<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 報酬率假設 '+(+led.rate.toFixed(2))+'% 已超過規劃上限 '+CAP_RATE+'%，缺口會被這個假設壓低，請以「保守情境」為準。</div>';
+ if(led.rateOverCap)warn+='<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 報酬率假設 '+(+led.rate.toFixed(1))+'% 已超過規劃上限 '+CAP_RATE+'%，缺口會被這個假設壓低，請以「保守情境」為準。</div>';
  else if(!ok&&led.conservative>led.total*3)warn+='<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 兩個讀數差 '+(led.conservative/led.total).toFixed(1)+' 倍：這份規劃的成敗幾乎完全押在報酬率假設上，務必與客戶說明。</div>';
 
  var how=ok?'<span style="color:var(--ok)">✅ '+(hasDraft?'這組調整之後':'依目前假設')+'不會轉負。仍請確認下方「缺口組成與即時缺口」裡的保障與預備金。</span>'
   :(led.years<=1?'<b style="color:var(--warn)">現金流最快在 '+led.negAge+' 歲轉負，缺口沒有攤提空間，必須立即處理。</b>'
-   :'補平的方式：'+led.years+' 年內（到 '+(n(c.profile.age)+led.years)+' 歲）每年存入 <b style="color:var(--amber2)">'+fmt(led.annual)+'</b> 元，以 '+(+led.rate.toFixed(2))+'% 複利累積。');
+   :'補平的方式：'+led.years+' 年內（到 '+(n(c.profile.age)+led.years)+' 歲）每年存入 <b style="color:var(--amber2)">'+fmt(led.annual)+'</b> 元，以 '+(+led.rate.toFixed(1))+'% 複利累積。');
 
  var sliders=LEVERS.map(function(L){return leverSliderHTML(c,L.id,gate)}).join('');
  var btns='<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">'+
@@ -8383,7 +8384,7 @@ function leverSliderHTML(c,id,gate){
   '<div style="display:flex;align-items:center;gap:8px">'+
    '<span style="font-weight:700;font-size:13px;min-width:92px;color:'+(on?'var(--amber2)':'var(--tx)')+'">'+esc(L.name)+'</span>'+
    '<input type="range" min="'+r.lo+'" max="'+r.hi+'" step="'+step+'" value="'+cur+'" onchange="setLever(\''+id+'\',this.value)" style="flex:1;min-width:90px;accent-color:var(--amber)"'+dis+'>'+
-   '<input type="number" inputmode="decimal" step="'+step+'" min="'+r.lo+'" max="'+r.hi+'" value="'+(+cur.toFixed(2))+'" onchange="setLever(\''+id+'\',this.value)" style="width:72px;background:#0b2136;border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:3px 6px;text-align:right"'+dis+'>'+
+   '<input type="number" inputmode="decimal" step="'+step+'" min="'+r.lo+'" max="'+r.hi+'" value="'+(+cur.toFixed(1))+'" onchange="setLever(\''+id+'\',this.value)" style="width:72px;background:#0b2136;border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:3px 6px;text-align:right"'+dis+'>'+
    '<span class="hint" style="width:20px">'+esc(L.unit)+'</span>'+
   '</div>'+
   (gate.block[id]?'<div class="hint" style="display:block;margin-left:100px;color:var(--mut2)">'+esc(gate.reason[id]||'已鎖住')+'</div>':'')+
@@ -8557,17 +8558,17 @@ function allocSecHTML(c){
  var cur=n(c.params.invReturn),eff=effReturn(c),p=c.plan||{};
  var diff=ap.weight>0&&Math.abs(ap.wRet-cur)>0.05;
  var rateBox='<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">'+
-  '<div class="big3"><div class="b"><div class="l">試算採用的報酬率</div><div class="v">'+(+eff.toFixed(2))+'%</div></div>'+
-  '<div class="b"><div class="l">配置加權報酬</div><div class="v">'+ap.wRet.toFixed(2)+'%</div></div>'+
+  '<div class="big3"><div class="b"><div class="l">試算採用的報酬率</div><div class="v">'+(+eff.toFixed(1))+'%</div></div>'+
+  '<div class="b"><div class="l">配置加權報酬</div><div class="v">'+ap.wRet.toFixed(1)+'%</div></div>'+
   '<div class="b"><div class="l">每年新增投入</div><div class="v">'+fmt(ap.yearly)+'</div></div></div>'+
   (ap.weight<=0?'<div class="hint" style="display:block;margin-top:8px">尚未登錄任何投資配置。</div>'
    :(p.useAllocReturn
-     ?'<div class="hint" style="display:block;margin-top:8px;color:var(--ok)">試算已跟著配置的加權報酬 '+ap.wRet.toFixed(2)+'% 走——改配置就會直接改變上面的缺口。</div>'
-     :(diff?'<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 配置加權報酬 '+ap.wRet.toFixed(2)+'% 與目前的報酬率假設 '+cur+'% 不一致——現在所有數字吃的是 '+cur+'%。</div>'
+     ?'<div class="hint" style="display:block;margin-top:8px;color:var(--ok)">試算已跟著配置的加權報酬 '+ap.wRet.toFixed(1)+'% 走——改配置就會直接改變上面的缺口。</div>'
+     :(diff?'<div class="hint" style="display:block;margin-top:8px;color:var(--warn)">⚠ 配置加權報酬 '+ap.wRet.toFixed(1)+'% 與目前的報酬率假設 '+cur+'% 不一致——現在所有數字吃的是 '+cur+'%。</div>'
            :'<div class="hint" style="display:block;margin-top:8px">配置加權報酬與報酬率假設一致。</div>')))+
   '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
   '<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" '+(p.useAllocReturn?'checked':'')+' onchange="setUseAlloc(this.checked)"> 讓試算直接跟著配置的加權報酬走</label>'+
-  (ap.weight>0?'<button class="tbtn" onclick="useAllocRate()">改以 '+ap.wRet.toFixed(2)+'% 寫入報酬率參數</button>':'')+'</div>'+
+  (ap.weight>0?'<button class="tbtn" onclick="useAllocRate()">改以 '+ap.wRet.toFixed(1)+'% 寫入報酬率參數</button>':'')+'</div>'+
   pie+'</div>';
 
  return '<div class="sec"><h4>配置與對帳 <span class="hint">上面算出缺口，這裡回答「那要放什麼進去」</span></h4>'+
@@ -9150,7 +9151,7 @@ function pieSVG(list){list=(list||[]).filter(function(x){return n(x.pct)>0});if(
  var segs=list.map(function(x,i){var frac=n(x.pct)/tot,a0=acc*2*Math.PI-Math.PI/2;acc+=frac;var a1=acc*2*Math.PI-Math.PI/2;
   var large=frac>0.5?1:0,x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
   return '<path d="M'+cx+' '+cy+' L'+x0.toFixed(1)+' '+y0.toFixed(1)+' A'+r+' '+r+' 0 '+large+' 1 '+x1.toFixed(1)+' '+y1.toFixed(1)+' Z" fill="'+cols[i%cols.length]+'"/>'}).join('');
- var leg=list.map(function(x,i){return '<div style="display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:4px"><span style="width:11px;height:11px;border-radius:3px;background:'+cols[i%cols.length]+'"></span>'+esc(x.name)+' <b style="color:var(--tx)">'+n(x.pct)+'%</b> <span class="muted">'+esc(x.benefit)+'</span></div>'}).join('');
+ var leg=list.map(function(x,i){return '<div style="display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:4px"><span style="width:11px;height:11px;border-radius:3px;background:'+cols[i%cols.length]+'"></span>'+esc(x.name)+' <b style="color:var(--tx)">'+r1(x.pct)+'%</b> <span class="muted">'+esc(x.benefit)+'</span></div>'}).join('');
  return '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center"><svg width="180" height="180" viewBox="0 0 180 180">'+segs+'<circle cx="90" cy="90" r="42" class="donutHole"/></svg><div style="flex:1;min-width:200px">'+leg+'</div></div>';
 }
 /* ============================================================
@@ -12931,7 +12932,7 @@ var COV_WHEEL=[
     src:function(c,nd){
      var py=n(nd.protectYears),pyE=protectYearsEff(c,nd);
      var s='家計負擔 <b>'+n(nd.depRatioOverride!=null?nd.depRatioOverride:memberDep(c,nd.member))+'%</b> × 家庭年生活費 <b>'+fmt(familyAnnualLiving(c))+'</b> × 保障 <b>'+py+'</b> 年';
-     if(Math.abs(pyE-py)>0.005)s+='<br>✅ 責任遞減：'+indepDeps(c,nd.member).map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立（支出比例 '+n(d.expRatio)+'%）';}).join('、')+'，等效 <b>'+pyE.toFixed(2)+'</b> 年';
+     if(Math.abs(pyE-py)>0.005)s+='<br>✅ 責任遞減：'+indepDeps(c,nd.member).map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立（支出比例 '+n(d.expRatio)+'%）';}).join('、')+'，等效 <b>'+pyE.toFixed(1)+'</b> 年';
      return s;}},
    {key:'loan',lb:'貸款',part:'壽險',go:'finance',goLb:'收支資債 · 負債表',ovr:'loanOverride',
     tg:'payDebt',tgLb:'身故要清償家庭負債',tgHint:'預設依角色：本人／配偶列入，子女／父母不列入',
@@ -13401,7 +13402,7 @@ function needCard(c,nd,i){
  var edu=coversEdu?eduTotal(c):0;
  auto='<table class="rtable" style="margin:6px 0 10px"><tr><th>自動帶入的責任</th><th>金額</th><th>來源</th></tr>'+
   '<tr><td class="k">家庭生活費</td><td class="calc">'+fmt(living)+'</td><td class="muted" style="font-size:11.5px">家計負擔 '+n(memberDep(c,nd.member))+'% × 家庭年生活費 × '+py+' 年'+
-   (Math.abs(pyEff-py)>0.005?'<br>\u2705 責任遞減：'+indepList.map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立（支出比例 '+n(d.expRatio)+'%）';}).join('、')+'，等效 '+pyEff.toFixed(2)+' 年':'')+'</td></tr>'+
+   (Math.abs(pyEff-py)>0.005?'<br>\u2705 責任遞減：'+indepList.map(function(d){return esc(d.name)+' '+n(d.indepAge)+' 歲財務獨立（支出比例 '+n(d.expRatio)+'%）';}).join('、')+'，等效 '+pyEff.toFixed(1)+' 年':'')+'</td></tr>'+
   '<tr><td class="k">父母奉養費</td><td class="calc">'+fmt(parents)+'</td><td class="muted" style="font-size:11.5px">'+(coversParents?'支出表「孝親」年額 × '+py+' 年':offWhy)+'</td></tr>'+
   '<tr><td class="k">貸款</td><td class="calc">'+fmt(loans)+'</td><td class="muted" style="font-size:11.5px">'+(coversDebt?'負債表餘額合計':offWhy)+'</td></tr>'+
   '<tr><td class="k">子女教育費</td><td class="calc">'+fmt(edu)+'</td><td class="muted" style="font-size:11.5px">'+(coversEdu?'教育規劃分頁（終值）':offWhy)+'</td></tr>'+
@@ -14139,7 +14140,7 @@ function analysisModules(c){
     return '<div id="an-tax"><table class="rtable"><tr><td class="k">綜合所得淨額</td><td>'+fmt(i.net)+'</td></tr><tr><td class="k">綜所稅(年)</td><td class="bad">'+fmt(i.tax)+'（稅率 '+(i.rate*100)+'%）</td></tr><tr><td class="k">課稅遺產淨額</td><td>'+fmt(e.base)+'</td></tr><tr><td class="k">預估遺產稅</td><td class="bad">'+fmt(e.tax)+'（稅率 '+(e.rate*100)+'%）</td></tr></table>'+taxDetailHTML(c)+'</div>';
    }},
 
-  {k:'alloc',t:'建議資產配置',g:'rx',hint:function(){return '加權報酬 '+al().wRet.toFixed(2)+'%'},
+  {k:'alloc',t:'建議資產配置',g:'rx',hint:function(){return '加權報酬 '+al().wRet.toFixed(1)+'%'},
    html:function(){return pieSVG(al().list)}},
 
   {k:'gapledger',t:'缺口帳與該解什麼',g:'rx',hint:function(){var g=gapPV(c);return g>0.5?'現值缺口 '+fmt(g)+' 元':'無現金流缺口'},
@@ -14887,7 +14888,7 @@ function irrToolHTML(){var T=app.tools.irr,ms=Math.max(1,n(T.months));
  for(var k=0;k<80;k++){mid=(lo+hi)/2;if(fv(mid)>target){hi=mid}else{lo=mid}}
  var annual=(Math.pow(1+mid,12)-1)*100,invested=n(T.monthly)*ms+n(T.start);
  return '<div class="sec"><h4>投資年化報酬回推 <span class="hint">由已投入期數與現值估算實際年化利率</span></h4><div class="fgrid">'+toolF('irr',[['monthly','每月定期定額'],['months','已投入期數(月)','num'],['fv','目前市場現值'],['start','起始金額']])+'</div>'+
-  toolBig([['實際年化報酬',annual.toFixed(2)+'%',annual>=0?'var(--ok)':'var(--warn)'],['累積投入',fmt(invested)],['損益',fmt(target-invested),target-invested>=0?'var(--ok)':'var(--warn)']])+detailBox('計算基礎',kvTbl([['每月定期定額',n(T.monthly)],['已投入期數',ms+' 期（月）'],['起始金額',n(T.start)],['累積投入本金',Math.round(invested)],['目前市場現值',target],['求得月報酬率',(mid*100).toFixed(4)+'%'],['年化報酬（有效）',annual.toFixed(2)+'%','var(--amber2)'],['年化報酬（名目 ×12）',(mid*12*100).toFixed(2)+'%']]))+'</div>';}
+  toolBig([['實際年化報酬',annual.toFixed(1)+'%',annual>=0?'var(--ok)':'var(--warn)'],['累積投入',fmt(invested)],['損益',fmt(target-invested),target-invested>=0?'var(--ok)':'var(--warn)']])+detailBox('計算基礎',kvTbl([['每月定期定額',n(T.monthly)],['已投入期數',ms+' 期（月）'],['起始金額',n(T.start)],['累積投入本金',Math.round(invested)],['目前市場現值',target],['求得月報酬率',(mid*100).toFixed(1)+'%'],['年化報酬（有效）',annual.toFixed(1)+'%','var(--amber2)'],['年化報酬（名目 ×12）',(mid*12*100).toFixed(1)+'%']]))+'</div>';}
 // 以房換房試算
 function houseToolHTML(){var T=app.tools.house,newLoan=Math.max(0,n(T.newPrice)-n(T.down)),ms=n(T.years)*12;
  var mp=pmt(newLoan,n(T.rate),ms),diff=n(T.newPrice)-n(T.oldPrice),needCash=n(T.down)+n(T.deco);
@@ -15066,7 +15067,7 @@ function cashHealthToolHTML(){var T=app.tools.cashh;
   '<div class="tw" style="margin-top:12px"><table class="rtable"><tr><th>指標</th><th>現況</th><th>健康標準</th><th>公式</th></tr>'+
    '<tr><td class="k">現金水位（可支撐月數）</td><td style="color:'+col(months>=3)+';font-weight:800">'+months.toFixed(1)+' 個月</td><td class="muted">至少 3 個月，波動大的行業 6 個月</td><td><code>現金 ÷ 每月固定支出</code></td></tr>'+
    '<tr><td class="k">現金轉換循環</td><td style="color:'+col(ccc<=60)+';font-weight:800">'+ccc.toFixed(0)+' 天</td><td class="muted">越短越好；負數代表你在用別人的錢做生意</td><td><code>應收 ＋ 存貨 − 應付</code></td></tr>'+
-   '<tr><td class="k">獲利品質</td><td style="color:'+col(quality>=1)+';font-weight:800">'+quality.toFixed(2)+'</td><td class="muted">&gt; 1 為佳；長期 &lt; 0.5 代表獲利收不回來</td><td><code>營業現金流 ÷ 稅後淨利</code></td></tr>'+
+   '<tr><td class="k">獲利品質</td><td style="color:'+col(quality>=1)+';font-weight:800">'+quality.toFixed(1)+'</td><td class="muted">&gt; 1 為佳；長期 &lt; 0.5 代表獲利收不回來</td><td><code>營業現金流 ÷ 稅後淨利</code></td></tr>'+
    '<tr><td class="k">自由現金流</td><td style="color:'+col(fcf>0)+';font-weight:800">'+fmt(fcf)+'</td><td class="muted">正數才有能力分紅、還債、擴張</td><td><code>營業現金流 − 資本支出</code></td></tr>'+
    '<tr><td class="k">利息保障倍數</td><td style="color:'+col(icov>=3)+';font-weight:800">'+(n(T.interest)>0?icov.toFixed(1)+' 倍':'—')+'</td><td class="muted">&gt; 3 倍；&lt; 2 倍要立即處理</td><td><code>(稅前淨利＋利息) ÷ 利息</code></td></tr>'+
    '</table></div>'+
@@ -15980,7 +15981,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<h2>§、傳承規劃</h2>'+rLegacy(c)+
 
   '<h2>§、投資風險屬性與建議配置</h2>'+(function(){var rp=riskProfile(c);if(!rp)return '<p style="color:#5a6b72">尚未完成風險屬性測驗；建議先於「風險屬性」分頁完成 12 題 KYC 評估。</p>';var t=rp.tier;return '<p style="color:#33474e">依 KYC 測驗（'+rp.score+' / 60 分）評定為 <b style="color:'+t.color+'">'+t.name+'（'+t.en+'）</b>。'+esc(t.desc)+' 對應建議投資報酬率約 <b>'+t.rr+'%</b>、報酬波動度約 '+t.std+'%。配置方向：'+esc(t.alloc)+'</p>';})()+
-   (al.list.filter(function(x){return n(x.pct)>0}).length?'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">實際規劃配置</div>'+rPie(al.list)+'<table style="margin-top:10px"><tr><th>標的</th><th>比例</th><th>預期報酬</th><th>效益</th></tr>'+allocRep+'</table><p style="color:#33474e;margin-top:6px">加權預期報酬約 <b>'+al.wRet.toFixed(2)+'%</b>。</p>':'<p style="color:#5a6b72">尚未設定實際配置方案。</p>')+
+   (al.list.filter(function(x){return n(x.pct)>0}).length?'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">實際規劃配置</div>'+rPie(al.list)+'<table style="margin-top:10px"><tr><th>標的</th><th>比例</th><th>預期報酬</th><th>效益</th></tr>'+allocRep+'</table><p style="color:#33474e;margin-top:6px">加權預期報酬約 <b>'+al.wRet.toFixed(1)+'%</b>。</p>':'<p style="color:#5a6b72">尚未設定實際配置方案。</p>')+
 
   '<h2>§、其他規劃面向</h2>'+(rOtherAspects(c)||'<p style="color:#5a6b72">職涯、婚姻、信用與海外資產這幾項本次沒有需要特別處理的內容。</p>')+
 

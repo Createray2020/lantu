@@ -87,8 +87,8 @@ export function planReversals(payouts: PaidPayout[], fee: number, delta: number)
       rankCode: p.rankCode,
       amount: -back,
       trace: [
-        `退費沖回：本次退費 ${delta} 元 ÷ 顧問費 ${fee} 元 = ${(ratio * 100).toFixed(2)}%`,
-        `原已發放 ${p.amount} 元 × ${(ratio * 100).toFixed(2)}% = 沖回 ${back} 元`,
+        `退費沖回：本次退費 ${delta} 元 ÷ 顧問費 ${fee} 元 = ${(ratio * 100).toFixed(1)}%`,
+        `原已發放 ${p.amount} 元 × ${(ratio * 100).toFixed(1)}% = 沖回 ${back} 元`,
       ],
     });
   }

@@ -182,7 +182,7 @@ function fmt(v){v=n(v);if(!isFinite(v))return '—';v=Math.round(v);return v.toS
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
 
-function pct(x){x=Number(x);if(!isFinite(x))return '—';return (x*100).toFixed(2)+'%'}
+function pct(x){x=Number(x);if(!isFinite(x))return '—';return (x*100).toFixed(1)+'%'}
 
 // 年利息負擔＝現齡當年的應計利息。⚠️ 刻意維持「原始餘額 × 年利率」的既有口徑
 // （不改成 lRemain，那會動到每一個既有個案的利息數字，是另一件事）。
@@ -2201,7 +2201,7 @@ function planActions(c,set){
   acts.push({axis:'累積',title:'把缺口補起來',
    detail:(led.years<=1
      ? '現金流最快在 '+led.negAge+' 歲轉負，'+fmt(led.total)+' 元的缺口沒有攤提空間，必須立即處理'
-     : '在 '+led.years+' 年內每年存入 '+fmt(led.annual)+' 元，以 '+(+led.rate.toFixed(2))+'% 複利累積'),
+     : '在 '+led.years+' 年內每年存入 '+fmt(led.annual)+' 元，以 '+(+led.rate.toFixed(1))+'% 複利累積'),
    note:'現值缺口 '+fmt(led.total)+' 元（保守情境 '+fmt(led.conservative)+' 元）'});
  }
 
@@ -2222,8 +2222,8 @@ function planActions(c,set){
  if(set.rate!==undefined&&set.rate!==null&&set.rate!==''&&n(set.rate)>effReturn(c)){
   var al=allocInfo(c);
   acts.push({axis:'效率',title:'調整資產配置以提高長期報酬',
-   detail:'報酬率假設由 '+(+effReturn(c).toFixed(2))+'％ 提高到 '+(+n(set.rate).toFixed(2))+'％',
-   note:(al.totalPct>0?'目前建議配置的加權報酬為 '+al.wRet.toFixed(2)+'％，需要重新檢視配置':'尚未填建議資產配置')+
+   detail:'報酬率假設由 '+(+effReturn(c).toFixed(1))+'％ 提高到 '+(+n(set.rate).toFixed(1))+'％',
+   note:(al.totalPct>0?'目前建議配置的加權報酬為 '+al.wRet.toFixed(1)+'％，需要重新檢視配置':'尚未填建議資產配置')+
         '；規劃上限 '+CAP_RATE+'％，此為假設不是承諾'});
  }
  if(n(set.retire)){

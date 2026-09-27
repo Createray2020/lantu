@@ -171,7 +171,7 @@ describe("稅額實算", () => {
     expect(E.fmt(1234567)).toBe("1,234,567");
     expect(E.pct(Infinity)).toBe("—");
     expect(E.pct(NaN)).toBe("—");
-    expect(E.pct(0.1234)).toBe("12.34%");
+    expect(E.pct(0.1234)).toBe("12.3%");
   });
 
   it("國民年金：月投保金額與 A／B 式給付率（115 年公告）", () => {

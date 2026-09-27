@@ -139,7 +139,7 @@ describe("五列數字換成一張水平堆疊條", () => {
 
   it("圖例寫的是每個面向真正算得出來的能力（走 passport.ts 的結果）", () => {
     expect(html).toContain(`可購房價 ${new Intl.NumberFormat("en-US").format(Math.round(RESULT.house.price / 10000))} 萬`);
-    expect(html).toContain(`可扶養約 ${RESULT.support.kids.toFixed(2)} 位`);
+    expect(html).toContain(`可扶養約 ${RESULT.support.kids.toFixed(1)} 位`);
   });
 
   it("五列 divide-y 的清單真的被換掉了", () => {

@@ -467,7 +467,7 @@ export default function PassportWizard({
             <div className="text-center">
               <div className="text-5xl mb-2">👨‍👩‍👧</div>
               <div className="text-tx2 text-sm">可扶養約</div>
-              <div className="font-serif text-4xl text-brand2 my-1">{m.support.kids.toFixed(2)} 位小孩</div>
+              <div className="font-serif text-4xl text-brand2 my-1">{m.support.kids.toFixed(1)} 位小孩</div>
               <div className="text-tx text-sm mt-2">
                 折算至出生時共約存 <b className="text-brand2">{wan(m.support.savedAtBirth)} 萬</b><br />
                 每位小孩共約花 <b className="text-brand2">{wan(m.support.perChildCost)} 萬</b>

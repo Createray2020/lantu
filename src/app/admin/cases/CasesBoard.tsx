@@ -365,7 +365,7 @@ export default function CasesBoard({
                                 <td className="px-3 py-1.5 text-right font-bold tabular-nums">
                                   {/* 沖回列不帶百分比、也不算進驗算——它是退費的軌跡，不是分潤的一部分。 */}
                                   {c.payouts.filter((p) => !p.reversal)
-                                    .reduce((a, p) => a + p.totalPct, 0).toFixed(2).replace(/\.00$/, "")}%
+                                    .reduce((a, p) => a + p.totalPct, 0).toFixed(1).replace(/\.0$/, "")}%
                                 </td>
                                 <td className="px-3 py-1.5 text-right font-bold tabular-nums">
                                   {fmtMoney(c.payouts.reduce((a, p) => a + p.amount, 0))}
