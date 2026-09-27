@@ -1100,8 +1100,6 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .vitem .vt{flex:1;min-width:0}.vitem .vn{display:block}.vitem .vm{font-size:11px;color:var(--mut2);display:block}
 .vitem input[type=text]{width:72px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:2px 6px;font-size:12px}
 .stamp{font-size:11px;color:var(--mut2);margin-top:8px}
-.tunehero{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.tunehero .t{font-family:var(--serif);font-size:17px;font-weight:700;color:var(--amber2);margin-bottom:6px}.tunehero .t .hint{font-family:inherit;font-size:12px;font-weight:400;margin-left:8px}
 .tunekpis{margin:10px 0 0}.tunekpis .kpi{border-top-color:var(--amber);padding:10px 12px}.tunekpis .lb{font-size:11px;color:var(--mut)}.tunekpis .vv{font-family:var(--serif);font-size:20px;font-weight:700}.tunekpis .was{color:var(--mut2);font-weight:400;font-size:15px}
 .tunelev.vis input[type=range]{accent-color:var(--amber2)}.chip.moved{border-color:var(--ok);color:var(--ok)}.chip b{font-family:inherit}
 .vitem input.vin{width:72px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:2px 6px;font-size:12px}
@@ -10153,6 +10151,12 @@ function flowTuneKpi(pb,pa){
  return '<div class="kpis tunekpis">'+rows.map(function(k){var same=k[1]===k[2];
   return '<div class="kpi"><div class="lb">'+k[0]+'</div><div class="vv">'+(same?k[3](k[2]):'<span class="was">'+k[3](k[1])+'</span> → '+k[3](k[2]))+'</div></div>'}).join('')+'</div>';
 }
+/* 方案頁首：全生涯財務流（同分析頁首屏那張圖，畫的是拉完之後）＋ 原本 → 拉完 三個數字。有沒有流程都畫。 */
+function flowTuneHeroHTML(c){
+ var f=flowOf(c),pb=projection(f?flowTuneBase(c):baseCase(c)),pa=projection(c);
+ return '<div class="sec tunehero"><h4>全生涯財務流 <span class="hint">畫的是拉完之後；三個數字左邊原本（沒有動作、願景原本的時間）、右邊拉完。缺口從這張圖抓。</span></h4>'+
+  '<div data-calc="tuneHero">'+annualBalanceSVG(pa,'dark')+'</div>'+flowTuneKpi(pb,pa)+'</div>';
+}
 function flowTuneHTML(c){
  var f=flowOf(c),t=flowTuneState(c),K=flowTuneCaps(c);
  var pb=projection(flowTuneBase(c)),pa=projection(c);
@@ -10161,9 +10165,6 @@ function flowTuneHTML(c){
  var work=aw&&aw.on!==false?n(aw.getMonthly):0,fin=ar&&ar.on!==false?n(ar.payMonthly):0;
  var incTot=K.workM+K.finM+K.othM;
  var IG=investGate(c);
- // 開頭：全生涯財務流（同分析頁首屏那張圖，畫的是拉完之後）＋ 原本 → 拉完 三個數字
- var hero='<div class="tunehero"><div class="t">全生涯財務流 <span class="hint">畫的是拉完之後；三個數字左邊原本、右邊拉完。缺口從這張圖抓，不另做一條。</span></div>'+
-  '<div data-calc="tuneHero">'+annualBalanceSVG(pa,'dark')+'</div>'+flowTuneKpi(pb,pa)+'</div>';
  // ① 願景拉桿：點清單選哪一項
  var items=flowVisionList(c),sel=flowTuneVSel(c),selIt=null;items.forEach(function(x){if(x.key===sel)selIt=x});
  if(sel!=='all'&&!selIt){sel='all';t.vsel='all'}
@@ -10211,8 +10212,8 @@ function flowTuneHTML(c){
  var dsum=[];items.forEach(function(x){var d=flowTuneDelayOf(c,x.key);if(d)dsum.push(x.name+' +'+d+'年')});
  var dtxt=dsum.length?'願景延後 '+dsum.join('、')+'；':'';
  var pay=function(closed,reason){return '{closed:'+closed+(reason?',reason:\''+reason+'\'':'')+',inc:'+t.inc+',exp:'+t.exp+',delay:'+JSON.stringify(t.delay||{}).replace(/"/g,'&quot;')+'}'};
- return flowAsk('先看全生涯財務流，缺口在哪一年、多深。三根拉桿照順序：願景的時間客戶自己拉（點清單選哪一項），再拉收入，最後才拉支出。願景不砍——要改金額從右邊「願景」抽屜。')+
-  hero+'<div style="margin-top:12px">'+vlev+lev+'</div><div class="tunecols">'+incCol+expCol+'</div>'+
+ return flowAsk('缺口看最上面的全生涯財務流，在哪一年、多深。三根拉桿照順序：願景的時間客戶自己拉（點清單選哪一項），再拉收入，最後才拉支出。願景不砍——要改金額從右邊「願景」抽屜。')+
+  '<div style="margin-top:4px">'+vlev+lev+'</div><div class="tunecols">'+incCol+expCol+'</div>'+
   flowGate('拉完之後',
    '<button class="tbtn amber" '+(closed?'':'disabled')+' onclick="flowTuneGate('+pay(true)+',\'S6x\')">補平了 → 行動清單與下一步</button>'+
    '<button class="tbtn ghost" onclick="flowTuneGate('+pay(false,'short')+',\'S6\')">沒補平 → 看後果</button>'+
@@ -10302,8 +10303,10 @@ function planSec(c){
   foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c))+
   foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>')+
   foldSec('真實追蹤','逐年實際淨資產疊到規劃線（有流程時在 S8 回訪對帳裡對帳）',trackingSec(c));
- return '<div data-ivsec="flow" data-ivname="願景處理流程">'+planHeroV2(c)+
-  (fl?flowSec(c)+foldSec('更多診斷（v2 既有折疊，原樣保留）','配額對帳、動作清單、資金勾稽、拉桿與處方…都在這裡',folds,false):flowEntryHTML(c)+folds)+
+ // 2026/09/28 Ray：方案最上面用「全生涯財務流」開頭（同分析頁那張圖），缺口從這裡抓；願景歷程收進折疊第一格。
+ var vf=foldSec('願景歷程','灰線＝現況、金線＝套用動作後；旗子 ✓ 做得到、✕ 做不到',planHeroV2(c),false);
+ return '<div data-ivsec="flow" data-ivname="願景處理流程">'+flowTuneHeroHTML(c)+
+  (fl?flowSec(c)+foldSec('更多診斷（v2 既有折疊，原樣保留）','願景歷程、配額對帳、動作清單、資金勾稽、拉桿與處方…都在這裡',vf+folds,false):flowEntryHTML(c)+vf+folds)+
   '</div>';
 }
 

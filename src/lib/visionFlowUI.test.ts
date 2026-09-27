@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 const cur = () => w.app.cases[0];
 const pane = () => w.document.querySelector("#app").innerHTML as string;
-const v2Folds = ["缺口配額對帳", "調整動作清單", "資金勾稽", "動作流程", "拉桿與處方", "缺口組成與即時缺口", "建議資產配置", "方案比較", "其他方案參數", "真實追蹤"];
+const v2Folds = ["缺口配額對帳", "調整動作清單", "資金勾稽", "動作流程", "拉桿與處方", "缺口組成與即時缺口", "建議資產配置", "方案比較", "其他方案參數", "真實追蹤", "願景歷程"];
 
 describe("TS 鏡射與 HTML 一致", () => {
   it("步驟常數兩邊一樣", () => {
@@ -45,6 +45,7 @@ describe("舊客戶（沒有 c.flow）", () => {
     expect(cur().flow).toBeUndefined();
     expect(h).toContain("開始願景處理流程");
     expect(h).not.toContain('class="flowrail"');
+    expect((h.match(/data-calc="tuneHero"/g) || []).length).toBe(1);   // 舊客戶也用全生涯財務流開頭
     v2Folds.forEach((t) => expect(h).toContain(t));
   });
   it("投影數字不因流程程式碼存在而改變（加了 c.flow 再拿掉也一樣）", () => {
@@ -127,10 +128,10 @@ describe("流程推進與閘門", () => {
     expect(cur().flow.step).toBe("S4");
     expect(pane()).toContain("教練建議");
   });
-  it("S4 調整台：開頭是全生涯財務流；三根拉桿（願景延後、收入、支出）；理財在收入結構底下", () => {
+  it("方案頁首是全生涯財務流（只畫一次）；S4 三根拉桿（願景延後、收入、支出）；理財在收入結構底下", () => {
     const h = pane();
-    expect(h).toContain("全生涯財務流");
-    expect(h).toContain('data-calc="tuneHero"');
+    expect((h.match(/data-calc="tuneHero"/g) || []).length).toBe(1);
+    expect(h.indexOf("全生涯財務流")).toBeLessThan(h.indexOf('class="flowrail"'));
     expect(h).toContain("tunekpis");
     expect((h.match(/type="range" inputmode="numeric"/g) || []).length).toBe(3);
     expect(h).toContain('class="tunelev vis"');

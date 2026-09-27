@@ -145,13 +145,13 @@ describe("版面（v2）：首屏必須是圖，不是報表", () => {
     const firstFold = h.indexOf("<details");
     expect(firstFold).toBeGreaterThan(0);
     const head = h.slice(0, firstFold);
-    // 首屏該有的
-    expect(head).toContain("願景歷程");
-    expect(head).toContain("一生願景需要的資金");
-    expect(head).toContain("缺口改善");
-    expect(head).toContain("願景達成");
-    expect(head).toContain("開開看");
+    // 首屏該有的（2026/09/28 Ray：方案最上面用「全生涯財務流」開頭，缺口從這張圖抓；願景歷程收進折疊第一格）
+    expect(head).toContain("全生涯財務流");
+    expect(head).toContain("首次入不敷出");
+    expect(head).toContain("存量用完");
+    expect(head).toContain("現值缺口");
     expect(head).toContain("<svg");
+    expect(head).not.toContain("一生願景需要的資金");
     // ⚠️ 首屏不該有的：任何表格、任何拉桿。
     //    v1 的拉桿／處方／該解什麼全部保留，但收進 <details>——見 feedback_圖表優先。
     expect(head).not.toContain("<table");
@@ -161,7 +161,7 @@ describe("版面（v2）：首屏必須是圖，不是報表", () => {
   it("v1 的診斷區塊沒有被刪掉，只是收進收合區", () => {
     const h = pane();
     const firstFold = h.indexOf("<details");
-    ["該解什麼", "三個處方", "曲線掉到零線以下", "配置與對帳", "方案比較"].forEach((t) => {
+    ["一生願景需要的資金", "缺口改善", "開開看", "該解什麼", "三個處方", "曲線掉到零線以下", "配置與對帳", "方案比較"].forEach((t) => {
       const i = h.indexOf(t);
       expect(i, t + " 不該消失").toBeGreaterThan(0);
       expect(i, t + " 應該在收合區裡").toBeGreaterThan(firstFold);
@@ -173,6 +173,7 @@ describe("版面（v2）：首屏必須是圖，不是報表", () => {
     const h = pane();
     // 用各區塊 hint 的獨特字串，避免撞到首屏文案裡出現的同名詞
     const order = [
+      "灰線＝現況、金線＝套用動作後",
       "這條線大概要生出多少錢",
       "補缺口的手段，一條一條具體動作",
       "客戶到底有沒有錢做這些動作",
@@ -194,13 +195,14 @@ describe("版面（v2）：首屏必須是圖，不是報表", () => {
     expect(h).toContain("✕ 做不到");
   });
 
-  it("動作 chips 緊貼主圖下方（點了要當場看到線動）", () => {
+  it("動作 chips 緊貼願景歷程主圖下方（點了要當場看到線動）——同在折疊第一格裡", () => {
     const h = pane();
-    const svg = h.indexOf("<svg");
+    const fold = h.indexOf("灰線＝現況、金線＝套用動作後");
+    const svg = h.indexOf("<svg", fold);
     const chips = h.indexOf("v2chips");
-    const firstFold = h.indexOf("<details");
+    const nextFold = h.indexOf("<details", fold + 1);
     expect(chips).toBeGreaterThan(svg);
-    expect(chips).toBeLessThan(firstFold);
+    expect(chips).toBeLessThan(nextFold);
   });
 });
 
