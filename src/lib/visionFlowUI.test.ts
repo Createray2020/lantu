@@ -207,14 +207,106 @@ describe("Step 6 後果引擎", () => {
       expect(d.to).toBeLessThanOrEqual(w.effHorizon(c));
     });
   });
-  it("S6 畫面：接受後前進到 S6′ 並出行動清單", () => {
+  it("S6 畫面：時間軸畫出後果旗（只在方案頁那一張）；接受後前進到 S6′ 並出行動清單", () => {
     w.flowGo("S6");
     expect(pane()).toContain("D3");
     const C = w.consequences(cur());
-    if (C.items.length) w.flowAcceptConsequences();
-    else w.flowDecide("S6", "d3", { choice: "accept", n: 0 }, "無後果", "S6x");
+    if (C.items.length) {
+      expect(w.app._flowCons.items.length).toBe(C.items.length);
+      expect(w.visionTimelineSVG(cur(), "dark", "plan")).toContain('class="vtcons"');
+      expect(w.visionTimelineSVG(cur(), "light", "rp")).not.toContain('class="vtcons"');
+      w.flowAcceptConsequences();
+    } else w.flowDecide("S6", "d3", { choice: "accept", n: 0 }, "無後果", "S6x");
     expect(cur().flow.step).toBe("S6x");
+    expect(w.app._flowCons).toBeNull();
     expect(pane()).toContain("這一階段的行動清單");
+    expect(pane()).toContain("進入執行期");
+  });
+});
+
+describe("Step 7–8 執行期與回訪對帳", () => {
+  it("進入執行期存下規劃線基準，每個啟用動作都有 status", () => {
+    w.flowStartExec();
+    const f = cur().flow;
+    expect(f.step).toBe("S7");
+    expect(f.baseline.rows.length).toBeGreaterThan(0);
+    expect(f.baseline.rows[0].age).toBe(w.n(cur().profile.age));
+    cur().actions.filter((a: any) => a.on !== false).forEach((a: any) => expect(a.status.state).toBe("planned"));
+    expect(pane()).toContain("回訪對帳");
+  });
+  it("標動作狀態；checkin 以里程碑為主、動作數並列", () => {
+    const c = cur();
+    const idx = c.actions.findIndex((a: any) => a.on !== false);
+    w.flowSetStatus(idx, "done");
+    expect(c.actions[idx].status.state).toBe("done");
+    const K = w.checkin(c);
+    expect(K.cnt.done).toBe(1);
+    expect(K.planned).not.toBeNull();
+    expect(K.ratio).toBeGreaterThan(0);
+    expect(["done", "partial", "none"]).toContain(K.grade);
+  });
+  it("D4 到位 → 階段標 reached、回 S3；完全沒動 → 先問願景", () => {
+    w.flowGo("S8");
+    expect(pane()).toContain("D4");
+    w.flowD4("done");
+    expect(["S3", "S0", "P0"]).toContain(cur().flow.step);
+    if (cur().flow.step === "S3") expect(cur().stages.some((s: any) => s.status === "reached")).toBe(true);
+    w.flowGo("S8");
+    w.flowD4("none");
+    expect(cur().flow.askVision).toBe(true);
+    expect(pane()).toContain("還是你要的嗎");
+    w.flowD4Vision(true);
+    expect(cur().flow.step).toBe("S6");
+    expect(cur().flow.askVision).toBe(false);
+  });
+});
+
+describe("餘裕線 P1–P3′", () => {
+  it("餘裕客戶走 P0→P1→P2→P2′→P3→P3′→S7；提早退休會改 retireAge 並記錄分配", () => {
+    const c = JSON.parse(JSON.stringify(w.sampleCase()));
+    c.id = "surplus1";
+    c.goals = []; c.travel = []; c.hobby = []; c.luxury = []; c.education = []; c.legacy = { on: false }; c.actions = [];
+    c.assets = [{ name: "現金", cls: "流動", value: 300000000 }];
+    w.app.cases.push(w.migrateCase(c)); w.app.activeId = "surplus1"; w.render();
+    w.flowStart();
+    const cc = w.app.cases[1];
+    expect(cc.flow.track).toBe("surplus");
+    expect(cc.flow.step).toBe("P0");
+    w.flowGo("P1");
+    expect(pane()).toContain("保守假設下的餘裕");
+    w.flowGo("P2");
+    w.flowUpgradeVision(false);
+    expect(cc.flow.step).toBe("P2g");
+    w.flowGo("P3");
+    expect(pane()).toContain("餘裕分配");
+    const early = w.flowEarlyRetire(cc);
+    expect(early).toBeGreaterThan(0);
+    const rA = w.n(cc.profile.retireAge);
+    w.flowApplyAdvance(1);
+    expect(w.n(cc.profile.retireAge)).toBe(rA - 1);
+    expect(cc.surplus.allocation[0].kind).toBe("advance");
+    w.flowConfirmSurplus();
+    expect(cc.flow.step).toBe("P3x");
+    expect(cc.surplus.trueSurplus).toBeGreaterThan(0);
+    w.flowStartExec();
+    expect(cc.flow.step).toBe("S7");
+    w.app.cases.pop(); w.app.activeId = w.app.cases[0].id; w.render();
+  });
+});
+
+describe("方案書與拉桿改標", () => {
+  it("方案書多一章「零、我們是怎麼走到這份方案的」，含決定、階段、行動清單", () => {
+    const h = w.planReportHTML(cur()) as string;
+    expect(h).toContain("零、我們是怎麼走到這份方案的");
+    expect(h).toContain("這一路的決定");
+    expect(h).toContain("行動清單");
+    const c0 = JSON.parse(JSON.stringify(cur())); delete c0.flow;
+    expect(w.planReportHTML(c0)).not.toContain("零、我們是怎麼走到這份方案的");
+  });
+  it("有 c.flow 時：該解什麼加分工說明、調願景型改標為後果試算", () => {
+    const h = pane();
+    expect(h).toContain("後果槓桿");
+    expect(h).toContain("後果試算（原調願景型）");
   });
 });
 
@@ -222,6 +314,6 @@ describe("分析頁段結論", () => {
   it("⑤ 調整處方段帶出流程線與步驟", () => {
     const v = w.anGroupVerdict("rx", cur());
     expect(v.text).toContain("缺口線");
-    expect(v.text).toContain("S6x");
+    expect(v.text).toContain("S6");
   });
 });

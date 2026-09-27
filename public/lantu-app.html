@@ -8546,6 +8546,8 @@ function visionTimelineSVG(c,theme,idKey){
    '<text x="'+x.toFixed(1)+'" y="'+ty+'" fill="'+col+'" font-size="12" font-weight="800" text-anchor="middle">'+(isIn?'↓':(ev.ok?'✓':'✕'))+'</text>'+
    '<text x="'+x.toFixed(1)+'" y="'+sy+'" fill="'+col+'" font-size="9.5" text-anchor="middle" opacity=".95">'+esc(String(ev.name).slice(0,6))+'</text>';
  });
+ // 願景處理流程 Step 6：後果旗（延後 ⇢／降規 ▽／消失 ○），只在方案頁那一張畫
+ if(idKey==='plan')s+=flowConsFlagsSVG(c,X,Y,T,a0,aEnd,pa);
 
  // hover：十字線＋數字（一張線圖沒有 hover 等於少一半資訊）
  s+='<g class="vthv">';
@@ -8668,8 +8670,9 @@ function soloHTML(c,solo,noAct){
  var verdict=allRed
   ? '<div class="hint" style="display:block;margin-top:8px;color:var(--warn)"><b>六根全紅——單靠任何一根都補不平。</b>請看下方「調願景型」處方，那是系統認為唯一走得通的方向。</div>'
   : '<div class="hint" style="display:block;margin-top:8px">每一條都是「其他都不動、只動這一根」的反解。條子衝出軌道＝拉到規劃上限仍補不平。</div>';
+ var flowNote=flowOf(c)?'<div class="hint" style="display:block;margin-top:8px;color:var(--amber2)">願景處理流程裡的分工：<b>增加收入／減少支出＝處方槓桿</b>（教練可開）；提高報酬不建議拉高（報酬率一律保守）；<b>延後退休／降低退休水準／調整願景／延後目標＝後果槓桿</b>——只在 Step 6 算給客戶看，不當處方開。</div>':'';
  return '<div class="sec"><h4>該解什麼 <span class="hint">六根槓桿各自反解</span></h4>'+baseNote+gateNote+
-  leverBarsHTML(c,solo,'dark',!noAct)+verdict+'</div>';
+  leverBarsHTML(c,solo,'dark',!noAct)+verdict+flowNote+'</div>';
 }
 
 function rxCardsHTML(c,rxs){
@@ -8683,7 +8686,7 @@ function rxCardsHTML(c,rxs){
   if(!steps)steps='<li style="color:var(--ok)">不需要調整——目前就補得平</li>';
   var badge=r.ok?'<span style="color:var(--ok);font-weight:700">✅ 可以填平</span>':'<span style="color:var(--warn);font-weight:700">❌ 仍差 '+fmt(r.gap)+'</span>';
   return '<div style="background:var(--field);border:1px solid var(--line);border-radius:10px;padding:13px;flex:1;min-width:230px">'+
-   '<div style="color:var(--amber2);font-weight:800;font-size:15px">'+esc(r.name)+'</div>'+
+   '<div style="color:var(--amber2);font-weight:800;font-size:15px">'+esc((flowOf(c)&&r.key==='vision')?'後果試算（原調願景型）':r.name)+'</div>'+
    '<div class="hint" style="display:block;margin:4px 0 8px;min-height:38px">'+esc(r.desc)+'</div>'+
    '<ul style="margin:0 0 8px;padding-left:18px;font-size:13px">'+steps+'</ul>'+
    '<div style="margin-bottom:8px">'+badge+'</div>'+
@@ -9365,12 +9368,12 @@ var FLOW_STEPS_GAP=[
  ['S0','判定','缺口線'],['S1','缺口呈現','◇ D1 願景是他要的？'],['S2','願景鎖定','客戶排序'],
  ['S2g','護欄','保障・預備金'],['S3','階段目標','里程碑'],['S4','選路','◇ D2 先收入或支出'],
  ['S5A','增加收入','工作＋理財 ◇ 補平？'],['S5B','減少支出','客戶自己標 ◇ 補平？'],
- ['S6','後果','◇ D3 加碼或接受'],['S6x','行動清單','→ 執行・回訪']];
+ ['S6','後果','◇ D3 加碼或接受'],['S6x','行動清單','定案'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
 var FLOW_STEPS_SUR=[
- ['P0','判定','餘裕線'],['P1','餘裕呈現','保守重算'],['P2','願景再確認','◇ 要升級？（下一輪）'],
- ['P2g','護欄','下一輪'],['P3','餘裕分配','下一輪'],['P3x','行動清單','下一輪']];
+ ['P0','判定','餘裕線'],['P1','餘裕呈現','保守重算'],['P2','願景再確認','◇ D1′ 要升級？'],
+ ['P2g','護欄','保障・預備金'],['P3','餘裕分配','三向'],['P3x','行動清單','定案'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
 var FLOW_GATES={S1:1,S4:1,S5A:1,S5B:1,S6:1,P2:1};
-var FLOW_LOCKED={P2:1,P2g:1,P3:1,P3x:1};
+var FLOW_LOCKED={};
 var FLOW_RULES=['願景不動','收入優先、支出其次','取捨以客戶願景為尺','後果只呈現、不代決定','報酬率保守假設','同一筆錢只用一次'];
 var CONS_LIFE_PLUS=5;   // 保守情境：壽命再加幾年
 var LOAN_LTV=60;        // 可貸款資產成數 %（非流動資產 × 成數）
@@ -9778,7 +9781,7 @@ function flowBodyHTML(c){
     '<button class="tbtn ghost" onclick="flowDecide(\'S6\',\'d3\',{choice:\'more\'},\'客戶選加碼，回選路調方案\',\'S4\')">加碼 → 回選路</button>'+
     (C.items.length?'<button class="tbtn amber" onclick="flowAcceptConsequences()">客戶接受後果 →</button>':'<button class="tbtn amber" onclick="flowDecide(\'S6\',\'d3\',{choice:\'accept\',n:0},\'無後果，進行動清單\',\'S6x\')">進行動清單 →</button>'),'客戶');
  }
- if(s==='S6x'){var acts=(c.actions||[]).filter(function(a){return a.on!==false}),curS2=flowCurrentStage(c);
+ if(s==='S6x_v1'){var acts=(c.actions||[]).filter(function(a){return a.on!==false}),curS2=flowCurrentStage(c);
   return '<p class="flowask"><b>這一階段的行動清單</b>　做什麼、什麼時候、下次怎麼驗收。全部來自調整動作清單（lane 標籤），不另存一份。</p>'+
    '<div class="tw"><table><tr><th>lane</th><th>動作</th><th>時點</th><th class="r">金額</th><th>狀態</th></tr>'+
    (acts.length?acts.map(function(a){var ln=laneOf(a),amt=(a.cat==='income'||a.cat==='expense')?(a.cat==='expense'?'−':'+')+fmt(a.getMonthly)+'／月':n(a.payMonthly)?fmt(a.payMonthly)+'／月':n(a.payLump)?fmt(a.payLump)+' 單筆':n(a.getLump)?'+'+fmt(a.getLump):'';
@@ -9793,10 +9796,176 @@ function flowBodyHTML(c){
    '<div class="flowcards"><div class="fcard"><div class="t">客戶假設下的餘裕</div><div class="n ok">'+cfAxis(T2.surplusOwn)+'</div><div class="s">報酬 '+r1(T2.proj.rate)+'%（現值口徑：一生不轉負後還多出的現值）</div></div>'+
    '<div class="fcard" style="border-color:var(--ok)"><div class="t">保守假設下的餘裕</div><div class="n ok">'+cfAxis(T2.surplus)+'</div><div class="s">這個才拿來分配</div></div>'+
    '<div class="fcard"><div class="t">退休可以提早</div><div class="n">'+(early?rA2+' → '+(rA2-early):'—')+'</div><div class="s">保守假設下仍不轉負的最早退休歲</div></div></div>'+
-   flowGate('下一步','<button class="tbtn ghost" disabled>願景再確認（P2，下一輪）</button>','客戶');
+   flowGate('下一步','<button class="tbtn amber" onclick="flowGo(\'P2\')">願景再確認 →</button>','客戶');
  }
- return '<div class="muted">此步驟下一輪實作。</div>';
+ return flowBodyHTML2(c);
 }
+/* ---------- 波 4–6：執行期／回訪對帳、餘裕線 P2–P3′、時間軸後果旗、方案書流程章 ---------- */
+var FLOW_D4_DONE=0.95, FLOW_D4_PARTIAL=0.5;   // 里程碑達成率門檻（實際可投資資產 ÷ 規劃線同齡值）
+
+/* 進入執行期：把規劃線存成基準（之後回訪比的就是這條），不含之後的任何改動 */
+function flowStartExec(){
+ var c=activeCase();var f=flowOf(c);if(!f)return;
+ var p=projection(c);
+ f.baseline={at:new Date().toISOString(),age:n(c.profile.age)||40,rows:p.rows.map(function(r){return {age:r.age,total:Math.round(r.total)}})};
+ (c.actions||[]).forEach(function(a){if(a.on!==false&&!a.status)a.status={state:'planned'}});
+ flowDecide(f.step,'exec',{n:(c.actions||[]).filter(function(a){return a.on!==false}).length},'行動清單定案，進入執行期（'+(c.actions||[]).filter(function(a){return a.on!==false}).length+' 個動作）','S7');
+}
+function flowSetStatus(i,state){var c=activeCase();if(!c)return;var a=(c.actions||[])[i];if(!a)return;a.status={state:state,checkedAt:new Date().toISOString(),sessionId:flowSessionId()};save();render()}
+/* 回訪對帳：里程碑為主（實際 vs 基準同齡值）、動作數並列 */
+function checkin(c){
+ var f=flowOf(c)||{},A=n(c.profile.age)||40,acts=(c.actions||[]).filter(function(a){return a.on!==false});
+ var cnt={done:0,partial:0,none:0,planned:0};
+ acts.forEach(function(a){var s=((a.status||{}).state)||'planned';cnt[s]=(cnt[s]||0)+1});
+ var actScore=acts.length?(cnt.done+cnt.partial*0.5)/acts.length:null;
+ var actual=Math.round((projection(c).rows[0]||{}).total||0),planned=null;
+ if(f.baseline&&f.baseline.rows){f.baseline.rows.forEach(function(r){if(r.age===A)planned=r.total})}
+ var ratio=(planned!=null&&planned>0)?actual/planned:null;
+ var grade;
+ if(ratio!=null)grade=ratio>=FLOW_D4_DONE?'done':(ratio>=FLOW_D4_PARTIAL?'partial':'none');
+ else if(actScore!=null)grade=actScore>=FLOW_D4_DONE?'done':(actScore>=FLOW_D4_PARTIAL?'partial':'none');
+ else grade='none';
+ return {grade:grade,actual:actual,planned:planned,ratio:ratio,cnt:cnt,actScore:actScore,total:acts.length,baselineAt:f.baseline?f.baseline.at:null};
+}
+function flowD4(grade){
+ var c=activeCase();var f=flowOf(c);if(!f)return;var K=checkin(c);
+ var txt='回訪對帳：'+(grade==='done'?'到位':grade==='partial'?'動了但不夠':'完全沒動')+
+  (K.planned!=null?'（可投資資產 '+cfAxis(K.actual)+' vs 規劃線 '+cfAxis(K.planned)+'，'+Math.round((K.ratio||0)*100)+'%）':'')+'，動作 '+K.cnt.done+' 到位／'+K.cnt.partial+' 部分／'+K.cnt.none+' 沒動';
+ if(grade==='done'){
+  var st=flowCurrentStage(c);if(st&&Array.isArray(c.stages)){c.stages.forEach(function(s){if(s.id===st.id){s.status='reached';s.reachedAt=new Date().toISOString()}})}
+  var T=flowTrack(c);
+  if(T.track!==f.track){f.track=T.track;flowDecide('S8','d4',{grade:grade,retrack:T.track},txt+'；重判後改走'+(T.track==='gap'?'缺口線':'餘裕線'),T.track==='gap'?'S0':'P0');return}
+  flowDecide('S8','d4',{grade:grade},txt+'；里程碑達成，進下一階段',f.track==='gap'?'S3':'P3');return;
+ }
+ if(grade==='partial'){flowDecide('S8','d4',{grade:grade},txt+'；幅度問題，看後果',f.track==='gap'?'S6':'P3');return}
+ flowDecide('S8','d4',{grade:grade},txt+'；意願問題',null);f.askVision=true;save();render();
+}
+function flowD4Vision(still){
+ var c=activeCase();var f=flowOf(c);if(!f)return;f.askVision=false;
+ if(still)flowDecide('S8','d4v',{still:true},'客戶確認願景還是要的，看後果',f.track==='gap'?'S6':'P3');
+ else {flowDecide('S8','d4v',{still:false},'客戶說願景不再是他要的，回願景澄清','S1');app.dataTab='intent';render();}
+}
+/* 餘裕線 */
+function flowRejudge(){var c=activeCase();var f=flowOf(c);if(!f)return;var T=flowTrack(c);f.track=T.track;f.step=T.track==='gap'?'S0':'P0';save();render()}
+function flowUpgradeVision(yes){
+ var c=activeCase();var f=flowOf(c);if(!f)return;
+ if(yes){flowDecide('P2','d1p',{upgrade:true},'客戶要升級願景，回意圖分頁加進去後重判',null);f.pendingRejudge=true;save();app.dataTab='intent';render();}
+ else flowDecide('P2','d1p',{upgrade:false},'客戶不升級願景，先補護欄','P2g');
+}
+function flowEarlyRetire(c){
+ var A=n(c.profile.age)||40,rA=n(c.profile.retireAge)||65,early=0;
+ for(var y=1;y<=Math.max(0,rA-A-1);y++){var t=baseCase(c);applyRetireDelay(t,-y);if(projection(t,0,PLAN_DISCOUNT).shortPV>0.5)break;early=y}
+ return early;
+}
+function flowApplyAdvance(years){
+ var c=activeCase();var f=flowOf(c);if(!f)return;years=n(years);if(years<=0)return;
+ var rA=n(c.profile.retireAge)||65;applyRetireDelay(c,-years);
+ c.surplus=c.surplus||{};c.surplus.allocation=(c.surplus.allocation||[]).concat([{kind:'advance',years:years,from:rA,to:rA-years,at:new Date().toISOString()}]);
+ flowDecide('P3','p3adv',{years:years},'餘裕分配：退休提早 '+years+' 年（'+rA+' → '+(rA-years)+' 歲）',null);
+}
+function flowConfirmSurplus(){var c=activeCase();var f=flowOf(c);if(!f)return;var T=flowTrack(c);c.surplus=c.surplus||{};c.surplus.trueSurplus=T.surplus;c.surplus.at=new Date().toISOString();flowDecide('P3','p3',{surplus:T.surplus},'餘裕分配定案（保守餘裕 '+cfAxis(T.surplus)+'）','P3x')}
+
+/* 時間軸後果旗：只在 Step 6 畫，資料由 planSec 先算好放 app._flowCons */
+function flowConsFlagsSVG(c,X,Y,T,a0,aEnd,pa){
+ var C=(typeof app!=='undefined')?app._flowCons:null;if(!C||!C.items||!C.items.length)return '';
+ var s='',lastX=-99,hi=false;
+ C.items.forEach(function(d){
+  var age=d.kind==='delay'?d.to:d.age;if(d.itemKind==='legacy')age=aEnd-1;
+  var x=X(Math.max(a0,Math.min(aEnd,age)));
+  var row=pa.rows[Math.max(0,Math.min(pa.rows.length-1,age-a0))]||pa.rows[0];
+  hi=(x-lastX<64)?!hi:false;lastX=x;
+  var ty=hi?T+26:T+12,sy=hi?T+38:T+24;
+  var sym=d.kind==='delay'?'⇢':(d.kind==='downgrade'?'▽':'○'),col='#c8873f';
+  s+='<line x1="'+x.toFixed(1)+'" y1="'+(ty-8)+'" x2="'+x.toFixed(1)+'" y2="'+Y(row.total).toFixed(1)+'" stroke="'+col+'" stroke-width="1" stroke-dasharray="3 3" stroke-opacity=".6"/>'+
+   '<text x="'+x.toFixed(1)+'" y="'+ty+'" fill="'+col+'" font-size="12" font-weight="800" text-anchor="middle">'+sym+'</text>'+
+   '<text x="'+x.toFixed(1)+'" y="'+sy+'" fill="'+col+'" font-size="9.5" text-anchor="middle">'+esc(String(d.name).slice(0,6))+(d.kind==='delay'?' +'+d.years:d.kind==='downgrade'?' 降規':' 消失')+'</text>';
+ });
+ return '<g class="vtcons">'+s+'</g>';
+}
+
+/* 方案書：有 c.flow 才多這一章（放在「一、」之前） */
+function flowReportChapterHTML(c){
+ var f=flowOf(c);if(!f)return '';
+ var dec=f.decisions||{},keys=Object.keys(dec).sort(function(a,b){return (dec[a].at||'')<(dec[b].at||'')?-1:1});
+ var st=flowStages(c),acts=(c.actions||[]).filter(function(a){return a.on!==false});
+ var cons=(c.consequences&&c.consequences.items)||[];
+ var laneOrder=['guard','income-work','income-invest','expense','surplus'];
+ var actRows=laneOrder.map(function(ln){return acts.filter(function(a){return laneOf(a)===ln}).map(function(a){
+  var amt=(a.cat==='income'||a.cat==='expense')?(a.cat==='expense'?'−':'+')+fmt(a.getMonthly)+'／月':n(a.payMonthly)?fmt(a.payMonthly)+'／月':n(a.payLump)?fmt(a.payLump)+' 單筆':n(a.getLump)?'+'+fmt(a.getLump):'';
+  return '<tr><td>'+esc(FLOW_LANES[ln]||ln)+'</td><td>'+esc((a.name||'').trim()||actCat(a.cat).n)+'</td><td>'+(n(a.startY)||n(a.payFrom)||n(a.getFrom)||'')+' 歲起</td><td style="text-align:right">'+amt+'</td><td>'+esc({planned:'待執行',done:'到位',partial:'部分',none:'未動'}[((a.status||{}).state)||'planned']||'待執行')+'</td></tr>'}).join('')}).join('');
+ return '<h2>零、我們是怎麼走到這份方案的</h2>'+
+  '<p style="font-size:14px;line-height:1.9">這份方案照「願景處理流程」走：<b>願景不動</b>；先看增加收入、再看減少支出；收入和支出都盡力之後還不夠的部分，只把後果算給你看，<b>由你自己決定</b>要加碼還是接受。目前走的是<b>'+(f.track==='gap'?'缺口線':'餘裕線')+'</b>，步驟 '+esc(f.step)+'。</p>'+
+  (keys.length?'<h3>這一路的決定</h3><table><tr><th>閘門</th><th>決定</th><th>時間</th></tr>'+keys.map(function(k){var d=dec[k];return '<tr><td>'+esc(k.toUpperCase())+'</td><td>'+esc(d.text||'')+'</td><td style="color:'+RP.mut+'">'+esc((d.at||'').slice(0,10))+'</td></tr>'}).join('')+'</table>':'')+
+  (st.length?'<h3>階段目標</h3><table><tr><th>階段</th><th>年齡</th><th>包含的願景</th><th style="text-align:right">里程碑：可投資資產</th><th>狀態</th></tr>'+st.map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+x.fromAge+'–'+x.toAge+'</td><td>'+esc((x.goals||[]).join('、')||'—')+'</td><td style="text-align:right">'+fmt(x.milestone)+'</td><td>'+(x.status==='reached'?'已達成':'進行中')+'</td></tr>'}).join('')+'</table>':'')+
+  (cons.length?'<h3>你接受的後果</h3><table><tr><th>願景</th><th>後果</th></tr>'+cons.map(function(d){return '<tr><td>'+esc(d.name)+'</td><td>'+(d.kind==='delay'?'延後 '+d.years+' 年（'+d.from+' → '+d.to+' 歲）':d.kind==='downgrade'?'降規 '+fmt(d.from)+' → '+fmt(d.to):d.kind==='drop'?'放手':'未解')+'</td></tr>'}).join('')+'</table>':'')+
+  (acts.length?'<h3>行動清單</h3><table><tr><th>類別</th><th>動作</th><th>時點</th><th style="text-align:right">金額</th><th>狀態</th></tr>'+actRows+'</table>':'');
+}
+
+/* 畫面：S6′／P3′ 共用的行動清單、S7、S8、P2、P2′、P3 */
+function flowActionListHTML(c,gateHTML){
+ var acts=(c.actions||[]).filter(function(a){return a.on!==false}),curS=flowCurrentStage(c);
+ return '<p class="flowask"><b>這一階段的行動清單</b>　做什麼、什麼時候、下次怎麼驗收。全部來自調整動作清單（lane 標籤），不另存一份。</p>'+
+  '<div class="tw"><table><tr><th>lane</th><th>動作</th><th>時點</th><th class="r">金額</th><th>狀態</th></tr>'+
+  (acts.length?acts.map(function(a){var ln=laneOf(a),amt=(a.cat==='income'||a.cat==='expense')?(a.cat==='expense'?'−':'+')+fmt(a.getMonthly)+'／月':n(a.payMonthly)?fmt(a.payMonthly)+'／月':n(a.payLump)?fmt(a.payLump)+' 單筆':n(a.getLump)?'+'+fmt(a.getLump):'';
+   return '<tr><td><span class="flpill '+({'income-work':'w','income-invest':'i','expense':'e','guard':'g','surplus':'i'}[ln]||'')+'">'+(FLOW_LANES[ln]||ln)+'</span></td><td>'+esc((a.name||'').trim()||actCat(a.cat).n)+'</td><td>'+(n(a.startY)||n(a.payFrom)||n(a.getFrom)||'')+' 歲起</td><td class="r">'+amt+'</td><td><span class="mk g">'+esc(((a.status||{}).state)||'planned')+'</span></td></tr>'}).join(''):'<tr><td colspan="5" class="muted" style="padding:12px">還沒有任何動作。</td></tr>')+'</table></div>'+
+  (curS?'<div class="hint" style="margin-top:8px">里程碑：'+esc(curS.name)+'（'+curS.toAge+' 歲）可投資資產 '+fmt(curS.milestone)+'。回訪時以里程碑差距為主、動作勾選並列。</div>':'')+
+  flowRecalc(c)+gateHTML;
+}
+function flowBodyHTML2(c){
+ var f=flowOf(c),s=f.step,A=n(c.profile.age)||40;
+ if(s==='S6x'||s==='P3x'){
+  return flowActionListHTML(c,flowGate('輸出與執行',
+   '<button class="tbtn amber" onclick="flowStartExec()">進入執行期 →</button>'+
+   '<button class="tbtn ghost" onclick="app.activeTab=\'report\';app.reportDoc=\'plan\';render()">產出調整方案書</button>'+
+   '<button class="tbtn ghost" onclick="app.activeTab=\'analysis\';render()">回到分析頁</button>','教練'));
+ }
+ if(s==='S7'){var acts7=c.actions||[],K7=checkin(c);
+  var stBtn=function(i,a){var cur=((a.status||{}).state)||'planned';return '<span class="flowsw">'+['planned','done','partial','none'].map(function(k){return '<button class="'+(cur===k?'on'+(k==='done'?' keep':''):'')+'" onclick="flowSetStatus('+i+',\''+k+'\')">'+({planned:'待',done:'到位',partial:'部分',none:'沒動'}[k])+'</button>'}).join('')+'</span>'};
+  return flowAsk('客戶去做，教練依週期追蹤。回訪時先把每個動作的狀態標好，再按「回訪對帳」。')+
+   '<div class="flowcards"><div class="fcard"><div class="t">規劃線（'+A+' 歲）</div><div class="n">'+(K7.planned!=null?cfAxis(K7.planned):'—')+'</div><div class="s">進入執行期時存下的基準'+(K7.baselineAt?'（'+K7.baselineAt.slice(0,10)+'）':'')+'</div></div>'+
+   '<div class="fcard"><div class="t">實際可投資資產</div><div class="n">'+cfAxis(K7.actual)+'</div><div class="s">現況資料（記得先更新收支資債）</div></div>'+
+   '<div class="fcard"><div class="t">里程碑達成率</div><div class="n '+(K7.ratio==null?'':K7.ratio>=FLOW_D4_DONE?'ok':K7.ratio>=FLOW_D4_PARTIAL?'warn':'bad')+'">'+(K7.ratio!=null?Math.round(K7.ratio*100)+'%':'—')+'</div><div class="s">≥'+Math.round(FLOW_D4_DONE*100)+'% 到位／≥'+Math.round(FLOW_D4_PARTIAL*100)+'% 部分</div></div></div>'+
+   '<div class="tw" style="margin-top:10px"><table><tr><th>lane</th><th>動作</th><th class="r">金額</th><th>狀態</th></tr>'+
+   acts7.map(function(a,i){if(a.on===false)return '';var ln=laneOf(a),amt=(a.cat==='income'||a.cat==='expense')?fmt(a.getMonthly)+'／月':n(a.payMonthly)?fmt(a.payMonthly)+'／月':n(a.payLump)?fmt(a.payLump):n(a.getLump)?fmt(a.getLump):'';
+    return '<tr><td><span class="flpill '+({'income-work':'w','income-invest':'i','expense':'e','guard':'g','surplus':'i'}[ln]||'')+'">'+(FLOW_LANES[ln]||ln)+'</span></td><td>'+esc((a.name||'').trim()||actCat(a.cat).n)+'</td><td class="r">'+amt+'</td><td>'+stBtn(i,a)+'</td></tr>'}).join('')+'</table></div>'+
+   flowGate('回訪','<button class="tbtn amber" onclick="flowGo(\'S8\')">回訪對帳 →</button>','教練');
+ }
+ if(s==='S8'){var K=checkin(c);
+  var gl={done:'到位',partial:'動了但不夠',none:'完全沒動'};
+  return flowAsk('上次說的，做了沒？——里程碑為主、動作數並列。系統先給判定，教練可以改。')+
+   '<div class="flowcards"><div class="fcard" style="border-color:var('+(K.grade==='done'?'--ok':K.grade==='partial'?'--warn':'--danger')+')"><div class="t">系統判定</div><div class="n '+(K.grade==='done'?'ok':K.grade==='partial'?'warn':'bad')+'">'+gl[K.grade]+'</div><div class="s">'+(K.ratio!=null?'里程碑 '+Math.round(K.ratio*100)+'%':'沒有基準，以動作數判')+'</div></div>'+
+   '<div class="fcard"><div class="t">里程碑</div><div class="n">'+cfAxis(K.actual)+(K.planned!=null?' <span class="muted" style="font-size:13px">/ '+cfAxis(K.planned)+'</span>':'')+'</div><div class="s">實際 vs 規劃線同齡值</div></div>'+
+   '<div class="fcard"><div class="t">動作</div><div class="n">'+K.cnt.done+' <span class="muted" style="font-size:13px">/ '+K.total+'</span></div><div class="s">到位 '+K.cnt.done+'・部分 '+K.cnt.partial+'・沒動 '+K.cnt.none+'・待 '+K.cnt.planned+'</div></div></div>'+
+   (f.askVision
+    ?flowGate('完全沒動——這個願景還是你要的嗎？','<button class="tbtn amber" onclick="flowD4Vision(true)">還是要的 → 看後果</button><button class="tbtn ghost" onclick="flowD4Vision(false)">不是了 → 回願景澄清</button>','客戶')
+    :flowGate('D4　執行到位嗎？','<button class="tbtn '+(K.grade==='done'?'amber':'ghost')+'" onclick="flowD4(\'done\')">到位 → 更新現況、下一階段</button><button class="tbtn '+(K.grade==='partial'?'amber':'ghost')+'" onclick="flowD4(\'partial\')">動了但不夠 → 看後果</button><button class="tbtn '+(K.grade==='none'?'amber':'ghost')+'" onclick="flowD4(\'none\')">完全沒動 → 問願景</button>','教練判、客戶認'));
+ }
+ if(s==='P2'){
+  return flowAsk('他的願景是不是寫得太保守？（小確幸的反面——因為以為要不到，所以沒把真正想要的寫進去。）')+
+   '<div class="fcard" style="margin-bottom:10px"><div class="t">問他</div><div style="font-family:var(--serif);font-size:18px">「如果錢不是問題，還有什麼是你想要的？」</div><div class="s" style="margin-top:6px">要升級就回意圖分頁把它加進必達清單，加完回來重判（升級後可能變缺口，那就走缺口線）。</div></div>'+
+   (f.pendingRejudge?'<div class="v2verdict">願景已回意圖分頁調整過？按重判。<div style="margin-top:8px"><button class="tbtn amber" onclick="flowRejudge()">重判 Step 0 →</button></div></div>':'')+
+   flowGate('D1′　要不要升級願景？','<button class="tbtn amber" onclick="flowUpgradeVision(true)">要 → 去加願景</button><button class="tbtn ghost" onclick="flowUpgradeVision(false)">不要 → 補護欄</button>','客戶');
+ }
+ if(s==='P2g'){var Gd=guardCheck(c);
+  return flowAsk('餘裕先補護欄，再談擴張。')+
+   '<div class="tw"><table><tr><th>項目</th><th>對象</th><th class="r">需要</th><th class="r">已有</th><th class="r">缺</th><th>處理</th></tr>'+
+   Gd.rows.map(function(r,i){var ex=guardActionExists(c,r);return '<tr><td>'+esc(r.name)+'</td><td>'+esc(r.member||'')+'</td><td class="r">'+fmt(r.need)+'</td><td class="r">'+fmt(r.have)+'</td><td class="r '+(r.gap>0?'bad':'ok')+'">'+(r.gap>0?fmt(r.gap):'—')+'</td><td>'+(r.gap>0?(ex?'<span class="ok">已列入</span>':'<button class="tbtn sm" onclick="flowAddGuard('+i+')">列入行動清單</button>'):'<span class="muted">已備</span>')+'</td></tr>'}).join('')+'</table></div>'+
+   flowGate('護欄列入行動清單','<button class="tbtn amber" onclick="flowGo(\'P3\')">'+(Gd.open?Gd.open+' 項待補':'護欄已備')+' → 餘裕分配</button>','教練提、客戶認');
+ }
+ if(s==='P3'){var T3=flowTrack(c),early=flowEarlyRetire(c),rA3=n(c.profile.retireAge)||65,IG3=investGate(c),alloc=((c.surplus||{}).allocation)||[];
+  return flowAsk('餘裕怎麼用？三個方向教練算給他看、客戶選，可以混配。')+
+   '<div class="flowcards">'+
+   '<div class="fcard"><div class="t">時間前移</div><div class="n">'+(early?rA3+' → '+(rA3-early):'—')+'</div><div class="s">保守假設下仍不轉負的最早退休歲（最多提早 '+early+' 年）</div>'+
+    (early?'<div style="margin-top:8px;display:flex;gap:6px;align-items:center"><input id="flowAdvY" type="number" inputmode="numeric" min="1" max="'+early+'" value="'+early+'" style="width:64px"> 年 <button class="tbtn sm amber" onclick="flowApplyAdvance(document.getElementById(\'flowAdvY\').value)">套用提早退休</button></div>':'')+
+    (alloc.filter(function(x){return x.kind==='advance'}).length?'<div class="s ok" style="margin-top:6px">已提早 '+alloc.filter(function(x){return x.kind==='advance'}).map(function(x){return x.years}).reduce(function(a,b){return a+b},0)+' 年</div>':'')+'</div>'+
+   '<div class="fcard"><div class="t">安全邊際加厚</div><div class="n">'+cfAxis(T3.surplus)+'</div><div class="s">保守餘裕現值；可轉成預備金加厚、保障補足、退休期厚度或傳承</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="tbtn sm" onclick="flowGo(\'P2g\')">補護欄</button><button class="tbtn sm" onclick="flowAddAction(\'regular\',\'surplus\',\'加厚退休準備\')">＋ 退休加厚（定期定額）</button></div></div>'+
+   '<div class="fcard"><div class="t">理財收入配置</div><div class="n">'+fmt(IG3.monthLeft)+'<span class="muted" style="font-size:13px">／月</span></div><div class="s">月結餘餘裕 → 定期定額；存量餘裕（水位 '+fmt(Math.max(0,IG3.investable))+'）→ 單筆</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="tbtn sm amber" onclick="flowAddAction(\'regular\',\'surplus\',\'定期定額\')" '+(IG3.regularOK?'':'disabled')+'>＋ 定期定額</button><button class="tbtn sm" onclick="flowAddAction(\'lump\',\'surplus\',\'單筆投入\')" '+(IG3.lumpOK?'':'disabled')+'>＋ 單筆投入</button></div></div></div>'+
+   '<div style="margin-top:10px">'+flowActionsTable(c,['surplus'],'')+'</div>'+flowRecalc(c)+
+   flowGate('餘裕分配定案','<button class="tbtn amber" onclick="flowConfirmSurplus()">定案 → 行動清單</button>','客戶選、教練算');
+ }
+ return '<div class="muted">此步驟尚未定義。</div>';
+}
+
 function flowSec(c){
  var f=flowOf(c);
  return '<div class="sec" id="flowSec"><h4>願景處理流程 <span class="flpill '+(f.track==='gap'?'w':'i')+'">'+(f.track==='gap'?'缺口線':'餘裕線')+'</span>'+
@@ -9823,6 +9992,7 @@ function planSec(c){
  // 2026/09/27 願景處理流程：有 c.flow 的客戶在首屏下方接步進器，v2 九個折疊原樣收進「更多診斷」；
  //   沒有 c.flow 的客戶只多一顆入口，其餘一模一樣（planChartsUI.test 守著）。
  var fl=flowOf(c);
+ app._flowCons=(fl&&fl.step==='S6')?consequences(c):null;   // 時間軸後果旗只在 Step 6 畫
  var folds=
   // 2026/09/26 全站盤查：首屏只留主圖＋數字，其餘一律收（含這兩塊，之前預設開）。
   foldSec('缺口配額對帳','這條線大概要生出多少錢 vs 動作實際排了多少',quotaV2HTML(c),false)+
@@ -16547,6 +16717,7 @@ function planReportHTML(c){
   (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
   '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+'　現年 '+n(p.age)+' 歲　目前階段：'+stageName(hb.grade)+docCodeHTML()+'</div></div>'+
 
+  flowReportChapterHTML(c)+
   '<h2>一、你和你想要的未來，差多少</h2>'+
   '<p style="font-size:14px;line-height:1.9">財務規劃要回答的是：<b>你這一生想做的事，錢夠不夠支撐。</b>'+
   '缺口幾乎一定存在——把基本的目標做到之後，還有傳承，還有更想追求的事。'+
