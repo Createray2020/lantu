@@ -281,6 +281,13 @@
       "when": 1790354979478,
       "tag": "0039_illegal_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790493803480,
+      "tag": "0040_house_params",
+      "breakpoints": true
     }
   ]
 }

@@ -4797,6 +4797,8 @@ function set(id,field,val,type){var c=activeCase();var t=id.split(':'),arr=t[0],
  if(arr==='profile'||arr==='incomes')syncSalaryIncome(c);
  if(arr==='marriage'||arr==='goals')applyMarriagePlan(c);
  if(arr==='goals')migrateParentGoals(c);
+ // 購屋：教練直接改總價＝手填，之後規格再變也不覆蓋（一鍵「用估值」可回來）。
+ if(arr==='goals'&&i!=null&&(field==='present'||field==='minPresent')){var hg=listOf(c,arr)[i];if(hg&&(hg.type==='購屋'||hg.type==='置產')){if(field==='present')hg.priceManual=true;else hg.minManual=true;}}
  if(arr==='members'||arr==='profile'||arr==='prepared')syncLaborPrepared(c);
  if(arr==='assets')syncPolicyAsset(c);
  // 健保費那一列吃「成員的投保薪資/眷口/類別」與「收入列的所得細類」，兩邊動了都要重算。
@@ -4841,6 +4843,7 @@ var CALC={
  // 教練在意圖分頁填「繼承人數 2」時，完整度計數器與那顆點的顏色要當場變。
  completeness:function(c){return completenessHTML(c);},
  houseCalc:function(c,i){return houseCalcDerivedHTML(c,i);},
+ houseEst:function(c,i){return houseEstHTML(c,i);},
  coverageNeeds:function(c){return coverageHubParts(c).needsTbl;},
  // 賓士圖的四個衍生區。⚠️ 全部不含輸入框——輸入框住在靜態外殼裡，
  // 只有 covRedraw()（換被保人／換格子）會重建外殼。理由見 covPadHTML 的註解。
@@ -9697,7 +9700,7 @@ function goalsTabBody(c,fixed){
  var tbl=(cur==='care')?careSec(c):tableSec('目標 / 置產 / 願望 · '+G.nm,'goals',list,GOAL_COLS,'',GOAL_MORE,idx,'addGoalInGroup(\''+cur+'\')');
  var extra='';
  if(cur==='care')extra=giftTaxSec(c);
- if(cur==='house')extra=detailSec(c,'house')+houseCalcSec(c);
+ if(cur==='house')extra=houseSpecSec(c)+detailSec(c,'house')+houseCalcSec(c);
  if(cur==='car')extra=detailSec(c,'car');
  return (fixed?'':nav)+'<div class="goalgrp" data-g="'+cur+'"'+(fixed&&G.t?' data-goalanchor="'+esc(G.t)+'"':'')+'>'+offNote+tbl+(cur==='care'?'':'<div data-calc="defer">'+deferHint(c)+'</div>')+extra+'</div>';
 }
@@ -12736,6 +12739,97 @@ function coverageCheckupHTML(c,ck,pc){
 //    病房費／看護費（＋進階的自付差額）合成 **一條住院醫療日額**（medicalDailyNeed）。
 //    所以那些格子點進去只顯示「本格金額」，缺口顯示的是它所屬險種整條的——
 //    刻意不在格子層級偽造一個缺口出來。
+
+// ===== 購屋模組（2026/09/27 Ray）=====
+// ⚠️ 以下常數與 src/lib/twDistricts.ts、src/lib/houseParams.defaults.ts 逐字對拍（houseParams.drift.test.ts）。
+//    後台 /admin/house-params 的數字由 window.LANTU_HOUSE 帶進來，這裡的只是 fallback。
+var TW_DISTRICTS={
+  "台北市": ["中正區","大同區","中山區","松山區","大安區","萬華區","信義區","士林區","北投區","內湖區","南港區","文山區"],
+  "新北市": ["板橋區","三重區","中和區","永和區","新莊區","新店區","樹林區","鶯歌區","三峽區","淡水區","汐止區","瑞芳區","土城區","蘆洲區","五股區","泰山區","林口區","深坑區","石碇區","坪林區","三芝區","石門區","八里區","平溪區","雙溪區","貢寮區","金山區","萬里區","烏來區"],
+  "桃園市": ["桃園區","中壢區","大溪區","楊梅區","蘆竹區","大園區","龜山區","八德區","龍潭區","平鎮區","新屋區","觀音區","復興區"],
+  "台中市": ["中區","東區","南區","西區","北區","北屯區","西屯區","南屯區","太平區","大里區","霧峰區","烏日區","豐原區","后里區","石岡區","東勢區","和平區","新社區","潭子區","大雅區","神岡區","大肚區","沙鹿區","龍井區","梧棲區","清水區","大甲區","外埔區","大安區"],
+  "台南市": ["中西區","東區","南區","北區","安平區","安南區","永康區","歸仁區","新化區","左鎮區","玉井區","楠西區","南化區","仁德區","關廟區","龍崎區","官田區","麻豆區","佳里區","西港區","七股區","將軍區","學甲區","北門區","新營區","後壁區","白河區","東山區","六甲區","下營區","柳營區","鹽水區","善化區","大內區","山上區","新市區","安定區"],
+  "高雄市": ["新興區","前金區","苓雅區","鹽埕區","鼓山區","旗津區","前鎮區","三民區","楠梓區","小港區","左營區","仁武區","大社區","岡山區","路竹區","阿蓮區","田寮區","燕巢區","橋頭區","梓官區","彌陀區","永安區","湖內區","鳳山區","大寮區","林園區","鳥松區","大樹區","旗山區","美濃區","六龜區","內門區","杉林區","甲仙區","桃源區","那瑪夏區","茂林區","茄萣區"],
+  "基隆市": ["仁愛區","信義區","中正區","中山區","安樂區","暖暖區","七堵區"],
+  "新竹市": ["東區","北區","香山區"],
+  "新竹縣": ["竹北市","湖口鄉","新豐鄉","新埔鎮","關西鎮","芎林鄉","寶山鄉","竹東鎮","五峰鄉","橫山鄉","尖石鄉","北埔鄉","峨眉鄉"],
+  "苗栗縣": ["竹南鎮","頭份市","三灣鄉","南庄鄉","獅潭鄉","後龍鎮","通霄鎮","苑裡鎮","苗栗市","造橋鄉","頭屋鄉","公館鄉","大湖鄉","泰安鄉","銅鑼鄉","三義鄉","西湖鄉","卓蘭鎮"],
+  "彰化縣": ["彰化市","芬園鄉","花壇鄉","秀水鄉","鹿港鎮","福興鄉","線西鄉","和美鎮","伸港鄉","員林市","社頭鄉","永靖鄉","埔心鄉","溪湖鎮","大村鄉","埔鹽鄉","田中鎮","北斗鎮","田尾鄉","埤頭鄉","溪州鄉","竹塘鄉","二林鎮","大城鄉","芳苑鄉","二水鄉"],
+  "南投縣": ["南投市","中寮鄉","草屯鎮","國姓鄉","埔里鎮","仁愛鄉","名間鄉","集集鎮","水里鄉","魚池鄉","信義鄉","竹山鎮","鹿谷鄉"],
+  "雲林縣": ["斗南鎮","大埤鄉","虎尾鎮","土庫鎮","褒忠鄉","東勢鄉","台西鄉","崙背鄉","麥寮鄉","斗六市","林內鄉","古坑鄉","莿桐鄉","西螺鎮","二崙鄉","北港鎮","水林鄉","口湖鄉","四湖鄉","元長鄉"],
+  "嘉義市": ["東區","西區"],
+  "嘉義縣": ["番路鄉","梅山鄉","竹崎鄉","阿里山鄉","中埔鄉","大埔鄉","水上鄉","鹿草鄉","太保市","朴子市","東石鄉","六腳鄉","新港鄉","民雄鄉","大林鎮","溪口鄉","義竹鄉","布袋鎮"],
+  "屏東縣": ["屏東市","三地門鄉","霧台鄉","瑪家鄉","九如鄉","里港鄉","高樹鄉","鹽埔鄉","長治鄉","麟洛鄉","竹田鄉","內埔鄉","萬丹鄉","潮州鎮","泰武鄉","來義鄉","萬巒鄉","崁頂鄉","新埤鄉","南州鄉","林邊鄉","東港鎮","琉球鄉","佳冬鄉","新園鄉","枋寮鄉","枋山鄉","春日鄉","獅子鄉","車城鄉","牡丹鄉","恆春鎮","滿州鄉"],
+  "宜蘭縣": ["宜蘭市","頭城鎮","礁溪鄉","壯圍鄉","員山鄉","羅東鎮","三星鄉","大同鄉","五結鄉","冬山鄉","蘇澳鎮","南澳鄉"],
+  "花蓮縣": ["花蓮市","新城鄉","秀林鄉","吉安鄉","壽豐鄉","鳳林鎮","光復鄉","豐濱鄉","瑞穗鄉","萬榮鄉","玉里鎮","卓溪鄉","富里鄉"],
+  "台東縣": ["台東市","綠島鄉","蘭嶼鄉","延平鄉","卑南鄉","鹿野鄉","關山鎮","海端鄉","池上鄉","東河鄉","成功鎮","長濱鄉","太麻里鄉","金峰鄉","大武鄉","達仁鄉"],
+  "澎湖縣": ["馬公市","西嶼鄉","望安鄉","七美鄉","白沙鄉","湖西鄉"],
+  "金門縣": ["金沙鎮","金湖鎮","金寧鄉","金城鎮","烈嶼鄉","烏坵鄉"],
+  "連江縣": ["南竿鄉","北竿鄉","莒光鄉","東引鄉"],
+};
+var TW_CITIES=Object.keys(TW_DISTRICTS);
+var HOUSE_PRICE_BASIS="2026-09";
+var HOUSE_CONDITIONS=["預售","新成屋","中古"];
+var HOUSE_CITY_BASE={
+  "台北市": [95, 300], "新北市": [55, 200], "桃園市": [36, 150], "台中市": [42, 160], "台南市": [30, 120],
+  "高雄市": [33, 130], "基隆市": [28, 100], "新竹市": [48, 160], "新竹縣": [42, 150], "苗栗縣": [24, 90],
+  "彰化縣": [23, 90], "南投縣": [20, 80], "雲林縣": [19, 80], "嘉義市": [24, 90], "嘉義縣": [18, 80],
+  "屏東縣": [19, 80], "宜蘭縣": [27, 100], "花蓮縣": [22, 90], "台東縣": [20, 80], "澎湖縣": [22, 80],
+  "金門縣": [20, 80], "連江縣": [16, 60],
+};
+var HOUSE_COND_RATIO={ "預售": 1.1, "新成屋": 1.0, "中古": 0.72 };
+var HOUSE_TYPES=["電梯大樓","華廈","公寓","透天"];
+var HOUSE_TYPE_RATIO_DEFAULT={ "電梯大樓": 1.0, "華廈": 0.9, "公寓": 0.7, "透天": 1.15 };
+var HOUSE_AGE_RATIO_DEFAULT=[[5, 1.0], [15, 0.9], [30, 0.8], [Infinity, 0.7]];
+var HOUSE_PAY_DEFAULT={
+  "預售":   { deposit: 15, progress: 10, progressYears: 3, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 75, loanYears: 30 },
+  "新成屋": { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 0, closingFee: 1.0, decoRatio: 5, loanRatio: 80, loanYears: 30 },
+  "中古":   { deposit: 0,  progress: 0,  progressYears: 0, agentFee: 2, closingFee: 1.5, decoRatio: 10, loanRatio: 75, loanYears: 30 },
+};
+var HOUSE_MIN_SPEC_DEFAULT={ type: "電梯大樓", rooms: 3, ping: 30, parking: 0, age: 10 };
+function defaultHousePrices(){
+ var out=[];
+ TW_CITIES.forEach(function(city){var b=HOUSE_CITY_BASE[city]||[20,80];
+  HOUSE_CONDITIONS.forEach(function(cond){out.push({city:city,district:'',condition:cond,unitPrice:Math.round(b[0]*HOUSE_COND_RATIO[cond]*10)/10,parkingPrice:b[1],source:'起手值（程式內建）',basis:HOUSE_PRICE_BASIS,builtin:true});});
+ });
+ return out;
+}
+// 三層：後台 payload（window.LANTU_HOUSE）→ 程式端 fallback。settings 的 ageRatio 最後一段上限 null＝Infinity。
+function houseData(){
+ var h=window.LANTU_HOUSE;
+ var prices=(h&&h.prices&&h.prices.length)?h.prices:defaultHousePrices();
+ var st=(h&&h.settings)||{};
+ var typeRatio=Object.assign({},HOUSE_TYPE_RATIO_DEFAULT,st.typeRatio||{});
+ var ageRatio=(st.ageRatio&&st.ageRatio.length)?st.ageRatio.map(function(x){return [x[0]==null?Infinity:+x[0],+x[1]]}):HOUSE_AGE_RATIO_DEFAULT;
+ var pay={};HOUSE_CONDITIONS.forEach(function(c){pay[c]=Object.assign({},HOUSE_PAY_DEFAULT[c],(st.pay||{})[c]||{});});
+ return {prices:prices,settings:{typeRatio:typeRatio,ageRatio:ageRatio,pay:pay},basis:(h&&h.basis)||HOUSE_PRICE_BASIS};
+}
+function housePriceLookup(prices,city,district,condition){
+ var cityRow=null;
+ for(var i=0;i<prices.length;i++){var r=prices[i];
+  if(r.city!==city||r.condition!==condition)continue;
+  if(r.district===district&&district)return {row:r,level:'district'};
+  if(r.district==='')cityRow=r;
+ }
+ return cityRow?{row:cityRow,level:'city'}:{row:null,level:'none'};
+}
+function houseAgeRatio(ageRatio,age,condition){
+ if(condition!=='中古')return 1;
+ for(var i=0;i<ageRatio.length;i++)if(age<=ageRatio[i][0])return ageRatio[i][1];
+ return ageRatio.length?ageRatio[ageRatio.length-1][1]:1;
+}
+/** 估值（元）＝均價×屋型倍率×屋齡倍率×坪數＋車位單價×車位數；均價單位是萬。 */
+function houseEstimate(prices,settings,spec){
+ var lk=housePriceLookup(prices,spec.city,spec.district||'',spec.condition),row=lk.row,level=lk.level;
+ if(!row)return {total:0,unit:0,level:level,parts:{price:0,parking:0}};
+ var unit=row.unitPrice*(settings.typeRatio[spec.type||'電梯大樓']||1)*houseAgeRatio(settings.ageRatio,n(spec.age||0),spec.condition);
+ var price=Math.round(unit*n(spec.ping||0)*10000);
+ var parkUnit=row.parkingPrice;
+ if(!(parkUnit>0)){var cr=housePriceLookup(prices,spec.city,'',spec.condition).row;parkUnit=cr?cr.parkingPrice:0;}
+ var parking=Math.round(parkUnit*n(spec.parking||0)*10000);
+ return {total:price+parking,unit:Math.round(unit*10)/10,level:level,parts:{price:price,parking:parking}};
+}
+
 var COV_WHEEL=[
  {ring:'責任',tone:'resp',kind:'壽險',
   note:'走了，誰接手。這一環的五格是壽險需求的<b>組成</b>，缺口在「責任」這一層一起看。',
@@ -13438,6 +13532,83 @@ function addDecoToPrice(i){
 // 利率／年期／裝修款走 finNum（oninput=setLive、onchange=set），兩條路徑在 data 分頁都不 render，
 // 舊版因此「把利率從 2.0 調到 2.1，月付・頭期・總利息一動也不動」——
 // 而這個元件的全部用途就是「拉了要當場看到多兩千」。
+/* ══ 購屋「這一間房」規格卡（2026/09/27 Ray）══
+   訪談問的是地區×規格，不是總價：縣市／行政區／屋況／屋型／房間數／坪數／車位／屋齡 → 市場起手估值 →
+   回填目標列的「金額(理想)」與「金額(最低)」。教練直接改總價就變「手填」（同賓士圖的覆寫語意），一鍵可回估值。
+   ⚠️ 規格存在 goal 上（g.spec／g.specMin／g.condition），不開新陣列；屋況同時決定第 3 塊的付款時程。
+   ⚠️ 輸入框在靜態外殼；只有估值那一行進 data-calc="houseEst:<i>"。 */
+function houseSpecOf(g,which){
+ var sp=(which==='min')?g.specMin:g.spec;
+ if(!sp||typeof sp!=='object'){sp=(which==='min')?Object.assign({},HOUSE_MIN_SPEC_DEFAULT):{type:'電梯大樓',rooms:3,ping:0,parking:0,age:0};}
+ var base=(which==='min'&&g.spec)?g.spec:{};
+ return {city:sp.city||base.city||'',district:sp.district||(sp.city?'':(base.district||'')),condition:g.condition||'新成屋',
+  type:sp.type||'電梯大樓',rooms:n(sp.rooms),ping:n(sp.ping),parking:n(sp.parking),age:n(sp.age)};
+}
+function houseEstOf(c,g,which){var h=houseData();return houseEstimate(h.prices,h.settings,houseSpecOf(g,which));}
+function houseGoalRows(c){
+ return (c.goals||[]).map(function(g,i){return {g:g,i:i}}).filter(function(p){return p.g&&!p.g.tag&&(p.g.type==='購屋'||p.g.type==='置產')});
+}
+// 規格一改就重估；總價沒被手填過就自動跟著估值走。屋況第一次選定時把成數／年期起手值帶進去（0 才帶）。
+function houseApplyEstimate(c,g){
+ var e=houseEstOf(c,g,'ideal'),m=houseEstOf(c,g,'min');
+ if(!g.priceManual&&e.total>0)g.present=e.total;
+ if(!g.minManual&&m.total>0)g.minPresent=Math.min(m.total,n(g.present)||m.total);
+ var pay=houseData().settings.pay[g.condition||'新成屋'];
+ if(pay){if(!(n(g.loanRatio)>0))g.loanRatio=pay.loanRatio;if(!(n(g.loanYears)>0))g.loanYears=pay.loanYears;}
+}
+function setHouseSpec(i,which,key,val,live){
+ var c=activeCase();var g=(c.goals||[])[i];if(!g)return;
+ if(key==='condition'){g.condition=val;}
+ else{
+  var k=(which==='min')?'specMin':'spec';g[k]=g[k]||Object.assign({},which==='min'?HOUSE_MIN_SPEC_DEFAULT:{type:'電梯大樓',rooms:3,ping:0,parking:0,age:0});
+  if(key==='city'){g[k].city=val;g[k].district='';}
+  else if(key==='district'||key==='type')g[k][key]=val;
+  else g[k][key]=n(val);
+ }
+ houseApplyEstimate(c,g);stampNeeds(c,'goals');
+ if(live){syncDerived();liveSave();}else{save();render();}
+}
+function houseUseEstimate(i,which){var c=activeCase();var g=(c.goals||[])[i];if(!g)return;
+ if(which==='min')g.minManual=false;else g.priceManual=false;houseApplyEstimate(c,g);save();render();}
+function houseEstHTML(c,i){
+ var g=((c||{}).goals||[])[+i];if(!g)return '';
+ var h=houseData(),e=houseEstOf(c,g,'ideal'),m=houseEstOf(c,g,'min');
+ var lvl=function(x){return x.level==='district'?'行政區價':(x.level==='city'?'縣市價（該行政區還沒有資料）':'沒有這個地區的價格')};
+ var line=function(lb,x,cur,manual,which){
+  if(!x.total)return '<div><b>'+lb+'</b>：'+(x.level==='none'?'先選縣市':'坪數還沒填')+'</div>';
+  return '<div><b>'+lb+'</b>估值 <b style="color:var(--amber2)">'+fmt(x.total)+'</b>'+
+   '<span class="muted" style="font-size:11.5px">（'+x.unit+' 萬/坪 · '+lvl(x)+(x.parts.parking?' · 含車位 '+fmt(x.parts.parking):'')+'）</span>'+
+   (manual?'　→ 目前手填 <b>'+fmt(cur)+'</b> <button class="tbtn" style="padding:1px 8px;font-size:11.5px" onclick="houseUseEstimate('+i+',\''+which+'\')">↺ 用估值</button>':'　→ 已回填總價')+'</div>';
+ };
+ return '<div class="hint" style="margin-top:8px;line-height:1.9">'+line('理想',e,n(g.present),!!g.priceManual,'ideal')+line('最低標準',m,n(g.minPresent),!!g.minManual,'min')+
+  '<div class="muted" style="font-size:11.5px">均價是<b>起手值</b>（基準 '+esc(h.basis)+'，權狀坪含公設、車位另計）——跟客戶對過再用；後台「房價參數」可改。</div></div>';
+}
+function houseSpecSec(c){
+ var rows=houseGoalRows(c);if(!rows.length)return '';
+ var h=houseData();
+ return rows.map(function(p){
+  var g=p.g,i=p.i,sp=houseSpecOf(g,'ideal'),mn=houseSpecOf(g,'min');
+  var sel=function(which,key,opts,cur,labelOf){return '<select onchange="setHouseSpec('+i+',\''+which+'\',\''+key+'\',this.value)">'+opts.map(function(o){return '<option value="'+esc(o)+'" '+(cur===o?'selected':'')+'>'+esc(labelOf?labelOf(o):o)+'</option>'}).join('')+'</select>'};
+  var num=function(which,key,cur){return '<input type="number" inputmode="decimal" value="'+esc(cur||'')+'" oninput="setHouseSpec('+i+',\''+which+'\',\''+key+'\',this.value,1)" onchange="setHouseSpec('+i+',\''+which+'\',\''+key+'\',this.value)">'};
+  var f=function(lab,ctl){return '<div class="dfield"><label>'+lab+'</label>'+ctl+'</div>'};
+  var col=function(which,s,title){
+   var dists=TW_DISTRICTS[s.city]||[];
+   return '<div class="sec" style="padding:10px 12px"><div class="cwsec" style="margin-bottom:6px">'+title+'</div><div class="dform">'+
+    f('縣市',sel(which,'city',[''].concat(TW_CITIES),s.city,function(o){return o||'（選縣市）'}))+
+    f('行政區',sel(which,'district',[''].concat(dists),s.district,function(o){return o||'（沿用縣市均價）'}))+
+    f('屋型',sel(which,'type',HOUSE_TYPES,s.type))+
+    f('房間數',num(which,'rooms',s.rooms))+
+    f('坪數（權狀）',num(which,'ping',s.ping))+
+    f('車位（個）',num(which,'parking',s.parking))+
+    ((g.condition||'新成屋')==='中古'?f('屋齡（年）',num(which,'age',s.age)):'')+
+   '</div></div>';
+  };
+  return '<div class="sec" data-goalanchor-detail="house-spec" style="margin-top:9px"><h4>這一間房 · '+esc(g.name||g.type)+' <span class="hint">先問地區與規格，總價用市場起手值推出來；理想與最低標準各一組。</span></h4>'+
+   '<div class="dform" style="margin-bottom:6px">'+f('屋況',sel('ideal','condition',HOUSE_CONDITIONS,g.condition||'新成屋'))+'</div>'+
+   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px">'+col('ideal',sp,'理想')+col('min',mn,'最低標準（問卷起手：電梯大樓・3 房・30 坪・≤10 年）')+'</div>'+
+   '<div data-calc="houseEst:'+i+'">'+houseEstHTML(c,i)+'</div></div>';
+ }).join('');
+}
 function houseCalcCardsHTML(c){
  var list=(c.goals||[]).map(function(g,i){return [g,i]})
    .filter(function(p){return p[0].type==='購屋'||p[0].type==='置產'});
@@ -15957,6 +16128,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
         if(d.an){window.LANTU_AN_DEFAULT=d.an;}
         if(d.birth&&d.birth.values){window.LANTU_BIRTH_COSTS=d.birth.values;}
         if(d.dash)window.LANTU_DASH=d.dash;
+        if(d.house)window.LANTU_HOUSE=d.house;
         try{ if(typeof render==='function')render(); }catch(e){}
       })
       .catch(function(){});

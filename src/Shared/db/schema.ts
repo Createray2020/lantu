@@ -1229,3 +1229,29 @@ export const siteSettings = pgTable('site_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   updatedBy: text('updated_by').references(() => coaches.id, { onDelete: 'set null' }),
 });
+
+// ===== 購屋模組（2026/09/27 Ray）=====
+// 房價參數：縣市×行政區×屋況 的每坪均價（萬／權狀坪）與車位單價（萬／位）。
+// ⚠️ district='' 代表縣市層；查價順序＝行政區列 → 縣市列 → 程式端 fallback（見 lib/houseParams.ts）。
+// ⚠️ 唯一鍵 (city, district, condition) 是給 Ray 之後爬蟲 upsert 用的——同鍵覆蓋、不重複。
+export const housePriceParams = pgTable('house_price_params', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  city: text('city').notNull(),                       // 22 縣市，例「新北市」
+  district: text('district').default('').notNull(),   // 行政區，例「板橋區」；'' ＝縣市層
+  condition: text('condition').notNull(),             // 預售 / 新成屋 / 中古
+  unitPrice: doublePrecision('unit_price').default(0).notNull(),     // 萬／權狀坪（含公設）
+  parkingPrice: doublePrecision('parking_price').default(0).notNull(), // 萬／位；0 ＝沿用縣市層
+  source: text('source'),                             // 來源（起手值／實價登錄／爬蟲…）
+  basis: text('basis'),                               // 資料基準年月，例 2026-09
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('house_price_params_key_uq').on(t.city, t.district, t.condition),
+  index('house_price_params_city_idx').on(t.city),
+]);
+
+// 購屋其他參數（屋型倍率／屋齡倍率／三種屋況的付款範本），key/value JSON，同 site_settings 的形狀。
+export const houseParams = pgTable('house_params', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

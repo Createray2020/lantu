@@ -13,6 +13,7 @@ import { getBizTaxPayload } from "@/lib/bizTaxParams";
 import { getInsProductPayload } from "@/lib/insProducts";
 import { getAnDefaultPayload } from "@/lib/anDefaults";
 import { getClientDashPayload } from "@/lib/clientDashStore";
+import { getHousePayload } from "@/lib/houseParams";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +22,13 @@ export async function GET() {
   // 搭這班車而不是另開一支 API：iframe 本來就在載入時抓這一包、抓到再 render()，
   // 多開一支等於多一次往返，還要多維護一條公開路由。
   // dash＝客戶財務儀表板的顯示開關（後台 /admin/client-view 維護）。同上，搭同一班車。
-  const [cats, edu, biz, ins, an, birth, dash] = await Promise.all([
+  // house＝購屋模組的房價與參數（後台 /admin/house-params 維護；2026/09/27）。同上，搭同一班車。
+  const [cats, edu, biz, ins, an, birth, dash, house] = await Promise.all([
     getCategoryPayload(), getEduCosts(), getBizTaxPayload(), getInsProductPayload(), getAnDefaultPayload(),
-    getBirthCostPayload(), getClientDashPayload(),
+    getBirthCostPayload(), getClientDashPayload(), getHousePayload(),
   ]);
   return Response.json(
-    { cats, edu, biz, ins, an, birth, dash },
+    { cats, edu, biz, ins, an, birth, dash, house },
     { headers: { "cache-control": "public, max-age=60, stale-while-revalidate=3600" } },
   );
 }
