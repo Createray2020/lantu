@@ -89,6 +89,11 @@ type NoteMsg =
  *   body     add 專用：註記內容，配合 blockKey 用來定位要收掉的那一則
  */
 type NoteErrOp = "add" | "del" | "kind" | "start" | "adopt" | "cancel" | "fixup" | "end" | "restore";
+/** 規劃資料裡的「下次檢視日」（YYYY-MM-DD），沒有就 null。 */
+function nextReviewOf(data: unknown): string | null {
+  const v = data && typeof data === "object" ? (data as { nextReview?: unknown }).nextReview : null;
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}
 const NOTE_ERR_FALLBACK = "沒有存成功。請檢查網路後再試一次。";
 
 // v12 App（/lantu-app.html?embed=1）以 iframe 載入。
@@ -136,7 +141,7 @@ export default function PlanEditor({
   const [state, setState] = useState<SaveState>("idle");
   // ⚠️ 結束諮詢不再直接寫紀錄，而是回一份草稿讓教練當場改（可改日期、類型、貼全文）。
   //    表單跟客戶詳情頁是同一個元件，就地彈出＝不用離開規劃編輯器。
-  const [draft, setDraft] = useState<{ sessionId: string; draft: string; todos: string[]; date?: string } | null>(null);
+  const [draft, setDraft] = useState<{ sessionId: string; draft: string; todos: string[]; date?: string; nextAppt?: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [draftErr, setDraftErr] = useState<string | null>(null);
   // 存檔輪次：一輪重試還在退避等待時，使用者又動了規劃 → 新的一輪接手，舊的那輪不准再改狀態。
@@ -298,7 +303,7 @@ export default function PlanEditor({
           if (r.ok) {
             await reload();
             router.refresh();
-            setDraft({ sessionId: r.sessionId, draft: r.draft, todos: r.todos, date: r.date });
+            setDraft({ sessionId: r.sessionId, draft: r.draft, todos: r.todos, date: r.date, nextAppt: nextReviewOf(latest.current) });
           } else {
             postErr("fixup", msg.sessionId, r.error);
           }
@@ -307,7 +312,7 @@ export default function PlanEditor({
           if (r.ok) {
             await reload();
             router.refresh();
-            setDraft({ sessionId: r.sessionId, draft: r.draft, todos: r.todos });
+            setDraft({ sessionId: r.sessionId, draft: r.draft, todos: r.todos, nextAppt: nextReviewOf(latest.current) });
           } else {
             postErr("end", msg.sessionId, r.error);
           }
@@ -518,7 +523,8 @@ export default function PlanEditor({
               plans={[{ id: planId, year }]}
               // ⚠️ 補整理舊場次時日期要是**那一天**，不是今天——這正是當初「結束並摘要」
               //    日期寫死 new Date() 被教練罵的同一個坑。
-              initial={{ planId, summary: draft.draft, ...(draft.date ? { date: draft.date } : {}) }}
+              // 下次會談日期預填規劃裡的「下次檢視日」（流程 6′ 收尾三題填的）；存檔後再回寫，單一真相在紀錄。
+              initial={{ planId, summary: draft.draft, ...(draft.date ? { date: draft.date } : {}), ...(draft.nextAppt ? { nextAppt: draft.nextAppt } : {}) }}
               todos={draft.todos}
               notice={draft.date
                 ? `這一場（${draft.date}）當時沒有按結束，是系統隔天自動封場的。這份草稿是依那一場留下的註記與缺口變化現產的，日期已經填回當天。內容都可以改——把整理好的紀錄整段貼上來也可以。`
@@ -538,6 +544,7 @@ export default function PlanEditor({
                     return;
                   }
                   setDraft(null);
+                  if (v.nextAppt) iframeRef.current?.contentWindow?.postMessage({ type: "lantu:nextreview", date: v.nextAppt }, window.location.origin);
                   router.refresh();
                 } catch (e) {
                   setDraftErr(e instanceof Error && e.name !== "Error" && e.message ? e.message : "存不進去。請稍後再試一次；草稿還留著，不會消失。");

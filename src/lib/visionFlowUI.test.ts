@@ -30,7 +30,7 @@ beforeAll(async () => {
 
 const cur = () => w.app.cases[0];
 const pane = () => w.document.querySelector("#app").innerHTML as string;
-const v2Folds = ["缺口配額對帳", "調整動作清單", "資金勾稽", "動作流程", "願景選定", "拉桿與處方", "缺口組成與即時缺口", "建議資產配置", "方案比較", "其他方案參數"];
+const v2Folds = ["缺口配額對帳", "調整動作清單", "資金勾稽", "動作流程", "拉桿與處方", "缺口組成與即時缺口", "建議資產配置", "方案比較", "其他方案參數"];
 
 describe("TS 鏡射與 HTML 一致", () => {
   it("步驟常數兩邊一樣", () => {
@@ -45,7 +45,7 @@ describe("舊客戶（沒有 c.flow）", () => {
     const h = pane();
     expect(cur().flow).toBeUndefined();
     expect(h).toContain("開始願景處理流程");
-    expect(h).not.toContain('id="flowSec"');
+    expect(h).not.toContain('class="flowrail"');
     v2Folds.forEach((t) => expect(h).toContain(t));
   });
   it("投影數字不因流程程式碼存在而改變（加了 c.flow 再拿掉也一樣）", () => {
@@ -85,7 +85,7 @@ describe("流程推進與閘門", () => {
     expect(h).toContain('id="flowSec"');
     expect(h).toContain("更多診斷");
     v2Folds.forEach((t) => expect(h).toContain(t));
-    expect(h).not.toContain("開始願景處理流程");
+    expect(h).not.toContain('onclick="flowStart()"');
   });
   it("S0 → S1 顯示三個數字與受影響願景；D1 決定寫進 decisions 並前進到 S2", () => {
     w.flowGo("S1");
@@ -219,7 +219,7 @@ describe("Step 6 後果引擎", () => {
     } else w.flowDecide("S6", "d3", { choice: "accept", n: 0 }, "無後果", "S6x");
     expect(cur().flow.step).toBe("S6x");
     expect(w.app._flowCons).toBeNull();
-    expect(pane()).toContain("這一階段的行動清單");
+    expect(pane()).toContain("行動清單與下一步");
     expect(pane()).toContain("進入執行期");
   });
 });
@@ -291,6 +291,51 @@ describe("餘裕線 P1–P3′", () => {
     w.flowStartExec();
     expect(cc.flow.step).toBe("S7");
     w.app.cases.pop(); w.app.activeId = w.app.cases[0].id; w.render();
+  });
+});
+
+describe("訪談清單第 ④ 群：補件 → 走流程 → 定行動 → 回訪對帳", () => {
+  it("四個項目名稱＝落地區塊標題；舊的「收斂與下一步」「調整方案」「真實追蹤」不再是項目", () => {
+    const names = w.INTERVIEW_STEPS.filter((s: any) => s.g === 4).map((s: any) => s.name);
+    expect(names).toEqual(["待補件", "願景處理流程", "行動清單與下一步", "回訪對帳"]);
+    w.INTERVIEW_STEPS.filter((s: any) => ["flow", "actlist", "checkin"].includes(s.k)).forEach((s: any) => expect(s.a).toBe("#flowSec"));
+    expect(pane()).not.toContain('data-ivsec="review"');
+    expect(pane()).toContain('data-ivname="願景處理流程"');
+  });
+  it("「已談過」的判定跟著流程走：flow 有 c.flow 就算；行動清單要走到 6′ 且有下次日期；回訪要有 D4", () => {
+    const c = cur();
+    const st = (k: string) => w.INTERVIEW_STEPS.find((s: any) => s.k === k);
+    expect(st("flow").has(c)).toBe(true);
+    c.flow.step = "S6x"; delete c.flow.wrap; c.nextReview = "";
+    expect(st("actlist").has(c)).toBe(false);
+    w.flowSetWrap("nextDate", "2027-01-15");
+    expect(c.nextReview).toBe("2027-01-15");
+    expect(st("actlist").has(c)).toBe(true);
+    expect(pane()).toContain("收尾三題");
+    expect(st("checkin").has(c)).toBe(!!(c.flow.decisions && c.flow.decisions.d4));
+  });
+  it("ivGoto：行動清單項目把步進器切到 6′；回訪項目在 S7 時切到 S8", () => {
+    const c = cur();
+    c.flow.step = "S5B"; w.render();
+    w.ivGoto("actlist");
+    expect(c.flow.step).toBe("S5B");            // 沒走到 6′ 就停在目前那一步
+    c.flow.step = "S7"; w.render();
+    w.ivGoto("checkin");
+    expect(c.flow.step).toBe("S8");
+    expect(pane()).toContain("規劃線 vs 實際淨資產");
+    c.flow.step = "S6x"; w.render();
+  });
+  it("父層回寫下次會談日期（embed）：lantu:nextreview → c.nextReview 與 wrap.nextDate", async () => {
+    const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://lantu.test/?embed=1" });
+    const e = dom.window as any;
+    await new Promise<void>((r) => e.addEventListener("load", () => r(), { once: true }));
+    e.app.role = "coach"; e.app.activeTab = "data"; e.app.dataTab = "plan";
+    const cc = e.migrateCase(e.sampleCase());
+    cc.flow = { track: "gap", step: "S6x", decisions: {} };
+    e.app.cases = [cc]; e.app.activeId = cc.id; e.render();
+    e.dispatchEvent(new e.MessageEvent("message", { data: { type: "lantu:nextreview", date: "2027-03-01" }, source: e.parent }));
+    expect(cc.nextReview).toBe("2027-03-01");
+    expect(cc.flow.wrap.nextDate).toBe("2027-03-01");
   });
 });
 

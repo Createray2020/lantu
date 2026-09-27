@@ -9368,10 +9368,10 @@ var FLOW_STEPS_GAP=[
  ['S0','判定','缺口線'],['S1','缺口呈現','◇ D1 願景是他要的？'],['S2','願景鎖定','客戶排序'],
  ['S2g','護欄','保障・預備金'],['S3','階段目標','里程碑'],['S4','選路','◇ D2 先收入或支出'],
  ['S5A','增加收入','工作＋理財 ◇ 補平？'],['S5B','減少支出','客戶自己標 ◇ 補平？'],
- ['S6','後果','◇ D3 加碼或接受'],['S6x','行動清單','定案'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
+ ['S6','後果','◇ D3 加碼或接受'],['S6x','行動清單與下一步','收尾三題'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
 var FLOW_STEPS_SUR=[
  ['P0','判定','餘裕線'],['P1','餘裕呈現','保守重算'],['P2','願景再確認','◇ D1′ 要升級？'],
- ['P2g','護欄','保障・預備金'],['P3','餘裕分配','三向'],['P3x','行動清單','定案'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
+ ['P2g','護欄','保障・預備金'],['P3','餘裕分配','三向'],['P3x','行動清單與下一步','收尾三題'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
 var FLOW_GATES={S1:1,S4:1,S5A:1,S5B:1,S6:1,P2:1};
 var FLOW_LOCKED={};
 var FLOW_RULES=['願景不動','收入優先、支出其次','取捨以客戶願景為尺','後果只呈現、不代決定','報酬率保守假設','同一筆錢只用一次'];
@@ -9829,6 +9829,10 @@ function checkin(c){
 }
 function flowD4(grade){
  var c=activeCase();var f=flowOf(c);if(!f)return;var K=checkin(c);
+ // 對帳的實際值同時落一列「真實追蹤」（同一年只留一列，覆蓋）。
+ try{var yr=new Date().getFullYear(),A0=n(c.profile.age)||40,nt=Math.round(n(metrics(c).net));c.tracking=c.tracking||[];
+  var hit=null;c.tracking.forEach(function(t){if(n(t.year)===yr)hit=t});
+  if(hit){hit.age=A0;hit.net=nt}else c.tracking.push({year:yr,age:A0,net:nt});}catch(e){}
  // 落表：這一場諮詢的 consult_sessions.checkin（教練首頁統計用）。沒在諮詢中就只留在 c.flow。
  try{if(typeof REMOTE!=='undefined'&&REMOTE&&typeof toParentLN==='function')toParentLN({type:'lantu:checkin',checkin:{grade:grade,actual:K.actual,planned:K.planned,ratio:K.ratio,cnt:K.cnt,total:K.total,at:new Date().toISOString()}})}catch(e){}
  var txt='回訪對帳：'+(grade==='done'?'到位':grade==='partial'?'動了但不夠':'完全沒動')+
@@ -9904,14 +9908,27 @@ function flowReportChapterHTML(c){
 }
 
 /* 畫面：S6′／P3′ 共用的行動清單、S7、S8、P2、P2′、P3 */
+/* 收尾三題（原訪談清單「收斂與下一步」）：今天最大的收穫／最願意先完成哪一件事／下次會談日期。
+   存 c.flow.wrap；日期同時寫 c.nextReview（單一真相在諮詢紀錄的 next_appt，存紀錄時會回寫這裡）。 */
+function flowSetWrap(k,v){var c=activeCase();var f=flowOf(c);if(!f)return;f.wrap=f.wrap||{};f.wrap[k]=v;if(k==='nextDate')c.nextReview=v;save();if(k!=='gain')render()}
+function flowWrapHTML(c){
+ var f=flowOf(c),w=(f&&f.wrap)||{},acts=(c.actions||[]).filter(function(a){return a.on!==false});
+ var opts='<option value="">— 選一個動作 —</option>'+acts.map(function(a){var nm=(a.name||'').trim()||actCat(a.cat).n;return '<option value="'+esc(a.id)+'" '+(w.first===a.id?'selected':'')+'>'+esc(nm)+'</option>'}).join('');
+ return '<div class="fcard" style="margin-top:12px"><div class="t">收尾三題 <span class="hint">這三題會進摘要與方案書</span></div>'+
+  '<div class="fgrid" style="margin-top:8px">'+
+  '<div class="f"><label>今天最大的收穫</label><input value="'+esc(w.gain||'')+'" onchange="flowSetWrap(\'gain\',this.value)" placeholder="客戶自己講的那一句"></div>'+
+  '<div class="f"><label>最願意先完成哪一件事</label><select onchange="flowSetWrap(\'first\',this.value)">'+opts+'</select></div>'+
+  '<div class="f"><label>下次會談日期</label><input type="date" value="'+esc(w.nextDate||c.nextReview||'')+'" onchange="flowSetWrap(\'nextDate\',this.value)"></div>'+
+  '</div></div>';
+}
 function flowActionListHTML(c,gateHTML){
  var acts=(c.actions||[]).filter(function(a){return a.on!==false}),curS=flowCurrentStage(c);
- return '<p class="flowask"><b>這一階段的行動清單</b>　做什麼、什麼時候、下次怎麼驗收。全部來自調整動作清單（lane 標籤），不另存一份。</p>'+
+ return '<p class="flowask"><b>行動清單與下一步</b>　做什麼、什麼時候、下次怎麼驗收。全部來自調整動作清單（lane 標籤），不另存一份。</p>'+
   '<div class="tw"><table><tr><th>lane</th><th>動作</th><th>時點</th><th class="r">金額</th><th>狀態</th></tr>'+
   (acts.length?acts.map(function(a){var ln=laneOf(a),amt=(a.cat==='income'||a.cat==='expense')?(a.cat==='expense'?'−':'+')+fmt(a.getMonthly)+'／月':n(a.payMonthly)?fmt(a.payMonthly)+'／月':n(a.payLump)?fmt(a.payLump)+' 單筆':n(a.getLump)?'+'+fmt(a.getLump):'';
    return '<tr><td><span class="flpill '+({'income-work':'w','income-invest':'i','expense':'e','guard':'g','surplus':'i'}[ln]||'')+'">'+(FLOW_LANES[ln]||ln)+'</span></td><td>'+esc((a.name||'').trim()||actCat(a.cat).n)+'</td><td>'+(n(a.startY)||n(a.payFrom)||n(a.getFrom)||'')+' 歲起</td><td class="r">'+amt+'</td><td><span class="mk g">'+esc(((a.status||{}).state)||'planned')+'</span></td></tr>'}).join(''):'<tr><td colspan="5" class="muted" style="padding:12px">還沒有任何動作。</td></tr>')+'</table></div>'+
   (curS?'<div class="hint" style="margin-top:8px">里程碑：'+esc(curS.name)+'（'+curS.toAge+' 歲）可投資資產 '+fmt(curS.milestone)+'。回訪時以里程碑差距為主、動作勾選並列。</div>':'')+
-  flowRecalc(c)+gateHTML;
+  flowWrapHTML(c)+flowRecalc(c)+gateHTML;
 }
 function flowBodyHTML2(c){
  var f=flowOf(c),s=f.step,A=n(c.profile.age)||40;
@@ -9938,6 +9955,9 @@ function flowBodyHTML2(c){
    '<div class="flowcards"><div class="fcard" style="border-color:var('+(K.grade==='done'?'--ok':K.grade==='partial'?'--warn':'--danger')+')"><div class="t">系統判定</div><div class="n '+(K.grade==='done'?'ok':K.grade==='partial'?'warn':'bad')+'">'+gl[K.grade]+'</div><div class="s">'+(K.ratio!=null?'里程碑 '+Math.round(K.ratio*100)+'%':'沒有基準，以動作數判')+'</div></div>'+
    '<div class="fcard"><div class="t">里程碑</div><div class="n">'+cfAxis(K.actual)+(K.planned!=null?' <span class="muted" style="font-size:13px">/ '+cfAxis(K.planned)+'</span>':'')+'</div><div class="s">實際 vs 規劃線同齡值</div></div>'+
    '<div class="fcard"><div class="t">動作</div><div class="n">'+K.cnt.done+' <span class="muted" style="font-size:13px">/ '+K.total+'</span></div><div class="s">到位 '+K.cnt.done+'・部分 '+K.cnt.partial+'・沒動 '+K.cnt.none+'・待 '+K.cnt.planned+'</div></div></div>'+
+   '<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--amber2);font-weight:700">規劃線 vs 實際淨資產（逐年） <span class="hint">原「真實追蹤」；對帳時會自動補上今年一列</span></summary>'+
+   '<div style="margin-top:8px" data-calc="trackingChart">'+trackingChartSVG(c)+'</div>'+
+   tableSec('逐年實際淨資產','tracking',c.tracking,[['year','西元年','num'],['age','年齡','num'],['net','實際淨資產','money']])+'</details>'+
    (f.askVision
     ?flowGate('完全沒動——這個願景還是你要的嗎？','<button class="tbtn amber" onclick="flowD4Vision(true)">還是要的 → 看後果</button><button class="tbtn ghost" onclick="flowD4Vision(false)">不是了 → 回願景澄清</button>','客戶')
     :flowGate('D4　執行到位嗎？','<button class="tbtn '+(K.grade==='done'?'amber':'ghost')+'" onclick="flowD4(\'done\')">到位 → 更新現況、下一階段</button><button class="tbtn '+(K.grade==='partial'?'amber':'ghost')+'" onclick="flowD4(\'partial\')">動了但不夠 → 看後果</button><button class="tbtn '+(K.grade==='none'?'amber':'ghost')+'" onclick="flowD4(\'none\')">完全沒動 → 問願景</button>','教練判、客戶認'));
@@ -9976,7 +9996,8 @@ function flowSec(c){
   flowRailHTML(c)+'<div class="flowbody">'+flowBodyHTML(c)+'</div>'+flowLogHTML(c)+'</div>';
 }
 function flowEntryHTML(c){
- return '<div class="sec" style="border-style:dashed"><h4>這位客戶還沒進流程 <span class="hint">規劃做完了？從這裡開始「願景處理流程」——先判定缺口線／餘裕線，之後每一步只展開該步該看的東西</span></h4>'+
+ // 同一個錨點 #flowSec：沒進流程時是入口卡，進了就是步進器——訪談清單第 ④ 群三個項目都指這裡。
+ return '<div class="sec" id="flowSec" style="border-style:dashed"><h4>這位客戶還沒進流程 <span class="hint">規劃做完了？從這裡開始「願景處理流程」——先判定缺口線／餘裕線，之後每一步只展開該步該看的東西</span></h4>'+
   '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="muted">下面的九個折疊維持原樣。</span><button class="tbtn amber" onclick="flowStart()">開始願景處理流程 →</button></div></div>';
 }
 
@@ -9997,20 +10018,21 @@ function planSec(c){
  app._flowCons=(fl&&fl.step==='S6')?consequences(c):null;   // 時間軸後果旗只在 Step 6 畫
  var folds=
   // 2026/09/26 全站盤查：首屏只留主圖＋數字，其餘一律收（含這兩塊，之前預設開）。
+  // 2026/09/27：「願景選定」折疊拿掉——S2 是唯一的鎖定點（舊客戶仍可在意圖分頁勾）；
+  //   「其他方案參數」（資產移轉、下次檢視日）併進同一串折疊，不再自成一個「收斂與下一步」區塊。
   foldSec('缺口配額對帳','這條線大概要生出多少錢 vs 動作實際排了多少',quotaV2HTML(c),false)+
   foldSec('調整動作清單（'+planActionsOn(c).length+' 個）','補缺口的手段，一條一條具體動作 — 改任何一格，上面的圖與旗子當場重算',actionsHTML(c),false)+
   foldSec('資金勾稽','客戶到底有沒有錢做這些動作',ledgerV2HTML(c))+
   foldSec('動作流程','定案後輸出到調整方案書的執行時序',actionFlowHTML(c))+
-  foldSec('願景選定','先決定要執行哪些願景，選定的當中按時間先到先付',visionPickHTML(c))+
   foldSec('拉桿與處方（v1 診斷）','六根槓桿的反解、該解什麼、三個處方 — 保留作為量體參考',
     soloHTML(c,solo)+rxCardsHTML(c,rxs)+gapHeroHTML(c,led,gate))+
   foldSec('缺口組成與即時缺口','缺口是哪些支出造成的，另有保障與預備金要補',gapDetailHTML(c,led))+
   foldSec('建議資產配置','投資型與保障型的配置與對帳',allocSecHTML(c))+
-  foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c));
- return '<div data-ivsec="planact" data-ivname="調整方案">'+planHeroV2(c)+
-  (fl?flowSec(c)+foldSec('更多診斷（v2 既有九個折疊，原樣保留）','配額對帳、動作清單、資金勾稽、拉桿與處方…都在這裡',folds,false):flowEntryHTML(c)+folds)+
-  '</div>'+'<div data-ivsec="review" data-ivname="收斂與下一步">'+
-  foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>')+'</div>';
+  foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c))+
+  foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>');
+ return '<div data-ivsec="flow" data-ivname="願景處理流程">'+planHeroV2(c)+
+  (fl?flowSec(c)+foldSec('更多診斷（v2 既有折疊，原樣保留）','配額對帳、動作清單、資金勾稽、拉桿與處方…都在這裡',folds,false):flowEntryHTML(c)+folds)+
+  '</div>';
 }
 
 /* 願景選定：把四張表的 on 旗標集中成一排卡片，教練在方案頁就能勾。
@@ -11295,13 +11317,19 @@ var INTERVIEW_STEPS=[
  {k:'coverbudget',g:3,nw:1,name:'保障預算與取捨',tab:'coverage',hint:'訪談題：每月可接受的保障預算？預算不夠時最優先補哪一項？',
   has:function(c){return n((c.coverPlan||{}).monthly)>0||((c.coverPlan||{}).first||[]).length}}, {k:'doc',g:4,name:'待補件',tab:'intent',a:'[data-ivanchor="doc"]',hint:'今天沒帶到的：勞健保投保資料／保單／報稅資料',
   has:function(c){var d=c.docCheck||{};return Object.keys(d).some(function(k){return d[k]!==''&&d[k]!=null})}},
- {k:'review',g:4,nw:1,name:'收斂與下一步',tab:'plan',hint:'今天最大的收穫／最願意先完成哪一件事／下次會談日期',
-  has:function(c){return !!c.nextReview}},
- {k:'planact',g:4,nw:1,name:'調整方案',tab:'plan',hint:'六根槓桿與具體動作；這一段在會談後做',
-  has:function(c){var pl=c.plan||{};return ((pl.allocations||[]).length>0)||Object.keys(pl.levers||{}).length>0}},
- {k:'track',g:4,nw:1,name:'真實追蹤',tab:'tracking',hint:'逐年實際淨資產，疊到模擬走勢上對照',
-  has:function(c){return (c.tracking||[]).length}}
+ // 2026/09/27 第 ④ 群改成一條時間線：補件 → 走流程 → 定行動 → 回訪對帳。
+ // ⚠️ 規則：項目名稱＝點進去落地那個區塊的標題，一個項目一個錨點、不共用分頁——
+ //    舊的「收斂與下一步」與「調整方案」都指向方案分頁、名字卻不一樣，教練點了會以為跳錯。
+ //    「調整方案」只留給分頁本身（它是頁，不是題目）；「真實追蹤」那張圖搬到回訪對帳底下。
+ {k:'flow',g:4,nw:1,name:'願景處理流程',tab:'plan',a:'#flowSec',hint:'判定缺口線／餘裕線，一步一步走到行動清單；沒開始就先按「開始願景處理流程」',
+  has:function(c){return !!flowOf(c)}},
+ {k:'actlist',g:4,nw:1,name:'行動清單與下一步',tab:'plan',a:'#flowSec',hint:'今天最大的收穫／最願意先完成哪一件事／下次會談日期',
+  has:function(c){var f=flowOf(c);if(!f)return false;var w=f.wrap||{};return flowReached(f,f.track==='gap'?'S6x':'P3x')&&!!(w.nextDate||c.nextReview)}},
+ {k:'checkin',g:4,nw:1,name:'回訪對帳',tab:'plan',a:'#flowSec',hint:'規劃線 vs 實際可投資資產、動作到位了沒；逐年實際淨資產也疊在這裡',
+  has:function(c){var f=flowOf(c);return !!(f&&f.decisions&&f.decisions.d4)}}
 ];
+// 流程走到某一步（含之後）了沒。S7／S8 兩條線共用，排在各自清單的最後。
+function flowReached(f,step){if(!f)return false;var i=flowStepIdx(f.track,f.step),j=flowStepIdx(f.track,step);return i>=0&&j>=0&&i>=j}
 // ⚠️ 第 1/3/6/13/20 項的 tab 全都是 'intent'，而這份清單本身就長在 intent 分頁上——
 //    舊版只做 app.dataTab='intent' 等於原地不動，教練看到的就是「按了沒反應」。
 //    所以一律走這支：切分頁 → 捲到該區塊 → 閃一下（與 gotoGoal 同一套）。
@@ -11312,6 +11340,11 @@ function ivGoto(k){
  // 「未來的需求」（第 2 群）一律進需求中樞，該項目直接展開
  if(st.g===2){NEED_SEL=k;NEED_SEL_ID=c?c.id:'';app.activeTab='data';app.dataTab='needhub';app.ivFacet=k;render();}
  else{app.activeTab='data';app.dataTab=st.tab;app.ivFacet=k;render();}
+ // 第 ④ 群的流程項目：落地前先把步進器切到該項目對應的步驟（沒走到就停在目前那一步）。
+ if(c&&(k==='actlist'||k==='checkin')){var f=flowOf(c);
+  if(f){var late=['S6x','P3x','S7','S8'];
+   if(k==='actlist'&&late.indexOf(f.step)<0&&flowReached(f,f.track==='gap'?'S6x':'P3x'))flowGo(f.track==='gap'?'S6x':'P3x');
+   if(k==='checkin'&&f.step==='S7')flowGo('S8');}}
  if(!st.a)return;
  setTimeout(function(){var el=document.querySelector(st.a);if(!el)return;revealEl(el);
   if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
@@ -17683,6 +17716,10 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
         ?'<span style="color:var(--warn)">送出失敗：'+esc(String(m.error))+'</span>'
         :'<span style="color:var(--ok)">已送出：新增 '+n(m.added)+' 項'+(n(m.skipped)?('，'+n(m.skipped)+' 項本來就在清單上'):'')+'。客戶在自己的首頁看得到。</span>';
       return;
+    }
+    if(m.type==='lantu:nextreview'){ // 諮詢紀錄存了 next_appt → 回寫規劃裡的下次檢視日（單一真相在紀錄）
+     try{var cc=activeCase();if(cc&&m.date){cc.nextReview=String(m.date);var ff=flowOf(cc);if(ff){ff.wrap=ff.wrap||{};ff.wrap.nextDate=cc.nextReview}save();render();}}catch(e){}
+     return;
     }
     if(m.type!=='lantu:init')return;
     if(m.uiScale)applyScale(m.uiScale);
