@@ -1255,3 +1255,28 @@ export const houseParams = pgTable('house_params', {
   value: jsonb('value').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ===== 購車模組（2026/09/27 Ray）=====
+// 車價參數：品牌×車型×動力 的新車均價（萬／台）。brand 也可以填等級名（國產／進口／豪華）＝等級層。
+// ⚠️ 查價順序＝品牌列 → 等級層列 × 品牌 priceFactor → 程式端 fallback（見 lib/carParams.ts）。
+// ⚠️ 唯一鍵 (brand, segment, power) 是給 Ray 之後爬蟲 upsert 用的——同鍵覆蓋、不重複。
+export const carPriceParams = pgTable('car_price_params', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  brand: text('brand').notNull(),                     // 品牌，例「Toyota」；或等級名「國產」＝等級層
+  segment: text('segment').notNull(),                 // 轎車 / 休旅SUV / 七人座MPV / 商用/貨車 / 跑車
+  power: text('power').notNull(),                     // 汽油 / 柴油 / 油電 / 純電
+  price: doublePrecision('price').default(0).notNull(),   // 萬／台（新車）
+  source: text('source'),
+  basis: text('basis'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('car_price_params_key_uq').on(t.brand, t.segment, t.power),
+  index('car_price_params_brand_idx').on(t.brand),
+]);
+
+// 購車其他參數（品牌表／保值曲線／持有成本參數／四種取得方式範本），key/value JSON。
+export const carParams = pgTable('car_params', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

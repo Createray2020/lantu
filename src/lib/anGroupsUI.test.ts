@@ -53,8 +53,8 @@ describe("分段：每個模組只在自己的段裡", () => {
       }
     }
     expect(new Set(seen).size).toBe(seen.length);
-    // sampleCase 沒有企業主體；置產缺口有條件——其餘全部都要在
-    for (const m of AN_MODULES) if (m.k !== "biz" && m.k !== "property") expect(seen).toContain(m.k);
+    // sampleCase 沒有企業主體；置產缺口與購車規劃有條件——其餘全部都要在
+    for (const m of AN_MODULES) if (m.k !== "biz" && m.k !== "property" && m.k !== "car") expect(seen).toContain(m.k);
     expect($("#angrp_biz"), "企業主體關著時沒有企業那一段").toBeNull();
   });
 

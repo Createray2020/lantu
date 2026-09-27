@@ -40,7 +40,7 @@ describe("三群的組成", () => {
 
   it("分析那一群＝AN_MODULES 全部（分析頁加模組時後台自動跟著長）", () => {
     expect(dashModulesOf("分析").map((m) => m.k)).toEqual(AN_MODULE_KEYS.map((k) => AN_PREFIX + k));
-    expect(AN_MODULE_KEYS.length).toBe(21);
+    expect(AN_MODULE_KEYS.length).toBe(22);
   });
 
   it("建議那一群跟 html 的 adviceModules() 一致", () => {
@@ -73,8 +73,8 @@ describe("三群的組成", () => {
     }
   });
 
-  it("總共 32 塊（總覽 6 ＋ 分析 21 ＋ 建議 5）", () => {
-    expect(CLIENT_DASH_MODULES.length).toBe(32);
+  it("總共 33 塊（總覽 6 ＋ 分析 22 ＋ 建議 5）", () => {
+    expect(CLIENT_DASH_MODULES.length).toBe(33);
   });
 });
 

@@ -99,8 +99,9 @@ describe("engine.ts ↔ lantu-app.html", () => {
       }
     }
     for (const lit of [
-      "function goalLoanPayAt(L,age,a0){return debtPayAt(L.liab,age,a0)+(L.decoLiab?debtPayAt(L.decoLiab,age,a0):0);}",
-      "function goalLoanRemain(L,age,a0){return lRemain(L.liab,age,a0)+(L.decoLiab?lRemain(L.decoLiab,age,a0):0);}",
+      // 2026/09/27 購車：liab 可為 null（全款／租賃）、殘值型還沒付的尾款算在剩餘本金裡
+      "function goalLoanPayAt(L,age,a0){return (L.liab?debtPayAt(L.liab,age,a0):0)+(L.decoLiab?debtPayAt(L.decoLiab,age,a0):0);}",
+      "function goalLoanRemain(L,age,a0){return (L.liab?lRemain(L.liab,age,a0):0)+(L.decoLiab?lRemain(L.decoLiab,age,a0):0)+((L.balloon>0&&age>=L.buyAge&&age<L.balloonAge)?L.balloon:0);}",
       "  var graceM=Math.round(housePayTpl(g).graceYears*12);if(graceM>=months)graceM=0;",
       "   liab:{balance:loan,rate:rate,pay:pmt(loan,rate,months-graceM),months:months,",
       "function houseDeco(g,handoverAge,growth){",

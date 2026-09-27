@@ -14,6 +14,7 @@ import { getInsProductPayload } from "@/lib/insProducts";
 import { getAnDefaultPayload } from "@/lib/anDefaults";
 import { getClientDashPayload } from "@/lib/clientDashStore";
 import { getHousePayload } from "@/lib/houseParams";
+import { getCarPayload } from "@/lib/carParams";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +24,13 @@ export async function GET() {
   // 多開一支等於多一次往返，還要多維護一條公開路由。
   // dash＝客戶財務儀表板的顯示開關（後台 /admin/client-view 維護）。同上，搭同一班車。
   // house＝購屋模組的房價與參數（後台 /admin/house-params 維護；2026/09/27）。同上，搭同一班車。
-  const [cats, edu, biz, ins, an, birth, dash, house] = await Promise.all([
+  // car＝購車模組的車價／品牌／持有成本／取得方式範本（後台 /admin/car-params 維護；2026/09/27）。同上。
+  const [cats, edu, biz, ins, an, birth, dash, house, car] = await Promise.all([
     getCategoryPayload(), getEduCosts(), getBizTaxPayload(), getInsProductPayload(), getAnDefaultPayload(),
-    getBirthCostPayload(), getClientDashPayload(), getHousePayload(),
+    getBirthCostPayload(), getClientDashPayload(), getHousePayload(), getCarPayload(),
   ]);
   return Response.json(
-    { cats, edu, biz, ins, an, birth, dash, house },
+    { cats, edu, biz, ins, an, birth, dash, house, car },
     { headers: { "cache-control": "public, max-age=60, stale-while-revalidate=3600" } },
   );
 }

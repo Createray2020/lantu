@@ -28,6 +28,9 @@ import {
   CAR_LIAB_BODILY, CAR_LIAB_PROPERTY, CALI_DEATH, CALI_MEDICAL,
   EMPLOYER_COMP_MONTHS, PUBLIC_LIAB_STD,
 } from "@/lib/bizTax";
+// 購車模組的程式端預設（品牌表用在保值率；後台品牌表只在前端 iframe 有）。
+import { CAR_BRANDS_DEFAULT } from "@/lib/carParams.defaults";
+var CAR_BRANDS_ENGINE=CAR_BRANDS_DEFAULT;
 
 // 保障險種。2026/08 對齊 Excel 需求分析三大塊（責任／重病重殘／醫療）：
 //  ・「意外險」更名「意外傷殘」——需求分析問的是傷殘失能，不是意外醫療雜支。
@@ -1281,8 +1284,9 @@ function houseDeco(g,handoverAge,growth){
   liab:loan>0?{balance:loan,rate:rate,pay:pmt(loan,rate,months),months:months,startAge:handoverAge,grace:0,repay:'本息攤還',fxRate:1}:null};
 }
 // 一筆購屋目標某一年的負債現金流／剩餘本金＝房貸＋裝修貸。投影、蒙地卡羅、淨值三邊一律走這兩支。
-function goalLoanPayAt(L,age,a0){return debtPayAt(L.liab,age,a0)+(L.decoLiab?debtPayAt(L.decoLiab,age,a0):0);}
-function goalLoanRemain(L,age,a0){return lRemain(L.liab,age,a0)+(L.decoLiab?lRemain(L.decoLiab,age,a0):0);}
+function goalLoanPayAt(L,age,a0){return (L.liab?debtPayAt(L.liab,age,a0):0)+(L.decoLiab?debtPayAt(L.decoLiab,age,a0):0);}
+// 剩餘本金：房貸／車貸＋裝修貸＋（殘值型）還沒付的尾款——尾款是確定要付的錢，淨值裡得先認它
+function goalLoanRemain(L,age,a0){return (L.liab?lRemain(L.liab,age,a0):0)+(L.decoLiab?lRemain(L.decoLiab,age,a0):0)+((L.balloon>0&&age>=L.buyAge&&age<L.balloonAge)?L.balloon:0);}
 /** 一筆購屋目標的付款時程。回 {pays:[{age,amount,label}],handoverAge,down} —— down＝所有自備款合計（含費用）。 */
 function housePaySchedule(g,buyAge,price,loan){
  var tp=housePayTpl(g),pays=[];
@@ -1305,12 +1309,98 @@ function housePaySchedule(g,buyAge,price,loan){
 }
 function housePayAt(L,age){var s=0;for(var i=0;i<L.pays.length;i++)if(L.pays[i].age===age)s+=L.pays[i].amount;return s;}
 function housePaidBy(L,age){var s=0;for(var i=0;i<L.pays.length;i++)if(L.pays[i].age<=age)s+=L.pays[i].amount;return s;}
+// ═══ 購車：四種取得方式的付款時程＋換車循環（2026/09/27 Ray）═══════════════
+// 全款：購車年付車價＋領牌雜費。貸款：頭期＋領牌，本息攤還 N 年。殘值型：頭期＋領牌，本金扣掉尾款後攤還，
+//   每年另付尾款利息，到期那一年付尾款（期末事件）。租賃：逐年付租金（含稅險保養），期末買斷才變成自己的車、否則歸還。
+// 換車循環：g.cycle＝每 N 年換一台、g.end＝最後一次購車歲；每次換車把上一台以「保值率 × (1−折價)」折抵進頭期（負的 pay）。
+// 車子是**折舊資產**：持有期間以「購車價 × 保值率(車齡)」進固定資產（跟房子「以購置價計、不增值」相反方向）；租賃不入資產。
+// 比例來源：後台範本（CAR_PAY_LIVE，前端才有）→ 程式端 CAR_PAY_DEFAULT_ENGINE；每筆目標可用 g.pay 覆寫。成數／利率／年期先看目標列自己填的（>0），沒填用範本。
+// ⚠️ 沒選取得方式（g.carMode 空）的舊購車目標：完全不進這裡——那一年一次扣全額、不進資產，跟改版前一模一樣（既有客戶數字一位不動）。
+var CAR_PAY_DEFAULT_ENGINE={
+ '全款':  {fee:1.5,loanRatio:0, loanYears:0,loanRate:0,  balloon:0, rentRate:0,  rentYears:0,buyout:0},
+ '貸款':  {fee:1.5,loanRatio:70,loanYears:5,loanRate:3.5,balloon:0, rentRate:0,  rentYears:0,buyout:0},
+ '殘值型':{fee:1.5,loanRatio:80,loanYears:3,loanRate:3.8,balloon:40,rentRate:0,  rentYears:0,buyout:0},
+ '租賃':  {fee:0,  loanRatio:0, loanYears:0,loanRate:0,  balloon:0, rentRate:1.6,rentYears:3,buyout:45}
+};
+var CAR_RETENTION_ENGINE=[[1,0.8],[2,0.72],[3,0.64],[5,0.52],[8,0.38],[12,0.25],[Infinity,0.15]];
+var CAR_TRADE_LOSS_ENGINE=10;
+function carPayTpl(g){
+ var mode=(g&&g.carMode)||'';
+ if(!mode||!CAR_PAY_DEFAULT_ENGINE[mode])return null;
+ var live=(typeof CAR_PAY_LIVE==='function')?CAR_PAY_LIVE(mode):null;
+ var base=Object.assign({},CAR_PAY_DEFAULT_ENGINE[mode],live||{});
+ var ov=(g&&g.pay&&typeof g.pay==='object')?g.pay:{};
+ var t={mode:mode};['fee','loanRatio','loanYears','loanRate','balloon','rentRate','rentYears','buyout'].forEach(function(k){t[k]=(ov[k]==null||ov[k]==='')?n(base[k]):n(ov[k]);});
+ // 目標列自己填的成數／利率／年期優先（>0 才算填了）
+ if(mode==='貸款'||mode==='殘值型'){if(n(g.loanRatio)>0)t.loanRatio=n(g.loanRatio);if(n(g.loanRate)>0)t.loanRate=n(g.loanRate);if(n(g.loanYears)>0)t.loanYears=n(g.loanYears);}
+ else{t.loanRatio=0;t.loanYears=0;t.loanRate=0;}
+ if(mode!=='殘值型')t.balloon=0;
+ if(mode!=='租賃'){t.rentRate=0;t.rentYears=0;t.buyout=0;}else{t.rentYears=Math.max(1,Math.round(t.rentYears));}
+ t.loanYears=Math.max(0,Math.round(t.loanYears));
+ return t;
+}
+// 車齡 y 年的保值率（相對新車價）：曲線 × 品牌係數，封頂 0.95。前端有後台品牌表（CAR_BRAND_LIVE／CAR_RETENTION_LIVE），引擎端用程式預設。
+function carCurveAt(curve,x){for(var i=0;i<curve.length;i++)if(x<=curve[i][0])return curve[i][1];return curve.length?curve[curve.length-1][1]:1;}
+function carRetentionOf(brand,years){
+ if(!(years>0))return 1;
+ var curve=(typeof CAR_RETENTION_LIVE==='function')?CAR_RETENTION_LIVE():CAR_RETENTION_ENGINE;
+ var b=(typeof CAR_BRAND_LIVE==='function')?CAR_BRAND_LIVE(brand):((typeof CAR_BRANDS_ENGINE!=='undefined'&&CAR_BRANDS_ENGINE[brand])||null);
+ return Math.min(0.95,carCurveAt(curve,years)*(b?n(b.retention)||1:1));
+}
+// 這一台車某一年的價值（進固定資產用）：購車價 × 保值率(車齡)／保值率(買時車齡)。買時車齡＝中古車的車齡（新車 0）。
+function carValueAt(L,age){
+ if(!(age>=L.ownFrom)||!(age<L.ownTo))return 0;
+ var a0=n(L.age0),r0=carRetentionOf(L.brand,a0);
+ return L.price*carRetentionOf(L.brand,a0+(age-L.buyAge))/(r0||1);
+}
+/** 一筆購車目標的所有購車事件（含換車循環）。回 goalLoans 同形狀的陣列，每一次購車一筆。 */
+function carPlans(c,g,idx,a0,gr){
+ var tp=carPayTpl(g);if(!tp)return [];
+ var buy0=n(g.start);if(!(buy0>=a0))return [];
+ var cycle=Math.max(0,Math.round(n(g.cycle)));
+ var last=n(g.end)>=buy0?n(g.end):buy0;
+ var ages=[buy0];if(cycle>0){for(var a=buy0+cycle;a<=last;a+=cycle)ages.push(a);}
+ var brand=(g.spec&&g.spec.brand)||'',age0=(g.condition==='中古')?n(g.spec&&g.spec.age):0;
+ var loss=(g.sellFee==null||g.sellFee==='')?CAR_TRADE_LOSS_ENGINE:n(g.sellFee);
+ var out=[];
+ ages.forEach(function(buyAge,k){
+  var t=Math.max(0,buyAge-a0),price=n(g.present)*Math.pow(1+gr,t);
+  var fee=price*tp.fee/100,pays=[],liab=null,balloon=0,balloonAge=null,loan=0,down=0;
+  var ownFrom=buyAge,ownTo=(k<ages.length-1)?ages[k+1]:Infinity;
+  // 換車：上一台折價進頭期（租賃沒買斷的車不是自己的，沒得折）
+  if(k>0){var prev=out[k-1];if(prev.ownTo>prev.ownFrom&&prev.ownFrom<=buyAge){var tv=carValueAt(prev,buyAge-1);if(buyAge-1<prev.ownFrom)tv=prev.price;var tradeIn=tv*(1-loss/100);if(tradeIn>0)pays.push({age:buyAge,amount:-tradeIn,label:'舊車折價'});}}
+  if(tp.mode==='租賃'){
+   var rent=price*tp.rentRate/100*12;
+   for(var y=0;y<tp.rentYears;y++)pays.push({age:buyAge+y,amount:rent,label:'租金'});
+   if(tp.buyout>0){pays.push({age:buyAge+tp.rentYears,amount:price*tp.buyout/100,label:'期末買斷'});ownFrom=buyAge+tp.rentYears;}
+   else ownTo=ownFrom;   // 歸還：從來不是自己的車
+   down=rent;
+  }else if(tp.mode==='全款'||!(tp.loanRatio>0&&tp.loanRate>0&&tp.loanYears>0)){
+   pays.push({age:buyAge,amount:price+fee,label:'全款＋領牌'});down=price+fee;
+  }else{
+   loan=price*Math.min(100,tp.loanRatio)/100;down=price-loan+fee;
+   pays.push({age:buyAge,amount:down,label:'頭期＋領牌'});
+   var months=tp.loanYears*12;
+   balloon=(tp.mode==='殘值型')?price*tp.balloon/100:0;if(balloon>=loan)balloon=0;
+   var amort=loan-balloon;
+   liab={balance:amort,rate:tp.loanRate,pay:pmt(amort,tp.loanRate,months),months:months,startAge:buyAge,grace:0,repay:'本息攤還',fxRate:1};
+   if(balloon>0){for(var yy=0;yy<tp.loanYears;yy++)pays.push({age:buyAge+yy,amount:balloon*tp.loanRate/100,label:'尾款利息'});balloonAge=buyAge+tp.loanYears;pays.push({age:balloonAge,amount:balloon,label:'尾款'});}
+  }
+  out.push({idx:idx,kind:'car',k:k,mode:tp.mode,buyAge:buyAge,handoverAge:buyAge,price:price,loan:loan,down:down,pays:pays,graceM:0,deco:null,decoLiab:null,
+   liab:liab,balloon:balloon,balloonAge:balloonAge,brand:brand,age0:age0,ownFrom:ownFrom,ownTo:ownTo});
+ });
+ return out;
+}
+// 一筆購置目標（房或車）某一年進固定資產的金額：房子交屋前＝已付期款、交屋後＝購置價；車子＝逐年折舊的價值。
+function goalLoanAssetAt(L,age){return L.kind==='car'?carValueAt(L,age):(age>=L.handoverAge?L.price:housePaidBy(L,age));}
 function goalLoans(c){
  var a0=n(((c||{}).profile||{}).age),infl=n(((c||{}).params||{}).inflation)/100;
  var sg=n(((c||{}).params||{}).salaryGrowth)/100;
  var out=[];
  ((c||{}).goals||[]).forEach(function(g,idx){
   if(!g||!visionOn(g))return;
+  // 購車（2026/09/27）：選了取得方式的購車目標走 carPlans（含換車循環，一次購車一筆）；沒選的照舊
+  if(g.type==='購車'&&g.carMode){var cgr=g.growth==='通膨'?infl:(g.growth==='薪資'?sg:0);carPlans(c,g,idx,a0,cgr).forEach(function(L){out.push(L)});return;}
   if(g.type!=='購屋'&&g.type!=='置產')return;
   if(n(g.freq)>0)return;
   var ratio=n(g.loanRatio),rate=n(g.loanRate),yrs=n(g.loanYears);
@@ -1350,16 +1440,17 @@ function houseSales(c){
  var gl=goalLoans(c);
  ((c||{}).goals||[]).forEach(function(g,idx){
   if(!g||!visionOn(g))return;
-  if(g.type!=='購屋'&&g.type!=='置產')return;
+  var isCar=(g.type==='購車'&&!!g.carMode);   // 購車：賣掉現況車輛（折價）進頭期，車與車貸從那一年起拿掉
+  if(!isCar&&g.type!=='購屋'&&g.type!=='置產')return;
   if(!g.sellAid)return;
   var a=null;((c.assets)||[]).forEach(function(x){if(x&&x.aid===g.sellAid)a=x;});
   if(!a||!a.sellable)return;
   var L=null;for(var i=0;i<gl.length;i++)if(gl[i].idx===idx)L=gl[i];
   var age=L?L.handoverAge:n(g.start);if(!(age>=a0))return;
   var lid=g.sellLid||'',l=null;((c.liabilities)||[]).forEach(function(x){if(x&&lid&&x.lid===lid)l=x;});
-  var fee=(g.sellFee==null||g.sellFee==='')?HOUSE_SALE_FEE_DEFAULT:n(g.sellFee);
+  var fee=(g.sellFee==null||g.sellFee==='')?(isCar?CAR_TRADE_LOSS_ENGINE:HOUSE_SALE_FEE_DEFAULT):n(g.sellFee);
   var gross=aVal(a)*(1-fee/100),owed=l?lRemain(l,age,a0):0;
-  out.push({idx:idx,age:age,aid:a.aid,lid:lid,value:aVal(a),gross:gross,owed:owed,net:gross-owed,fee:fee,name:a.name||'現況房產'});
+  out.push({idx:idx,age:age,aid:a.aid,lid:lid,value:aVal(a),gross:gross,owed:owed,net:gross-owed,fee:fee,name:a.name||(isCar?'現況車輛':'現況房產')});
  });
  return out;
 }
@@ -1581,7 +1672,7 @@ function projection(c,lump,rateOverride){
   // 買下來的房子從購置年起進固定資產。⚠️ 以購置當年的價格計、之後不再增值——
   // 保守，也避免「房價自己漲出淨值」這種一被問就站不住的數字。
   // 交屋前已付的期款也是資產（預付給建商的錢），淨值不會憑空少一塊。
-  var fixedAt=fixedAssets-sum(c.assets,function(a){return (!aLiquid(c,a)&&soldAsset(hSales,a,age))?aVal(a):0})+sum(gLoans,function(L){return age>=L.handoverAge?L.price:housePaidBy(L,age)});
+  var fixedAt=fixedAssets-sum(c.assets,function(a){return (!aLiquid(c,a)&&soldAsset(hSales,a,age))?aVal(a):0})+sum(gLoans,function(L){return goalLoanAssetAt(L,age)});
   var netEst=totalInv+fixedAt-remDebt;
 
   // 願景事件的可負擔性標記。
@@ -1594,7 +1685,7 @@ function projection(c,lump,rateOverride){
    evts.push({kind:'goal',age:age,name:(gg.name||gg.type||'目標'),amount:n(gg.present),ok:totalInv>=0});
   });
 
-  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst});
+  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst,liab:remDebt,fixed:fixedAt});
  }
  // 子女教育是連續好幾年的支出，不是單一事件——逐年插旗會在圖上排出六支「子女教育」，
  // 把整張時間軸擠爆。合併成一個區段：起於第一個繳費年，全程不轉負才算做得到。
@@ -2833,6 +2924,11 @@ export {
   propGaps,
   propGapTotals,
   goalLoans,
+  carPlans,
+  carPayTpl,
+  carRetentionOf,
+  carValueAt,
+  goalLoanAssetAt,
   propertyGaps,
   metrics,
   ratios,
