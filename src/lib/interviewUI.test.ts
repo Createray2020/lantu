@@ -322,7 +322,7 @@ describe("訪談檢核清單", () => {
     expect(g("income"), "財務現況在第三群").toBe(3);
     expect(g("risk"), "風險屬性從第一群搬到第三群，與保障中心作伴").toBe(3);
     expect(g("cover")).toBe(3);
-    expect(g("doc"), "收斂與方案在第四群").toBe(4);
+    expect(g("doc"), "待補件併進第一群（2026/09/28 第 ④ 群拿掉，方案升成頂層分頁）").toBe(1);
   });
 
   /**
@@ -355,10 +355,10 @@ describe("訪談檢核清單", () => {
     expect(threw, `這些面向的偵測在空白新案會爆：${threw.join(", ")}`).toEqual([]);
   });
 
-  it("四群的面向數：①9 ②13 ③10 ④4", () => {
+  it("三群的面向數：①10 ②13 ③10（2026/09/28 第 ④ 群拿掉，待補件併進 ①）", () => {
     const n = (g: number) => w.INTERVIEW_STEPS.filter((s: { g: number }) => s.g === g).length;
-    expect([n(1), n(2), n(3), n(4)]).toEqual([9, 13, 10, 4]);
-    expect(w.INTERVIEW_STEPS.length).toBe(36);
+    expect([n(1), n(2), n(3), n(4)]).toEqual([10, 13, 10, 0]);
+    expect(w.INTERVIEW_STEPS.length).toBe(33);
   });
 
   it("自動偵測「這一段有沒有東西」，教練不用自己維護", () => {

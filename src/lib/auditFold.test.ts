@@ -195,7 +195,7 @@ describe("目標／置產：上面點群，底下只出那一群", () => {
 });
 
 describe("資料分頁下拉：項目分組顯示（純顯示層）", () => {
-  it("①②③ 各有小標題，項目一個不少、順序照分組；方案·追蹤不分", () => {
+  it("①②③ 各有小標題，項目一個不少、順序照分組；沒有第 ④ 群", () => {
     go("family");
     const menus = $$("#app .dmenu");
     const catsOf = (i: number) => [...menus[i].querySelectorAll(".dmcat")].map((e) => e.textContent);
@@ -210,8 +210,7 @@ describe("資料分頁下拉：項目分組顯示（純顯示層）", () => {
     }
     const names2 = [...menus[1].querySelectorAll(".ivt")].map((e) => e.textContent?.replace("新", ""));
     expect(names2.slice(0, 3)).toEqual(["職涯規劃", "退休規劃", "傳承規劃"]);
-    const last = menus[menus.length - 1];
-    expect(last.querySelectorAll(".dmcat").length).toBe(0);
+    expect(menus.length).toBe(3);
   });
 });
 

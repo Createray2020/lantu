@@ -14,9 +14,7 @@ export const FLOW_STEPS_GAP: ReadonlyArray<readonly [string, string, string]> = 
   ["S2", "願景鎖定", "客戶排序"],
   ["S2g", "護欄", "保障・預備金"],
   ["S3", "階段目標", "里程碑"],
-  ["S4", "選路", "◇ D2 先收入或支出"],
-  ["S5A", "增加收入", "工作＋理財 ◇ 補平？"],
-  ["S5B", "減少支出", "客戶自己標 ◇ 補平？"],
+  ["S4", "調整台", "收入・支出拉桿 ◇ 補平？"],
   ["S6", "後果", "◇ D3 加碼或接受"],
   ["S6x", "行動清單與下一步", "收尾三題"],
   ["S7", "執行期", "客戶去做"],
@@ -52,7 +50,9 @@ export type FlowState = {
   updatedAt?: string;
 };
 
+/** 2026/09/28：舊資料的 S5A／S5B（增收／減支）併進 S4 調整台。 */
 export function flowStepName(track: FlowTrack, step: string): string {
+  if (step === "S5A" || step === "S5B") step = "S4";
   const list = track === "surplus" ? FLOW_STEPS_SUR : FLOW_STEPS_GAP;
   const hit = list.find((s) => s[0] === step);
   return hit ? hit[1] : step;

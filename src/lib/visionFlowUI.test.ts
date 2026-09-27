@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 import { FLOW_STEPS_GAP, FLOW_STEPS_SUR, FLOW_LANES } from "./visionFlow";
 
 /**
- * 願景處理流程（2026/09/27）——調整方案頁的步進器與後果引擎。
+ * 願景處理流程（2026/09/27；2026/09/28 調整台＋願景抽屜＋方案升頂層分頁）——方案分頁的步進器與後果引擎。
  *
  * 守的是四件事：
  *  1. 沒有 c.flow 的舊客戶，/plan 長得跟 v2 一模一樣（只多一顆入口），投影數字一位不動。
@@ -21,8 +21,7 @@ beforeAll(async () => {
   w = dom.window;
   await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
   w.app.role = "coach";
-  w.app.activeTab = "data";
-  w.app.dataTab = "plan";
+  w.app.activeTab = "plan";
   w.app.cases = [w.migrateCase(w.sampleCase())];
   w.app.activeId = w.app.cases[0].id;
   w.render();
@@ -30,7 +29,7 @@ beforeAll(async () => {
 
 const cur = () => w.app.cases[0];
 const pane = () => w.document.querySelector("#app").innerHTML as string;
-const v2Folds = ["缺口配額對帳", "調整動作清單", "資金勾稽", "動作流程", "拉桿與處方", "缺口組成與即時缺口", "建議資產配置", "方案比較", "其他方案參數"];
+const v2Folds = ["缺口配額對帳", "調整動作清單", "資金勾稽", "動作流程", "拉桿與處方", "缺口組成與即時缺口", "建議資產配置", "方案比較", "其他方案參數", "真實追蹤"];
 
 describe("TS 鏡射與 HTML 一致", () => {
   it("步驟常數兩邊一樣", () => {
@@ -128,46 +127,108 @@ describe("流程推進與閘門", () => {
     expect(cur().flow.step).toBe("S4");
     expect(pane()).toContain("教練建議");
   });
-  it("S4 routeSim 兩條路都有反解；D2 先收入 → S5A", () => {
-    const RS = w.routeSim(cur());
-    expect(RS.income.id).toBe("income");
-    expect(RS.expense.id).toBe("expense");
-    w.flowDecide("S4", "d2", { first: "income" }, "先收入", "S5A");
-    expect(cur().flow.step).toBe("S5A");
-    expect(pane()).toContain("A-1 工作收入");
+  it("S4 調整台：兩根拉桿（收入、支出），沒有第三根；理財在收入結構底下", () => {
+    const h = pane();
+    expect(h).toContain("tunegap");
+    expect((h.match(/type="range" inputmode="numeric"/g) || []).length).toBe(2);
+    expect(h).toContain("收入結構");
+    expect(h).toContain("支出結構");
+    expect(h).toContain("定期定額");
+    expect(h).not.toContain("A-1 工作收入");
+    const K = w.flowTuneCaps(cur());
+    expect(K.workCap).toBe(Math.round(K.workM * w.CAP_INCOME_UP / 100));
+    expect(K.incMax).toBe(K.workCap + K.finRoom);
   });
-  it("S5A：investGate 三個數字；新增的收入動作帶 lane 與 stageId", () => {
-    const IG = w.investGate(cur());
-    expect(typeof IG.monthLeft).toBe("number");
-    expect(typeof IG.investable).toBe("number");
-    expect(IG.loanable).toBeGreaterThanOrEqual(0);
-    const before = cur().actions.length;
-    w.flowAddAction("income", "income-work", "晉升");
-    const a = cur().actions[before];
-    expect(a.lane).toBe("income-work");
-    expect(a.cat).toBe("income");
-    expect(a.stageId).toBe(w.flowCurrentStage(cur()).id);
-    w.flowSub("a2");
-    expect(pane()).toContain("可投資水位");
-  });
-  it("S5B：客戶標「放一半」長出 ref 到該列的 expense 動作；勾結餘回流長出專屬定期定額；改回「留」就關掉", () => {
-    w.flowDecide("S5A", "d5a", { closed: false, reason: "short" }, "沒補平", "S5B");
-    expect(cur().flow.step).toBe("S5B");
+  it("收入拉桿：先落工作收入（上限 CAP_INCOME_UP%），超過的落定期定額；動作帶 flowKey、lane、不重複長", () => {
     const c = cur();
-    const i = c.expenses.findIndex((e: any) => w.isLivingCat(e.cat) && w.n(e.amount) > 0);
-    expect(i).toBeGreaterThanOrEqual(0);
-    w.flowExpMark(i, "half");
-    const act = c.actions.find((a: any) => a.cat === "expense" && a.ref === "expenses:" + i);
-    expect(act).toBeTruthy();
-    expect(act.getMonthly).toBe(Math.round(w.n(c.expenses[i].amount) / 12 * 0.5));
-    expect(w.flowExpMode(c, i)).toBe("half");
+    const K = w.flowTuneCaps(c);
+    const before = c.actions.length;
+    w.flowTuneInc(K.workCap + 3000);
+    const aw = c.actions.find((a: any) => a.flowKey === "tune:work");
+    const ar = c.actions.find((a: any) => a.flowKey === "tune:regular");
+    expect(aw.lane).toBe("income-work"); expect(aw.cat).toBe("income");
+    expect(aw.getMonthly).toBe(K.workCap);
+    expect(ar.lane).toBe("income-invest"); expect(ar.cat).toBe("regular");
+    expect(ar.payMonthly).toBe(Math.min(3000, K.finRoom));
+    expect(ar.on).toBe(K.finRoom > 0);
+    expect(cur().flow.tune.inc).toBe(Math.min(K.workCap + 3000, K.incMax));
+    w.flowTuneInc(1000);
+    expect(c.actions.length).toBe(before + 2);           // 再拉不會多長一條
+    expect(c.actions.find((a: any) => a.flowKey === "tune:work").getMonthly).toBe(1000);
+    expect(c.actions.find((a: any) => a.flowKey === "tune:regular").on).toBe(false);
+    w.flowTuneRoute("專業兼職");
+    expect(c.actions.find((a: any) => a.flowKey === "tune:work").tool).toBe("專業兼職");
+    expect(pane()).toContain("class=\"chip on\" onclick=\"flowTuneRoute('專業兼職')\"");
+  });
+  it("支出拉桿與「留／半／放」是同一件事：拉桿由上到下配到放／半；客戶點標記，拉桿跟著走；固定與必達那幾列碰不到", () => {
+    const c = cur();
+    const K = w.flowTuneCaps(c);
+    const first = c.expenses.findIndex((e: any) => w.tuneRowOK(e));
+    expect(first).toBeGreaterThanOrEqual(0);
+    const amt = w.n(c.expenses[first].amount) / 12;
+    w.flowTuneExp(amt);
+    expect(w.flowExpMode(c, first)).toBe("drop");
+    expect(cur().flow.tune.exp).toBe(Math.round(amt));
+    c.expenses.forEach((e: any, i: number) => { if (!w.tuneRowOK(e)) expect(w.flowExpMode(c, i)).toBe("keep"); });
+    w.flowExpMark(first, "half");
+    expect(cur().flow.tune.exp).toBe(Math.round(amt / 2));
+    const act = c.actions.find((a: any) => a.cat === "expense" && a.ref === "expenses:" + first);
+    expect(act.getMonthly).toBe(Math.round(amt * 0.5));
     w.flowToggleReflow(true);
     const rf = c.actions.find((a: any) => a.flowKey === "reflow");
     expect(rf.on).toBe(true);
     expect(rf.payMonthly).toBe(act.getMonthly);
-    w.flowExpMark(i, "keep");
-    expect(w.flowExpMode(c, i)).toBe("keep");
+    w.flowExpMark(first, "keep");
+    expect(cur().flow.tune.exp).toBe(0);
     expect(c.actions.find((a: any) => a.flowKey === "reflow").on).toBe(false);
+    w.flowTuneExp(K.expCap + 99999);
+    expect(cur().flow.tune.exp).toBe(K.expCap);
+    w.flowTuneExp(0);
+    expect(cur().flow.tune.exp).toBe(0);
+  });
+  it("單筆入口跟著可投資水位：investGate 三個數字算得出來", () => {
+    const IG = w.investGate(cur());
+    expect(typeof IG.monthLeft).toBe("number");
+    expect(typeof IG.investable).toBe("number");
+    expect(IG.loanable).toBeGreaterThanOrEqual(0);
+    expect(pane()).toContain("可投資水位");
+  });
+  it("願景抽屜：方案分頁才掛；客戶在抽屜改金額 → 願景改了、印記重打（editedBy client）、留一條 vedit 決定、步驟不動", () => {
+    const c = cur();
+    expect(w.document.getElementById("vdr")).toBeTruthy();
+    expect(w.document.getElementById("vdr").className).toBe("");
+    w.flowVisionToggle();
+    expect(w.document.getElementById("vdr").className).toBe("on");
+    const items = w.flowVisionList(c);
+    const g = items.find((x: any) => x.kind === "goal");
+    expect(g).toBeTruthy();
+    const lockAt = c.flow.visionLock.at;
+    const step = c.flow.step;
+    w.flowVisionEdit(g.key, "amt", String(g.amount + 1000000));
+    expect(w.n(c.goals[g.ref.i].present)).toBe(g.amount + 1000000);
+    expect(c.flow.visionLock.editedBy).toBe("client");
+    expect(c.flow.visionLock.at >= lockAt).toBe(true);
+    expect(c.flow.decisions.vedit.key).toBe(g.key);
+    expect(c.flow.decisions.vedit.text).toContain("客戶自己改願景");
+    expect(c.flow.step).toBe(step);
+    w.flowVisionEdit(g.key, "age", String(g.age + 1));
+    expect(w.n(c.goals[g.ref.i].start)).toBe(g.age + 1);
+    w.flowVisionToggle();
+    w.app.activeTab = "analysis"; w.render();
+    expect(w.document.getElementById("vdr")).toBeNull();
+    w.app.activeTab = "plan"; w.render();
+  });
+  it("舊資料的 S5A／S5B 一律併到 S4 調整台", () => {
+    const c = cur();
+    c.flow.step = "S5B";
+    expect(w.flowOf(c).step).toBe("S4");
+    c.flow.step = "S5A";
+    expect(w.flowOf(c).step).toBe("S4");
+  });
+  it("D5 閘門：沒補平 → S6 看後果", () => {
+    w.flowDecide("S4", "d5", { closed: false, reason: "short", inc: 1000, exp: 0 }, "沒補平", "S6");
+    expect(cur().flow.step).toBe("S6");
+    expect(cur().flow.decisions.d5.inc).toBe(1000);
   });
 });
 
@@ -294,34 +355,40 @@ describe("餘裕線 P1–P3′", () => {
   });
 });
 
-describe("訪談清單第 ④ 群：補件 → 走流程 → 定行動 → 回訪對帳", () => {
-  it("四個項目名稱＝落地區塊標題；舊的「收斂與下一步」「調整方案」「真實追蹤」不再是項目", () => {
-    const names = w.INTERVIEW_STEPS.filter((s: any) => s.g === 4).map((s: any) => s.name);
-    expect(names).toEqual(["待補件", "願景處理流程", "行動清單與下一步", "回訪對帳"]);
-    w.INTERVIEW_STEPS.filter((s: any) => ["flow", "actlist", "checkin"].includes(s.k)).forEach((s: any) => expect(s.a).toBe("#flowSec"));
-    expect(pane()).not.toContain('data-ivsec="review"');
-    expect(pane()).toContain('data-ivname="願景處理流程"');
+describe("方案是頂層分頁（分析 → 方案 → 建議）；訪談清單不再有第 ④ 群", () => {
+  it("分頁列順序；待補件在第 ① 群；流程三項不再是訪談項目；分組列沒有「方案 · 追蹤」", () => {
+    const h = pane();
+    const order = [...h.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
+    expect(order).toEqual(["data", "analysis", "plan", "advice", "report", "tools"]);
+    expect(w.INTERVIEW_STEPS.filter((s: any) => s.g === 4).length).toBe(0);
+    expect(w.INTERVIEW_STEPS.find((s: any) => s.k === "doc").g).toBe(1);
+    expect(w.INTERVIEW_STEPS.some((s: any) => ["flow", "actlist", "checkin"].includes(s.k))).toBe(false);
+    expect(h).toContain('data-ivname="願景處理流程"');
+    w.app.activeTab = "data"; w.app.dataTab = "intent"; w.render();
+    expect(pane()).not.toContain("方案 · 追蹤");
+    expect(pane()).not.toContain("調整方案");
+    w.app.activeTab = "plan"; w.render();
   });
-  it("「已談過」的判定跟著流程走：flow 有 c.flow 就算；行動清單要走到 6′ 且有下次日期；回訪要有 D4", () => {
+  it("舊連結：資料分頁的 plan／tracking 一律轉到頂層方案分頁", () => {
+    w.app.activeTab = "data"; w.app.dataTab = "plan"; w.render();
+    expect(w.app.activeTab).toBe("plan");
+    expect(pane()).toContain('id="flowSec"');
+    w.app.activeTab = "data"; w.app.dataTab = "tracking"; w.render();
+    expect(w.app.activeTab).toBe("plan");
+    expect(pane()).toContain('data-tab="plan" class="on"');
+  });
+  it("分析頁 ⑤ 的段結論有「進入方案 →」", () => {
+    const v = w.anGroupVerdict("rx", cur());
+    expect(v.text).toContain("進入方案 →");
+    expect(v.text).toContain("app.activeTab='plan'");
+  });
+  it("收尾三題仍在 S6x；下次日期寫進 c.nextReview；S8 有規劃線 vs 實際淨資產", () => {
     const c = cur();
-    const st = (k: string) => w.INTERVIEW_STEPS.find((s: any) => s.k === k);
-    expect(st("flow").has(c)).toBe(true);
     c.flow.step = "S6x"; delete c.flow.wrap; c.nextReview = "";
-    expect(st("actlist").has(c)).toBe(false);
     w.flowSetWrap("nextDate", "2027-01-15");
     expect(c.nextReview).toBe("2027-01-15");
-    expect(st("actlist").has(c)).toBe(true);
     expect(pane()).toContain("收尾三題");
-    expect(st("checkin").has(c)).toBe(!!(c.flow.decisions && c.flow.decisions.d4));
-  });
-  it("ivGoto：行動清單項目把步進器切到 6′；回訪項目在 S7 時切到 S8", () => {
-    const c = cur();
-    c.flow.step = "S5B"; w.render();
-    w.ivGoto("actlist");
-    expect(c.flow.step).toBe("S5B");            // 沒走到 6′ 就停在目前那一步
-    c.flow.step = "S7"; w.render();
-    w.ivGoto("checkin");
-    expect(c.flow.step).toBe("S8");
+    c.flow.step = "S7"; w.flowGo("S8");
     expect(pane()).toContain("規劃線 vs 實際淨資產");
     c.flow.step = "S6x"; w.render();
   });
@@ -329,7 +396,7 @@ describe("訪談清單第 ④ 群：補件 → 走流程 → 定行動 → 回�
     const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://lantu.test/?embed=1" });
     const e = dom.window as any;
     await new Promise<void>((r) => e.addEventListener("load", () => r(), { once: true }));
-    e.app.role = "coach"; e.app.activeTab = "data"; e.app.dataTab = "plan";
+    e.app.role = "coach"; e.app.activeTab = "plan";
     const cc = e.migrateCase(e.sampleCase());
     cc.flow = { track: "gap", step: "S6x", decisions: {} };
     e.app.cases = [cc]; e.app.activeId = cc.id; e.render();
@@ -343,11 +410,11 @@ describe("底列：執行期入口", () => {
   it("客戶在 S7 而人不在方案頁 → 底列多一顆「回訪對帳」；按下去跳到方案頁 S8", () => {
     const c = cur();
     c.flow.step = "S7";
-    w.app.dataTab = "family"; w.render();
+    w.app.activeTab = "data"; w.app.dataTab = "family"; w.render();
     const bar = () => (w.document.getElementById("lnSessBar")?.innerHTML ?? "") as string;
     expect(bar()).toContain("回訪對帳");
     w.LN.checkin();
-    expect(w.app.dataTab).toBe("plan");
+    expect(w.app.activeTab).toBe("plan");
     expect(c.flow.step).toBe("S8");
     expect(bar()).not.toContain("回到對帳");   // 人已經在方案頁，不再重複給入口
     c.flow.step = "S6x"; w.render();

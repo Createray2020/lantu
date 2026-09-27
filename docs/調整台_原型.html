@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>調整台 · 願景處理流程 原型</title>
+<style>
+:root{
+ --bg:#081a2b;--panel:#0d2b45;--card:#12334f;--card2:#17406a;
+ --field:#0a1a2b;--line:#1c3a58;--line2:#2a4d73;
+ --tx:#eef2f7;--mut:#a9bccf;--mut2:#8296ab;
+ --amber:#c99a5b;--amber2:#e0bd8b;--onbrand:#08202a;
+ --teal:#8fbfc8;--blue:#8fb8ff;
+ --ok:#8fc0a3;--warn:#e08a68;--danger:#ff9d9f;--gap2:#ef6f6f;
+ --serif:"Noto Serif TC","Songti TC","PingFang TC",serif;--r:12px;--sh:0,0,0;
+}
+:root[data-theme="light"]{
+ --bg:#f4f6f8;--panel:#ffffff;--card:#eaeef3;--card2:#dfe6ee;
+ --field:#fbfcfd;--line:#e3e8ee;--line2:#c9d2dc;
+ --tx:#14212e;--mut:#4a5c6e;--mut2:#75838f;
+ --amber:#9a6f22;--amber2:#c08f3c;--onbrand:#ffffff;
+ --teal:#2a6f7a;--blue:#2c6fb5;
+ --ok:#2f7d57;--warn:#a8681a;--danger:#c0362f;--gap2:#c2453e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6;font-size:14px}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 16px 90px}
+.tbtn{background:var(--card);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.tbtn:hover{background:var(--card2)}.tbtn.amber{background:var(--amber);color:var(--onbrand);border-color:var(--amber)}.tbtn.ghost{background:transparent}.tbtn.sm{padding:4px 10px;font-size:12px}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(var(--sh),.22)}
+.sec h4{font-size:15px;font-weight:700;margin:0 0 10px;color:var(--amber);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec h4 .hint{flex:1 0 100%;margin-top:2px}
+.hint{font-size:12px;font-weight:400;color:var(--mut2);line-height:1.6}
+.muted{color:var(--mut2)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--danger)}
+.num{font-family:var(--serif);font-variant-numeric:tabular-nums}
+.proto{position:sticky;top:0;z-index:9;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.proto b{font-size:12px;color:var(--mut);letter-spacing:.07em}.proto .sp{flex:1}
+
+/* 步進器（縮小版，只示意這一步的位置） */
+.rail{display:flex;gap:6px;margin:4px 0 14px;overflow-x:auto}
+.st{flex:1 0 80px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--line2);border-radius:8px;padding:6px 8px;font-size:12px}
+.st .nm{font-family:var(--serif);font-weight:700;white-space:nowrap}
+.st.done{border-top-color:var(--ok)}.st.on{border-top-color:var(--amber);background:var(--card)}.st.on .nm{color:var(--amber2)}
+.st.gate{border-style:dashed}
+
+/* ── 調整台 ── */
+.gapbar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+.gapbar .lbl{font-size:11px;color:var(--mut);font-weight:600;letter-spacing:.06em}
+.gapbar .big{font-family:var(--serif);font-size:30px;font-weight:700;line-height:1.1}
+.gapbar .arrow{color:var(--mut2);font-size:22px}
+.gapbar .meta{font-size:12px;color:var(--mut2);margin-left:auto;text-align:right;line-height:1.5}
+.gapmeter{height:8px;border-radius:999px;background:var(--card);overflow:hidden;margin-top:10px;position:relative}
+.gapmeter i{position:absolute;left:0;top:0;bottom:0;background:var(--gap2);border-radius:999px;transition:width .2s}
+.gapmeter b{position:absolute;left:0;top:0;bottom:0;background:var(--ok);border-radius:999px;transition:width .2s}
+
+.lever{display:grid;grid-template-columns:64px 1fr 150px;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.lever:last-child{border-bottom:0}
+.lever .nm{font-family:var(--serif);font-size:17px;font-weight:700}
+.lever .nm small{display:block;font-family:inherit;font-size:11px;color:var(--mut2);font-weight:400}
+.lever.rec .nm{color:var(--amber2)}
+.lever input[type=range]{width:100%;accent-color:var(--amber);height:26px}
+.lever.exp input[type=range]{accent-color:var(--warn)}
+.lever .val{text-align:right}
+.lever .val .v{font-family:var(--serif);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.lever .val .p{font-size:11px;color:var(--mut2)}
+.lever .cap{display:flex;justify-content:space-between;font-size:10px;color:var(--mut2);margin-top:-4px}
+.lever .tag{font-size:10px;padding:1px 7px;border-radius:999px;border:1px solid var(--amber);color:var(--amber2);margin-left:6px;vertical-align:middle}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.col{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 14px;transition:border-color .15s}
+.col.on{border-color:var(--amber)}
+.col .t{font-weight:700;font-size:13px;color:var(--amber2);display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.col .t .hint{margin-left:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--mut);font-weight:600;text-align:left;font-size:11px;letter-spacing:.05em;padding:5px 6px;border-bottom:1px solid var(--line)}
+td{padding:6px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+tr.tot td{font-weight:700;border-bottom:0}
+tr.sub td{color:var(--mut);padding-left:18px;font-size:12px}
+.delta{color:var(--ok);font-weight:700}.delta.neg{color:var(--warn)}
+.barmini{display:inline-block;height:6px;border-radius:999px;background:var(--card2);vertical-align:middle;width:60px;position:relative;margin-right:6px}
+.barmini i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--amber)}
+.sw{display:inline-flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
+.sw button{background:transparent;border:0;color:var(--mut);padding:1px 8px;font-size:11px;cursor:pointer;font-family:inherit}
+.sw button.on{background:var(--warn);color:var(--onbrand)}.sw button.on.keep{background:var(--ok);color:var(--onbrand)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
+.chip{font-size:11px;padding:2px 10px;border-radius:999px;border:1px solid var(--line2);color:var(--mut);cursor:pointer}
+.chip.on{border-color:var(--amber);color:var(--amber2);background:var(--card)}
+.sub-open{display:none;background:var(--card);border:1px dashed var(--line2);border-radius:8px;padding:8px 10px;margin:6px 0 8px;font-size:12px}
+.sub-open.on{display:block}
+.gate{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line2);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.gate .q{font-weight:700;color:var(--amber2);font-size:13px}.gate .q::before{content:"◇ ";color:var(--mut2)}
+.gate .who{font-size:11px;color:var(--mut2);margin-left:auto}.gate .who::before{content:"決定者："}
+
+/* ── 願景抽屜（右緣收合，同記事本） ── */
+#vdr{position:fixed;right:0;top:120px;z-index:20;display:flex;align-items:flex-start}
+#vdr .tab{writing-mode:vertical-rl;background:var(--amber);color:var(--onbrand);border-radius:8px 0 0 8px;padding:10px 6px;font-weight:700;font-size:13px;cursor:pointer;letter-spacing:.2em}
+#vdr .pane{width:0;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-right:0;transition:width .2s;max-height:70vh}
+#vdr.on .pane{width:340px;overflow:auto}
+#vdr .pane .in{padding:12px 14px;width:340px}
+.vitem{display:flex;align-items:center;gap:8px;padding:7px 8px;background:var(--field);border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:13px}
+.vitem .pr{font-family:var(--serif);color:var(--amber2);font-weight:700;width:18px}
+.vitem .vn{flex:1}.vitem .vm{font-size:11px;color:var(--mut2);display:block}
+.vitem input[type=text]{width:70px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:6px;padding:2px 6px;font-size:12px}
+.stamp{font-size:11px;color:var(--mut2);margin-top:8px}
+.log{margin-top:14px;font-size:12px;color:var(--mut2)}
+.log .row{display:flex;gap:8px;padding:4px 0;border-bottom:1px dashed var(--line)}
+.log .row .k{color:var(--amber2);font-weight:700;min-width:56px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}.lever{grid-template-columns:56px 1fr 110px}}
+</style>
+</head>
+<body>
+<div class="proto"><b>原型 · 調整方案 › 願景處理流程 › 調整台（取代 S4／5A／5B）</b><span class="sp"></span><button class="tbtn sm" onclick="toggleTheme()">深／淺</button></div>
+
+<div class="wrap">
+<div class="rail">
+ <div class="st done"><div class="nm">判定</div></div><div class="st done"><div class="nm">缺口呈現</div></div><div class="st done"><div class="nm">願景鎖定</div></div><div class="st done"><div class="nm">護欄</div></div><div class="st done"><div class="nm">階段目標</div></div>
+ <div class="st on gate"><div class="nm">調整台</div></div>
+ <div class="st gate"><div class="nm">後果</div></div><div class="st"><div class="nm">行動清單與下一步</div></div><div class="st"><div class="nm">執行期</div></div><div class="st gate"><div class="nm">回訪對帳</div></div>
+</div>
+
+<div class="sec">
+ <h4>調整台 <span class="hint">拉收入、拉支出，缺口當場重算。理財是收入的一部分，動收入時在底下展開。願景不動——要改就從右邊抽屜拉出來。</span></h4>
+
+ <!-- 缺口 -->
+ <div class="gapbar">
+  <div><div class="lbl">現值缺口</div><div class="big bad" id="gBefore">412 萬</div></div>
+  <div class="arrow">→</div>
+  <div><div class="lbl">拉完之後</div><div class="big warn" id="gAfter">412 萬</div></div>
+  <div class="meta"><span id="gImp">改善 0%</span><br><span id="gTn">存量用完 58 歲</span></div>
+ </div>
+ <div class="gapmeter"><i id="mRed" style="width:100%"></i><b id="mGreen" style="width:0%"></b></div>
+
+ <!-- 拉桿 -->
+ <div style="margin-top:14px">
+  <div class="lever rec" id="lvInc">
+   <div class="nm">收入<span class="tag">先動這根</span><small>工作＋理財</small></div>
+   <div><input type="range" min="0" max="40000" step="1000" value="0" id="rInc" oninput="onInc(this.value)" onfocus="focusCol('inc')"><div class="cap"><span>0</span><span>上限 +4 萬／月（工作收入 30%＋理財）</span></div></div>
+   <div class="val"><div class="v" id="vInc">+0</div><div class="p" id="pInc">／月　+0%</div></div>
+  </div>
+  <div class="lever exp" id="lvExp">
+   <div class="nm">支出<small>客戶自己標留／放</small></div>
+   <div><input type="range" min="0" max="25000" step="500" value="0" id="rExp" oninput="onExp(this.value)" onfocus="focusCol('exp')"><div class="cap"><span>0</span><span>上限 −2.5 萬／月（可動的生活消費）</span></div></div>
+   <div class="val"><div class="v" id="vExp">−0</div><div class="p" id="pExp">／月　−0%</div></div>
+  </div>
+ </div>
+
+ <!-- 結構 -->
+ <div class="cols">
+  <div class="col" id="colInc">
+   <div class="t">收入結構 <span class="hint">現在 → 拉完</span></div>
+   <table>
+    <tr><th>來源</th><th class="r">現在／月</th><th class="r">拉完／月</th><th class="r">變化</th></tr>
+    <tr><td>工作收入</td><td class="r">60,000</td><td class="r" id="iWork">60,000</td><td class="r"><span class="delta" id="dWork">—</span></td></tr>
+    <tr class="sub"><td>└ 薪資提升／專業兼職／創業</td><td class="r"></td><td class="r"></td><td class="r"></td></tr>
+    <tr><td>理財收入</td><td class="r">3,000</td><td class="r" id="iFin">3,000</td><td class="r"><span class="delta" id="dFin">—</span></td></tr>
+    <tr class="sub"><td>└ 定期定額（月金流為正才通）／單筆（看水位）</td><td class="r"></td><td class="r"></td><td class="r"></td></tr>
+    <tr><td>其他</td><td class="r">2,000</td><td class="r">2,000</td><td class="r"><span class="muted">—</span></td></tr>
+    <tr class="tot"><td>合計</td><td class="r">65,000</td><td class="r" id="iTot">65,000</td><td class="r"><span class="delta" id="dTot">—</span></td></tr>
+   </table>
+   <div class="sub-open" id="incOpen">
+    <div style="font-weight:700;color:var(--amber2);margin-bottom:4px">這一根怎麼拉出來</div>
+    <div class="chips"><span class="chip on" onclick="pickRoute(this)">薪資提升 +1.2 萬</span><span class="chip" onclick="pickRoute(this)">專業兼職 +0.8 萬</span><span class="chip" onclick="pickRoute(this)">創業（不建議）</span></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px">
+     <span>定期定額 <b id="regAmt">0</b>／月 <span class="hint" id="regGate">月結餘 +0.6 萬 ✓</span></span>
+     <span>單筆投入 <b>40 萬</b> <span class="hint">可投資水位 42 萬 ✓</span></span>
+    </div>
+    <div class="hint" style="margin-top:4px">拉桿超過工作收入能到的部分，自動落到理財（先定期定額、再單筆）；月結餘不為正時理財那段鎖住。</div>
+   </div>
+  </div>
+
+  <div class="col" id="colExp">
+   <div class="t">支出結構 <span class="hint">拉桿與「留／半／放」是同一件事的兩個入口</span></div>
+   <table id="expTbl">
+    <tr><th>支出</th><th class="r">現在／月</th><th>客戶標</th><th class="r">放掉</th></tr>
+    <tr data-amt="18000"><td>外食・聚餐</td><td class="r">18,000</td><td><span class="sw"><button class="on keep" onclick="mark(this,0)">留</button><button onclick="mark(this,.5)">半</button><button onclick="mark(this,1)">放</button></span></td><td class="r delta">0</td></tr>
+    <tr data-amt="3200"><td>訂閱・娛樂</td><td class="r">3,200</td><td><span class="sw"><button class="on keep" onclick="mark(this,0)">留</button><button onclick="mark(this,.5)">半</button><button onclick="mark(this,1)">放</button></span></td><td class="r delta">0</td></tr>
+    <tr data-amt="6000"><td>治裝・美容</td><td class="r">6,000</td><td><span class="sw"><button class="on keep" onclick="mark(this,0)">留</button><button onclick="mark(this,.5)">半</button><button onclick="mark(this,1)">放</button></span></td><td class="r delta">0</td></tr>
+    <tr data-amt="6700"><td>每年旅遊 <span class="hint">願景第 6 位</span></td><td class="r">6,700</td><td><span class="sw"><button class="on keep" onclick="mark(this,0)">留</button><button onclick="mark(this,.5)">半</button><button onclick="mark(this,1)">放</button></span></td><td class="r delta">0</td></tr>
+    <tr class="sub"><td>房租</td><td class="r">28,000</td><td><span class="hint">固定・購屋後消失</span></td><td class="r">—</td></tr>
+    <tr class="sub"><td>孝親</td><td class="r">10,000</td><td><span class="hint">必達（最低 1 萬）</span></td><td class="r">—</td></tr>
+    <tr class="tot"><td>合計</td><td class="r">71,900</td><td></td><td class="r delta" id="eTot">0</td></tr>
+   </table>
+   <div class="hint" style="margin-top:6px">拉桿拉多少，由上到下配到「半」「放」；客戶自己點標記，拉桿跟著走。固定與必達那幾列拉桿碰不到。</div>
+  </div>
+ </div>
+
+ <div class="gate">
+  <span class="q">拉完之後</span>
+  <button class="tbtn amber" id="btnOk" disabled onclick="log('D5','補平：收入 +'+fmt(INC)+'／月、支出 −'+fmt(EXP)+'／月 → 行動清單')">補平了 → 行動清單與下一步</button>
+  <button class="tbtn ghost" onclick="log('D5','沒補平（剩 '+gapNow()+' 萬）→ 看後果')">沒補平 → 看後果</button>
+  <button class="tbtn ghost" onclick="log('D5','客戶不願再動收入或支出 → 看後果')">客戶不願意再動 → 看後果</button>
+  <span class="who">客戶拉、教練建議</span>
+ </div>
+ <div class="hint" style="margin-top:8px">按下去那一刻，拉桿位置才轉成具體動作（工作收入動作、定期定額／單筆、支出列的刪減）寫進行動清單；之後執行期、回訪對帳照舊。</div>
+
+ <div class="log" id="log"><div style="font-weight:700;color:var(--mut);margin-bottom:4px">這一場的決定</div></div>
+</div>
+</div>
+
+<!-- 願景抽屜 -->
+<div id="vdr">
+ <div class="tab" onclick="document.getElementById('vdr').classList.toggle('on')">願景 7</div>
+ <div class="pane"><div class="in">
+  <div style="font-weight:700;color:var(--amber2);margin-bottom:6px">願景清單（已鎖定）</div>
+  <div class="hint" style="margin-bottom:8px">教練不動它。客戶要改，直接在這裡改；改了重新打印記，並留一條「客戶自己改的」決定。</div>
+  <div class="vitem"><span class="pr">1</span><span class="vn">退休生活<span class="vm">65 歲　每月 6 萬</span></span><input type="text" value="65" onchange="vedit('退休生活','65 → '+this.value+' 歲')"></div>
+  <div class="vitem"><span class="pr">2</span><span class="vn">子女教育<span class="vm">47–56 歲　640 萬</span></span><input type="text" value="640" onchange="vedit('子女教育','640 → '+this.value+' 萬')"></div>
+  <div class="vitem"><span class="pr">3</span><span class="vn">購屋<span class="vm">40 歲　1,800 萬</span></span><input type="text" value="1800" onchange="vedit('購屋','1800 → '+this.value+' 萬')"></div>
+  <div class="vitem"><span class="pr">4</span><span class="vn">結婚<span class="vm">33 歲　120 萬</span></span><input type="text" value="120"></div>
+  <div class="vitem"><span class="pr">5</span><span class="vn">購車<span class="vm">36 歲　90 萬</span></span><input type="text" value="90"></div>
+  <div class="vitem"><span class="pr">6</span><span class="vn">每年旅遊<span class="vm">31–75 歲　每次 8 萬</span></span><input type="text" value="8"></div>
+  <div class="vitem"><span class="pr">7</span><span class="vn">傳承<span class="vm">期末 1,000 萬</span></span><input type="text" value="1000"></div>
+  <div class="stamp" id="stamp">印記：2026-09-27 14:02 · rev 8a1f</div>
+ </div></div>
+</div>
+
+<script>
+var INC=0,EXP=0,GAP0=412,K=10.1;
+function fmt(v){return Math.round(v).toLocaleString('en-US')}
+function gapNow(){return Math.max(0,Math.round(GAP0-(INC+EXP)/10000*12*K))}
+function paint(){
+ var g=gapNow(),imp=Math.round((1-g/GAP0)*100);
+ var a=document.getElementById('gAfter');a.textContent=(g?g+' 萬':'已補平');a.className='big '+(g?(imp>=50?'warn':'bad'):'ok');
+ document.getElementById('gImp').textContent='改善 '+imp+'%';
+ document.getElementById('gTn').textContent=g?('存量用完 '+(g>250?58:g>100?66:79)+' 歲'):'存量不會用完';
+ document.getElementById('mRed').style.width=(g/GAP0*100)+'%';document.getElementById('mGreen').style.width=(100-g/GAP0*100)+'%';
+ document.getElementById('btnOk').disabled=g>0;
+ // 收入結構
+ var work=Math.min(INC,18000),fin=INC-work;
+ document.getElementById('vInc').textContent='+'+fmt(INC);document.getElementById('pInc').textContent='／月　+'+Math.round(INC/65000*100)+'%';
+ document.getElementById('iWork').textContent=fmt(60000+work);document.getElementById('dWork').textContent=work?'+'+fmt(work):'—';
+ document.getElementById('iFin').textContent=fmt(3000+fin);document.getElementById('dFin').textContent=fin?'+'+fmt(fin):'—';
+ document.getElementById('iTot').textContent=fmt(65000+INC);document.getElementById('dTot').textContent=INC?'+'+fmt(INC):'—';
+ document.getElementById('regAmt').textContent=fmt(fin);
+ var bal=6000+INC-fin+EXP;document.getElementById('regGate').textContent='月結餘 '+(bal>0?'+':'')+fmt(bal)+(bal>0?' ✓':' ✕ 先走支出');
+ // 支出
+ document.getElementById('vExp').textContent='−'+fmt(EXP);document.getElementById('pExp').textContent='／月　−'+Math.round(EXP/71900*100)+'%';
+ document.getElementById('eTot').textContent=EXP?'−'+fmt(EXP):'0';
+}
+function onInc(v){INC=+v;document.getElementById('incOpen').classList.add('on');focusCol('inc');paint()}
+function onExp(v){EXP=+v;focusCol('exp');distribute(EXP);paint()}
+function focusCol(k){document.getElementById('colInc').classList.toggle('on',k==='inc');document.getElementById('colExp').classList.toggle('on',k==='exp');}
+// 拉桿 → 由上到下配到「半」「放」
+function distribute(total){
+ var rows=[].slice.call(document.querySelectorAll('#expTbl tr[data-amt]')),left=total;
+ rows.forEach(function(tr){var amt=+tr.dataset.amt,cut=0;
+  if(left>=amt){cut=amt;left-=amt}else if(left>=amt/2){cut=amt/2;left-=amt/2}else{cut=0}
+  setMark(tr,cut/amt)});
+}
+function setMark(tr,r){var bs=tr.querySelectorAll('.sw button');bs.forEach(function(b,i){b.className=(i===(r===0?0:r===.5?1:2))?('on'+(i===0?' keep':'')):''});tr.querySelector('td.delta').textContent=r?'−'+fmt(+tr.dataset.amt*r):'0'}
+// 標記 → 拉桿跟著走
+function mark(btn,r){var tr=btn.closest('tr');setMark(tr,r);var sum=0;document.querySelectorAll('#expTbl tr[data-amt]').forEach(function(t){var on=t.querySelector('.sw button.on'),i=[].indexOf.call(t.querySelectorAll('.sw button'),on);sum+=+t.dataset.amt*(i===1?.5:i===2?1:0)});EXP=sum;document.getElementById('rExp').value=Math.min(25000,sum);focusCol('exp');paint()}
+function pickRoute(el){el.parentNode.querySelectorAll('.chip').forEach(function(c){c.classList.toggle('on',c===el)})}
+function log(k,t){var r=document.createElement('div');r.className='row';r.innerHTML='<span class="k">'+k+'</span><span>'+t+'</span>';document.getElementById('log').appendChild(r)}
+function vedit(name,txt){document.getElementById('stamp').textContent='印記：'+new Date().toISOString().slice(0,16).replace('T',' ')+' · rev 新';log('願景','客戶自己改：'+name+' '+txt+'（重新打印記）');GAP0=Math.max(50,GAP0-20);document.getElementById('gBefore').textContent=GAP0+' 萬';paint()}
+function toggleTheme(){var h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'}
+paint();
+</script>
+</body>
+</html>

@@ -1049,6 +1049,57 @@ input:disabled,select:disabled,textarea:disabled,button:disabled{opacity:.45;cur
 td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .vitem .pr{font-family:var(--serif);color:var(--amber2);font-weight:700;width:22px;flex:none}
 @media (max-width:760px){.fst{min-width:78px}}
+/* ── 調整台＋願景抽屜（2026/09/28）── */
+.tunegap{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+.tunegap .lbl{font-size:11px;color:var(--mut);font-weight:600;letter-spacing:.06em}
+.tunegap .big{font-family:var(--serif);font-size:30px;font-weight:700;line-height:1.1}
+.tunegap .big.ok{color:var(--ok)}.tunegap .big.warn{color:var(--warn)}.tunegap .big.bad{color:var(--danger)}
+.tunegap .arrow{color:var(--mut2);font-size:22px}
+.tunegap .meta{font-size:12px;color:var(--mut2);margin-left:auto;text-align:right;line-height:1.5}
+.tunemeter{height:8px;border-radius:999px;background:var(--card);overflow:hidden;margin-top:10px;position:relative}
+.tunemeter i{position:absolute;left:0;top:0;bottom:0;background:var(--gap2);border-radius:999px;transition:width .2s}
+.tunemeter b{position:absolute;left:0;top:0;bottom:0;background:var(--ok);border-radius:999px;transition:width .2s}
+.tunelev{display:grid;grid-template-columns:110px 1fr 150px;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.tunelev:last-child{border-bottom:0}
+.tunelev .nm{font-family:var(--serif);font-size:17px;font-weight:700}
+.tunelev .nm small{display:block;font-family:inherit;font-size:11px;color:var(--mut2);font-weight:400}
+.tunelev.rec .nm{color:var(--amber2)}
+.tunelev input[type=range]{width:100%;accent-color:var(--amber);height:26px}
+.tunelev.exp input[type=range]{accent-color:var(--warn)}
+.tunelev .val{text-align:right}
+.tunelev .val .v{font-family:var(--serif);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.tunelev .val .p{font-size:11px;color:var(--mut2)}
+.tunelev .cap{display:flex;justify-content:space-between;font-size:10px;color:var(--mut2);margin-top:-4px}
+.tunelev .tag{font-size:10px;padding:1px 7px;border-radius:999px;border:1px solid var(--amber);color:var(--amber2);margin-left:6px;vertical-align:middle;font-family:inherit;font-weight:400}
+.tunecols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media (max-width:900px){.tunecols{grid-template-columns:1fr}.tunelev{grid-template-columns:1fr;gap:6px}}
+.tunecol{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 14px;transition:border-color .15s}
+.tunecol.on{border-color:var(--amber)}
+.tunecol .t{font-weight:700;font-size:13px;color:var(--amber2);display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.tunecol .t .hint{margin-left:auto;font-weight:400}
+.tunecol table{width:100%;border-collapse:collapse;font-size:13px}
+.tunecol th{color:var(--mut);font-weight:600;text-align:left;font-size:11px;letter-spacing:.05em;padding:5px 6px;border-bottom:1px solid var(--line)}
+.tunecol td{padding:6px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tunecol td.r,.tunecol th.r{text-align:right;font-variant-numeric:tabular-nums}
+.tunecol td.ok{color:var(--ok);font-weight:700}
+.tunecol tr.tot td{font-weight:700;border-bottom:0}
+.tunecol tr.sub td{color:var(--mut);padding-left:18px;font-size:12px}
+.tunecol .delta{color:var(--ok);font-weight:700}
+.tuneopen{display:none;background:var(--card);border:1px dashed var(--line2);border-radius:8px;padding:8px 10px;margin:8px 0 0;font-size:12px}
+.tuneopen.on{display:block}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
+.chip{font-size:11px;padding:2px 10px;border-radius:999px;border:1px solid var(--line2);color:var(--mut);cursor:pointer}
+.chip.on{border-color:var(--amber);color:var(--amber2);background:var(--card)}
+#vdr{position:fixed;right:0;top:120px;z-index:20;display:flex;align-items:flex-start}
+#vdr .vtab{writing-mode:vertical-rl;background:var(--amber);color:var(--onbrand);border-radius:8px 0 0 8px;padding:10px 6px;font-weight:700;font-size:13px;cursor:pointer;letter-spacing:.2em;user-select:none}
+#vdr .vpane{width:0;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-right:0;transition:width .2s;max-height:70vh}
+#vdr.on .vpane{width:340px;overflow:auto}
+#vdr .vin{padding:12px 14px;width:340px;font-size:13px}
+.vitem{display:flex;align-items:center;gap:8px;padding:7px 8px;background:var(--field);border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:13px}
+.vitem .pr{font-family:var(--serif);color:var(--amber2);font-weight:700;width:18px}
+.vitem .vt{flex:1;min-width:0}.vitem .vn{display:block}.vitem .vm{font-size:11px;color:var(--mut2);display:block}
+.vitem input[type=text]{width:72px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:2px 6px;font-size:12px}
+.stamp{font-size:11px;color:var(--mut2);margin-top:8px}
 </style>
 </head>
 <body>
@@ -5404,7 +5455,7 @@ function bindVT(){
 }
 function render(){document.querySelectorAll('#roleSw button').forEach(function(b){b.classList.toggle('on',b.dataset.r===app.role)});
  var ac=activeCase();if(ac)normalizeIntent(ac);
- document.getElementById('app').innerHTML=app.role==='coach'?coachView():clientView();bindTabs();bindPrioDrag();bindAnalysis();bindVT()}
+ document.getElementById('app').innerHTML=app.role==='coach'?coachView():clientView();bindTabs();bindPrioDrag();bindAnalysis();bindVT();try{if(typeof mountVisionDrawer==='function')mountVisionDrawer()}catch(e){}}
 function bindTabs(){document.querySelectorAll('[data-tab]').forEach(function(b){b.onclick=function(){app.activeTab=b.dataset.tab;render()}});
  document.querySelectorAll('[data-dtab]').forEach(function(b){b.onclick=function(){app.dataTab=b.dataset.dtab;app.ivFacet='';render()}});
  // 下拉裡的面向：走 ivGoto（切分頁 → 捲到錨點 → 閃一下），與訪談清單同一條路。
@@ -5474,10 +5525,12 @@ function coachView(){var c=activeCase();
   '<div class="gr" style="color:'+stageColor(h.grade)+'">'+stageName(h.grade)+'</div><div class="nm">'+esc(x.profile.name)+'</div>'+
   '<div class="mt">'+n(x.profile.age)+' 歲 · 淨值 '+fmt(metrics(x).net)+'</div></div>';}).join('');
  var side='<h3>客戶管理</h3>'+list+'<button class="tbtn amber" style="width:100%;margin-top:6px" onclick="var n=newCase();app.cases.push(n);app.activeId=n.id;save();render()">＋ 新增客戶</button>';
- var tabs=[['data','資料'],['analysis','分析'],['advice','建議'],['report','報告'],['tools','工具']];
+ var tabs=[['data','資料'],['analysis','分析'],['plan','方案'],['advice','建議'],['report','報告'],['tools','工具']];
+ // 2026/09/28：方案升成頂層分頁（分析 → 方案 → 建議）。舊的資料分頁 plan／tracking 一律轉過去，舊連結不會掉到空白。
+ if(app.activeTab==='data'&&(app.dataTab==='plan'||app.dataTab==='tracking')){app.activeTab='plan';app.dataTab='family';}
  var tb=tabs.map(function(t){return '<button data-tab="'+t[0]+'" class="'+(app.activeTab===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('');
  if(!c)return '<div class="shell"><div class="side">'+side+'</div><div class="main"><div style="padding:64px 30px;text-align:center;color:var(--mut)"><div style="font-size:40px;margin-bottom:10px">🗂️</div><div style="font-size:16px;font-weight:700;color:var(--tx);margin-bottom:6px">尚未選取客戶</div>請於左側點選客戶，或按「＋ 新增客戶」建立第一筆個案。</div></div></div>';
- var body=app.activeTab==='data'?dataPane(c):app.activeTab==='analysis'?analysisPane(c):app.activeTab==='advice'?advicePane(c):app.activeTab==='tools'?toolsPane(c):reportPane(c);
+ var body=app.activeTab==='data'?dataPane(c):app.activeTab==='analysis'?analysisPane(c):app.activeTab==='plan'?planSec(c):app.activeTab==='advice'?advicePane(c):app.activeTab==='tools'?toolsPane(c):reportPane(c);
  return '<div class="shell"><div class="side">'+side+'</div><div class="main"><div class="tabbar">'+tb+'</div>'+body+'</div></div>';
 }
 // ===== 分組列的資料來源：面向（2026-09-11）=====
@@ -5486,7 +5539,7 @@ function coachView(){var c=activeCase();
 var DTAB_LABEL={intent:'意圖 / 生涯',family:'家庭 / 參數',risk:'風險屬性',
  goals:'目標/置產',education:'子女教育',lifestyle:'生活願望',retire:'退休',
  finance:'收支資債',credit:'信用/海外',coverage:'保障中心',tax:'稅賦',
- plan:'調整方案',tracking:'真實追蹤'};
+ plan:'方案',tracking:'真實追蹤'};
 // ===== 聚焦模式（2026-09-12）=====
 // 點下拉裡的某個面向 → 該區塊留著、同分頁其餘折成一行標題（點一下就展開）。
 //
@@ -5531,7 +5584,7 @@ function navStep(k){var r=null;INTERVIEW_STEPS.forEach(function(s){if(s.k===k)r=
 // 2026/09/26 Ray：下拉裡的項目太多全擺一起——分組顯示（小標題），點了照樣跳到後面的分頁。
 // 純顯示層：INTERVIEW_STEPS 與訪談步驟的定義一個字都不動；沒列在這裡的面向排在「其他」。
 var NAV_CATS={
- 1:[['這個家',['scope','basic','bg','decide']],['想法與習慣',['purpose','values','money','ready']],['參數',['params']]],
+ 1:[['這個家',['scope','basic','bg','decide']],['想法與習慣',['purpose','values','money','ready']],['參數',['params','doc']]],   // 2026/09/28 待補件併進第 ① 群（原第 ④ 群拿掉）
  2:[['人生階段',['career','retire','legacy']],['置產',['house','car','land']],['家庭',['marry','birth','child','parent']],['生活願望',['travel','hobby','luxury']]],
  3:[['收支',['income','expense','shortterm']],['資產負債',['asset','debt','credit']],['稅賦',['tax']],['風險與保障',['risk','cover','coverbudget']]]   // 順序照手冊 4→5→6 章（interviewUI 守著）
 };
@@ -5584,9 +5637,9 @@ function dataPane(c){
  var dgroups=[
   {no:'①',fg:1,name:'基礎參數 · 諮詢資料'},
   {no:'②',fg:2,name:'未來的需求'},
-  {no:'③',fg:3,name:'現在的狀況'},
-  {no:'',fg:4,name:'方案 · 追蹤',exec:true}
+  {no:'③',fg:3,name:'現在的狀況'}
  ];
+ // 2026/09/28：第 ④ 群「方案 · 追蹤」拿掉——方案升成頂層分頁，步進器本身就是導引，不再當訪談項目。
  // 第 ④ 群「企業」只在企業主體開啟時出現；插在「現在的狀況」之後，
  // 因為它描述的是現況的另一半（②③對調後，現況是第 3 群，所以 splice 的位置跟著往後一格）。
  if(entityOn(c,'company')){
@@ -5650,7 +5703,6 @@ function dataPane(c){
  else if(app.dataTab==='coverages')body='<div class="sec"><h4 style="color:var(--mut)">簡易保障輸入 <span class="hint">若已於「現有保單」逐張登錄，此處通常留空；系統會自動彙總。員工團體保險也可登錄於此（計入已備）。</span></h4></div>'+tableSec('已備保障(手動補充)','coverages',c.coverages,[['member','被保人','memsel'],['kind','險種','sel:壽險,意外傷殘,住院醫療,醫療雜費,薪資補償（日）,薪資補償（月）,初次罹癌,癌症住院,重病給付,每月照護'],['comm','已備商業','money'],['social','已備社會','money']]);
  else if(app.dataTab==='policies')body=policiesSec(c);
  else if(app.dataTab==='tax')body=taxSec(c);
- else if(app.dataTab==='plan')body=planSec(c);
  else if(app.dataTab==='intent')body=intentSec(c);
  else if(app.dataTab==='risk')body=riskSec(c);
  else if(app.dataTab==='credit')body=creditSec(c);
@@ -5660,7 +5712,7 @@ function dataPane(c){
  else if(app.dataTab==='bizcomp')body=(targetOn(c,'報酬結構優化')?goalHead(c,'報酬結構優化')+bizCompSec(c):foldedGoal(c,'報酬結構優化',''));
  else if(app.dataTab==='bizrisk')body=(targetOn(c,'企業風險保障')?goalHead(c,'企業風險保障')+bizRiskSec(c):foldedGoal(c,'企業風險保障',''));
  else if(app.dataTab==='bizexit')body=(targetOn(c,'事業退場規劃')?goalHead(c,'事業退場規劃')+bizExitSec(c):foldedGoal(c,'事業退場規劃',''));
- else body=trackingSec(c);
+ else body=peopleSec(c);
  if(['incomes','expenses','assets','liabilities'].indexOf(app.dataTab)>=0)body=ownerBar(c)+body;
  // 分頁名＝模組標題（L1，19px serif），與小節標題（L2，15px）差開一階。
  // 對不到的分頁（理論上不會有）就退回原本的裸 body，不硬塞一個空標題。
@@ -9366,20 +9418,21 @@ function actionFlowHTML(c){
    ============================================================ */
 var FLOW_STEPS_GAP=[
  ['S0','判定','缺口線'],['S1','缺口呈現','◇ D1 願景是他要的？'],['S2','願景鎖定','客戶排序'],
- ['S2g','護欄','保障・預備金'],['S3','階段目標','里程碑'],['S4','選路','◇ D2 先收入或支出'],
- ['S5A','增加收入','工作＋理財 ◇ 補平？'],['S5B','減少支出','客戶自己標 ◇ 補平？'],
+ ['S2g','護欄','保障・預備金'],['S3','階段目標','里程碑'],['S4','調整台','收入・支出拉桿 ◇ 補平？'],
  ['S6','後果','◇ D3 加碼或接受'],['S6x','行動清單與下一步','收尾三題'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
 var FLOW_STEPS_SUR=[
  ['P0','判定','餘裕線'],['P1','餘裕呈現','保守重算'],['P2','願景再確認','◇ D1′ 要升級？'],
  ['P2g','護欄','保障・預備金'],['P3','餘裕分配','三向'],['P3x','行動清單與下一步','收尾三題'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
-var FLOW_GATES={S1:1,S4:1,S5A:1,S5B:1,S6:1,P2:1};
+var FLOW_GATES={S1:1,S4:1,S6:1,P2:1};
 var FLOW_LOCKED={};
 var FLOW_RULES=['願景不動','收入優先、支出其次','取捨以客戶願景為尺','後果只呈現、不代決定','報酬率保守假設','同一筆錢只用一次'];
 var CONS_LIFE_PLUS=5;   // 保守情境：壽命再加幾年
 var LOAN_LTV=60;        // 可貸款資產成數 %（非流動資產 × 成數）
 var FLOW_LANES={'income-work':'收入·工作','income-invest':'收入·理財','expense':'支出','guard':'護欄','surplus':'餘裕'};
 
-function flowOf(c){return (c&&c.flow&&typeof c.flow==='object')?c.flow:null}
+function flowOf(c){var f=(c&&c.flow&&typeof c.flow==='object')?c.flow:null;
+ if(f&&(f.step==='S5A'||f.step==='S5B'))f.step='S4';  // 2026/09/28 舊資料：選路／增收／減支併成調整台
+ return f}
 function flowSteps(track){return track==='surplus'?FLOW_STEPS_SUR:FLOW_STEPS_GAP}
 function flowStepIdx(track,s){var st=flowSteps(track);for(var i=0;i<st.length;i++)if(st[i][0]===s)return i;return -1}
 function laneOf(a){
@@ -9621,7 +9674,7 @@ function flowExpMark(i,mode){
  if(cut<=0){if(found)found.on=false;}
  else{if(!found){found={id:actId(),on:true,cat:'expense',ref:ref,lane:'expense',src:'',getFrom:A+1,getTo:R,startY:A+1};c.actions.push(found)}
   found.on=true;found.name=(mode==='half'?'減半：':'放掉：')+(e.name||e.subCat||e.cat||'支出');found.getMonthly=Math.round(n(e.amount)/12*cut);found.flowMode=mode;}
- flowReflow(c);save();render();
+ flowReflow(c);flowTuneSyncExp(c);save();render();
 }
 function flowExpMode(c,i){var ref='expenses:'+i,m='keep';(c.actions||[]).forEach(function(a){if(a.on!==false&&a.cat==='expense'&&a.ref===ref&&a.lane==='expense')m=a.flowMode||'drop'});return m}
 /* 結餘回流：教練勾了才把 5B 多出的結餘投進定期定額（一筆專屬動作，金額每次重算） */
@@ -9720,9 +9773,10 @@ function flowBodyHTML(c){
    '<div class="tw"><table><tr><th>階段</th><th>年齡</th><th>包含的願景</th><th class="r">里程碑：可投資資產</th><th class="r">年儲蓄需要</th><th>檢查點</th></tr>'+
    st.map(function(x,i){var isCur=curS&&curS.id===x.id;return '<tr'+(isCur?' style="background:var(--card)"':'')+'><td><b>'+(editable?'<input value="'+esc(x.name)+'" onchange="flowSetStage('+i+',\'name\',this.value)" style="width:110px">':esc(x.name))+'</b>'+(isCur?' <span class="flpill w">目前</span>':'')+'</td><td>'+x.fromAge+'–'+x.toAge+'</td><td>'+esc((x.goals||[]).join('、')||'—')+'</td><td class="r">'+(editable?'<input value="'+fmt(x.milestone)+'" onchange="flowSetStage('+i+',\'milestone\',this.value.replace(/,/g,\'\'))" style="width:120px;text-align:right">':fmt(x.milestone))+'</td><td class="r">'+fmt(x.annualSave)+'</td><td>每年 1 月</td></tr>'}).join('')+'</table></div>'+
    '<div class="hint" style="margin-top:8px">初稿由引擎切（目標年齡分段、金線段末值當里程碑）；定案後可改名、改數字。這張表同時是回訪對帳的依據。</div>'+
-   flowGate('階段目標表定案','<button class="tbtn amber" onclick="flowConfirmStages()">客戶認了 → 選路</button>','教練拆、客戶認');
+   flowGate('階段目標表定案','<button class="tbtn amber" onclick="flowConfirmStages()">客戶認了 → 調整台</button>','教練拆、客戶認');
  }
- if(s==='S4'){var RS=routeSim(c);
+ if(s==='S4')return flowTuneHTML(c);
+ if(s==='S4_v1'){var RS=routeSim(c);
   function rc(L,label,rec,note,m){return '<div class="fcard'+(rec?' sel':'')+'"><div class="t">'+label+(rec?' <span class="tag rec">教練建議</span>':'')+'</div><div class="n">'+(L.needed?(L.feasible?(L.x>0?'+':'')+r1(L.x)+'%':'上限 '+r1(L.cap)+'% 仍不夠'):'不需要')+'</div><div class="s">'+(L.needed?(L.feasible?'約 <b>'+fmt(m)+'／月</b>就補平；上限 '+r1(L.cap)+'%，<span class="ok">可行</span>':'單獨走這條走不到，要搭配另一條')+'':'現況已無缺口')+'</div><div class="s" style="margin-top:6px">'+note+'</div></div>'}
   return flowAsk('他要先從哪一邊動？——兩條路各自試算「單獨走這條要到多少才補平」。')+
    '<div class="flowcards">'+rc(RS.income,'增加收入',true,'願景不動的前提下，這是唯一讓「人」變大的路',RS.incMonthly)+rc(RS.expense,'減少支出',false,'客戶完全能控制，但要他自己對照願景決定放掉什麼',RS.expMonthly)+'</div>'+
@@ -9730,7 +9784,7 @@ function flowBodyHTML(c){
     '<button class="tbtn amber" onclick="flowDecide(\'S4\',\'d2\',{first:\'income\'},\'先走增加收入（教練建議、客戶同意）\',\'S5A\')">先收入 →</button>'+
     '<button class="tbtn ghost" onclick="flowDecide(\'S4\',\'d2\',{first:\'expense\'},\'客戶選先減少支出\',\'S5B\')">先支出 →</button>','客戶選、教練建議');
  }
- if(s==='S5A'){var sub=app.flowSub||'a1',IG=investGate(c);
+ if(s==='S5A_v1'){var sub=app.flowSub||'a1',IG=investGate(c);
   var a1='<div class="flowcards">'+
     '<div class="fcard"><div class="t">薪資提升</div><div class="s">本業晉升、調薪、換跑道</div></div>'+
     '<div class="fcard"><div class="t">專業兼職</div><div class="s">用既有專業換額外收入</div></div>'+
@@ -9753,7 +9807,7 @@ function flowBodyHTML(c){
     '<button class="tbtn ghost" onclick="flowDecide(\'S5A\',\'d5a\',{closed:false,reason:\'unwilling\'},\'客戶目前不願／不能提升收入，進減少支出\',\'S5B\')">客戶不願意／做不到 → 減少支出</button>'+
     '<button class="tbtn amber" onclick="flowDecide(\'S5A\',\'d5a\',{closed:true},\'收入方案補平缺口\',\'S6x\')">補平了 → 行動清單</button>','客戶選路、教練建議');
  }
- if(s==='S5B'){var L5=actionLedger(c),cutTot=0;(c.actions||[]).forEach(function(a){if(a.on!==false&&a.cat==='expense'&&a.lane==='expense')cutTot+=n(a.getMonthly)});
+ if(s==='S5B_v1'){var L5=actionLedger(c),cutTot=0;(c.actions||[]).forEach(function(a){if(a.on!==false&&a.cat==='expense'&&a.lane==='expense')cutTot+=n(a.getMonthly)});
   var exps=(c.expenses||[]);
   return flowAsk('這筆錢在買什麼？跟他要的未來有關嗎？——教練不拿比例尺，客戶自己標「留／放」。')+
    '<div class="tw"><table><tr><th>支出</th><th>類別</th><th class="r">每月</th><th>客戶標</th><th class="r">放掉省</th></tr>'+
@@ -9775,10 +9829,10 @@ function flowBodyHTML(c){
   return flowAsk('收入和支出能做的都做了還是不夠——那哪些願景會怎樣？<b>不動願景</b>，只算、只呈現。')+
    (C.closed&&!C.items.length?'<div class="v2verdict good">✅ 照現在的方案，選定的願景全部做得到，沒有後果要呈現。</div>':
    '<div class="tw"><table><tr><th>順位</th><th>願景</th><th>原本</th><th>照現在的方案</th><th>後果</th></tr>'+
-   items.map(function(x){return '<tr><td>'+x.pos+'</td><td>'+esc(x.name)+'</td><td>'+x.age+' 歲 '+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+'</td><td>'+flowMark(x.ok)+'</td><td>'+consText(byKey[x.key])+'</td></tr>'}).join('')+'</table></div>'+
+   items.map(function(x){return '<tr><td>'+x.pos+'</td><td>'+esc(x.name)+'</td><td>'+x.age+' 歲 '+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+'</td><td>'+flowMark(x.ok)+'</td><td>'+consText(byKey[x.key])+(byKey[x.key]?' <button class="tbtn sm" onclick="app.vdrOpen=true;mountVisionDrawer()">客戶要改這一項</button>':'')+'</td></tr>'}).join('')+'</table></div>'+
    '<div class="hint" style="margin-top:8px">後果引擎由<b>低優先往高優先</b>逐一試：先延後（掃到一生盡頭，不設上限）→ 再降到「最低金額」→ 都不過才標「消失」。只回清單；客戶按接受才寫進資料，並在該願景打 byConsequence 印記。'+(C.closed?'':'　<span class="warn">全部試完仍有缺口 '+cfAxis(C.after)+'：要回頭加碼。</span>')+'</div>')+
    flowGate('D3　加碼還是接受？',
-    '<button class="tbtn ghost" onclick="flowDecide(\'S6\',\'d3\',{choice:\'more\'},\'客戶選加碼，回選路調方案\',\'S4\')">加碼 → 回選路</button>'+
+    '<button class="tbtn ghost" onclick="flowDecide(\'S6\',\'d3\',{choice:\'more\'},\'客戶選加碼，回調整台再拉\',\'S4\')">加碼 → 回調整台</button>'+
     (C.items.length?'<button class="tbtn amber" onclick="flowAcceptConsequences()">客戶接受後果 →</button>':'<button class="tbtn amber" onclick="flowDecide(\'S6\',\'d3\',{choice:\'accept\',n:0},\'無後果，進行動清單\',\'S6x\')">進行動清單 →</button>'),'客戶');
  }
  if(s==='S6x_v1'){var acts=(c.actions||[]).filter(function(a){return a.on!==false}),curS2=flowCurrentStage(c);
@@ -9988,6 +10042,152 @@ function flowBodyHTML2(c){
  return '<div class="muted">此步驟尚未定義。</div>';
 }
 
+/* ---------- 波 9：調整台（取代 S4／5A／5B）＋ 願景抽屜（2026/09/28，原型 docs/調整台_原型.html） ----------
+   Ray：拉桿只要收入、支出兩根；理財是收入結構的子項，動收入時才展開。願景不跳回去改——右緣抽屜拉出來改。
+   拉桿位置即時重算缺口；按閘門那一刻，拉桿才是「動作」（它們本來就是 c.actions 裡帶 flowKey 的列，
+   所以行動清單、執行期、回訪對帳一個都不用改）。 */
+var TUNE_LOCK_CATS=['孝親','貸款','保險','稅賦'];   // 支出拉桿碰不到的類別（必達／固定）
+
+function flowTuneState(c){var f=flowOf(c);if(!f)return {inc:0,exp:0};f.tune=f.tune||{inc:0,exp:0,route:'薪資提升'};return f.tune}
+function tuneRowOK(e){return !!e&&n(e.amount)>0&&TUNE_LOCK_CATS.indexOf(e.cat||'')<0&&e.cat!=='儲蓄理財投入'}
+function flowTuneCaps(c){
+ var workM=sum(c.incomes,function(x){return x.type==='工作'?n(x.amount):0})/12;
+ var finM=sum(c.incomes,function(x){return x.type==='理財'?n(x.amount):0})/12;
+ var othM=sum(c.incomes,function(x){return (x.type!=='工作'&&x.type!=='理財')?n(x.amount):0})/12;
+ var workCap=Math.round(workM*CAP_INCOME_UP/100);
+ var expCap=0;(c.expenses||[]).forEach(function(e){if(tuneRowOK(e))expCap+=n(e.amount)/12});expCap=Math.round(expCap);
+ var m=metrics(c),base=n(m.save)/12;              // 現況月結餘（不含動作）
+ var cut=0;(c.actions||[]).forEach(function(a){if(a.on!==false&&a.cat==='expense'&&a.lane==='expense')cut+=n(a.getMonthly)});
+ var finRoom=Math.max(0,Math.round(base+cut));   // 定期定額能投的上限＝月結餘＋支出放掉的
+ return {workM:workM,finM:finM,othM:othM,workCap:workCap,expCap:expCap,base:base,cut:cut,finRoom:finRoom,incMax:workCap+finRoom};
+}
+function flowTuneAct(c,key){var hit=null;(c.actions||[]).forEach(function(a){if(a.flowKey===key)hit=a});return hit}
+function flowTuneEnsure(c,key,init){var a=flowTuneAct(c,key);if(!a){c.actions=c.actions||[];a=init();a.flowKey=key;c.actions.push(a)}return a}
+/* 收入拉桿：先落工作收入（上限＝工作月收入 × CAP_INCOME_UP%），超過的落理財（定期定額，上限＝月結餘＋支出放掉的） */
+function flowTuneInc(v){
+ var c=activeCase();var f=flowOf(c);if(!f)return;var t=flowTuneState(c),K=flowTuneCaps(c);
+ v=Math.max(0,Math.min(n(v),K.incMax));t.inc=v;
+ var work=Math.min(v,K.workCap),fin=Math.min(Math.max(0,v-work),K.finRoom);
+ var A=n(c.profile.age)||40,R=n(c.profile.retireAge)||65;
+ var aw=flowTuneEnsure(c,'tune:work',function(){return {id:actId(),on:true,cat:'income',lane:'income-work',name:'工作收入提升',tool:t.route||'薪資提升',getFrom:A+1,getTo:R,startY:A+1,src:''}});
+ aw.getMonthly=Math.round(work);aw.on=work>0;aw.tool=t.route||aw.tool;
+ var ar=flowTuneEnsure(c,'tune:regular',function(){return {id:actId(),on:true,cat:'regular',lane:'income-invest',name:'定期定額（理財收入）',payFrom:A+1,payTo:R,growth:PLAN_DISCOUNT,divMode:'reinvest',src:'月結餘',startY:A+1}});
+ ar.payMonthly=Math.round(fin);ar.on=fin>0;
+ save();render();
+}
+function flowTuneRoute(r){var c=activeCase();var t=flowTuneState(c);t.route=r;var a=flowTuneAct(c,'tune:work');if(a)a.tool=r;save();render()}
+/* 支出拉桿：由上到下配到「放」「半」（同一列的留／半／放標記是同一件事的另一個入口） */
+function flowExpSet(c,i,mode){
+ var e=(c.expenses||[])[i];if(!e)return;c.actions=c.actions||[];
+ var ref='expenses:'+i,found=null;c.actions.forEach(function(a){if(a.cat==='expense'&&a.ref===ref&&a.lane==='expense')found=a});
+ var A=n(c.profile.age)||40,R=n(c.profile.retireAge)||65,cut=mode==='half'?0.5:(mode==='drop'?1:0);
+ if(cut<=0){if(found)found.on=false;return}
+ if(!found){found={id:actId(),on:true,cat:'expense',ref:ref,lane:'expense',src:'',getFrom:A+1,getTo:R,startY:A+1};c.actions.push(found)}
+ found.on=true;found.name=(mode==='half'?'減半：':'放掉：')+(e.name||e.subCat||e.cat||'支出');found.getMonthly=Math.round(n(e.amount)/12*cut);found.flowMode=mode;
+}
+function flowTuneExp(v){
+ var c=activeCase();var f=flowOf(c);if(!f)return;var t=flowTuneState(c),K=flowTuneCaps(c);
+ v=Math.max(0,Math.min(n(v),K.expCap));var left=v,got=0;
+ (c.expenses||[]).forEach(function(e,i){if(!tuneRowOK(e))return;var amt=n(e.amount)/12,mode='keep';
+  if(left>=amt-0.5){mode='drop';left-=amt}else if(left>=amt/2-0.5){mode='half';left-=amt/2}
+  flowExpSet(c,i,mode);if(mode==='drop')got+=amt;else if(mode==='half')got+=amt/2});
+ // 拉的量比每一列的一半都小 → 找最小的那列標「半」，拉桿吸到最近能做到的位置（不然客戶拉了沒反應）
+ if(got<=0&&v>0){var mi=-1,mv=Infinity;(c.expenses||[]).forEach(function(e,i){if(tuneRowOK(e)&&n(e.amount)<mv){mv=n(e.amount);mi=i}});if(mi>=0){flowExpSet(c,mi,'half');got=mv/12/2}}
+ t.exp=Math.round(got);flowReflow(c);
+ // 支出放掉的錢會讓理財那段的上限變大：收入拉桿的位置不變，但落點重算
+ var K2=flowTuneCaps(c),aw=flowTuneAct(c,'tune:work'),ar=flowTuneAct(c,'tune:regular');
+ if(t.inc>0){var work=Math.min(t.inc,K2.workCap),fin=Math.min(Math.max(0,t.inc-work),K2.finRoom);if(aw){aw.getMonthly=Math.round(work);aw.on=work>0}if(ar){ar.payMonthly=Math.round(fin);ar.on=fin>0}}
+ save();render();
+}
+function flowTuneSyncExp(c){var t=flowTuneState(c),s=0;(c.actions||[]).forEach(function(a){if(a.on!==false&&a.cat==='expense'&&a.lane==='expense')s+=n(a.getMonthly)});t.exp=Math.round(s)}
+function flowTuneLive(k,v){ // 拖曳中只換數字，放開（onchange）才重算
+ var el=document.getElementById(k==='inc'?'tuneIncV':'tuneExpV');if(el)el.textContent=(k==='inc'?'+':'−')+fmt(v);
+}
+function flowTuneHTML(c){
+ var f=flowOf(c),t=flowTuneState(c),K=flowTuneCaps(c),R=planImprove(c),pa=R.pa,pb=R.pb;
+ var g0=pb.shortPV,g1=pa.shortPV,imp=g0>0.5?Math.max(0,Math.round((1-g1/g0)*100)):100;
+ var aw=flowTuneAct(c,'tune:work'),ar=flowTuneAct(c,'tune:regular');
+ var work=aw&&aw.on!==false?n(aw.getMonthly):0,fin=ar&&ar.on!==false?n(ar.payMonthly):0;
+ var incTot=K.workM+K.finM+K.othM;
+ var IG=investGate(c);
+ // 缺口條
+ var gap='<div class="tunegap"><div><div class="lbl">現值缺口</div><div class="big '+(g0>0.5?'bad':'ok')+'">'+(g0>0.5?cfAxis(g0):'無缺口')+'</div></div>'+
+  '<div class="arrow">→</div><div><div class="lbl">拉完之後</div><div class="big '+(g1<=0.5?'ok':(imp>=50?'warn':'bad'))+'">'+(g1<=0.5?'已補平':cfAxis(g1))+'</div></div>'+
+  '<div class="meta">改善 '+imp+'%<br>'+(pa.turnNeg!=null?'存量用完 '+pa.turnNeg+' 歲':'存量不會用完')+'　·　願景達成 '+R.okCnt+' / '+R.total+'</div></div>'+
+  '<div class="tunemeter"><i style="width:'+(g0>0.5?Math.round(g1/g0*100):0)+'%"></i><b style="width:'+(g0>0.5?100-Math.round(g1/g0*100):100)+'%"></b></div>';
+ // 兩根拉桿
+ var lev='<div class="tunelev rec"><div class="nm">收入<span class="tag">先動這根</span><small>工作＋理財</small></div>'+
+  '<div><input type="range" inputmode="numeric" min="0" max="'+K.incMax+'" step="500" value="'+t.inc+'" oninput="flowTuneLive(\'inc\',this.value)" onchange="flowTuneInc(this.value)"><div class="cap"><span>0</span><span>上限 +'+fmt(K.incMax)+'／月（工作 '+CAP_INCOME_UP+'% '+fmt(K.workCap)+(K.finRoom?' ＋ 理財 '+fmt(K.finRoom):'')+'）</span></div></div>'+
+  '<div class="val"><div class="v" id="tuneIncV">+'+fmt(t.inc)+'</div><div class="p">／月　+'+(incTot?r1(t.inc/incTot*100):0)+'%</div></div></div>'+
+  '<div class="tunelev exp"><div class="nm">支出<small>客戶自己標留／放</small></div>'+
+  '<div><input type="range" inputmode="numeric" min="0" max="'+K.expCap+'" step="500" value="'+t.exp+'" oninput="flowTuneLive(\'exp\',this.value)" onchange="flowTuneExp(this.value)"><div class="cap"><span>0</span><span>上限 −'+fmt(K.expCap)+'／月（可動的生活消費）</span></div></div>'+
+  '<div class="val"><div class="v" id="tuneExpV">−'+fmt(t.exp)+'</div><div class="p">／月　−'+(K.expCap?r1(t.exp/(sum(c.expenses,function(e){return n(e.amount)})/12||1)*100):0)+'%</div></div></div>';
+ // 收入結構
+ var routes=['薪資提升','專業兼職','創業做生意'];
+ var dl=function(v){return v?'<span class="delta">+'+fmt(v)+'</span>':'<span class="muted">—</span>'};
+ var incCol='<div class="tunecol'+(t.inc>0?' on':'')+'"><div class="t">收入結構 <span class="hint">現在 → 拉完</span></div>'+
+  '<div class="tw"><table><tr><th>來源</th><th class="r">現在／月</th><th class="r">拉完／月</th><th class="r">變化</th></tr>'+
+  '<tr><td>工作收入</td><td class="r">'+fmt(K.workM)+'</td><td class="r">'+fmt(K.workM+work)+'</td><td class="r">'+dl(work)+'</td></tr>'+
+  '<tr class="sub"><td colspan="4">└ 薪資提升／專業兼職／創業做生意</td></tr>'+
+  '<tr><td>理財收入</td><td class="r">'+fmt(K.finM)+'</td><td class="r">'+fmt(K.finM+fin)+'</td><td class="r">'+dl(fin)+'</td></tr>'+
+  '<tr class="sub"><td colspan="4">└ 定期定額（月金流為正才通）／單筆（看可投資水位）</td></tr>'+
+  '<tr><td>其他</td><td class="r">'+fmt(K.othM)+'</td><td class="r">'+fmt(K.othM)+'</td><td class="r"><span class="muted">—</span></td></tr>'+
+  '<tr class="tot"><td>合計</td><td class="r">'+fmt(incTot)+'</td><td class="r">'+fmt(incTot+work+fin)+'</td><td class="r">'+dl(work+fin)+'</td></tr></table></div>'+
+  '<div class="tuneopen'+(t.inc>0?' on':'')+'"><div style="font-weight:700;color:var(--amber2);margin-bottom:4px">這一根怎麼拉出來</div>'+
+   '<div class="chips">'+routes.map(function(r){return '<span class="chip'+((t.route||'薪資提升')===r?' on':'')+'" onclick="flowTuneRoute(\''+r+'\')">'+r+'</span>'}).join('')+'</div>'+
+   '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px"><span>定期定額 <b>'+fmt(fin)+'</b>／月 <span class="hint">'+(K.finRoom>0?'月結餘 +'+fmt(K.finRoom)+' ✓':'月結餘不為正 ✕ 先走支出')+'</span></span>'+
+   '<span>單筆投入 <span class="hint">可投資水位 '+fmt(Math.max(0,IG.investable))+(IG.lumpOK?' ✓':' ✕')+'</span> <button class="tbtn sm" onclick="flowAddAction(\'lump\',\'income-invest\',\'單筆投入\')" '+(IG.lumpOK?'':'disabled')+'>＋ 單筆</button></span></div>'+
+   '<div class="hint" style="margin-top:4px">拉桿超過工作收入能到的部分，自動落到定期定額；月結餘不為正時理財那段鎖住。</div></div></div>';
+ // 支出結構
+ var rows='';(c.expenses||[]).forEach(function(e,i){if(n(e.amount)<=0)return;var mo=n(e.amount)/12;
+  if(!tuneRowOK(e)){rows+='<tr class="sub"><td>'+esc(e.name||e.subCat||e.cat||'')+'</td><td class="r">'+fmt(mo)+'</td><td><span class="hint">'+(e.cat==='孝親'?'必達':'固定')+'</span></td><td class="r">—</td></tr>';return}
+  var m=flowExpMode(c,i),sav=m==='half'?mo/2:(m==='drop'?mo:0);
+  rows+='<tr><td>'+esc(e.name||e.subCat||e.cat||'')+'</td><td class="r">'+fmt(mo)+'</td><td><span class="flowsw"><button class="'+(m==='keep'?'on keep':'')+'" onclick="flowExpMark('+i+',\'keep\')">留</button><button class="'+(m==='half'?'on':'')+'" onclick="flowExpMark('+i+',\'half\')">半</button><button class="'+(m==='drop'?'on':'')+'" onclick="flowExpMark('+i+',\'drop\')">放</button></span></td><td class="r '+(sav>0?'ok':'')+'">'+(sav>0?'−'+fmt(sav):'0')+'</td></tr>'});
+ var expCol='<div class="tunecol'+(t.exp>0?' on':'')+'"><div class="t">支出結構 <span class="hint">拉桿與「留／半／放」是同一件事的兩個入口</span></div>'+
+  '<div class="tw"><table><tr><th>支出</th><th class="r">現在／月</th><th>客戶標</th><th class="r">放掉</th></tr>'+rows+
+  '<tr class="tot"><td>合計</td><td class="r">'+fmt(sum(c.expenses,function(e){return n(e.amount)})/12)+'</td><td></td><td class="r '+(t.exp?'ok':'')+'">'+(t.exp?'−'+fmt(t.exp):'0')+'</td></tr></table></div>'+
+  '<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px"><input type="checkbox" '+(f.reflow?'checked':'')+' onchange="flowToggleReflow(this.checked)" style="accent-color:var(--amber);width:15px;height:15px"> 放掉的結餘投入定期定額</label>'+
+  '<div class="hint" style="margin-top:4px">拉桿拉多少，由上到下配到「放」「半」；客戶自己點標記，拉桿跟著走。固定與必達那幾列拉桿碰不到。</div></div>';
+ var closed=g1<=0.5&&!pa.firstFail;
+ return flowAsk('拉收入、拉支出，缺口當場重算。理財是收入的一部分，動收入時在底下展開。願景不動——要改就從右邊「願景」抽屜拉出來。')+
+  gap+'<div style="margin-top:12px">'+lev+'</div><div class="tunecols">'+incCol+expCol+'</div>'+
+  flowGate('拉完之後',
+   '<button class="tbtn amber" '+(closed?'':'disabled')+' onclick="flowDecide(\'S4\',\'d5\',{closed:true,inc:'+t.inc+',exp:'+t.exp+'},\'調整台補平：收入 +'+fmt(t.inc)+'／月、支出 −'+fmt(t.exp)+'／月\',\'S6x\')">補平了 → 行動清單與下一步</button>'+
+   '<button class="tbtn ghost" onclick="flowDecide(\'S4\',\'d5\',{closed:false,reason:\'short\',inc:'+t.inc+',exp:'+t.exp+'},\'調整台拉完仍未補平（收入 +'+fmt(t.inc)+'、支出 −'+fmt(t.exp)+'／月），看後果\',\'S6\')">沒補平 → 看後果</button>'+
+   '<button class="tbtn ghost" onclick="flowDecide(\'S4\',\'d5\',{closed:false,reason:\'unwilling\',inc:'+t.inc+',exp:'+t.exp+'},\'客戶不願再動收入或支出，看後果\',\'S6\')">客戶不願意再動 → 看後果</button>','客戶拉、教練建議')+
+  '<div class="hint" style="margin-top:8px">按下去那一刻，拉桿位置就是行動清單裡的動作（工作收入提升、定期定額、各列的刪減）；之後執行期、回訪對帳照舊。</div>';
+}
+
+/* ---------- 願景抽屜：右緣收合，任何一步都能拉出來改；改了重打印記＋留一條「客戶自己改的」決定 ---------- */
+function flowVisionEdit(key,field,val){
+ var c=activeCase();var f=flowOf(c);if(!f)return;var items=flowVisionList(c),it=null;items.forEach(function(x){if(x.key===key)it=x});if(!it)return;
+ var v=n(val),desc='';
+ if(it.kind==='goal'&&it.ref){var g=c.goals[it.ref.i];if(field==='age'){desc=n(g.start)+' → '+v+' 歲';var d=v-n(g.start);g.start=v;if(n(g.end)>0)g.end=n(g.end)+d}else{desc=fmt(g.present)+' → '+fmt(v);g.present=v}}
+ else if(it.kind==='wish'&&it.ref){var w=c[it.ref.arr][it.ref.i];if(field==='age'){desc=n(w.start)+' → '+v+' 歲';var d2=v-n(w.start);w.start=v;w.end=n(w.end)+d2}else{desc=fmt(w.amount)+' → '+fmt(v);w.amount=v}}
+ else if(it.kind==='retire'){var rA=n(c.profile.retireAge)||65;desc=rA+' → '+v+' 歲';applyRetireDelay(c,v-rA)}
+ else if(it.kind==='legacy'){var lg=c.legacy||{};desc=fmt(n(lg.perHeirCash))+' → '+fmt(v)+'／人';lg.perHeirCash=v;c.legacy=lg}
+ else return;
+ f.visionLock={at:new Date().toISOString(),revisionId:null,order:flowVisionList(c).map(function(x){return x.key}),editedBy:'client'};
+ flowDecide(f.step,'vedit',{key:key,field:field,val:v},'客戶自己改願景：'+it.name+' '+desc+'（重新打印記）',null);
+}
+function flowVisionToggle(){app.vdrOpen=!app.vdrOpen;mountVisionDrawer()}
+function mountVisionDrawer(){
+ var el=document.getElementById('vdr');var c=activeCase();var f=c?flowOf(c):null;
+ if(!(f&&app.activeTab==='plan'&&app.role==='coach')){if(el)el.remove();return}
+ if(!el){el=document.createElement('div');el.id='vdr';document.body.appendChild(el)}
+ var items=flowVisionList(c),lk=f.visionLock||{};
+ el.className=app.vdrOpen?'on':'';
+ el.innerHTML='<div class="vtab" onclick="flowVisionToggle()">願景 '+items.length+'</div><div class="vpane"><div class="vin">'+
+  '<div style="font-weight:700;color:var(--amber2);margin-bottom:6px">願景清單'+(lk.at?'（已鎖定）':'')+'</div>'+
+  '<div class="hint" style="margin-bottom:8px">教練不動它。客戶要改，直接在這裡改；改了重新打印記，並留一條「客戶自己改的」決定，缺口跟著重算。</div>'+
+  items.map(function(x){var amtV=x.kind==='retire'?'':(x.kind==='legacy'?n((c.legacy||{}).perHeirCash):x.amount);
+   return '<div class="vitem"><span class="pr">'+x.pos+'</span><span class="vt"><span class="vn">'+esc(x.name)+'</span><span class="vm">'+x.age+(x.span?'–'+x.span:'')+' 歲　'+(x.kind==='retire'?'':fmt(x.amount))+'</span></span>'+
+    ((x.kind==='goal'||x.kind==='wish'||x.kind==='retire')?'<input type="text" inputmode="numeric" value="'+x.age+'" title="歲" onchange="flowVisionEdit(\''+esc(x.key)+'\',\'age\',this.value)">':'')+
+    ((x.kind==='goal'||x.kind==='wish'||x.kind==='legacy')?'<input type="text" inputmode="numeric" value="'+fmt(amtV)+'" title="金額" onchange="flowVisionEdit(\''+esc(x.key)+'\',\'amt\',this.value.replace(/,/g,\'\'))">':'')+
+    '</div>'}).join('')+
+  '<div class="stamp">'+(lk.at?'印記：'+esc(String(lk.at).slice(0,16).replace('T',' '))+(lk.editedBy==='client'?' · 客戶自己改過':''):'還沒鎖定（Step 2）')+'</div></div></div>';
+}
+
 function flowSec(c){
  var f=flowOf(c);
  return '<div class="sec" id="flowSec"><h4>願景處理流程 <span class="flpill '+(f.track==='gap'?'w':'i')+'">'+(f.track==='gap'?'缺口線':'餘裕線')+'</span>'+
@@ -10029,7 +10229,8 @@ function planSec(c){
   foldSec('缺口組成與即時缺口','缺口是哪些支出造成的，另有保障與預備金要補',gapDetailHTML(c,led))+
   foldSec('建議資產配置','投資型與保障型的配置與對帳',allocSecHTML(c))+
   foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c))+
-  foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>');
+  foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>')+
+  foldSec('真實追蹤','逐年實際淨資產疊到規劃線（有流程時在 S8 回訪對帳裡對帳）',trackingSec(c));
  return '<div data-ivsec="flow" data-ivname="願景處理流程">'+planHeroV2(c)+
   (fl?flowSec(c)+foldSec('更多診斷（v2 既有折疊，原樣保留）','配額對帳、動作清單、資金勾稽、拉桿與處方…都在這裡',folds,false):flowEntryHTML(c)+folds)+
   '</div>';
@@ -11315,18 +11516,9 @@ var INTERVIEW_STEPS=[
   has:function(c){return Object.keys(((c.riskQuiz||{}).ans)||{}).length>0}}, {k:'cover',g:3,name:'保障需求',tab:'coverage',hint:'留給家人幾年／病房水準／醫藥自付／看護／罹癌／重病／每月照護',
   has:function(c){return (c.needs||[]).length||(c.policies||[]).length}},
  {k:'coverbudget',g:3,nw:1,name:'保障預算與取捨',tab:'coverage',hint:'訪談題：每月可接受的保障預算？預算不夠時最優先補哪一項？',
-  has:function(c){return n((c.coverPlan||{}).monthly)>0||((c.coverPlan||{}).first||[]).length}}, {k:'doc',g:4,name:'待補件',tab:'intent',a:'[data-ivanchor="doc"]',hint:'今天沒帶到的：勞健保投保資料／保單／報稅資料',
-  has:function(c){var d=c.docCheck||{};return Object.keys(d).some(function(k){return d[k]!==''&&d[k]!=null})}},
- // 2026/09/27 第 ④ 群改成一條時間線：補件 → 走流程 → 定行動 → 回訪對帳。
- // ⚠️ 規則：項目名稱＝點進去落地那個區塊的標題，一個項目一個錨點、不共用分頁——
- //    舊的「收斂與下一步」與「調整方案」都指向方案分頁、名字卻不一樣，教練點了會以為跳錯。
- //    「調整方案」只留給分頁本身（它是頁，不是題目）；「真實追蹤」那張圖搬到回訪對帳底下。
- {k:'flow',g:4,nw:1,name:'願景處理流程',tab:'plan',a:'#flowSec',hint:'判定缺口線／餘裕線，一步一步走到行動清單；沒開始就先按「開始願景處理流程」',
-  has:function(c){return !!flowOf(c)}},
- {k:'actlist',g:4,nw:1,name:'行動清單與下一步',tab:'plan',a:'#flowSec',hint:'今天最大的收穫／最願意先完成哪一件事／下次會談日期',
-  has:function(c){var f=flowOf(c);if(!f)return false;var w=f.wrap||{};return flowReached(f,f.track==='gap'?'S6x':'P3x')&&!!(w.nextDate||c.nextReview)}},
- {k:'checkin',g:4,nw:1,name:'回訪對帳',tab:'plan',a:'#flowSec',hint:'規劃線 vs 實際可投資資產、動作到位了沒；逐年實際淨資產也疊在這裡',
-  has:function(c){var f=flowOf(c);return !!(f&&f.decisions&&f.decisions.d4)}}
+  has:function(c){return n((c.coverPlan||{}).monthly)>0||((c.coverPlan||{}).first||[]).length}}, {k:'doc',g:1,name:'待補件',tab:'intent',a:'[data-ivanchor="doc"]',hint:'今天沒帶到的：勞健保投保資料／保單／報稅資料',
+  has:function(c){var d=c.docCheck||{};return Object.keys(d).some(function(k){return d[k]!==''&&d[k]!=null})}}
+ // 2026/09/28：原第 ④ 群的三個流程項目（願景處理流程／行動清單與下一步／回訪對帳）拿掉——方案是頂層分頁，步進器就是導引。
 ];
 // 流程走到某一步（含之後）了沒。S7／S8 兩條線共用，排在各自清單的最後。
 function flowReached(f,step){if(!f)return false;var i=flowStepIdx(f.track,f.step),j=flowStepIdx(f.track,step);return i>=0&&j>=0&&i>=j}
@@ -11340,11 +11532,6 @@ function ivGoto(k){
  // 「未來的需求」（第 2 群）一律進需求中樞，該項目直接展開
  if(st.g===2){NEED_SEL=k;NEED_SEL_ID=c?c.id:'';app.activeTab='data';app.dataTab='needhub';app.ivFacet=k;render();}
  else{app.activeTab='data';app.dataTab=st.tab;app.ivFacet=k;render();}
- // 第 ④ 群的流程項目：落地前先把步進器切到該項目對應的步驟（沒走到就停在目前那一步）。
- if(c&&(k==='actlist'||k==='checkin')){var f=flowOf(c);
-  if(f){var late=['S6x','P3x','S7','S8'];
-   if(k==='actlist'&&late.indexOf(f.step)<0&&flowReached(f,f.track==='gap'?'S6x':'P3x'))flowGo(f.track==='gap'?'S6x':'P3x');
-   if(k==='checkin'&&f.step==='S7')flowGo('S8');}}
  if(!st.a)return;
  setTimeout(function(){var el=document.querySelector(st.a);if(!el)return;revealEl(el);
   if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
@@ -15795,7 +15982,7 @@ function anGroupVerdict(g,c){
    return {text:(pj.turnNeg?'存量 <b class="w">'+pj.turnNeg+' 歲</b>用完':'存量 <b class="o">期間內未用完</b>')+(gp2>0.5?' · 現值缺口 <b class="w">'+cfAxis(gp2)+'</b>':''),warn:!!pj.turnNeg};}
   if(g==='rx'){var gp=gapPV(c),na=(c.actions||[]).length;
    var fl=flowOf(c),ft=fl?(fl.track==='gap'?' · 願景處理：缺口線 '+fl.step:' · 願景處理：餘裕線 '+fl.step):'';
-   return {text:(gp>0.5?'現值缺口 <b class="w">'+cfAxis(gp)+'</b>':'<b class="o">無現金流缺口</b>')+' · 方案動作 <b>'+na+'</b> 個'+ft,warn:gp>0.5};}
+   return {text:(gp>0.5?'現值缺口 <b class="w">'+cfAxis(gp)+'</b>':'<b class="o">無現金流缺口</b>')+' · 方案動作 <b>'+na+'</b> 個'+ft+' <button class="tbtn sm" onclick="event.stopPropagation();app.activeTab=\'plan\';render()">進入方案 →</button>',warn:gp>0.5};}
  }catch(e){}
  return {text:'',warn:false};
 }
@@ -18264,9 +18451,9 @@ function isAlert(key){
 function mount(){
  var root=document.getElementById('app'); if(!root) return;
  LN.mountedKeys=[];
- var tab=(window.app&&app.dataTab)||'';
+ var tab=(window.app&&app.activeTab==='plan')?'plan':((window.app&&app.dataTab)||'');
  if(window.app&&app.activeTab==='report'){ try{ mountReport(); }catch(e){} mountSessBar(); try{ mountPad(); }catch(e){} return; }
- if(!(window.app&&app.activeTab==='data')) { mountSessBar(); try{ mountPad(); }catch(e){} return; }
+ if(!(window.app&&(app.activeTab==='data'||app.activeTab==='plan'))) { mountSessBar(); try{ mountPad(); }catch(e){} return; }
 
  var secs=[].slice.call(root.querySelectorAll('.sec'));
  MOUNTS().forEach(function(m){
@@ -18546,7 +18733,7 @@ function mountSessBar(){
  // 開場時教練第一件事應該是回訪對帳，不是從資料分頁一路找到方案頁。
  try{
   var fc=(typeof flowOf==='function')?flowOf(c):null;
-  if(fc&&(fc.step==='S7'||fc.step==='S8')&&!(app.activeTab==='data'&&app.dataTab==='plan')){
+  if(fc&&(fc.step==='S7'||fc.step==='S8')&&app.activeTab!=='plan'){
    var host=bar.querySelector('.lnbarin');
    if(host)host.insertAdjacentHTML('beforeend','<button class="lnbtn pri" onclick="LN.checkin()" title="願景處理流程：先對上次的行動清單">'+(fc.step==='S7'?'執行期中 · 回訪對帳':'對帳進行中 · 回到對帳')+'</button>');
   }
@@ -18567,7 +18754,7 @@ LN.kind=function(k,v){ d(k).kind=v; redraw(); };
 LN.vis=function(k,v){ d(k).visible=v; };
 LN.typing=function(k,v){ d(k).text=v; };
 LN.openRow=function(k){ d(k).open=true; LN.rowKey=k; redraw(); setTimeout(function(){var e=document.getElementById('lnta_'+k); if(e)e.focus()},30); };
-LN.checkin=function(){ var c=C(); var f=(c&&typeof flowOf==='function')?flowOf(c):null; app.activeTab='data'; app.dataTab='plan'; if(f&&f.step==='S7')flowGo('S8'); else render(); };
+LN.checkin=function(){ var c=C(); var f=(c&&typeof flowOf==='function')?flowOf(c):null; app.activeTab='plan'; if(f&&f.step==='S7')flowGo('S8'); else render(); };
 
 // 寫入一則註記的共同路徑（區塊註記帶與側邊記事本都走這裡）。
 function addNoteRaw(k,kind,txt,visible){
@@ -18865,7 +19052,7 @@ function tabLabel(){
   try{ if(typeof DTAB_LABEL!=='undefined'&&DTAB_LABEL[t]) return DTAB_LABEL[t]; }catch(e){}
   return t||'資料';
  }
- return {analysis:'分析',report:'報告書',advice:'建議',plan:'調整方案',tools:'工具'}[a.activeTab]||(a.activeTab||'');
+ return {analysis:'分析',report:'報告書',advice:'建議',plan:'方案',tools:'工具'}[a.activeTab]||(a.activeTab||'');
 }
 // 目前畫面裡「看得到的那個區塊」：最後一個標題已經捲過頂端線（120px）的 .sec；都還沒捲到就取第一個。
 function currentSec(){
@@ -18890,10 +19077,10 @@ function secKey(sec){
  var w=sec.querySelector('.lnwrap[data-k]');
  if(w) return w.getAttribute('data-k');                       // 有掛點：記進那個區塊的註記帶
  var t=secTitle(sec); if(!t) return '';
- return 'page:'+((window.app&&app.dataTab)||(window.app&&app.activeTab)||'')+'|'+t;
+ return 'page:'+((window.app&&app.activeTab==='data'&&app.dataTab)||(window.app&&app.activeTab)||'')+'|'+t;
 }
 function padContext(){
- var sec=(window.app&&app.activeTab==='data')?currentSec():null;
+ var sec=(window.app&&(app.activeTab==='data'||app.activeTab==='plan'))?currentSec():null;
  var tl=tabLabel(), st=sec?secTitle(sec):'';
  return { block: secKey(sec)||('page:'+((window.app&&app.activeTab)||'')+'|'+tl), title: tl+(st&&st!==tl?' › '+st:'') };
 }
