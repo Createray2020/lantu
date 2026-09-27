@@ -49,7 +49,7 @@ export const AN_MODULES: AnModuleDef[] = [
   { k: "gap", t: "保障缺口（毛需求 − 已備）", g: "risk" },
   { k: "respgap", t: "責任遞減缺口圖", g: "risk" },
   { k: "lifeneed", t: "壽險需求圖", g: "risk" },
-  { k: "property", t: "置產缺口", g: "goal", cond: "只在有置產目標時出現" },
+  { k: "property", t: "購屋規劃", g: "goal", cond: "只在有置產目標時出現" },
   { k: "cross", t: "財務十字表", g: "now" },
   { k: "timeline", t: "財務目標歷程", g: "future" },
   { k: "tax", t: "稅賦分析", g: "now" },

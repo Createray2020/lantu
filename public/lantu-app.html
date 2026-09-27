@@ -9234,6 +9234,9 @@ function crossTableHTML(x,after){
 }
 function timelineHTML(c,theme){var A=n(c.profile.age);var evs=[];
  (c.goals||[]).forEach(function(g){if(!visionOn(g))return;evs.push({age:n(g.start),label:g.name})});
+ // 購屋：預售交屋年、換屋賣屋年也是人生事件（2026/09/27）
+ goalLoans(c).forEach(function(L){if(L.handoverAge>L.buyAge)evs.push({age:L.handoverAge,label:'交屋·'+((c.goals[L.idx]||{}).name||'購屋')})});
+ houseSales(c).forEach(function(x){evs.push({age:x.age,label:'賣屋·'+x.name})});
  if((c.retire&&n(c.retire.monthLiving)>0)||((c.retireExpenses||[]).length)){
   var rp=earnerRetirePoints(c);
   if(rp.length)rp.forEach(function(pt){evs.push({age:pt.at,label:(pt.name||'')+' 退休'})});
@@ -9260,6 +9263,76 @@ function timelineHTML(c,theme){var A=n(c.profile.age);var evs=[];
  return '<svg width="100%" viewBox="0 0 '+W+' '+H+'"'+svgFit(W)+'><line x1="'+pad+'" y1="'+cy+'" x2="'+(W-pad)+'" y2="'+cy+'" stroke="'+col.line+'" stroke-width="2"/>'+nodes+'</svg>';
 }
 function timelineSVG(c){return timelineHTML(c,'dark');}
+
+/* ══ 購屋⑤ 呈現（2026/09/27 Ray）：這一間房的錢怎麼流 ══════════════════════
+   一句話結論＝「哪一年要拿多少現金出來、貸款月付什麼時候變重」。首屏一張逐年長條圖＋三個數字，
+   舊的「置產缺口」表收進折疊。分析頁（深色）與報告書（淺色）共用同一支，只換色。
+   ⚠️ 數字全部來自 goalLoans／houseSales（跟投影同一份），這裡不再算第二套。 */
+function houseFlowRows(c,L){
+ var a0=n(c.profile.age),hz=effHorizon(c),S=houseSales(c).filter(function(x){return x.idx===L.idx});
+ var end=L.handoverAge+Math.ceil(n(L.liab.months)/12);
+ if(L.decoLiab)end=Math.max(end,L.handoverAge+Math.ceil(n(L.decoLiab.months)/12));
+ S.forEach(function(x){end=Math.max(end,x.age)});
+ end=Math.min(hz,end);var rows=[];
+ for(var age=L.buyAge;age<=end;age++){
+  var down=0,deco=0;L.pays.forEach(function(p){if(p.age===age){if(p.label==='裝修（自備）')deco+=p.amount;else down+=p.amount;}});
+  var sale=0;S.forEach(function(x){if(x.age===age)sale+=x.net});
+  rows.push({age:age,down:down,deco:deco,loan:debtPayAt(L.liab,age,a0),decoLoan:L.decoLiab?debtPayAt(L.decoLiab,age,a0):0,sale:sale,
+   grace:age>=L.handoverAge&&(age-L.handoverAge)*12<n(L.graceM)});
+ }
+ return rows;
+}
+function houseFlowSVG(c,L,theme){
+ var rows=houseFlowRows(c,L);if(!rows.length)return '';
+ var dark=theme!=='light';
+ var C=dark?{down:TPAL.amber,loan:TPAL.c1,deco:TPAL.c2,dloan:TPAL.c6,sale:TPAL.ok,ax:TPAL.mut2,grid:TPAL.grid,lab:TPAL.mut,mark:TPAL.mut2}
+           :{down:'#b07d3d',loan:'#0d2b45',deco:'#8ba888',dloan:'#7f97ac',sale:'#3f7d54',ax:'#5a6b72',grid:'rgba(0,0,0,.08)',lab:'#33474e',mark:'#8a9aa2'};
+ var W=760,H=230,pL=58,pR=14,pT=22,pB=30,pw=W-pL-pR,ph=H-pT-pB,N=rows.length;
+ // 刻度只看支出：賣屋淨得通常比任何一年的支出大一個數量級，放進同一把尺會把每年的錢壓成一條線。
+ var mx=0;rows.forEach(function(r){mx=Math.max(mx,r.down+r.deco+r.loan+r.decoLoan)});mx=mx||1;
+ var slot=pw/N,bw=Math.max(3,Math.min(26,slot*0.62));
+ function X(i){return pL+(i+0.5)*slot}function Y(v){return pT+ph-v/mx*ph}
+ var s='';
+ // 格線＋左軸（萬）
+ for(var k=0;k<=3;k++){var v=mx*k/3,y=Y(v);s+='<line x1="'+pL+'" y1="'+y.toFixed(1)+'" x2="'+(W-pR)+'" y2="'+y.toFixed(1)+'" stroke="'+C.grid+'"/>'+
+  '<text x="'+(pL-6)+'" y="'+(y+3.5).toFixed(1)+'" fill="'+C.ax+'" font-size="10" text-anchor="end">'+Math.round(v/10000)+'萬</text>';}
+ var step=Math.max(1,Math.ceil(N/12));
+ rows.forEach(function(r,i){
+  var x=X(i),y0=Y(0),segs=[[r.down,C.down],[r.deco,C.deco],[r.loan,C.loan],[r.decoLoan,C.dloan]],acc=0;
+  segs.forEach(function(sg){if(sg[0]<=0)return;var y1=Y(acc+sg[0]),y2=Y(acc);
+   s+='<rect x="'+(x-bw/2).toFixed(1)+'" y="'+y1.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(0.5,y2-y1).toFixed(1)+'" fill="'+sg[1]+'"'+(sg[1]===C.loan&&r.grace?' opacity=".45"':'')+'/>';acc+=sg[0];});
+  // 賣屋淨得：不進刻度，畫成從上方落下的綠色箭頭＋數字（那一年的自備款就是被它抵掉的）
+  if(r.sale>0){var ty=Y(acc)-26;s+='<line x1="'+x.toFixed(1)+'" y1="'+(ty+4).toFixed(1)+'" x2="'+x.toFixed(1)+'" y2="'+(Y(acc)-3).toFixed(1)+'" stroke="'+C.sale+'" stroke-width="2"/>'+
+   '<path d="M'+(x-4).toFixed(1)+' '+(Y(acc)-8).toFixed(1)+' L'+x.toFixed(1)+' '+(Y(acc)-2).toFixed(1)+' L'+(x+4).toFixed(1)+' '+(Y(acc)-8).toFixed(1)+'Z" fill="'+C.sale+'"/>'+
+   '<text x="'+(x+6).toFixed(1)+'" y="'+ty.toFixed(1)+'" fill="'+C.sale+'" font-size="10.5" font-weight="700">賣屋淨得 '+Math.round(r.sale/10000)+' 萬</text>';}
+  if(i%step===0||i===N-1)s+='<text x="'+x.toFixed(1)+'" y="'+(H-pB+14)+'" fill="'+C.ax+'" font-size="10" text-anchor="middle">'+r.age+(i===N-1?' 歲':'')+'</text>';
+ });
+ // 交屋線＋寬限期標示
+ var hi=L.handoverAge-L.buyAge;if(hi>=0&&hi<N){var hx=X(hi)-slot/2;
+  s+='<line x1="'+hx.toFixed(1)+'" y1="'+pT+'" x2="'+hx.toFixed(1)+'" y2="'+(pT+ph)+'" stroke="'+C.mark+'" stroke-dasharray="3 3"/>'+
+   '<text x="'+(hx+4).toFixed(1)+'" y="'+(pT-8)+'" fill="'+C.lab+'" font-size="10.5" font-weight="700">'+(L.handoverAge>L.buyAge?'交屋 ':'購置 ')+L.handoverAge+' 歲'+(n(L.graceM)>0?'　·　寬限期 '+Math.round(n(L.graceM)/12)+' 年（淺色）':'')+'</text>';}
+ var leg=[['自備款・期款・費用',C.down],['房貸本息',C.loan]];if(rows.some(function(r){return r.deco>0}))leg.push(['裝修（自備）',C.deco]);
+ if(rows.some(function(r){return r.decoLoan>0}))leg.push(['裝修貸',C.dloan]);
+ var legend='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:'+C.lab+';margin-top:4px">'+leg.map(function(l){return '<span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+l[1]+';margin-right:5px;vertical-align:-1px"></i>'+l[0]+'</span>'}).join('')+'</div>';
+ return '<svg width="100%" viewBox="0 0 '+W+' '+H+'"'+svgFit(W)+'>'+s+'</svg>'+legend;
+}
+/** 一筆購屋目標的三個數字＋一張圖。theme 'light' 給報告書（rBig），否則分析頁（.big3）。 */
+function houseFlowCard(c,L,theme){
+ var g=c.goals[L.idx]||{},dark=theme!=='light';
+ var yrs=Math.round(n(L.liab.months)/12),gm=n(L.graceM),mpA=Math.round(n(L.liab.pay)),mpG=Math.round(L.loan*n(L.liab.rate)/100/12);
+ var S=houseSales(c).filter(function(x){return x.idx===L.idx})[0];
+ var k=[['自備款合計（含費用'+(L.deco&&L.deco.cash>0?'・裝修':'')+'）',fmt(Math.round(L.down))+' 元',S?'賣屋淨得 '+fmt(Math.round(S.net))+' 元可抵':''],
+        [(L.handoverAge>L.buyAge?'交屋 ':'購置 ')+L.handoverAge+' 歲・貸款',fmt(Math.round(L.loan))+' 元',yrs+' 年'+(L.decoLiab?'・另有裝修貸 '+fmt(Math.round(L.decoLiab.balance))+' 元':'')],
+        gm>0?['寬限後月付',fmt(mpA)+' 元','寬限期 '+Math.round(gm/12)+' 年只繳息，月付 '+fmt(mpG)+' 元']:['月付',fmt(mpA)+' 元','本息攤還 '+yrs+' 年']];
+ var nums=dark?'<div class="big3">'+k.map(function(x){return '<div class="b"><div class="l">'+esc(x[0])+'</div><div class="v" style="color:var(--amber2)">'+x[1]+'</div>'+(x[2]?'<div class="hint">'+esc(x[2])+'</div>':'')+'</div>'}).join('')+'</div>'
+             :rBig(k.map(function(x){return [x[0],x[1],'#0d2b45',esc(x[2]||'')]}));
+ var title=esc(g.name||g.type||'購屋')+(g.condition?' · '+esc(g.condition):'')+(g.spec&&g.spec.city?' · '+esc(g.spec.city+(g.spec.district||'')):'');
+ return (dark?'<div class="sec"><h4>'+title+'</h4>':rSub(title))+nums+houseFlowSVG(c,L,theme)+(dark?'</div>':'');
+}
+function houseFlowSec(c,theme){
+ var gl=goalLoans(c);if(!gl.length)return '';
+ return gl.map(function(L){return houseFlowCard(c,L,theme)}).join('');
+}
 /* ===== 規劃前 / 後對照 =====
    一列一項、成對水平長條（HTML div，不畫 SVG——這裡沒有座標軸要對，長度就是全部資訊）。
    灰 var(--mut)＝規劃前、金 #f0c34e＝規劃後（planChartColors 的 BASE / AFT，全站既有語意）。
@@ -14155,10 +14228,13 @@ function analysisModules(c){
   {k:'lifeneed',t:'壽險需求圖',g:'risk',hint:'身故情境下家庭保障可支撐幾年',
    html:function(){return lifeNeedCharts(c)}},
 
-  {k:'property',t:'置產缺口',g:'goal',when:props().length>0,
+  {k:'property',t:'購屋規劃',g:'goal',when:props().length>0,hint:'哪一年要拿多少現金、貸款月付什麼時候變重',
    html:function(){
     var pt=props().map(function(p){return '<tr><td class="k">'+esc(p.name)+'</td><td>'+fmt(p.fv)+'</td><td>'+fmt(p.loan)+'</td><td class="'+(p.gap>0?'bad':'good')+'">'+fmt(p.gap)+'</td></tr>'}).join('');
-    return '<table class="rtable"><tr><th>項目</th><th>需求終值</th><th>可貸款</th><th>缺口</th></tr>'+pt+'</table>';
+    var flow=houseFlowSec(c,'dark');
+    var tbl='<table class="rtable"><tr><th>項目</th><th>需求終值</th><th>可貸款</th><th>缺口</th></tr>'+pt+'</table>';
+    // 首屏＝每一筆的三個數字＋逐年長條圖；沒接上貸款（成數／利率／年期缺一）的目標只有缺口表可看。
+    return flow?flow+'<details><summary class="foldln">置產缺口（目標年房價 − 可貸 − 已準備）</summary>'+tbl+'</details>':tbl;
    }},
 
   {k:'cross',t:'財務十字表',g:'now',html:function(){return crossTableHTML(ct(),crossTableAfter(c))}},
@@ -15605,9 +15681,12 @@ function rLifestyle(c){
 function rPropertyGap(c){
  var ps=propertyGaps(c);
  if(!ps.length)return '';
- return rSub('置產缺口（購屋・置產）')+
-  rAmtBars(ps.map(function(g){return {label:g.name||'置產',val:g.gap,note:'目標價 '+fmt(g.fv)+'・可貸 '+fmt(g.loan),color:g.gap>0?'#b05a4a':'#3f7d54'};}),' 元')+
+ var flow=houseFlowSec(c,'light');
+ var bars=rAmtBars(ps.map(function(g){return {label:g.name||'置產',val:g.gap,note:'目標價 '+fmt(g.fv)+'・可貸 '+fmt(g.loan),color:g.gap>0?'#b05a4a':'#3f7d54'};}),' 元')+
   rNote('缺口＝目標年度的預估房價 − 可貸款金額 − 已準備。房價依「年漲幅」推到購置那一年，所以離現在越遠，需要準備的自備款越多。');
+ // 2026/09/27：接上貸款的購屋目標先講「錢怎麼流」（一張逐年圖＋三個數字），缺口表收進折疊。
+ return flow?rSub('購屋規劃')+flow+rNote('長條＝那一年為這間房拿出去的錢：自備款與期款、房貸本息（寬限期淺色）、裝修；綠色＝賣掉現況房產的淨得。')+rFold('置產缺口',bars)
+            :rSub('置產缺口（購屋・置產）')+bars;
 }
 
 /* ── 六、退休與教育 · 退休三段式金流 ─────────────────────────────────────── */
