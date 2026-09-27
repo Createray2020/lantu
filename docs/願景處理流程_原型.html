@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>調整方案 · 願景處理流程 原型</title>
+<style>
+:root{
+ --bg:#081a2b;--panel:#0d2b45;--card:#12334f;--card2:#17406a;
+ --field:#0a1a2b;--line:#1c3a58;--line2:#2a4d73;
+ --tx:#eef2f7;--mut:#a9bccf;--mut2:#8296ab;
+ --amber:#c99a5b;--amber2:#e0bd8b;--onbrand:#08202a;
+ --teal:#8fbfc8;--blue:#8fb8ff;
+ --ok:#8fc0a3;--warn:#e08a68;--danger:#ff9d9f;--gap2:#ef6f6f;
+ --serif:"Noto Serif TC","Songti TC","PingFang TC",serif;--r:12px;--sh:0,0,0;
+}
+:root[data-theme="light"]{
+ --bg:#f4f6f8;--panel:#ffffff;--card:#eaeef3;--card2:#dfe6ee;
+ --field:#fbfcfd;--line:#e3e8ee;--line2:#c9d2dc;
+ --tx:#14212e;--mut:#4a5c6e;--mut2:#75838f;
+ --amber:#9a6f22;--amber2:#c08f3c;--onbrand:#ffffff;
+ --teal:#2a6f7a;--blue:#2c6fb5;
+ --ok:#2f7d57;--warn:#a8681a;--danger:#c0362f;--gap2:#c2453e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6;font-size:14px}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 16px 90px}
+.tbtn{background:var(--card);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.tbtn:hover{background:var(--card2)}
+.tbtn.amber{background:var(--amber);color:var(--onbrand);border-color:var(--amber)}
+.tbtn.ghost{background:transparent}
+.tbtn.sm{padding:4px 10px;font-size:12px}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(var(--sh),.22)}
+.sec h4{font-size:15px;font-weight:700;margin:0 0 10px;color:var(--amber);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec h4 .hint{flex:1 0 100%;margin-top:2px}
+.hint{font-size:12px;font-weight:400;color:var(--mut2);line-height:1.6}
+.muted{color:var(--mut2)}
+b.k{color:var(--amber2)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--danger)}
+.num{font-family:var(--serif);font-variant-numeric:tabular-nums}
+
+/* 原型頂列 */
+.proto{position:sticky;top:0;z-index:9;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.proto b{font-size:12px;color:var(--mut);letter-spacing:.07em}
+.proto .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.proto .seg button{background:transparent;border:0;color:var(--mut);padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.proto .seg button.on{background:var(--amber);color:var(--onbrand)}
+.proto .sp{flex:1}
+
+/* 首屏（不動） */
+.big3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+.big3 .b{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:12px}
+.big3 .b .l{color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.07em}
+.big3 .b .v{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:3px;line-height:1.15;font-variant-numeric:tabular-nums}
+.v2verdict{background:var(--field);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:10px 13px;font-size:13px;margin-top:10px}
+.v2verdict.good{border-left-color:var(--ok)}
+.chart{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px;margin-top:12px}
+
+/* 流程步進器 */
+.rail{display:flex;gap:6px;margin:4px 0 14px;overflow-x:auto;padding-bottom:4px}
+.st{flex:1 0 88px;min-width:88px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--line2);border-radius:10px;padding:8px 9px;cursor:pointer;position:relative}
+.st .no{font-size:10.5px;color:var(--mut2);letter-spacing:.06em;font-weight:600}
+.st .nm{font-family:var(--serif);font-size:14px;font-weight:700;margin-top:1px;white-space:nowrap}
+.st .sub{font-size:11px;color:var(--mut2);margin-top:2px;white-space:nowrap}
+.st.done{border-top-color:var(--ok)}.st.done .nm::after{content:" ✓";color:var(--ok);font-size:12px}
+.st.on{border-top-color:var(--amber);background:var(--card)}.st.on .nm{color:var(--amber2)}
+.st.lock{opacity:.45;cursor:default}
+.st.gate{border-style:dashed}
+.st .dec{position:absolute;right:8px;top:7px;font-size:10.5px;color:var(--ok)}
+.rules{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.rules span{font-size:11.5px;background:var(--field);border:1px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--mut)}
+.body{display:none}.body.on{display:block}
+.ask{font-size:13px;color:var(--mut);margin:0 0 12px;padding:8px 12px;background:var(--field);border-left:3px solid var(--amber);border-radius:0 8px 8px 0}
+.ask b{color:var(--amber2)}
+.gate{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line2);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.gate .q{font-weight:700;color:var(--amber2);font-size:13.5px}
+.gate .q::before{content:"◇ ";color:var(--mut2)}
+.gate .who{font-size:11.5px;color:var(--mut2);margin-left:auto}
+.gate .who::before{content:"決定者："}
+
+/* 元件 */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.card{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card.pick{cursor:pointer}.card.pick:hover{border-color:var(--amber)}
+.card.sel{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
+.card .t{font-weight:700;font-size:13.5px;margin-bottom:4px}
+.card .n{font-family:var(--serif);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.card .s{font-size:12px;color:var(--mut2)}
+.card .tag{font-size:10.5px;padding:1px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--mut);margin-left:6px;vertical-align:middle}
+.card .tag.rec{border-color:var(--amber);color:var(--amber2)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--mut);font-weight:600;text-align:left;font-size:11.5px;letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+tr.dim td{color:var(--mut2)}
+.mk{font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid}
+.mk.y{color:var(--ok);border-color:var(--ok)}.mk.n{color:var(--danger);border-color:var(--danger)}.mk.d{color:var(--warn);border-color:var(--warn)}.mk.g{color:var(--mut2);border-color:var(--line2)}
+.vitem{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--field);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+.vitem .h{cursor:grab;color:var(--mut2)}
+.vitem .pr{font-family:var(--serif);color:var(--amber2);font-weight:700;width:22px}
+.vitem .vn{font-weight:700}.vitem .vm{font-size:12px;color:var(--mut2)}
+.vitem .vt{flex:1}
+.vitem input[type=checkbox]{width:17px;height:17px;accent-color:var(--amber)}
+.actctxbar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 12px}
+.actctx{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.actctx .l{font-size:11px;color:var(--mut);font-weight:600;letter-spacing:.05em}
+.actctx .v{font-family:var(--serif);font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.actctx .s{font-size:11.5px;color:var(--mut2)}
+.actctx.bad{border-color:var(--danger)}.actctx.bad .v{color:var(--danger)}
+.actctx.good .v{color:var(--ok)}
+.sw{display:inline-flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
+.sw button{background:transparent;border:0;color:var(--mut);padding:2px 10px;font-size:12px;cursor:pointer;font-family:inherit}
+.sw button.on{background:var(--amber);color:var(--onbrand)}
+.sw button.on.keep{background:var(--ok);color:var(--onbrand)}
+.subtabs{display:flex;gap:6px;margin:8px 0 10px}
+.subtabs button{background:var(--field);border:1px solid var(--line);color:var(--mut);border-radius:8px;padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.subtabs button.on{border-color:var(--amber);color:var(--amber2);background:var(--card)}
+.recalc{margin-top:12px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 13px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.recalc .big{font-family:var(--serif);font-size:22px;font-weight:700}
+.recalc .arrow{color:var(--mut2)}
+details.more{margin-top:18px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+details.more>summary{cursor:pointer;padding:12px 16px;font-weight:700;color:var(--mut);list-style:none}
+details.more>summary::before{content:"▸ ";color:var(--mut2)}
+details.more[open]>summary::before{content:"▾ "}
+details.more .in{padding:0 16px 14px}
+details.more .in .fold{padding:9px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:13px;color:var(--mut)}
+details.more .in .fold b{color:var(--tx)}
+.log{margin-top:16px;font-size:12px;color:var(--mut2)}
+.log .row{display:flex;gap:8px;padding:4px 0;border-bottom:1px dashed var(--line)}
+.log .row .k{color:var(--amber2);font-weight:700;min-width:64px}
+.log .row .note{color:var(--mut)}
+.flagline{margin-top:10px;font-size:12px;color:var(--mut2)}
+.pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--card);border:1px solid var(--line2);color:var(--mut);margin-right:4px}
+.pill.w{border-color:var(--amber);color:var(--amber2)}
+.pill.i{border-color:var(--teal);color:var(--teal)}
+.pill.e{border-color:var(--warn);color:var(--warn)}
+.pill.g{border-color:var(--blue);color:var(--blue)}
+@media (max-width:760px){.big3,.actctxbar{grid-template-columns:1fr}.st{min-width:78px}}
+</style>
+</head>
+<body>
+<div class="proto">
+ <b>原型 · 資料 → 調整方案（/plan）</b>
+ <span class="seg"><button class="on" onclick="setTrack('gap',this)">缺口線（現況＜願景）</button><button onclick="setTrack('surplus',this)">餘裕線（現況＞願景）</button></span>
+ <span class="sp"></span>
+ <span class="seg"><button class="on" onclick="setLegacy(false,this)">有 c.flow（新流程）</button><button onclick="setLegacy(true,this)">舊客戶（無 c.flow）</button></span>
+ <button class="tbtn sm" onclick="toggleTheme()">深／淺</button>
+</div>
+
+<div class="wrap">
+
+<!-- ═══ 首屏：不動 ═══ -->
+<div class="sec">
+ <h4>願景歷程 <span class="hint">灰線＝現況、金線＝套用動作後。旗子 ✓ 做得到、✕ 做不到（v2 首屏，一格都不動）</span></h4>
+ <div class="big3">
+  <div class="b"><div class="l">一生願景需要的資金</div><div class="v">3,860 萬</div><div class="hint">折現到今天的總需求</div></div>
+  <div class="b"><div class="l">缺口改善</div><div class="v" style="color:var(--warn)">412 萬 <span style="opacity:.6">→</span> <span id="heroAfter">412 萬</span></div><div class="hint" id="heroImp">尚未排任何動作</div></div>
+  <div class="b"><div class="l">願景達成</div><div class="v" style="color:var(--amber2)"><span id="heroOk">4</span> / 7 件</div><div class="hint">選定的願景中做得到幾件</div></div>
+ </div>
+ <div class="chart">
+  <svg viewBox="0 0 1000 220" width="100%" height="220" id="tl">
+   <defs><linearGradient id="gp" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ef6f6f" stop-opacity=".35"/><stop offset="1" stop-color="#ef6f6f" stop-opacity=".05"/></linearGradient></defs>
+   <line x1="60" y1="150" x2="980" y2="150" stroke="#2a4d73" stroke-width="1"/>
+   <text x="30" y="154" fill="#8296ab" font-size="11">0</text>
+   <line x1="430" y1="20" x2="430" y2="200" stroke="#2a4d73" stroke-dasharray="4 4"/><text x="436" y="32" fill="#8296ab" font-size="11">十年</text>
+   <!-- 灰虛線現況 -->
+   <path d="M60 130 C 200 95, 330 80, 430 100 S 620 175, 720 195 S 880 205, 980 210" fill="none" stroke="#8296ab" stroke-width="2" stroke-dasharray="6 5"/>
+   <path d="M600 150 C 660 165, 720 195, 980 210 L980 150 Z" fill="url(#gp)"/>
+   <!-- 金線調整後 -->
+   <path id="gold" d="M60 130 C 200 95, 330 80, 430 100 S 620 175, 720 195 S 880 205, 980 210" fill="none" stroke="#e0bd8b" stroke-width="2.5"/>
+   <!-- 旗子 -->
+   <g font-size="11" font-weight="700">
+    <text x="150" y="75" fill="#8fc0a3">✓ 結婚 33</text>
+    <text x="260" y="62" fill="#8fc0a3">✓ 購車 36</text>
+    <text x="380" y="78" fill="#8fc0a3">✓ 購屋 40</text>
+    <text x="520" y="135" fill="#ff9d9f" id="f_edu">✕ 子女教育 47</text>
+    <text x="690" y="185" fill="#ff9d9f" id="f_ret">✕ 退休 65</text>
+    <text x="840" y="200" fill="#ff9d9f" id="f_leg">✕ 傳承 90</text>
+   </g>
+   <text x="700" y="210" fill="#ef6f6f" font-size="11" id="tnLbl">存量用完 58 歲</text>
+   <text x="60" y="212" fill="#8296ab" font-size="10">31 歲</text><text x="950" y="212" fill="#8296ab" font-size="10">90 歲</text>
+  </svg>
+ </div>
+ <div class="v2verdict" id="verdict">照現在這樣走，你做得到 <b>40 歲以前</b>的所有事；第一個做不到的是 <b class="bad">47 歲的「子女教育」</b>，之後還有 <b>2</b> 件會落空。<div style="margin-top:6px" class="bad">🔴 缺口在 47 歲就出現（十年內）— 沒有攤提空間，必須立即處理。</div></div>
+</div>
+
+<!-- ═══ 舊客戶版（無 c.flow）：只是提示 ═══ -->
+<div id="legacyBox" style="display:none">
+ <div class="sec" style="border-style:dashed">
+  <h4>這位客戶還沒進流程 <span class="hint">沒有 c.flow 的客戶，這一頁跟現在 v2 一模一樣（九個折疊原樣）；只多這一顆入口</span></h4>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+   <span class="muted">規劃做完了？從這裡開始「願景處理流程」——先判定缺口線／餘裕線，之後每一步只展開該步該看的東西。</span>
+   <button class="tbtn amber" onclick="setLegacy(false)">開始願景處理流程 →</button>
+  </div>
+ </div>
+ <details class="more" open><summary>v2 既有的九個折疊（原樣）</summary><div class="in">
+  <div class="fold"><b>缺口配額對帳</b> · 這條線大概要生出多少錢 vs 動作實際排了多少</div>
+  <div class="fold"><b>調整動作清單（0 個）</b></div>
+  <div class="fold"><b>資金勾稽</b></div><div class="fold"><b>動作流程</b></div><div class="fold"><b>願景選定</b></div>
+  <div class="fold"><b>拉桿與處方（v1 診斷）</b></div><div class="fold"><b>缺口組成與即時缺口</b></div><div class="fold"><b>建議資產配置</b></div><div class="fold"><b>方案比較</b></div>
+ </div></details>
+</div>
+
+<!-- ═══ 流程 ═══ -->
+<div id="flowBox">
+<div class="sec">
+ <h4>願景處理流程 <span class="pill w" id="trackPill">缺口線</span> <span class="hint">每一步只展開該步要看的東西；◇ 是閘門，決定寫成這一場的「決定」註記，自動進摘要與方案書</span></h4>
+ <div class="rules"><span>願景不動</span><span>收入優先、支出其次</span><span>取捨以客戶願景為尺</span><span>後果只呈現、不代決定</span><span>報酬率保守假設</span><span>同一筆錢只用一次</span></div>
+
+ <!-- 缺口線步進 -->
+ <div class="rail" id="railGap">
+  <div class="st" data-s="S0"><div class="no">STEP 0</div><div class="nm">判定</div><div class="sub">缺口線</div></div>
+  <div class="st gate" data-s="S1"><div class="no">STEP 1</div><div class="nm">缺口呈現</div><div class="sub">◇ D1 願景是他要的？</div></div>
+  <div class="st" data-s="S2"><div class="no">STEP 2</div><div class="nm">願景鎖定</div><div class="sub">客戶排序</div></div>
+  <div class="st" data-s="S2g"><div class="no">STEP 2′</div><div class="nm">護欄</div><div class="sub">保障・預備金</div></div>
+  <div class="st" data-s="S3"><div class="no">STEP 3</div><div class="nm">階段目標</div><div class="sub">里程碑</div></div>
+  <div class="st gate" data-s="S4"><div class="no">STEP 4</div><div class="nm">選路</div><div class="sub">◇ D2 先收入或支出</div></div>
+  <div class="st gate" data-s="S5A"><div class="no">STEP 5A</div><div class="nm">增加收入</div><div class="sub">工作＋理財 ◇ 補平？</div></div>
+  <div class="st gate" data-s="S5B"><div class="no">STEP 5B</div><div class="nm">減少支出</div><div class="sub">客戶自己標 ◇ 補平？</div></div>
+  <div class="st gate" data-s="S6"><div class="no">STEP 6</div><div class="nm">後果</div><div class="sub">◇ D3 加碼或接受</div></div>
+  <div class="st" data-s="S6x"><div class="no">STEP 6′</div><div class="nm">行動清單</div><div class="sub">→ 執行・回訪</div></div>
+ </div>
+ <!-- 餘裕線步進 -->
+ <div class="rail" id="railSur" style="display:none">
+  <div class="st" data-s="P0"><div class="no">STEP 0</div><div class="nm">判定</div><div class="sub">餘裕線</div></div>
+  <div class="st" data-s="P1"><div class="no">STEP 1</div><div class="nm">餘裕呈現</div><div class="sub">保守重算</div></div>
+  <div class="st gate lock" data-s="P2"><div class="no">STEP 2</div><div class="nm">願景再確認</div><div class="sub">◇ 要升級？（下一輪）</div></div>
+  <div class="st lock" data-s="P2g"><div class="no">STEP 2′</div><div class="nm">護欄</div><div class="sub">下一輪</div></div>
+  <div class="st lock" data-s="P3"><div class="no">STEP 3</div><div class="nm">餘裕分配</div><div class="sub">下一輪</div></div>
+  <div class="st lock" data-s="P3x"><div class="no">STEP 3′</div><div class="nm">行動清單</div><div class="sub">下一輪</div></div>
+ </div>
+
+ <!-- ─── S0 ─── -->
+ <div class="body" data-b="S0">
+  <p class="ask"><b>問自己</b>　現況照原樣走完一生，願景要的錢夠不夠？</p>
+  <div class="cards">
+   <div class="card"><div class="t">現況能到</div><div class="n">3,448 萬</div><div class="s">現況投影下，一生可用於願景的現值</div></div>
+   <div class="card"><div class="t">願景需要</div><div class="n">3,860 萬</div><div class="s">選定願景折現到今天</div></div>
+   <div class="card" style="border-color:var(--warn)"><div class="t">判定</div><div class="n warn">缺口線</div><div class="s">現值缺口 412 萬（保守假設下 1,034 萬）</div></div>
+  </div>
+  <div class="hint" style="margin-top:8px">餘裕線只有在「保守假設重算後仍有餘裕」才成立；這位客戶現況就不夠，直接進缺口線。</div>
+  <div class="gate"><span class="q">分流</span><button class="tbtn amber" onclick="go('S1')">進入缺口線 →</button><span class="who">系統</span></div>
+ </div>
+
+ <!-- ─── S1 ─── -->
+ <div class="body" data-b="S1">
+  <p class="ask"><b>問自己</b>　他看見的是「缺口」還是「被否定」？——只攤開三件事，不評價、不開藥。</p>
+  <div class="cards">
+   <div class="card"><div class="t">首次入不敷出</div><div class="n">47 歲</div><div class="s">那一年開始要動用存量</div></div>
+   <div class="card"><div class="t">存量用完</div><div class="n bad">58 歲</div><div class="s">可投資資產被吃光，之後才是真的不夠</div></div>
+   <div class="card"><div class="t">現值缺口</div><div class="n bad">412 萬</div><div class="s">今天要多放進去多少，一生才不轉負</div></div>
+  </div>
+  <div style="margin-top:12px"><b class="k">哪些願景受影響</b>（依客戶的必達順序）</div>
+  <table><thead><tr><th>順位</th><th>願景</th><th>年齡</th><th class="r">金額</th><th>照現在走</th></tr></thead><tbody>
+   <tr><td>1</td><td>退休生活</td><td>65</td><td class="r">每月 6 萬</td><td><span class="mk n">✕ 58 歲起不夠</span></td></tr>
+   <tr><td>2</td><td>子女教育（2 位）</td><td>47–56</td><td class="r">640 萬</td><td><span class="mk n">✕ 做不到</span></td></tr>
+   <tr><td>3</td><td>購屋</td><td>40</td><td class="r">1,800 萬</td><td><span class="mk y">✓ 做得到</span></td></tr>
+   <tr><td>4</td><td>結婚</td><td>33</td><td class="r">120 萬</td><td><span class="mk y">✓</span></td></tr>
+   <tr><td>5</td><td>購車</td><td>36</td><td class="r">90 萬</td><td><span class="mk y">✓</span></td></tr>
+   <tr><td>6</td><td>每年旅遊</td><td>31–75</td><td class="r">每次 8 萬</td><td><span class="mk y">✓</span></td></tr>
+   <tr class="dim"><td>7</td><td>傳承</td><td>90</td><td class="r">1,000 萬</td><td><span class="mk n">✕</span></td></tr>
+  </tbody></table>
+  <div class="gate"><span class="q">D1　這個願景是他自己要的嗎？</span>
+   <button class="tbtn amber" onclick="decide('S1','D1','是——客戶確認願景是自己要的，看見缺口','S2')">是，他要的 → 鎖定願景</button>
+   <button class="tbtn ghost" onclick="alert('回意圖／生涯分頁重新對願景，不進調整')">不是 → 回願景澄清</button>
+   <span class="who">客戶</span></div>
+ </div>
+
+ <!-- ─── S2 ─── -->
+ <div class="body" data-b="S2">
+  <p class="ask"><b>問自己</b>　哪幾件是他非到不可的？排序是為了後面知道先保哪個，不是為了砍。</p>
+  <div class="hint" style="margin-bottom:8px">拖曳排順序（＝意圖分頁的必達優先序 <code>intent.mustHave</code>，同一份資料）；勾選＝要做（＝願景選定閘 <code>on</code>）。</div>
+  <div class="vitem"><span class="h">⋮⋮</span><span class="pr">1</span><input type="checkbox" checked><div class="vt"><div class="vn">退休生活</div><div class="vm">65 歲　每月 6 萬</div></div><span class="mk n">✕</span></div>
+  <div class="vitem"><span class="h">⋮⋮</span><span class="pr">2</span><input type="checkbox" checked><div class="vt"><div class="vn">子女教育（2 位）</div><div class="vm">47–56 歲　640 萬</div></div><span class="mk n">✕</span></div>
+  <div class="vitem"><span class="h">⋮⋮</span><span class="pr">3</span><input type="checkbox" checked><div class="vt"><div class="vn">購屋</div><div class="vm">40 歲　1,800 萬</div></div><span class="mk y">✓</span></div>
+  <div class="vitem"><span class="h">⋮⋮</span><span class="pr">4</span><input type="checkbox" checked><div class="vt"><div class="vn">結婚</div><div class="vm">33 歲　120 萬</div></div><span class="mk y">✓</span></div>
+  <div class="vitem"><span class="h">⋮⋮</span><span class="pr">5</span><input type="checkbox" checked><div class="vt"><div class="vn">購車</div><div class="vm">36 歲　90 萬</div></div><span class="mk y">✓</span></div>
+  <div class="vitem"><span class="h">⋮⋮</span><span class="pr">6</span><input type="checkbox" checked><div class="vt"><div class="vn">每年旅遊</div><div class="vm">31–75 歲　每次 8 萬</div></div><span class="mk y">✓</span></div>
+  <div class="vitem"><span class="h">⋮⋮</span><span class="pr">7</span><input type="checkbox" checked><div class="vt"><div class="vn">傳承</div><div class="vm">期末 1,000 萬（2 位繼承人）</div></div><span class="mk n">✕</span></div>
+  <div class="gate"><span class="q">鎖定願景清單（定案版）</span>
+   <button class="tbtn amber" onclick="decide('S2','鎖定','願景清單定案：退休＞子女教育＞購屋＞結婚＞購車＞旅遊＞傳承（7 件全選）','S2g')">鎖定 · 打版本印記</button>
+   <span class="hint">鎖定會記 <code>visionLock{at, revisionId}</code>，之後願景只能由客戶自己升級或放手</span>
+   <span class="who">客戶</span></div>
+ </div>
+
+ <!-- ─── S2′ ─── -->
+ <div class="body" data-b="S2g">
+  <p class="ask"><b>問自己</b>　一次意外會不會讓後面所有努力白做？——護欄先立，保障額度依剛鎖定的願景算。</p>
+  <table><thead><tr><th>項目</th><th>對象</th><th class="r">需要</th><th class="r">已有</th><th class="r">缺</th><th>處理</th></tr></thead><tbody>
+   <tr><td>壽險（家庭責任）</td><td>本人</td><td class="r">2,400 萬</td><td class="r">800 萬</td><td class="r bad">1,600 萬</td><td><button class="tbtn sm">列入行動清單</button></td></tr>
+   <tr><td>失能／重疾</td><td>本人</td><td class="r">500 萬</td><td class="r">200 萬</td><td class="r bad">300 萬</td><td><button class="tbtn sm">列入行動清單</button></td></tr>
+   <tr><td>醫療（日額）</td><td>配偶</td><td class="r">3,000／日</td><td class="r">3,000／日</td><td class="r ok">—</td><td><span class="muted">已備</span></td></tr>
+   <tr><td>緊急預備金</td><td>家庭</td><td class="r">36 萬（6 個月）</td><td class="r">18 萬</td><td class="r bad">18 萬</td><td><button class="tbtn sm">列入行動清單</button></td></tr>
+  </tbody></table>
+  <div class="hint" style="margin-top:8px">保障缺口與預備金是「事件才要的錢」與「隨時要能動的錢」，不進現值缺口、刻意不相加（既有語意不動）。預備金同時是 5A 單筆投資「可投資水位」的扣項。</div>
+  <div class="gate"><span class="q">護欄列入行動清單</span><button class="tbtn amber" onclick="go('S3')">3 項已列入 → 拆階段</button><span class="who">教練提、客戶認</span></div>
+ </div>
+
+ <!-- ─── S3 ─── -->
+ <div class="body" data-b="S3">
+  <p class="ask"><b>問自己</b>　下一個他看得到、摸得到的里程碑是什麼？——依願景事件切段，每段一個數字。</p>
+  <table><thead><tr><th>階段</th><th>年齡</th><th>包含的願景</th><th class="r">里程碑：可投資資產</th><th class="r">年儲蓄需要</th><th>檢查點</th></tr></thead><tbody>
+   <tr><td><b>① 成家</b></td><td>31–33</td><td>結婚</td><td class="r">180 萬</td><td class="r">36 萬</td><td>每年 1 月</td></tr>
+   <tr><td><b>② 立業</b></td><td>34–40</td><td>購車、購屋頭期</td><td class="r">620 萬</td><td class="r">60 萬</td><td>每年 1 月</td></tr>
+   <tr style="background:var(--card)"><td><b>③ 育兒</b> <span class="pill w">目前</span></td><td>41–56</td><td>子女教育</td><td class="r">1,450 萬</td><td class="r">72 萬</td><td>每年 1 月</td></tr>
+   <tr><td><b>④ 退休準備</b></td><td>57–65</td><td>退休</td><td class="r">2,900 萬</td><td class="r">96 萬</td><td>每年 1 月</td></tr>
+   <tr><td><b>⑤ 退休期</b></td><td>65–90</td><td>退休生活、傳承</td><td class="r">期末 1,000 萬</td><td class="r">—</td><td>每年 1 月</td></tr>
+  </tbody></table>
+  <div class="hint" style="margin-top:8px">初稿由引擎切（<code>stagesOf</code>：目標年齡分段、金線段末值當里程碑），教練可改名、合併、改數字。這張表同時是 Step 8 回訪對帳的依據。</div>
+  <div class="gate"><span class="q">階段目標表定案</span><button class="tbtn amber" onclick="go('S4')">客戶認了 → 選路</button><span class="who">教練拆、客戶認</span></div>
+ </div>
+
+ <!-- ─── S4 ─── -->
+ <div class="body" data-b="S4">
+  <p class="ask"><b>問自己</b>　他要先從哪一邊動？——兩條路各自試算「單獨走這條要到多少才補平」。</p>
+  <div class="cards">
+   <div class="card pick sel" onclick="pickRoute(this,'income')"><div class="t">增加收入 <span class="tag rec">教練建議</span></div><div class="n">+18%</div><div class="s">工作收入約 <b>+1.4 萬／月</b>就補平；上限 30%，<span class="ok">可行</span></div><div class="s" style="margin-top:6px">願景不動的前提下，這是唯一讓「人」變大的路</div></div>
+   <div class="card pick" onclick="pickRoute(this,'expense')"><div class="t">減少支出</div><div class="n">−22%</div><div class="s">生活消費約 <b>−1.7 萬／月</b>才補平；上限 30%，<span class="ok">可行</span></div><div class="s" style="margin-top:6px">客戶完全能控制，但要他自己對照願景決定放掉什麼</div></div>
+  </div>
+  <div class="gate"><span class="q">D2　先收入還是先支出？</span>
+   <button class="tbtn amber" onclick="decide('S4','D2','先走增加收入（教練建議、客戶同意）','S5A')">先收入 →</button>
+   <button class="tbtn ghost" onclick="decide('S4','D2','客戶選先減少支出','S5B')">先支出 →</button>
+   <span class="who">客戶選、教練建議</span></div>
+ </div>
+
+ <!-- ─── S5A ─── -->
+ <div class="body" data-b="S5A">
+  <p class="ask"><b>問自己</b>　他的收入能從哪裡長？人的部分（工作收入），還是錢的部分（理財收入）？</p>
+  <div class="subtabs"><button class="on" onclick="sub(this,'a1')">A-1 工作收入</button><button onclick="sub(this,'a2')">A-2 理財收入</button></div>
+
+  <div id="a1">
+   <div class="cards">
+    <div class="card pick sel"><div class="t">薪資提升 <span class="tag rec">建議</span></div><div class="s">就業者、年資 8 年、可爭取晉升</div><div class="n" style="margin-top:6px">+1.2 萬／月</div><div class="s">缺口 412 萬 → <b>168 萬</b>　3 年內</div></div>
+    <div class="card pick"><div class="t">專業兼職</div><div class="s">有可授課的專業、每週可撥 6 小時</div><div class="n" style="margin-top:6px">+0.8 萬／月</div><div class="s">缺口 412 萬 → <b>250 萬</b>　1 年內</div></div>
+    <div class="card pick"><div class="t">創業做生意</div><div class="s">資本不足、風險承受中；可貸款資產 300 萬會被佔用</div><div class="n" style="margin-top:6px">不建議</div><div class="s">同一筆錢只能用一次——用了就不能再算單筆投資</div></div>
+   </div>
+   <table style="margin-top:10px"><thead><tr><th>動作</th><th>路線</th><th>起</th><th>迄</th><th class="r">每月</th><th>階段</th><th></th></tr></thead><tbody>
+    <tr><td>爭取晉升主任</td><td>薪資提升</td><td>33 歲</td><td>65 歲</td><td class="r">+12,000</td><td>③ 育兒</td><td><span class="pill w">income-work</span></td></tr>
+    <tr><td>週末企業內訓</td><td>專業兼職</td><td>32 歲</td><td>45 歲</td><td class="r">+8,000</td><td>③ 育兒</td><td><span class="pill w">income-work</span></td></tr>
+    <tr><td colspan="7"><button class="tbtn sm">＋ 新增工作收入動作</button></td></tr>
+   </tbody></table>
+  </div>
+
+  <div id="a2" style="display:none">
+   <div class="actctxbar">
+    <div class="actctx good"><div class="l">月結餘 可再投入</div><div class="v">+2.6 萬</div><div class="s">現況 0.6 萬 ＋ 5A 收入 2.0 萬 − 已排 0</div></div>
+    <div class="actctx"><div class="l">可投資水位（單筆）</div><div class="v">42 萬</div><div class="s">現金 120 萬 − 預備金 36 萬 − 階段內目標 42 萬</div></div>
+    <div class="actctx"><div class="l">可貸款資產</div><div class="v">300 萬</div><div class="s">房產淨值 × 成數；用於創業就不能再算這裡</div></div>
+   </div>
+   <table><thead><tr><th>動作</th><th>類型</th><th>前提</th><th class="r">金額</th><th class="r">保守報酬</th><th></th></tr></thead><tbody>
+    <tr><td>定期定額 ETF</td><td>定期定額</td><td><span class="ok">月金流為正 ✓</span></td><td class="r">1.5 萬／月</td><td class="r">4.0%</td><td><span class="pill i">income-invest</span></td></tr>
+    <tr><td>單筆投入</td><td>單筆</td><td><span class="ok">水位 42 萬 ✓</span></td><td class="r">40 萬</td><td class="r">4.0%</td><td><span class="pill i">income-invest</span></td></tr>
+    <tr class="dim"><td>質押房產再投</td><td>單筆（貸款）</td><td><span class="warn">利差 1.2%，月付會壓到結餘</span></td><td class="r">—</td><td class="r">—</td><td><span class="pill i">未採用</span></td></tr>
+    <tr><td colspan="6"><button class="tbtn sm">＋ 新增理財收入動作</button></td></tr>
+   </tbody></table>
+   <div class="hint" style="margin-top:6px">兩種都用保守報酬率算，不拿樂觀假設補缺口。沒有月結餘時定期定額這條先不通，等 5B 之後回來。</div>
+  </div>
+
+  <div class="recalc"><span class="muted">重算投影</span><span class="big">412 萬</span><span class="arrow">→</span><span class="big warn">96 萬</span><span class="muted">改善 77%　·　願景達成 6 / 7　·　存量用完 58 歲 → 不轉負，傳承差 96 萬</span></div>
+  <div class="gate"><span class="q">D5A　缺口補平了嗎？</span>
+   <button class="tbtn ghost" onclick="decide('S5A','D5A','收入方案排定：晉升＋內訓＋定期定額 1.5 萬＋單筆 40 萬；缺口 412→96 萬，未補平','S5B')">沒補平 → 減少支出</button>
+   <button class="tbtn ghost" onclick="decide('S5A','D5A','客戶目前不願／不能提升收入','S5B')">客戶不願意／做不到 → 減少支出</button>
+   <button class="tbtn amber" onclick="decide('S5A','D5A','補平','S6x')">補平了 → 行動清單</button>
+   <span class="who">客戶選路、教練建議</span></div>
+ </div>
+
+ <!-- ─── S5B ─── -->
+ <div class="body" data-b="S5B">
+  <p class="ask"><b>問自己</b>　這筆錢在買什麼？跟他要的未來有關嗎？——教練不拿比例尺，客戶自己標「留／放」。</p>
+  <table><thead><tr><th>支出</th><th class="r">每月</th><th>它在買什麼（客戶說）</th><th>跟願景的關係</th><th>客戶標</th><th class="r">放掉省</th></tr></thead><tbody>
+   <tr><td>外食・聚餐</td><td class="r">18,000</td><td>社交、方便</td><td class="muted">不在願景裡</td><td><span class="sw"><button>留</button><button class="on">放一半</button><button>放</button></span></td><td class="r ok">9,000</td></tr>
+   <tr><td>訂閱・娛樂</td><td class="r">3,200</td><td>習慣</td><td class="muted">不在願景裡</td><td><span class="sw"><button>留</button><button>放一半</button><button class="on">放</button></span></td><td class="r ok">3,200</td></tr>
+   <tr><td>每年旅遊</td><td class="r">6,700</td><td>家人時間</td><td><span class="ok">願景第 6 位</span></td><td><span class="sw"><button class="on keep">留</button><button>放一半</button><button>放</button></span></td><td class="r">0</td></tr>
+   <tr><td>房租</td><td class="r">28,000</td><td>住</td><td><span class="muted">購屋後消失</span></td><td><span class="sw"><button class="on keep">留</button><button>放一半</button><button>放</button></span></td><td class="r">0</td></tr>
+   <tr><td>治裝・美容</td><td class="r">6,000</td><td>工作形象</td><td><span class="muted">與晉升有關</span></td><td><span class="sw"><button class="on keep">留</button><button>放一半</button><button>放</button></span></td><td class="r">0</td></tr>
+   <tr><td>孝親</td><td class="r">10,000</td><td>責任</td><td><span class="ok">必達（最低 1 萬）</span></td><td><span class="sw"><button class="on keep">留</button><button disabled>—</button><button disabled>—</button></span></td><td class="r">0</td></tr>
+  </tbody></table>
+  <div style="display:flex;gap:14px;align-items:center;margin-top:10px;flex-wrap:wrap">
+   <span>客戶放掉 <b class="num ok">12,200／月</b>（支出 −8.5%）</span>
+   <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" checked style="accent-color:var(--amber);width:16px;height:16px"> 多出的結餘投入定期定額（1.5 萬 → 2.7 萬／月）</label>
+  </div>
+  <div class="recalc"><span class="muted">重算投影</span><span class="big">96 萬</span><span class="arrow">→</span><span class="big warn">31 萬</span><span class="muted">改善 92%　·　願景達成 6 / 7　·　只剩傳承差 31 萬</span></div>
+  <div class="gate"><span class="q">D5B　缺口補平了嗎？</span>
+   <button class="tbtn ghost" onclick="decide('S5B','D5B','客戶自標放掉 1.22 萬／月、結餘回流定期定額；缺口 96→31 萬，未補平','S6')">沒補平 → 看後果</button>
+   <button class="tbtn ghost" onclick="decide('S5B','D5B','客戶不願意放','S6')">客戶不願意放 → 看後果</button>
+   <button class="tbtn amber" onclick="decide('S5B','D5B','補平','S6x')">補平了 → 行動清單</button>
+   <span class="who">客戶</span></div>
+ </div>
+
+ <!-- ─── S6 ─── -->
+ <div class="body" data-b="S6">
+  <p class="ask"><b>問自己</b>　收入和支出能做的都做了還是不夠——那哪些願景會怎樣？<b>不動願景</b>，只算、只呈現。</p>
+  <table><thead><tr><th>順位</th><th>願景</th><th>原本</th><th>照現在的方案</th><th>後果</th></tr></thead><tbody>
+   <tr><td>1</td><td>退休生活</td><td>65 歲 每月 6 萬</td><td><span class="mk y">✓ 做得到</span></td><td class="muted">不動</td></tr>
+   <tr><td>2</td><td>子女教育</td><td>47–56 歲 640 萬</td><td><span class="mk y">✓ 做得到</span></td><td class="muted">不動</td></tr>
+   <tr><td>3–6</td><td>購屋・結婚・購車・旅遊</td><td>—</td><td><span class="mk y">✓</span></td><td class="muted">不動</td></tr>
+   <tr><td>7</td><td>傳承</td><td>期末 1,000 萬</td><td><span class="mk n">✕ 差 31 萬</span></td><td><span class="mk d">延後 · 改到 92 歲才夠</span>　或　<span class="mk d">降規 · 969 萬</span></td></tr>
+  </tbody></table>
+  <div class="flagline">後果引擎由<b>低優先往高優先</b>逐一試：先延後（掃到一生盡頭，不設上限）→ 再降到「最低金額」→ 都不過才標「消失」。這裡只回清單，客戶按接受才寫進資料，並在該願景打 <code>byConsequence</code> 印記。時間軸上會多一面灰旗（延後）／空心旗（消失）。</div>
+  <div class="gate"><span class="q">D3　加碼還是接受？</span>
+   <button class="tbtn ghost" onclick="decide('S6','D3','客戶選加碼，回選路調方案','S4')">加碼 → 回選路</button>
+   <button class="tbtn amber" onclick="acceptCons()">客戶接受：傳承降規 969 萬 →</button>
+   <span class="who">客戶</span></div>
+ </div>
+
+ <!-- ─── S6′ ─── -->
+ <div class="body" data-b="S6x">
+  <p class="ask"><b>這一階段的行動清單</b>　做什麼、什麼時候、下次怎麼驗收。全部來自 <code>c.actions[]</code>（lane 標籤），不另存一份。</p>
+  <table><thead><tr><th>lane</th><th>動作</th><th>時點</th><th class="r">金額</th><th>驗收（下次回訪）</th><th>狀態</th></tr></thead><tbody>
+   <tr><td><span class="pill w">收入·工作</span></td><td>爭取晉升主任</td><td>33 歲起</td><td class="r">+12,000／月</td><td>薪資單 ≥ 5.7 萬</td><td><span class="mk g">planned</span></td></tr>
+   <tr><td><span class="pill w">收入·工作</span></td><td>週末企業內訓</td><td>32–45 歲</td><td class="r">+8,000／月</td><td>接到第一案</td><td><span class="mk g">planned</span></td></tr>
+   <tr><td><span class="pill i">收入·理財</span></td><td>定期定額 ETF</td><td>每月</td><td class="r">27,000／月</td><td>扣款紀錄 12 次</td><td><span class="mk g">planned</span></td></tr>
+   <tr><td><span class="pill i">收入·理財</span></td><td>單筆投入</td><td>本季</td><td class="r">400,000</td><td>對帳單</td><td><span class="mk g">planned</span></td></tr>
+   <tr><td><span class="pill e">支出</span></td><td>外食減半、停訂閱</td><td>即刻</td><td class="r">−12,200／月</td><td>三個月支出平均</td><td><span class="mk g">planned</span></td></tr>
+   <tr><td><span class="pill g">護欄</span></td><td>補壽險 1,600 萬、失能 300 萬</td><td>本季</td><td class="r">保費 4,200／月</td><td>保單生效</td><td><span class="mk g">planned</span></td></tr>
+   <tr><td><span class="pill g">護欄</span></td><td>預備金補到 36 萬</td><td>6 個月內</td><td class="r">+18 萬</td><td>帳戶餘額</td><td><span class="mk g">planned</span></td></tr>
+  </tbody></table>
+  <div class="hint" style="margin-top:8px">里程碑：③ 育兒階段末（56 歲）可投資資產 1,450 萬；下一個檢查點 明年 1 月。「動了但不夠」以里程碑差距為主、動作勾選並列（Step 8，下一輪做）。</div>
+  <div class="gate"><span class="q">輸出</span><button class="tbtn amber">產出調整方案書</button><button class="tbtn ghost">回到分析頁</button><span class="hint">方案書章節重排成流程順序：差多少 → 願景與階段 → 護欄 → 收入 → 支出 → 後果與接受 → 執行清單</span></div>
+ </div>
+
+ <!-- ─── 餘裕線 P0 / P1 ─── -->
+ <div class="body" data-b="P0">
+  <p class="ask"><b>問自己</b>　現況照原樣走完一生，願景要的錢夠不夠？</p>
+  <div class="cards">
+   <div class="card"><div class="t">現況能到</div><div class="n">4,610 萬</div></div>
+   <div class="card"><div class="t">願景需要</div><div class="n">3,860 萬</div></div>
+   <div class="card" style="border-color:var(--ok)"><div class="t">判定</div><div class="n ok">餘裕線</div><div class="s">保守假設重算仍有餘裕 290 萬</div></div>
+  </div>
+  <div class="gate"><span class="q">分流</span><button class="tbtn amber" onclick="go('P1')">進入餘裕線 →</button><span class="who">系統</span></div>
+ </div>
+ <div class="body" data-b="P1">
+  <p class="ask"><b>問自己</b>　這是真餘裕嗎？——保守假設（報酬率 2.5%、收入不成長、壽命 +5）重算一次，還有餘裕才算。</p>
+  <div class="cards">
+   <div class="card"><div class="t">客戶假設下的餘裕</div><div class="n ok">750 萬</div><div class="s">報酬 5%</div></div>
+   <div class="card" style="border-color:var(--ok)"><div class="t">保守假設下的餘裕</div><div class="n ok">290 萬</div><div class="s">這個才拿來分配</div></div>
+   <div class="card"><div class="t">哪些願景會提早</div><div class="n">退休 65 → 61</div><div class="s">其餘依序不變</div></div>
+  </div>
+  <div class="gate"><span class="q">下一步</span><button class="tbtn ghost" disabled>願景再確認（P2，下一輪）</button><span class="who">客戶</span></div>
+ </div>
+
+ <!-- 決定紀錄 -->
+ <div class="log" id="log"><div style="font-weight:700;color:var(--mut);margin-bottom:4px">這一場的決定（自動寫成 <code>client_notes kind=decision</code>，page=<code>flow:&lt;step&gt;</code>）</div></div>
+</div>
+
+<!-- v2 既有的東西：一個不刪，收進這裡 -->
+<details class="more"><summary>更多診斷（v2 既有九個折疊，原樣保留）</summary><div class="in">
+ <div class="fold"><b>缺口配額對帳</b> · 補缺口三條線的總配額 vs 動作實際排了多少　<span class="pill">對到 S5A／S5B</span></div>
+ <div class="fold"><b>調整動作清單（7 個）</b> · 完整動作表　<span class="pill">對到 S6′</span></div>
+ <div class="fold"><b>資金勾稽</b> · 客戶到底有沒有錢做這些動作　<span class="pill">對到 A-2 前提</span></div>
+ <div class="fold"><b>動作流程</b> · 定案後輸出到方案書的執行時序　<span class="pill">對到 S6′</span></div>
+ <div class="fold"><b>願景選定</b> · 四張表的 on 旗標　<span class="pill">對到 S2</span></div>
+ <div class="fold"><b>拉桿與處方（v1 診斷）</b> · 六根槓桿反解、三個處方　<span class="pill e">改標：income／expense＝處方槓桿；vision／retire／retireLevel／defer＝後果槓桿；「調願景型」改名「後果試算」</span></div>
+ <div class="fold"><b>缺口組成與即時缺口</b>　<span class="pill">對到 S1／S2′</span></div>
+ <div class="fold"><b>建議資產配置</b>　<span class="pill">對到 A-2</span></div>
+ <div class="fold"><b>方案比較</b> · 最多 5 組</div>
+ <div class="fold"><b>其他方案參數</b> · 資產移轉、下次檢視日</div>
+</div></details>
+</div><!-- /flowBox -->
+
+</div>
+
+<script>
+var TRACK='gap', CUR='S0', DONE={};
+function $(s){return document.querySelector(s)}
+function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
+function railEl(){return TRACK==='gap'?$('#railGap'):$('#railSur')}
+function paint(){
+ $$('.body').forEach(function(b){b.classList.toggle('on',b.dataset.b===CUR)});
+ var order=$$('#railGap .st').concat($$('#railSur .st')).map(function(x){return x.dataset.s});
+ $$('.st').forEach(function(st){
+  var s=st.dataset.s; st.classList.remove('on','done');
+  if(s===CUR)st.classList.add('on'); else if(DONE[s])st.classList.add('done');
+  var d=st.querySelector('.dec'); if(d)d.remove();
+  if(DONE[s]&&DONE[s].label){var e=document.createElement('span');e.className='dec';e.textContent=DONE[s].label;st.appendChild(e);}
+ });
+}
+$$('.st').forEach(function(st){st.addEventListener('click',function(){if(st.classList.contains('lock'))return;CUR=st.dataset.s;paint();})});
+function go(s){DONE[CUR]=DONE[CUR]||{};CUR=s;paint();window.scrollTo({top:$('#flowBox').offsetTop-60,behavior:'smooth'});}
+function decide(step,gate,text,next){
+ DONE[step]={label:gate};
+ var row=document.createElement('div');row.className='row';
+ row.innerHTML='<span class="k">'+gate+'</span><span class="note">'+text+'</span><span class="muted" style="margin-left:auto">'+new Date().toTimeString().slice(0,5)+'</span>';
+ $('#log').appendChild(row);
+ if(step==='S5A'){$('#heroAfter').textContent='96 萬';$('#heroImp').textContent='改善 77%';$('#heroOk').textContent='6';
+  $('#gold').setAttribute('d','M60 130 C 200 90, 330 70, 430 80 S 620 95, 720 105 S 880 130, 980 140');$('#f_edu').setAttribute('fill','#8fc0a3');$('#f_edu').textContent='✓ 子女教育 47';$('#f_ret').setAttribute('fill','#8fc0a3');$('#f_ret').textContent='✓ 退休 65';$('#tnLbl').textContent='';
+  $('#verdict').innerHTML='照這組動作走，你做得到 <b>65 歲以前</b>的所有事；卡在 <b class="bad">「傳承」</b> — 期末差 96 萬。';}
+ if(step==='S5B'){$('#heroAfter').textContent='31 萬';$('#heroImp').textContent='改善 92%';$('#gold').setAttribute('d','M60 130 C 200 88, 330 62, 430 70 S 620 80, 720 88 S 880 110, 980 122');$('#verdict').innerHTML='照這組動作走，只剩 <b class="bad">「傳承」</b>差 31 萬。';}
+ go(next);
+}
+function acceptCons(){
+ DONE.S6={label:'D3 接受'};
+ var row=document.createElement('div');row.className='row';
+ row.innerHTML='<span class="k">D3</span><span class="note">客戶接受後果：傳承由 1,000 萬降規為 969 萬（byConsequence 印記）</span>';
+ $('#log').appendChild(row);
+ $('#heroAfter').innerHTML='<span class="ok">已補平</span>';$('#heroImp').textContent='改善 100%（含客戶接受的後果）';$('#heroOk').textContent='7';
+ $('#f_leg').setAttribute('fill','#c99a5b');$('#f_leg').textContent='⚑ 傳承 90（降規 969 萬）';
+ $('#verdict').className='v2verdict good';$('#verdict').innerHTML='✅ <b>選定的願景全部做得到</b>（傳承為客戶接受的降規版）。仍請確認護欄動作已排進行動清單。';
+ go('S6x');
+}
+function setTrack(t,btn){TRACK=t;$$('.proto .seg')[0].querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b===btn)});
+ $('#railGap').style.display=t==='gap'?'':'none';$('#railSur').style.display=t==='gap'?'none':'';
+ $('#trackPill').textContent=t==='gap'?'缺口線':'餘裕線';$('#trackPill').className='pill '+(t==='gap'?'w':'i');
+ CUR=t==='gap'?'S0':'P0';paint();}
+function setLegacy(v,btn){$('#legacyBox').style.display=v?'':'none';$('#flowBox').style.display=v?'none':'';
+ var segs=$$('.proto .seg')[1].querySelectorAll('button');segs[0].classList.toggle('on',!v);segs[1].classList.toggle('on',!!v);}
+function sub(btn,id){btn.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b===btn)});$('#a1').style.display=id==='a1'?'':'none';$('#a2').style.display=id==='a2'?'':'none';}
+function pickRoute(el){el.parentNode.querySelectorAll('.card').forEach(function(c){c.classList.toggle('sel',c===el)})}
+function toggleTheme(){var h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'}
+paint();
+</script>
+</body>
+</html>
