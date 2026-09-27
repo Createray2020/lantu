@@ -160,7 +160,8 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(HTML).toContain("function goalLoans(c){");
     expect(HTML).toContain("  if(!(ratio>0&&rate>0&&yrs>0))return;");
     // 2026/09/27：交屋年才進房子、交屋前已付期款當固定資產（預售）
-    expect(HTML).toContain(" var fixedAt=fixedAssets-sum(c.assets,function(a){return (!aLiquid(c,a)&&soldAsset(hSales,a,age))?aVal(a):0})+sum(gLoans,function(L){return goalLoanAssetAt(L,age)});".trim());
+    // 2026/09/27 未來入帳：賣掉的整筆、到期回收的按比例，都走 fixedGone
+    expect(HTML).toContain(" var fixedAt=fixedAssets-fixedGone(c,mats,soldAll,age)+sum(gLoans,function(L){return goalLoanAssetAt(L,age)});".trim());
     // 2026/09/27 購車：房＝交屋前已付期款／交屋後購置價；車＝逐年折舊的價值
     expect(HTML).toContain("function goalLoanAssetAt(L,age){return L.kind==='car'?carValueAt(L,age):(age>=L.handoverAge?L.price:housePaidBy(L,age));}");
     expect(HTML).toContain("function housePaySchedule(g,buyAge,price,loan){");

@@ -52,6 +52,7 @@ export const AN_MODULES: AnModuleDef[] = [
   { k: "property", t: "購屋規劃", g: "goal", cond: "只在有置產目標時出現" },
   { k: "car", t: "購車規劃", g: "goal", cond: "只在購車目標選了取得方式時出現" },
   { k: "cross", t: "財務十字表", g: "now" },
+  { k: "inflow", t: "未來會進來的錢", g: "now", cond: "只在有資產到期回收或預期入帳時出現" },
   { k: "timeline", t: "財務目標歷程", g: "future" },
   { k: "tax", t: "稅賦分析", g: "now" },
   { k: "alloc", t: "建議資產配置", g: "rx" },

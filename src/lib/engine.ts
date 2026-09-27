@@ -353,6 +353,80 @@ function aLiquid(c,a){return aCls(a,n(((c||{}).profile||{}).age))==='流動';}
 function aMatured(c,a){var m=n((a||{}).matureAge);return m>0&&n(((c||{}).profile||{}).age)>=m;}
 function liquidMovable(c){return sum(c.assets,function(a){return (aLiquid(c,a)&&a.movable)?aVal(a):0})}
 
+// ===== 未來入帳（2026/09/27 Ray）：資產到期回收 ＋ 預期入帳 =====
+// ⚠️ 改版前：固定資產永遠鎖在投影的 fixedAssets——借出款三年後收回、債券到期還本這種錢，
+//    既不會在那一年變成現金、也不會進主池再投資；「到期年齡」只做現值快照（被動流停算、流動性翻流動）。
+// 語意：
+//  ・資產列：matureAge（既有）＋ matureAmt（到期回收金額，原幣，留空＝現值）＋ matureMode 一次／分期 ＋ matureYears。
+//    到期那一年（分期：那幾年平均）回收金額進主池；固定資產按已回收比例減少；被動現金流按剩餘本金比例遞減。
+//    只有「今天不流動」的資產才有本金進主池——流動資產本來就在主池裡，到期只停算被動流。
+//  ・預期入帳 futureInflows[]：還不是資產的錢（事業出場、一次性分紅、遺產…）。入帳＝金額×把握度%，
+//    只折投影，不動現值與淨值。可指定 sellAid：那一年起該資產離開固定資產（一筆資產只能被一個事件賣掉，換屋／換車先）。
+//  ⚠️ 兩邊都沒填時，投影每一行退化成改版前的算式（既有客戶一位不動，engine.drift 有測試守著）。
+//  ⚠️ 已填 matureAge 的既有客戶投影**會動**：本金開始進池、到期後被動流在逐年裡真的停——這是修正不是回歸。
+// ⚠️ set() 的 num 型把空字串存成 0，所以「沒填／清空」＝現值一律用 >0 判斷。
+function matureAmount(a){return n(a.matureAmt)>0?n(a.matureAmt)*(n(a.fxRate)||1):aVal(a);}
+function assetMaturities(c,sold){
+ var a0=n(((c||{}).profile||{}).age),out=[];
+ ((c||{}).assets||[]).forEach(function(a,i){
+  if(!a)return;var m=n(a.matureAge);if(!(m>a0))return;      // 已過到期年齡：本金已在主池（aLiquid）、被動流已停（aMatured）
+  if(sold&&a.aid){for(var k=0;k<sold.length;k++)if(sold[k].aid===a.aid&&n(sold[k].age)<=m)return;}   // 先被賣掉的不再到期
+  var years=(a.matureMode==='分期')?Math.max(1,Math.round(n(a.matureYears))||1):1;
+  var liquid=aLiquid(c,a);                                   // 今天就流動：本金已在主池，只管被動流停算
+  var total=liquid?0:matureAmount(a);
+  out.push({aid:a.aid||'',idx:i,age:m,years:years,perYear:total/years,total:total,value:aVal(a),liquid:liquid,name:a.name||a.type||'資產',kind:'mature'});
+ });
+ return out;
+}
+// 那一年結束時已回收的比例（一次：到期年 1；分期：(age−到期年+1)/年數）。
+function matureRatio(x,age){if(age<x.age)return 0;return Math.min(1,(age-x.age+1)/x.years);}
+// 那一年進主池的錢（到期回收與預期入帳同一種形狀）。
+function yearInflow(L,age){var s=0;for(var i=0;i<L.length;i++){var x=L[i];if(age>=x.age&&age<x.age+x.years)s+=x.perYear;}return s;}
+function expectedInflows(c,sold){
+ var a0=n(((c||{}).profile||{}).age),out=[];
+ ((c||{}).futureInflows||[]).forEach(function(x,i){
+  if(!x||x.on===false)return;
+  var age=n(x.age);if(!(age>=a0))return;
+  var prob=(x.prob==null||x.prob==='')?100:Math.max(0,Math.min(100,n(x.prob)));
+  var gross=n(x.amount),total=gross*prob/100;
+  var years=(x.mode==='分期')?Math.max(1,Math.round(n(x.years))||1):1;
+  var aid='';
+  if(x.sellAid){var a=null;((c.assets)||[]).forEach(function(q){if(q&&q.aid===x.sellAid)a=q;});
+   var taken=false;if(sold)for(var k=0;k<sold.length;k++)if(sold[k].aid===x.sellAid)taken=true;
+   if(a&&!taken)aid=x.sellAid;}
+  if(!(total>0)&&!aid)return;
+  out.push({idx:i,age:age,years:years,perYear:total/years,total:total,gross:gross,prob:prob,aid:aid,name:x.name||x.source||'預期入帳',source:x.source||'',kind:'expect'});
+ });
+ return out;
+}
+// 逐年的被動現金流：有到期的資產按「剩餘本金比例」遞減（一次：到期年起 0，與 aMatured 同一年）；其餘與 assetPassive 一樣。
+function assetPassiveAt(c,M,age){
+ var s=0,assets=(c.assets||[]);
+ for(var i=0;i<assets.length;i++){var a=assets[i];if(!a)continue;
+  if(aMatured(c,a))continue;
+  var p=aInc(a);if(!(p>0))p=n(a.ret)>0?aVal(a)*n(a.ret)/100:0;
+  if(!(p>0))continue;
+  for(var k=0;k<M.length;k++)if(M[k].idx===i){p*=1-matureRatio(M[k],age);break;}
+  s+=p;}
+ return s;
+}
+// 固定資產裡「那一年已經不在了」的部分：被賣掉的整筆、到期回收的按比例（同一筆只算一種）。
+function fixedGone(c,M,sold,age){
+ var s=0,assets=(c.assets||[]);
+ for(var i=0;i<assets.length;i++){var a=assets[i];if(!a||aLiquid(c,a))continue;
+  var x=null;for(var k=0;k<M.length;k++)if(M[k].idx===i&&!M[k].liquid){x=M[k];break;}
+  if(x)s+=x.value*matureRatio(x,age);
+  else if(soldAsset(sold,a,age))s+=aVal(a);}
+ return s;
+}
+// 事件清單（分析頁時間軸、報告書、財務流圖旗子共用）：到期回收＋預期入帳，依年排序。
+function futureInflowEvents(c){
+ var hS=houseSales(c),F=expectedInflows(c,hS);
+ var soldAll=hS.concat(F.filter(function(x){return !!x.aid}));
+ var M=assetMaturities(c,soldAll).filter(function(x){return x.total>0});
+ return M.concat(F).sort(function(a,b){return a.age-b.age});
+}
+
 // ---------- 願景選定閘 ----------
 // 財務規劃的第一步是「先選定要執行哪些願景」，沒選的完全不進計算：
 // 不進一生需求、不上時間軸、也不會被壓縮槓桿動到。
@@ -1583,6 +1657,10 @@ function projection(c,lump,rateOverride){
  // 購置目標的貸款（見 goalLoans 上方）。空陣列時下面每一行都退化成改版前的算式。
  var gLoans=goalLoans(c);
  var hSales=houseSales(c);   // 換屋：賣屋所得那一年進主池、房子與房貸從那一年起拿掉
+ // 未來入帳（2026/09/27）：預期入帳可指定賣掉一筆資產；資產到期回收。兩邊都空時每一行退化成改版前。
+ var fIn=expectedInflows(c,hSales);
+ var soldAll=hSales.concat(fIn.filter(function(x){return !!x.aid}));
+ var mats=assetMaturities(c,soldAll);
  var rows=[],turnNeg=null,totalOut=0;
  var eduByYear={}; var g=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){var ag=s+yy;eduByYear[ag]=(eduByYear[ag]||0)+n(e.annual)*Math.pow(1+g,n(e.startIn)+yy)}});
@@ -1602,7 +1680,7 @@ function projection(c,lump,rateOverride){
  for(var age=a0;age<=aEnd;age++){
   var t=age-a0;
   var workIncome=sum(c.incomes,function(i){return (i.type==='工作'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
-  var finIncome=sum(c.incomes,function(i){return (i.type==='理財'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0})+assetPassive(c);
+  var finIncome=sum(c.incomes,function(i){return (i.type==='理財'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0})+assetPassiveAt(c,mats,age);
   var otherIncome=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
   var income=workIncome+finIncome+otherIncome;
   // 三段式：w＝已退休賺薪成員的支出比例權重。生活/消費依 w 從工作期換到退休期。
@@ -1611,6 +1689,7 @@ function projection(c,lump,rateOverride){
   var expense=workPhaseExpense(c,age,inflF,w);
   var debt=sum(c.liabilities,function(l){return soldLiab(hSales,l,age)?0:debtPayAt(l,age,a0)})+sum(gLoans,function(L){return goalLoanPayAt(L,age,a0)});
   var saleIn=houseSaleIn(hSales,age);
+  var inflowY=yearInflow(mats,age)+yearInflow(fIn,age);   // 到期回收＋預期入帳：那一年進主池
   // 有貸款計畫的那幾筆只扣頭期款，貸款那一段走上面的 debt。
   // 有貸款計畫的目標走付款時程（可能跨好幾年：預售的訂簽開→工程期款→交屋）；其餘照舊在目標那一年一次扣。
   var goalOut=sum(gLoans,function(L){return housePayAt(L,age)});
@@ -1655,7 +1734,7 @@ function projection(c,lump,rateOverride){
   });
   var potSum=0;for(var _pk in pots){if(pots.hasOwnProperty(_pk))potSum+=pots[_pk];}
 
-  var bal=income-expense-debt-goalOut-edu-life-retireDraw+actIn-actOut-actPay+saleIn;
+  var bal=income-expense-debt-goalOut-edu-life-retireDraw+actIn-actOut-actPay+saleIn+inflowY;
   invest=(invest>0?invest*(1+ret):invest)+bal;
   raw=raw*(1+ret)+bal;
   var df=Math.pow(1+ret,t+1);
@@ -1672,7 +1751,8 @@ function projection(c,lump,rateOverride){
   // 買下來的房子從購置年起進固定資產。⚠️ 以購置當年的價格計、之後不再增值——
   // 保守，也避免「房價自己漲出淨值」這種一被問就站不住的數字。
   // 交屋前已付的期款也是資產（預付給建商的錢），淨值不會憑空少一塊。
-  var fixedAt=fixedAssets-sum(c.assets,function(a){return (!aLiquid(c,a)&&soldAsset(hSales,a,age))?aVal(a):0})+sum(gLoans,function(L){return goalLoanAssetAt(L,age)});
+  // 賣掉的整筆、到期回收的按比例離開固定資產（fixedGone；兩邊都空時＝改版前只扣賣屋那一段）。
+  var fixedAt=fixedAssets-fixedGone(c,mats,soldAll,age)+sum(gLoans,function(L){return goalLoanAssetAt(L,age)});
   var netEst=totalInv+fixedAt-remDebt;
 
   // 願景事件的可負擔性標記。
@@ -1685,8 +1765,13 @@ function projection(c,lump,rateOverride){
    evts.push({kind:'goal',age:age,name:(gg.name||gg.type||'目標'),amount:n(gg.present),ok:totalInv>=0});
   });
 
-  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst,liab:remDebt,fixed:fixedAt});
+  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst,liab:remDebt,fixed:fixedAt,inflow:inflowY});
  }
+ // 未來入帳：到期回收與預期入帳各插一支旗（分期用 span 表示那幾年）。是流入，ok 一律 true。
+ mats.concat(fIn).forEach(function(x){
+  if(!(x.total>0))return;
+  evts.push({kind:'inflow',age:x.age,span:(x.years>1?x.age+x.years-1:undefined),name:x.name,amount:x.total,ok:true});
+ });
  // 子女教育是連續好幾年的支出，不是單一事件——逐年插旗會在圖上排出六支「子女教育」，
  // 把整張時間軸擠爆。合併成一個區段：起於第一個繳費年，全程不轉負才算做得到。
  var eduAges=Object.keys(eduByYear).map(Number).filter(function(a){return eduByYear[a]>0}).sort(function(x,y){return x-y});
@@ -2378,7 +2463,6 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  var a0=n(c.profile.age)||40,aEnd=effHorizon(c),years=Math.max(0,aEnd-a0+1);
  var bR=n(c.params.invReturn),sR=n(c.params.invReturnStd),bI=n(c.params.inflation),sI=n(c.params.inflationStd),bG=n(c.params.salaryGrowth),sG=n(c.params.salaryStd);
  var liquid0=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
- var passive=assetPassive(c);
  var workBase=sum(c.incomes,function(i){return i.type==='工作'?n(i.amount):0});
  var edu=[];var g0=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){edu[s+yy]=(edu[s+yy]||0)+n(e.annual)*Math.pow(1+g0,n(e.startIn)+yy)}});
@@ -2387,13 +2471,18 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  //    貸款契約的金額本來就在簽約當下就固定了。
  var gLoansMC=goalLoans(c);
  var hSalesMC=houseSales(c);
+ // 未來入帳：與 projection() 同一份（確定性，不隨抽樣走）。
+ var fInMC=expectedInflows(c,hSalesMC);
+ var matsMC=assetMaturities(c,hSalesMC.concat(fInMC.filter(function(x){return !!x.aid})));
+ var passiveAt=[];for(var pa=a0;pa<=aEnd;pa++)passiveAt[pa]=assetPassiveAt(c,matsMC,pa);
+ var inflowAt=[];for(var ia=a0;ia<=aEnd;ia++)inflowAt[ia]=yearInflow(matsMC,ia)+yearInflow(fInMC,ia);
  var matrix=[],finals=[],neg=0;
  for(var s=0;s<N;s++){var invest=liquid0,cumI=1,cumG=1,broke=false,traj=[];
   for(var age=a0;age<=aEnd;age++){var t=age-a0;
    var ret=gauss(rng,bR,sR)/100,infl=gauss(rng,bI,sI)/100,sg=gauss(rng,bG,sG)/100;
    var work=(function(){var w=0;c.incomes.forEach(function(i){if(i.type==='工作'&&inSpan(i,age))w+=n(i.amount)*cumG});return w})();
    var other=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&inSpan(i,age))?n(i.amount):0});
-   var fin=sum(c.incomes,function(i){return (i.type==='理財'&&inSpan(i,age))?n(i.amount):0})+passive;
+   var fin=sum(c.incomes,function(i){return (i.type==='理財'&&inSpan(i,age))?n(i.amount):0})+passiveAt[age];
    var income=work+other+fin;
    var wMC=retiredWeight(c,age);
    var expense=workPhaseExpense(c,age,cumI,wMC);
@@ -2409,7 +2498,7 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
    var eduY=edu[age]||0;
    var lifeY=lifestyleFactor(c,age,cumI);
    var retireDraw=retireAnnual(c,age,cumI)*wMC;
-   invest=(invest>0?invest*(1+ret):invest)+(income-expense-debt-goalOut-eduY-lifeY-retireDraw+houseSaleIn(hSalesMC,age));
+   invest=(invest>0?invest*(1+ret):invest)+(income-expense-debt-goalOut-eduY-lifeY-retireDraw+houseSaleIn(hSalesMC,age)+inflowAt[age]);
    if(invest<0)broke=true;
    traj.push(invest);
    cumI*=(1+infl);cumG*=(1+sg);
@@ -2998,6 +3087,14 @@ export {
   needOvr,
   housePaySchedule,
   houseSales,
+  assetMaturities,
+  matureAmount,
+  matureRatio,
+  yearInflow,
+  expectedInflows,
+  assetPassiveAt,
+  fixedGone,
+  futureInflowEvents,
   houseDeco,
   goalLoanPayAt,
   goalLoanRemain,
