@@ -500,7 +500,8 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(HTML).toContain("(arr||[]).forEach(function(it){if(!visionOn(it))return;if(inSpan(it,age))");
     // 2026/08/30：purchase-loan 之後 goalOut 從 sum() 換成帶索引的 forEach（要認得出「這一筆有沒有貸款」），
     // 攔截點本身沒有搬家——projection 與 monteCarlo 各一處。
-    expect(HTML.match(/if\(!visionOn\(gg\)\)return;if\(!inSpan\(gg,age\)\)return;/g)?.length).toBe(2);
+    // 2026/09/27：有貸款計畫的目標先走付款時程（housePayAt），攔截點拆成兩行——projection 與 monteCarlo 各一處。
+    expect(HTML.match(/if\(!visionOn\(gg\)\)return;\n\s*var gl=null;/g)?.length).toBe(2);
     expect(HTML).toContain("return visionOn(g)?Math.max(0,n(g.present)-goalFloor(g)):0");
     expect(HTML).toContain("(a.goals||[]).forEach(function(g){if(!visionOn(g))return;var f=goalFloor(g)");
     expect(HTML).toContain("function legacyNeed(c){var lg=c.legacy||{};if(lg.on===false)return 0;");
