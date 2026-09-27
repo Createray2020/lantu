@@ -160,7 +160,7 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(HTML).toContain("function goalLoans(c){");
     expect(HTML).toContain("  if(!(ratio>0&&rate>0&&yrs>0))return;");
     // 2026/09/27：交屋年才進房子、交屋前已付期款當固定資產（預售）
-    expect(HTML).toContain(" var fixedAt=fixedAssets+sum(gLoans,function(L){return age>=L.handoverAge?L.price:housePaidBy(L,age)});".trim());
+    expect(HTML).toContain(" var fixedAt=fixedAssets-sum(c.assets,function(a){return (!aLiquid(c,a)&&soldAsset(hSales,a,age))?aVal(a):0})+sum(gLoans,function(L){return age>=L.handoverAge?L.price:housePaidBy(L,age)});".trim());
     expect(HTML).toContain("function housePaySchedule(g,buyAge,price,loan){");
     expect(HTML).toContain(" if(!cond)return {deposit:0,progress:0,progressYears:0,agentFee:0,closingFee:0};");
   });

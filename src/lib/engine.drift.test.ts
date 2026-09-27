@@ -933,7 +933,7 @@ describe("雙實作對拍：死欄位接線（C1–C11）", () => {
     // 三個呼叫端一律走 debtPayAt（annualDebtPay / projection / monteCarlo）
     expect(HTML).toContain("function annualDebtPay(c){var a0=n(c.profile.age);return sum(c.liabilities,function(l){return debtPayAt(l,a0,a0)})}");
     // 2026/08/30：projection 與 monteCarlo 的 debt 都多接了購置貸款那一段（goalLoans）。
-    expect(HTML.match(/var debt=sum\(c\.liabilities,function\(l\)\{return debtPayAt\(l,age,a0\)\}\)\+sum\(gLoans(MC)?,function\(L\)\{return debtPayAt\(L\.liab,age,a0\)\}\);/g)?.length).toBe(2);
+    expect(HTML.match(/var debt=sum\(c\.liabilities,function\(l\)\{return soldLiab\(hSales(MC)?,l,age\)\?0:debtPayAt\(l,age,a0\)\}\)\+sum\(gLoans(MC)?,function\(L\)\{return debtPayAt\(L\.liab,age,a0\)\}\);/g)?.length).toBe(2);
     expect(HTML).not.toContain("(age>=sa&&(n(l.months)-el)>0)?lPay(l)*12:0");
 
     for (const mode of ["本息攤還", "只付利息", "暫緩還款", ""]) {

@@ -157,7 +157,7 @@ describe("目標／置產：上面點群，底下只出那一群", () => {
     go("goals");
     expect($$("#goalNav .grp").map((e) => e.dataset.g)).toEqual(["house", "car", "land", "care", "other"]);
     expect($$("#goalNav .grp.on").map((e) => e.dataset.g)).toEqual(["house"]);
-    const rowsIn = () => $$('.goalgrp table tr:not(.addtr) td:nth-child(2) input').map((e: HTMLInputElement) => e.value);
+    const rowsIn = () => $$('.goalgrp table tr:not(.addtr) td:nth-child(2) input').map((e) => (e as HTMLInputElement).value);
     expect(rowsIn()).toEqual(["換屋"]);
     expect($("#app").textContent).toContain("買房之後的持有成本");
     expect($("#app").textContent).toContain("購置試算");

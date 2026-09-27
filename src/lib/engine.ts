@@ -1316,6 +1316,37 @@ function goalLoans(c){
  return out;
 }
 
+// ═══ 換屋：賣掉現況房產（2026/09/27 Ray）═══════════════════════════════
+// 購屋目標可指定「賣掉哪一間」（g.sellAid → 資產列的 aid）與要清償的房貸（g.sellLid → 負債列的 lid）。
+// 賣屋年＝這筆購屋的交屋年（預售＝簽約＋工程年數；否則＝購置年）。那一年：
+//   ・賣屋所得＝現值×(1−賣屋費用%)−該房貸剩餘本金 → 一次進主池（拿去付頭期）
+//   ・那間房從固定資產拿掉；那筆房貸之後不再攤還、也不再算餘額
+// ⚠️ 只有資產列勾了「可變賣」（sellable）才賣——問卷本來就有這一題（Ray 定案）。
+// ⚠️ 現值用今天的數字（跟「房子以購置當年價格計、之後不增值」同一條保守規則）。
+var HOUSE_SALE_FEE_DEFAULT=2;   // 賣屋仲介費 %（起手值）
+function houseSales(c){
+ var a0=n(((c||{}).profile||{}).age),out=[];
+ var gl=goalLoans(c);
+ ((c||{}).goals||[]).forEach(function(g,idx){
+  if(!g||!visionOn(g))return;
+  if(g.type!=='購屋'&&g.type!=='置產')return;
+  if(!g.sellAid)return;
+  var a=null;((c.assets)||[]).forEach(function(x){if(x&&x.aid===g.sellAid)a=x;});
+  if(!a||!a.sellable)return;
+  var L=null;for(var i=0;i<gl.length;i++)if(gl[i].idx===idx)L=gl[i];
+  var age=L?L.handoverAge:n(g.start);if(!(age>=a0))return;
+  var lid=g.sellLid||'',l=null;((c.liabilities)||[]).forEach(function(x){if(x&&lid&&x.lid===lid)l=x;});
+  var fee=(g.sellFee==null||g.sellFee==='')?HOUSE_SALE_FEE_DEFAULT:n(g.sellFee);
+  var gross=aVal(a)*(1-fee/100),owed=l?lRemain(l,age,a0):0;
+  out.push({idx:idx,age:age,aid:a.aid,lid:lid,value:aVal(a),gross:gross,owed:owed,net:gross-owed,fee:fee,name:a.name||'現況房產'});
+ });
+ return out;
+}
+function houseSaleIn(S,age){var s=0;for(var i=0;i<S.length;i++)if(S[i].age===age)s+=S[i].net;return s;}
+// 賣掉之後：那間房不在固定資產裡、那筆房貸不再攤還也沒有餘額。
+function soldAsset(S,a,age){for(var i=0;i<S.length;i++)if(S[i].aid&&a&&a.aid===S[i].aid&&age>=S[i].age)return true;return false;}
+function soldLiab(S,l,age){for(var i=0;i<S.length;i++)if(S[i].lid&&l&&l.lid===S[i].lid&&age>=S[i].age)return true;return false;}
+
 function propertyGaps(c){
  return (c.goals||[]).filter(function(g){return g.type==='購屋'||g.type==='置產'}).map(function(g){
   var years=n(g.start)-n(c.profile.age);
@@ -1439,6 +1470,7 @@ function projection(c,lump,rateOverride){
  var fixedAssets=sum(c.assets,function(a){return aLiquid(c,a)?0:aVal(a)});
  // 購置目標的貸款（見 goalLoans 上方）。空陣列時下面每一行都退化成改版前的算式。
  var gLoans=goalLoans(c);
+ var hSales=houseSales(c);   // 換屋：賣屋所得那一年進主池、房子與房貸從那一年起拿掉
  var rows=[],turnNeg=null,totalOut=0;
  var eduByYear={}; var g=n(c.params.tuitionGrowth)/100;
  (c.education||[]).forEach(function(e){var s=a0+n(e.startIn);for(var yy=0;yy<n(e.years);yy++){var ag=s+yy;eduByYear[ag]=(eduByYear[ag]||0)+n(e.annual)*Math.pow(1+g,n(e.startIn)+yy)}});
@@ -1465,7 +1497,8 @@ function projection(c,lump,rateOverride){
   var inflF=Math.pow(1+infl,t);
   var w=retiredWeight(c,age);
   var expense=workPhaseExpense(c,age,inflF,w);
-  var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)})+sum(gLoans,function(L){return debtPayAt(L.liab,age,a0)});
+  var debt=sum(c.liabilities,function(l){return soldLiab(hSales,l,age)?0:debtPayAt(l,age,a0)})+sum(gLoans,function(L){return debtPayAt(L.liab,age,a0)});
+  var saleIn=houseSaleIn(hSales,age);
   // 有貸款計畫的那幾筆只扣頭期款，貸款那一段走上面的 debt。
   // 有貸款計畫的目標走付款時程（可能跨好幾年：預售的訂簽開→工程期款→交屋）；其餘照舊在目標那一年一次扣。
   var goalOut=sum(gLoans,function(L){return housePayAt(L,age)});
@@ -1510,7 +1543,7 @@ function projection(c,lump,rateOverride){
   });
   var potSum=0;for(var _pk in pots){if(pots.hasOwnProperty(_pk))potSum+=pots[_pk];}
 
-  var bal=income-expense-debt-goalOut-edu-life-retireDraw+actIn-actOut-actPay;
+  var bal=income-expense-debt-goalOut-edu-life-retireDraw+actIn-actOut-actPay+saleIn;
   invest=(invest>0?invest*(1+ret):invest)+bal;
   raw=raw*(1+ret)+bal;
   var df=Math.pow(1+ret,t+1);
@@ -1523,11 +1556,11 @@ function projection(c,lump,rateOverride){
   totalOut+=expense+debt+goalOut+edu+life+retireDraw;
   var totalInv=invest+potSum;
   if(turnNeg===null&&totalInv<0)turnNeg=age;
-  var remDebt=sum(c.liabilities,function(l){return lRemain(l,age,a0)})+sum(gLoans,function(L){return lRemain(L.liab,age,a0)});
+  var remDebt=sum(c.liabilities,function(l){return soldLiab(hSales,l,age)?0:lRemain(l,age,a0)})+sum(gLoans,function(L){return lRemain(L.liab,age,a0)});
   // 買下來的房子從購置年起進固定資產。⚠️ 以購置當年的價格計、之後不再增值——
   // 保守，也避免「房價自己漲出淨值」這種一被問就站不住的數字。
   // 交屋前已付的期款也是資產（預付給建商的錢），淨值不會憑空少一塊。
-  var fixedAt=fixedAssets+sum(gLoans,function(L){return age>=L.handoverAge?L.price:housePaidBy(L,age)});
+  var fixedAt=fixedAssets-sum(c.assets,function(a){return (!aLiquid(c,a)&&soldAsset(hSales,a,age))?aVal(a):0})+sum(gLoans,function(L){return age>=L.handoverAge?L.price:housePaidBy(L,age)});
   var netEst=totalInv+fixedAt-remDebt;
 
   // 願景事件的可負擔性標記。
@@ -2241,6 +2274,7 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  // ⚠️ 頭期款用確定性的成長率算（goalLoans 內），不隨每一次抽樣的通膨走——
  //    貸款契約的金額本來就在簽約當下就固定了。
  var gLoansMC=goalLoans(c);
+ var hSalesMC=houseSales(c);
  var matrix=[],finals=[],neg=0;
  for(var s=0;s<N;s++){var invest=liquid0,cumI=1,cumG=1,broke=false,traj=[];
   for(var age=a0;age<=aEnd;age++){var t=age-a0;
@@ -2251,7 +2285,7 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
    var income=work+other+fin;
    var wMC=retiredWeight(c,age);
    var expense=workPhaseExpense(c,age,cumI,wMC);
-   var debt=sum(c.liabilities,function(l){return debtPayAt(l,age,a0)})+sum(gLoansMC,function(L){return debtPayAt(L.liab,age,a0)});
+   var debt=sum(c.liabilities,function(l){return soldLiab(hSalesMC,l,age)?0:debtPayAt(l,age,a0)})+sum(gLoansMC,function(L){return debtPayAt(L.liab,age,a0)});
    var goalOut=sum(gLoansMC,function(L){return housePayAt(L,age)});
    (c.goals||[]).forEach(function(gg,gi){
     if(!visionOn(gg))return;
@@ -2263,7 +2297,7 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
    var eduY=edu[age]||0;
    var lifeY=lifestyleFactor(c,age,cumI);
    var retireDraw=retireAnnual(c,age,cumI)*wMC;
-   invest=(invest>0?invest*(1+ret):invest)+(income-expense-debt-goalOut-eduY-lifeY-retireDraw);
+   invest=(invest>0?invest*(1+ret):invest)+(income-expense-debt-goalOut-eduY-lifeY-retireDraw+houseSaleIn(hSalesMC,age));
    if(invest<0)broke=true;
    traj.push(invest);
    cumI*=(1+infl);cumG*=(1+sg);
@@ -2846,6 +2880,7 @@ export {
   careCutCap,
   needOvr,
   housePaySchedule,
+  houseSales,
   housePayTpl,
   expenseCutCap,
   horizonManual,
