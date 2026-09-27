@@ -127,10 +127,14 @@ describe("流程推進與閘門", () => {
     expect(cur().flow.step).toBe("S4");
     expect(pane()).toContain("教練建議");
   });
-  it("S4 調整台：兩根拉桿（收入、支出），沒有第三根；理財在收入結構底下", () => {
+  it("S4 調整台：開頭是全生涯財務流；三根拉桿（願景延後、收入、支出）；理財在收入結構底下", () => {
     const h = pane();
-    expect(h).toContain("tunegap");
-    expect((h.match(/type="range" inputmode="numeric"/g) || []).length).toBe(2);
+    expect(h).toContain("全生涯財務流");
+    expect(h).toContain('data-calc="tuneHero"');
+    expect(h).toContain("tunekpis");
+    expect((h.match(/type="range" inputmode="numeric"/g) || []).length).toBe(3);
+    expect(h).toContain('class="tunelev vis"');
+    expect(h).toContain('onclick="flowTuneSelect(\'all\')"');
     expect(h).toContain("收入結構");
     expect(h).toContain("支出結構");
     expect(h).toContain("定期定額");
@@ -185,6 +189,57 @@ describe("流程推進與閘門", () => {
     expect(cur().flow.tune.exp).toBe(K.expCap);
     w.flowTuneExp(0);
     expect(cur().flow.tune.exp).toBe(0);
+  });
+  it("願景拉桿：點清單選哪一項就只延後那一項；「全部」每一項各自推；拉回 0 還原；閘門那一刻重打印記、留 vedit 決定", () => {
+    const c = cur();
+    const items = w.flowVisionList(c).filter((x: any) => w.flowTuneDelayable(x));
+    const g = items.find((x: any) => x.kind === "goal");
+    const other = items.find((x: any) => x.kind !== "goal" && x.key !== g.key);
+    expect(g).toBeTruthy(); expect(other).toBeTruthy();
+    const age0 = g.age, oage0 = other.age;
+    w.flowTuneSelect(g.key);
+    expect(pane()).toContain("只動：" + g.name);
+    w.flowTuneDelay(3);
+    const after = w.flowVisionList(c);
+    expect(after.find((x: any) => x.key === g.key).age).toBe(age0 + 3);
+    expect(after.find((x: any) => x.key === other.key).age).toBe(oage0);   // 沒選的那一項不動
+    expect(c.flow.tune.delay[g.key]).toBe(3);
+    expect(c.flow.tune.vbase[g.key]).toBe(age0);
+    expect(pane()).toContain("+3 年");
+    w.flowTuneDelay(0);
+    expect(w.flowVisionList(c).find((x: any) => x.key === g.key).age).toBe(age0);
+    w.flowTuneSelect("all");
+    w.flowTuneDelay(2);
+    w.flowVisionList(c).filter((x: any) => w.flowTuneDelayable(x)).forEach((x: any) => expect(c.flow.tune.delay[x.key]).toBe(2));
+    expect(w.flowVisionList(c).find((x: any) => x.key === g.key).age).toBe(age0 + 2);
+    // 原本 vs 拉完：原本那份把歲數還原、動作清空
+    const b = w.flowTuneBase(c);
+    expect(w.flowVisionList(b).find((x: any) => x.key === g.key).age).toBe(age0);
+    expect(b.actions.length).toBe(0);
+    // 閘門
+    const step = c.flow.step;
+    w.flowTuneGate({ closed: false, reason: "short", inc: 0, exp: 0, delay: c.flow.tune.delay }, "S6");
+    expect(c.flow.step).toBe("S6");
+    expect(c.flow.visionLock.editedBy).toBe("client");
+    expect(c.flow.decisions.vedit.text).toContain("客戶自己延後願景");
+    expect(c.flow.decisions.d5.delay[g.key]).toBe(2);
+    c.flow.step = step;
+    w.flowTuneSelect("all"); w.flowTuneDelay(0);
+    expect(w.flowVisionList(c).find((x: any) => x.key === g.key).age).toBe(age0);
+  });
+  it("抽屜直接改歲數＝新的原本：拉桿基準跟著換、延後歸零", () => {
+    const c = cur();
+    const g = w.flowVisionList(c).find((x: any) => x.kind === "goal");
+    w.flowVisionEdit(g.key, "age", String(g.age + 5));
+    expect(c.flow.tune.vbase[g.key]).toBe(g.age + 5);
+    expect(c.flow.tune.delay[g.key]).toBe(0);
+    w.flowVisionEdit(g.key, "age", String(g.age));
+  });
+  it("S2 願景清單同抽屜：每一項可以直接改歲數／金額", () => {
+    const c = cur();
+    const st = c.flow.step; c.flow.step = "S2"; w.render();
+    expect((pane().match(/class="vin"/g) || []).length).toBeGreaterThan(2);
+    c.flow.step = st; w.render();
   });
   it("單筆入口跟著可投資水位：investGate 三個數字算得出來", () => {
     const IG = w.investGate(cur());

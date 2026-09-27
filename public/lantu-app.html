@@ -1100,6 +1100,11 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .vitem .vt{flex:1;min-width:0}.vitem .vn{display:block}.vitem .vm{font-size:11px;color:var(--mut2);display:block}
 .vitem input[type=text]{width:72px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:2px 6px;font-size:12px}
 .stamp{font-size:11px;color:var(--mut2);margin-top:8px}
+.tunehero{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.tunehero .t{font-family:var(--serif);font-size:17px;font-weight:700;color:var(--amber2);margin-bottom:6px}.tunehero .t .hint{font-family:inherit;font-size:12px;font-weight:400;margin-left:8px}
+.tunekpis{margin:10px 0 0}.tunekpis .kpi{border-top-color:var(--amber);padding:10px 12px}.tunekpis .lb{font-size:11px;color:var(--mut)}.tunekpis .vv{font-family:var(--serif);font-size:20px;font-weight:700}.tunekpis .was{color:var(--mut2);font-weight:400;font-size:15px}
+.tunelev.vis input[type=range]{accent-color:var(--amber2)}.chip.moved{border-color:var(--ok);color:var(--ok)}.chip b{font-family:inherit}
+.vitem input.vin{width:72px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:2px 6px;font-size:12px}
 </style>
 </head>
 <body>
@@ -9758,7 +9763,9 @@ function flowBodyHTML(c){
    items.map(function(x){var t=x.target,mi=t?must.indexOf(t):-1,arrows='';
     if(t&&mi>=0&&!seen[t]){seen[t]=1;arrows='<span class="flowarr"><button class="tbtn sm" onclick="flowMoveTarget(\''+esc(t)+'\',-1)" '+(mi<=0?'disabled':'')+'>▲</button><button class="tbtn sm" onclick="flowMoveTarget(\''+esc(t)+'\',1)" '+(mi>=must.length-1?'disabled':'')+'>▼</button></span>'}
     var chk=x.ref?'<input type="checkbox" checked onchange="set(\''+x.ref.arr+':'+x.ref.i+'\',\'on\',this.checked,\'bool\');render()">':(x.kind==='legacy'?'<input type="checkbox" checked onchange="setObj(\'legacy\',\'on\',this.checked);render()">':'<span style="width:17px;display:inline-block"></span>');
-    return '<div class="vitem"><span class="pr">'+x.pos+'</span>'+chk+'<div class="vt"><div class="vn">'+esc(x.name)+'</div><div class="vm">'+x.age+(x.span?'–'+x.span:'')+' 歲　'+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+(x.rank>=99?'　<span class="hint">未列必達</span>':'')+'</div></div>'+flowMark(x.ok)+arrows+'</div>'}).join('')+
+    return '<div class="vitem"><span class="pr">'+x.pos+'</span>'+chk+'<div class="vt"><div class="vn">'+esc(x.name)+'</div><div class="vm">'+x.age+(x.span?'–'+x.span:'')+' 歲　'+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+(x.rank>=99?'　<span class="hint">未列必達</span>':'')+'</div></div>'+
+     ((x.kind==='goal'||x.kind==='wish'||x.kind==='retire')?'<input type="text" inputmode="numeric" class="vin" value="'+x.age+'" title="歲" onchange="flowVisionEdit(\''+esc(x.key)+'\',\'age\',this.value)">':'')+
+     ((x.kind==='goal'||x.kind==='wish'||x.kind==='legacy')?'<input type="text" inputmode="numeric" class="vin" value="'+fmt(x.kind==='legacy'?n((c.legacy||{}).perHeirCash):x.amount)+'" title="金額" onchange="flowVisionEdit(\''+esc(x.key)+'\',\'amt\',this.value.replace(/,/g,\'\'))">':'')+flowMark(x.ok)+arrows+'</div>'}).join('')+
    flowGate('鎖定願景清單（定案版）','<button class="tbtn amber" onclick="flowLockVision()">鎖定 · 打版本印記</button><span class="hint">鎖定會記 visionLock，之後願景只能由客戶自己升級或放手</span>','客戶');
  }
  if(s==='S2g'){var Gd=guardCheck(c);
@@ -10101,22 +10108,74 @@ function flowTuneExp(v){
 }
 function flowTuneSyncExp(c){var t=flowTuneState(c),s=0;(c.actions||[]).forEach(function(a){if(a.on!==false&&a.cat==='expense'&&a.lane==='expense')s+=n(a.getMonthly)});t.exp=Math.round(s)}
 function flowTuneLive(k,v){ // 拖曳中只換數字，放開（onchange）才重算
- var el=document.getElementById(k==='inc'?'tuneIncV':'tuneExpV');if(el)el.textContent=(k==='inc'?'+':'−')+fmt(v);
+ var el=document.getElementById(k==='inc'?'tuneIncV':(k==='vis'?'tuneVisV':'tuneExpV'));if(el)el.textContent=k==='vis'?('+'+n(v)+' 年'):((k==='inc'?'+':'−')+fmt(v));
+}
+/* ---------- 波 10：調整台三根拉桿（願景延後・收入・支出）＋ 全生涯財務流開頭（2026/09/28 Ray）----------
+   Ray：方案最上面用「全生涯財務流」開頭，缺口從那張圖抓。三根拉桿都放上去：
+   ① 願景（延後）：點右邊願景清單裡的哪一項，拉桿就只動那一項；點「全部」才整批推（C 結構）。
+   ② 增加收入 ③ 減少支出：照波 9。
+   延後是客戶自己動自己的時間，不是教練砍願景——原本的歲數記在 f.tune.vbase，拉回 0 就還原。 */
+function flowVisionSetAge(c,it,v){ // 回一句「原本 → 現在」；不 save、不 render
+ var desc='';
+ if(it.kind==='goal'&&it.ref){var g=c.goals[it.ref.i];desc=n(g.start)+' → '+v+' 歲';var d=v-n(g.start);g.start=v;if(n(g.end)>0)g.end=n(g.end)+d}
+ else if(it.kind==='wish'&&it.ref){var w=c[it.ref.arr][it.ref.i];desc=n(w.start)+' → '+v+' 歲';var d2=v-n(w.start);w.start=v;w.end=n(w.end)+d2}
+ else if(it.kind==='retire'){var rA=n(c.profile.retireAge)||65;desc=rA+' → '+v+' 歲';applyRetireDelay(c,v-rA)}
+ else return null;
+ return desc;
+}
+function flowTuneDelayable(x){return x.kind==='goal'||x.kind==='wish'||x.kind==='retire'}
+function flowTuneVSel(c){var t=flowTuneState(c);return t.vsel||'all'}
+function flowTuneSelect(key){var c=activeCase();var t=flowTuneState(c);t.vsel=key;save();render()}
+function flowTuneDelayOf(c,key){var t=flowTuneState(c);t.delay=t.delay||{};return n(t.delay[key])}
+/* 願景拉桿：v 年。選「全部」→ 每一項都從自己的原本歲數推 v 年；選某一項 → 只推那一項。 */
+function flowTuneDelay(v){
+ var c=activeCase();var f=flowOf(c);if(!f)return;var t=flowTuneState(c);t.delay=t.delay||{};t.vbase=t.vbase||{};
+ v=Math.max(0,Math.round(n(v)));var sel=flowTuneVSel(c),items=flowVisionList(c);
+ items.forEach(function(x){if(!flowTuneDelayable(x))return;if(sel!=='all'&&x.key!==sel)return;
+  if(t.vbase[x.key]==null)t.vbase[x.key]=x.age;
+  var to=t.vbase[x.key]+v;if(to>effHorizon(c))to=effHorizon(c);
+  if(to!==x.age)flowVisionSetAge(c,x,to);t.delay[x.key]=to-t.vbase[x.key]});
+ if(sel==='all')t.delay.all=v;
+ save();render();
+}
+function flowTuneDelayMax(c){var A=n(c.profile.age)||40;return Math.max(1,effHorizon(c)-A-1)}
+/* 「原本」＝沒有動作、願景回到原本歲數的那一份（只給對照數字用，不寫回） */
+function flowTuneBase(c){
+ var b=baseCase(c),t=flowTuneState(c),vb=t.vbase||{};
+ if(Object.keys(vb).length){flowVisionList(b).forEach(function(x){if(vb[x.key]!=null&&vb[x.key]!==x.age)flowVisionSetAge(b,x,vb[x.key])})}
+ return b;
+}
+function flowTuneKpi(pb,pa){
+ function fn(p){var a=null;p.rows.forEach(function(r){if(a===null&&r.bal<0)a=r.age});return a}
+ var rows=[['首次入不敷出',fn(pb),fn(pa),function(v){return v!==null?v+' 歲':'都有結餘'}],
+  ['存量用完',pb.turnNeg||null,pa.turnNeg||null,function(v){return v?v+' 歲':'未用完'}],
+  ['現值缺口',n(pb.shortPV),n(pa.shortPV),function(v){return v>0.5?cfAxis(v):'0'}]];
+ return '<div class="kpis tunekpis">'+rows.map(function(k){var same=k[1]===k[2];
+  return '<div class="kpi"><div class="lb">'+k[0]+'</div><div class="vv">'+(same?k[3](k[2]):'<span class="was">'+k[3](k[1])+'</span> → '+k[3](k[2]))+'</div></div>'}).join('')+'</div>';
 }
 function flowTuneHTML(c){
- var f=flowOf(c),t=flowTuneState(c),K=flowTuneCaps(c),R=planImprove(c),pa=R.pa,pb=R.pb;
- var g0=pb.shortPV,g1=pa.shortPV,imp=g0>0.5?Math.max(0,Math.round((1-g1/g0)*100)):100;
+ var f=flowOf(c),t=flowTuneState(c),K=flowTuneCaps(c);
+ var pb=projection(flowTuneBase(c)),pa=projection(c);
+ var g0=pb.shortPV,g1=pa.shortPV;
  var aw=flowTuneAct(c,'tune:work'),ar=flowTuneAct(c,'tune:regular');
  var work=aw&&aw.on!==false?n(aw.getMonthly):0,fin=ar&&ar.on!==false?n(ar.payMonthly):0;
  var incTot=K.workM+K.finM+K.othM;
  var IG=investGate(c);
- // 缺口條
- var gap='<div class="tunegap"><div><div class="lbl">現值缺口</div><div class="big '+(g0>0.5?'bad':'ok')+'">'+(g0>0.5?cfAxis(g0):'無缺口')+'</div></div>'+
-  '<div class="arrow">→</div><div><div class="lbl">拉完之後</div><div class="big '+(g1<=0.5?'ok':(imp>=50?'warn':'bad'))+'">'+(g1<=0.5?'已補平':cfAxis(g1))+'</div></div>'+
-  '<div class="meta">改善 '+imp+'%<br>'+(pa.turnNeg!=null?'存量用完 '+pa.turnNeg+' 歲':'存量不會用完')+'　·　願景達成 '+R.okCnt+' / '+R.total+'</div></div>'+
-  '<div class="tunemeter"><i style="width:'+(g0>0.5?Math.round(g1/g0*100):0)+'%"></i><b style="width:'+(g0>0.5?100-Math.round(g1/g0*100):100)+'%"></b></div>';
- // 兩根拉桿
- var lev='<div class="tunelev rec"><div class="nm">收入<span class="tag">先動這根</span><small>工作＋理財</small></div>'+
+ // 開頭：全生涯財務流（同分析頁首屏那張圖，畫的是拉完之後）＋ 原本 → 拉完 三個數字
+ var hero='<div class="tunehero"><div class="t">全生涯財務流 <span class="hint">畫的是拉完之後；三個數字左邊原本、右邊拉完。缺口從這張圖抓，不另做一條。</span></div>'+
+  '<div data-calc="tuneHero">'+annualBalanceSVG(pa,'dark')+'</div>'+flowTuneKpi(pb,pa)+'</div>';
+ // ① 願景拉桿：點清單選哪一項
+ var items=flowVisionList(c),sel=flowTuneVSel(c),selIt=null;items.forEach(function(x){if(x.key===sel)selIt=x});
+ if(sel!=='all'&&!selIt){sel='all';t.vsel='all'}
+ var dv=sel==='all'?n((t.delay||{}).all):flowTuneDelayOf(c,sel),dmax=flowTuneDelayMax(c);
+ var chips='<span class="chip'+(sel==='all'?' on':'')+'" onclick="flowTuneSelect(\'all\')">全部</span>'+
+  items.filter(flowTuneDelayable).map(function(x){var d=flowTuneDelayOf(c,x.key);return '<span class="chip'+(sel===x.key?' on':'')+(d?' moved':'')+'" onclick="flowTuneSelect(\''+esc(x.key)+'\')">'+x.pos+' '+esc(x.name)+' '+x.age+'歲'+(d?' <b>+'+d+'</b>':'')+'</span>'}).join('');
+ var vlev='<div class="tunelev vis"><div class="nm">願景<span class="tag">先動這根</span><small>'+(sel==='all'?'全部一起延後':'只動：'+esc(selIt.name))+'</small></div>'+
+  '<div><input type="range" inputmode="numeric" min="0" max="'+dmax+'" step="1" value="'+dv+'" oninput="flowTuneLive(\'vis\',this.value)" onchange="flowTuneDelay(this.value)"><div class="cap"><span>不延</span><span>延後幾年（客戶自己拉；拉回 0 就還原）</span></div>'+
+  '<div class="chips">'+chips+'</div></div>'+
+  '<div class="val"><div class="v" id="tuneVisV">+'+dv+' 年</div><div class="p">'+(sel==='all'?'每一項各自往後推':(t.vbase&&t.vbase[sel]!=null?t.vbase[sel]+' → '+selIt.age+' 歲':selIt.age+' 歲'))+'</div></div></div>';
+ // ② ③ 收入・支出拉桿
+ var lev='<div class="tunelev rec"><div class="nm">收入<small>工作＋理財</small></div>'+
   '<div><input type="range" inputmode="numeric" min="0" max="'+K.incMax+'" step="500" value="'+t.inc+'" oninput="flowTuneLive(\'inc\',this.value)" onchange="flowTuneInc(this.value)"><div class="cap"><span>0</span><span>上限 +'+fmt(K.incMax)+'／月（工作 '+CAP_INCOME_UP+'% '+fmt(K.workCap)+(K.finRoom?' ＋ 理財 '+fmt(K.finRoom):'')+'）</span></div></div>'+
   '<div class="val"><div class="v" id="tuneIncV">+'+fmt(t.inc)+'</div><div class="p">／月　+'+(incTot?r1(t.inc/incTot*100):0)+'%</div></div></div>'+
   '<div class="tunelev exp"><div class="nm">支出<small>客戶自己標留／放</small></div>'+
@@ -10149,22 +10208,34 @@ function flowTuneHTML(c){
   '<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px"><input type="checkbox" '+(f.reflow?'checked':'')+' onchange="flowToggleReflow(this.checked)" style="accent-color:var(--amber);width:15px;height:15px"> 放掉的結餘投入定期定額</label>'+
   '<div class="hint" style="margin-top:4px">拉桿拉多少，由上到下配到「放」「半」；客戶自己點標記，拉桿跟著走。固定與必達那幾列拉桿碰不到。</div></div>';
  var closed=g1<=0.5&&!pa.firstFail;
- return flowAsk('拉收入、拉支出，缺口當場重算。理財是收入的一部分，動收入時在底下展開。願景不動——要改就從右邊「願景」抽屜拉出來。')+
-  gap+'<div style="margin-top:12px">'+lev+'</div><div class="tunecols">'+incCol+expCol+'</div>'+
+ var dsum=[];items.forEach(function(x){var d=flowTuneDelayOf(c,x.key);if(d)dsum.push(x.name+' +'+d+'年')});
+ var dtxt=dsum.length?'願景延後 '+dsum.join('、')+'；':'';
+ var pay=function(closed,reason){return '{closed:'+closed+(reason?',reason:\''+reason+'\'':'')+',inc:'+t.inc+',exp:'+t.exp+',delay:'+JSON.stringify(t.delay||{}).replace(/"/g,'&quot;')+'}'};
+ return flowAsk('先看全生涯財務流，缺口在哪一年、多深。三根拉桿照順序：願景的時間客戶自己拉（點清單選哪一項），再拉收入，最後才拉支出。願景不砍——要改金額從右邊「願景」抽屜。')+
+  hero+'<div style="margin-top:12px">'+vlev+lev+'</div><div class="tunecols">'+incCol+expCol+'</div>'+
   flowGate('拉完之後',
-   '<button class="tbtn amber" '+(closed?'':'disabled')+' onclick="flowDecide(\'S4\',\'d5\',{closed:true,inc:'+t.inc+',exp:'+t.exp+'},\'調整台補平：收入 +'+fmt(t.inc)+'／月、支出 −'+fmt(t.exp)+'／月\',\'S6x\')">補平了 → 行動清單與下一步</button>'+
-   '<button class="tbtn ghost" onclick="flowDecide(\'S4\',\'d5\',{closed:false,reason:\'short\',inc:'+t.inc+',exp:'+t.exp+'},\'調整台拉完仍未補平（收入 +'+fmt(t.inc)+'、支出 −'+fmt(t.exp)+'／月），看後果\',\'S6\')">沒補平 → 看後果</button>'+
-   '<button class="tbtn ghost" onclick="flowDecide(\'S4\',\'d5\',{closed:false,reason:\'unwilling\',inc:'+t.inc+',exp:'+t.exp+'},\'客戶不願再動收入或支出，看後果\',\'S6\')">客戶不願意再動 → 看後果</button>','客戶拉、教練建議')+
-  '<div class="hint" style="margin-top:8px">按下去那一刻，拉桿位置就是行動清單裡的動作（工作收入提升、定期定額、各列的刪減）；之後執行期、回訪對帳照舊。</div>';
+   '<button class="tbtn amber" '+(closed?'':'disabled')+' onclick="flowTuneGate('+pay(true)+',\'S6x\')">補平了 → 行動清單與下一步</button>'+
+   '<button class="tbtn ghost" onclick="flowTuneGate('+pay(false,'short')+',\'S6\')">沒補平 → 看後果</button>'+
+   '<button class="tbtn ghost" onclick="flowTuneGate('+pay(false,'unwilling')+',\'S6\')">客戶不願意再動 → 看後果</button>','客戶拉、教練建議')+
+  '<div class="hint" style="margin-top:8px">'+dtxt+'按下去那一刻，拉桿位置就是行動清單裡的動作（工作收入提升、定期定額、各列的刪減）；願景延後會重打印記、留一條「客戶自己改的」決定。</div>';
+}
+function flowTuneGate(payload,next){
+ var c=activeCase();var f=flowOf(c);if(!f)return;var t=flowTuneState(c),items=flowVisionList(c),ds=[];
+ items.forEach(function(x){var d=flowTuneDelayOf(c,x.key);if(d)ds.push(x.name+' +'+d+' 年（'+(t.vbase[x.key])+' → '+x.age+' 歲）')});
+ if(ds.length){f.visionLock={at:new Date().toISOString(),revisionId:null,order:items.map(function(x){return x.key}),editedBy:'client'};
+  f.decisions=f.decisions||{};f.decisions.vedit={at:f.visionLock.at,step:'S4',key:'delay',text:'客戶自己延後願景：'+ds.join('、')};
+  try{if(typeof addNoteRaw==='function')addNoteRaw('flow:S4','decision','客戶自己延後願景：'+ds.join('、'),false)}catch(e){}}
+ var txt=(payload.closed?'調整台補平：':'調整台拉完仍未補平（'+(payload.reason==='unwilling'?'客戶不願再動':'')+'）：')+(ds.length?'願景延後 '+ds.length+' 項、':'')+'收入 +'+fmt(payload.inc)+'／月、支出 −'+fmt(payload.exp)+'／月';
+ flowDecide('S4','d5',payload,txt,next);
 }
 
 /* ---------- 願景抽屜：右緣收合，任何一步都能拉出來改；改了重打印記＋留一條「客戶自己改的」決定 ---------- */
 function flowVisionEdit(key,field,val){
  var c=activeCase();var f=flowOf(c);if(!f)return;var items=flowVisionList(c),it=null;items.forEach(function(x){if(x.key===key)it=x});if(!it)return;
  var v=n(val),desc='';
- if(it.kind==='goal'&&it.ref){var g=c.goals[it.ref.i];if(field==='age'){desc=n(g.start)+' → '+v+' 歲';var d=v-n(g.start);g.start=v;if(n(g.end)>0)g.end=n(g.end)+d}else{desc=fmt(g.present)+' → '+fmt(v);g.present=v}}
- else if(it.kind==='wish'&&it.ref){var w=c[it.ref.arr][it.ref.i];if(field==='age'){desc=n(w.start)+' → '+v+' 歲';var d2=v-n(w.start);w.start=v;w.end=n(w.end)+d2}else{desc=fmt(w.amount)+' → '+fmt(v);w.amount=v}}
- else if(it.kind==='retire'){var rA=n(c.profile.retireAge)||65;desc=rA+' → '+v+' 歲';applyRetireDelay(c,v-rA)}
+ if(field==='age'){desc=flowVisionSetAge(c,it,v);if(desc==null)return;var t=flowTuneState(c);t.vbase=t.vbase||{};t.delay=t.delay||{};t.vbase[key]=v;t.delay[key]=0}  // 抽屜直接改歲數＝新的原本，拉桿歸零
+ else if(it.kind==='goal'&&it.ref){var g=c.goals[it.ref.i];desc=fmt(g.present)+' → '+fmt(v);g.present=v}
+ else if(it.kind==='wish'&&it.ref){var w=c[it.ref.arr][it.ref.i];desc=fmt(w.amount)+' → '+fmt(v);w.amount=v}
  else if(it.kind==='legacy'){var lg=c.legacy||{};desc=fmt(n(lg.perHeirCash))+' → '+fmt(v)+'／人';lg.perHeirCash=v;c.legacy=lg}
  else return;
  f.visionLock={at:new Date().toISOString(),revisionId:null,order:flowVisionList(c).map(function(x){return x.key}),editedBy:'client'};
