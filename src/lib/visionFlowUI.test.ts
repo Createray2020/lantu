@@ -191,6 +191,26 @@ describe("流程推進與閘門", () => {
     w.flowTuneExp(0);
     expect(cur().flow.tune.exp).toBe(0);
   });
+  it("三根拉桿住在頁首圖的正下方；拖曳中只換圖與三個數字（複本上算，資料不動），放開才寫進資料", async () => {
+    const c = cur();
+    const h = pane();
+    const hero = h.indexOf('class="sec tunehero"');
+    const levs = h.indexOf('class="tunelevs"');
+    const rail = h.indexOf('class="flowrail"');
+    expect(levs).toBeGreaterThan(hero);
+    expect(levs).toBeLessThan(rail);
+    expect((h.match(/class="tunelev /g) || []).length).toBe(3);
+    const snap = JSON.stringify(c);
+    const before = w.document.getElementById("tuneKpis").innerHTML;
+    w.flowTuneLive("inc", 20000);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(JSON.stringify(c)).toBe(snap);                       // 資料一個字沒動
+    expect(w.document.getElementById("tuneIncV").textContent).toBe("+20,000");
+    expect(w.document.getElementById("tuneKpis").innerHTML).not.toBe(before);   // 三個數字換了
+    expect(w.document.getElementById("tuneHeroChart").innerHTML).toContain("<svg");
+    w.render();
+    expect(w.document.getElementById("tuneKpis").innerHTML).toBe(before);       // 重畫回到資料的樣子
+  });
   it("願景拉桿：點清單選哪一項就只延後那一項；「全部」每一項各自推；拉回 0 還原；閘門那一刻重打印記、留 vedit 決定", () => {
     const c = cur();
     const items = w.flowVisionList(c).filter((x: any) => w.flowTuneDelayable(x));

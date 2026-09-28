@@ -1101,6 +1101,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .vitem input[type=text]{width:72px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:2px 6px;font-size:12px}
 .stamp{font-size:11px;color:var(--mut2);margin-top:8px}
 .tunekpis{margin:10px 0 0}.tunekpis .kpi{border-top-color:var(--amber);padding:10px 12px}.tunekpis .lb{font-size:11px;color:var(--mut)}.tunekpis .vv{font-family:var(--serif);font-size:20px;font-weight:700}.tunekpis .was{color:var(--mut2);font-weight:400;font-size:15px}
+.tunelevs{margin-top:10px;border-top:1px dashed var(--line2);padding-top:4px}
 .tunelev.vis input[type=range]{accent-color:var(--amber2)}.chip.moved{border-color:var(--ok);color:var(--ok)}.chip b{font-family:inherit}
 .vitem input.vin{width:72px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:2px 6px;font-size:12px}
 </style>
@@ -10069,8 +10070,9 @@ function flowTuneCaps(c){
 function flowTuneAct(c,key){var hit=null;(c.actions||[]).forEach(function(a){if(a.flowKey===key)hit=a});return hit}
 function flowTuneEnsure(c,key,init){var a=flowTuneAct(c,key);if(!a){c.actions=c.actions||[];a=init();a.flowKey=key;c.actions.push(a)}return a}
 /* 收入拉桿：先落工作收入（上限＝工作月收入 × CAP_INCOME_UP%），超過的落理財（定期定額，上限＝月結餘＋支出放掉的） */
-function flowTuneInc(v){
- var c=activeCase();var f=flowOf(c);if(!f)return;var t=flowTuneState(c),K=flowTuneCaps(c);
+function flowTuneInc(v){var c=activeCase();if(!flowOf(c))return;flowTuneApplyInc(c,v);save();render()}
+function flowTuneApplyInc(c,v){
+ var t=flowTuneState(c),K=flowTuneCaps(c);
  v=Math.max(0,Math.min(n(v),K.incMax));t.inc=v;
  var work=Math.min(v,K.workCap),fin=Math.min(Math.max(0,v-work),K.finRoom);
  var A=n(c.profile.age)||40,R=n(c.profile.retireAge)||65;
@@ -10078,7 +10080,6 @@ function flowTuneInc(v){
  aw.getMonthly=Math.round(work);aw.on=work>0;aw.tool=t.route||aw.tool;
  var ar=flowTuneEnsure(c,'tune:regular',function(){return {id:actId(),on:true,cat:'regular',lane:'income-invest',name:'定期定額（理財收入）',payFrom:A+1,payTo:R,growth:PLAN_DISCOUNT,divMode:'reinvest',src:'月結餘',startY:A+1}});
  ar.payMonthly=Math.round(fin);ar.on=fin>0;
- save();render();
 }
 function flowTuneRoute(r){var c=activeCase();var t=flowTuneState(c);t.route=r;var a=flowTuneAct(c,'tune:work');if(a)a.tool=r;save();render()}
 /* 支出拉桿：由上到下配到「放」「半」（同一列的留／半／放標記是同一件事的另一個入口） */
@@ -10090,8 +10091,9 @@ function flowExpSet(c,i,mode){
  if(!found){found={id:actId(),on:true,cat:'expense',ref:ref,lane:'expense',src:'',getFrom:A+1,getTo:R,startY:A+1};c.actions.push(found)}
  found.on=true;found.name=(mode==='half'?'減半：':'放掉：')+(e.name||e.subCat||e.cat||'支出');found.getMonthly=Math.round(n(e.amount)/12*cut);found.flowMode=mode;
 }
-function flowTuneExp(v){
- var c=activeCase();var f=flowOf(c);if(!f)return;var t=flowTuneState(c),K=flowTuneCaps(c);
+function flowTuneExp(v){var c=activeCase();if(!flowOf(c))return;flowTuneApplyExp(c,v);save();render()}
+function flowTuneApplyExp(c,v){
+ var t=flowTuneState(c),K=flowTuneCaps(c);
  v=Math.max(0,Math.min(n(v),K.expCap));var left=v,got=0;
  (c.expenses||[]).forEach(function(e,i){if(!tuneRowOK(e))return;var amt=n(e.amount)/12,mode='keep';
   if(left>=amt-0.5){mode='drop';left-=amt}else if(left>=amt/2-0.5){mode='half';left-=amt/2}
@@ -10102,11 +10104,18 @@ function flowTuneExp(v){
  // 支出放掉的錢會讓理財那段的上限變大：收入拉桿的位置不變，但落點重算
  var K2=flowTuneCaps(c),aw=flowTuneAct(c,'tune:work'),ar=flowTuneAct(c,'tune:regular');
  if(t.inc>0){var work=Math.min(t.inc,K2.workCap),fin=Math.min(Math.max(0,t.inc-work),K2.finRoom);if(aw){aw.getMonthly=Math.round(work);aw.on=work>0}if(ar){ar.payMonthly=Math.round(fin);ar.on=fin>0}}
- save();render();
 }
 function flowTuneSyncExp(c){var t=flowTuneState(c),s=0;(c.actions||[]).forEach(function(a){if(a.on!==false&&a.cat==='expense'&&a.lane==='expense')s+=n(a.getMonthly)});t.exp=Math.round(s)}
-function flowTuneLive(k,v){ // 拖曳中只換數字，放開（onchange）才重算
+var _tunePrevT=null;
+function flowTuneLive(k,v){ // 拖曳中：數字立刻換；圖與三個數字在複本上算、80ms 節流換掉（不存、不整頁重畫）；放開（onchange）才真的寫進資料
  var el=document.getElementById(k==='inc'?'tuneIncV':(k==='vis'?'tuneVisV':'tuneExpV'));if(el)el.textContent=k==='vis'?('+'+n(v)+' 年'):((k==='inc'?'+':'−')+fmt(v));
+ if(_tunePrevT)clearTimeout(_tunePrevT);
+ _tunePrevT=setTimeout(function(){_tunePrevT=null;try{
+  var c=activeCase();if(!flowOf(c))return;var cc=JSON.parse(JSON.stringify(c));
+  if(k==='inc')flowTuneApplyInc(cc,v);else if(k==='exp')flowTuneApplyExp(cc,v);else flowTuneApplyDelay(cc,v);
+  var ch=document.getElementById('tuneHeroChart'),kp=document.getElementById('tuneKpis');
+  var pa=projection(cc);if(ch)ch.innerHTML=annualBalanceSVG(pa,'dark');if(kp)kp.outerHTML=flowTuneKpi(projection(flowTuneBase(cc)),pa);
+ }catch(e){}},80);
 }
 /* ---------- 波 10：調整台三根拉桿（願景延後・收入・支出）＋ 全生涯財務流開頭（2026/09/28 Ray）----------
    Ray：方案最上面用「全生涯財務流」開頭，缺口從那張圖抓。三根拉桿都放上去：
@@ -10126,15 +10135,15 @@ function flowTuneVSel(c){var t=flowTuneState(c);return t.vsel||'all'}
 function flowTuneSelect(key){var c=activeCase();var t=flowTuneState(c);t.vsel=key;save();render()}
 function flowTuneDelayOf(c,key){var t=flowTuneState(c);t.delay=t.delay||{};return n(t.delay[key])}
 /* 願景拉桿：v 年。選「全部」→ 每一項都從自己的原本歲數推 v 年；選某一項 → 只推那一項。 */
-function flowTuneDelay(v){
- var c=activeCase();var f=flowOf(c);if(!f)return;var t=flowTuneState(c);t.delay=t.delay||{};t.vbase=t.vbase||{};
+function flowTuneDelay(v){var c=activeCase();if(!flowOf(c))return;flowTuneApplyDelay(c,v);save();render()}
+function flowTuneApplyDelay(c,v){
+ var t=flowTuneState(c);t.delay=t.delay||{};t.vbase=t.vbase||{};
  v=Math.max(0,Math.round(n(v)));var sel=flowTuneVSel(c),items=flowVisionList(c);
  items.forEach(function(x){if(!flowTuneDelayable(x))return;if(sel!=='all'&&x.key!==sel)return;
   if(t.vbase[x.key]==null)t.vbase[x.key]=x.age;
   var to=t.vbase[x.key]+v;if(to>effHorizon(c))to=effHorizon(c);
   if(to!==x.age)flowVisionSetAge(c,x,to);t.delay[x.key]=to-t.vbase[x.key]});
  if(sel==='all')t.delay.all=v;
- save();render();
 }
 function flowTuneDelayMax(c){var A=n(c.profile.age)||40;return Math.max(1,effHorizon(c)-A-1)}
 /* 「原本」＝沒有動作、願景回到原本歲數的那一份（只給對照數字用，不寫回） */
@@ -10143,29 +10152,24 @@ function flowTuneBase(c){
  if(Object.keys(vb).length){flowVisionList(b).forEach(function(x){if(vb[x.key]!=null&&vb[x.key]!==x.age)flowVisionSetAge(b,x,vb[x.key])})}
  return b;
 }
-function flowTuneKpi(pb,pa){
+function flowTuneKpi(pb,pa){ // 外層 id=tuneKpis 讓拖曳預覽能整塊換
  function fn(p){var a=null;p.rows.forEach(function(r){if(a===null&&r.bal<0)a=r.age});return a}
  var rows=[['首次入不敷出',fn(pb),fn(pa),function(v){return v!==null?v+' 歲':'都有結餘'}],
   ['存量用完',pb.turnNeg||null,pa.turnNeg||null,function(v){return v?v+' 歲':'未用完'}],
   ['現值缺口',n(pb.shortPV),n(pa.shortPV),function(v){return v>0.5?cfAxis(v):'0'}]];
- return '<div class="kpis tunekpis">'+rows.map(function(k){var same=k[1]===k[2];
+ return '<div class="kpis tunekpis" id="tuneKpis">'+rows.map(function(k){var same=k[1]===k[2];
   return '<div class="kpi"><div class="lb">'+k[0]+'</div><div class="vv">'+(same?k[3](k[2]):'<span class="was">'+k[3](k[1])+'</span> → '+k[3](k[2]))+'</div></div>'}).join('')+'</div>';
 }
 /* 方案頁首：全生涯財務流（同分析頁首屏那張圖，畫的是拉完之後）＋ 原本 → 拉完 三個數字。有沒有流程都畫。 */
 function flowTuneHeroHTML(c){
  var f=flowOf(c),pb=projection(f?flowTuneBase(c):baseCase(c)),pa=projection(c);
  return '<div class="sec tunehero"><h4>全生涯財務流 <span class="hint">畫的是拉完之後；三個數字左邊原本（沒有動作、願景原本的時間）、右邊拉完。缺口從這張圖抓。</span></h4>'+
-  '<div data-calc="tuneHero">'+annualBalanceSVG(pa,'dark')+'</div>'+flowTuneKpi(pb,pa)+'</div>';
+  '<div data-calc="tuneHero" id="tuneHeroChart">'+annualBalanceSVG(pa,'dark')+'</div>'+flowTuneKpi(pb,pa)+
+  (f&&f.step==='S4'?'<div class="tunelevs">'+flowTuneLeversHTML(c)+'</div>':'')+'</div>';
 }
-function flowTuneHTML(c){
- var f=flowOf(c),t=flowTuneState(c),K=flowTuneCaps(c);
- var pb=projection(flowTuneBase(c)),pa=projection(c);
- var g0=pb.shortPV,g1=pa.shortPV;
- var aw=flowTuneAct(c,'tune:work'),ar=flowTuneAct(c,'tune:regular');
- var work=aw&&aw.on!==false?n(aw.getMonthly):0,fin=ar&&ar.on!==false?n(ar.payMonthly):0;
- var incTot=K.workM+K.finM+K.othM;
- var IG=investGate(c);
- // ① 願景拉桿：點清單選哪一項
+/* 三根拉桿（S4 時住在頁首圖的正下方：拉的時候圖就在眼前） */
+function flowTuneLeversHTML(c){
+ var t=flowTuneState(c),K=flowTuneCaps(c),incTot=K.workM+K.finM+K.othM;
  var items=flowVisionList(c),sel=flowTuneVSel(c),selIt=null;items.forEach(function(x){if(x.key===sel)selIt=x});
  if(sel!=='all'&&!selIt){sel='all';t.vsel='all'}
  var dv=sel==='all'?n((t.delay||{}).all):flowTuneDelayOf(c,sel),dmax=flowTuneDelayMax(c);
@@ -10175,13 +10179,23 @@ function flowTuneHTML(c){
   '<div><input type="range" inputmode="numeric" min="0" max="'+dmax+'" step="1" value="'+dv+'" oninput="flowTuneLive(\'vis\',this.value)" onchange="flowTuneDelay(this.value)"><div class="cap"><span>不延</span><span>延後幾年（客戶自己拉；拉回 0 就還原）</span></div>'+
   '<div class="chips">'+chips+'</div></div>'+
   '<div class="val"><div class="v" id="tuneVisV">+'+dv+' 年</div><div class="p">'+(sel==='all'?'每一項各自往後推':(t.vbase&&t.vbase[sel]!=null?t.vbase[sel]+' → '+selIt.age+' 歲':selIt.age+' 歲'))+'</div></div></div>';
- // ② ③ 收入・支出拉桿
  var lev='<div class="tunelev rec"><div class="nm">收入<small>工作＋理財</small></div>'+
   '<div><input type="range" inputmode="numeric" min="0" max="'+K.incMax+'" step="500" value="'+t.inc+'" oninput="flowTuneLive(\'inc\',this.value)" onchange="flowTuneInc(this.value)"><div class="cap"><span>0</span><span>上限 +'+fmt(K.incMax)+'／月（工作 '+CAP_INCOME_UP+'% '+fmt(K.workCap)+(K.finRoom?' ＋ 理財 '+fmt(K.finRoom):'')+'）</span></div></div>'+
   '<div class="val"><div class="v" id="tuneIncV">+'+fmt(t.inc)+'</div><div class="p">／月　+'+(incTot?r1(t.inc/incTot*100):0)+'%</div></div></div>'+
   '<div class="tunelev exp"><div class="nm">支出<small>客戶自己標留／放</small></div>'+
   '<div><input type="range" inputmode="numeric" min="0" max="'+K.expCap+'" step="500" value="'+t.exp+'" oninput="flowTuneLive(\'exp\',this.value)" onchange="flowTuneExp(this.value)"><div class="cap"><span>0</span><span>上限 −'+fmt(K.expCap)+'／月（可動的生活消費）</span></div></div>'+
   '<div class="val"><div class="v" id="tuneExpV">−'+fmt(t.exp)+'</div><div class="p">／月　−'+(K.expCap?r1(t.exp/(sum(c.expenses,function(e){return n(e.amount)})/12||1)*100):0)+'%</div></div></div>';
+ return vlev+lev;
+}
+function flowTuneHTML(c){
+ var f=flowOf(c),t=flowTuneState(c),K=flowTuneCaps(c);
+ var pb=projection(flowTuneBase(c)),pa=projection(c);
+ var g0=pb.shortPV,g1=pa.shortPV;
+ var aw=flowTuneAct(c,'tune:work'),ar=flowTuneAct(c,'tune:regular');
+ var work=aw&&aw.on!==false?n(aw.getMonthly):0,fin=ar&&ar.on!==false?n(ar.payMonthly):0;
+ var incTot=K.workM+K.finM+K.othM;
+ var IG=investGate(c);
+ var items=flowVisionList(c);
  // 收入結構
  var routes=['薪資提升','專業兼職','創業做生意'];
  var dl=function(v){return v?'<span class="delta">+'+fmt(v)+'</span>':'<span class="muted">—</span>'};
@@ -10212,8 +10226,8 @@ function flowTuneHTML(c){
  var dsum=[];items.forEach(function(x){var d=flowTuneDelayOf(c,x.key);if(d)dsum.push(x.name+' +'+d+'年')});
  var dtxt=dsum.length?'願景延後 '+dsum.join('、')+'；':'';
  var pay=function(closed,reason){return '{closed:'+closed+(reason?',reason:\''+reason+'\'':'')+',inc:'+t.inc+',exp:'+t.exp+',delay:'+JSON.stringify(t.delay||{}).replace(/"/g,'&quot;')+'}'};
- return flowAsk('缺口看最上面的全生涯財務流，在哪一年、多深。三根拉桿照順序：願景的時間客戶自己拉（點清單選哪一項），再拉收入，最後才拉支出。願景不砍——要改金額從右邊「願景」抽屜。')+
-  '<div style="margin-top:4px">'+vlev+lev+'</div><div class="tunecols">'+incCol+expCol+'</div>'+
+ return flowAsk('三根拉桿在最上面那張圖的正下方，拉的時候圖當場動。照順序：願景的時間客戶自己拉（點清單選哪一項），再拉收入，最後才拉支出。願景不砍——要改金額從右邊「願景」抽屜。')+
+  '<div class="tunecols">'+incCol+expCol+'</div>'+
   flowGate('拉完之後',
    '<button class="tbtn amber" '+(closed?'':'disabled')+' onclick="flowTuneGate('+pay(true)+',\'S6x\')">補平了 → 行動清單與下一步</button>'+
    '<button class="tbtn ghost" onclick="flowTuneGate('+pay(false,'short')+',\'S6\')">沒補平 → 看後果</button>'+
