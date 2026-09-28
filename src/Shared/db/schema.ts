@@ -1283,3 +1283,18 @@ export const carParams = pgTable('car_params', {
   value: jsonb('value').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// 帳務後台（組織營業損益，2026/09/29）。items（營業項目＋單價拆分）／params（vatRate）／goal（netTarget），key/value JSON。
+// 計算在 lib/acctEngine.ts；讀寫在 lib/acctStore.ts。
+export const acctParams = pgTable('acct_params', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+// 帳務按月資料：qty＝{itemId: 本月筆數}、fixed＝[{name, amt}]。一個月一列，改本月不動歷史。
+export const acctMonths = pgTable('acct_months', {
+  ym: text('ym').primaryKey(),                       // 'YYYY-MM'
+  qty: jsonb('qty').$type<Record<string, number>>().default({}).notNull(),
+  fixed: jsonb('fixed').$type<{ name: string; amt: number }[]>().default([]).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

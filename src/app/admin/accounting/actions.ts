@@ -1,0 +1,42 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { ensureCoach, isAdmin } from "@/lib/coach";
+import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth } from "@/lib/acctStore";
+
+export type ActionResult = { ok: true; info?: string } | { ok: false; error: string };
+
+const MSG: Record<string, string> = {
+  forbidden: "沒有後台權限",
+  "invalid-name": "每個營業項目都要有名稱",
+  "invalid-id": "項目 id 重複",
+  "invalid-ym": "月份格式要是 YYYY-MM",
+};
+function fail(e: unknown): ActionResult {
+  const raw = e instanceof Error ? e.message : String(e);
+  return { ok: false, error: MSG[raw] ?? raw };
+}
+async function guard() {
+  const me = await ensureCoach();
+  if (!(await isAdmin(me))) throw new Error("forbidden");
+}
+const refresh = () => revalidatePath("/admin/accounting");
+
+export async function saveAcctItemsAction(items: unknown): Promise<ActionResult> {
+  try { await guard(); await saveAcctItems(items); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function saveAcctParamsAction(params: unknown): Promise<ActionResult> {
+  try { await guard(); await saveAcctParams(params); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function saveAcctGoalAction(goal: unknown): Promise<ActionResult> {
+  try { await guard(); await saveAcctGoal(goal); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function saveAcctMonthAction(ym: string, month: unknown): Promise<ActionResult> {
+  try { await guard(); await saveAcctMonth(ym, month); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function ensureAcctMonthAction(ym: string): Promise<ActionResult> {
+  try { await guard(); await ensureAcctMonth(ym); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function deleteAcctMonthAction(ym: string): Promise<ActionResult> {
+  try { await guard(); await deleteAcctMonth(ym); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}

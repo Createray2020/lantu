@@ -35,6 +35,8 @@ const GROUPS: { title: string; items: { href: string; label: string }[] }[] = [
       { href: "/admin/system", label: "制度設定" },
       { href: "/admin/system/simulator", label: "分潤試算" },
       { href: "/admin/cases", label: "案件與分潤" },
+      // 組織自己的損益（營業項目→拆分→數量→固定支出→淨利），跟案件分潤是同一件事的兩端：一邊是分出去多少、一邊是留下多少。
+      { href: "/admin/accounting", label: "帳務" },
       { href: "/admin/advisors", label: "職級與晉升" },
     ],
   },
