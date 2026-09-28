@@ -5,7 +5,7 @@ import Link from "next/link";
 import { confirmDialog } from "@/components/ui/confirm";
 import { SELECT_SM } from "@/components/ui/Field";
 import { calcMonth, calcTarget, compareMonth, breakeven, prevYm, nextYm, isYm, type AcctState, type AcctMonth } from "@/lib/acctEngine";
-import { saveAcctMonthAction, ensureAcctMonthAction, deleteAcctMonthAction } from "./actions";
+import { saveAcctMonthAction, ensureAcctMonthAction, deleteAcctMonthAction, setAcctEntryVoidAction, backfillAcctMonthAction } from "./actions";
 import { useAcct, MonthEditor, PLTable, Waterfall, Trend, CompareHero, CompareQty, CompareFixed, PLCompare, card, h2, hint, btn, xbtn, F, P, EMPTY } from "./AcctParts";
 
 // 帳務 › 本月帳務：選月份 → 填實際（數量、固定支出）→ 結論／KPI／圖 → 損益結構。有目標的月份多一個「對照」。
@@ -23,6 +23,15 @@ export default function MonthlyBoard({ initial, today }: { initial: AcctState; t
   const cmp = useMemo(() => compareMonth(S, ym), [S, ym]);
   const showCmp = cmpOn && !!cmp && !!r && !!rt;
 
+  const sys = S.sys?.[ym] ?? [];
+  const setVoid = (id: string, v: boolean) => {
+    setS((s) => ({ ...s, sys: { ...(s.sys ?? {}), [ym]: (s.sys?.[ym] ?? []).map((x) => x.id === id ? { ...x, void: v } : x) } }));
+    run(() => setAcctEntryVoidAction(id, v), v ? "已作廢" : "已恢復");
+  };
+  const backfill = async () => {
+    if (!await confirmDialog(`把 ${ym} 核准報聘、開通培訓帳號的教練補進帳務？測試帳號與已記過的會跳過——先到教練帳號把測試帳號勾好。`)) return;
+    run(async () => { const r = await backfillAcctMonthAction(ym); if (r.ok) window.location.reload(); return r; }, "已回填");
+  };
   const saveMonth = (m: AcctMonth) => { setS((s) => ({ ...s, months: { ...s.months, [ym]: m } })); run(() => saveAcctMonthAction(ym, m), `已存 ${ym}`); };
   const openMonth = (k: string) => {
     if (!isYm(k)) return;
@@ -89,7 +98,13 @@ export default function MonthlyBoard({ initial, today }: { initial: AcctState; t
           <div className={card}>
             <h2 className={h2}>{ym} 實際</h2>
             <p className={`${hint} mb-3`}>這個月每個項目賣出幾筆、固定支出實際是多少。之後接上實際訂單就自動帶入。</p>
-            <MonthEditor data={month} res={r} refQty={target ? target.qty : S.months[prevYm(ym)]?.qty} refLabel={target ? "目標" : "上月"} label="本月" keyTag={ym} onSave={saveMonth} />
+            <MonthEditor data={month} res={r} refQty={target ? target.qty : S.months[prevYm(ym)]?.qty} refLabel={target ? "目標" : "上月"} label="本月" keyTag={ym} onSave={saveMonth} sys={sys} onVoid={setVoid} />
+            {S.items.some((it) => it.source) && (
+              <div className={`${hint} mt-3 flex flex-wrap items-center gap-2`}>
+                系統入帳：報聘核准、培訓帳號第一次開通會自動記一筆（測試帳號不記）。上線前發生的事件沒記到 →
+                <button className={`${btn} text-xs py-1`} onClick={backfill}>回填 {ym}</button>
+              </div>
+            )}
           </div>
           {/* ② 結論與圖 */}
           <div className={card}>

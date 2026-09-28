@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget, saveAcctDraft } from "@/lib/acctStore";
+import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget, saveAcctDraft, setAcctEntryVoid, backfillAcctMonth } from "@/lib/acctStore";
 
 export type ActionResult = { ok: true; info?: string } | { ok: false; error: string };
 
@@ -48,4 +48,10 @@ export async function deleteAcctTargetAction(ym: string): Promise<ActionResult> 
 }
 export async function saveAcctDraftAction(draft: unknown): Promise<ActionResult> {
   try { await guard(); await saveAcctDraft(draft); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function setAcctEntryVoidAction(id: string, v: boolean): Promise<ActionResult> {
+  try { await guard(); await setAcctEntryVoid(id, v); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function backfillAcctMonthAction(ym: string): Promise<ActionResult> {
+  try { await guard(); const r = await backfillAcctMonth(ym); refresh(); return { ok: true, info: `報聘 ${r.apply} 筆、培訓帳號 ${r.license} 筆` }; } catch (e) { return fail(e); }
 }

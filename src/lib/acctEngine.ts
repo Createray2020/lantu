@@ -8,7 +8,11 @@
 
 export type SplitMode = "pct" | "amt";
 export type AcctSplit = { to: string; mode: SplitMode; v: number };
-export type AcctItem = { id: string; name: string; price: number; splits: AcctSplit[] };
+/** source：這個項目由哪個系統事件自動入帳（apply＝報聘核准／license＝培訓帳號開通）；空＝只手填。 */
+export type AcctSource = "apply" | "license";
+export type AcctItem = { id: string; name: string; price: number; splits: AcctSplit[]; source?: AcctSource | "" };
+/** 系統入帳的一筆（acct_entries）：金額是事件當下的單價快照。 */
+export type SysRow = { id: string; itemId: string; coachId: string; coachName: string; source: AcctSource; amount: number; void: boolean; createdAt: string };
 export type AcctMonth = { qty: Record<string, number>; fixed: { name: string; amt: number }[] };
 export type AcctParams = { vatRate: number };
 export type AcctGoal = { netTarget: number };
@@ -19,6 +23,7 @@ export type AcctState = {
   months: Record<string, AcctMonth>;   // 'YYYY-MM' 實際
   targets: Record<string, AcctTarget>; // 'YYYY-MM' 目標
   draft: AcctTarget | null;            // 目標工作台的草稿（Ray：目標不綁期間，設好了再存入哪個月）
+  sys?: Record<string, SysRow[]>;      // 'YYYY-MM' → 系統入帳事件（含作廢的，作廢不計）
   params: AcctParams;
   goal: AcctGoal;
 };
@@ -26,7 +31,7 @@ export type AcctState = {
 export type AcctAdj = { price?: number; split?: number; qty?: number; fix?: number };
 
 export type UnitResult = { price: number; split: number; rows: { to: string; v: number }[]; gp: number; gm: number };
-export type ItemResult = { it: AcctItem; q: number; u: UnitResult; rev: number; gp: number };
+export type ItemResult = { it: AcctItem; q: number; u: UnitResult; rev: number; gp: number; sysN: number; manualQ: number };
 export type MonthResult = {
   rev: number; split: number; gp: number; gm: number;
   fixed: number; vat: number; net: number; nm: number;
@@ -48,8 +53,8 @@ export function nextYm(k: string): string {
 export const isYm = (s: unknown) => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(s ?? ""));
 
 /** 單筆：售價、拆出多少、單筆毛利、毛利率。 */
-export function unitOf(it: AcctItem, adj: AcctAdj = {}): UnitResult {
-  const price = it.price * (1 + (adj.price ?? 0) / 100);
+export function unitOf(it: AcctItem, adj: AcctAdj = {}, basePrice?: number): UnitResult {
+  const price = (basePrice ?? it.price) * (1 + (adj.price ?? 0) / 100);
   let split = 0;
   const rows = it.splits.map((s) => {
     const v = s.mode === "pct" ? price * Math.max(0, s.v + (adj.split ?? 0)) / 100 : s.v;
@@ -60,16 +65,26 @@ export function unitOf(it: AcctItem, adj: AcctAdj = {}): UnitResult {
 }
 
 /** 一份月資料（實際或目標都行）的損益結構。 */
-export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, adj: AcctAdj = {}): MonthResult {
+export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, adj: AcctAdj = {}, sys: SysRow[] = []): MonthResult {
   let rev = 0, split = 0, gp = 0;
   const byItem: ItemResult[] = [];
   const byTo: Record<string, number> = {};
+  const scale = 1 + (adj.qty ?? 0) / 100;
   for (const it of items) {
-    const q = (m.qty[it.id] ?? 0) * (1 + (adj.qty ?? 0) / 100);
+    const manualQ = (m.qty[it.id] ?? 0) * scale;
     const u = unitOf(it, adj);
-    rev += u.price * q; split += u.split * q; gp += u.gp * q;
-    byItem.push({ it, q, u, rev: u.price * q, gp: u.gp * q });
-    for (const r of u.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * q;
+    let irev = u.price * manualQ, isplit = u.split * manualQ, igp = u.gp * manualQ;
+    for (const r of u.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * manualQ;
+    // 系統入帳：每一筆用它自己的快照金額算（不同期間價格不同），拆分規則套現在的
+    const rows = sys.filter((x) => x.itemId === it.id && !x.void);
+    for (const x of rows) {
+      const ux = unitOf(it, adj, x.amount);
+      irev += ux.price * scale; isplit += ux.split * scale; igp += ux.gp * scale;
+      for (const r of ux.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * scale;
+    }
+    const q = manualQ + rows.length * scale;
+    rev += irev; split += isplit; gp += igp;
+    byItem.push({ it, q, u, rev: irev, gp: igp, sysN: rows.length, manualQ });
   }
   const fixed = m.fixed.reduce((a, f) => a + (Number(f.amt) || 0), 0) * (1 + (adj.fix ?? 0) / 100);
   const vat = rev * params.vatRate / 100;
@@ -79,7 +94,7 @@ export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, ad
 /** 某一個月的實際損益結構。沒有那個月回 null。 */
 export function calcMonth(S: AcctState, ym: string, adj: AcctAdj = {}): MonthResult | null {
   const m = S.months[ym];
-  return m ? calcData(S.items, m, S.params, adj) : null;
+  return m ? calcData(S.items, m, S.params, adj, S.sys?.[ym] ?? []) : null;
 }
 /** 某一個月的目標損益結構（目標筆數 × 現在的單價與拆分）。沒設目標回 null。 */
 export function calcTarget(S: AcctState, ym: string): MonthResult | null {
@@ -101,11 +116,12 @@ export type Compare = {
 export function compareMonth(S: AcctState, ym: string): Compare | null {
   const t = S.targets?.[ym], a = S.months[ym];
   if (!t || !a) return null;
-  const rt = calcData(S.items, t, S.params), ra = calcData(S.items, a, S.params);
+  const sys = S.sys?.[ym] ?? [];
+  const rt = calcData(S.items, t, S.params), ra = calcData(S.items, a, S.params, {}, sys);
   const items: CompareRow[] = S.items.map((it) => {
     const u = unitOf(it);
     const net1 = u.gp - u.price * S.params.vatRate / 100;
-    const target = t.qty[it.id] ?? 0, actual = a.qty[it.id] ?? 0;
+    const target = t.qty[it.id] ?? 0, actual = (a.qty[it.id] ?? 0) + sys.filter((x) => x.itemId === it.id && !x.void).length;
     return { key: it.id, name: it.name, target, actual, diff: actual - target, netEffect: (actual - target) * net1 };
   });
   const sumBy = (rows: { name: string; amt: number }[]) => { const o: Record<string, number> = {}; for (const f of rows) o[f.name] = (o[f.name] ?? 0) + f.amt; return o; };
@@ -177,7 +193,8 @@ export function normItems(v: unknown): AcctItem[] {
     const splits = Array.isArray(x.splits) ? (x.splits as Partial<AcctSplit>[]).filter((s) => s && typeof s === "object").map((s) => ({
       to: String(s.to ?? "").trim(), mode: (s.mode === "amt" ? "amt" : "pct") as SplitMode, v: Math.max(0, num0(s.v)),
     })) : [];
-    out.push({ id: String(x.id), name: String(x.name ?? "").trim(), price: Math.max(0, num0(x.price)), splits });
+    const source = x.source === "apply" || x.source === "license" ? x.source : "";
+    out.push({ id: String(x.id), name: String(x.name ?? "").trim(), price: Math.max(0, num0(x.price)), splits, ...(source ? { source } : {}) });
   }
   return out;
 }

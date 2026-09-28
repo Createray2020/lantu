@@ -32,6 +32,8 @@ export const coaches = pgTable('coaches', {
   // 但「名字」是全站都要用的東西。
   displayName: text('display_name'),
   role: text('role').default('coach').notNull(),
+  // 測試帳號（2026/09/29 Ray：核准時勾起來，帳務事件一律不記；其他帳號照算，才有行政財務紀律）。
+  isTest: boolean('is_test').default(false).notNull(),
   status: text('status').default('pending').notNull(),
   orgRank: text('org_rank').default('member').notNull(),
   uplineId: text('upline_id').references((): AnyPgColumn => coaches.id, { onDelete: 'set null' }),
@@ -1306,3 +1308,20 @@ export const acctTargets = pgTable('acct_targets', {
   net: doublePrecision('net').default(0).notNull(),  // 目標淨利（元／月）
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+// 帳務入帳事件（2026/09/29）：系統事件自動寫進本月帳務的那一筆。
+// source：apply＝報聘核准／license＝培訓帳號第一次開通。amount＝事件當下的項目單價快照（之後改價不動歷史）。
+// 同一個人同一種事件只記一次（180 天培訓一生一次、報聘一次）——唯一鍵擋重複；測試帳號（coaches.is_test）不寫。
+export const acctEntries = pgTable('acct_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  ym: text('ym').notNull(),                          // 'YYYY-MM'，事件發生月
+  itemId: text('item_id').notNull(),                 // 對到 acct_params.items[].id
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  source: text('source').notNull(),                  // apply / license
+  amount: doublePrecision('amount').default(0).notNull(),
+  void: boolean('void').default(false).notNull(),    // 作廢（免費、退費）：不計入，但留痕
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('acct_entries_coach_source_uq').on(t.coachId, t.source),
+  index('acct_entries_ym_idx').on(t.ym),
+]);

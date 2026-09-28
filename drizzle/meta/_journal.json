@@ -316,6 +316,13 @@
       "when": 1790628685767,
       "tag": "0044_acct_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1790631571910,
+      "tag": "0045_acct_entries",
+      "breakpoints": true
     }
   ]
 }

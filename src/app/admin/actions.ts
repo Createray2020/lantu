@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
+import { db } from "@/Shared/db";
+import { coaches } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg, transferClients, removeCoach } from "@/lib/coach";
 import { saveBrand } from "@/lib/brand";
 import { approveApplication, saveApplySettings, saveReviewChecks } from "@/lib/coachApplyStore";
@@ -183,4 +186,14 @@ export async function removeBrandLogo() {
   await saveBrand(me.id, { logoUrl: null, iconUrl: null });
   revalidatePath("/admin");
   revalidatePath("/dashboard");
+}
+
+/** 測試帳號（2026/09/29 Ray）：勾了的帳號帳務事件一律不記；其他帳號照算。 */
+export async function setCoachTestAction(id: string, isTest: boolean): Promise<ActionResult> {
+  try {
+    await guard();
+    await db.update(coaches).set({ isTest }).where(eq(coaches.id, id));
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) { return fail(e); }
 }

@@ -7,7 +7,7 @@ import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
 import {
   calcData, suggestQty, isYm,
-  type AcctState, type AcctItem, type AcctMonth, type AcctTarget, type AcctAdj, type MonthResult, type Compare,
+  type AcctState, type AcctItem, type AcctMonth, type AcctTarget, type AcctAdj, type MonthResult, type Compare, type SysRow, type AcctSource,
 } from "@/lib/acctEngine";
 
 // 帳務三頁共用的元件與常數（2026/09/29 拆頁：參數設定／目標設定／本月帳務）。
@@ -41,9 +41,12 @@ export function useAcct(initial: AcctState) {
 }
 
 /** 數量表＋固定支出表：實際與目標共用同一套畫面。keyTag 換了輸入框才會重置（defaultValue 非受控）。 */
-export function MonthEditor({ data, res, refQty, refLabel, label, keyTag, onSave }: {
+export function MonthEditor({ data, res, refQty, refLabel, label, keyTag, onSave, sys, onVoid }: {
   data: AcctMonth; res: MonthResult; refQty?: Record<string, number>; refLabel: string; label: string; keyTag: string; onSave: (m: AcctMonth) => void;
+  sys?: SysRow[]; onVoid?: (id: string, v: boolean) => void;
 }) {
+  const [openSys, setOpenSys] = useState<string | null>(null);
+  const hasSys = !!sys?.length;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div>
@@ -55,12 +58,29 @@ export function MonthEditor({ data, res, refQty, refLabel, label, keyTag, onSave
               <tr key={b.it.id} className="border-t border-line">
                 <td className="py-1.5">{b.it.name}</td>
                 <td className="text-right text-tx3">{refQty ? (refQty[b.it.id] ?? 0) : "—"}</td>
-                <td className="text-right"><input className={`${FIELD_SM} w-20 text-right`} inputMode="numeric" defaultValue={data.qty[b.it.id] ?? 0} onBlur={(e) => { const v = NUM(e.target.value); if (v !== (data.qty[b.it.id] ?? 0)) onSave({ ...data, qty: { ...data.qty, [b.it.id]: v } }); }} /></td>
+                <td className="text-right whitespace-nowrap">
+                  {hasSys && b.it.source ? <button className={`text-xs mr-1 ${b.sysN ? "text-brand2" : "text-tx3"} hover:underline`} onClick={() => setOpenSys(openSys === b.it.id ? null : b.it.id)}>系統 {b.sysN} ＋</button> : null}
+                  <input className={`${FIELD_SM} w-16 text-right`} inputMode="numeric" defaultValue={data.qty[b.it.id] ?? 0} onBlur={(e) => { const v = NUM(e.target.value); if (v !== (data.qty[b.it.id] ?? 0)) onSave({ ...data, qty: { ...data.qty, [b.it.id]: v } }); }} />
+                </td>
                 <td className="text-right">{F(b.rev)}</td>
                 <td className="text-right text-brand2">{F(b.gp)}</td>
                 <td className="text-right text-tx2">{res.gp ? P(b.gp / res.gp * 100) : "—"}</td>
               </tr>
             ))}
+            {openSys && sys && (
+              <tr className="border-t border-line bg-panel2"><td colSpan={6} className="p-2">
+                <div className={`${hint} mb-1`}>系統入帳：{res.byItem.find((b) => b.it.id === openSys)?.it.name}。作廢＝不計入但留痕（免費、退費）。</div>
+                {sys.filter((x) => x.itemId === openSys).length ? sys.filter((x) => x.itemId === openSys).map((x) => (
+                  <div key={x.id} className={`flex items-center gap-3 text-xs py-0.5 ${x.void ? "text-tx3 line-through" : ""}`}>
+                    <span className="w-24 truncate">{x.coachName}</span>
+                    <span className="text-tx3">{x.source === "apply" ? "報聘核准" : "培訓帳號"}</span>
+                    <span className="text-tx3">{x.createdAt.slice(0, 10)}</span>
+                    <span className="ml-auto">{F(x.amount)}</span>
+                    {onVoid && <button className="text-tx3 hover:text-tx" onClick={() => onVoid(x.id, !x.void)}>{x.void ? "恢復" : "作廢"}</button>}
+                  </div>
+                )) : <div className="text-xs text-tx3">這個月沒有系統入帳。</div>}
+              </td></tr>
+            )}
             <tr className="border-t-2 border-line font-bold"><td className="py-1.5">合計</td><td /><td className="text-right">{res.byItem.reduce((a, b) => a + b.q, 0)}</td><td className="text-right">{F(res.rev)}</td><td className="text-right text-brand2">{F(res.gp)}</td><td className="text-right">{P(res.gm * 100)}</td></tr>
           </tbody>
         </table>
@@ -292,6 +312,12 @@ export function ItemsEditor({ items, onSave }: { items: AcctItem[]; onSave: (ite
               <input className={nameIn} defaultValue={it.name} onBlur={(e) => { if (e.target.value !== it.name) set(i, { name: e.target.value }); }} />
               <span className="text-sm text-tx2">單價</span>
               <input className={numIn} inputMode="numeric" defaultValue={it.price} onBlur={(e) => { const v = NUM(e.target.value); if (v !== it.price) set(i, { price: v }); }} />
+              <span className="text-xs text-tx3">自動來源</span>
+              <select className={SELECT_SM} value={it.source ?? ""} onChange={(e) => set(i, { source: e.target.value as AcctSource | "" })} title="系統事件發生時自動記一筆到本月帳務；同一種來源只能掛一個項目">
+                <option value="">無（只手填）</option>
+                <option value="apply" disabled={items.some((x, k) => k !== i && x.source === "apply")}>報聘核准</option>
+                <option value="license" disabled={items.some((x, k) => k !== i && x.source === "license")}>培訓帳號開通</option>
+              </select>
               <button className={`${xbtn} ml-auto`} onClick={async () => { if (await confirmDialog(`刪除「${it.name}」？各月的數量也不再計入。`, { danger: true })) onSave(items.filter((_, j) => j !== i)); }}>✕</button>
             </div>
             <div className="rounded-lg bg-panel2 p-2 mt-2">

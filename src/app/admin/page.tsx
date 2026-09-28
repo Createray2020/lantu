@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ensureCoach, isAdmin, listCoaches, coachWorkloads } from "@/lib/coach";
 import OrgCell from "./OrgCell";
 import StatusActions from "./StatusActions";
+import TestToggle from "./TestToggle";
 import RemoveCoach from "./RemoveCoach";
 import AdminHeader from "./AdminHeader";
 import AdminNav from "./AdminNav";
@@ -176,6 +177,7 @@ export default async function Admin() {
                       ) : (
                         <div className="flex flex-col items-end gap-1">
                           <StatusActions id={c.id} status={c.status} />
+                          <TestToggle id={c.id} isTest={c.isTest} />
                           <RemoveCoach
                             id={c.id}
                             name={c.name || c.email || c.id}

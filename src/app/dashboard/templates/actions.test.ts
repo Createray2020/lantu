@@ -5,7 +5,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // 這支 action 存在的唯一理由是補一個洞：lib/templates.ts 的 copyTemplateToCoach()
 // 只驗 `status === 'active'`，**不驗使用期限**。所以這裡守的第一件事就是
 // 「期限到期的教練不能從範本長出新客戶」——那是全站唯讀鎖的一部分。
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// coach.ts 現在 import acctStore（用 unstable_cache／updateTag），mock 要一起給，不然模組載入就炸。
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), unstable_cache: (fn: unknown) => fn, updateTag: vi.fn() }));
 vi.mock("@/lib/guard", async () => {
   const actual = await vi.importActual<typeof import("@/lib/guard")>("@/lib/guard");
   return { ...actual, requireWritableCoach: vi.fn() };

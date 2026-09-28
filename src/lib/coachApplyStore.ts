@@ -7,6 +7,7 @@ import { db } from "@/Shared/db";
 import { coachApplications, coachApplySettings, coaches, coachDisplayName } from "@/Shared/db/schema";
 import { normalizeCode } from "./codes";
 import { ensureCoachCode } from "./coach";
+import { recordAcctEvent } from "./acctStore";
 import { addPeriod, todayISO, INTERN_MONTHS, type LicenseUnit } from "./license";
 import {
   APPLY_CONSENTS,
@@ -342,6 +343,10 @@ export async function approveApplication(coachId: string, reviewerId: string): P
 
   // 編號在「核准報聘」那一刻發，且只發一次（停權後再核准拿回同一個號）。
   await ensureCoachCode(coachId);
+
+  // 帳務：報聘核准記一筆；這一刻順便開通培訓帳號的話再記一筆（測試帳號、已記過的自己會跳過，永不丟錯）。
+  await recordAcctEvent("apply", coachId);
+  if (license) await recordAcctEvent("license", coachId);
 
   return {
     ok: true,

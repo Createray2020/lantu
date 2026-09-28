@@ -3,6 +3,7 @@
 import { cache } from "react";
 import { currentUser } from "@clerk/nextjs/server";
 import { eq, count } from "drizzle-orm";
+import { recordAcctEvent } from "./acctStore";
 import { db } from "@/Shared/db";
 import { coaches, clients, compCases } from "@/Shared/db/schema";
 import { allocCode } from "./codeAlloc";
@@ -252,7 +253,11 @@ export async function setCoachStatus(id: string, status: "pending" | "active" | 
     .update(coaches)
     .set({ status, approvedAt: status === "active" ? new Date() : null })
     .where(eq(coaches.id, id));
-  if (status === "active") await ensureCoachCode(id);
+  if (status === "active") {
+    await ensureCoachCode(id);
+    // 帳務：報聘核准＝一筆入帳（測試帳號與已記過的自己會跳過，永不丟錯）
+    await recordAcctEvent("apply", id);
+  }
 }
 
 /**

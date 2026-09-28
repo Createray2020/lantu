@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcMonth, calcTarget, compareMonth, suggestQty, calcData, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, type AcctState } from "./acctEngine";
+import { calcMonth, calcTarget, compareMonth, suggestQty, calcData, normItems as normItems2, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, type AcctState } from "./acctEngine";
 
 // 原型（docs/帳務後台_原型.html）的示範資料——2026-09 那一個月。
 const S: AcctState = {
@@ -137,5 +137,35 @@ describe("acctEngine 目標工作台 suggestQty", () => {
     const r = calcData(S.items, { ...base, qty: q }, S.params);
     expect(r.net).toBeGreaterThanOrEqual(400000);
     expect(suggestQty(S.items, base, 1, S.params)).toEqual(base.qty);
+  });
+});
+
+describe("acctEngine 系統入帳（acct_entries）", () => {
+  const sysRows = [
+    { id: "e1", itemId: "a", coachId: "c1", coachName: "甲", source: "apply" as const, amount: 6000, void: false, createdAt: "2026-09-03T00:00:00Z" },
+    { id: "e2", itemId: "a", coachId: "c2", coachName: "乙", source: "apply" as const, amount: 5000, void: false, createdAt: "2026-09-10T00:00:00Z" },
+    { id: "e3", itemId: "a", coachId: "c3", coachName: "丙", source: "apply" as const, amount: 6000, void: true, createdAt: "2026-09-12T00:00:00Z" },
+    { id: "e4", itemId: "zzz", coachId: "c4", coachName: "丁", source: "license" as const, amount: 9000, void: false, createdAt: "2026-09-12T00:00:00Z" },
+  ];
+  const T: AcctState = { ...S, months: { "2026-09": { qty: { a: 2 }, fixed: [] } }, sys: { "2026-09": sysRows } };
+  it("筆數＝手填＋系統（作廢不算）；營業額用每筆快照金額；找不到項目的事件不算", () => {
+    const r = calcMonth(T, "2026-09")!;
+    const a = r.byItem.find((b) => b.it.id === "a")!;
+    expect(a.manualQ).toBe(2); expect(a.sysN).toBe(2); expect(a.q).toBe(4);
+    expect(a.rev).toBe(12000 * 2 + 6000 + 5000);
+    // 拆分規則套在快照金額上：全比例 67.5%
+    expect(a.gp).toBeCloseTo((12000 * 2 + 6000 + 5000) * (1 - 0.675));
+    expect(r.rev).toBe(a.rev);
+  });
+  it("目標不吃系統入帳；對照的實際筆數含系統", () => {
+    const U: AcctState = { ...T, targets: { "2026-09": { qty: { a: 5 }, fixed: [], net: 0 } } };
+    expect(calcTarget(U, "2026-09")!.byItem[0].q).toBe(5);
+    const c = compareMonth(U, "2026-09")!;
+    expect(c.items.find((x) => x.key === "a")!.actual).toBe(4);
+  });
+  it("normItems 只認 apply／license 當自動來源", () => {
+    const it = normItems2([{ id: "x", name: "報聘", price: 6000, splits: [], source: "apply" }, { id: "y", name: "y", price: 1, splits: [], source: "junk" }]);
+    expect(it[0].source).toBe("apply");
+    expect(it[1].source).toBeUndefined();
   });
 });

@@ -13,6 +13,7 @@ import { db } from "@/Shared/db";
 import { coaches } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import { addPeriod, INTERN_MONTHS, type LicenseUnit } from "@/lib/license";
+import { recordAcctEvent } from "@/lib/acctStore";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -37,6 +38,9 @@ export async function setLicenseAction(
     const unit: LicenseUnit = intern ? "month" : input.unit === "year" ? "year" : "month";
     const qty = intern ? INTERN_MONTHS : Math.min(120, Math.max(1, Math.round(input.qty || 1)));
     const until = addPeriod(input.licenseFrom, unit, qty);
+    // 第一次開通才算「培訓帳號」入帳（180 天一生一次）；之後延長只是改期限，不再收。
+    const [before] = await db.select({ licenseUntil: coaches.licenseUntil }).from(coaches).where(eq(coaches.id, id));
+    const firstOpen = !before?.licenseUntil;
 
     await db
       .update(coaches)
@@ -49,6 +53,7 @@ export async function setLicenseAction(
       })
       .where(eq(coaches.id, id));
 
+    if (firstOpen) await recordAcctEvent("license", id, new Date(input.licenseFrom + "T00:00:00"));
     touch();
     return { ok: true };
   } catch (e) {
