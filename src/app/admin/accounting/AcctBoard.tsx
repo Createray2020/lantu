@@ -5,19 +5,19 @@ import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
 import {
-  calcMonth, calcTarget, calcData, compareMonth, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, isYm,
+  calcMonth, calcTarget, calcData, compareMonth, breakeven, suggestQty, prevYm, nextYm, isYm,
   type AcctState, type AcctItem, type AcctMonth, type AcctTarget, type AcctAdj, type MonthResult, type Compare,
 } from "@/lib/acctEngine";
 import {
-  saveAcctItemsAction, saveAcctParamsAction, saveAcctGoalAction, saveAcctMonthAction, ensureAcctMonthAction, deleteAcctMonthAction,
-  saveAcctTargetAction, deleteAcctTargetAction, type ActionResult,
+  saveAcctItemsAction, saveAcctParamsAction, saveAcctMonthAction, ensureAcctMonthAction, deleteAcctMonthAction,
+  saveAcctTargetAction, deleteAcctTargetAction, saveAcctDraftAction, type ActionResult,
 } from "./actions";
 
 // 帳務後台面板（2026/09/29）。版面照原型 docs/帳務後台_原型.html：
 //   ① 一句話結論＋三 KPI＋瀑布圖＋近 12 月趨勢
 //   ② 營業項目與單價拆分 ｜ ③ 本月數量
 //   ④ 固定支出           ｜ ⑤ 本月損益結構
-//   ⑥ 目標設定 ＋ what-if 四根拉桿（只試算不動資料）
+//   目標工作台（Ray 2026/09/29：目標不綁期間、放最前面）：目標淨利 → 反推筆數（可手改）→ 固定支出 → what-if 拉桿 → 存入哪一個月
 // 三種視角（Ray：目標要獨立出來、不跟真實帳務混）：
 //   實際＝acct_months；目標＝acct_targets（同形狀＋目標淨利），②③④⑤ 換成編輯目標；
 //   對照＝每一格「目標 → 實際（差）」，結論改成「差在哪」，趨勢圖多一條虛線＝目標淨利。
@@ -44,7 +44,6 @@ export default function AcctBoard({ initial, today }: { initial: AcctState; toda
   const keys = useMemo(() => Object.keys(S.months).sort(), [S.months]);
   const [ym, setYm] = useState<string>(keys.includes(today) ? today : keys[keys.length - 1] ?? today);
   const [view, setView] = useState<View>("actual");
-  const [adj, setAdj] = useState<Required<AcctAdj>>({ price: 0, split: 0, qty: 0, fix: 0 });
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -63,7 +62,7 @@ export default function AcctBoard({ initial, today }: { initial: AcctState; toda
   const saveItems = (items: AcctItem[]) => { setS((s) => ({ ...s, items })); run(() => saveAcctItemsAction(items), "已存營業項目"); };
   const saveMonth = (m: AcctMonth) => { setS((s) => ({ ...s, months: { ...s.months, [ym]: m } })); run(() => saveAcctMonthAction(ym, m), `已存 ${ym} 實際`); };
   const saveTarget = (t: AcctTarget, k = ym) => { setS((s) => ({ ...s, targets: { ...s.targets, [k]: t } })); run(() => saveAcctTargetAction(k, t), `已存 ${k} 目標`); };
-  const saveGoal = (netTarget: number) => { setS((s) => ({ ...s, goal: { netTarget } })); run(() => saveAcctGoalAction({ netTarget }), "已存目標淨利"); };
+  const saveDraft = (d: AcctTarget) => { setS((s) => ({ ...s, draft: d })); run(() => saveAcctDraftAction(d), "已存工作台草稿"); };
   const saveVat = (vatRate: number) => { setS((s) => ({ ...s, params: { vatRate } })); run(() => saveAcctParamsAction({ vatRate }), "已存營業稅率"); };
   const openMonth = (k: string) => {
     if (!isYm(k)) return;
@@ -88,31 +87,28 @@ export default function AcctBoard({ initial, today }: { initial: AcctState; toda
     setS((s) => ({ ...s, targets: rest }));
     run(() => deleteAcctTargetAction(ym), `已刪 ${ym} 目標`);
   };
-  /** 目標從哪來：① 用試算反推的筆數＋這個月的固定支出 ② 複製上月目標 ③ 從實際複製 */
-  const targetFromSolve = () => {
-    if (!r) return;
-    const g = goalSolve(S, r);
-    const qty: Record<string, number> = {};
-    for (const x of g.perItem) qty[x.id] = x.needQ;
-    saveTarget({ qty, fixed: month.fixed.map((f) => ({ ...f })), net: S.goal.netTarget });
-  };
+  /** 目標從哪來：① 從最上面的工作台存入 ② 複製上月目標 ③ 從實際複製 */
+  const targetFromDraft = (k: string) => { if (!S.draft) return; saveTarget({ qty: { ...S.draft.qty }, fixed: S.draft.fixed.map((f) => ({ ...f })), net: S.draft.net }, k); };
   const targetFromPrev = () => { const t = S.targets[prevYm(ym)]; if (t) saveTarget({ qty: { ...t.qty }, fixed: t.fixed.map((f) => ({ ...f })), net: t.net }); };
   const targetFromActual = () => saveTarget({ qty: { ...month.qty }, fixed: month.fixed.map((f) => ({ ...f })), net: r?.net ?? 0 });
 
   const be = r ? breakeven(r, S.params.vatRate) : Infinity;
   const dn = r && p ? r.net - p.net : null;
-  const g = r ? goalSolve(S, r) : null;
-  const w = useMemo(() => calcMonth(S, ym, adj), [S, ym, adj]);
-  const sens = useMemo(() => leverSensitivity(S, ym), [S, ym]);
 
   // 目標視角下 ②③④⑤ 編輯的是目標；MonthEditor 共用同一套畫面
   const editing: { data: AcctMonth; res: MonthResult | null; save: (m: AcctMonth) => void; label: string } = view === "target"
-    ? { data: target ?? EMPTY, res: rt, save: (m) => saveTarget({ ...m, net: target?.net ?? S.goal.netTarget }), label: "目標" }
+    ? { data: target ?? EMPTY, res: rt, save: (m) => saveTarget({ ...m, net: target?.net ?? 0 }), label: "目標" }
     : { data: month, res: r, save: saveMonth, label: "實際" };
   const editable = view === "target" ? !!target : hasMonth;
 
   return (
     <div className="space-y-4">
+      {/* 目標工作台（不綁月份） */}
+      <TargetWorkbench S={S} draft={S.draft} onSave={saveDraft} onStore={targetFromDraft} latestYm={keys[keys.length - 1] ?? null} today={today} pending={pending} />
+
+      <div className="flex items-center gap-3 pt-2">
+        <span className="text-10 tracking-[0.22em] text-tx3">月帳</span><span className="flex-1 border-t border-line" />
+      </div>
       {/* 月份與視角 */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-tx2">看哪一個月</span>
@@ -155,11 +151,11 @@ export default function AcctBoard({ initial, today }: { initial: AcctState; toda
           <div className={card}>
             <p className="text-sm text-tx2 mb-3">{ym} 還沒有目標。目標可以從三個地方來：</p>
             <div className="flex flex-wrap gap-2">
-              <button className={`${btn} border-brand2 text-brand2`} disabled={!r || !(S.goal.netTarget > 0)} onClick={targetFromSolve}>用試算反推（目標淨利 {F(S.goal.netTarget)} → 每項筆數）</button>
+              <button className={`${btn} border-brand2 text-brand2`} disabled={!S.draft} onClick={() => targetFromDraft(ym)}>從上面的目標工作台存入（目標淨利 {F(S.draft?.net ?? 0)}）</button>
               <button className={btn} disabled={!S.targets[prevYm(ym)]} onClick={targetFromPrev}>複製上月目標</button>
               <button className={btn} disabled={!hasMonth} onClick={targetFromActual}>從這個月的實際複製</button>
             </div>
-            {!(S.goal.netTarget > 0) && <p className={`${hint} mt-2`}>試算反推要先在最下面「5・目標設定」填目標淨利。</p>}
+            {!S.draft && <p className={`${hint} mt-2`}>工作台還沒有草稿——到最上面設一組。</p>}
           </div>
         )
       ) : r ? (
@@ -259,50 +255,115 @@ export default function AcctBoard({ initial, today }: { initial: AcctState; toda
         </div>
       </div>
 
-      {/* ⑥ 目標與 what-if */}
-      <div className={card}>
-        <h2 className={h2}>5・目標設定與可調整的地方</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-3">
+    </div>
+  );
+}
+
+// ---------- 目標工作台 ----------
+function TargetWorkbench({ S, draft, onSave, onStore, latestYm, today, pending }: {
+  S: AcctState; draft: AcctTarget | null; onSave: (d: AcctTarget) => void; onStore: (ym: string) => void; latestYm: string | null; today: string; pending: boolean;
+}) {
+  const [adj, setAdj] = useState<Required<AcctAdj>>({ price: 0, split: 0, qty: 0, fix: 0 });
+  const [baseYm, setBaseYm] = useState<string>(latestYm ?? "");
+  const [storeYm, setStoreYm] = useState<string>(today);
+  const d: AcctTarget = useMemo(() => draft ?? { qty: {}, fixed: [], net: 0 }, [draft]);
+  const res = useMemo(() => calcData(S.items, d, S.params), [S.items, S.params, d]);
+  const w = useMemo(() => calcData(S.items, d, S.params, adj), [S.items, S.params, d, adj]);
+  const base = baseYm ? S.months[baseYm] : undefined;
+  const monthKeys = Object.keys(S.months).sort();
+  const suggest = () => {
+    const b = base ?? { qty: { ...d.qty }, fixed: d.fixed };
+    onSave({ qty: suggestQty(S.items, b, d.net, S.params), fixed: (base ? base.fixed : d.fixed).map((f) => ({ ...f })), net: d.net });
+  };
+  const netOk = res.net >= d.net;
+  const sens = {
+    split1: calcData(S.items, d, S.params, { split: -1 }).net - res.net,
+    price1: calcData(S.items, d, S.params, { price: 1 }).net - res.net,
+    qty1: calcData(S.items, d, S.params, { qty: 1 }).net - res.net,
+  };
+  return (
+    <div className={`${card} border-brand2/40`}>
+      <h2 className={h2}>目標工作台</h2>
+      <p className={`${hint} mb-3`}>目標不綁月份：先設目標淨利、把每項筆數與固定支出調到算出來的淨利過線，再存入哪一個月。存入前這裡的東西不會動到任何月帳。</p>
+      <div className="flex flex-wrap items-center gap-2 text-sm mb-3">
+        <span>目標淨利</span>
+        <input className={numIn} inputMode="numeric" defaultValue={d.net} onBlur={(e) => { const v = NUM(e.target.value); if (v !== d.net) onSave({ ...d, net: v }); }} />
+        <span>元／月</span>
+        <span className="text-tx3 mx-1">｜</span>
+        <span>以</span>
+        <select className={SELECT_SM} value={baseYm} onChange={(e) => setBaseYm(e.target.value)}>
+          <option value="">（現在的草稿）</option>
+          {monthKeys.map((k) => <option key={k} value={k}>{k} 實際</option>)}
+        </select>
+        <span>為基準</span>
+        <button className={`${btn} border-brand2 text-brand2`} disabled={!(d.net > 0) || (!base && !S.items.length)} onClick={suggest}>反推每項筆數</button>
+        <span className={hint}>等比放大到目標；固定支出一起從基準複製</span>
+      </div>
+
+      {S.items.length ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
-            <p className={`${hint} mb-2`}>設一個目標淨利，看以現在的毛利結構要賣幾筆才到；滿意就存成這個月的目標（存進目標表，不動實際帳）。</p>
-            <div className="flex items-center gap-2 mb-2 text-sm">目標淨利 <input className={numIn} inputMode="numeric" defaultValue={S.goal.netTarget} onBlur={(e) => { const v = NUM(e.target.value); if (v !== S.goal.netTarget) saveGoal(v); }} /> 元／月</div>
-            {r && g && S.goal.netTarget > 0 ? (
-              <>
-                <p className="text-sm mb-2">需要「毛利 − 營業稅」達 <b>{F(g.need)}</b>，目前 {F(g.have)}，{g.gap <= 0 ? <b className="text-ok">已達標</b> : <>還差 <b className="text-danger">{F(g.gap)}</b></>}。</p>
-                {g.gap > 0 && Number.isFinite(g.k) && (
-                  <>
-                    <p className={`${hint} mb-1`}>照現在的組合等比放大，每項要賣到：</p>
-                    <table className="w-full text-sm">
-                      <tbody>{g.perItem.map((x) => <tr key={x.id} className="border-t border-line"><td className="py-1">{x.name}</td><td className="text-right">{x.q} → <b>{x.needQ}</b> 筆</td><td className="text-right text-tx3">或單靠它補：{x.aloneQ == null ? "補不到" : `+${x.aloneQ} 筆`}</td></tr>)}</tbody>
-                    </table>
-                  </>
-                )}
-                {g.gap > 0 && !Number.isFinite(g.k) && <p className="text-sm text-tx3">現在的毛利扣稅後 ≤ 0，等比放大也到不了——先看拆分與單價。</p>}
-                <button className={`${btn} mt-3 border-brand2 text-brand2`} onClick={async () => { if (target && !await confirmDialog(`${ym} 已有目標，覆蓋成這組筆數與目標淨利 ${F(S.goal.netTarget)}？`)) return; targetFromSolve(); setView("target"); }}>存成 {ym} 的目標</button>
-              </>
-            ) : <p className="text-sm text-tx3">填一個目標淨利就會算。</p>}
+            <table className="w-full text-sm">
+              <thead><tr className="text-xs text-tx3"><th className="text-left py-1">項目</th><th className="text-right">基準</th><th className="text-right">目標筆數</th><th className="text-right">營業額</th><th className="text-right">毛利</th></tr></thead>
+              <tbody>
+                {res.byItem.map((b) => (
+                  <tr key={b.it.id} className="border-t border-line">
+                    <td className="py-1.5">{b.it.name}</td>
+                    <td className="text-right text-tx3">{base ? (base.qty[b.it.id] ?? 0) : "—"}</td>
+                    <td className="text-right"><input key={`${b.it.id}-${d.qty[b.it.id] ?? 0}`} className={`${FIELD_SM} w-20 text-right`} inputMode="numeric" defaultValue={d.qty[b.it.id] ?? 0} onBlur={(e) => { const v = NUM(e.target.value); if (v !== (d.qty[b.it.id] ?? 0)) onSave({ ...d, qty: { ...d.qty, [b.it.id]: v } }); }} /></td>
+                    <td className="text-right">{F(b.rev)}</td>
+                    <td className="text-right text-brand2">{F(b.gp)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-line font-bold"><td className="py-1.5">合計</td><td /><td className="text-right">{res.byItem.reduce((a, b) => a + b.q, 0)}</td><td className="text-right">{F(res.rev)}</td><td className="text-right text-brand2">{F(res.gp)}</td></tr>
+              </tbody>
+            </table>
+            <table className="w-full text-sm mt-3">
+              <thead><tr className="text-xs text-tx3"><th className="text-left py-1">固定支出</th><th className="text-right">每月金額</th><th /></tr></thead>
+              <tbody>
+                {d.fixed.map((f, i) => (
+                  <tr key={`${i}-${f.name}-${f.amt}`} className="border-t border-line">
+                    <td className="py-1.5"><input className={nameIn} defaultValue={f.name} onBlur={(e) => { if (e.target.value !== f.name) onSave({ ...d, fixed: d.fixed.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }); }} /></td>
+                    <td className="text-right"><input className={numIn} inputMode="numeric" defaultValue={f.amt} onBlur={(e) => { const v = NUM(e.target.value); if (v !== f.amt) onSave({ ...d, fixed: d.fixed.map((x, j) => j === i ? { ...x, amt: v } : x) }); }} /></td>
+                    <td className="text-right"><button className={xbtn} onClick={() => onSave({ ...d, fixed: d.fixed.filter((_, j) => j !== i) })}>✕</button></td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-line font-bold"><td className="py-1.5">合計</td><td className="text-right">{F(res.fixed)}</td><td /></tr>
+              </tbody>
+            </table>
+            <button className={`${btn} mt-2`} onClick={() => onSave({ ...d, fixed: [...d.fixed, { name: "新支出", amt: 0 }] })}>＋ 固定支出</button>
           </div>
           <div>
-            <p className={`${hint} mb-2`}>試試看「如果調整這幾件事」淨利會變多少（只是試算，不動任何資料）。</p>
+            <p className="text-base leading-relaxed mb-2">
+              照這組設定：營業額 <b className="text-brand2">{F(res.rev)}</b>、毛利率 <b>{P(res.gm * 100)}</b>、扣固定支出 {F(res.fixed)} 與營業稅，淨利 <b className={res.net >= 0 ? "text-ok" : "text-danger"}>{F(res.net)}</b>
+              {d.net > 0 && <>，{netOk ? <span className="text-ok">達到目標淨利 {F(d.net)}</span> : <>離目標淨利 {F(d.net)} 還差 <b className="text-danger">{F(d.net - res.net)}</b></>}</>}。
+            </p>
+            <Waterfall r={res} />
+            <p className={`${hint} mt-3 mb-1`}>試試看調整這幾件事（只在這裡試算，不寫進草稿）：</p>
             {([["price", "單價調整", -20, 30, "%"], ["split", "拆分比例調整", -20, 20, " 點"], ["qty", "數量調整", -50, 100, "%"], ["fix", "固定支出調整", -50, 50, "%"]] as [keyof AcctAdj, string, number, number, string][]).map(([k, l, lo, hi, u]) => (
-              <div key={k} className="flex items-center gap-3 my-1.5 text-sm">
+              <div key={k} className="flex items-center gap-3 my-1 text-sm">
                 <span className="w-28 shrink-0">{l}</span>
                 <input type="range" className="flex-1" min={lo} max={hi} value={adj[k]} onChange={(e) => setAdj({ ...adj, [k]: Number(e.target.value) })} />
                 <b className="w-16 text-right">{adj[k]}{u}</b>
               </div>
             ))}
-            {r && w && (
-              <div className="mt-3 text-sm">
-                調整後淨利 <b className={w.net >= 0 ? "text-ok" : "text-danger"}>{F(w.net)}</b>（{D(w.net - r.net)}）・毛利率 {P(w.gm * 100)}
-                {S.goal.netTarget > 0 && <> ・ {w.net >= S.goal.netTarget ? <span className="text-ok">達到目標</span> : <>離目標還差 {F(S.goal.netTarget - w.net)}</>}</>}
-                <div className={`${hint} mt-2`}>
-                  可調整的槓桿：拆分比例每降 1 點 ≈ 淨利 +{F(sens.split1)}；固定支出每省 1 萬 ＝ 淨利 +10,000；單價每 +1% ≈ 淨利 +{F(sens.price1)}（固定額拆分的項目吃得到，比例制的拆分會跟著漲）；數量每 +1% ≈ 淨利 +{F(sens.qty1)}。
-                </div>
-                {(adj.price || adj.split || adj.qty || adj.fix) ? <button className={`${btn} mt-2`} onClick={() => setAdj({ price: 0, split: 0, qty: 0, fix: 0 })}>拉桿歸零</button> : null}
-              </div>
-            )}
+            {(adj.price || adj.split || adj.qty || adj.fix) ? (
+              <div className="text-sm mt-1">調整後淨利 <b className={w.net >= 0 ? "text-ok" : "text-danger"}>{F(w.net)}</b>（{D(w.net - res.net)}）・毛利率 {P(w.gm * 100)} <button className={`${xbtn} ml-2`} onClick={() => setAdj({ price: 0, split: 0, qty: 0, fix: 0 })}>歸零</button></div>
+            ) : null}
+            <div className={`${hint} mt-2`}>可調整的槓桿：拆分比例每降 1 點 ≈ 淨利 +{F(sens.split1)}；固定支出每省 1 萬 ＝ +10,000；單價每 +1% ≈ +{F(sens.price1)}（固定額拆分的項目吃得到）；數量每 +1% ≈ +{F(sens.qty1)}。</div>
           </div>
         </div>
+      ) : <p className="text-sm text-tx3">先在下面「1・營業項目與單價拆分」建項目，工作台才有東西可算。</p>}
+
+      <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-line text-sm">
+        <span>滿意了，存入</span>
+        <input className={`${FIELD_SM} w-28`} value={storeYm} onChange={(e) => setStoreYm(e.target.value)} placeholder="YYYY-MM" />
+        <button className={`${btn} border-brand2 text-brand2`} disabled={pending || !isYm(storeYm) || !S.items.length} onClick={async () => {
+          if (!isYm(storeYm)) return;
+          if (S.targets[storeYm] && !await confirmDialog(`${storeYm} 已有目標，覆蓋？`)) return;
+          onStore(storeYm);
+        }}>存成 {isYm(storeYm) ? storeYm : "…"} 的目標</button>
+        {isYm(storeYm) && S.targets[storeYm] && <span className={hint}>{storeYm} 目前目標淨利 {F(S.targets[storeYm].net)}</span>}
       </div>
     </div>
   );

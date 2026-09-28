@@ -18,6 +18,7 @@ export type AcctState = {
   items: AcctItem[];
   months: Record<string, AcctMonth>;   // 'YYYY-MM' 實際
   targets: Record<string, AcctTarget>; // 'YYYY-MM' 目標
+  draft: AcctTarget | null;            // 目標工作台的草稿（Ray：目標不綁期間，設好了再存入哪個月）
   params: AcctParams;
   goal: AcctGoal;
 };
@@ -146,6 +147,16 @@ export function goalSolve(S: AcctState, r: MonthResult): GoalSolve {
     return { id: b.it.id, name: b.it.name, q: b.q, needQ: gap > 0 && Number.isFinite(k) ? Math.ceil(b.q * k) : b.q, aloneQ: gap > 0 ? (net1 > 0 ? Math.ceil(gap / net1) : null) : 0 };
   });
   return { need, have, gap, k, perItem };
+}
+
+/** 目標工作台：以某一份基準（通常是最近一個月的實際）等比放大到目標淨利，回建議筆數。基準毛利扣稅 ≤0 時回基準筆數。 */
+export function suggestQty(items: AcctItem[], base: AcctMonth, netTarget: number, params: AcctParams): Record<string, number> {
+  const r = calcData(items, base, params);
+  const have = r.gp - r.vat, need = netTarget + r.fixed;
+  const k = have > 0 && need > have ? need / have : 1;
+  const out: Record<string, number> = {};
+  for (const it of items) out[it.id] = Math.ceil((base.qty[it.id] ?? 0) * k);
+  return out;
 }
 
 /** 四根槓桿各動 1 單位，淨利差多少（給「可調整的地方」那一行）。 */

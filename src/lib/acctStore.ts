@@ -1,6 +1,6 @@
 // 帳務後台（組織營業損益）的伺服器端讀寫（2026/09/29）。與 carParams 同一模式：兩張表、後台一存 updateTag。
 //
-//   acct_params   key/value：items（營業項目＋拆分）／params（vatRate）／goal（netTarget）
+//   acct_params   key/value：items（營業項目＋拆分）／params（vatRate）／goal（netTarget）／draft（目標工作台草稿，不綁月份）
 //   acct_months   ym 主鍵：qty（各項目本月筆數）／fixed（本月固定支出列）
 //   acct_targets  ym 主鍵：同形狀的月目標＋net（目標淨利）——目標與實際分兩張表，不混
 // 計算全在 acctEngine.ts（純函式），這裡只管進出 DB 與正規化。
@@ -21,19 +21,21 @@ async function loadState(): Promise<AcctState> {
   let goal: AcctGoal = { ...ACCT_DEFAULT_GOAL };
   const months: Record<string, AcctMonth> = {};
   const targets: Record<string, AcctTarget> = {};
+  let draft: AcctTarget | null = null;
   try {
     const rows = await db.select({ key: acctParams.key, value: acctParams.value }).from(acctParams);
     for (const r of rows) {
       if (r.key === "items") items = normItems(r.value);
       if (r.key === "params") params = normParams(r.value);
       if (r.key === "goal") goal = normGoal(r.value);
+      if (r.key === "draft" && r.value) draft = normTarget(r.value);
     }
     const ms = await db.select().from(acctMonths).orderBy(asc(acctMonths.ym));
     for (const m of ms) if (isYm(m.ym)) months[m.ym] = normMonth({ qty: m.qty, fixed: m.fixed });
     const ts = await db.select().from(acctTargets).orderBy(asc(acctTargets.ym));
     for (const t of ts) if (isYm(t.ym)) targets[t.ym] = normTarget({ qty: t.qty, fixed: t.fixed, net: t.net });
   } catch { /* 表還沒建：空狀態 */ }
-  return { items, months, targets, params, goal };
+  return { items, months, targets, draft, params, goal };
 }
 export const getAcctState = unstable_cache(loadState, ["lantu-acct-state"], { tags: [ACCT_TAG] });
 
@@ -56,6 +58,10 @@ export async function saveAcctParams(value: unknown): Promise<void> {
 }
 export async function saveAcctGoal(value: unknown): Promise<void> {
   await putParam("goal", normGoal(value));
+  updateTag(ACCT_TAG);
+}
+export async function saveAcctDraft(value: unknown): Promise<void> {
+  await putParam("draft", normTarget(value));
   updateTag(ACCT_TAG);
 }
 export async function saveAcctMonth(ym: string, value: unknown): Promise<void> {

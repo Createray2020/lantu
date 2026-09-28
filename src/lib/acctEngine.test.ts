@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcMonth, calcTarget, compareMonth, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, type AcctState } from "./acctEngine";
+import { calcMonth, calcTarget, compareMonth, suggestQty, calcData, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, type AcctState } from "./acctEngine";
 
 // 原型（docs/帳務後台_原型.html）的示範資料——2026-09 那一個月。
 const S: AcctState = {
@@ -13,6 +13,7 @@ const S: AcctState = {
     "2026-09": { qty: { a: 19, b: 5, c: 96, d: 4 }, fixed: [{ name: "辦公室租金", amt: 35000 }, { name: "系統與雲端費用", amt: 12000 }, { name: "行政人員薪資", amt: 42000 }, { name: "行銷投放", amt: 15000 }, { name: "保險與雜支", amt: 6000 }] },
   },
   targets: {},
+  draft: null,
   params: { vatRate: 5 },
   goal: { netTarget: 200000 },
 };
@@ -125,5 +126,16 @@ describe("acctEngine 目標與對照（目標另存，不動實際）", () => {
   it("normTarget 帶 net、負數夾 0", () => {
     expect(normTarget({ qty: { a: "3" }, fixed: [], net: -5 })).toEqual({ qty: { a: 3 }, fixed: [], net: 0 });
     expect(normTarget(null).net).toBe(0);
+  });
+});
+
+describe("acctEngine 目標工作台 suggestQty", () => {
+  it("等比放大到目標淨利；已達標時維持基準筆數", () => {
+    const base = S.months["2026-09"];
+    const q = suggestQty(S.items, base, 400000, S.params);
+    for (const it of S.items) expect(q[it.id]).toBeGreaterThanOrEqual(base.qty[it.id]);
+    const r = calcData(S.items, { ...base, qty: q }, S.params);
+    expect(r.net).toBeGreaterThanOrEqual(400000);
+    expect(suggestQty(S.items, base, 1, S.params)).toEqual(base.qty);
   });
 });
