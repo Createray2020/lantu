@@ -128,139 +128,157 @@ describe("流程推進與閘門", () => {
     expect(cur().flow.step).toBe("S4");
     expect(pane()).toContain("教練建議");
   });
-  it("方案頁首是全生涯財務流（只畫一次）；S4 三根拉桿（願景延後、收入、支出）；理財在收入結構底下", () => {
+  it("方案頁首是全生涯財務流（只畫一次）；S4 兩根拉桿（收入、支出）住在圖正下方，沒有願景拉桿", () => {
     const h = pane();
     expect((h.match(/data-calc="tuneHero"/g) || []).length).toBe(1);
     expect(h.indexOf("全生涯財務流")).toBeLessThan(h.indexOf('class="flowrail"'));
     expect(h).toContain("tunekpis");
-    expect((h.match(/type="range" inputmode="numeric"/g) || []).length).toBe(3);
-    expect(h).toContain('class="tunelev vis"');
-    expect(h).toContain('onclick="flowTuneSelect(\'all\')"');
+    const hero = h.indexOf('class="sec tunehero"');
+    const levs = h.indexOf('class="tunelevs"');
+    expect(levs).toBeGreaterThan(hero);
+    expect(levs).toBeLessThan(h.indexOf('class="flowrail"'));
+    expect((h.match(/class="tunelev /g) || []).length).toBe(2);
+    expect(h).not.toContain('class="tunelev vis"');
     expect(h).toContain("收入結構");
     expect(h).toContain("支出結構");
-    expect(h).toContain("定期定額");
     expect(h).not.toContain("A-1 工作收入");
     const K = w.flowTuneCaps(cur());
     expect(K.workCap).toBe(Math.round(K.workM * w.CAP_INCOME_UP / 100));
     expect(K.incMax).toBe(K.workCap + K.finRoom);
   });
-  it("收入拉桿：先落工作收入（上限 CAP_INCOME_UP%），超過的落定期定額；動作帶 flowKey、lane、不重複長", () => {
+  it("拖曳中只換圖與三個數字（複本上算，資料不動）；放開只記草稿、確定鈕亮起；按確定才寫動作並開「從哪裡來」視窗", async () => {
     const c = cur();
+    const snap = JSON.stringify(c);
+    const before = w.document.getElementById("tuneKpis").innerHTML;
+    w.flowTuneLive("inc", 20000);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(JSON.stringify(c)).toBe(snap);
+    expect(w.document.getElementById("tuneIncV").textContent).toBe("+20,000");
+    expect(w.document.getElementById("tuneKpis").innerHTML).not.toBe(before);
+    w.flowTuneDraft("inc", 20000);
+    expect(c.flow.tune.incDraft).toBe(20000);
+    expect(c.flow.tune.inc).toBe(0);
+    expect(c.actions.find((a: any) => a.flowKey === "tune:work")).toBeUndefined();   // 沒按確定不長動作
+    expect(w.document.getElementById("tuneIncOk").disabled).toBe(false);
+    w.flowTuneConfirm("inc");
+    expect(c.flow.tune.inc).toBe(20000);
     const K = w.flowTuneCaps(c);
-    const before = c.actions.length;
-    w.flowTuneInc(K.workCap + 3000);
     const aw = c.actions.find((a: any) => a.flowKey === "tune:work");
-    const ar = c.actions.find((a: any) => a.flowKey === "tune:regular");
-    expect(aw.lane).toBe("income-work"); expect(aw.cat).toBe("income");
-    expect(aw.getMonthly).toBe(K.workCap);
-    expect(ar.lane).toBe("income-invest"); expect(ar.cat).toBe("regular");
-    expect(ar.payMonthly).toBe(Math.min(3000, K.finRoom));
-    expect(ar.on).toBe(K.finRoom > 0);
-    expect(cur().flow.tune.inc).toBe(Math.min(K.workCap + 3000, K.incMax));
-    w.flowTuneInc(1000);
-    expect(c.actions.length).toBe(before + 2);           // 再拉不會多長一條
-    expect(c.actions.find((a: any) => a.flowKey === "tune:work").getMonthly).toBe(1000);
-    expect(c.actions.find((a: any) => a.flowKey === "tune:regular").on).toBe(false);
+    expect(aw.getMonthly).toBe(Math.min(20000, K.workCap));
+    expect(c.flow.tune.incSplit.work + c.flow.tune.incSplit.regular).toBeLessThanOrEqual(20000);
+    expect(w.app.tuneOpen).toBe("inc");
+    expect(w.document.getElementById("tuneMask")).toBeTruthy();
+    expect(w.document.getElementById("tuneMask").innerHTML).toContain("從哪裡來");
+    expect(w.document.getElementById("tuneIncOk").disabled).toBe(true);
+  });
+  it("收入視窗：改工作／定期定額的分法，合計＝目標、另一格自動補；路徑籤寫進動作 tool；不重複長動作", () => {
+    const c = cur();
+    const before = c.actions.length;
+    const K = w.flowTuneCaps(c);
+    w.flowTuneSetSplit("work", 5000);
+    expect(c.flow.tune.incSplit.work).toBe(5000);
+    expect(c.flow.tune.incSplit.regular).toBe(Math.min(15000, K.finRoom));
+    expect(c.actions.find((a: any) => a.flowKey === "tune:work").getMonthly).toBe(5000);
+    expect(c.actions.find((a: any) => a.flowKey === "tune:regular").payMonthly).toBe(Math.min(15000, K.finRoom));
     w.flowTuneRoute("專業兼職");
     expect(c.actions.find((a: any) => a.flowKey === "tune:work").tool).toBe("專業兼職");
-    expect(pane()).toContain("class=\"chip on\" onclick=\"flowTuneRoute('專業兼職')\"");
+    expect(c.actions.length).toBe(before);
+    w.flowTuneModalClose();
+    expect(w.document.getElementById("tuneMask")).toBeNull();
+    w.flowTuneInc(1000);
+    expect(c.actions.find((a: any) => a.flowKey === "tune:work").getMonthly).toBe(1000);
+    expect(c.actions.find((a: any) => a.flowKey === "tune:regular").on).toBe(false);
   });
-  it("支出拉桿與「留／半／放」是同一件事：拉桿由上到下配到放／半；客戶點標記，拉桿跟著走；固定與必達那幾列碰不到", () => {
+  it("支出：拉桿記草稿 → 確定才由上到下標放／半並開「放哪幾項」視窗；視窗裡點留／半／放，拉桿跟著走；固定與必達碰不到", () => {
     const c = cur();
     const K = w.flowTuneCaps(c);
     const first = c.expenses.findIndex((e: any) => w.tuneRowOK(e));
     expect(first).toBeGreaterThanOrEqual(0);
     const amt = w.n(c.expenses[first].amount) / 12;
-    w.flowTuneExp(amt);
+    w.flowTuneDraft("exp", amt);
+    expect(c.flow.tune.expDraft).toBe(Math.min(amt, K.expCap));
+    expect(w.flowExpMode(c, first)).toBe("keep");                 // 沒確定不標
+    w.flowTuneConfirm("exp");
     expect(w.flowExpMode(c, first)).toBe("drop");
     expect(cur().flow.tune.exp).toBe(Math.round(amt));
+    expect(w.app.tuneOpen).toBe("exp");
+    expect(w.document.getElementById("tuneMask").innerHTML).toContain("放哪幾項");
     c.expenses.forEach((e: any, i: number) => { if (!w.tuneRowOK(e)) expect(w.flowExpMode(c, i)).toBe("keep"); });
-    w.flowExpMark(first, "half");
+    w.flowTuneExpMark(first, "half");
     expect(cur().flow.tune.exp).toBe(Math.round(amt / 2));
+    expect(cur().flow.tune.expDraft).toBe(Math.round(amt / 2));
     const act = c.actions.find((a: any) => a.cat === "expense" && a.ref === "expenses:" + first);
     expect(act.getMonthly).toBe(Math.round(amt * 0.5));
     w.flowToggleReflow(true);
     const rf = c.actions.find((a: any) => a.flowKey === "reflow");
     expect(rf.on).toBe(true);
     expect(rf.payMonthly).toBe(act.getMonthly);
-    w.flowExpMark(first, "keep");
+    w.flowTuneExpMark(first, "keep");
     expect(cur().flow.tune.exp).toBe(0);
     expect(c.actions.find((a: any) => a.flowKey === "reflow").on).toBe(false);
+    w.flowTuneModalClose();
     w.flowTuneExp(K.expCap + 99999);
     expect(cur().flow.tune.exp).toBe(K.expCap);
     w.flowTuneExp(0);
     expect(cur().flow.tune.exp).toBe(0);
   });
-  it("三根拉桿住在頁首圖的正下方；拖曳中只換圖與三個數字（複本上算，資料不動），放開才寫進資料", async () => {
+  it("願景：點右邊清單一項 → 中間視窗；拖時間拉桿只預覽（資料不動）；確定才寫、重打印記、留 vedit；取消什麼都不動；拉回 0 還原", async () => {
     const c = cur();
-    const h = pane();
-    const hero = h.indexOf('class="sec tunehero"');
-    const levs = h.indexOf('class="tunelevs"');
-    const rail = h.indexOf('class="flowrail"');
-    expect(levs).toBeGreaterThan(hero);
-    expect(levs).toBeLessThan(rail);
-    expect((h.match(/class="tunelev /g) || []).length).toBe(3);
+    expect(w.document.getElementById("vdr")).toBeTruthy();
+    expect(w.document.getElementById("vdr").innerHTML).toContain('class="vitem click"');
+    expect(w.document.getElementById("vdr").innerHTML).not.toContain("<input");
+    const g = w.flowVisionList(c).find((x: any) => x.kind === "goal");
+    const age0 = g.age;
+    w.flowVisionOpen(g.key);
+    expect(w.document.getElementById("vmodMask")).toBeTruthy();
+    expect(w.document.getElementById("vmodMask").innerHTML).toContain(g.name);
     const snap = JSON.stringify(c);
-    const before = w.document.getElementById("tuneKpis").innerHTML;
-    w.flowTuneLive("inc", 20000);
+    w.flowVisionPreview("delay", 3);
     await new Promise((r) => setTimeout(r, 200));
-    expect(JSON.stringify(c)).toBe(snap);                       // 資料一個字沒動
-    expect(w.document.getElementById("tuneIncV").textContent).toBe("+20,000");
-    expect(w.document.getElementById("tuneKpis").innerHTML).not.toBe(before);   // 三個數字換了
-    expect(w.document.getElementById("tuneHeroChart").innerHTML).toContain("<svg");
-    w.render();
-    expect(w.document.getElementById("tuneKpis").innerHTML).toBe(before);       // 重畫回到資料的樣子
-  });
-  it("願景拉桿：點清單選哪一項就只延後那一項；「全部」每一項各自推；拉回 0 還原；閘門那一刻重打印記、留 vedit 決定", () => {
-    const c = cur();
-    const items = w.flowVisionList(c).filter((x: any) => w.flowTuneDelayable(x));
-    const g = items.find((x: any) => x.kind === "goal");
-    const other = items.find((x: any) => x.kind !== "goal" && x.key !== g.key);
-    expect(g).toBeTruthy(); expect(other).toBeTruthy();
-    const age0 = g.age, oage0 = other.age;
-    w.flowTuneSelect(g.key);
-    expect(pane()).toContain("只動：" + g.name);
-    w.flowTuneDelay(3);
-    const after = w.flowVisionList(c);
-    expect(after.find((x: any) => x.key === g.key).age).toBe(age0 + 3);
-    expect(after.find((x: any) => x.key === other.key).age).toBe(oage0);   // 沒選的那一項不動
-    expect(c.flow.tune.delay[g.key]).toBe(3);
-    expect(c.flow.tune.vbase[g.key]).toBe(age0);
-    expect(pane()).toContain("+3 年");
-    w.flowTuneDelay(0);
+    expect(JSON.stringify(c)).toBe(snap);
+    expect(w.document.getElementById("vmodAge").textContent).toBe(age0 + 3 + " 歲");
+    w.flowVisionClose();
+    expect(w.document.getElementById("vmodMask")).toBeNull();
     expect(w.flowVisionList(c).find((x: any) => x.key === g.key).age).toBe(age0);
-    w.flowTuneSelect("all");
-    w.flowTuneDelay(2);
-    w.flowVisionList(c).filter((x: any) => w.flowTuneDelayable(x)).forEach((x: any) => expect(c.flow.tune.delay[x.key]).toBe(2));
-    expect(w.flowVisionList(c).find((x: any) => x.key === g.key).age).toBe(age0 + 2);
+    w.flowVisionOpen(g.key);
+    w.flowVisionPreview("delay", 3);
+    w.flowVisionPreview("amt", String(g.amount + 1000000));
+    const step = c.flow.step;
+    w.flowVisionApply();
+    expect(w.flowVisionList(c).find((x: any) => x.key === g.key).age).toBe(age0 + 3);
+    expect(w.n(c.goals[g.ref.i].present)).toBe(g.amount + 1000000);
+    expect(c.flow.tune.vbase[g.key]).toBe(age0);
+    expect(c.flow.tune.delay[g.key]).toBe(3);
+    expect(c.flow.visionLock.editedBy).toBe("client");
+    expect(c.flow.decisions.vedit.text).toContain("客戶自己改願景");
+    expect(c.flow.step).toBe(step);
+    expect(w.document.getElementById("vdr").innerHTML).toContain("+3年");
+    w.flowVisionOpen(g.key);
+    w.flowVisionPreview("delay", 0);
+    w.flowVisionPreview("amt", String(g.amount));
+    w.flowVisionApply();
+    expect(w.flowVisionList(c).find((x: any) => x.key === g.key).age).toBe(age0);
+    expect(w.n(c.goals[g.ref.i].present)).toBe(g.amount);
     // 原本 vs 拉完：原本那份把歲數還原、動作清空
     const b = w.flowTuneBase(c);
-    expect(w.flowVisionList(b).find((x: any) => x.key === g.key).age).toBe(age0);
     expect(b.actions.length).toBe(0);
-    // 閘門
-    const step = c.flow.step;
-    w.flowTuneGate({ closed: false, reason: "short", inc: 0, exp: 0, delay: c.flow.tune.delay }, "S6");
-    expect(c.flow.step).toBe("S6");
-    expect(c.flow.visionLock.editedBy).toBe("client");
-    expect(c.flow.decisions.vedit.text).toContain("客戶自己延後願景");
-    expect(c.flow.decisions.d5.delay[g.key]).toBe(2);
-    c.flow.step = step;
-    w.flowTuneSelect("all"); w.flowTuneDelay(0);
-    expect(w.flowVisionList(c).find((x: any) => x.key === g.key).age).toBe(age0);
   });
-  it("抽屜直接改歲數＝新的原本：拉桿基準跟著換、延後歸零", () => {
-    const c = cur();
-    const g = w.flowVisionList(c).find((x: any) => x.kind === "goal");
-    w.flowVisionEdit(g.key, "age", String(g.age + 5));
-    expect(c.flow.tune.vbase[g.key]).toBe(g.age + 5);
-    expect(c.flow.tune.delay[g.key]).toBe(0);
-    w.flowVisionEdit(g.key, "age", String(g.age));
-  });
-  it("S2 願景清單同抽屜：每一項可以直接改歲數／金額", () => {
+  it("S2 願景清單每一項有「微調」開同一個視窗；S6 後果列「客戶要改這一項」也是", () => {
     const c = cur();
     const st = c.flow.step; c.flow.step = "S2"; w.render();
-    expect((pane().match(/class="vin"/g) || []).length).toBeGreaterThan(2);
+    expect(pane()).toContain("flowVisionOpen(");
+    expect(pane()).toContain(">微調</button>");
     c.flow.step = st; w.render();
+  });
+  it("閘門那一刻：只有按過確定的收入／支出算數；有延後的願景已在確定時打過印記", () => {
+    const c = cur();
+    w.flowTuneInc(2000);
+    const step = c.flow.step;
+    w.flowTuneGate({ closed: false, reason: "short", inc: c.flow.tune.inc, exp: c.flow.tune.exp, delay: c.flow.tune.delay }, "S6");
+    expect(c.flow.step).toBe("S6");
+    expect(c.flow.decisions.d5.inc).toBe(2000);
+    c.flow.step = step;
+    w.flowTuneInc(0);
   });
   it("單筆入口跟著可投資水位：investGate 三個數字算得出來", () => {
     const IG = w.investGate(cur());
@@ -269,26 +287,10 @@ describe("流程推進與閘門", () => {
     expect(IG.loanable).toBeGreaterThanOrEqual(0);
     expect(pane()).toContain("可投資水位");
   });
-  it("願景抽屜：方案分頁才掛；客戶在抽屜改金額 → 願景改了、印記重打（editedBy client）、留一條 vedit 決定、步驟不動", () => {
-    const c = cur();
+  it("願景抽屜只在方案分頁掛；換分頁就拆掉", () => {
     expect(w.document.getElementById("vdr")).toBeTruthy();
-    expect(w.document.getElementById("vdr").className).toBe("");
     w.flowVisionToggle();
     expect(w.document.getElementById("vdr").className).toBe("on");
-    const items = w.flowVisionList(c);
-    const g = items.find((x: any) => x.kind === "goal");
-    expect(g).toBeTruthy();
-    const lockAt = c.flow.visionLock.at;
-    const step = c.flow.step;
-    w.flowVisionEdit(g.key, "amt", String(g.amount + 1000000));
-    expect(w.n(c.goals[g.ref.i].present)).toBe(g.amount + 1000000);
-    expect(c.flow.visionLock.editedBy).toBe("client");
-    expect(c.flow.visionLock.at >= lockAt).toBe(true);
-    expect(c.flow.decisions.vedit.key).toBe(g.key);
-    expect(c.flow.decisions.vedit.text).toContain("客戶自己改願景");
-    expect(c.flow.step).toBe(step);
-    w.flowVisionEdit(g.key, "age", String(g.age + 1));
-    expect(w.n(c.goals[g.ref.i].start)).toBe(g.age + 1);
     w.flowVisionToggle();
     w.app.activeTab = "analysis"; w.render();
     expect(w.document.getElementById("vdr")).toBeNull();
