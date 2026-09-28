@@ -1109,6 +1109,8 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .tmrow .tmn{font-weight:700}.tmrow .tmn .hint{font-weight:400;margin-left:6px}
 .tmrow input[type=text]{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:6px 8px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums}
 .tmsum{margin-top:10px;font-size:13px}.tmsum b{font-family:var(--serif);font-size:18px}
+.vmodpanel{pointer-events:auto;position:absolute;right:28px;bottom:calc(var(--lnbar-h,52px) + 20px);max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.45);border-color:var(--amber)}
+@media (max-width:900px){.vmodpanel{right:12px;left:12px;max-width:none}}
 .vitem.click{cursor:pointer}.vitem.click:hover{border-color:var(--amber)}.vitem .go{font-size:11px;color:var(--amber2);white-space:nowrap}
 .tunelev.vis input[type=range]{accent-color:var(--amber2)}.chip.moved{border-color:var(--ok);color:var(--ok)}.chip b{font-family:inherit}
 .vitem input.vin{width:72px;background:var(--card);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:2px 6px;font-size:12px}
@@ -10300,7 +10302,8 @@ function mountTuneModal(){
  m.innerHTML='<div class="lnmodal tunemodal">'+body+'<div style="display:flex;gap:8px;margin-top:14px"><span style="flex:1"></span><button class="tbtn amber" onclick="flowTuneModalClose()">好了</button></div></div>';
 }
 /* ---------- 願景：點右邊清單一項 → 中間視窗微調那一項（時間拉桿＋金額），圖在後面跟著動；確定才寫 ---------- */
-function flowVisionOpen(key){app.vmod={key:key,delay:null,amt:null};render()}
+function flowVisionOpen(key){app.vmod={key:key,delay:null,amt:null};app.vdrOpen=false;render();
+ try{var h=document.querySelector('.tunehero');if(h&&h.scrollIntoView)h.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){}}
 function flowVisionClose(){app.vmod=null;render()}
 function flowVisionItem(c,key){var it=null;flowVisionList(c).forEach(function(x){if(x.key===key)it=x});return it}
 function flowVisionPreview(k,v){ // 視窗裡拖時間拉桿／改金額：複本預覽
@@ -10331,12 +10334,12 @@ function mountVisionModal(){
  var m=document.getElementById('vmodMask');var c=activeCase();var f=c?flowOf(c):null;var vm=app.vmod;
  if(!(f&&vm&&app.activeTab==='plan')){if(m)m.remove();return}
  var it=flowVisionItem(c,vm.key);if(!it){app.vmod=null;if(m)m.remove();return}
- if(!m){m=document.createElement('div');m.id='vmodMask';m.style.cssText='position:fixed;inset:0;background:rgba(4,14,24,.5);display:flex;align-items:center;justify-content:center;z-index:80;padding:20px';
-  m.onclick=function(e){if(e.target===m)flowVisionClose()};document.body.appendChild(m)}
+ // 不遮、不暗：面板浮在右下角，圖留在眼前——Ray：拉的時候要看得到圖形變化
+ if(!m){m=document.createElement('div');m.id='vmodMask';m.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:80';document.body.appendChild(m)}
  var t=flowTuneState(c),base=(t.vbase||{})[vm.key]!=null?t.vbase[vm.key]:it.age,dv=vm.delay!=null?vm.delay:flowTuneDelayOf(c,vm.key),dmax=flowTuneDelayMax(c);
  var amtV=it.kind==='legacy'?n((c.legacy||{}).perHeirCash):it.amount;
- m.innerHTML='<div class="lnmodal tunemodal" style="max-width:460px"><h3><span class="pr" style="font-family:var(--serif);color:var(--amber2)">'+it.pos+'</span>　'+esc(it.name)+'</h3>'+
-  '<div class="hint" style="margin-bottom:10px">客戶自己微調這一項；拉的時候後面那張圖跟著動。按「確定」才寫進去、重新打印記。</div>'+
+ m.innerHTML='<div class="lnmodal tunemodal vmodpanel"><h3><span class="pr" style="font-family:var(--serif);color:var(--amber2)">'+it.pos+'</span>　'+esc(it.name)+'</h3>'+
+  '<div class="hint" style="margin-bottom:10px">客戶自己微調這一項；拉的時候上面那張圖跟著動。按「確定」才寫進去、重新打印記。</div>'+
   (flowTuneDelayable(it)?'<div class="tmrow" style="display:block"><div class="tmn">時間　原本 '+base+' 歲 → <b id="vmodAge">'+(vm.delay!=null?Math.min(effHorizon(c),base+vm.delay):it.age)+' 歲</b></div>'+
    '<div style="display:grid;grid-template-columns:1fr 80px;gap:10px;align-items:center"><input type="range" inputmode="numeric" min="0" max="'+dmax+'" step="1" value="'+dv+'" oninput="flowVisionPreview(\'delay\',this.value)" style="width:100%;accent-color:var(--amber2)"><b id="vmodDelayV" style="text-align:right">+'+dv+' 年</b></div></div>':'')+
   (it.kind!=='retire'?'<div class="tmrow"><div class="tmn">金額'+(it.kind==='legacy'?'（每人）':'')+'</div><input type="text" inputmode="numeric" value="'+fmt(vm.amt!=null?vm.amt:amtV)+'" onchange="flowVisionPreview(\'amt\',this.value)"></div>':'')+
