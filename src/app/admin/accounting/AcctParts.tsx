@@ -1,266 +1,93 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import type { ActionResult } from "./actions";
 import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
 import {
-  calcMonth, calcTarget, calcData, compareMonth, breakeven, suggestQty, prevYm, nextYm, isYm,
+  calcData, suggestQty, isYm,
   type AcctState, type AcctItem, type AcctMonth, type AcctTarget, type AcctAdj, type MonthResult, type Compare,
 } from "@/lib/acctEngine";
-import {
-  saveAcctItemsAction, saveAcctParamsAction, saveAcctMonthAction, ensureAcctMonthAction, deleteAcctMonthAction,
-  saveAcctTargetAction, deleteAcctTargetAction, saveAcctDraftAction, type ActionResult,
-} from "./actions";
 
-// 帳務後台面板（2026/09/29）。版面照原型 docs/帳務後台_原型.html：
-//   ① 一句話結論＋三 KPI＋瀑布圖＋近 12 月趨勢
-//   ② 營業項目與單價拆分 ｜ ③ 本月數量
-//   ④ 固定支出           ｜ ⑤ 本月損益結構
-//   目標工作台（Ray 2026/09/29：目標不綁期間、放最前面）：目標淨利 → 反推筆數（可手改）→ 固定支出 → what-if 拉桿 → 存入哪一個月
-// 三種視角（Ray：目標要獨立出來、不跟真實帳務混）：
-//   實際＝acct_months；目標＝acct_targets（同形狀＋目標淨利），②③④⑤ 換成編輯目標；
-//   對照＝每一格「目標 → 實際（差）」，結論改成「差在哪」，趨勢圖多一條虛線＝目標淨利。
-// 狀態在前端一份（S），每一格 onBlur／onChange 存回 server action；引擎 acctEngine 純算。
+// 帳務三頁共用的元件與常數（2026/09/29 拆頁：參數設定／目標設定／本月帳務）。
+// 版面與公式照原型 docs/帳務後台_原型.html；引擎在 lib/acctEngine.ts。
 
-type View = "actual" | "target" | "compare";
-const F = fmtMoney0;
-const P = (n: number) => (Number.isFinite(n) ? (Math.round(n * 10) / 10).toFixed(1) : "—") + "%";
-const D = (n: number) => (n >= 0 ? "+" : "−") + F(Math.abs(n));
-const uid = () => Math.random().toString(36).slice(2, 8);
-const btn = "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
-const xbtn = "text-xs text-tx3 hover:text-danger px-1";
-const card = "rounded-xl border border-line bg-panel p-5 shadow-e1";
-const h2 = "text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-1";
-const hint = "text-xs text-tx3 leading-relaxed";
-const numIn = `${FIELD_SM} w-24 text-right`;
-const nameIn = `${FIELD_SM} w-40`;
-const NUM = (v: string) => { const x = Number(String(v).replace(/,/g, "")); return Number.isFinite(x) ? x : 0; };
-const diffCls = (n: number) => (n > 0 ? "text-ok" : n < 0 ? "text-danger" : "text-tx3");
-const EMPTY: AcctMonth = { qty: {}, fixed: [] };
+export const F = fmtMoney0;
+export const P = (n: number) => (Number.isFinite(n) ? (Math.round(n * 10) / 10).toFixed(1) : "—") + "%";
+export const D = (n: number) => (n >= 0 ? "+" : "−") + F(Math.abs(n));
+export const uid = () => Math.random().toString(36).slice(2, 8);
+export const btn = "rounded-lg border border-line2 px-3 py-1.5 text-sm text-tx2 hover:bg-panel3 disabled:opacity-40";
+export const xbtn = "text-xs text-tx3 hover:text-danger px-1";
+export const card = "rounded-xl border border-line bg-panel p-5 shadow-e1";
+export const h2 = "text-sm font-bold border-l-[3px] border-brand2 pl-2 mb-1";
+export const hint = "text-xs text-tx3 leading-relaxed";
+export const numIn = `${FIELD_SM} w-24 text-right`;
+export const nameIn = `${FIELD_SM} w-40`;
+export const NUM = (v: string) => { const x = Number(String(v).replace(/,/g, "")); return Number.isFinite(x) ? x : 0; };
+export const diffCls = (n: number) => (n > 0 ? "text-ok" : n < 0 ? "text-danger" : "text-tx3");
+export const EMPTY: AcctMonth = { qty: {}, fixed: [] };
 
-export default function AcctBoard({ initial, today }: { initial: AcctState; today: string }) {
+/** 三頁共用的狀態殼：本地一份 S，先改本地再打 action，訊息列統一。 */
+export function useAcct(initial: AcctState) {
   const [S, setS] = useState<AcctState>({ ...initial, targets: initial.targets ?? {} });
-  const keys = useMemo(() => Object.keys(S.months).sort(), [S.months]);
-  const [ym, setYm] = useState<string>(keys.includes(today) ? today : keys[keys.length - 1] ?? today);
-  const [view, setView] = useState<View>("actual");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<ActionResult>, okMsg: string) =>
     start(async () => { const r = await fn(); if (r.ok) { setMsg(okMsg); setErr(null); } else { setErr(r.error); setMsg(null); } });
+  const status = pending ? "存檔中…" : err ? <span className="text-danger">{err}</span> : msg ?? "";
+  return { S, setS, run, pending, status };
+}
 
-  const month: AcctMonth = S.months[ym] ?? EMPTY;
-  const hasMonth = !!S.months[ym];
-  const target: AcctTarget | null = S.targets[ym] ?? null;
-  const r = useMemo(() => calcMonth(S, ym), [S, ym]);
-  const p = useMemo(() => calcMonth(S, prevYm(ym)), [S, ym]);
-  const rt = useMemo(() => calcTarget(S, ym), [S, ym]);
-  const cmp = useMemo(() => compareMonth(S, ym), [S, ym]);
-
-  // ---- 存檔（先改本地、再打 action）----
-  const saveItems = (items: AcctItem[]) => { setS((s) => ({ ...s, items })); run(() => saveAcctItemsAction(items), "已存營業項目"); };
-  const saveMonth = (m: AcctMonth) => { setS((s) => ({ ...s, months: { ...s.months, [ym]: m } })); run(() => saveAcctMonthAction(ym, m), `已存 ${ym} 實際`); };
-  const saveTarget = (t: AcctTarget, k = ym) => { setS((s) => ({ ...s, targets: { ...s.targets, [k]: t } })); run(() => saveAcctTargetAction(k, t), `已存 ${k} 目標`); };
-  const saveDraft = (d: AcctTarget) => { setS((s) => ({ ...s, draft: d })); run(() => saveAcctDraftAction(d), "已存工作台草稿"); };
-  const saveVat = (vatRate: number) => { setS((s) => ({ ...s, params: { vatRate } })); run(() => saveAcctParamsAction({ vatRate }), "已存營業稅率"); };
-  const openMonth = (k: string) => {
-    if (!isYm(k)) return;
-    if (S.months[k]) { setYm(k); return; }
-    // 本地先複製最近一個月的固定支出，畫面不用等 round-trip；server 端 ensureAcctMonth 做同一件事
-    const src = [...keys].reverse().find((x) => x <= k) ?? keys[keys.length - 1];
-    setS((s) => ({ ...s, months: { ...s.months, [k]: { qty: {}, fixed: src ? s.months[src].fixed.map((f) => ({ ...f })) : [] } } }));
-    setYm(k);
-    run(() => ensureAcctMonthAction(k), `已開 ${k}`);
-  };
-  const removeMonth = async () => {
-    if (!hasMonth || !await confirmDialog(`刪除 ${ym} 的實際數量與固定支出？`, { danger: true })) return;
-    const rest = { ...S.months }; delete rest[ym];
-    setS((s) => ({ ...s, months: rest }));
-    const ks = Object.keys(rest).sort();
-    setYm(ks[ks.length - 1] ?? today);
-    run(() => deleteAcctMonthAction(ym), `已刪 ${ym} 實際`);
-  };
-  const removeTarget = async () => {
-    if (!target || !await confirmDialog(`刪除 ${ym} 的目標？`, { danger: true })) return;
-    const rest = { ...S.targets }; delete rest[ym];
-    setS((s) => ({ ...s, targets: rest }));
-    run(() => deleteAcctTargetAction(ym), `已刪 ${ym} 目標`);
-  };
-  /** 目標從哪來：① 從最上面的工作台存入 ② 複製上月目標 ③ 從實際複製 */
-  const targetFromDraft = (k: string) => { if (!S.draft) return; saveTarget({ qty: { ...S.draft.qty }, fixed: S.draft.fixed.map((f) => ({ ...f })), net: S.draft.net }, k); };
-  const targetFromPrev = () => { const t = S.targets[prevYm(ym)]; if (t) saveTarget({ qty: { ...t.qty }, fixed: t.fixed.map((f) => ({ ...f })), net: t.net }); };
-  const targetFromActual = () => saveTarget({ qty: { ...month.qty }, fixed: month.fixed.map((f) => ({ ...f })), net: r?.net ?? 0 });
-
-  const be = r ? breakeven(r, S.params.vatRate) : Infinity;
-  const dn = r && p ? r.net - p.net : null;
-
-  // 目標視角下 ②③④⑤ 編輯的是目標；MonthEditor 共用同一套畫面
-  const editing: { data: AcctMonth; res: MonthResult | null; save: (m: AcctMonth) => void; label: string } = view === "target"
-    ? { data: target ?? EMPTY, res: rt, save: (m) => saveTarget({ ...m, net: target?.net ?? 0 }), label: "目標" }
-    : { data: month, res: r, save: saveMonth, label: "實際" };
-  const editable = view === "target" ? !!target : hasMonth;
-
+/** 數量表＋固定支出表：實際與目標共用同一套畫面。keyTag 換了輸入框才會重置（defaultValue 非受控）。 */
+export function MonthEditor({ data, res, refQty, refLabel, label, keyTag, onSave }: {
+  data: AcctMonth; res: MonthResult; refQty?: Record<string, number>; refLabel: string; label: string; keyTag: string; onSave: (m: AcctMonth) => void;
+}) {
   return (
-    <div className="space-y-4">
-      {/* 目標工作台（不綁月份） */}
-      <TargetWorkbench S={S} draft={S.draft} onSave={saveDraft} onStore={targetFromDraft} latestYm={keys[keys.length - 1] ?? null} today={today} pending={pending} />
-
-      <div className="flex items-center gap-3 pt-2">
-        <span className="text-10 tracking-[0.22em] text-tx3">月帳</span><span className="flex-1 border-t border-line" />
-      </div>
-      {/* 月份與視角 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-tx2">看哪一個月</span>
-        <button className={btn} onClick={() => openMonth(prevYm(ym))}>‹</button>
-        <select className={SELECT_SM} value={hasMonth ? ym : ""} onChange={(e) => setYm(e.target.value)}>
-          {!hasMonth && <option value="">（{ym} 還沒開）</option>}
-          {keys.map((k) => <option key={k} value={k}>{k}{S.targets[k] ? "・有目標" : ""}</option>)}
-        </select>
-        <button className={btn} onClick={() => openMonth(nextYm(ym))}>›</button>
-        {!hasMonth && <button className={`${btn} border-brand2 text-brand2`} onClick={() => openMonth(ym)}>開 {ym} 這一個月</button>}
-        <span className="inline-flex rounded-lg border border-line overflow-hidden ml-2">
-          {([["actual", "實際"], ["target", "目標"], ["compare", "對照"]] as [View, string][]).map(([v, l]) => (
-            <button key={v} className={`px-3 py-1.5 text-sm ${view === v ? "bg-brand text-onbrand font-bold" : "text-tx2 hover:bg-panel3"}`} onClick={() => setView(v)}>{l}</button>
-          ))}
-        </span>
-        {view === "actual" && hasMonth && <button className={xbtn} onClick={removeMonth}>刪這個月的實際</button>}
-        {view === "target" && target && <button className={xbtn} onClick={removeTarget}>刪這個月的目標</button>}
-        <span className="text-xs text-tx3 ml-auto">{pending ? "存檔中…" : err ? <span className="text-danger">{err}</span> : msg ?? ""}</span>
-      </div>
-
-      {/* ① 結論與圖 */}
-      {view === "compare" ? (
-        cmp && r && rt ? <CompareHero ym={ym} cmp={cmp} r={r} rt={rt} S={S} /> : (
-          <div className={card}><p className="text-sm text-tx2">{ym} 要同時有實際與目標才能對照。{!target && <>切到「目標」把目標建起來。</>}{!hasMonth && <>先按「開 {ym} 這一個月」。</>}</p></div>
-        )
-      ) : view === "target" ? (
-        rt && target ? (
-          <div className={card}>
-            <p className="text-base leading-relaxed mb-3">
-              {ym} 目標：營業額 <b className="text-brand2">{F(rt.rev)}</b>、毛利率 <b>{P(rt.gm * 100)}</b>、固定支出 {F(rt.fixed)}，照這樣算下來淨利 <b className={rt.net >= 0 ? "text-ok" : "text-danger"}>{F(rt.net)}</b>；
-              設定的目標淨利 <b>{F(target.net)}</b>{Math.round(rt.net) !== Math.round(target.net) && <>（{rt.net >= target.net ? "筆數算出來超過目標" : `筆數算出來還差 ${F(target.net - rt.net)}`}）</>}。
-            </p>
-            <div className="flex items-center gap-2 text-sm mb-3">目標淨利 <input className={numIn} inputMode="numeric" defaultValue={target.net} onBlur={(e) => { const v = NUM(e.target.value); if (v !== target.net) saveTarget({ ...target, net: v }); }} /> 元／月</div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div><div className={`${hint} mb-1`}>目標的錢怎麼一層一層變成淨利</div><Waterfall r={rt} /></div>
-              <div><div className={`${hint} mb-1`}>近 12 個月：實際淨利（線）vs 目標淨利（虛線）</div><Trend S={S} ym={ym} /></div>
-            </div>
-          </div>
-        ) : (
-          <div className={card}>
-            <p className="text-sm text-tx2 mb-3">{ym} 還沒有目標。目標可以從三個地方來：</p>
-            <div className="flex flex-wrap gap-2">
-              <button className={`${btn} border-brand2 text-brand2`} disabled={!S.draft} onClick={() => targetFromDraft(ym)}>從上面的目標工作台存入（目標淨利 {F(S.draft?.net ?? 0)}）</button>
-              <button className={btn} disabled={!S.targets[prevYm(ym)]} onClick={targetFromPrev}>複製上月目標</button>
-              <button className={btn} disabled={!hasMonth} onClick={targetFromActual}>從這個月的實際複製</button>
-            </div>
-            {!S.draft && <p className={`${hint} mt-2`}>工作台還沒有草稿——到最上面設一組。</p>}
-          </div>
-        )
-      ) : r ? (
-        <div className={card}>
-          <p className="text-base leading-relaxed mb-3">
-            {ym} 營業額 <b className="text-brand2">{F(r.rev)}</b>，毛利率 <b>{P(r.gm * 100)}</b>，扣掉固定支出 {F(r.fixed)} 與營業稅後淨利{" "}
-            <b className={r.net >= 0 ? "text-ok" : "text-danger"}>{F(r.net)}</b>（淨利率 {P(r.nm * 100)}）
-            {dn != null && <>，比上月{dn >= 0 ? "多" : "少"} {F(Math.abs(dn))}</>}。
-            {Number.isFinite(be) ? <>損益兩平營業額約 <b>{F(be)}</b>，目前{r.rev >= be ? `已過線 ${P((r.rev / be - 1) * 100)}` : `還差 ${F(be - r.rev)}`}。</> : <>目前的毛利率蓋不過營業稅，沒有損益兩平點。</>}
-            {target && <> 目標淨利 {F(target.net)}，{r.net >= target.net ? <span className="text-ok">已達標</span> : <>還差 {F(target.net - r.net)}</>}。</>}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            {([["營業額", r.rev, p ? `上月 ${F(p.rev)}` : ""], ["營業毛利", r.gp, `毛利率 ${P(r.gm * 100)}`], ["淨利", r.net, `淨利率 ${P(r.nm * 100)}`]] as [string, number, string][]).map(([l, v, s]) => (
-              <div key={l} className="rounded-lg bg-panel2 p-3">
-                <div className="text-xs text-tx3">{l}</div>
-                <div className={`text-2xl font-bold ${v < 0 ? "text-danger" : ""}`}>{F(v)}</div>
-                <div className="text-xs text-tx3">{s}</div>
-              </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div>
+        <h3 className="text-xs text-tx2 mb-2">{label}筆數</h3>
+        <table key={`q-${keyTag}`} className="w-full text-sm">
+          <thead><tr className="text-xs text-tx3"><th className="text-left py-1">項目</th><th className="text-right">{refLabel}</th><th className="text-right">{label}筆數</th><th className="text-right">營業額</th><th className="text-right">毛利</th><th className="text-right">佔毛利</th></tr></thead>
+          <tbody>
+            {res.byItem.map((b) => (
+              <tr key={b.it.id} className="border-t border-line">
+                <td className="py-1.5">{b.it.name}</td>
+                <td className="text-right text-tx3">{refQty ? (refQty[b.it.id] ?? 0) : "—"}</td>
+                <td className="text-right"><input className={`${FIELD_SM} w-20 text-right`} inputMode="numeric" defaultValue={data.qty[b.it.id] ?? 0} onBlur={(e) => { const v = NUM(e.target.value); if (v !== (data.qty[b.it.id] ?? 0)) onSave({ ...data, qty: { ...data.qty, [b.it.id]: v } }); }} /></td>
+                <td className="text-right">{F(b.rev)}</td>
+                <td className="text-right text-brand2">{F(b.gp)}</td>
+                <td className="text-right text-tx2">{res.gp ? P(b.gp / res.gp * 100) : "—"}</td>
+              </tr>
             ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div><div className={`${hint} mb-1`}>這個月的錢是怎麼一層一層變成淨利的</div><Waterfall r={r} /></div>
-            <div><div className={`${hint} mb-1`}>近 12 個月：營業額（淡）、毛利（金）、淨利（線）{Object.keys(S.targets).length ? "、目標淨利（虛線）" : ""}</div><Trend S={S} ym={ym} /></div>
-          </div>
-        </div>
-      ) : (
-        <div className={card}><p className="text-sm text-tx2">{ym} 還沒有資料。先在下面把營業項目建起來，再按「開 {ym} 這一個月」填數量。</p></div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* ② 營業項目與單價拆分 */}
-        <div className={card}>
-          <h2 className={h2}>1・營業項目與單價拆分</h2>
-          <p className={`${hint} mb-3`}>每個項目的單價要分給誰：比例（%）或固定金額都可以。扣完就是這一筆的毛利。實際與目標共用同一套單價與拆分。</p>
-          <ItemsEditor items={S.items} onSave={saveItems} />
-        </div>
-        {/* ③ 本月數量 */}
-        <div className={card}>
-          <h2 className={h2}>2・本月數量與營業狀況{view !== "actual" && <span className="text-tx3 font-normal">（{view === "target" ? "目標" : "目標 → 實際"}）</span>}</h2>
-          <p className={`${hint} mb-3`}>{view === "target" ? "這個月每個項目想賣幾筆。" : view === "compare" ? "每一項目標賣幾筆、實際賣幾筆、差幾筆對淨利影響多少。" : "這個月每個項目賣出幾筆。之後接上實際訂單就自動帶入。"}</p>
-          {view === "compare" ? (
-            cmp ? <CompareQty cmp={cmp} /> : <p className="text-sm text-tx3">要同時有實際與目標。</p>
-          ) : editing.res && editable ? (
-            <table key={`${view}-${ym}`} className="w-full text-sm">
-              <thead><tr className="text-xs text-tx3"><th className="text-left py-1">項目</th><th className="text-right">{view === "target" ? "實際" : "上月"}</th><th className="text-right">{editing.label}筆數</th><th className="text-right">營業額</th><th className="text-right">毛利</th><th className="text-right">佔毛利</th></tr></thead>
-              <tbody>
-                {editing.res.byItem.map((b) => (
-                  <tr key={b.it.id} className="border-t border-line">
-                    <td className="py-1.5">{b.it.name}</td>
-                    <td className="text-right text-tx3">{view === "target" ? (month.qty[b.it.id] ?? 0) : p ? (p.byItem.find((x) => x.it.id === b.it.id)?.q ?? 0) : "—"}</td>
-                    <td className="text-right"><input className={`${FIELD_SM} w-20 text-right`} inputMode="numeric" defaultValue={editing.data.qty[b.it.id] ?? 0} onBlur={(e) => { const v = NUM(e.target.value); if (v !== (editing.data.qty[b.it.id] ?? 0)) editing.save({ ...editing.data, qty: { ...editing.data.qty, [b.it.id]: v } }); }} /></td>
-                    <td className="text-right">{F(b.rev)}</td>
-                    <td className="text-right text-brand2">{F(b.gp)}</td>
-                    <td className="text-right text-tx2">{editing.res!.gp ? P(b.gp / editing.res!.gp * 100) : "—"}</td>
-                  </tr>
-                ))}
-                <tr className="border-t-2 border-line font-bold"><td className="py-1.5">合計</td><td /><td className="text-right">{editing.res.byItem.reduce((a, b) => a + b.q, 0)}</td><td className="text-right">{F(editing.res.rev)}</td><td className="text-right text-brand2">{F(editing.res.gp)}</td><td className="text-right">{P(editing.res.gm * 100)}</td></tr>
-              </tbody>
-            </table>
-          ) : <p className="text-sm text-tx3">{view === "target" ? "這個月還沒有目標。" : "這個月還沒開。"}</p>}
-        </div>
+            <tr className="border-t-2 border-line font-bold"><td className="py-1.5">合計</td><td /><td className="text-right">{res.byItem.reduce((a, b) => a + b.q, 0)}</td><td className="text-right">{F(res.rev)}</td><td className="text-right text-brand2">{F(res.gp)}</td><td className="text-right">{P(res.gm * 100)}</td></tr>
+          </tbody>
+        </table>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* ④ 固定支出 */}
-        <div className={card}>
-          <h2 className={h2}>3・固定支出（每月）{view !== "actual" && <span className="text-tx3 font-normal">（{view === "target" ? "目標" : "目標 → 實際"}）</span>}</h2>
-          <p className={`${hint} mb-3`}>{view === "target" ? "這個月固定支出打算控制在多少。" : view === "compare" ? "同名的列合併比較。" : "不隨銷量變動的費用，一列一項；按月存，開新月份會把上一個月的複製過來。"}</p>
-          {view === "compare" ? (
-            cmp ? <CompareFixed cmp={cmp} /> : <p className="text-sm text-tx3">要同時有實際與目標。</p>
-          ) : editable ? (
-            <>
-              <table key={`${view}-${ym}`} className="w-full text-sm">
-                <thead><tr className="text-xs text-tx3"><th className="text-left py-1">項目</th><th className="text-right">每月金額</th><th /></tr></thead>
-                <tbody>
-                  {editing.data.fixed.map((f, i) => (
-                    <tr key={i} className="border-t border-line">
-                      <td className="py-1.5"><input className={nameIn} defaultValue={f.name} onBlur={(e) => { if (e.target.value !== f.name) editing.save({ ...editing.data, fixed: editing.data.fixed.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }); }} /></td>
-                      <td className="text-right"><input className={numIn} inputMode="numeric" defaultValue={f.amt} onBlur={(e) => { const v = NUM(e.target.value); if (v !== f.amt) editing.save({ ...editing.data, fixed: editing.data.fixed.map((x, j) => j === i ? { ...x, amt: v } : x) }); }} /></td>
-                      <td className="text-right"><button className={xbtn} onClick={() => editing.save({ ...editing.data, fixed: editing.data.fixed.filter((_, j) => j !== i) })}>✕</button></td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 border-line font-bold"><td className="py-1.5">合計</td><td className="text-right">{F(editing.data.fixed.reduce((a, f) => a + f.amt, 0))}</td><td /></tr>
-                </tbody>
-              </table>
-              <button className={`${btn} mt-2`} onClick={() => editing.save({ ...editing.data, fixed: [...editing.data.fixed, { name: "新支出", amt: 0 }] })}>＋ 新增固定支出</button>
-            </>
-          ) : <p className="text-sm text-tx3">{view === "target" ? "這個月還沒有目標。" : "這個月還沒開。"}</p>}
-        </div>
-        {/* ⑤ 損益表 */}
-        <div className={card}>
-          <h2 className={h2}>4・本月損益結構{view !== "actual" && <span className="text-tx3 font-normal">（{view === "target" ? "目標" : "目標 → 實際"}）</span>}</h2>
-          <p className={`${hint} mb-3`}>營業稅率 <input className={`${FIELD_SM} w-14 text-right`} inputMode="decimal" defaultValue={S.params.vatRate} onBlur={(e) => { const v = NUM(e.target.value); if (v !== S.params.vatRate) saveVat(v); }} /> %（營所稅先不算）</p>
-          {view === "compare" ? (
-            r && rt ? <PLCompare r={r} rt={rt} vat={S.params.vatRate} /> : <p className="text-sm text-tx3">要同時有實際與目標。</p>
-          ) : editing.res && editable ? <PLTable r={editing.res} month={editing.data} vat={S.params.vatRate} /> : <p className="text-sm text-tx3">{view === "target" ? "這個月還沒有目標。" : "這個月還沒開。"}</p>}
-        </div>
+      <div>
+        <h3 className="text-xs text-tx2 mb-2">{label}固定支出（每月）</h3>
+        <table key={`f-${keyTag}`} className="w-full text-sm">
+          <thead><tr className="text-xs text-tx3"><th className="text-left py-1">項目</th><th className="text-right">每月金額</th><th /></tr></thead>
+          <tbody>
+            {data.fixed.map((f, i) => (
+              <tr key={i} className="border-t border-line">
+                <td className="py-1.5"><input className={nameIn} defaultValue={f.name} onBlur={(e) => { if (e.target.value !== f.name) onSave({ ...data, fixed: data.fixed.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }); }} /></td>
+                <td className="text-right"><input className={numIn} inputMode="numeric" defaultValue={f.amt} onBlur={(e) => { const v = NUM(e.target.value); if (v !== f.amt) onSave({ ...data, fixed: data.fixed.map((x, j) => j === i ? { ...x, amt: v } : x) }); }} /></td>
+                <td className="text-right"><button className={xbtn} onClick={() => onSave({ ...data, fixed: data.fixed.filter((_, j) => j !== i) })}>✕</button></td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-line font-bold"><td className="py-1.5">合計</td><td className="text-right">{F(data.fixed.reduce((a, f) => a + f.amt, 0))}</td><td /></tr>
+          </tbody>
+        </table>
+        <button className={`${btn} mt-2`} onClick={() => onSave({ ...data, fixed: [...data.fixed, { name: "新支出", amt: 0 }] })}>＋ 新增固定支出</button>
       </div>
-
     </div>
   );
 }
 
 // ---------- 目標工作台 ----------
-function TargetWorkbench({ S, draft, onSave, onStore, latestYm, today, pending }: {
+export function TargetWorkbench({ S, draft, onSave, onStore, latestYm, today, pending }: {
   S: AcctState; draft: AcctTarget | null; onSave: (d: AcctTarget) => void; onStore: (ym: string) => void; latestYm: string | null; today: string; pending: boolean;
 }) {
   const [adj, setAdj] = useState<Required<AcctAdj>>({ price: 0, split: 0, qty: 0, fix: 0 });
@@ -370,7 +197,7 @@ function TargetWorkbench({ S, draft, onSave, onStore, latestYm, today, pending }
 }
 
 // ---------- 對照視角 ----------
-function CompareHero({ ym, cmp, r, rt, S }: { ym: string; cmp: Compare; r: MonthResult; rt: MonthResult; S: AcctState }) {
+export function CompareHero({ ym, cmp, r, rt, S }: { ym: string; cmp: Compare; r: MonthResult; rt: MonthResult; S: AcctState }) {
   const d = cmp.net.diff;
   return (
     <div className={card}>
@@ -396,7 +223,7 @@ function CompareHero({ ym, cmp, r, rt, S }: { ym: string; cmp: Compare; r: Month
     </div>
   );
 }
-function CompareQty({ cmp }: { cmp: Compare }) {
+export function CompareQty({ cmp }: { cmp: Compare }) {
   return (
     <table className="w-full text-sm">
       <thead><tr className="text-xs text-tx3"><th className="text-left py-1">項目</th><th className="text-right">目標</th><th className="text-right">實際</th><th className="text-right">差</th><th className="text-right">對淨利</th></tr></thead>
@@ -413,7 +240,7 @@ function CompareQty({ cmp }: { cmp: Compare }) {
     </table>
   );
 }
-function CompareFixed({ cmp }: { cmp: Compare }) {
+export function CompareFixed({ cmp }: { cmp: Compare }) {
   return (
     <table className="w-full text-sm">
       <thead><tr className="text-xs text-tx3"><th className="text-left py-1">項目</th><th className="text-right">目標</th><th className="text-right">實際</th><th className="text-right">差</th></tr></thead>
@@ -429,7 +256,7 @@ function CompareFixed({ cmp }: { cmp: Compare }) {
     </table>
   );
 }
-function PLCompare({ r, rt, vat }: { r: MonthResult; rt: MonthResult; vat: number }) {
+export function PLCompare({ r, rt, vat }: { r: MonthResult; rt: MonthResult; vat: number }) {
   const rows: [string, number, number, boolean, boolean][] = [
     ["營業額", rt.rev, r.rev, true, false], ["減：拆分給別人", -rt.split, -r.split, false, false], ["營業毛利", rt.gp, r.gp, true, false],
     ["減：固定支出", -rt.fixed, -r.fixed, false, false], [`減：營業稅 ${vat}%`, -rt.vat, -r.vat, false, false], ["淨利", rt.net, r.net, true, true],
@@ -450,7 +277,7 @@ function PLCompare({ r, rt, vat }: { r: MonthResult; rt: MonthResult; vat: numbe
 }
 
 // ---------- 營業項目編輯 ----------
-function ItemsEditor({ items, onSave }: { items: AcctItem[]; onSave: (items: AcctItem[]) => void }) {
+export function ItemsEditor({ items, onSave }: { items: AcctItem[]; onSave: (items: AcctItem[]) => void }) {
   const set = (i: number, patch: Partial<AcctItem>) => onSave(items.map((x, j) => j === i ? { ...x, ...patch } : x));
   return (
     <div>
@@ -496,7 +323,7 @@ function ItemsEditor({ items, onSave }: { items: AcctItem[]; onSave: (items: Acc
 }
 
 // ---------- 損益表 ----------
-function PLRow({ r, l, v, lv, ind, cls }: { r: MonthResult; l: string; v: number; lv?: boolean; ind?: boolean; cls?: string }) {
+export function PLRow({ r, l, v, lv, ind, cls }: { r: MonthResult; l: string; v: number; lv?: boolean; ind?: boolean; cls?: string }) {
   return (
     <tr className={`border-t border-line ${lv ? "font-bold" : ""} ${lv && cls === "hi" ? "bg-brand/10" : ""}`}>
       <td className={`py-1.5 ${ind ? "pl-6 text-tx2" : "pl-2"}`}>{l}</td>
@@ -505,7 +332,7 @@ function PLRow({ r, l, v, lv, ind, cls }: { r: MonthResult; l: string; v: number
     </tr>
   );
 }
-function PLTable({ r, month, vat }: { r: MonthResult; month: AcctMonth; vat: number }) {
+export function PLTable({ r, month, vat }: { r: MonthResult; month: AcctMonth; vat: number }) {
   return (
     <table className="w-full text-sm">
       <thead><tr className="text-xs text-tx3"><th className="text-left py-1 pl-2">科目</th><th className="text-right">金額</th><th className="text-right">佔營業額</th></tr></thead>
@@ -525,11 +352,11 @@ function PLTable({ r, month, vat }: { r: MonthResult; month: AcctMonth; vat: num
 }
 
 // ---------- 圖 ----------
-const STEPS = (r: MonthResult): [string, number, string, boolean][] => [
+export const STEPS = (r: MonthResult): [string, number, string, boolean][] => [
   ["營業額", r.rev, "var(--brand2)", true], ["拆分給別人", -r.split, "var(--danger)", false], ["營業毛利", r.gp, "var(--brand2)", true],
   ["固定支出", -r.fixed, "var(--danger)", false], ["營業稅", -r.vat, "var(--danger)", false], ["淨利", r.net, r.net >= 0 ? "var(--ok)" : "var(--danger)", true],
 ];
-function wfBars(steps: [string, number, string, boolean][], sc: number, H: number) {
+export function wfBars(steps: [string, number, string, boolean][], sc: number, H: number) {
   let y = 0;
   return steps.map(([, v, , sub]) => {
     let top: number, h: number;
@@ -538,7 +365,7 @@ function wfBars(steps: [string, number, string, boolean][], sc: number, H: numbe
     return { top, h };
   });
 }
-function Waterfall({ r }: { r: MonthResult }) {
+export function Waterfall({ r }: { r: MonthResult }) {
   const steps = STEPS(r);
   const W = 520, H = 220, pad = 30, max = Math.max(1, r.rev) * 1.05, sc = (H - pad - 20) / max, bw = 60, gap = (W - pad) / steps.length;
   const bars = wfBars(steps, sc, H);
@@ -558,7 +385,7 @@ function Waterfall({ r }: { r: MonthResult }) {
   );
 }
 /** 對照：每一層兩根柱，左淡＝目標、右實＝實際。 */
-function WaterfallPair({ rt, r }: { rt: MonthResult; r: MonthResult }) {
+export function WaterfallPair({ rt, r }: { rt: MonthResult; r: MonthResult }) {
   const st = STEPS(rt), sa = STEPS(r);
   const W = 520, H = 220, pad = 30, max = Math.max(1, rt.rev, r.rev) * 1.05, sc = (H - pad - 20) / max, bw = 30, gap = (W - pad) / st.length;
   const bt = wfBars(st, sc, H), ba = wfBars(sa, sc, H);
@@ -578,7 +405,7 @@ function WaterfallPair({ rt, r }: { rt: MonthResult; r: MonthResult }) {
     </svg>
   );
 }
-function Trend({ S, ym }: { S: AcctState; ym: string }) {
+export function Trend({ S, ym }: { S: AcctState; ym: string }) {
   const keys = Array.from(new Set([...Object.keys(S.months), ...Object.keys(S.targets)])).sort().filter((k) => k <= ym).slice(-12);
   const rows = keys.map((k) => ({ k, a: S.months[k] ? calcData(S.items, S.months[k], S.params) : null, t: S.targets[k]?.net ?? null }));
   if (!rows.length) return null;
