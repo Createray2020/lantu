@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth } from "@/lib/acctStore";
+import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget } from "@/lib/acctStore";
 
 export type ActionResult = { ok: true; info?: string } | { ok: false; error: string };
 
@@ -39,4 +39,10 @@ export async function ensureAcctMonthAction(ym: string): Promise<ActionResult> {
 }
 export async function deleteAcctMonthAction(ym: string): Promise<ActionResult> {
   try { await guard(); await deleteAcctMonth(ym); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function saveAcctTargetAction(ym: string, target: unknown): Promise<ActionResult> {
+  try { await guard(); await saveAcctTarget(ym, target); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function deleteAcctTargetAction(ym: string): Promise<ActionResult> {
+  try { await guard(); await deleteAcctTarget(ym); refresh(); return { ok: true }; } catch (e) { return fail(e); }
 }

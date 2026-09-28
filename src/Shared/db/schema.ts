@@ -1298,3 +1298,11 @@ export const acctMonths = pgTable('acct_months', {
   fixed: jsonb('fixed').$type<{ name: string; amt: number }[]>().default([]).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+// 帳務月目標（2026/09/29 Ray：目標要獨立出來，不跟真實帳務混）：形狀同 acct_months，多一個目標淨利 net。
+export const acctTargets = pgTable('acct_targets', {
+  ym: text('ym').primaryKey(),                       // 'YYYY-MM'
+  qty: jsonb('qty').$type<Record<string, number>>().default({}).notNull(),
+  fixed: jsonb('fixed').$type<{ name: string; amt: number }[]>().default([]).notNull(),
+  net: doublePrecision('net').default(0).notNull(),  // 目標淨利（元／月）
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

@@ -2,14 +2,15 @@
 //
 //   acct_params   key/value：items（營業項目＋拆分）／params（vatRate）／goal（netTarget）
 //   acct_months   ym 主鍵：qty（各項目本月筆數）／fixed（本月固定支出列）
+//   acct_targets  ym 主鍵：同形狀的月目標＋net（目標淨利）——目標與實際分兩張表，不混
 // 計算全在 acctEngine.ts（純函式），這裡只管進出 DB 與正規化。
 import { unstable_cache, updateTag } from "next/cache";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { acctParams, acctMonths } from "@/Shared/db/schema";
+import { acctParams, acctMonths, acctTargets } from "@/Shared/db/schema";
 import {
-  ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, isYm, normGoal, normItems, normMonth, normParams, prevYm, ymOf,
-  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState,
+  ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, isYm, normGoal, normItems, normMonth, normParams, normTarget, prevYm, ymOf,
+  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget,
 } from "./acctEngine";
 
 export const ACCT_TAG = "acct-params";
@@ -19,6 +20,7 @@ async function loadState(): Promise<AcctState> {
   let params: AcctParams = { ...ACCT_DEFAULT_PARAMS };
   let goal: AcctGoal = { ...ACCT_DEFAULT_GOAL };
   const months: Record<string, AcctMonth> = {};
+  const targets: Record<string, AcctTarget> = {};
   try {
     const rows = await db.select({ key: acctParams.key, value: acctParams.value }).from(acctParams);
     for (const r of rows) {
@@ -28,8 +30,10 @@ async function loadState(): Promise<AcctState> {
     }
     const ms = await db.select().from(acctMonths).orderBy(asc(acctMonths.ym));
     for (const m of ms) if (isYm(m.ym)) months[m.ym] = normMonth({ qty: m.qty, fixed: m.fixed });
+    const ts = await db.select().from(acctTargets).orderBy(asc(acctTargets.ym));
+    for (const t of ts) if (isYm(t.ym)) targets[t.ym] = normTarget({ qty: t.qty, fixed: t.fixed, net: t.net });
   } catch { /* 表還沒建：空狀態 */ }
-  return { items, months, params, goal };
+  return { items, months, targets, params, goal };
 }
 export const getAcctState = unstable_cache(loadState, ["lantu-acct-state"], { tags: [ACCT_TAG] });
 
@@ -76,6 +80,18 @@ export async function ensureAcctMonth(ym: string): Promise<void> {
 export async function deleteAcctMonth(ym: string): Promise<void> {
   if (!isYm(ym)) throw new Error("invalid-ym");
   await db.delete(acctMonths).where(eq(acctMonths.ym, ym));
+  updateTag(ACCT_TAG);
+}
+export async function saveAcctTarget(ym: string, value: unknown): Promise<void> {
+  if (!isYm(ym)) throw new Error("invalid-ym");
+  const t = normTarget(value);
+  await db.insert(acctTargets).values({ ym, qty: t.qty, fixed: t.fixed, net: t.net, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: acctTargets.ym, set: { qty: t.qty, fixed: t.fixed, net: t.net, updatedAt: new Date() } });
+  updateTag(ACCT_TAG);
+}
+export async function deleteAcctTarget(ym: string): Promise<void> {
+  if (!isYm(ym)) throw new Error("invalid-ym");
+  await db.delete(acctTargets).where(eq(acctTargets.ym, ym));
   updateTag(ACCT_TAG);
 }
 export const currentYm = () => ymOf(new Date());

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcMonth, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, type AcctState } from "./acctEngine";
+import { calcMonth, calcTarget, compareMonth, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, type AcctState } from "./acctEngine";
 
 // 原型（docs/帳務後台_原型.html）的示範資料——2026-09 那一個月。
 const S: AcctState = {
@@ -12,6 +12,7 @@ const S: AcctState = {
   months: {
     "2026-09": { qty: { a: 19, b: 5, c: 96, d: 4 }, fixed: [{ name: "辦公室租金", amt: 35000 }, { name: "系統與雲端費用", amt: 12000 }, { name: "行政人員薪資", amt: 42000 }, { name: "行銷投放", amt: 15000 }, { name: "保險與雜支", amt: 6000 }] },
   },
+  targets: {},
   params: { vatRate: 5 },
   goal: { netTarget: 200000 },
 };
@@ -91,5 +92,38 @@ describe("acctEngine 工具", () => {
     expect(items).toEqual([{ id: "x", name: "講座", price: 1200, splits: [{ to: "a", mode: "pct", v: 0 }] }]);
     expect(normMonth({ qty: { x: "7", y: -1 }, fixed: [{ name: "租金", amt: "35,000" }, 3] })).toEqual({ qty: { x: 7, y: 0 }, fixed: [{ name: "租金", amt: 35000 }] });
     expect(normMonth(null)).toEqual({ qty: {}, fixed: [] });
+  });
+});
+
+describe("acctEngine 目標與對照（目標另存，不動實際）", () => {
+  const T: AcctState = {
+    ...S,
+    targets: { "2026-09": { qty: { a: 22, b: 5, c: 96, d: 6 }, fixed: [{ name: "辦公室租金", amt: 35000 }, { name: "系統與雲端費用", amt: 12000 }, { name: "行政人員薪資", amt: 42000 }, { name: "行銷投放", amt: 8000 }, { name: "保險與雜支", amt: 6000 }], net: 250000 } },
+  };
+  it("calcTarget 用目標筆數算、實際不受影響；沒目標回 null", () => {
+    const rt = calcTarget(T, "2026-09")!;
+    expect(rt.rev).toBe(12000 * 22 + 45000 * 5 + 2400 * 96 + 38000 * 6);
+    expect(calcMonth(T, "2026-09")!.rev).toBe(calcMonth(S, "2026-09")!.rev);
+    expect(calcTarget(S, "2026-09")).toBeNull();
+  });
+  it("compareMonth：逐項筆數差 × 每筆淨貢獻＝對淨利影響；固定支出同名合併；差最大的當 drivers", () => {
+    const c = compareMonth(T, "2026-09")!;
+    const a = c.items.find((x) => x.key === "a")!;
+    expect(a.diff).toBe(19 - 22);
+    const u = unitOf(S.items[0]);
+    expect(a.netEffect).toBeCloseTo(-3 * (u.gp - u.price * 0.05));
+    const mk = c.fixedRows.find((x) => x.name === "行銷投放")!;
+    expect(mk.diff).toBe(15000 - 8000);
+    expect(mk.netEffect).toBe(-7000);
+    expect(c.net.target).toBe(250000);
+    expect(c.net.actual).toBeCloseTo(calcMonth(S, "2026-09")!.net);
+    expect(c.drivers.length).toBeGreaterThan(0);
+    expect(c.drivers.join("")).toContain("少賣 3 筆");
+    expect(c.drivers.join("")).toContain("行銷投放多花 7,000");
+    expect(compareMonth(S, "2026-09")).toBeNull();
+  });
+  it("normTarget 帶 net、負數夾 0", () => {
+    expect(normTarget({ qty: { a: "3" }, fixed: [], net: -5 })).toEqual({ qty: { a: 3 }, fixed: [], net: 0 });
+    expect(normTarget(null).net).toBe(0);
   });
 });

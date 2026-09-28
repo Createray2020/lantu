@@ -12,9 +12,12 @@ export type AcctItem = { id: string; name: string; price: number; splits: AcctSp
 export type AcctMonth = { qty: Record<string, number>; fixed: { name: string; amt: number }[] };
 export type AcctParams = { vatRate: number };
 export type AcctGoal = { netTarget: number };
+/** 月目標：跟 AcctMonth 同一個形狀（目標筆數、目標固定支出），多一個目標淨利。另一張表存，不跟實際帳混。 */
+export type AcctTarget = AcctMonth & { net: number };
 export type AcctState = {
   items: AcctItem[];
-  months: Record<string, AcctMonth>;   // 'YYYY-MM'
+  months: Record<string, AcctMonth>;   // 'YYYY-MM' 實際
+  targets: Record<string, AcctTarget>; // 'YYYY-MM' 目標
   params: AcctParams;
   goal: AcctGoal;
 };
@@ -55,14 +58,12 @@ export function unitOf(it: AcctItem, adj: AcctAdj = {}): UnitResult {
   return { price, split, rows, gp: price - split, gm: price ? (price - split) / price : 0 };
 }
 
-/** 某一個月的損益結構。沒有那個月回 null。 */
-export function calcMonth(S: AcctState, ym: string, adj: AcctAdj = {}): MonthResult | null {
-  const m = S.months[ym];
-  if (!m) return null;
+/** 一份月資料（實際或目標都行）的損益結構。 */
+export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, adj: AcctAdj = {}): MonthResult {
   let rev = 0, split = 0, gp = 0;
   const byItem: ItemResult[] = [];
   const byTo: Record<string, number> = {};
-  for (const it of S.items) {
+  for (const it of items) {
     const q = (m.qty[it.id] ?? 0) * (1 + (adj.qty ?? 0) / 100);
     const u = unitOf(it, adj);
     rev += u.price * q; split += u.split * q; gp += u.gp * q;
@@ -70,9 +71,55 @@ export function calcMonth(S: AcctState, ym: string, adj: AcctAdj = {}): MonthRes
     for (const r of u.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * q;
   }
   const fixed = m.fixed.reduce((a, f) => a + (Number(f.amt) || 0), 0) * (1 + (adj.fix ?? 0) / 100);
-  const vat = rev * S.params.vatRate / 100;
+  const vat = rev * params.vatRate / 100;
   const net = gp - fixed - vat;
   return { rev, split, gp, gm: rev ? gp / rev : 0, fixed, vat, net, nm: rev ? net / rev : 0, byItem, byTo };
+}
+/** 某一個月的實際損益結構。沒有那個月回 null。 */
+export function calcMonth(S: AcctState, ym: string, adj: AcctAdj = {}): MonthResult | null {
+  const m = S.months[ym];
+  return m ? calcData(S.items, m, S.params, adj) : null;
+}
+/** 某一個月的目標損益結構（目標筆數 × 現在的單價與拆分）。沒設目標回 null。 */
+export function calcTarget(S: AcctState, ym: string): MonthResult | null {
+  const t = S.targets?.[ym];
+  return t ? calcData(S.items, t, S.params) : null;
+}
+
+export type CompareRow = { key: string; name: string; target: number; actual: number; diff: number; netEffect: number };
+export type Compare = {
+  net: { target: number; actual: number; diff: number };        // target＝目標淨利（存的那個數字）
+  rev: { target: number; actual: number; diff: number };
+  gp: { target: number; actual: number; diff: number };
+  fixed: { target: number; actual: number; diff: number };
+  items: CompareRow[];   // 逐項筆數：diff＝實際−目標；netEffect＝這個差對淨利的影響（Δ筆數 × 每筆淨貢獻）
+  fixedRows: CompareRow[];  // 逐列固定支出（同名合併）：netEffect＝−Δ金額
+  drivers: string[];     // 差最大的前幾個原因，給一句話結論用
+};
+/** 目標 vs 實際的差異拆解。 */
+export function compareMonth(S: AcctState, ym: string): Compare | null {
+  const t = S.targets?.[ym], a = S.months[ym];
+  if (!t || !a) return null;
+  const rt = calcData(S.items, t, S.params), ra = calcData(S.items, a, S.params);
+  const items: CompareRow[] = S.items.map((it) => {
+    const u = unitOf(it);
+    const net1 = u.gp - u.price * S.params.vatRate / 100;
+    const target = t.qty[it.id] ?? 0, actual = a.qty[it.id] ?? 0;
+    return { key: it.id, name: it.name, target, actual, diff: actual - target, netEffect: (actual - target) * net1 };
+  });
+  const sumBy = (rows: { name: string; amt: number }[]) => { const o: Record<string, number> = {}; for (const f of rows) o[f.name] = (o[f.name] ?? 0) + f.amt; return o; };
+  const ft = sumBy(t.fixed), fa = sumBy(a.fixed);
+  const names = Array.from(new Set([...Object.keys(ft), ...Object.keys(fa)]));
+  const fixedRows: CompareRow[] = names.map((n) => ({ key: n, name: n, target: ft[n] ?? 0, actual: fa[n] ?? 0, diff: (fa[n] ?? 0) - (ft[n] ?? 0), netEffect: -((fa[n] ?? 0) - (ft[n] ?? 0)) }));
+  const cands = [
+    ...items.filter((x) => x.diff !== 0).map((x) => ({ e: x.netEffect, s: `${x.name}${x.diff > 0 ? "多賣" : "少賣"} ${Math.abs(x.diff)} 筆` })),
+    ...fixedRows.filter((x) => x.diff !== 0).map((x) => ({ e: x.netEffect, s: `${x.name}${x.diff > 0 ? "多花" : "少花"} ${Math.round(Math.abs(x.diff)).toLocaleString("zh-TW")}` })),
+  ].sort((x, y) => Math.abs(y.e) - Math.abs(x.e)).slice(0, 3);
+  const pair = (target: number, actual: number) => ({ target, actual, diff: actual - target });
+  return {
+    net: pair(t.net, ra.net), rev: pair(rt.rev, ra.rev), gp: pair(rt.gp, ra.gp), fixed: pair(rt.fixed, ra.fixed),
+    items, fixedRows, drivers: cands.map((c) => `${c.s}（${c.e >= 0 ? "+" : "−"}${Math.round(Math.abs(c.e)).toLocaleString("zh-TW")}）`),
+  };
 }
 
 /** 損益兩平營業額：固定支出 ÷（毛利率 − 營業稅率）。毛利率不夠蓋稅時回 Infinity。 */
@@ -129,6 +176,11 @@ export function normMonth(v: unknown): AcctMonth {
   if (m.qty && typeof m.qty === "object") for (const [k, q] of Object.entries(m.qty)) qty[k] = Math.max(0, num0(q));
   const fixed = Array.isArray(m.fixed) ? (m.fixed as { name?: unknown; amt?: unknown }[]).filter((f) => f && typeof f === "object").map((f) => ({ name: String(f.name ?? "").trim(), amt: Math.max(0, num0(f.amt)) })) : [];
   return { qty, fixed };
+}
+export function normTarget(v: unknown): AcctTarget {
+  const m = normMonth(v);
+  const t = (v && typeof v === "object" ? v : {}) as { net?: unknown };
+  return { ...m, net: Math.max(0, num0(t.net)) };
 }
 export function normParams(v: unknown): AcctParams {
   const p = (v && typeof v === "object" ? v : {}) as Partial<AcctParams>;
