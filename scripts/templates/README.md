@@ -1,6 +1,6 @@
 # 共用示範範本
 
-所有教練登入後都看得到、誰都改不了的四份示範個案。資料上就是 `clients` 的四列，
+所有教練登入後都看得到、誰都改不了的五份示範個案。資料上就是 `clients` 的五列，
 只是租戶維度不同：`coach_id = null`、`client_user_id = null`、`is_template = true`
 （邊界寫在 `src/lib/clientScope.ts` 的 `templateClient()` 與 `src/lib/templates.ts` 檔頭）。
 
@@ -10,8 +10,12 @@
 | 單身上班族 | 吳宜靜 29 | D 整裝期 | 不是亂花錢，是每筆都剛好，所以什麼都留不下來 |
 | 中年企業主 | 張永昌 52 | A 遠行期 | 帳面近億，動得了的現金不到一成；問題在稅與交棒 |
 | 屆臨退休 | 黃文彬 60 | B 前行期 | 房子很好、現金不夠，八十歲以後那一段長照接不住 |
+| 準新人雙薪 | 周承翰 32 | C 啟程期 | 結婚、兩胎、買房、換車全擠在 33～39 歲，退休一個字都還沒準備 |
 
 四個階段各一份是刻意的：教練示範時要能指著說「你大概在這裡」。
+第五份（2026/10）是「成家前後」那一段——2026/09 之後上線的新模組（副業、婚禮明細、生育規劃、
+「這一間房」／「這一台車」規格與付款時程、孝親三種給付、未來入帳、生活願望細節欄、願景處理流程）
+全部填滿，是教練看「新功能長什麼樣」的那一份。
 
 ## 怎麼改內容
 
@@ -21,6 +25,20 @@
 node scripts/templates/build.mjs      # 1. 過 migrateCase + 實地檢查（會擋下有問題的版本）
 npx tsx scripts/templates/seed.ts     # 2. 寫進資料庫（同名的先刪再寫，可重複執行）
 ```
+
+### `walk`：要按按鈕才會長出來的東西
+
+有些資料不是「填進欄位」而是「按了按鈕才長出來」的：生育規劃三產物、買房／買車之後的持有成本列、
+子女的其他準備基金、以及整條願景處理流程（`c.flow`／`c.stages`／`c.actions[].status`…）。
+這些**不要手寫進 `cases.ts`**（手寫的形狀一定會跟按鈕長出來的漂掉），改在 TEMPLATES 那一筆加 `walk: string[]`：
+`build.mjs` 載入資料後在同一個瀏覽器裡逐步 `eval`，每一步都是 `lantu-app.html` 的全域函式
+（`applyBirthPlan`／`addDetailPresets`／`flowStart`／`flowTuneDraft`…）。任何一步丟例外，整份不寫。
+有 walk 的那一份以可寫模式握手（流程函式會 `save()`，embed 模式下只是 postMessage，無害）。
+
+第五份的 walk 踩過的坑（都寫在 `cases.ts` 的 `NEWLYWEDS_WALK` 註解裡）：
+- `flowAddGuard(i)` 吃的是 `guardCheck().rows` 的索引，每加一個動作 rows 就少一列——要每加一個重算一次、用名字找。
+- 調整台要**先支出再收入**：`flowTuneApplyExp` 收尾用預設分法重寫收入兩個動作，不看 `t.incSplit`。
+- 後果引擎會把「生產與月子」當成可延後／可放手的目標——所以第五份把收入拉到補平、不走後果那一步。
 
 ### 第 1 步為什麼不能跳過
 
@@ -47,7 +65,7 @@ npx tsx scripts/templates/seed.ts     # 2. 寫進資料庫（同名的先刪再�
 
 ## 檔案
 
-- `cases.ts` — 四份個案的內容（唯一真相）
+- `cases.ts` — 五份個案的內容（唯一真相）＋第五份的 `walk`
 - `dump.ts` — 給 `build.mjs` 用的中繼步驟，不要單獨執行
 - `build.mjs` — 過 `migrateCase` ＋ 實地檢查 → `built.json`、`shots/`
 - `seed.ts` — 寫進資料庫

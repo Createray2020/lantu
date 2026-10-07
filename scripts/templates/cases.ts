@@ -1,4 +1,4 @@
-// 四份共用示範範本的內容（2026 版）——這個檔案就是範本的原始碼。
+// 五份共用示範範本的內容（2026 版）——這個檔案就是範本的原始碼。
 //
 // 三步驟（順序不能換，見 scripts/templates/README.md）：
 //   1. node scripts/templates/build.mjs   把這裡的四份個案送進 lantu-app.html 的 migrateCase()
@@ -546,9 +546,260 @@ export function preRetire(): C {
   return c;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 5｜準新人雙薪　周承翰 32 歲（2026/10 加，第五份）
+// 半年後結婚、兩年內想生第一胎、三年內買房買車、還借了一筆錢給弟弟。
+// 這一份的任務是把 2026/09 之後上線的新模組一次填滿：副業、婚禮明細、生育規劃、
+// 「這一間房」規格估值＋預售付款時程＋裝修貸、「這一台車」規格＋貸款＋換車循環＋舊車折價、
+// 孝親給付三種、未來入帳兩層、生活願望細節欄、自訂關注議題、短期資金需求，
+// 以及用正式流程函式走到「執行期」的願景處理流程（見 TEMPLATES 的 walk）。
+//
+// 人物誌：兩個人都不是高薪，但也沒亂花；問題是「所有大事都擠在 33～39 歲」——
+// 結婚、兩胎、買房（預售屋三年才交屋）、換車，而退休一個字都還沒準備。
+// ══════════════════════════════════════════════════════════════════
+export function newlyweds(): C {
+  const c = base("周承翰");
+  Object.assign(c.profile, {
+    gender: "男", birth: "1994-06-18", age: 32, retireAge: 63, lifeExp: 90,
+    jobType: "一般就業者", monthlySalary: 65000, jobCompany: "軟體公司", jobTitle: "前端工程師",
+    jobNote: "年薪含兩個月年終；假日接攝影案",
+  });
+  Object.assign(c.params, {
+    inflation: 2, salaryGrowth: 3, invReturn: 5, tuitionGrowth: 3,
+    planSaving: 0, emergencyMonths: 6, horizon: 90,
+  });
+  c.credit = { cards: 3, payFull: "是", firstCardOver1yr: "是", installment: "無", badRecord5yr: "否", recentApply: "無", score: 780 };
+  c.profile.credit = 780;
+  c.riskQuiz = { ans: { ...RISK_HIGH, 2: 2, 5: 2 } };
+
+  c.members = [
+    { name: "周承翰", role: "本人", gender: "男", age: 32, worked: 8, insType: "勞保", insSalary: 45800, nhiSalary: 66800, nhiDeps: 0, depRatio: 100, expRatio: 50, indepAge: "", jobType: "一般就業者", monthlySalary: 65000 },
+    // 芷晴小兩歲：她的事件要換算回本人年齡（她 60 歲退休＝本人 62 歲）。
+    { name: "林芷晴", role: "配偶", gender: "女", age: 30, worked: 6, insType: "勞保", insSalary: 45800, nhiSalary: 53000, nhiDeps: 0, depRatio: 0, expRatio: 50, indepAge: "", jobType: "一般就業者", monthlySalary: 52000 },
+    // 父母是孝親的對象（careSec 的「對象」連動這兩位）。不是經濟支柱、不進需求分析表。
+    { name: "周志明", role: "父", gender: "男", age: 62, worked: 0, insType: "健保眷屬", insSalary: 0, depRatio: 0, expRatio: 0, indepAge: "" },
+    { name: "陳淑芬", role: "母", gender: "女", age: 60, worked: 0, insType: "健保眷屬", insSalary: 0, depRatio: 0, expRatio: 0, indepAge: "" },
+    // 兩個孩子由生育規劃（c.birthPlan ＋ walk 裡的 applyBirthPlan）長出來，這裡不手寫。
+  ];
+
+  // 生育規劃：第一胎本人 34 歲、第二胎 37 歲。applyBirthPlan 會長出未出生成員、生育一次性、0–2 歲育兒列。
+  c.birthPlan = [
+    { bid: "nw-b1", atAge: 34, delivery: "自然產", care: "月子中心", careMonths: 1 },
+    { bid: "nw-b2", atAge: 37, delivery: "剖腹產", care: "到宅月嫂", careMonths: 2 },
+  ];
+
+  c.incomes = [
+    { name: "本人薪資（含年終）", owner: "周承翰", type: "工作", subType: "薪資", period: "年", amount: 910_000, growth: 3, start: 32, end: 63 },
+    // 副業＝incomes 裡 owner＝本人、side:true 的列（成員卡片與收支資債改的是同一列）。
+    { name: "婚禮／活動攝影接案", owner: "周承翰", type: "工作", subType: "兼職", period: "月", amount: 180_000, growth: 0, start: 32, end: 45, side: true },
+    { name: "配偶薪資", owner: "林芷晴", type: "工作", subType: "薪資", period: "年", amount: 728_000, growth: 2.5, start: 32, end: 62 },
+    { name: "線上日文課程分潤", owner: "林芷晴", type: "工作", subType: "兼職", period: "月", amount: 60_000, growth: 0, start: 32, end: 40, side: true },
+  ];
+
+  c.expenses = [
+    { name: "兩人生活費（餐食・交通・日用）", cat: "生活", amount: 540_000, infl: true, start: 32, end: 90, cut: 15 },
+    // 房租到交屋前一年（預售 36 歲簽約、三年工程期 → 39 歲交屋）；walk 裡再用 houseStopRent 對齊一次。
+    { name: "房租（兩房・新北）", cat: "居住", subCat: "居住(房租)", amount: 300_000, infl: true, start: 32, end: 38, cut: 0 },
+    { name: "寵物（兩隻貓）", cat: "生活", subCat: "寵物", amount: 48_000, infl: true, start: 32, end: 46, cut: 20 },
+    { name: "綜合所得稅", cat: "稅賦", amount: 62_000, infl: false, start: 32, end: 63, cut: 0 },
+    // 孝親：住在支出表（cat 孝親）、引擎只讀這裡。三種給付各一筆。
+    { tag: "care", who: "周志明", name: "每月孝親金", cat: "孝親", subCat: "孝親金", period: "月", amount: 120_000, minAmount: 72_000, infl: true, cut: 0, once: false, start: 32, end: 55 },
+    { tag: "care", who: "陳淑芬", name: "過年紅包", cat: "孝親", subCat: "孝親金", period: "年", amount: 24_000, infl: true, cut: 0, once: false, start: 32, end: 57 },
+    // 一次性：爸爸 70 歲那年（本人 40）帶爸媽環島一趟。進贈與稅檢核。
+    { tag: "care", who: "周志明", name: "父母七十歲環島旅行", cat: "孝親", subCat: "孝親金", period: "年", amount: 150_000, infl: true, cut: 0, once: true, start: 40, end: 40 },
+  ];
+
+  c.assets = [
+    { name: "薪轉活存", owner: "周承翰", mainCat: "自用資產", type: "現金", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: 280_000, value: 280_000, ret: 0.5, income: 0, movable: true },
+    { name: "結婚基金定存", owner: "周承翰", mainCat: "可投資資產", type: "定存", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: 450_000, value: 450_000, ret: 1.6, income: 7_200, movable: true },
+    { name: "台股市值型 ETF", owner: "周承翰", mainCat: "可投資資產", type: "股票", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: 560_000, value: 680_000, ret: 6, income: 20_400, movable: true },
+    { name: "美股 ETF（複委託）", owner: "周承翰", mainCat: "可投資資產", type: "股票", cls: "流動", region: "美國", currency: "美金", fxRate: 31.5, cost: 10_000, value: 12_000, ret: 7, income: 150, movable: true },
+    // 借給弟弟創業的錢：是資產但還沒收到。到期屬性＝35 歲一次收回 40 萬（未來入帳第一層）。
+    { name: "借給弟弟（創業周轉）", owner: "周承翰", mainCat: "可投資資產", type: "應收帳款/借出款", cls: "固定", region: "台灣", currency: "台幣", fxRate: 1, cost: 400_000, value: 400_000, ret: 0, income: "", movable: false,
+      matureAge: 35, matureAmt: 400_000, matureMode: "一次", matureNote: "口頭約定 2029 年還清，無息" },
+    // 現況車輛：勾「可變賣」，購車目標用 sellAid 把它折價進頭期（walk 裡接上）。
+    { name: "2016 Toyota Altis（二手買入）", owner: "周承翰", mainCat: "自用資產", type: "自用車輛", cls: "固定", region: "台灣", currency: "台幣", fxRate: 1, cost: 380_000, value: 220_000, ret: -8, income: 0, movable: false, sellable: true },
+    { name: "配偶活存", owner: "林芷晴", mainCat: "自用資產", type: "現金", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: 180_000, value: 180_000, ret: 0.5, income: 0, movable: true },
+    { name: "配偶定期定額基金", owner: "林芷晴", mainCat: "可投資資產", type: "基金", cls: "流動", region: "台灣", currency: "台幣", fxRate: 1, cost: 360_000, value: 410_000, ret: 5.5, income: 0, movable: true },
+  ];
+  c.liabilities = [
+    { name: "就學貸款（最後兩年）", owner: "周承翰", mainCat: "信貸", currency: "台幣", fxRate: 1, balance: 86_000, rate: 1.15, repay: "本息攤還", pay: 3_650, months: 24, grace: 0, startAge: 26 },
+  ];
+
+  // 未來入帳第二層：還不是資產的預期款。把握度只折投影、不動淨值。
+  c.futureInflows = [
+    { on: true, name: "員工限制型股票解禁", source: "其他", owner: "周承翰", age: 34, amount: 600_000, prob: 80, mode: "一次", years: "", sellAid: "", note: "2028 年第二批解禁，依今日股價估" },
+    { on: true, name: "父母贊助購屋頭期", source: "遺產贈與", owner: "周承翰", age: 36, amount: 1_500_000, prob: 90, mode: "一次", years: "", sellAid: "", note: "爸媽口頭答應，簽約那年給；在免稅額內" },
+  ];
+
+  // 退休：逐項口徑（mode 由 migrateCase 依明細列判定）。勞保勞退概算由 syncLaborPrepared 自動帶入。
+  c.retire = { monthLiving: 60_000, replaceRate: 70, retireReturn: 3.5, retireInflation: 1.5, prepared: [] };
+  c.retireExpenses = [
+    { name: "退休生活費（兩人）", cat: "生活", subCat: "餐食", period: "年", amount: 540_000, infl: true, startAge: "", endAge: "" },
+    { name: "醫療與保健", cat: "生活", subCat: "醫療/健康", period: "年", amount: 120_000, infl: true, startAge: "", endAge: "" },
+    { name: "退休旅遊（前十五年）", cat: "消費", subCat: "旅遊", period: "年", amount: 150_000, infl: true, startAge: 63, endAge: 78 },
+    { name: "長期照護", cat: "生活", subCat: "醫療/健康", period: "年", amount: 480_000, infl: true, startAge: 84, endAge: "" },
+  ];
+
+  // 婚姻：33 歲。預算 74 萬 vs 最低 50 萬；婚禮費用明細五列（tag wedding）才是逐項真相，
+  // applyMarriagePlan 看到明細列就不會再疊一筆「結婚（預算）」。
+  c.marriage = { plan: "是", age: 33, latestAge: 35, budget: 740_000, minBudget: 500_000, importance: 5 };
+  c.goals = [
+    { on: true, tag: "wedding", name: "喜宴（場地與酒水）", type: "婚姻", present: 350_000, minPresent: 250_000, start: 33, end: 33, freq: 0, growth: "通膨", imp: 5, prepared: 0, loanRatio: 0, appreciation: 0 },
+    { on: true, tag: "wedding", name: "婚紗攝影與禮服", type: "婚姻", present: 80_000, minPresent: 50_000, start: 33, end: 33, freq: 0, growth: "通膨", imp: 3, prepared: 0, loanRatio: 0, appreciation: 0 },
+    { on: true, tag: "wedding", name: "婚戒與對戒", type: "婚姻", present: 60_000, minPresent: 40_000, start: 33, end: 33, freq: 0, growth: "通膨", imp: 4, prepared: 0, loanRatio: 0, appreciation: 0 },
+    { on: true, tag: "wedding", name: "蜜月旅行（北海道）", type: "婚姻", present: 150_000, minPresent: 100_000, start: 33, end: 33, freq: 0, growth: "通膨", imp: 4, prepared: 0, loanRatio: 0, appreciation: 0 },
+    { on: true, tag: "wedding", name: "聘金／儀式禮俗", type: "婚姻", present: 100_000, minPresent: 60_000, start: 33, end: 33, freq: 0, growth: "通膨", imp: 3, prepared: 0, loanRatio: 0, appreciation: 0 },
+    // 購屋 36 歲：預售屋 桃園龜山 3 房 32 坪＋1 車位。總價走「這一間房」規格卡估值（priceManual 讓估值不覆蓋這個數）。
+    // 預售付款時程用後台範本（訂簽開 15% → 工程期款 10% 分 3 年 → 交屋起貸、寬限 3 年）；pay 留空＝跟範本。
+    // 裝修款 70 萬獨立成裝修貸（7 成、3.2%、7 年），不併總價。
+    { on: true, name: "第一間房（預售・桃園龜山）", type: "購屋", present: 14_200_000, minPresent: 9_900_000, start: 36, end: 36, latest: 40, freq: 0, growth: "固定", imp: 5, prepared: 0,
+      loanRatio: 75, loanRate: 2.2, loanYears: 30, appreciation: 2,
+      condition: "預售", priceManual: true, minManual: true,
+      spec: { city: "桃園市", district: "龜山區", type: "電梯大樓", rooms: 3, ping: 32, parking: 1, age: 0 },
+      specMin: { city: "桃園市", district: "龜山區", type: "電梯大樓", rooms: 2, ping: 25, parking: 0, age: 0 },
+      pay: {}, decoCost: 700_000, decoLoanRatio: 70, decoLoanRate: 3.2, decoLoanYears: 7 },
+    // 購車 35 歲（第一胎出生後）：Toyota SUV 油電 新車、貸款 7 成 5 年；每 8 年換到 51 歲（35／43／51 三台）；
+    // 舊 Altis 勾可變賣折價進頭期（sellAid 在 walk 裡接上）。養車成本六列由 carSyncCostRows 依規格推算。
+    { on: true, name: "第一台家庭車（SUV 油電）", type: "購車", present: 1_250_000, minPresent: 900_000, start: 35, end: 51, latest: 38, freq: 0, growth: "固定", imp: 4, prepared: 0,
+      loanRatio: 70, loanRate: 3.5, loanYears: 5, appreciation: 0,
+      carMode: "貸款", condition: "新車", cycle: 8, priceManual: true, minManual: true,
+      spec: { brand: "Toyota", segment: "SUV", power: "油電", cc: 2500, hp: 0, seats: 5, age: 0, km: 0, kmPerYear: 15000, ownParking: true } },
+  ];
+
+  // 生活願望：三張表都有細節欄（latest／end／freq／minAmount 收在「細節」）。
+  c.travel = [
+    { on: true, cat: "國外", sub: "消費旅遊", start: 34, end: 70, latest: 36, freq: 2, amount: 90_000, minAmount: 50_000, imp: 3 },
+    { on: true, cat: "國內", sub: "鄉村旅遊", start: 36, end: 55, latest: 38, freq: 1, amount: 30_000, minAmount: 15_000, imp: 3 },
+  ];
+  c.hobby = [
+    { on: true, sub: "娛樂創作類", start: 32, end: 60, freq: 1, amount: 40_000, minAmount: 15_000, imp: 3 },   // 攝影器材與鏡頭（也是副業工具）
+    { on: true, sub: "體能類", start: 32, end: 75, freq: 12, amount: 1_800, minAmount: 1_200, imp: 2 },        // 兩人健身房月費
+  ];
+  c.luxury = [
+    { on: true, sub: "首飾配件", start: 38, end: 38, freq: 1, amount: 80_000, minAmount: 0, imp: 1 },   // 結婚五週年
+  ];
+
+  // 短期資金需求：一年內婚禮尾款、兩年內預售訂簽開。
+  c.shortTerm = [
+    { name: "婚禮尾款（喜宴＋蜜月）", inYears: 1, amount: 500_000, minAmount: 350_000, prepared: 450_000, alt: "否" },
+    { name: "預售屋訂簽開（總價 15%）", inYears: 4, amount: 2_130_000, minAmount: 1_500_000, prepared: 0, alt: "是" },
+  ];
+
+  c.needs = [
+    // 保障年數 25：撐到第二胎（本人 37 歲生）經濟獨立。父母與未出生子女不進需求分析表。
+    { member: "周承翰", funeral: 800_000, protectYears: 25, estateTax: 0, room: 2_500, selfPay: 2_000, nursing: 2_200, miscDaily: 3_000, incomeCompDay: 0, incomeCompMonth: 50_000, disability: 5_000_000, firstCancer: 1_000_000, cancerHosp: 3_000, critical: 3_000_000, monthCare: 40_000, careMonths: 120 },
+    { member: "林芷晴", funeral: 800_000, protectYears: 25, estateTax: 0, room: 2_500, selfPay: 2_000, nursing: 2_200, miscDaily: 3_000, incomeCompDay: 0, incomeCompMonth: 40_000, disability: 4_000_000, firstCancer: 1_000_000, cancerHosp: 3_000, critical: 3_000_000, monthCare: 40_000, careMonths: 120 },
+  ];
+  c.coverages = [
+    { member: "周承翰", kind: "壽險", comm: 1_000_000, social: 0 },
+    { member: "周承翰", kind: "住院醫療", comm: 1_500, social: 0 },
+    { member: "林芷晴", kind: "壽險", comm: 500_000, social: 0 },
+  ];
+  c.policies = [
+    { insured: "周承翰", name: "定期壽險（20 年期）", subtype: "定期壽險", premium: 9_800, life: 3_000_000, accident: 0, medical: 0, medMisc: 0, incomeCompDay: 0, incomeCompMonth: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, cashValue: 0 },
+    { insured: "周承翰", name: "實支實付醫療（定期）", subtype: "醫療險", premium: 18_200, life: 0, accident: 0, medical: 2_000, medMisc: 200_000, incomeCompDay: 0, incomeCompMonth: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, cashValue: 0 },
+    { insured: "周承翰", name: "意外險（附傷害醫療）", subtype: "意外險", premium: 3_600, life: 0, accident: 2_000_000, medical: 0, medMisc: 50_000, incomeCompDay: 0, incomeCompMonth: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, cashValue: 0 },
+    { insured: "林芷晴", name: "實支實付醫療（定期）", subtype: "醫療險", premium: 16_400, life: 0, accident: 0, medical: 2_000, medMisc: 150_000, incomeCompDay: 0, incomeCompMonth: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, cashValue: 0 },
+    { insured: "林芷晴", name: "意外險", subtype: "意外險", premium: 3_000, life: 0, accident: 2_000_000, medical: 0, medMisc: 30_000, incomeCompDay: 0, incomeCompMonth: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, cashValue: 0 },
+    // 爸媽多年前幫他買的儲蓄險：有現金價值（syncPolicyAsset 會鏡射成一列資產）。
+    { insured: "周承翰", name: "六年期儲蓄險（已繳清）", subtype: "儲蓄險", premium: 0, life: 600_000, accident: 0, medical: 0, medMisc: 0, incomeCompDay: 0, incomeCompMonth: 0, firstCancer: 0, cancerHosp: 0, critical: 0, monthCare: 0, cashValue: 620_000 },
+  ];
+
+  c.savings = [
+    { name: "定期定額 ETF（兩人）", subCat: "定期定額ETF/基金", period: "月", amount: 12_000 },
+    { name: "購屋頭期專戶", subCat: "定存/儲蓄", period: "月", amount: 15_000 },
+  ];
+  c.intent = {
+    purposes: ["想進行儲蓄，替未來準備", "想進行投資、活化資產", "想進行風險的保障評估", "人生模擬，了解一生金流"],
+    // 自訂議題住 purposesCustom（normalizeIntent 會濾掉不在 PURPOSES 裡的字串）。
+    purposesCustom: ["婚後兩個人的錢怎麼合併管理"],
+    targets: ["婚姻規劃", "購屋規劃", "購車規劃", "子女教養規劃", "孝親規劃", "旅遊規劃", "休閒興趣規劃", "退休生活規劃", "職涯規劃"],
+    mustHave: ["婚姻規劃", "購屋規劃", "子女教養規劃", "退休生活規劃"],
+  };
+  c.lifeGoals = [
+    { name: "婚後三年內有自己的房子", priority: 1, value: "孩子出生前安定下來，不再搬家", importance: 5, linkModule: "置產", note: "" },
+    { name: "兩個孩子都能念到大學", priority: 2, value: "給他們我沒有的選擇權", importance: 4, linkModule: "教育", note: "" },
+    { name: "63 歲退休、每年帶爸媽出國一次", priority: 3, value: "趁爸媽還走得動", importance: 3, linkModule: "退休", note: "" },
+  ];
+  c.legacy = { on: true, heirs: 2, perHeirCash: 2_000_000, perHeirNote: "兩個孩子各一筆成家起步金", feedEstate: false };
+  c.taxParams = { married: false, dependents: 0, otherDeduction: 0, estateDeduction: 0, houseAssessed: 0, landAssessed: 0, carTax: 11_920 };
+  c.plan = {
+    retireDelay: 0, movableToOverseas: 0,
+    allocations: [
+      { name: "全球股票 ETF（定期定額）", pct: 50, ret: 6, benefit: "長期增值" },
+      { name: "購屋頭期專戶（高利活存／短天期定存）", pct: 35, ret: 1.8, benefit: "四年內要用、不能承受波動" },
+      { name: "生活預備金", pct: 15, ret: 1, benefit: "流動安全網" },
+    ],
+  };
+  c.career = { plan: "考慮轉職", switchAge: 36, switchFund: 200_000, startupType: "", startupBudget: "", importance: 3 };
+  c.overseas = { hasAssets: "是", identity: "否", purpose: "投資", assetTypes: "股票" };
+  c.tracking = [
+    { year: 2025, age: 31, net: 1_780_000 },
+    { year: 2026, age: 32, net: 2_250_000 },
+  ];
+  c.nextReview = "2027-01-15";
+  c.reportNote =
+    "兩個人加起來不算高薪，但也沒亂花。問題不是錢不夠，是結婚、兩胎、買房、換車全部擠在 33 到 39 歲，" +
+    "而退休一個字都還沒開始準備。這份規劃先把這七年的錢攤開來看——哪一筆先、哪一筆可以等、" +
+    "弟弟那 40 萬和爸媽答應的 150 萬什麼時候進來——再談要不要多賺、少花。";
+  c.tags = ["示範範本", "準新人", "雙薪"];
+  return c;
+}
+
+
+// 第五份的 walk（在瀏覽器裡逐步 eval；每一步都是 lantu-app.html 既有的全域函式）。
+// ⚠️ 步驟順序有意義：生育先長成員，持有成本列要在購車／購屋目標齊全後再帶，流程最後走。
+export const NEWLYWEDS_WALK: string[] = [
+  // ① 生育規劃 → 未出生子女成員＋生育一次性＋0–2 歲育兒列
+  "applyBirthPlan(true)",
+  // ② 現況車輛接上購車目標（sellAid＝那台 Altis 的 aid）
+  "(function(){var c=activeCase();var car=c.assets.filter(function(a){return /Altis/.test(a.name)})[0];var g=c.goals.filter(function(x){return x.type==='購車'&&!x.tag})[0];if(car&&g){g.sellAid=car.aid;}})()",
+  // ③ 買房／買車之後的持有成本（預設列由規格推算；房的那組從交屋年起）
+  "addDetailPresets('house')",
+  "addDetailPresets('car')",
+  // ④ 房租收到交屋前一年
+  "(function(){var c=activeCase();var i=-1;c.goals.forEach(function(x,k){if(x.type==='購屋'&&!x.tag&&i<0)i=k});if(i>=0)houseStopRent(i);})()",
+  // ⑤ 子女的其他準備基金：老大 30 歲結婚基金（進贈與稅檢核）
+  "(function(){var c=activeCase();var kid=c.members.filter(function(m){return m.role==='子女'})[0];if(kid){addChildFund(kid.name,'結婚基金');var g=c.goals.filter(function(x){return x.childFundFor===kid.name})[0];if(g){g.present=1000000;g.minPresent=600000;}}})()",
+  // ⑥ 願景處理流程：判定 → 缺口呈現（D1）→ 鎖願景 → 護欄 → 階段表 → 調整台 → 後果 → 行動清單 → 執行期
+  "flowStart()",
+  "flowGo('S1')",
+  "flowDecide('S1','d1',{ok:true},'客戶確認願景是自己要的，看見缺口','S2')",
+  "flowLockVision()",
+  // 護欄只列最要緊的四項（兩人壽險、本人重病給付、預備金），不把十六個缺口全倒進行動清單
+  // ⚠️ flowAddGuard 吃的是 guardCheck().rows 的索引，而每加一個動作 rows 就少一列——所以每加一個都重算一次、用名字＋成員找索引。
+  "(function(){var c=activeCase();var want=[['壽險',primaryName(c)],['壽險',null],['重病給付',primaryName(c)],['reserve',null]];want.forEach(function(w){var G=guardCheck(c);for(var i=0;i<G.rows.length;i++){var r=G.rows[i];if(!(r.gap>0))continue;var hit=(w[0]==='reserve')?r.kind==='reserve':(r.name===w[0]&&(w[1]==null?r.member!==primaryName(c):r.member===w[1]));if(hit){flowAddGuard(i);break;}}});})()",
+  "flowGo('S3')",
+  "flowConfirmStages()",
+  // 調整台：支出 −5,000／月（由上到下留／半／放）→ 收入拉到補平為止。
+  // ⚠️ 先支出再收入：flowTuneApplyExp 收尾會用預設分法重寫收入兩個動作（不看 t.incSplit），
+  //    反過來做的話「定期定額 8,000」會被洗回 0（2026/10/07 發現，待修）。
+  "flowTuneDraft('exp',5000)",
+  "flowTuneConfirm('exp')",
+  "flowTuneModalClose()",
+  // 收入：從 +20,000 起每次加 5,000，拉到投影補平為止（上限＝拉桿上限）；分法固定「工作 60%／定期定額 40%」
+  "(function(){var c=activeCase();var K=flowTuneCaps(c);var v=20000;while(true){flowTuneDraft('inc',v);flowTuneConfirm('inc');var reg=Math.round(v*0.4/1000)*1000;flowTuneSetSplit('regular',reg);if(projection(c).shortPV<=0.5||v+5000>K.incMax)break;v+=5000;}})()",
+  "flowTuneRoute('專業兼職')",
+  "flowTuneModalClose()",
+  // 閘門照引擎說的走：拉完補平了就直接進行動清單，沒補平才看後果、客戶接受
+  "(function(){var c=activeCase();var t=flowTuneState(c);var closed=projection(c).shortPV<=0.5;flowTuneGate({closed:closed,reason:closed?'':'short',inc:t.inc,exp:t.exp},closed?'S6x':'S6');})()",
+  "(function(){var f=flowOf(activeCase());if(f.step==='S6')flowAcceptConsequences();})()",
+  "flowSetWrap('gain','原來最大的壓力不是房子，是七年內所有事都擠在一起')",
+  "(function(){var c=activeCase();var a=(c.actions||[]).filter(function(x){return x.on!==false})[0];if(a)flowSetWrap('first',a.id);})()",
+  "flowSetWrap('nextDate','2027-01-15')",
+  "flowStartExec()",
+  // 執行期：前兩個動作標「到位」、第三個「部分」，示範回訪對帳時有東西可對
+  "(function(){var c=activeCase();var k=0;(c.actions||[]).forEach(function(a,i){if(a.on===false)return;k++;if(k<=2)flowSetStatus(i,'done');else if(k===3)flowSetStatus(i,'partial');});})()",
+];
+
 export const TEMPLATES = [
   { key: "dual", name: "雙薪育兒家庭", label: "38 歲・兩個孩子・房貸 920 萬", lifeStage: "家庭形成期", build: dualIncome },
   { key: "single", name: "單身上班族", label: "29 歲・未婚・租屋・想買第一間房", lifeStage: "單身期", build: single },
   { key: "biz", name: "中年企業主", label: "52 歲・公司負責人・傳承與交棒", lifeStage: "家庭成熟期", build: bizOwner },
   { key: "pre", name: "屆臨退休", label: "60 歲・五年後退休・子女已獨立", lifeStage: "退休準備期", build: preRetire },
+  // walk：build.mjs 在瀏覽器裡、資料載入之後，用正式的函式把「要按按鈕才會長出來的東西」長出來——
+  // 生育規劃三產物、買房／買車之後的持有成本列、現況車輛接上購車目標、房租收到交屋前一年，
+  // 以及把願景處理流程走到「執行期」（教練打開就能示範回訪對帳）。每一步都是 lantu-app.html 既有的全域函式。
+  { key: "newly", name: "準新人雙薪", label: "32 歲・半年後結婚・想生兩個・三年內買房買車", lifeStage: "家庭形成期", build: newlyweds, walk: NEWLYWEDS_WALK },
 ];

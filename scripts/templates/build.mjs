@@ -1,4 +1,4 @@
-// 步驟 1：把 cases.ts 的四份個案送進 public/lantu-app.html 的 migrateCase()，
+// 步驟 1：把 cases.ts 的每一份個案送進 public/lantu-app.html 的 migrateCase()，
 // 再用同一個瀏覽器實地走過每一個分頁與報告書，最後輸出 scripts/templates/built.json。
 //
 // ⚠️ 為什麼一定要走瀏覽器：migrateCase／syncPremium 只存在於 lantu-app.html，engine.ts 沒有這兩支。
@@ -65,18 +65,39 @@ for (const item of cases) {
   await page.waitForFunction(() => typeof window.render === "function", null, { timeout: 15000 });
 
   // 走正式握手（不要直接塞 app.cases，見檔頭）
-  await page.evaluate((data) => {
+  // 有 walk 的那一份要以可寫模式握手——walk 裡的流程函式會改資料並 save()（embed 模式的 save 只是 postMessage 給父層，這裡沒有父層，無害）。
+  const hasWalk = Array.isArray(item.walk) && item.walk.length > 0;
+  await page.evaluate(({ data, readOnly }) => {
     window.postMessage(
       {
-        type: "lantu:init", data, uiScale: 100, readOnly: true,
+        type: "lantu:init", data, uiScale: 100, readOnly,
         readOnlyNote: "示範範本（唯讀）", clientCode: null,
         notes: [], session: null, past: [], noteAccess: "none",
       },
       location.origin,
     );
-  }, item.data);
+  }, { data: item.data, readOnly: !hasWalk });
   await page.waitForFunction(() => !!(window.app && window.app.cases && window.app.cases.length), null, { timeout: 10000 });
   await page.waitForTimeout(300);
+
+  // walk：資料載入之後，用頁面裡既有的全域函式把「要按按鈕才會長出來的東西」長出來
+  // （生育規劃三產物、持有成本列、願景處理流程…）。一步失敗就記下來，整份不寫。
+  if (hasWalk) {
+    for (const step of item.walk) {
+      const r = await page.evaluate((code) => {
+        try { (0, eval)(code); return null; } catch (e) { return String(e && e.stack || e).slice(0, 300); }
+      }, step);
+      if (r) errs.push(`walk 步驟失敗：${step.slice(0, 80)} → ${r}`);
+      await page.waitForTimeout(30);
+    }
+    const flow = await page.evaluate(() => {
+      const c = window.activeCase(); const f = c.flow || {};
+      return { step: f.step, track: f.track, stages: (c.stages || []).length, actions: (c.actions || []).length,
+        kids: (c.members || []).filter((m) => m.role === "子女").length,
+        detail: (c.expenses || []).filter((e) => e.tag === "house" || e.tag === "car").length };
+    });
+    console.log(`   walk：流程 ${flow.track}/${flow.step}　階段 ${flow.stages}　動作 ${flow.actions}　子女 ${flow.kids}　持有成本列 ${flow.detail}`);
+  }
 
   const tabs = await page.evaluate(() =>
     Array.from(document.querySelectorAll("[data-tab]")).map((b) => b.getAttribute("data-tab")),
@@ -140,4 +161,4 @@ if (fail) {
   process.exit(1);
 }
 writeFileSync(join(HERE, "built.json"), JSON.stringify(out));
-console.log("\n四份都乾淨 → scripts/templates/built.json（接著跑 npx tsx scripts/templates/seed.ts）");
+console.log(`\n${out.length} 份都乾淨 → scripts/templates/built.json（接著跑 npx tsx scripts/templates/seed.ts）`);
