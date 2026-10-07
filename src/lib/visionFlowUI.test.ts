@@ -189,6 +189,22 @@ describe("流程推進與閘門", () => {
     expect(c.actions.find((a: any) => a.flowKey === "tune:work").getMonthly).toBe(1000);
     expect(c.actions.find((a: any) => a.flowKey === "tune:regular").on).toBe(false);
   });
+  it("先在收入視窗手調分法、再拉支出：分法沿用（只夾新上限），不會被預設分法洗掉", () => {
+    const c = cur();
+    w.flowTuneInc(20000);
+    const K = w.flowTuneCaps(c);
+    const reg = Math.min(8000, K.finRoom);
+    w.flowTuneSetSplit("regular", reg);
+    expect(c.actions.find((a: any) => a.flowKey === "tune:regular").payMonthly).toBe(reg);
+    const work0 = c.actions.find((a: any) => a.flowKey === "tune:work").getMonthly;
+    const first = c.expenses.findIndex((e: any) => w.tuneRowOK(e));
+    w.flowTuneExp(w.n(c.expenses[first].amount) / 24);
+    expect(c.actions.find((a: any) => a.flowKey === "tune:regular").payMonthly).toBe(reg);
+    expect(c.actions.find((a: any) => a.flowKey === "tune:work").getMonthly).toBe(work0);
+    expect(c.flow.tune.incSplit.regular).toBe(reg);
+    w.flowTuneExp(0);
+    w.flowTuneInc(0);
+  });
   it("支出：拉桿記草稿 → 確定才由上到下標放／半並開「放哪幾項」視窗；視窗裡點留／半／放，拉桿跟著走；固定與必達碰不到", () => {
     const c = cur();
     const K = w.flowTuneCaps(c);
@@ -311,14 +327,43 @@ describe("流程推進與閘門", () => {
 });
 
 describe("Step 6 後果引擎", () => {
-  it("consequences() 只回清單、不改 c；有缺口時清單非空且從最低順位開始", () => {
+  it("客戶沒開放任何一項 → consequences() 什麼都不動（有缺口也一樣）；S6 畫面提示先問他", () => {
     const c = cur();
+    delete c.flow.flex;
+    const snap = JSON.stringify(c);
+    const C = w.consequences(c);
+    expect(JSON.stringify(c)).toBe(snap);
+    expect(C.items.length).toBe(0);
+    const st = c.flow.step; c.flow.step = "S6"; w.render();
+    expect(pane()).toContain("客戶願意調整？");
+    expect(pane()).toContain("客戶還沒說哪一項願意先調整");
+    expect(pane()).toContain("flowFlex(");
+    c.flow.step = st; w.render();
+  });
+  it("flowFlex(key,true) 開放一項：只有那一項可能被動，其餘一律不動；收回就不再動", () => {
+    const c = cur();
+    const st = c.flow.step; c.flow.step = "S6";
+    const list = w.flowVisionList(c).filter((x: any) => x.kind !== "edu");
+    const low = list[list.length - 1];
+    w.flowFlex(low.key, true);
+    expect(c.flow.flex[low.key]).toBe(true);
+    const C = w.consequences(c);
+    C.items.forEach((d: any) => expect(d.key).toBe(low.key));
+    expect(pane()).toContain("只對客戶勾「可以談」的 1 項");
+    w.flowFlex(low.key, false);
+    expect(c.flow.flex[low.key]).toBeUndefined();
+    expect(w.consequences(c).items.length).toBe(0);
+    c.flow.step = st; w.render();
+  });
+  it("全部開放時：consequences() 只回清單、不改 c；有缺口時清單非空且從最低順位開始", () => {
+    const c = cur();
+    c.flow.flex = {}; w.flowVisionList(c).forEach((x: any) => { c.flow.flex[x.key] = true; });
     const snap = JSON.stringify(c);
     const C = w.consequences(c);
     expect(JSON.stringify(c)).toBe(snap);
     if (w.projection(c).shortPV > 0.5) {
       expect(C.items.length).toBeGreaterThan(0);
-      const list = w.flowVisionList(c);
+      const list = w.flowVisionList(c).filter((x: any) => x.kind !== "edu");
       expect(C.items[0].pos).toBe(list[list.length - 1].pos);
       C.items.forEach((d: any) => expect(["delay", "downgrade", "drop", "unsolved"]).toContain(d.kind));
     }

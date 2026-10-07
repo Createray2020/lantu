@@ -9606,9 +9606,13 @@ function consequences(c){
  var base=JSON.parse(JSON.stringify(c)),p=projection(base);
  if(flowSolved(p))return {items:[],closed:true,before:p.shortPV,after:p.shortPV};
  var list=flowVisionList(base,p).slice().reverse(),aEnd=effHorizon(c),items=[];
+ // ⚠️ 2026/10/08 Ray：後果引擎只能動「客戶自己說願意先調整」的願景（f.flex[key]＝true）。
+ //    沒開放的一律不碰——不是系統決定他要放掉什麼，是他自己決定哪幾項可以談。
+ var flex=flowFlexOf(c);
  for(var k=0;k<list.length;k++){
   var it=list[k],cur=projection(base);if(flowSolved(cur))break;
   if(it.kind==='edu')continue;      // 教育年限跟著孩子走，不延後、不降規
+  if(!flex[it.key])continue;        // 客戶沒開放這一項：不延後、不降規、不消失
   var done=null;
   // 1) 延後：整數年線性掃描到一生盡頭
   if(it.kind==='goal'||it.kind==='wish'||it.kind==='retire'){
@@ -9628,6 +9632,12 @@ function consequences(c){
  var pf=projection(base);
  return {items:items,closed:flowSolved(pf),before:p.shortPV,after:pf.shortPV};
 }
+/* 客戶開放哪幾項願景可以談（Step 6）。存 c.flow.flex[key]=true；key 同 flowVisionList。 */
+function flowFlexOf(c){var f=flowOf(c);return (f&&f.flex&&typeof f.flex==='object')?f.flex:{}}
+function flowFlex(key,on){var c=activeCase();var f=flowOf(c);if(!f)return;f.flex=f.flex||{};if(on)f.flex[key]=true;else delete f.flex[key];
+ var it=flowVisionList(c).filter(function(x){return x.key===key})[0];
+ try{if(typeof addNoteRaw==='function'&&it)addNoteRaw('flow:S6','decision',(on?'客戶願意先調整：':'客戶收回、這一項不談：')+it.name,false)}catch(e){}
+ save();render()}
 /* 客戶接受：寫進資料＋印記（唯一會改願景的地方） */
 function applyConsequences(c,items,meta){
  meta=meta||{};var stamp={at:new Date().toISOString(),sessionId:meta.sessionId||null};
@@ -9839,13 +9849,16 @@ function flowBodyHTML(c){
     '<button class="tbtn ghost" onclick="flowDecide(\'S5B\',\'d5b\',{closed:false,reason:\'unwilling\'},\'客戶不願意放，看後果\',\'S6\')">客戶不願意放 → 看後果</button>'+
     '<button class="tbtn amber" onclick="flowDecide(\'S5B\',\'d5b\',{closed:true},\'支出調整後補平缺口\',\'S6x\')">補平了 → 行動清單</button>','客戶');
  }
- if(s==='S6'){var C=consequences(c),items=flowVisionList(c),byKey={};C.items.forEach(function(d){byKey[d.key]=d});
-  function consText(d){if(!d)return '<span class="muted">不動</span>';if(d.kind==='delay')return '<span class="mk d">延後 '+d.years+' 年 · '+d.from+' → '+d.to+' 歲</span>';if(d.kind==='downgrade')return '<span class="mk d">降規 · '+cfAxis(d.from)+' → '+cfAxis(d.to)+'</span>';if(d.kind==='drop')return '<span class="mk n">消失</span>';return '<span class="mk n">延後、降規都不夠</span>'}
-  return flowAsk('收入和支出能做的都做了還是不夠——那哪些願景會怎樣？<b>不動願景</b>，只算、只呈現。')+
-   (C.closed&&!C.items.length?'<div class="v2verdict good">✅ 照現在的方案，選定的願景全部做得到，沒有後果要呈現。</div>':
-   '<div class="tw"><table><tr><th>順位</th><th>願景</th><th>原本</th><th>照現在的方案</th><th>後果</th></tr>'+
-   items.map(function(x){return '<tr><td>'+x.pos+'</td><td>'+esc(x.name)+'</td><td>'+x.age+' 歲 '+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+'</td><td>'+flowMark(x.ok)+'</td><td>'+consText(byKey[x.key])+(byKey[x.key]?' <button class="tbtn sm" onclick="flowVisionOpen(\''+esc(x.key)+'\')">客戶要改這一項</button>':'')+'</td></tr>'}).join('')+'</table></div>'+
-   '<div class="hint" style="margin-top:8px">後果引擎由<b>低優先往高優先</b>逐一試：先延後（掃到一生盡頭，不設上限）→ 再降到「最低金額」→ 都不過才標「消失」。只回清單；客戶按接受才寫進資料，並在該願景打 byConsequence 印記。'+(C.closed?'':'　<span class="warn">全部試完仍有缺口 '+cfAxis(C.after)+'：要回頭加碼。</span>')+'</div>')+
+ if(s==='S6'){var C=consequences(c),items=flowVisionList(c),byKey={};C.items.forEach(function(d){byKey[d.key]=d});var p0ok=flowSolved(projection(c));
+  var flex=flowFlexOf(c),nFlex=items.filter(function(x){return flex[x.key]}).length;
+  function consText(d,x){if(!flex[x.key])return '<span class="muted">客戶沒開放 · 不動</span>';if(!d)return '<span class="muted">不動</span>';if(d.kind==='delay')return '<span class="mk d">延後 '+d.years+' 年 · '+d.from+' → '+d.to+' 歲</span>';if(d.kind==='downgrade')return '<span class="mk d">降規 · '+cfAxis(d.from)+' → '+cfAxis(d.to)+'</span>';if(d.kind==='drop')return '<span class="mk n">消失</span>';return '<span class="mk n">延後、降規都不夠</span>'}
+  return flowAsk('收入和支出能做的都做了還是不夠——那哪些願景會怎樣？<b>不動願景</b>：先問他<b>哪幾項願意先調整</b>，系統只算那幾項，其餘一律不碰。')+
+   (C.closed&&!C.items.length&&!nFlex&&p0ok?'<div class="v2verdict good">✅ 照現在的方案，選定的願景全部做得到，沒有後果要呈現。</div>':
+   '<div class="tw"><table><tr><th>順位</th><th>願景</th><th>原本</th><th>照現在的方案</th><th>客戶願意調整？</th><th>後果</th></tr>'+
+   items.map(function(x){var ed=(x.kind==='edu');return '<tr><td>'+x.pos+'</td><td>'+esc(x.name)+'</td><td>'+x.age+' 歲 '+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+'</td><td>'+flowMark(x.ok)+'</td>'+
+    '<td>'+(ed?'<span class="muted">跟著孩子走</span>':'<label class="flexlab"><input type="checkbox" '+(flex[x.key]?'checked':'')+' onchange="flowFlex(\''+esc(x.key)+'\',this.checked)"> 可以談</label>')+'</td>'+
+    '<td>'+consText(byKey[x.key],x)+(byKey[x.key]?' <button class="tbtn sm" onclick="flowVisionOpen(\''+esc(x.key)+'\')">客戶要改這一項</button>':'')+'</td></tr>'}).join('')+'</table></div>'+
+   '<div class="hint" style="margin-top:8px">'+(nFlex?'只對客戶勾「可以談」的 '+nFlex+' 項、由<b>低優先往高優先</b>逐一試：先延後（掃到一生盡頭，不設上限）→ 再降到「最低金額」→ 都不過才標「消失」。沒勾的一項都不會動。只回清單；客戶按接受才寫進資料，並在該願景打 byConsequence 印記。':'<b>客戶還沒說哪一項願意先調整</b>——先問他。沒開放之前，系統不會替他延後、降規或放掉任何一項。')+(C.closed||!nFlex?'':'　<span class="warn">開放的幾項全部試完仍有缺口 '+cfAxis(C.after)+'：回頭加碼，或再多開放幾項。</span>')+'</div>')+
    flowGate('D3　加碼還是接受？',
     '<button class="tbtn ghost" onclick="flowDecide(\'S6\',\'d3\',{choice:\'more\'},\'客戶選加碼，回調整台再拉\',\'S4\')">加碼 → 回調整台</button>'+
     (C.items.length?'<button class="tbtn amber" onclick="flowAcceptConsequences()">客戶接受後果 →</button>':'<button class="tbtn amber" onclick="flowDecide(\'S6\',\'d3\',{choice:\'accept\',n:0},\'無後果，進行動清單\',\'S6x\')">進行動清單 →</button>'),'客戶');
@@ -10101,7 +10114,12 @@ function flowTuneApplyExp(c,v){
  t.exp=Math.round(got);flowReflow(c);
  // 支出放掉的錢會讓理財那段的上限變大：收入拉桿的位置不變，但落點重算
  var K2=flowTuneCaps(c),aw=flowTuneAct(c,'tune:work'),ar=flowTuneAct(c,'tune:regular');
- if(t.inc>0){var work=Math.min(t.inc,K2.workCap),fin=Math.min(Math.max(0,t.inc-work),K2.finRoom);if(aw){aw.getMonthly=Math.round(work);aw.on=work>0}if(ar){ar.payMonthly=Math.round(fin);ar.on=fin>0}}
+ // ⚠️ 2026/10/08：教練在收入視窗手調過的分法（t.incSplit）要沿用、只各自夾新上限——
+ //    原本在這裡用預設分法重算，會把「定期定額 8,000」洗回 0，而畫面上的分法數字還顯示 8,000。
+ if(t.inc>0){var work,fin;
+  if(t.incSplit){work=Math.min(n(t.incSplit.work),K2.workCap);fin=Math.min(n(t.incSplit.regular),K2.finRoom);t.incSplit={work:Math.round(work),regular:Math.round(fin)};}
+  else{work=Math.min(t.inc,K2.workCap);fin=Math.min(Math.max(0,t.inc-work),K2.finRoom);}
+  if(aw){aw.getMonthly=Math.round(work);aw.on=work>0}if(ar){ar.payMonthly=Math.round(fin);ar.on=fin>0}}
 }
 function flowTuneSyncExp(c){var t=flowTuneState(c),s=0;(c.actions||[]).forEach(function(a){if(a.on!==false&&a.cat==='expense'&&a.lane==='expense')s+=n(a.getMonthly)});t.exp=Math.round(s)}
 /* ---------- 波 10：調整台三根拉桿（願景延後・收入・支出）＋ 全生涯財務流開頭（2026/09/28 Ray）----------
