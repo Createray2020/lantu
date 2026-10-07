@@ -5,9 +5,10 @@ import type { ActionResult } from "./actions";
 import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
+import Link from "next/link";
 import {
-  calcData, suggestQty, isYm,
-  type AcctState, type AcctItem, type AcctMonth, type AcctTarget, type AcctAdj, type MonthResult, type Compare, type SysRow, type AcctSource,
+  calcData, suggestQty, isYm, unitOf, SPLIT_MODE_LABEL, ACCT_DEFAULT_PARAMS,
+  type AcctState, type AcctItem, type AcctMonth, type AcctTarget, type AcctAdj, type MonthResult, type Compare, type SysRow, type AcctSource, type AcctParams, type SplitMode,
 } from "@/lib/acctEngine";
 
 // 帳務三頁共用的元件與常數（2026/09/29 拆頁：參數設定／目標設定／本月帳務）。
@@ -59,6 +60,7 @@ export function MonthEditor({ data, res, refQty, refLabel, label, keyTag, onSave
                 <td className="py-1.5">{b.it.name}</td>
                 <td className="text-right text-tx3">{refQty ? (refQty[b.it.id] ?? 0) : "—"}</td>
                 <td className="text-right whitespace-nowrap">
+                  {b.rcN ? <Link href="/admin/accounting/receipts" className="text-xs mr-1 text-brand2 hover:underline" title="逐筆收款（對帳表）記的筆數，到收款明細改">收款 {b.rcN} ＋</Link> : null}
                   {hasSys && b.it.source ? <button className={`text-xs mr-1 ${b.sysN ? "text-brand2" : "text-tx3"} hover:underline`} onClick={() => setOpenSys(openSys === b.it.id ? null : b.it.id)}>系統 {b.sysN} ＋</button> : null}
                   <input className={`${FIELD_SM} w-16 text-right`} inputMode="numeric" defaultValue={data.qty[b.it.id] ?? 0} onBlur={(e) => { const v = NUM(e.target.value); if (v !== (data.qty[b.it.id] ?? 0)) onSave({ ...data, qty: { ...data.qty, [b.it.id]: v } }); }} />
                 </td>
@@ -297,21 +299,29 @@ export function PLCompare({ r, rt, vat }: { r: MonthResult; rt: MonthResult; vat
 }
 
 // ---------- 營業項目編輯 ----------
-export function ItemsEditor({ items, onSave }: { items: AcctItem[]; onSave: (items: AcctItem[]) => void }) {
+export function ItemsEditor({ items, onSave, params = ACCT_DEFAULT_PARAMS }: { items: AcctItem[]; onSave: (items: AcctItem[]) => void; params?: AcctParams }) {
   const set = (i: number, patch: Partial<AcctItem>) => onSave(items.map((x, j) => j === i ? { ...x, ...patch } : x));
   return (
     <div>
       {items.map((it, i) => {
         const price = it.price;
-        let split = 0;
-        const rows = it.splits.map((s) => { const v = s.mode === "pct" ? price * s.v / 100 : s.v; split += v; return v; });
-        const gp = price - split, gm = price ? gp / price : 0;
+        // 示範數字：分潤池用「2 位分潤人」那一階（最常見），其餘照公式
+        const demoSharers = it.splits.some((s) => s.mode === "pool") ? [{ name: "分潤一" }, { name: "分潤二" }].slice(0, Math.min(2, params.poolTiers.length)) : [];
+        const u = unitOf(it, {}, undefined, params, demoSharers);
+        const rowVal = (s: { to: string; mode: SplitMode; v: number }) => {
+          if (s.mode === "pool") return u.rows.filter((r) => demoSharers.some((d) => d.name === r.to)).reduce((a, r) => a + r.v, 0);
+          if (s.mode === "keep") return price * s.v / 100;
+          return u.rows.find((r) => r.to === s.to)?.v ?? 0;
+        };
+        const split = u.split, gp = u.gp, gm = u.gm;
         return (
           <div key={it.id} className="mb-3 pb-3 border-b border-line">
             <div className="flex flex-wrap items-center gap-2">
               <input className={nameIn} defaultValue={it.name} onBlur={(e) => { if (e.target.value !== it.name) set(i, { name: e.target.value }); }} />
               <span className="text-sm text-tx2">單價</span>
               <input className={numIn} inputMode="numeric" defaultValue={it.price} onBlur={(e) => { const v = NUM(e.target.value); if (v !== it.price) set(i, { price: v }); }} />
+              <span className="text-xs text-tx3">分類</span>
+              <input className={`${FIELD_SM} w-24`} defaultValue={it.cat ?? ""} placeholder="（選填）" title="收款明細與匯款對帳用來分組，例如：嵐途學院、活動" onBlur={(e) => { if (e.target.value.trim() !== (it.cat ?? "")) set(i, { cat: e.target.value.trim() }); }} />
               <span className="text-xs text-tx3">自動來源</span>
               <select className={SELECT_SM} value={it.source ?? ""} onChange={(e) => set(i, { source: e.target.value as AcctSource | "" })} title="系統事件發生時自動記一筆到本月帳務；同一種來源只能掛一個項目">
                 <option value="">無（只手填）</option>
@@ -325,19 +335,21 @@ export function ItemsEditor({ items, onSave }: { items: AcctItem[]; onSave: (ite
                 <div key={j} className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="text-10 tracking-wider text-tx3 rounded-full border border-line px-2 py-0.5">分給</span>
                   <input className={`${FIELD_SM} w-28`} defaultValue={s.to} placeholder="對象" onBlur={(e) => { if (e.target.value !== s.to) set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, to: e.target.value } : x) }); }} />
-                  <select className={SELECT_SM} value={s.mode} onChange={(e) => set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, mode: e.target.value as "pct" | "amt" } : x) })}>
-                    <option value="pct">比例 %</option><option value="amt">固定金額</option>
+                  <select className={SELECT_SM} value={s.mode} onChange={(e) => set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, mode: e.target.value as SplitMode } : x) })}>
+                    {(Object.keys(SPLIT_MODE_LABEL) as SplitMode[]).map((m) => <option key={m} value={m}>{SPLIT_MODE_LABEL[m]}</option>)}
                   </select>
-                  <input className={`${FIELD_SM} w-20 text-right`} inputMode="decimal" defaultValue={s.v} onBlur={(e) => { const v = NUM(e.target.value); if (v !== s.v) set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, v } : x) }); }} />
-                  <span className="text-xs text-tx3">＝ {F(rows[j])}</span>
+                  {s.mode === "pool"
+                    ? <span className="text-xs text-tx3">每筆依分潤人數查切法表（{params.poolTiers.map((t, n) => `${n + 1} 人 ${t.join("／")}`).join("；")}）</span>
+                    : <input className={`${FIELD_SM} w-20 text-right`} inputMode="decimal" defaultValue={s.v} onBlur={(e) => { const v = NUM(e.target.value); if (v !== s.v) set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, v } : x) }); }} />}
+                  <span className="text-xs text-tx3">＝ {F(rowVal(s))}{s.mode === "pool" ? "（2 人時）" : s.mode === "keep" ? "（留在公司）" : ""}</span>
                   <button className={xbtn} onClick={() => set(i, { splits: it.splits.filter((_, k) => k !== j) })}>✕</button>
                 </div>
               ))}
               <button className="text-xs text-tx2 hover:text-tx" onClick={() => set(i, { splits: [...it.splits, { to: "", mode: "pct", v: 0 }] })}>＋ 拆分</button>
             </div>
             <div className="flex justify-between items-center mt-2 text-sm">
-              <span className="text-xs text-tx3">拆出 {F(split)}</span>
-              <span>單筆毛利 <b className="text-brand2">{F(gp)}</b> ・ 毛利率 <b>{P(gm * 100)}</b></span>
+              <span className="text-xs text-tx3">匯出去 {F(split)}</span>
+              <span>公司實收 <b className="text-brand2">{F(gp)}</b> ・ 毛利率 <b>{P(gm * 100)}</b></span>
             </div>
             <div className="h-1.5 rounded bg-line overflow-hidden mt-1"><i className="block h-full bg-brand2" style={{ width: `${Math.max(0, Math.min(100, gm * 100))}%` }} /></div>
           </div>

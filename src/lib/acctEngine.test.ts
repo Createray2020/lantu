@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcMonth, calcTarget, compareMonth, suggestQty, calcData, normItems as normItems2, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, type AcctState } from "./acctEngine";
+import { calcReceipt, payoutsOf, normReceipt, normParams, calcMonth, type AcctItem, calcTarget, compareMonth, suggestQty, calcData, normItems as normItems2, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, type AcctState } from "./acctEngine";
 
 // 原型（docs/帳務後台_原型.html）的示範資料——2026-09 那一個月。
 const S: AcctState = {
@@ -14,7 +14,7 @@ const S: AcctState = {
   },
   targets: {},
   draft: null,
-  params: { vatRate: 5 },
+  params: { vatRate: 5, poolTiers: [[30], [25, 5]] },
   goal: { netTarget: 200000 },
 };
 
@@ -167,5 +167,141 @@ describe("acctEngine 系統入帳（acct_entries）", () => {
     const it = normItems2([{ id: "x", name: "報聘", price: 6000, splits: [], source: "apply" }, { id: "y", name: "y", price: 1, splits: [], source: "junk" }]);
     expect(it[0].source).toBe("apply");
     expect(it[1].source).toBeUndefined();
+  });
+});
+
+// ---------- 2026/10/08 對帳表（嵐途_財務對帳表.xlsx）逐字對拍 ----------
+const P: AcctState["params"] = { vatRate: 5, poolTiers: [[30], [25, 5]] };
+const ITEMS: Record<"annual" | "train" | "academy" | "event", AcctItem> = {
+  annual: { id: "annual", name: "年度合作費（報聘）", price: 6000, splits: [{ to: "創造共好", mode: "amt", v: 4800 }, { to: "分潤", mode: "pool", v: 0 }] },
+  train: { id: "train", name: "培訓費", price: 9800, splits: [{ to: "分潤", mode: "pool", v: 0 }, { to: "公司", mode: "keep", v: 20 }, { to: "創造共好", mode: "amt", v: 600 }, { to: "講師一", mode: "rest", v: 80 }, { to: "講師二", mode: "rest", v: 20 }] },
+  academy: { id: "academy", name: "學院・年度方案", price: 4800, cat: "嵐途學院", splits: [{ to: "分潤", mode: "pool", v: 0 }] },
+  event: { id: "event", name: "8/8 一日培訓", price: 600, cat: "活動", splits: [{ to: "講師車馬費", mode: "pct", v: 37.5 }, { to: "場地", mode: "pct", v: 62.5 }] },
+};
+const two = [{ name: "陳昱豪" }, { name: "邱浩軍" }];
+
+describe("對帳表公式對拍", () => {
+  it("年度合作費：系統 4,800 固定、無分潤人 → 公司 1,200（J=B−SUM(F:I)）", () => {
+    const r = calcReceipt(ITEMS.annual, 6000, [], {}, P);
+    expect(r.rows.map((x) => [x.to, x.v])).toEqual([["創造共好", 4800]]);
+    expect(r.company).toBe(1200);
+    expect(r.payout).toBe(4800);
+  });
+  it("年度合作費有兩位分潤人：25／5 之後公司剩 −600 也照算（讓人看得到不夠分）", () => {
+    const r = calcReceipt(ITEMS.annual, 6000, two, {}, P);
+    expect(r.rows.map((x) => x.v)).toEqual([4800, 1500, 300]);
+    expect(r.company).toBe(-600);
+  });
+  it("培訓費兩位分潤人：F=25%、G=5%、公司 20%、系統 600、講師＝餘額×80／20", () => {
+    const r = calcReceipt(ITEMS.train, 9800, two, { 講師一: "王老師" }, P);
+    const by = Object.fromEntries(r.rows.map((x) => [x.to, x.v]));
+    expect(by["陳昱豪"]).toBeCloseTo(2450);
+    expect(by["邱浩軍"]).toBeCloseTo(490);
+    expect(by["公司"]).toBeCloseTo(1960);
+    expect(by["創造共好"]).toBe(600);
+    expect(by["王老師"]).toBeCloseTo(3440);   // (9800−2450−490−1960−600)×80%
+    expect(by["講師二"]).toBeCloseTo(860);
+    expect(r.keep).toBeCloseTo(1960);
+    expect(r.company).toBeCloseTo(1960);     // 公司實收＝自留那 20%
+    expect(r.payout).toBeCloseTo(9800 - 1960);
+  });
+  it("培訓費一位分潤人：F=30%，講師 3,440／860 不變", () => {
+    const r = calcReceipt(ITEMS.train, 9800, [{ name: "邱浩軍" }], {}, P);
+    const by = Object.fromEntries(r.rows.map((x) => [x.to, x.v]));
+    expect(by["邱浩軍"]).toBeCloseTo(2940);
+    expect(by["講師一"]).toBeCloseTo(3440);
+    expect(by["講師二"]).toBeCloseTo(860);
+  });
+  it("培訓費沒有分潤人：池不扣，餘額變大，講師拿更多", () => {
+    const r = calcReceipt(ITEMS.train, 9800, [], {}, P);
+    const by = Object.fromEntries(r.rows.map((x) => [x.to, x.v]));
+    expect(by["講師一"]).toBeCloseTo((9800 - 1960 - 600) * 0.8);
+    expect(r.company).toBeCloseTo(1960);
+  });
+  it("學院年度方案 4,800 兩位分潤人：1,200／240，公司 3,360；單場票 300：75／15，公司 210", () => {
+    const r = calcReceipt(ITEMS.academy, 4800, two, {}, P);
+    expect(r.rows.map((x) => x.v)).toEqual([1200, 240]);
+    expect(r.company).toBe(3360);
+    const t = calcReceipt(ITEMS.academy, 300, [{ name: "謝采恩" }, { name: "邱浩軍" }], {}, P);
+    expect(t.rows.map((x) => x.v)).toEqual([75, 15]);
+    expect(t.company).toBe(210);
+  });
+  it("8/8 一日培訓：600 × 3000/8000 講師車馬費、× 5000/8000 場地，公司 0", () => {
+    const r = calcReceipt(ITEMS.event, 600, [], {}, P);
+    expect(r.rows.map((x) => x.v)).toEqual([225, 375]);
+    expect(r.company).toBe(0);
+  });
+  it("三位分潤人但切法表只到兩人：用兩人那一階、第三位 0，並給警示", () => {
+    const r = calcReceipt(ITEMS.academy, 4800, [...two, { name: "第三位" }], {}, P);
+    expect(r.rows.map((x) => x.v)).toEqual([1200, 240, 0]);
+    expect(r.warn).toContain("3 位");
+    const r3 = calcReceipt(ITEMS.academy, 4800, [...two, { name: "第三位" }], {}, { ...P, poolTiers: [[30], [25, 5], [20, 5, 5]] });
+    expect(r3.rows.map((x) => x.v)).toEqual([960, 240, 240]);
+    expect(r3.warn).toBeNull();
+  });
+  it("what-if 拆分點數只動 pct 列，不動 pool／amt／keep", () => {
+    const r = calcReceipt(ITEMS.event, 600, [], {}, P, { split: -5 });
+    expect(r.rows.map((x) => x.v)).toEqual([195, 345]);
+    const t = calcReceipt(ITEMS.train, 9800, two, {}, P, { split: -5 });
+    expect(t.rows[0].v).toBeCloseTo(2450);
+  });
+});
+
+describe("收款進月結與匯款對帳", () => {
+  const rc = (id: string, itemId: string, on: string, amount: number, payer: string, sharers: { name: string }[] = [], payees = {}) =>
+    normReceipt({ itemId, on, amount, payer, sharers, payees }, id);
+  const S2: AcctState = {
+    items: [ITEMS.annual, ITEMS.train, ITEMS.academy, ITEMS.event],
+    months: { "2026-09": { qty: {}, fixed: [{ name: "記帳費", amt: 3000 }] } },
+    targets: {}, draft: null, params: P, goal: { netTarget: 0 },
+    receipts: { "2026-09": [
+      rc("r1", "annual", "2026-09-02", 6000, "李沛瑄"),
+      rc("r2", "annual", "2026-09-02", 6000, "王忠岳"),
+      rc("r3", "train", "2026-09-22", 9800, "林祐丞", two, { 講師一: "王老師" }),
+      rc("r4", "train", "2026-09-24", 9800, "Sabrina", [{ name: "邱浩軍" }], { 講師一: "王老師" }),
+      rc("r5", "academy", "2026-09-30", 4800, "許家瑜", two),
+      { ...rc("r6", "annual", "2026-09-23", 6000, "退費的人"), void: true },
+    ] },
+    payouts: { "2026-09": { 邱浩軍: { paidOn: "2026-10-05", amount: 3000, note: "" } } },
+  };
+  it("營業額＝Σ收款（作廢不算）；拆分給別人＝Σ匯出去；毛利＝公司實收", () => {
+    const r = calcMonth(S2, "2026-09")!;
+    expect(r.rev).toBe(6000 * 2 + 9800 * 2 + 4800);
+    expect(r.gp).toBeCloseTo(1200 * 2 + 1960 * 2 + 3360);
+    expect(r.split).toBeCloseTo(r.rev - r.gp);
+    expect(r.byItem.find((b) => b.it.id === "annual")!.q).toBe(2);
+    expect(r.byItem.find((b) => b.it.id === "annual")!.rcN).toBe(2);
+    expect(r.byTo["王老師"]).toBeCloseTo(3440 * 2);
+    expect(r.byTo["公司"]).toBeUndefined();   // keep 不是匯款
+    expect(r.net).toBeCloseTo(r.gp - 3000 - r.rev * 0.05);
+  });
+  it("匯款對帳：按受款人彙總、來源可追、已匯扣掉", () => {
+    const p = payoutsOf(S2, "2026-09");
+    const by = Object.fromEntries(p.lines.map((l) => [l.payee, l]));
+    expect(by["創造共好"].due).toBe(4800 * 2 + 600 * 2);
+    expect(by["創造共好"].srcs.length).toBe(4);
+    expect(by["邱浩軍"].due).toBeCloseTo(490 + 2940 + 240);
+    expect(by["邱浩軍"].remaining).toBeCloseTo(490 + 2940 + 240 - 3000);
+    expect(by["陳昱豪"].due).toBeCloseTo(2450 + 1200);
+    expect(by["王老師"].due).toBeCloseTo(3440 * 2);
+    expect(by["講師二"].due).toBeCloseTo(860 * 2);
+    expect(p.lines[0].due).toBeGreaterThanOrEqual(p.lines[1].due);   // 大的在前
+    expect(p.received).toBe(6000 * 2 + 9800 * 2 + 4800);
+    expect(p.company).toBeCloseTo(1200 * 2 + 1960 * 2 + 3360);
+    expect(p.due).toBeCloseTo(p.received - p.company);
+    expect(p.paid).toBe(3000);
+    expect(p.remaining).toBeCloseTo(p.due - 3000);
+  });
+  it("normReceipt：ym 由日期推、分潤人字串也收、壞日期變空", () => {
+    const r = normReceipt({ itemId: "x", on: "2026-08-18", amount: "4,800", sharers: ["陳昱豪", { name: "邱浩軍", coachId: "c1" }], payees: { 講師一: " 王老師 ", 講師二: "" } }, "id1");
+    expect(r.ym).toBe("2026-08");
+    expect(r.amount).toBe(4800);
+    expect(r.sharers).toEqual([{ name: "陳昱豪" }, { name: "邱浩軍", coachId: "c1" }]);
+    expect(r.payees).toEqual({ 講師一: "王老師" });
+    expect(normReceipt({ on: "2026/08/18" }, "id2").on).toBe("");
+  });
+  it("normParams：切法表壞值歸零、尾端空階砍掉、沒有就用預設", () => {
+    expect(normParams({ vatRate: 5 }).poolTiers).toEqual([[30], [25, 5]]);
+    expect(normParams({ vatRate: 5, poolTiers: [[30], ["25", "x"], [], []] }).poolTiers).toEqual([[30], [25, 0]]);
   });
 });

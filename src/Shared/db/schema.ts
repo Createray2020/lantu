@@ -1325,3 +1325,35 @@ export const acctEntries = pgTable('acct_entries', {
   uniqueIndex('acct_entries_coach_source_uq').on(t.coachId, t.source),
   index('acct_entries_ym_idx').on(t.ym),
 ]);
+// 逐筆收款（2026/10/08，Ray 的「嵐途_財務對帳表.xlsx」每一列）：匯款日／金額／後五碼／匯款人／分潤人，
+// 拆分規則掛在 acct_params.items[].splits（pct／amt／pool／keep／rest），計算在 acctEngine.calcReceipt。
+// sharers＝[{name, coachId?}] 職級低→高；payees＝{拆分列名: 這一筆實際受款人}（講師一→王老師）。
+export const acctReceipts = pgTable('acct_receipts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  ym: text('ym').notNull(),                          // 'YYYY-MM'（＝received_on 的月份）
+  itemId: text('item_id').notNull(),                 // 對到 acct_params.items[].id
+  receivedOn: date('received_on').notNull(),
+  amount: doublePrecision('amount').default(0).notNull(),
+  last5: text('last5').default('').notNull(),        // 匯款帳號後五碼（或「信用卡分期」之類備註）
+  payer: text('payer').default('').notNull(),
+  payerCoachId: text('payer_coach_id').references(() => coaches.id, { onDelete: 'set null' }),
+  sharers: jsonb('sharers').$type<{ name: string; coachId?: string | null }[]>().default([]).notNull(),
+  payees: jsonb('payees').$type<Record<string, string>>().default({}).notNull(),
+  note: text('note').default('').notNull(),
+  void: boolean('void').default(false).notNull(),    // 作廢（退費）：不計入，但留痕
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('acct_receipts_ym_idx').on(t.ym),
+]);
+// 匯款對帳的「已匯」紀錄：某月某受款人匯了多少、哪一天。應匯金額不存，每次從收款算。
+export const acctPayouts = pgTable('acct_payouts', {
+  ym: text('ym').notNull(),
+  payee: text('payee').notNull(),
+  paidOn: date('paid_on'),
+  amount: doublePrecision('amount').default(0).notNull(),
+  note: text('note').default('').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('acct_payouts_ym_payee_uq').on(t.ym, t.payee),
+]);

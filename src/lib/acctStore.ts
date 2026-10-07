@@ -4,14 +4,15 @@
 //   acct_months   ym 主鍵：qty（各項目本月筆數）／fixed（本月固定支出列）
 //   acct_targets  ym 主鍵：同形狀的月目標＋net（目標淨利）——目標與實際分兩張表，不混
 //   acct_entries  系統入帳事件（報聘核准／培訓帳號開通），每筆帶單價快照；測試帳號不寫、同人同事件只一次
+//   acct_receipts 逐筆收款（對帳表的每一列，2026/10/08）；acct_payouts 某月某受款人「已匯」
 // 計算全在 acctEngine.ts（純函式），這裡只管進出 DB 與正規化。
 import { unstable_cache, updateTag } from "next/cache";
-import { and, asc, eq, gte, isNotNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { acctParams, acctMonths, acctTargets, acctEntries, coaches } from "@/Shared/db/schema";
+import { acctParams, acctMonths, acctTargets, acctEntries, acctReceipts, acctPayouts, coaches } from "@/Shared/db/schema";
 import {
-  ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, isYm, normGoal, normItems, normMonth, normParams, normTarget, prevYm, ymOf,
-  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow,
+  ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, isYm, normGoal, normItems, normMonth, normParams, normTarget, normReceipt, normPayoutMark, prevYm, ymOf,
+  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark,
 } from "./acctEngine";
 
 export const ACCT_TAG = "acct-params";
@@ -24,6 +25,9 @@ async function loadState(): Promise<AcctState> {
   const targets: Record<string, AcctTarget> = {};
   let draft: AcctTarget | null = null;
   const sys: Record<string, SysRow[]> = {};
+  const receipts: Record<string, Receipt[]> = {};
+  const payouts: Record<string, Record<string, PayoutMark>> = {};
+  let coachList: { id: string; name: string }[] = [];
   try {
     const rows = await db.select({ key: acctParams.key, value: acctParams.value }).from(acctParams);
     for (const r of rows) {
@@ -42,8 +46,17 @@ async function loadState(): Promise<AcctState> {
       if (!isYm(e.ym) || (e.source !== "apply" && e.source !== "license")) continue;
       (sys[e.ym] ??= []).push({ id: e.id, ym: e.ym, itemId: e.itemId, coachId: e.coachId, coachName: e.displayName || e.name || e.coachId.slice(0, 8), source: e.source, amount: e.amount, void: e.void, createdAt: e.createdAt.toISOString() } as SysRow & { ym: string });
     }
+    const rs = await db.select().from(acctReceipts).orderBy(asc(acctReceipts.receivedOn), asc(acctReceipts.createdAt));
+    for (const r of rs) {
+      const x = normReceipt({ ...r, on: r.receivedOn }, r.id);
+      if (isYm(x.ym)) (receipts[x.ym] ??= []).push(x);
+    }
+    const ps = await db.select().from(acctPayouts);
+    for (const p of ps) if (isYm(p.ym)) (payouts[p.ym] ??= {})[p.payee] = normPayoutMark({ paidOn: p.paidOn, amount: p.amount, note: p.note });
+    const cl = await db.select({ id: coaches.id, name: coaches.name, displayName: coaches.displayName, isTest: coaches.isTest }).from(coaches).orderBy(desc(coaches.createdAt));
+    coachList = cl.filter((c) => !c.isTest).map((c) => ({ id: c.id, name: (c.displayName || c.name || "").trim() })).filter((c) => c.name);
   } catch { /* 表還沒建：空狀態 */ }
-  return { items, months, targets, draft, sys, params, goal };
+  return { items, months, targets, draft, sys, receipts, payouts, coachList, params, goal };
 }
 export const getAcctState = unstable_cache(loadState, ["lantu-acct-state"], { tags: [ACCT_TAG] });
 
@@ -151,5 +164,35 @@ export async function backfillAcctMonth(ym: string): Promise<{ apply: number; li
     .where(and(eq(coaches.isTest, false), isNotNull(coaches.licenseFrom), gte(coaches.licenseFrom, fromD), lt(coaches.licenseFrom, toD)));
   for (const c of lic) if (await recordAcctEvent("license", c.id, c.at ? new Date(c.at) : from)) out.license++;
   return out;
+}
+// ---------- 逐筆收款（對帳表）與匯款對帳 ----------
+/** 存一筆收款（新增或改）。那個月還沒開就順手開（固定支出照 ensureAcctMonth 的規則複製）。回存進去的 id。 */
+export async function saveAcctReceipt(id: string | null, value: unknown): Promise<string> {
+  const r = normReceipt(value, id ?? "");
+  if (!r.on) throw new Error("invalid-date");
+  if (!r.itemId) throw new Error("invalid-item");
+  if (!(r.amount > 0)) throw new Error("invalid-amount");
+  const row = { ym: r.ym, itemId: r.itemId, receivedOn: r.on, amount: r.amount, last5: r.last5, payer: r.payer, payerCoachId: r.payerCoachId ?? null, sharers: r.sharers, payees: r.payees, note: r.note, void: r.void, updatedAt: new Date() };
+  let out = id;
+  if (id) await db.update(acctReceipts).set(row).where(eq(acctReceipts.id, id));
+  else { const [x] = await db.insert(acctReceipts).values(row).returning({ id: acctReceipts.id }); out = x.id; }
+  await ensureAcctMonth(r.ym);
+  updateTag(ACCT_TAG);
+  return out!;
+}
+export async function deleteAcctReceipt(id: string): Promise<void> {
+  await db.delete(acctReceipts).where(eq(acctReceipts.id, id));
+  updateTag(ACCT_TAG);
+}
+/** 標「已匯」：amount 0 ＝ 取消標記（刪列）。 */
+export async function markAcctPayout(ym: string, payee: string, value: unknown): Promise<void> {
+  if (!isYm(ym)) throw new Error("invalid-ym");
+  const p = payee.trim();
+  if (!p) throw new Error("invalid-payee");
+  const m = normPayoutMark(value);
+  if (!(m.amount > 0)) await db.delete(acctPayouts).where(and(eq(acctPayouts.ym, ym), eq(acctPayouts.payee, p)));
+  else await db.insert(acctPayouts).values({ ym, payee: p, paidOn: m.paidOn || null, amount: m.amount, note: m.note, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: [acctPayouts.ym, acctPayouts.payee], set: { paidOn: m.paidOn || null, amount: m.amount, note: m.note, updatedAt: new Date() } });
+  updateTag(ACCT_TAG);
 }
 export const currentYm = () => ymOf(new Date());

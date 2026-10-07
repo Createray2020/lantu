@@ -6,15 +6,39 @@
 // 三層口徑：營業額 → 減「拆分給別人」＝營業毛利 → 減固定支出、減營業稅 ＝ 淨利。
 // 拆分一列可以是比例（占單價 %）或固定金額；營業稅單獨列一層（營所稅先不算）；數量與固定支出按月存。
 
-export type SplitMode = "pct" | "amt";
+/**
+ * 拆分模式（2026/10/08 依 Ray 的「嵐途_財務對帳表.xlsx」加三種）：
+ *   pct  ＝ 占收款金額的比例（系統 80%…）
+ *   amt  ＝ 固定金額（系統 4,800／600…）
+ *   pool ＝ 分潤池：這一筆有幾位分潤人，就查 params.poolTiers 的切法（1 人 30；2 人 25／5…）。v 不用。
+ *   keep ＝ 公司自留比例（培訓 20%）：不是匯款，但要先從餘額扣掉再算 rest
+ *   rest ＝ 餘額再分：收款 − 上面全部 之後的比例（講師一 80%／講師二 20%）
+ * 公司實收 ＝ 收款 − 所有要匯出去的錢（pct／amt／pool／rest），keep 自然留在公司。
+ */
+export type SplitMode = "pct" | "amt" | "pool" | "keep" | "rest";
 export type AcctSplit = { to: string; mode: SplitMode; v: number };
+/** 分潤人（職級由低到高）；coachId 對得上名冊就帶，之後可接職級分潤表。 */
+export type Sharer = { name: string; coachId?: string | null };
+/**
+ * 逐筆收款（acct_receipts）：對帳表的一列。
+ * payees：某個拆分列（以 split.to 為鍵）這一筆實際匯給誰（講師一→王老師）；沒填就用拆分列的名字。
+ */
+export type Receipt = {
+  id: string; ym: string; itemId: string; on: string; amount: number; last5: string;
+  payer: string; payerCoachId?: string | null; sharers: Sharer[]; payees: Record<string, string>; note: string; void: boolean;
+};
+/** 某月某受款人的「已匯」紀錄（acct_payouts）。 */
+export type PayoutMark = { paidOn: string; amount: number; note: string };
+export type ReceiptRow = { to: string; v: number; mode: SplitMode; label: string };
+export type ReceiptResult = { amount: number; rows: ReceiptRow[]; payout: number; keep: number; company: number; warn: string | null };
 /** source：這個項目由哪個系統事件自動入帳（apply＝報聘核准／license＝培訓帳號開通）；空＝只手填。 */
 export type AcctSource = "apply" | "license";
-export type AcctItem = { id: string; name: string; price: number; splits: AcctSplit[]; source?: AcctSource | "" };
+export type AcctItem = { id: string; name: string; price: number; splits: AcctSplit[]; source?: AcctSource | ""; cat?: string };
 /** 系統入帳的一筆（acct_entries）：金額是事件當下的單價快照。 */
 export type SysRow = { id: string; itemId: string; coachId: string; coachName: string; source: AcctSource; amount: number; void: boolean; createdAt: string };
 export type AcctMonth = { qty: Record<string, number>; fixed: { name: string; amt: number }[] };
-export type AcctParams = { vatRate: number };
+/** poolTiers[n-1]＝n 位分潤人時各自占收款的 %（職級低→高）。Excel：1 人 [30]、2 人 [25,5]；3 人等 Ray 的制度表。 */
+export type AcctParams = { vatRate: number; poolTiers: number[][] };
 export type AcctGoal = { netTarget: number };
 /** 月目標：跟 AcctMonth 同一個形狀（目標筆數、目標固定支出），多一個目標淨利。另一張表存，不跟實際帳混。 */
 export type AcctTarget = AcctMonth & { net: number };
@@ -24,6 +48,9 @@ export type AcctState = {
   targets: Record<string, AcctTarget>; // 'YYYY-MM' 目標
   draft: AcctTarget | null;            // 目標工作台的草稿（Ray：目標不綁期間，設好了再存入哪個月）
   sys?: Record<string, SysRow[]>;      // 'YYYY-MM' → 系統入帳事件（含作廢的，作廢不計）
+  receipts?: Record<string, Receipt[]>; // 'YYYY-MM' → 逐筆收款（對帳表），作廢不計
+  payouts?: Record<string, Record<string, PayoutMark>>; // 'YYYY-MM' → 受款人 → 已匯
+  coachList?: { id: string; name: string }[]; // 名冊（給匯款人／分潤人對名字用）
   params: AcctParams;
   goal: AcctGoal;
 };
@@ -31,14 +58,16 @@ export type AcctState = {
 export type AcctAdj = { price?: number; split?: number; qty?: number; fix?: number };
 
 export type UnitResult = { price: number; split: number; rows: { to: string; v: number }[]; gp: number; gm: number };
-export type ItemResult = { it: AcctItem; q: number; u: UnitResult; rev: number; gp: number; sysN: number; manualQ: number };
+export type ItemResult = { it: AcctItem; q: number; u: UnitResult; rev: number; gp: number; sysN: number; manualQ: number; rcN: number };
 export type MonthResult = {
   rev: number; split: number; gp: number; gm: number;
   fixed: number; vat: number; net: number; nm: number;
   byItem: ItemResult[]; byTo: Record<string, number>;
 };
 
-export const ACCT_DEFAULT_PARAMS: AcctParams = { vatRate: 5 };
+export const ACCT_DEFAULT_TIERS: number[][] = [[30], [25, 5]];
+export const ACCT_DEFAULT_PARAMS: AcctParams = { vatRate: 5, poolTiers: ACCT_DEFAULT_TIERS };
+export const SPLIT_MODE_LABEL: Record<SplitMode, string> = { pct: "比例 %", amt: "固定金額", pool: "分潤池（依切法表）", keep: "公司自留 %", rest: "餘額再分 %" };
 export const ACCT_DEFAULT_GOAL: AcctGoal = { netTarget: 0 };
 
 export const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -52,39 +81,73 @@ export function nextYm(k: string): string {
 }
 export const isYm = (s: unknown) => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(s ?? ""));
 
-/** 單筆：售價、拆出多少、單筆毛利、毛利率。 */
-export function unitOf(it: AcctItem, adj: AcctAdj = {}, basePrice?: number): UnitResult {
+/**
+ * 一筆收款怎麼拆（對帳表一列的公式）。what-if 的 adj.split 只動 pct 列。
+ * 順序：pct／amt／pool／keep 先算 → 餘額 ＝ 收款 − 這些 → rest 列吃餘額的比例。
+ */
+export function calcReceipt(it: AcctItem, amount: number, sharers: Sharer[], payees: Record<string, string>, params: AcctParams, adj: AcctAdj = {}): ReceiptResult {
+  const tiers = params.poolTiers?.length ? params.poolTiers : ACCT_DEFAULT_TIERS;
+  const rows: ReceiptRow[] = [];
+  let warn: string | null = null;
+  let first = 0;
+  const nameOf = (s: AcctSplit) => (payees[s.to] || s.to).trim();
+  for (const s of it.splits) {
+    if (s.mode === "rest") continue;
+    if (s.mode === "pool") {
+      const n = sharers.length;
+      if (!n) continue;
+      const tier = tiers[n - 1] ?? tiers[tiers.length - 1];
+      if (!tiers[n - 1]) warn = `${n} 位分潤人的切法表還沒設定，先用 ${tier.length} 人的`;
+      sharers.forEach((sh, i) => { const v = amount * (tier[i] ?? 0) / 100; first += v; rows.push({ to: sh.name.trim() || `分潤${i + 1}`, v, mode: "pool", label: `分潤${["一", "二", "三", "四", "五"][i] ?? i + 1} ${tier[i] ?? 0}%` }); });
+      continue;
+    }
+    const v = s.mode === "amt" ? s.v : amount * Math.max(0, s.v + (s.mode === "pct" ? (adj.split ?? 0) : 0)) / 100;
+    first += v;
+    rows.push({ to: nameOf(s), v, mode: s.mode, label: s.mode === "keep" ? `公司自留 ${s.v}%` : s.mode === "amt" ? "固定" : `${s.v}%` });
+  }
+  const remain = Math.max(0, amount - first);
+  for (const s of it.splits) if (s.mode === "rest") rows.push({ to: nameOf(s), v: remain * s.v / 100, mode: "rest", label: `餘額 ${s.v}%` });
+  let payout = 0, keep = 0;
+  for (const r of rows) { if (r.mode === "keep") keep += r.v; else payout += r.v; }
+  return { amount, rows, payout, keep, company: amount - payout, warn };
+}
+
+/** 單筆：售價、拆出多少、單筆毛利、毛利率。沒有收款資料時（手填筆數、目標）當作沒有分潤人。 */
+export function unitOf(it: AcctItem, adj: AcctAdj = {}, basePrice?: number, params: AcctParams = ACCT_DEFAULT_PARAMS, sharers: Sharer[] = [], payees: Record<string, string> = {}): UnitResult {
   const price = (basePrice ?? it.price) * (1 + (adj.price ?? 0) / 100);
-  let split = 0;
-  const rows = it.splits.map((s) => {
-    const v = s.mode === "pct" ? price * Math.max(0, s.v + (adj.split ?? 0)) / 100 : s.v;
-    split += v;
-    return { to: s.to, v };
-  });
-  return { price, split, rows, gp: price - split, gm: price ? (price - split) / price : 0 };
+  const rr = calcReceipt(it, price, sharers, payees, params, adj);
+  const rows = rr.rows.filter((r) => r.mode !== "keep").map((r) => ({ to: r.to, v: r.v }));
+  return { price, split: rr.payout, rows, gp: rr.company, gm: price ? rr.company / price : 0 };
 }
 
 /** 一份月資料（實際或目標都行）的損益結構。 */
-export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, adj: AcctAdj = {}, sys: SysRow[] = []): MonthResult {
+export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, adj: AcctAdj = {}, sys: SysRow[] = [], receipts: Receipt[] = []): MonthResult {
   let rev = 0, split = 0, gp = 0;
   const byItem: ItemResult[] = [];
   const byTo: Record<string, number> = {};
   const scale = 1 + (adj.qty ?? 0) / 100;
   for (const it of items) {
     const manualQ = (m.qty[it.id] ?? 0) * scale;
-    const u = unitOf(it, adj);
+    const u = unitOf(it, adj, undefined, params);
     let irev = u.price * manualQ, isplit = u.split * manualQ, igp = u.gp * manualQ;
     for (const r of u.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * manualQ;
     // 系統入帳：每一筆用它自己的快照金額算（不同期間價格不同），拆分規則套現在的
     const rows = sys.filter((x) => x.itemId === it.id && !x.void);
     for (const x of rows) {
-      const ux = unitOf(it, adj, x.amount);
+      const ux = unitOf(it, adj, x.amount, params);
       irev += ux.price * scale; isplit += ux.split * scale; igp += ux.gp * scale;
       for (const r of ux.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * scale;
     }
-    const q = manualQ + rows.length * scale;
+    // 逐筆收款（對帳表）：每一筆用自己的金額、分潤人、受款人算
+    const rcs = receipts.filter((x) => x.itemId === it.id && !x.void);
+    for (const x of rcs) {
+      const ux = unitOf(it, adj, x.amount, params, x.sharers, x.payees);
+      irev += ux.price * scale; isplit += ux.split * scale; igp += ux.gp * scale;
+      for (const r of ux.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * scale;
+    }
+    const q = manualQ + (rows.length + rcs.length) * scale;
     rev += irev; split += isplit; gp += igp;
-    byItem.push({ it, q, u, rev: irev, gp: igp, sysN: rows.length, manualQ });
+    byItem.push({ it, q, u, rev: irev, gp: igp, sysN: rows.length, manualQ, rcN: rcs.length });
   }
   const fixed = m.fixed.reduce((a, f) => a + (Number(f.amt) || 0), 0) * (1 + (adj.fix ?? 0) / 100);
   const vat = rev * params.vatRate / 100;
@@ -94,7 +157,7 @@ export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, ad
 /** 某一個月的實際損益結構。沒有那個月回 null。 */
 export function calcMonth(S: AcctState, ym: string, adj: AcctAdj = {}): MonthResult | null {
   const m = S.months[ym];
-  return m ? calcData(S.items, m, S.params, adj, S.sys?.[ym] ?? []) : null;
+  return m ? calcData(S.items, m, S.params, adj, S.sys?.[ym] ?? [], S.receipts?.[ym] ?? []) : null;
 }
 /** 某一個月的目標損益結構（目標筆數 × 現在的單價與拆分）。沒設目標回 null。 */
 export function calcTarget(S: AcctState, ym: string): MonthResult | null {
@@ -116,12 +179,12 @@ export type Compare = {
 export function compareMonth(S: AcctState, ym: string): Compare | null {
   const t = S.targets?.[ym], a = S.months[ym];
   if (!t || !a) return null;
-  const sys = S.sys?.[ym] ?? [];
-  const rt = calcData(S.items, t, S.params), ra = calcData(S.items, a, S.params, {}, sys);
+  const sys = S.sys?.[ym] ?? [], rcs = S.receipts?.[ym] ?? [];
+  const rt = calcData(S.items, t, S.params), ra = calcData(S.items, a, S.params, {}, sys, rcs);
   const items: CompareRow[] = S.items.map((it) => {
-    const u = unitOf(it);
+    const u = unitOf(it, {}, undefined, S.params);
     const net1 = u.gp - u.price * S.params.vatRate / 100;
-    const target = t.qty[it.id] ?? 0, actual = (a.qty[it.id] ?? 0) + sys.filter((x) => x.itemId === it.id && !x.void).length;
+    const target = t.qty[it.id] ?? 0, actual = (a.qty[it.id] ?? 0) + sys.filter((x) => x.itemId === it.id && !x.void).length + rcs.filter((x) => x.itemId === it.id && !x.void).length;
     return { key: it.id, name: it.name, target, actual, diff: actual - target, netEffect: (actual - target) * net1 };
   });
   const sumBy = (rows: { name: string; amt: number }[]) => { const o: Record<string, number> = {}; for (const f of rows) o[f.name] = (o[f.name] ?? 0) + f.amt; return o; };
@@ -137,6 +200,40 @@ export function compareMonth(S: AcctState, ym: string): Compare | null {
     net: pair(t.net, ra.net), rev: pair(rt.rev, ra.rev), gp: pair(rt.gp, ra.gp), fixed: pair(rt.fixed, ra.fixed),
     items, fixedRows, drivers: cands.map((c) => `${c.s}（${c.e >= 0 ? "+" : "−"}${Math.round(Math.abs(c.e)).toLocaleString("zh-TW")}）`),
   };
+}
+
+// ---------- 匯款對帳（誰、多少） ----------
+export type PayoutSrc = { receiptId: string; itemName: string; on: string; payer: string; v: number; label: string };
+export type PayoutLine = { payee: string; due: number; srcs: PayoutSrc[]; mark: PayoutMark | null; remaining: number };
+export type PayoutSummary = { lines: PayoutLine[]; due: number; paid: number; remaining: number; company: number; received: number; warns: string[] };
+/** 某一個月：每個受款人應匯多少、從哪幾筆來、匯了沒。公司自留（keep）與公司實收不在裡面。 */
+export function payoutsOf(S: AcctState, ym: string): PayoutSummary {
+  const by: Record<string, PayoutLine> = {};
+  const warns: string[] = [];
+  let company = 0, received = 0;
+  for (const x of S.receipts?.[ym] ?? []) {
+    if (x.void) continue;
+    const it = S.items.find((i) => i.id === x.itemId);
+    if (!it) continue;
+    const rr = calcReceipt(it, x.amount, x.sharers, x.payees, S.params);
+    received += x.amount; company += rr.company;
+    if (rr.warn) warns.push(`${x.on} ${x.payer}：${rr.warn}`);
+    for (const r of rr.rows) {
+      if (r.mode === "keep" || !r.v) continue;
+      const l = (by[r.to] ??= { payee: r.to, due: 0, srcs: [], mark: null, remaining: 0 });
+      l.due += r.v;
+      l.srcs.push({ receiptId: x.id, itemName: it.name, on: x.on, payer: x.payer, v: r.v, label: r.label });
+    }
+  }
+  const marks = S.payouts?.[ym] ?? {};
+  let due = 0, paid = 0;
+  const lines = Object.values(by).sort((a, b) => b.due - a.due).map((l) => {
+    const mark = marks[l.payee] ?? null;
+    const p = mark ? mark.amount : 0;
+    due += l.due; paid += p;
+    return { ...l, mark, remaining: l.due - p };
+  });
+  return { lines, due, paid, remaining: due - paid, company, received, warns };
 }
 
 /** 損益兩平營業額：固定支出 ÷（毛利率 − 營業稅率）。毛利率不夠蓋稅時回 Infinity。 */
@@ -191,10 +288,11 @@ export function normItems(v: unknown): AcctItem[] {
   for (const x of v as Partial<AcctItem>[]) {
     if (!x || typeof x !== "object" || !x.id) continue;
     const splits = Array.isArray(x.splits) ? (x.splits as Partial<AcctSplit>[]).filter((s) => s && typeof s === "object").map((s) => ({
-      to: String(s.to ?? "").trim(), mode: (s.mode === "amt" ? "amt" : "pct") as SplitMode, v: Math.max(0, num0(s.v)),
+      to: String(s.to ?? "").trim(), mode: (["pct", "amt", "pool", "keep", "rest"].includes(String(s.mode)) ? s.mode : "pct") as SplitMode, v: Math.max(0, num0(s.v)),
     })) : [];
     const source = x.source === "apply" || x.source === "license" ? x.source : "";
-    out.push({ id: String(x.id), name: String(x.name ?? "").trim(), price: Math.max(0, num0(x.price)), splits, ...(source ? { source } : {}) });
+    const cat = String(x.cat ?? "").trim();
+    out.push({ id: String(x.id), name: String(x.name ?? "").trim(), price: Math.max(0, num0(x.price)), splits, ...(source ? { source } : {}), ...(cat ? { cat } : {}) });
   }
   return out;
 }
@@ -213,9 +311,36 @@ export function normTarget(v: unknown): AcctTarget {
 export function normParams(v: unknown): AcctParams {
   const p = (v && typeof v === "object" ? v : {}) as Partial<AcctParams>;
   const vat = num0(p.vatRate);
-  return { vatRate: vat >= 0 && vat <= 100 ? vat : ACCT_DEFAULT_PARAMS.vatRate };
+  const tiers = Array.isArray(p.poolTiers) ? p.poolTiers.map((t) => Array.isArray(t) ? t.map((v) => Math.max(0, num0(v))) : []) : [];
+  while (tiers.length && !tiers[tiers.length - 1].length) tiers.pop();
+  return { vatRate: vat >= 0 && vat <= 100 ? vat : ACCT_DEFAULT_PARAMS.vatRate, poolTiers: tiers.length ? tiers : ACCT_DEFAULT_TIERS.map((t) => [...t]) };
 }
 export function normGoal(v: unknown): AcctGoal {
   const g = (v && typeof v === "object" ? v : {}) as Partial<AcctGoal>;
   return { netTarget: Math.max(0, num0(g.netTarget)) };
+}
+export const isIsoDate = (s: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(s ?? ""));
+export function normSharers(v: unknown): Sharer[] {
+  if (!Array.isArray(v)) return [];
+  return (v as unknown[]).map((x) => typeof x === "string" ? { name: x } : (x && typeof x === "object" ? x : {}) as Partial<Sharer>)
+    .map((x) => ({ name: String(x.name ?? "").trim(), ...(x.coachId ? { coachId: String(x.coachId) } : {}) })).filter((x) => x.name);
+}
+export function normPayees(v: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (v && typeof v === "object") for (const [k, val] of Object.entries(v as Record<string, unknown>)) { const n = String(val ?? "").trim(); if (n) out[k] = n; }
+  return out;
+}
+/** 一筆收款的正規化（id／ym 由呼叫端給）。 */
+export function normReceipt(v: unknown, id: string): Receipt {
+  const r = (v && typeof v === "object" ? v : {}) as Partial<Receipt>;
+  const on = isIsoDate(r.on) ? String(r.on) : "";
+  return {
+    id, ym: on ? on.slice(0, 7) : (isYm(r.ym) ? String(r.ym) : ""), itemId: String(r.itemId ?? ""), on, amount: Math.max(0, num0(r.amount)),
+    last5: String(r.last5 ?? "").trim().slice(0, 20), payer: String(r.payer ?? "").trim(), payerCoachId: r.payerCoachId ? String(r.payerCoachId) : null,
+    sharers: normSharers(r.sharers), payees: normPayees(r.payees), note: String(r.note ?? "").trim(), void: !!r.void,
+  };
+}
+export function normPayoutMark(v: unknown): PayoutMark {
+  const m = (v && typeof v === "object" ? v : {}) as Partial<PayoutMark>;
+  return { paidOn: isIsoDate(m.paidOn) ? String(m.paidOn) : "", amount: Math.max(0, num0(m.amount)), note: String(m.note ?? "").trim() };
 }

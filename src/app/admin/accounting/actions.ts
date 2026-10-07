@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget, saveAcctDraft, setAcctEntryVoid, backfillAcctMonth } from "@/lib/acctStore";
+import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget, saveAcctDraft, setAcctEntryVoid, backfillAcctMonth, saveAcctReceipt, deleteAcctReceipt, markAcctPayout } from "@/lib/acctStore";
 
 export type ActionResult = { ok: true; info?: string } | { ok: false; error: string };
 
@@ -11,6 +11,10 @@ const MSG: Record<string, string> = {
   "invalid-name": "每個營業項目都要有名稱",
   "invalid-id": "項目 id 重複",
   "invalid-ym": "月份格式要是 YYYY-MM",
+  "invalid-date": "匯款日期要填",
+  "invalid-item": "要選一個營業項目",
+  "invalid-amount": "匯款金額要大於 0",
+  "invalid-payee": "受款人不能空白",
 };
 function fail(e: unknown): ActionResult {
   const raw = e instanceof Error ? e.message : String(e);
@@ -54,4 +58,13 @@ export async function setAcctEntryVoidAction(id: string, v: boolean): Promise<Ac
 }
 export async function backfillAcctMonthAction(ym: string): Promise<ActionResult> {
   try { await guard(); const r = await backfillAcctMonth(ym); refresh(); return { ok: true, info: `報聘 ${r.apply} 筆、培訓帳號 ${r.license} 筆` }; } catch (e) { return fail(e); }
+}
+export async function saveAcctReceiptAction(id: string | null, receipt: unknown): Promise<ActionResult> {
+  try { await guard(); const rid = await saveAcctReceipt(id, receipt); refresh(); return { ok: true, info: rid }; } catch (e) { return fail(e); }
+}
+export async function deleteAcctReceiptAction(id: string): Promise<ActionResult> {
+  try { await guard(); await deleteAcctReceipt(id); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function markAcctPayoutAction(ym: string, payee: string, mark: unknown): Promise<ActionResult> {
+  try { await guard(); await markAcctPayout(ym, payee, mark); refresh(); return { ok: true }; } catch (e) { return fail(e); }
 }
