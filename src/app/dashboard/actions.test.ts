@@ -8,7 +8,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * 而真正的原因（使用期限到期、客戶數已滿）恰恰是使用者唯一需要知道的事，
  * 不知道就會一直重試，重試一百次也不會成功。
  */
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() , unstable_cache: (fn: unknown) => fn, updateTag: vi.fn() }));
+// 建客戶時的顧問費走帳務層；這支測試只守客戶流程，帳務整個 mock 掉
+vi.mock("@/lib/acctStore", () => ({ createCoachFeeReceipt: vi.fn(async () => "r1"), receiptsForClient: vi.fn(async () => []) }));
+vi.mock("@/lib/org", () => ({ listActiveCoaches: vi.fn(async () => []) }));
 vi.mock("@/lib/guard", () => ({
   requireWritableCoach: vi.fn(),
   requireClientQuota: vi.fn(),

@@ -31,10 +31,15 @@ export type Receipt = {
   payer: string; payerCoachId?: string | null; sharers: Sharer[]; payees: Record<string, string>; note: string; void: boolean;
   /** 退款（含部分退款）：以最終實收＝amount − refund 重算（V7.2 §41）。 */
   refund: number;
-  /** case＝從「案件與分潤」帶進來的顧問費（唯讀，拆分已由 comp 引擎算好放在 allocs）；manual＝這裡手記 */
-  source: "manual" | "case";
+  /** case＝從「案件與分潤」帶進來的顧問費（唯讀）；coach＝教練建客戶時勾付費寫的顧問費；manual＝後台手記 */
+  source: "manual" | "case" | "coach";
   caseId?: string | null;
-  /** 已算好的拆分（case 用）：直接當拆分結果，不再套項目的 splits */
+  /** 顧問費：客戶、執案教練、開發教練 */
+  clientId?: string | null; execCoachId?: string | null; promoCoachId?: string | null;
+  /** 後台查帳確認。false＝待查帳：收款明細看得到，但不進營業額、分潤匯款與實績 */
+  verified: boolean;
+  enteredBy?: string | null;
+  /** 已算好的拆分（case／coach 用）：直接當拆分結果，不再套項目的 splits */
   allocs?: ReceiptRow[];
 };
 /** 名冊精簡列：職級與直屬主管用來展開推薦端輔導鏈。 */
@@ -230,7 +235,7 @@ export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, ad
       for (const r of ux.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * scale;
     }
     // 逐筆收款（對帳表）：每一筆用自己的金額、分潤人、受款人算
-    const rcs = receipts.filter((x) => x.itemId === it.id && !x.void);
+    const rcs = receipts.filter((x) => x.itemId === it.id && !x.void && x.verified !== false);
     for (const x of rcs) {
       const ux = x.allocs ? unitFromAllocs(netOf(x), x.allocs) : unitOf(it, adj, netOf(x), params, x.sharers, x.payees);
       irev += ux.price * scale; isplit += ux.split * scale; igp += ux.gp * scale;
@@ -303,7 +308,7 @@ export type PayoutLine = {
   due: number; srcs: PayoutSrc[]; mark: PayoutMark | null; remaining: number;
   tax: PayoutTax;         // 扣繳：net＝實匯
 };
-export type PayoutSummary = { lines: PayoutLine[]; due: number; net: number; paid: number; remaining: number; company: number; received: number; warns: string[]; payDate: string };
+export type PayoutSummary = { lines: PayoutLine[]; due: number; net: number; paid: number; remaining: number; company: number; received: number; warns: string[]; payDate: string; pending: { n: number; amount: number } };
 /** 結算發放日（V7.2 §40）：前一曆月入帳的分潤於次月 5 日發放；遇六日提前到週五。 */
 export function settlementDate(ym: string, day = 5): string {
   const [y, m] = ym.split("-").map(Number);
@@ -337,8 +342,10 @@ export function payoutsOf(S: AcctState, ym: string): PayoutSummary {
   const book = S.payeeBook ?? [], tax = S.params.tax ?? ACCT_DEFAULT_TAX;
   let company = 0, received = 0;
   const blank: PayoutTax = { mode: "", withhold: 0, nhi: 0, net: 0, applied: false };
+  const pending = { n: 0, amount: 0 };
   for (const x of S.receipts?.[ym] ?? []) {
     if (x.void) continue;
+    if (x.verified === false) { pending.n++; pending.amount += netOf(x); continue; }
     const it = S.items.find((i) => i.id === x.itemId);
     if (!it) continue;
     const rr = calcReceipt(it, netOf(x), x.sharers, x.payees, S.params, {}, x.allocs);
@@ -367,7 +374,7 @@ export function payoutsOf(S: AcctState, ym: string): PayoutSummary {
     due += l.due; net += t.net; paid += p;
     return { ...l, mark, tax: t, remaining: t.net - p };
   });
-  return { lines, due, net, paid, remaining: net - paid, company, received, warns, payDate: settlementDate(ym) };
+  return { lines, due, net, paid, remaining: net - paid, company, received, warns, payDate: settlementDate(ym), pending };
 }
 /** 某受款人（key）在某月的對帳單；沒有這個人回 null。 */
 export function statementOf(S: AcctState, ym: string, key: string): PayoutLine | null {
@@ -494,9 +501,31 @@ export function normReceipt(v: unknown, id: string): Receipt {
     id, ym: on ? on.slice(0, 7) : (isYm(r.ym) ? String(r.ym) : ""), itemId: String(r.itemId ?? ""), on, amount: Math.max(0, num0(r.amount)),
     last5: String(r.last5 ?? "").trim().slice(0, 20), payer: String(r.payer ?? "").trim(), payerCoachId: r.payerCoachId ? String(r.payerCoachId) : null,
     sharers: normSharers(r.sharers), payees: normPayees(r.payees), note: String(r.note ?? "").trim(), void: !!r.void,
-    refund: Math.max(0, num0(r.refund)), source: r.source === "case" ? "case" : "manual", caseId: r.caseId ? String(r.caseId) : null,
-    ...(Array.isArray(r.allocs) ? { allocs: r.allocs } : {}),
+    refund: Math.max(0, num0(r.refund)), source: r.source === "case" ? "case" : r.source === "coach" ? "coach" : "manual", caseId: r.caseId ? String(r.caseId) : null,
+    clientId: r.clientId ? String(r.clientId) : null, execCoachId: r.execCoachId ? String(r.execCoachId) : null, promoCoachId: r.promoCoachId ? String(r.promoCoachId) : null,
+    verified: r.verified !== false, enteredBy: r.enteredBy ? String(r.enteredBy) : null,
+    ...(Array.isArray(r.allocs) ? { allocs: r.allocs as ReceiptRow[] } : {}),
   };
+}
+/**
+ * 顧問費實績（V7.2 §27：同一客戶同一年度合計一案；§九：只算已確認的）。
+ * 回每位執案教練的 { cases, fees }，fees＝最終實收合計。給晉升進度與首頁用。
+ */
+export function consultStats(S: AcctState, opts: { coachId?: string; year?: number } = {}): Record<string, { cases: number; fees: number; keys: string[] }> {
+  const out: Record<string, { cases: number; fees: number; keys: string[] }> = {};
+  const caseItem = S.items.find((it) => it.source === "case");
+  if (!caseItem) return out;
+  for (const list of Object.values(S.receipts ?? {})) for (const x of list) {
+    if (x.void || x.verified === false || x.itemId !== caseItem.id || !x.execCoachId) continue;
+    if (opts.coachId && x.execCoachId !== opts.coachId) continue;
+    const y = Number(x.on.slice(0, 4));
+    if (opts.year && y !== opts.year) continue;
+    const o = (out[x.execCoachId] ??= { cases: 0, fees: 0, keys: [] });
+    const key = `${x.clientId ?? x.payer}:${y}`;
+    if (!o.keys.includes(key)) { o.keys.push(key); o.cases++; }
+    o.fees += netOf(x);
+  }
+  return out;
 }
 export function normPayoutMark(v: unknown): PayoutMark {
   const m = (v && typeof v === "object" ? v : {}) as Partial<PayoutMark>;

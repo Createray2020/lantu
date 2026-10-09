@@ -10,6 +10,9 @@ import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import { buildOverview } from "@/lib/comp/view";
 import { personalStats } from "@/lib/comp/stats";
 import MyBusiness, { type MyView } from "./MyBusiness";
+import { getAcctState } from "@/lib/acctStore";
+import { memberMoney, promoProgress } from "@/lib/homeStats";
+import { currentPeriod } from "@/lib/home";
 
 export const dynamic = "force-dynamic";
 
@@ -43,13 +46,23 @@ export default async function MyBusinessPage() {
   );
 
   const rank = params.ranks.find((r) => r.code === me.rankCode);
-  const track = (t: typeof ov.promotion.trackA) =>
-    t ? { toCode: t.threshold.toCode, gaps: t.gaps, met: t.met } : null;
+  // 個人門檻的「已完成」改用收款明細的實績（案件與分潤那條線不自動化，Ray 2026/10/09）；團隊門檻照舊。
+  const track = (t: typeof ov.promotion.trackA) => {
+    if (!t) return null;
+    const gaps = t.gaps.map((g) => {
+      if (g.label.includes("團隊") || g.label.includes("育成")) return g;
+      const have = g.unit === "money" ? promo.fees : promo.cases;
+      return { ...g, have, met: have >= g.need };
+    });
+    return { toCode: t.threshold.toCode, gaps, met: gaps.every((g) => g.met) };
+  };
 
-  // 待發放＝尚未標記 paid 的分潤。
-  const pendingAmount = payouts
-    .filter((p) => p.status !== "paid")
-    .reduce((a, p) => a + p.amount, 0);
+  // 2026/10/09：錢與實績改從帳務真相算——本月實匯（分潤匯款）、顧問費實績（已確認入帳的收款）。
+  const S = await getAcctState();
+  const period = currentPeriod();
+  const money = memberMoney(S, me, period);
+  const promo = promoProgress(S, params, me);
+  const pendingAmount = money.net;
 
   const view: MyView = {
     name: me.name || me.email || "我",
@@ -63,7 +76,8 @@ export default async function MyBusinessPage() {
     tenureNote: ov.tenure.note ?? null,
     pendingAmount,
     payoutDay: params.settings.payoutDay ?? null,
-    stats: ov.stats,
+    stats: { ...ov.stats, personalCases: promo.cases, personalFees: promo.fees },
+    applyGate: promo.kind === "apply" ? { cases: promo.cases, fees: promo.fees, needCases: promo.needCases ?? 1, needFees: promo.needFees ?? 30000, met: promo.met } : null,
     trackA: track(ov.promotion.trackA),
     trackB: track(ov.promotion.trackB),
     blocked: ov.promotion.blocked,

@@ -74,7 +74,7 @@ async function loadState(): Promise<AcctState> {
         }));
         (receipts[ym] ??= []).push({
           id: `case:${c.id}`, ym, itemId: caseItem.id, on, amount: c.fee, last5: "", payer: c.clientName, payerCoachId: null, sharers: [], payees: {},
-          note: c.note ?? "", void: c.status === "void" || c.status === "cancelled", refund: c.refund ?? 0, source: "case", caseId: c.id, allocs,
+          note: c.note ?? "", void: c.status === "void" || c.status === "cancelled", refund: c.refund ?? 0, source: "case", caseId: c.id, allocs, verified: true,
         });
       }
     }
@@ -208,6 +208,65 @@ export async function saveAcctReceipt(id: string | null, value: unknown): Promis
   await ensureAcctMonth(r.ym);
   updateTag(ACCT_TAG);
   return out!;
+}
+// ---------- 顧問費：教練端入口（2026/10/09 Ray：建客戶時勾付費才記，後台查帳確認） ----------
+/** 顧問費項目（參數設定裡自動來源＝顧問費案件的那一個）。 */
+async function consultItem(): Promise<AcctItem | null> {
+  const S = await loadState();
+  return S.items.find((it) => it.source === "case") ?? null;
+}
+/**
+ * 用業務制度引擎算一筆顧問費的拆分快照（30／60／10、差階、平階、代管、公司派案）。
+ * 動態載入 comp 層：它會碰 comp_* 表，帳務的既有測試只 mock 了帳務的表。
+ */
+async function consultAllocs(fee: number, execCoachId: string, promoCoachId: string | null): Promise<ReceiptRow[]> {
+  const { listAdvisors, toAdvisorRows, computePayouts } = await import("./comp/caseRepo");
+  const { ensureActiveVersion, loadParams } = await import("./comp/repo");
+  const version = await ensureActiveVersion();
+  const [params, rows] = await Promise.all([loadParams(version.id), listAdvisors()]);
+  const r = computePayouts({ fee, isCompanyLead: !promoCoachId, promoterId: promoCoachId, executorId: execCoachId, refundAmount: 0 }, toAdvisorRows(rows), params);
+  return r.lines.map((l) => ({
+    to: l.name, v: Math.round(l.amount), mode: l.kind === "advisor" ? "pct" : "keep", coachId: l.payeeId ?? null,
+    label: l.kind === "advisor" ? `${l.role}${l.rankCode ? `（${l.rankCode}）` : ""} ${Math.round(l.totalPct * 10) / 10}%` : l.kind === "company_lead" ? "公司派案推廣端" : l.kind === "company_remainder" ? "鏈不完整歸公司" : "公司營運",
+  }));
+}
+export type CoachFeeInput = { clientId: string; clientName: string; amount: number; on: string; last5?: string; promoCoachId?: string | null; note?: string };
+/**
+ * 教練建客戶（或之後補）時記一筆顧問費：verified=false 等後台確認。回 receipt id；沒有顧問費項目時回 null（帳務不擋客戶建立）。
+ */
+export async function createCoachFeeReceipt(execCoachId: string, input: CoachFeeInput): Promise<string | null> {
+  const it = await consultItem();
+  if (!it) return null;
+  const amount = Math.max(0, Number(input.amount) || 0);
+  if (!(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(input.on)) throw new Error("invalid-amount");
+  // 開發教練：預設本人（自招自執）；明確選「無」＝公司派案，推廣端歸公司
+  const promo = input.promoCoachId || null;
+  let allocs: ReceiptRow[] = [];
+  try { allocs = await consultAllocs(amount, execCoachId, promo); } catch { /* 制度還沒設好：先只記收款，確認時再算 */ }
+  const [x] = await db.insert(acctReceipts).values({
+    ym: input.on.slice(0, 7), itemId: it.id, receivedOn: input.on, amount, last5: (input.last5 ?? "").trim().slice(0, 20), payer: input.clientName.trim(),
+    payerCoachId: null, sharers: [], payees: {}, note: (input.note ?? "").trim(), void: false, refund: 0,
+    clientId: input.clientId, execCoachId, promoCoachId: promo, verified: false, enteredBy: execCoachId, allocs, updatedAt: new Date(),
+  }).returning({ id: acctReceipts.id });
+  await ensureAcctMonth(input.on.slice(0, 7));
+  updateTag(ACCT_TAG);
+  return x.id;
+}
+/** 後台查帳：確認入帳（v=true）或退回待查帳。確認時若還沒有拆分快照就補算。 */
+export async function verifyAcctReceipt(id: string, v: boolean): Promise<void> {
+  const [r] = await db.select().from(acctReceipts).where(eq(acctReceipts.id, id));
+  if (!r) throw new Error("not-found");
+  let allocs = r.allocs ?? null;
+  if (v && r.execCoachId && (!allocs || !allocs.length)) {
+    try { allocs = await consultAllocs(Math.max(0, r.amount - (r.refund ?? 0)), r.execCoachId, r.promoCoachId ?? null); } catch { /* 留空，照項目拆分 */ }
+  }
+  await db.update(acctReceipts).set({ verified: v, allocs: allocs as ReceiptRow[] | null, updatedAt: new Date() }).where(eq(acctReceipts.id, id));
+  updateTag(ACCT_TAG);
+}
+/** 某客戶的顧問費收款（教練端客戶詳情用）。 */
+export async function receiptsForClient(clientId: string): Promise<Receipt[]> {
+  const rs = await db.select().from(acctReceipts).where(eq(acctReceipts.clientId, clientId)).orderBy(desc(acctReceipts.receivedOn));
+  return rs.map((r) => normReceipt({ ...r, on: r.receivedOn }, r.id));
 }
 export async function deleteAcctReceipt(id: string): Promise<void> {
   if (id.startsWith("case:")) throw new Error("case-readonly");

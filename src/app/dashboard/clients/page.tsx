@@ -34,6 +34,7 @@ export default async function ClientsPage() {
         templates={templates}
         quota={quota}
         readOnly={hp.license.expired}
+        meId={coach.id}
       />
     </div>
   );

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { calcReceipt, payoutsOf, prevYm, nextYm, isYm, netOf, referralChain, isFormalRank, type AcctState, type AcctItem, type Receipt, type Sharer, type CoachLite } from "@/lib/acctEngine";
-import { saveAcctReceiptAction, deleteAcctReceiptAction } from "./actions";
+import { saveAcctReceiptAction, deleteAcctReceiptAction, verifyAcctReceiptAction } from "./actions";
 import { useAcct, card, h2, hint, btn, xbtn, F, NUM, uid } from "./AcctParts";
 
 // 帳務 › 收款明細（2026/10/08）：對帳表的每一列進系統。
@@ -13,7 +13,7 @@ import { useAcct, card, h2, hint, btn, xbtn, F, NUM, uid } from "./AcctParts";
 // 每一筆的拆分由 acctEngine.calcReceipt 算，規則掛在參數設定的項目上。
 
 const EMPTY_FORM = (it: AcctItem | undefined, ym: string): Receipt => ({
-  id: "", ym, itemId: it?.id ?? "", on: `${ym}-01`, amount: it?.price ?? 0, last5: "", payer: "", payerCoachId: null, sharers: [], payees: {}, note: "", void: false, refund: 0, source: "manual",
+  id: "", ym, itemId: it?.id ?? "", on: `${ym}-01`, amount: it?.price ?? 0, last5: "", payer: "", payerCoachId: null, sharers: [], payees: {}, note: "", void: false, refund: 0, source: "manual", verified: true,
 });
 /** 手填的分潤人（備援）：對得上名冊就帶 coachId 與目前職級。正規做法是用「推薦人」挑人讓系統展開輔導鏈。 */
 const parseSharers = (text: string, coachList: CoachLite[]): Sharer[] =>
@@ -56,6 +56,10 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
     run(() => deleteAcctReceiptAction(r.id), "已刪");
   };
   const toggleVoid = (r: Receipt) => save({ ...r, void: !r.void });
+  const verify = (r: Receipt, v: boolean) => {
+    setS((s) => ({ ...s, receipts: { ...(s.receipts ?? {}), [r.ym]: (s.receipts?.[r.ym] ?? []).map((x) => x.id === r.id ? { ...x, verified: v } : x) } }));
+    run(() => verifyAcctReceiptAction(r.id, v), v ? "已確認入帳" : "已退回待查帳");
+  };
 
   // 分組：照項目的分類（沒有分類就用項目名）；順序照參數設定的項目順序
   const groups = useMemo(() => {
@@ -112,7 +116,7 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
           </>
         ) : <p className={hint}>這個月還沒有收款。</p>}
         <div className="grid grid-cols-3 gap-3 mt-4">
-          <Kpi l="本月收款" v={F(sum.received)} />
+          <Kpi l="本月收款" v={F(sum.received)} sub={sum.pending.n ? <span className="text-danger">另有 {sum.pending.n} 筆待查帳 {F(sum.pending.amount)}</span> : ""} />
           <Kpi l="公司實收" v={F(sum.company)} cls="text-brand2" sub={sum.received ? `${Math.round(sum.company / sum.received * 100)}%` : ""} />
           <Kpi l="待匯出" v={F(sum.remaining)} cls={sum.remaining > 0 ? "text-danger" : "text-ok"} sub={<Link href="/admin/accounting/payouts" className="hover:text-brand2 underline">去分潤匯款</Link>} />
         </div>
@@ -138,13 +142,17 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
                   const it = S.items.find((i) => i.id === r.itemId)!;
                   const rr = calcReceipt(it, netOf(r), r.sharers, r.payees, S.params, {}, r.allocs);
                   const isCase = r.source === "case";
+                  const unverified = r.verified === false;
+                  const coachName = (id: string | null | undefined) => coachList.find((c) => c.id === id)?.name ?? "";
                   return (
-                    <tr key={r.id} className={`border-t border-line align-top ${r.void ? "text-tx3 line-through" : ""}`}>
+                    <tr key={r.id} className={`border-t border-line align-top ${r.void ? "text-tx3 line-through" : ""} ${unverified ? "bg-panel2" : ""}`}>
                       <td className="py-1.5 whitespace-nowrap">{r.on}</td>
                       {g.items.length > 1 && <td className="whitespace-nowrap">{it.name}</td>}
                       <td className="text-right whitespace-nowrap">{F(r.amount)}{r.refund > 0 && <div className="text-10 text-danger">退 {F(r.refund)}</div>}</td>
                       <td className="pl-3 text-tx2">{r.last5 || "—"}</td>
-                      <td className="whitespace-nowrap">{r.payer}{r.payerCoachId && <span className="text-10 text-tx3 ml-1">教練</span>}</td>
+                      <td className="whitespace-nowrap">{r.payer}{r.payerCoachId && <span className="text-10 text-tx3 ml-1">教練</span>}
+                        {r.execCoachId && <div className="text-10 text-tx3">執案 {coachName(r.execCoachId)}{r.promoCoachId ? `・開發 ${r.promoCoachId === r.execCoachId ? "本人" : coachName(r.promoCoachId)}` : "・公司派案"}</div>}
+                        {unverified && <span className="text-10 rounded-full border border-danger text-danger px-2 py-0.5">待查帳</span>}</td>
                       <td className="text-tx2">{isCase ? <span className="text-tx3">案件</span> : r.sharers.length ? r.sharers.map((s) => `${s.name}${s.rankCode ? ` ${s.rankCode}` : ""}`).join(" → ") : <span className="text-tx3">—</span>}</td>
                       <td className="no-underline">
                         <div className="flex flex-wrap gap-1">
@@ -155,6 +163,9 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
                         {r.note && <div className="text-xs text-tx3 mt-0.5">{r.note}</div>}
                       </td>
                       <td className="text-right whitespace-nowrap">
+                        {r.source === "coach" && (unverified
+                          ? <button className="text-xs text-ok hover:underline px-1 font-bold" onClick={() => verify(r, true)}>確認入帳</button>
+                          : <button className="text-xs text-tx3 hover:text-tx px-1" onClick={() => verify(r, false)}>退回待查</button>)}
                         {isCase ? <Link href="/admin/cases" className="text-xs text-tx3 hover:text-brand2 px-1 no-underline">案件與分潤 ›</Link> : (<>
                           <button className="text-xs text-tx3 hover:text-tx px-1" onClick={() => setEditing(r)}>改</button>
                           <button className="text-xs text-tx3 hover:text-tx px-1" onClick={() => toggleVoid(r)}>{r.void ? "恢復" : "作廢"}</button>

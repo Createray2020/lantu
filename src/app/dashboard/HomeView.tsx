@@ -1,8 +1,10 @@
 // 首頁三角色版面（伺服器元件，純呈現）。設計對齊嵐途 v12 深藍＋琥珀金色票。
 import Link from "next/link";
 import type { AgendaItem, HomeView, MemberHome, ManagerHome, OwnerHome } from "@/lib/home";
-import { fmtMoney, fmtNTD, fmtWan } from "@/lib/money";
+import { fmtNTD } from "@/lib/money";
 import { todayISO } from "@/lib/license";
+import { TAX_MODE_LABEL } from "@/lib/acctEngine";
+import { WaterfallChart, MonthBars, TwoLines } from "@/components/acctCharts";
 
 const nt = fmtNTD;
 
@@ -66,41 +68,6 @@ function Bar({ pct, kind = "amber" }: { pct: number; kind?: string }) {
   );
 }
 
-function Progress({ label, cur, goal, unit, kind }: { label: string; cur: number; goal: number; unit: string; kind: string }) {
-  const pct = goal ? Math.min(100, Math.round((cur / goal) * 100)) : 0;
-  const fmt = (v: number) => (unit === "money" ? nt(v) : v.toLocaleString("en-US") + unit);
-  return (
-    <div className="my-2.5">
-      <div className="flex justify-between text-xs mb-1.5">
-        <span>{label}</span>
-        <span><b className="text-tx">{fmt(cur)}</b> <span className="text-tx3">/ {fmt(goal)} ({pct}%)</span></span>
-      </div>
-      <Bar pct={pct} kind={kind} />
-    </div>
-  );
-}
-
-function Leaderboard({ rows }: { rows: { name: string; income: number }[] }) {
-  const max = Math.max(1, ...rows.map((r) => r.income));
-  const medal = ["🥇", "🥈", "🥉"];
-  return (
-    <div className="grid gap-1">
-      {rows.map((r, i) => (
-        <div key={i} className="grid grid-cols-[20px_1fr_auto] gap-3 items-center py-1.5">
-          <div className={`text-center text-13 font-extrabold ${i === 0 ? "text-brand" : "text-tx3"}`}>{medal[i] ?? i + 1}</div>
-          <div>
-            <span className="text-13 font-bold block mb-1">{r.name}</span>
-            <div className="h-[9px] bg-field rounded-md overflow-hidden">
-              <div className="h-full rounded-md" style={{ width: `${(r.income / max) * 100}%`, background: i === 0 ? "linear-gradient(90deg,var(--brand),var(--brand2))" : "linear-gradient(90deg,var(--tx3),var(--tx2))" }} />
-            </div>
-          </div>
-          <div className="font-extrabold text-13 tabular-nums">{nt(r.income)}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function Funnel({ steps }: { steps: { label: string; value: number }[] }) {
   const max = Math.max(1, ...steps.map((s) => s.value));
   return (
@@ -138,34 +105,6 @@ function Gauge({ score }: { score: number }) {
 
 // 折線圖原本完全沒有數值標籤——看得到形狀、讀不出數字。
 // preserveAspectRatio="none" 會把 SVG 內的文字一起拉扁，所以刻度用 HTML 疊在上下兩側。
-function Spark({ vals, fmtVal }: { vals: number[]; fmtVal?: (v: number) => string }) {
-  const w = 320, h = 70;
-  if (!vals.length) return <div className="text-11 text-tx3">尚無資料</div>;
-  const mx = Math.max(...vals), mn = Math.min(...vals), rng = (mx - mn) || 1;
-  const f = fmtVal ?? ((v: number) => String(v));
-  const pts = vals.map((v, i) => {
-    const x = i / (vals.length - 1) * (w - 8) + 4;
-    const y = h - 6 - (v - mn) / rng * (h - 16);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const area = `4,${h - 2} ${pts.join(" ")} ${w - 4},${h - 2}`;
-  return (
-    <div>
-      <div className="flex justify-between text-10 text-tx3 tabular-nums mb-0.5">
-        <span>最高 {f(mx)}</span>
-        <span>最新 {f(vals[vals.length - 1])}</span>
-      </div>
-      <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block">
-        <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--brand)" stopOpacity=".38" /><stop offset="1" stopColor="var(--brand)" stopOpacity="0" /></linearGradient></defs>
-        <polygon points={area} fill="url(#sg)" />
-        <polyline points={pts.join(" ")} fill="none" className="stroke-brand2" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        {pts.map((p, i) => { const [cx, cy] = p.split(","); return <circle key={i} cx={cx} cy={cy} r="2.6" className="fill-brand2" />; })}
-      </svg>
-      <div className="text-10 text-tx3 tabular-nums mt-0.5">最低 {f(mn)}</div>
-    </div>
-  );
-}
-
 function Hero({ k, h1, sub, right }: { k: string; h1: string; sub: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-line px-6 py-5 mb-4 flex items-center gap-4 flex-wrap" style={{ background: "linear-gradient(120deg,var(--panel),var(--panel2))" }}>
@@ -179,74 +118,149 @@ function Hero({ k, h1, sub, right }: { k: string; h1: string; sub: React.ReactNo
   );
 }
 
-/** 業績／活動量／增員這幾塊的資料來源是 member_metrics —— 由後台填，不是系統算的。 */
-const NoData = ({ children }: { children: React.ReactNode }) => (
+const NoMoney = ({ children }: { children: React.ReactNode }) => (
   <div className="text-tx3 text-xs py-6 text-center">{children}</div>
 );
+const Chip = ({ children, warn = false }: { children: React.ReactNode; warn?: boolean }) => (
+  <div className={`inline-flex items-center gap-1.5 bg-panel2 border rounded-lg px-3 py-2 text-xs shadow-e1 ${warn ? "border-danger text-danger" : "border-line text-tx2"}`}>{children}</div>
+);
+const PAY_STATUS: Record<string, [string, string]> = { none: ["本月沒有分潤", "mut"], pending: ["未匯", "amber"], partial: ["部分已匯", "amber"], paid: ["已匯", "green"] };
 
-// ══════════ 主管 ══════════
-function ManagerView({ d }: { d: ManagerHome }) {
-  const k = d.kpis;
-  const act = [
-    { v: d.activity.visits, l: "拜訪" }, { v: d.activity.calls, l: "電話" },
-    { v: d.activity.proposals, l: "提案" }, { v: d.activity.closes, l: "成交" },
-  ];
+// ══════════ 教練 ══════════
+function MemberView({ d, today }: { d: MemberHome; today: string }) {
+  const k = d.kpis, m = d.money, p = d.promo, t = d.term;
+  const [ps, pk] = PAY_STATUS[m.status];
+  const promoLine = p.kind === "apply" ? `報聘門檻：${p.cases}／${p.needCases} 件・${nt(p.fees)}／${nt(p.needFees ?? 0)}`
+    : p.kind === "promote" ? `${p.rankCode} → ${p.nextCode}：${p.cases}／${p.needCases ?? "—"} 件・${nt(p.fees)}／${p.needFees != null ? nt(p.needFees) : "—"}`
+    : p.kind === "top" ? "已是最高職級" : "尚未核定職級";
   return (
     <>
-      <Hero k={`團隊概況 · ${d.teamName}`}
-        h1={d.hasMetrics ? `本月團隊達成 ${k.achievePct}%` : `${d.teamName}`}
-        sub={<>{d.memberCount} 位教練 · <b className="text-brand2">{k.pending} 件</b> 待你審核{d.hasMetrics ? null : <> · 本月尚未有業績資料</>}</>}
-        right={d.hasMetrics
-          ? <div className="min-w-[150px]"><div className="text-11 text-tx2">團隊月目標進度</div><div className="text-15 font-extrabold text-brand2">{k.achievePct}%</div><div className="mt-1.5"><Bar pct={k.achievePct} /></div></div>
-          : undefined} />
+      <Hero k={`早安，${d.coach.name}`}
+        h1={d.hasMoney || m.net > 0 ? `這個月實匯 ${nt(m.net)}` : `今天有 ${k.todayAppts} 場約訪、${k.openItems} 件待辦`}
+        sub={<>{today} · {p.rankLabel} · {promoLine}{p.met && p.kind !== "top" ? <b className="text-ok ml-1">已達門檻</b> : null}</>}
+        right={<div className="min-w-[170px]"><div className="text-11 text-tx2">{p.kind === "apply" ? "離報聘" : p.nextCode ? `離 ${p.nextCode}` : "晉升"}</div><div className="text-15 font-extrabold text-brand2">{p.pct}%</div><div className="mt-1.5"><Bar pct={p.pct} /></div></div>} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
-        <Kpi icon="💰" label="團隊收益（本月）" value={nt(k.teamIncome)} top="var(--brand)" pending={!d.hasMetrics} />
-        <Kpi icon="🎯" label="團隊達成率" value={String(k.achievePct)} sm="%" note={`目標 ${nt(k.teamGoal)}`} top="var(--ok)" pending={!d.hasMetrics} />
-        <Kpi icon="🔥" label="本月活動量" value={String(k.activity)} sm="次" note="拜訪+電話+提案+成交" pending={!d.hasMetrics} />
-        <Kpi icon="🧲" label="增員進行中" value={String(k.recruitsActive)} sm="位" top="var(--c5)" />
-        <Kpi icon="✅" label="待審核 / 簽核" value={String(k.pending)} sm="件" top="var(--danger)" />
-      </div>
-
-      <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
-        <Agenda items={d.agenda} today={todayISO()} />
-      </Section>
-
-      <Section title="🏆 團隊業績排行（本月收益）" more="團隊業績">
-        {d.leaderboard.length === 0 ? <Empty>團隊尚無成員業績</Empty> : <Leaderboard rows={d.leaderboard} />}
-      </Section>
-
-      <div className="grid md:grid-cols-2 gap-4 items-start">
-        <Section title="🔥 活動量看板（本月）">
-          {!d.hasMetrics ? <NoData>本月還沒有活動量資料。<br />後台「訓練時數與業績」填了拜訪／電話／提案／成交才會出現。</NoData> : (
-          <><div className="grid grid-cols-4 gap-2.5">
-            {act.map((a, i) => (
-              <div key={i} className="bg-panel2 border border-line rounded-lg px-3 py-2.5 text-center shadow-e1">
-                <div className="text-xl font-extrabold">{a.v}</div>
-                <div className="text-xs text-tx2 mt-0.5">{a.l}</div>
-              </div>
-            ))}
-          </div>
-          <div className="text-tx3 text-11 mt-2.5">業務核心 KPI — 拜訪／電話／提案／成交漏斗即時彙總</div></>
-          )}
-        </Section>
-        <Section title="🧲 增員漏斗（本季）"><Funnel steps={d.funnel} /></Section>
+        <Kpi icon="💵" label="本月實匯" value={nt(m.net)} note={m.withhold ? `應付 ${nt(m.due)}・扣繳 ${nt(m.withhold)}` : m.srcN ? `${m.srcN} 筆分潤` : "本月還沒有分潤"} top="var(--brand)" />
+        <Kpi icon="🏦" label="匯款狀態" value={ps} note={`${m.ym} 入帳・${m.payDate} 發放`} top={pk === "green" ? "var(--ok)" : "var(--tx2)"} />
+        <Kpi icon="📄" label="累計正式案件" value={String(p.cases)} sm="案" note={`顧問費 ${nt(p.fees)}`} top="var(--c5)" />
+        <Kpi icon="✅" label="待辦事項" value={String(k.openItems)} sm="項" top="var(--danger)" />
+        <Kpi icon="📅" label="今日約訪" value={String(k.todayAppts)} sm="場" />
+        <Kpi icon="🧭" label="本月回訪到位" value={`${d.checkins.done}/${d.checkins.total}`} sm="場" note={d.checkins.total ? `部分 ${d.checkins.partial}・沒動 ${d.checkins.none}` : "本月還沒有回訪對帳"} top="var(--brand)" />
       </div>
 
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
-        <Section title="📈 團隊本週約訪熱度">
-          <Spark vals={d.weekly} fmtVal={(v) => `${v} 場`} />
-          <div className="text-tx3 text-11 mt-1.5">週日 → 週六 · 本週合計 {d.weekly.reduce((a, b) => a + b, 0)} 場約訪</div>
-        </Section>
-        <Section title="✅ 待審核與簽核" more="成員審核">
-          {d.pending.length === 0 ? <Empty>沒有待審核項目</Empty> : d.pending.map((p, i) => (
-            <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
-              <div className="w-[18px] h-[18px] rounded border-2 border-tx3 shrink-0" />
-              <div className="flex-1 min-w-0"><div className="font-bold text-13">{p.title}</div><div className="text-tx2 text-xs">{p.sub}</div></div>
-              <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[p.tagKind]}`}>{p.tag}</span>
+        <div>
+          <Section title="💵 我的實匯（近 6 個月）" more="我的分潤" moreHref="/dashboard/payouts">
+            {m.months.some((x) => x.net > 0) ? <MonthBars rows={m.months.map((x) => ({ ym: x.ym, v: x.net }))} current={m.ym} /> : <NoMoney>近六個月還沒有分潤。有分潤的月份會在這裡長出來；每月 5 日結算前一個月。</NoMoney>}
+            {m.unverified.n > 0 && <div className="text-xs text-tx2 mt-2">另有 <b className="text-brand2">{m.unverified.n} 筆</b> 顧問費（{nt(m.unverified.amount)}）等公司查帳確認，確認後才算分潤與實績。</div>}
+          </Section>
+          <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
+            <Agenda items={d.agenda} today={todayISO()} />
+          </Section>
+          <Section title="✅ 待辦動作" more="全部待辦">
+            {d.todos.length === 0 ? <Empty>沒有待辦動作</Empty> : d.todos.map((x, i) => (
+              <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+                <span className="text-brand2 font-extrabold text-13 w-11 tabular-nums">{x.time}</span>
+                <div className="w-[18px] h-[18px] rounded border-2 border-tx3 shrink-0" />
+                <div className="flex-1 min-w-0"><div className="font-bold text-13">{x.title}</div><div className="text-tx2 text-xs">{x.sub}</div></div>
+                <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[x.tagKind]}`}>{x.tag}</span>
+              </div>
+            ))}
+          </Section>
+        </div>
+        <div>
+          <Section title="🎯 晉升進度" more="我的業務" moreHref="/dashboard/my-business">
+            {p.kind === "unranked" ? <NoMoney>職級還沒核定，核定後這裡會顯示離下一階還差多少。</NoMoney> : (
+              <>
+                <div className="text-13 mb-2">{promoLine}</div>
+                <Bar pct={p.pct} kind={p.met ? "green" : "amber"} />
+                <div className="text-11 text-tx3 mt-2">件數＝同一客戶同年度合計一案；顧問費＝公司已確認入帳的實收。只勾了「付費顧問案」的才算。</div>
+              </>
+            )}
+          </Section>
+          <Section title="🛡️ 合作與收款設定">
+            <div className="flex gap-2.5 flex-wrap">
+              <Chip warn={t.warn}>{t.kind === "intern" ? "🎓" : "📇"} {t.label}</Chip>
+              {m.payeeReady
+                ? <Chip>🏦 收款設定已填・{TAX_MODE_LABEL[m.taxMode as keyof typeof TAX_MODE_LABEL] ?? m.taxMode}</Chip>
+                : <Link href="/dashboard/profile" className="no-underline"><Chip warn>🏦 收款帳號還沒填 → 去我的檔案</Chip></Link>}
+              <Chip>🛡️ 適合度問卷待補 <b className="text-tx">{d.compliance.kycPending} 位</b></Chip>
             </div>
-          ))}
-        </Section>
+          </Section>
+          <Section title="👥 待關注客戶" more="我的客戶" moreHref="/dashboard/clients">
+            {d.watch.length === 0 ? <Empty>目前沒有待關注客戶</Empty> : d.watch.map((w, i) => (
+              <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: w.dot === "warn" ? "var(--danger)" : w.dot === "ok" ? "var(--ok)" : "var(--tx2)" }} />
+                <div className="flex-1 min-w-0"><div className="font-bold text-13">{w.name}</div><div className="text-tx2 text-xs">{w.note}</div></div>
+                <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[w.tagKind]}`}>{w.tag}</span>
+              </div>
+            ))}
+          </Section>
+          {d.announcements.length > 0 && (
+            <Section title="📢 最新公告">
+              {d.announcements.map((a) => (
+                <div key={a.id} className="py-2.5 border-b border-line last:border-0">
+                  <div className="font-bold text-13 flex gap-2 items-center">
+                    <span className={`text-11 font-bold px-2 py-0.5 rounded ${a.category === "important" ? TAG.warn : a.category === "activity" ? TAG.amber : TAG.mut}`}>{a.category === "important" ? "重要" : a.category === "activity" ? "活動" : "一般"}</span>
+                    {a.title}
+                  </div>
+                  <div className="text-tx3 text-11 mt-1">{a.author}</div>
+                </div>
+              ))}
+            </Section>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ══════════ 主管 ══════════
+function ManagerView({ d }: { d: ManagerHome }) {
+  const tm = d.team;
+  const max = Math.max(1, ...tm.rows.map((r) => r.net));
+  return (
+    <>
+      <Hero k={`團隊概況 · ${d.teamName}`}
+        h1={d.hasMoney ? `團隊這個月實匯 ${nt(tm.total)}` : `${d.teamName}`}
+        sub={<>{d.memberCount} 位教練 · <b className="text-brand2">{d.pendingCount} 位</b> 報聘中{tm.nearPromo ? <> · <b className="text-ok">{tm.nearPromo} 位</b> 接近晉升門檻</> : null}{d.hasMoney ? null : <> · 本月還沒有收款</>}</>}
+        right={<div className="text-xs text-tx2">結算 {d.payDate} 發放</div>} />
+
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
+        <Kpi icon="💰" label="團隊實匯（本月）" value={nt(tm.total)} top="var(--brand)" note={tm.unverified.n ? `另 ${tm.unverified.n} 筆顧問費待查帳` : undefined} />
+        <Kpi icon="🎯" label="接近晉升" value={String(tm.nearPromo)} sm="位" note="門檻達成 70% 以上" top="var(--ok)" />
+        <Kpi icon="🧲" label="報聘中" value={String(d.pendingCount)} sm="位" top="var(--c5)" />
+        <Kpi icon="🤝" label="我推薦的申請" value={String(d.funnel.referredByMe)} sm="位" />
+      </div>
+
+      <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
+        <div>
+          <Section title="🏆 團隊本月實匯與晉升進度" more="職級與晉升" moreHref="/dashboard/my-business">
+            {tm.rows.length === 0 ? <Empty>團隊還沒有成員</Empty> : tm.rows.map((r) => (
+              <div key={r.id} className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 items-center py-2 border-b border-line last:border-0">
+                <div className="font-bold text-13">{r.name} <span className="text-11 text-tx3 font-normal">{r.rankCode ?? "未定級"}{r.nextCode ? ` → ${r.nextCode} ${r.pct}%` : ""}</span></div>
+                <div className="text-right font-extrabold tabular-nums">{nt(r.net)}</div>
+                <div className="col-span-2 h-2 bg-field rounded overflow-hidden"><div className="h-full rounded" style={{ width: `${(r.net / max) * 100}%`, background: "linear-gradient(90deg,var(--brand),var(--brand2))" }} /></div>
+              </div>
+            ))}
+          </Section>
+          <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
+            <Agenda items={d.agenda} today={todayISO()} />
+          </Section>
+        </div>
+        <div>
+          <Section title="🧲 報聘漏斗" more="待我處理" moreHref="/admin/inbox"><Funnel steps={d.funnel.steps} /></Section>
+          <Section title="✅ 報聘審核">
+            {d.funnel.pending.length === 0 ? <Empty>沒有待審核的申請</Empty> : d.funnel.pending.map((x, i) => (
+              <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+                <div className="w-[18px] h-[18px] rounded border-2 border-tx3 shrink-0" />
+                <div className="flex-1 min-w-0"><div className="font-bold text-13">{x.name}</div><div className="text-tx2 text-xs">{x.sub}</div></div>
+                <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[x.tagKind]}`}>{x.tag}</span>
+              </div>
+            ))}
+          </Section>
+        </div>
       </div>
     </>
   );
@@ -254,44 +268,43 @@ function ManagerView({ d }: { d: ManagerHome }) {
 
 // ══════════ 核心成員 ══════════
 function OwnerView({ d }: { d: OwnerHome }) {
-  const k = d.kpis;
-  const tmax = Math.max(1, ...d.teams.map((t) => t.income));
+  const c = d.company, r = c.r, po = c.payouts;
+  const cmax = Math.max(1, ...c.chains.map((x) => x.net));
   return (
     <>
-      <Hero k="全組織健康度"
-        h1={d.hasMetrics
-          ? `組織健康度 ${d.healthScore} 分 · 本月業績 ${fmtWan(k.income)} 萬，月成長 ${k.growthPct >= 0 ? "+" : ""}${k.growthPct}%`
-          : "本月尚未有業績資料"}
-        sub={d.hasMetrics
-          ? <>{d.teams.length} 個團隊 · {k.headcount} 位夥伴 · 客戶留存率 {k.retention}%</>
-          : <>{d.teams.length} 個團隊 · {k.headcount} 位夥伴 · 業績與活動量由後台「訓練時數與業績」登錄</>}
+      <Hero k="公司這個月"
+        h1={r && d.hasMoney ? `公司實收 ${nt(r.gp)}，淨利 ${nt(r.net)}` : "本月還沒有收款"}
+        sub={<>{c.headcount} 位有效教練 · 收款 {nt(po.received)} · 要匯出去 {nt(po.net)}（已匯 {nt(po.paid)}）{po.pending.n ? <> · <b className="text-danger">{po.pending.n} 筆顧問費待查帳</b></> : null}</>}
         right={<>
-          <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">🏢 團隊 <b className="text-tx">{d.teams.length}</b></div>
-          <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">🧑‍🤝‍🧑 人力 <b className="text-tx">{k.headcount}</b></div>
+          {c.bodies.map((b) => <div key={b.code} className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">{b.label} <b className="text-tx">{b.n}</b></div>)}
         </>} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
-        <Kpi icon="💎" label="全組織業績（本月）" value={nt(k.income)} top="var(--brand)" pending={!d.hasMetrics} />
-        <Kpi icon="📈" label="月成長率" value={`${k.growthPct >= 0 ? "+" : ""}${k.growthPct}`} sm="%" note="對比上月" top="var(--ok)" pending={!d.hasMetrics} />
-        <Kpi icon="🧑‍🤝‍🧑" label="總人力" value={String(k.headcount)} sm="人" />
-        <Kpi icon="🔁" label="客戶留存率" value={String(k.retention)} sm="%" top="var(--c5)" pending={!d.hasMetrics} />
-        <Kpi icon="🔥" label="活動總量" value={k.activity.toLocaleString("en-US")} sm="次" note="全組織本月" pending={!d.hasMetrics} />
+        <Kpi icon="💎" label="營業額（本月）" value={nt(r?.rev ?? 0)} top="var(--brand)" />
+        <Kpi icon="🏢" label="公司實收" value={nt(r?.gp ?? 0)} note={r?.rev ? `${Math.round(r.gp / r.rev * 100)}%` : undefined} top="var(--ok)" />
+        <Kpi icon="📈" label="淨利" value={nt(r?.net ?? 0)} note={r ? `固定 ${nt(r.fixed)}・稅 ${nt(r.vat)}` : undefined} top={r && r.net < 0 ? "var(--danger)" : "var(--ok)"} />
+        <Kpi icon="🏦" label="還要匯" value={nt(po.remaining)} note={`發放日 ${po.payDate}`} top="var(--danger)" />
+        <Kpi icon="📇" label="合作到期／未設" value={`${c.expired}／${c.unlicensed}`} sm="位" top="var(--c5)" />
       </div>
-
-      <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
-        <Agenda items={d.agenda} today={todayISO()} />
-      </Section>
 
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <div>
-          <Section title="🧭 組織健康度總覽" more="組織儀表">
-            {/* ⚠️ 健康度是四項指標的平均，沒有業績資料時每一項都是 0 → 顯示「0 分」。
-                那個 0 看起來是「組織很不健康」，實際上是「沒人填」。差別很大。 */}
-            {!d.hasMetrics ? <NoData>本月還沒有業績與活動量資料，算不出組織健康度。</NoData> : (
+          <Section title="🧭 本月損益" more="本月帳務" moreHref="/admin/accounting/monthly">
+            {r && d.hasMoney ? <WaterfallChart r={r} /> : <NoMoney>本月還沒有收款，畫不出損益。</NoMoney>}
+          </Section>
+          <Section title="📈 營業額 vs 公司實收（近 8 個月）">
+            {c.trend.some((x) => x.rev > 0) ? <TwoLines rows={c.trend.map((x) => ({ ym: x.ym, a: x.rev, b: x.company }))} /> : <NoMoney>還沒有任何月份的收款。</NoMoney>}
+          </Section>
+          <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
+            <Agenda items={d.agenda} today={todayISO()} />
+          </Section>
+        </div>
+        <div>
+          <Section title="🧭 組織健康度（制度量表）">
             <div className="flex items-center gap-5 flex-wrap">
-              <Gauge score={d.healthScore} />
+              <Gauge score={c.healthScore} />
               <div className="flex-1 min-w-[180px] flex flex-col gap-2.5">
-                {d.health.map((g, i) => (
+                {c.health.map((g, i) => (
                   <div key={i} className="flex items-center gap-2.5 text-xs">
                     <span className="text-tx2 min-w-[74px]">{g.label}</span>
                     <div className="flex-1 h-[7px] bg-field rounded overflow-hidden"><div className="h-full rounded" style={{ width: `${g.pct}%`, background: g.color }} /></div>
@@ -300,38 +313,25 @@ function OwnerView({ d }: { d: OwnerHome }) {
                 ))}
               </div>
             </div>
-            )}
+            <div className="text-11 text-tx3 mt-2">合作有效＝未到期教練比例；維持資格＝本年度達標比例；推薦動能＝本月有推薦分潤的人數比例；回訪完成＝本月回訪對帳到位；對帳完成＝已匯／實匯。</div>
           </Section>
-          <Section title="🏢 各團隊業績對比（本月）" more="團隊業績">
-            {d.teams.length === 0 ? <Empty>還沒有任何團隊</Empty>
-              : !d.hasMetrics ? <NoData>本月還沒有業績資料。</NoData>
-              : d.teams.map((t, i) => (
-              <div key={i} className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 items-center py-2.5 border-b border-line last:border-0">
+          <Section title="🏢 各輔導鏈本月實匯">
+            {c.chains.length === 0 ? <Empty>還沒有任何團隊</Empty> : c.chains.map((t) => (
+              <div key={t.id} className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 items-center py-2.5 border-b border-line last:border-0">
                 <div><div className="font-bold text-13">{t.name}</div><div className="text-tx2 text-xs">{t.headcount} 位成員</div></div>
-                <div className="text-right font-extrabold tabular-nums">{nt(t.income)}<div className="text-tx2 text-xs font-normal">達成率 {t.achievePct}%</div></div>
-                <div className="col-span-2 h-2 bg-field rounded overflow-hidden"><div className="h-full rounded" style={{ width: `${(t.income / tmax) * 100}%`, background: "linear-gradient(90deg,var(--tx3),var(--tx2))" }} /></div>
+                <div className="text-right font-extrabold tabular-nums">{nt(t.net)}</div>
+                <div className="col-span-2 h-2 bg-field rounded overflow-hidden"><div className="h-full rounded" style={{ width: `${(t.net / cmax) * 100}%`, background: "linear-gradient(90deg,var(--tx3),var(--tx2))" }} /></div>
               </div>
             ))}
           </Section>
-        </div>
-        <div>
-          <Section title="🔻 全組織活動漏斗（本月）">
-            {d.hasMetrics ? <Funnel steps={d.funnel} /> : <NoData>本月還沒有活動量資料。</NoData>}
+          <Section title="🏅 本月實匯 Top 5" more="分潤匯款" moreHref="/admin/accounting/payouts">
+            {d.top5.length === 0 ? <Empty>本月還沒有分潤</Empty> : d.top5.map((x, i) => (
+              <div key={i} className="flex items-center gap-3 py-2 border-b border-line last:border-0"><span className="text-tx3 w-5 text-center font-extrabold">{i + 1}</span><span className="flex-1 font-bold text-13">{x.name}</span><span className="font-extrabold tabular-nums">{nt(x.net)}</span></div>
+            ))}
           </Section>
-          <Section title="📈 業績月成長趨勢">
-            {d.trend.some((t) => t.value > 0) ? (
-              <>
-                <Spark vals={d.trend.map((t) => t.value)} fmtVal={(v) => `${fmtMoney(v)} 萬`} />
-                <div className="text-tx3 text-11 mt-1.5">近 {d.trend.length} 個月業績（萬）</div>
-              </>
-            ) : <NoData>還沒有任何月份的業績資料，畫不出趨勢。</NoData>}
-          </Section>
+          <Section title="🧲 報聘漏斗" more="待我處理" moreHref="/admin/inbox"><Funnel steps={d.funnel.steps} /></Section>
         </div>
       </div>
-
-      <Section title="🏅 全組織教練排行榜 Top 5" more="排行榜">
-        {d.top5.length === 0 || !d.hasMetrics ? <Empty>尚無排行資料</Empty> : <Leaderboard rows={d.top5} />}
-      </Section>
     </>
   );
 }
@@ -412,106 +412,12 @@ function Empty({ children }: { children: React.ReactNode }) {
 export default function Home({ data }: { data: HomeView }) {
   return (
     <div>
-      {data.member && <MemberViewWithDate d={data.member} today={data.today} />}
+      {data.member && <MemberView d={data.member} today={data.today} />}
       {data.manager && <ManagerView d={data.manager} />}
       {data.owner && <OwnerView d={data.owner} />}
       <div className="text-tx3 text-11 text-center mt-6 pt-4 border-t border-line">
-        嵐途 LAN TU · 組織管理後台 · {data.today} · {data.periodLabel} · 業績／活動量／增員由後台登錄
+        嵐途 LAN TU · {data.today} · {data.periodLabel} · 數字來自後台帳務、分潤匯款與業務制度
       </div>
     </div>
-  );
-}
-
-// 教練 Hero 需要日期，補一層把 today 帶進 sub。
-function MemberViewWithDate({ d, today }: { d: MemberHome; today: string }) {
-  const k = d.kpis;
-  return (
-    <>
-      <Hero k={`早安，${d.coach.name}`} h1={`今天有 ${k.todayAppts} 場約訪、${k.openItems} 件待辦`}
-        sub={d.hasMetrics
-          ? <>{today} · 本月收益目標已達成 <b className="text-brand2">{d.progressPct}%</b> 💪</>
-          : <>{today} · 本月還沒有業績資料</>}
-        right={d.hasMetrics
-          ? <div className="min-w-[150px]"><div className="text-11 text-tx2">本月收益進度</div><div className="text-15 font-extrabold text-brand2">{d.progressPct}%</div><div className="mt-1.5"><Bar pct={d.progressPct} /></div></div>
-          : undefined} />
-      <MemberBody d={d} />
-    </>
-  );
-}
-
-// 抽出教練主體（去掉 Hero，避免重複）。
-function MemberBody({ d }: { d: MemberHome }) {
-  const k = d.kpis;
-  return (
-    <>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
-        <Kpi icon="💵" label="本月收益" value={nt(k.income)} top="var(--brand)" pending={!d.hasMetrics} />
-        <Kpi icon="📄" label="本月成交案" value={String(k.deals)} sm="案" note={`目標 ${k.dealsGoal} 案`} pending={!d.hasMetrics} />
-        <Kpi icon="🌱" label="新增客戶" value={String(k.newClients)} sm="位" top="var(--ok)" />
-        <Kpi icon="✅" label="待辦事項" value={String(k.openItems)} sm="項" top="var(--danger)" />
-        <Kpi icon="📅" label="今日約訪" value={String(k.todayAppts)} sm="場" top="var(--c5)" />
-        <Kpi icon="🧭" label="本月回訪到位" value={`${d.checkins.done}/${d.checkins.total}`} sm="場" note={d.checkins.total ? `部分 ${d.checkins.partial}・沒動 ${d.checkins.none}` : "本月還沒有回訪對帳"} top="var(--brand)" />
-      </div>
-      <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
-        <div>
-          <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
-            <Agenda items={d.agenda} today={todayISO()} />
-          </Section>
-          {/* ⚠️ 這塊只剩 action_items。約訪已經搬到「近期行程」——兩邊都放的話
-              同一場約訪會在首頁出現兩次。改這塊之前先看 lib/home.ts 的註解。 */}
-          <Section title="✅ 待辦動作" more="全部待辦">
-            {d.todos.length === 0 ? <Empty>沒有待辦動作</Empty> : d.todos.map((t, i) => (
-              <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
-                <span className="text-brand2 font-extrabold text-13 w-11 tabular-nums">{t.time}</span>
-                <div className="w-[18px] h-[18px] rounded border-2 border-tx3 shrink-0" />
-                <div className="flex-1 min-w-0"><div className="font-bold text-13">{t.title}</div><div className="text-tx2 text-xs">{t.sub}</div></div>
-                <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[t.tagKind]}`}>{t.tag}</span>
-              </div>
-            ))}
-          </Section>
-          <Section title="👥 待關注客戶" more="我的客戶">
-            {d.watch.length === 0 ? <Empty>目前沒有待關注客戶</Empty> : d.watch.map((w, i) => (
-              <div key={i} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: w.dot === "warn" ? "var(--danger)" : w.dot === "ok" ? "var(--ok)" : "var(--tx2)" }} />
-                <div className="flex-1 min-w-0"><div className="font-bold text-13">{w.name}</div><div className="text-tx2 text-xs">{w.note}</div></div>
-                <span className={`text-11 font-bold px-2 py-0.5 rounded ${TAG[w.tagKind]}`}>{w.tag}</span>
-              </div>
-            ))}
-          </Section>
-        </div>
-        <div>
-          <Section title="🎯 我的目標進度" more="目標競賽">
-            {d.hasMetrics ? d.goals.map((g, i) => <Progress key={i} {...g} />)
-              : <NoData>本月的收益／案件／活動量目標還沒設定。<br />後台「訓練時數與業績」填了才會出現在這裡。</NoData>}
-          </Section>
-          <Section title="📢 最新公告" more="公告中心">
-            {d.announcements.length === 0 ? <Empty>目前沒有公告</Empty> : d.announcements.map((a) => (
-              <div key={a.id} className="py-2.5 border-b border-line last:border-0">
-                <div className="font-bold text-13 flex gap-2 items-center">
-                  <span className={`text-11 font-bold px-2 py-0.5 rounded ${a.category === "important" ? TAG.warn : a.category === "activity" ? TAG.amber : TAG.mut}`}>{a.category === "important" ? "重要" : a.category === "activity" ? "活動" : "一般"}</span>
-                  {a.title}
-                </div>
-                <div className="text-tx3 text-11 mt-1">{a.author}</div>
-              </div>
-            ))}
-          </Section>
-          <Section title="🛡️ 合規與學習提醒">
-            <div className="flex gap-2.5 flex-wrap">
-              {/* 證照與進修時數同樣來自 member_metrics：沒填就不要編一個出來。 */}
-              {d.compliance.licenseNote && (
-                <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">📇 {d.compliance.licenseNote}</div>
-              )}
-              {d.hasMetrics && (
-                <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">🎓 進修時數 <b className="text-tx">{d.compliance.ceHours} / {d.compliance.ceHoursGoal} 小時</b></div>
-              )}
-              <div className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">🛡️ 適合度問卷待補 <b className="text-tx">{d.compliance.kycPending} 位</b></div>
-            </div>
-            {!d.hasMetrics && !d.compliance.licenseNote && (
-              <NoData>證照與進修時數還沒登錄。</NoData>
-            )}
-          </Section>
-        </div>
-      </div>
-    </>
   );
 }

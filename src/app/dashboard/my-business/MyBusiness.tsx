@@ -39,6 +39,8 @@ export type MyView = {
   };
   canRecruit: boolean;
   canReceiveLeads: boolean;
+  /** 實習／結業：報聘門檻（V7.2 §38之2）。正式職級為 null。 */
+  applyGate: { cases: number; fees: number; needCases: number; needFees: number; met: boolean } | null;
   /** 距離年度結束剩幾天（用來決定提醒的語氣強度） */
   daysLeftInYear: number;
   payouts: { id: string; period: string; clientName: string; role: string; totalPct: number; amount: number; status: string; trace: string[] }[];
@@ -48,7 +50,7 @@ export type MyView = {
 };
 
 const REASON: Record<string, string> = {
-  auto_a: "A 軌自動晉升", auto_b: "B 軌自動晉升", tenure: "真除轉正",
+  auto_a: "A 軌自動晉升", auto_b: "B 軌自動晉升", tenure: "預認階確認",
   manual: "人工調整", refund: "退費扣回",
 };
 
@@ -99,16 +101,22 @@ export default function MyBusiness({ v }: { v: MyView }) {
           </div>
           {v.tenureRankCode && (
             <div className="text-xs text-brand mt-1">
-              真除中（核定 {v.tenureRankCode}，至 {v.tenureUntil ?? "—"}）
+              預認階確認中（核定 {v.tenureRankCode}，至 {v.tenureUntil ?? "—"}；12 個月實收顧問費達 S1 15 萬／S2 45 萬／S3 75 萬即正式認階）
             </div>
           )}
         </Tile>
-        <Tile title="待發放分潤">
+        <Tile title="本月實匯（扣繳後）">
           <div className="text-2xl font-bold tabular-nums">{fmtMoney(v.pendingAmount)}</div>
           <div className="text-xs text-tx2 mt-0.5">
-            {v.payoutDay ? `每月 ${v.payoutDay} 日發放` : "發放日未設定"} · 共 {v.payouts.filter((p) => p.status !== "paid").length} 筆
+            {v.payoutDay ? `每月 ${v.payoutDay} 日發放` : "發放日未設定"} · 明細在「我的分潤」
           </div>
         </Tile>
+        {v.applyGate && (
+          <Tile title="報聘門檻">
+            <div className={`text-2xl font-bold ${v.applyGate.met ? "text-ok" : "text-brand"}`}>{v.applyGate.met ? "可報聘" : "尚未達門檻"}</div>
+            <div className="text-xs text-tx2 mt-0.5">正式案件 {v.applyGate.cases}/{v.applyGate.needCases} 件 · 顧問費 {fmtMoney(v.applyGate.fees)}/{fmtMoney(v.applyGate.needFees)}{!v.applyGate.met && " · 未達可專案申請面談"}</div>
+          </Tile>
+        )}
         <Tile title="維持資格">
           {v.maintenance.exempt ? (
             <>
@@ -185,12 +193,12 @@ export default function MyBusiness({ v }: { v: MyView }) {
         )}
         {v.tenureRankCode && v.tenureSettledCode && (
           <p className="mt-3 text-xs text-brand">
-            真除進度：以目前完成度，期滿將轉正為 <b>{v.tenureSettledCode}</b>。{v.tenureNote}
+            認階確認進度：以目前實收，期滿將正式認階為 <b>{v.tenureSettledCode}</b>。{v.tenureNote}
           </p>
         )}
         <div className="mt-3 flex flex-wrap gap-4 text-xs text-tx2">
           <span>終身累計 <b className="text-tx">{v.stats.personalCases}</b> 案</span>
-          <span>累計顧問費 <b className="text-tx">{fmtMoney(v.stats.personalFees)}</b> 元</span>
+          <span>累計顧問費（已確認實收） <b className="text-tx">{fmtMoney(v.stats.personalFees)}</b> 元</span>
           <span>團隊輔導業績 <b className="text-tx">{v.stats.teamCases}</b> 案</span>
         </div>
       </div>

@@ -11,6 +11,8 @@ import * as Notes from "@/lib/notes";
 import * as Session from "@/lib/consultSession";
 import * as ClientQuiz from "@/lib/clientRiskQuiz";
 import { RISK_QUIZ_TODO } from "@/lib/riskQuizTodo";
+import { createCoachFeeReceipt, receiptsForClient } from "@/lib/acctStore";
+import { listActiveCoaches } from "@/lib/org";
 
 // 這裡是教練端「所有寫入」的唯一身分入口 —— 期限到期的唯讀鎖定就掛在 requireWritableCoach()，
 // 不要繞過它直接取教練身分，否則那條路徑會變成到期後仍可寫的破口。
@@ -25,7 +27,7 @@ async function coachId(): Promise<string> {
 // 畫面上就只剩「建立失敗，請重試」——重試一百次也不會成功。
 export type ActionResult = { ok: true } | { ok: false; error: string };
 export type IdResult = { ok: true; id: string } | { ok: false; error: string };
-export type CreateClientResult = IdResult;
+export type CreateClientResult = { ok: true; id: string; warn?: string } | { ok: false; error: string };
 
 /** 未知錯誤的統一說法：不要留下「操作失敗」這種按幾次都一樣的死路。 */
 const FALLBACK_ERROR = "這個動作沒有完成。請重新整理頁面再試一次；若還是失敗請聯繫管理員。";
@@ -51,12 +53,21 @@ function fail(e: unknown): { ok: false; error: string } {
   return { ok: false, error: FALLBACK_ERROR };
 }
 
-export async function createClientAction(input: Clients.ClientInput): Promise<CreateClientResult> {
+/** 建客戶時勾「付費顧問案」帶的收款資料（2026/10/09 Ray：勾了才記進後台顧問費、等後台查帳確認）。 */
+export type ClientFeeInput = { amount: number; on: string; last5?: string; promoCoachId?: string | null };
+
+export async function createClientAction(input: Clients.ClientInput & { fee?: ClientFeeInput | null }): Promise<CreateClientResult> {
   try {
     const me = await requireWritableCoach();
     // 客戶數上限依級別（實習與 C1–C3 為 20 位、S1–S2 為 50 位、S3 與首席為 100 位）
     await requireClientQuota(me);
-    const id = await Clients.createClient(me.id, input);
+    const { fee, ...clientInput } = input;
+    const id = await Clients.createClient(me.id, clientInput);
+    // 顧問費：客戶建好之後才記；帳務失敗不能讓客戶建立失敗（客戶已經在了），把錯誤帶回畫面就好
+    if (fee && fee.amount > 0) {
+      try { await createCoachFeeReceipt(me.id, { clientId: id, clientName: clientInput.name, ...fee }); }
+      catch { revalidatePath("/dashboard/clients"); return { ok: true, id, warn: "客戶已建立，但顧問費沒記成功，請到客戶頁補記" }; }
+    }
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clients");
     revalidatePath("/dashboard/overview");
@@ -496,4 +507,29 @@ export async function restoreToSessionAction(clientId: string, sessionId: string
   if (!r.ok) return { ok: false, error: r.error };
   revalidatePath(`/dashboard/clients/${clientId}`);
   return { ok: true, planId: s.planId };
+}
+
+/** 既有客戶之後收費：補記一筆顧問費（待後台查帳）。 */
+export async function addClientFeeAction(clientId: string, fee: ClientFeeInput): Promise<ActionResult> {
+  try {
+    const me = await requireWritableCoach();
+    const c = await Clients.getClient(me.id, clientId);
+    if (!c) throw new Error("forbidden");
+    await createCoachFeeReceipt(me.id, { clientId, clientName: c.name, ...fee });
+    revalidatePath(`/dashboard/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+export type ClientFeeRow = { id: string; on: string; amount: number; refund: number; verified: boolean; void: boolean; promo: string };
+/** 這位客戶的顧問費收款（教練端只看自己客戶的）。 */
+export async function clientFeesAction(clientId: string): Promise<ClientFeeRow[]> {
+  const me = await requireWritableCoach().catch(() => null);
+  if (!me) return [];
+  const rows = await receiptsForClient(clientId);
+  return rows.filter((r) => r.execCoachId === me.id || r.enteredBy === me.id).map((r) => ({ id: r.id, on: r.on, amount: r.amount, refund: r.refund, verified: r.verified, void: r.void, promo: r.promoCoachId ? (r.promoCoachId === me.id ? "本人" : r.promoCoachId) : "公司派案" }));
+}
+/** 開發教練下拉用：全組織在職教練。 */
+export async function coachOptionsAction(): Promise<{ id: string; name: string; rankCode: string | null }[]> {
+  const rows = await listActiveCoaches();
+  return rows.filter((c) => !c.isTest).map((c) => ({ id: c.id, name: c.name ?? "", rankCode: c.rankCode ?? null }));
 }

@@ -33,8 +33,18 @@ vi.mock("./org", () => ({
   downlineIds: () => [],
   visibleCoachIds: () => [],
 }));
+// 2026/10/09 首頁錢／晉升／到期改從帳務與制度算：這支只守行程，帳務與制度整個 mock 成空狀態
+vi.mock("./acctStore", () => ({
+  getAcctState: async () => ({ items: [], months: {}, targets: {}, draft: null, receipts: {}, payouts: {}, payeeBook: [], coachList: [], params: { vatRate: 5, poolTiers: [[30], [25, 5]], tax: { withholdRate: 10, nhiRate: 2.11, threshold: 20000 }, referralRates: {}, referralCap: 30, annualFee: {}, earlyApplyFee: 6000 }, goal: { netTarget: 0 } }),
+}));
+vi.mock("./comp/repo", () => ({ ensureActiveVersion: async () => ({ id: "v1" }), loadParams: async () => ({ settings: {}, ranks: [], thresholds: [] }) }));
+vi.mock("./coachApplyStore", () => ({ listApplications: async () => ({}) }));
 vi.mock("./license", () => ({
   todayISO: () => "2026-09-14",
+  internEndISO: (iso: string) => iso,
+  isCoopRank: (c: string) => c === "INTERN" || c === "PARTNER",
+  diffDays: () => 0,
+  RANK_GROUP_LABEL: {},
   addDaysISO: (iso: string, days: number) =>
     new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) + days * 86400000)
       .toISOString().slice(0, 10),

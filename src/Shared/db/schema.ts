@@ -1342,10 +1342,20 @@ export const acctReceipts = pgTable('acct_receipts', {
   note: text('note').default('').notNull(),
   void: boolean('void').default(false).notNull(),    // 作廢（全額退費）：不計入，但留痕
   refund: doublePrecision('refund').default(0).notNull(),  // 部分退款：以 amount − refund 重算（V7.2 §41）
+  // 顧問費（2026/10/09 Ray）：教練建客戶時勾「付費顧問案」就寫一筆，標 verified=false 等後台查帳確認；
+  // 分潤匯款與晉升實績只算已確認的。allocs＝入帳當時用 comp 引擎算好的拆分快照（含差階、平階、代管）。
+  clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+  execCoachId: text('exec_coach_id').references(() => coaches.id, { onDelete: 'set null' }),
+  promoCoachId: text('promo_coach_id').references(() => coaches.id, { onDelete: 'set null' }),
+  verified: boolean('verified').default(true).notNull(),
+  enteredBy: text('entered_by'),
+  allocs: jsonb('allocs').$type<{ to: string; v: number; mode: string; label: string; coachId?: string | null }[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('acct_receipts_ym_idx').on(t.ym),
+  index('acct_receipts_client_idx').on(t.clientId),
+  index('acct_receipts_exec_idx').on(t.execCoachId),
 ]);
 // 匯款對帳的「已匯」紀錄：某月某受款人匯了多少、哪一天。應匯金額不存，每次從收款算。
 export const acctPayouts = pgTable('acct_payouts', {

@@ -11,6 +11,7 @@ import type { TemplateListItem } from "@/lib/templates";
 import type { QuotaState } from "@/lib/license";
 import { QUOTA_FULL_MESSAGE, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { createClientAction } from "./actions";
+import FeeFields, { EMPTY_FEE, feeError, feeToInput, type FeeDraft } from "./FeeFields";
 import { copyTemplateAction } from "./templates/actions";
 import { StageGuideModal } from "./StageGuide";
 import {
@@ -30,8 +31,11 @@ export default function ClientList({
   templates = [],
   quota,
   readOnly = false,
+  meId = "",
 }: {
   clients: ClientListItem[];
+  /** 我的教練 id：付費顧問案的執案教練＝我。 */
+  meId?: string;
   /** 別人邀我共同執案的客戶（唯讀）。刻意跟自己的客戶分兩區，也不計入額度。 */
   shared?: SharedClientItem[];
   /** 全公司共用的示範範本（唯讀、不計入額度）。同樣分開一區，理由見下方那一節。 */
@@ -296,6 +300,7 @@ export default function ClientList({
     const [tags, setTags] = useState("");
     const [phone, setPhone] = useState("");
     const [birthDate, setBirthDate] = useState("");
+    const [fee, setFee] = useState<FeeDraft>(EMPTY_FEE);
     const [err, setErr] = useState("");
     const [pending, start] = useTransition();
 
@@ -306,6 +311,8 @@ export default function ClientList({
         setErr("請填客戶姓名");
         return;
       }
+      const fe = feeError(fee);
+      if (fe) { setErr(fe); return; }
       setErr("");
       const finalSource =
         source === "其他"
@@ -321,6 +328,7 @@ export default function ClientList({
             tags: tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean),
             contact: phone ? { phone } : {},
             birthDate: birthDate || null,
+            fee: feeToInput(fee, meId),
           });
           // 額度已滿／期限到期是「使用者要看到理由」的情況，原樣顯示伺服器的訊息。
           if (!r.ok) setErr(r.error);
@@ -332,10 +340,12 @@ export default function ClientList({
     }
 
     return (
-      <Modal onClose={onClose} labelledBy="newClientTitle" width="max-w-md">
+      <Modal onClose={onClose} labelledBy="newClientTitle" width="max-w-lg">
         <div className="p-5">
           <h2 id="newClientTitle" className="font-serif text-lg mb-4">新增客戶</h2>
           <div className="grid gap-3">
+            {/* 2026/10/09 Ray：最上面先問有沒有付費——勾了才記進公司顧問費 */}
+            <FeeFields value={fee} onChange={setFee} meId={meId} compact />
             <div>
               <label className="text-xs text-tx2">姓名 *</label>
               <input className={field} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
