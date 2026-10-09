@@ -60,7 +60,7 @@ export default function HomeSwitcher({
           {memberOptions.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
         </select>
       )}
-      <span className="text-11 text-tx3">預覽視角 · 業績/活動/增員為可編輯模擬資料</span>
+      <span className="text-11 text-tx3">預覽視角 · 數字來自後台帳務、分潤匯款與業務制度</span>
     </div>
   );
 }

@@ -66,10 +66,15 @@ export function TwoLines({ rows }: { rows: { ym: string; a: number; b: number }[
       <path d={path("a")} fill="none" stroke="var(--brand2)" strokeWidth={2} opacity={0.5} />
       <path d={path("b")} fill="none" stroke="var(--ok)" strokeWidth={2.2} />
       {rows.map((r, i) => (rows.length <= 8 || i % 2) ? <text key={r.ym} x={x(i)} y={H - 8} textAnchor="middle" fontSize={10} fill="var(--tx3)">{r.ym.slice(2)}</text> : null)}
-      {last && <>
-        <text x={x(rows.length - 1) + 6} y={y(last.a) + 4} fontSize={11} fill="var(--brand2)">營業額 {F(last.a)}</text>
-        <text x={x(rows.length - 1) + 6} y={y(last.b) + 4} fontSize={11} fill="var(--ok)">公司實收 {F(last.b)}</text>
-      </>}
+      {last && (() => {
+        // 兩條線末端貼在一起時把標籤錯開，不然疊成一團
+        const ya = y(last.a), yb0 = y(last.b);
+        const yb = Math.abs(yb0 - ya) < 12 ? ya + 13 : yb0;
+        return <>
+          <text x={x(rows.length - 1) + 6} y={ya + 4} fontSize={11} fill="var(--brand2)">營業額 {F(last.a)}</text>
+          <text x={x(rows.length - 1) + 6} y={yb + 4} fontSize={11} fill="var(--ok)">公司實收 {F(last.b)}</text>
+        </>;
+      })()}
     </svg>
   );
 }
