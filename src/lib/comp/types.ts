@@ -139,6 +139,10 @@ export type CompSettings = Partial<{
   selfExecFirstN: number;
   teamCreditChainOnly: boolean;
 
+  // ── 報聘門檻（V7.2 §38之2；與維持資格分開判斷） ──
+  applyMinCases: number;
+  applyMinFees: number;
+
   // ── 頁 5 同業招募與真除（第十四、十五、二十四條） ──
   recruitByThreshold: boolean;
   recruitAllowHigher: boolean;

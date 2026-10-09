@@ -15,6 +15,7 @@
 /** 級別的內建客戶上限。comp_ranks.clientCap 留空時的 fallback。 */
 export const RANK_CLIENT_CAPS: Record<string, number> = {
   INTERN: 20,
+  PARTNER: 20,   // 結業合作夥伴原則用直屬教練系統；這裡給實習同額，免得既有帳號一轉身分就被鎖
   C1: 20,
   C2: 20,
   C3: 20,
@@ -24,8 +25,17 @@ export const RANK_CLIENT_CAPS: Record<string, number> = {
   CHIEF: 100,
 };
 
-/** 實習教練的固定期間（月）。UI 不給選，直接鎖死。 */
-export const INTERN_MONTHS = 6;
+/**
+ * 實習教練的固定期間（天）。UI 不給選，直接鎖死。
+ * 2026/10/09 V7.2：實習期＝Email 所載培訓起算日起 **180 天**，不以日曆半年替代（辦法 §38之1）。
+ * 起算日＝licenseFrom（後台可改）；期滿未報聘 → 轉結業合作夥伴 PARTNER（§38之5）。
+ */
+export const INTERN_DAYS = 180;
+/** 實習期滿日（含當日仍是實習）：起算日 + 180 − 1 天。 */
+export const internEndISO = (fromISO: string) => addDaysISO(fromISO, INTERN_DAYS - 1);
+/** 不是正式職級的兩個合作身分（§6之1）。 */
+export const COOP_RANKS = ["INTERN", "PARTNER"] as const;
+export const isCoopRank = (code: string | null | undefined) => code === "INTERN" || code === "PARTNER";
 
 /**
  * 級別的內建順序（seq 小＝低階）。
@@ -35,10 +45,10 @@ export const INTERN_MONTHS = 6;
  * 所以那一列不會自己長出來。程式端一律以這份為準做 fallback，
  * 後台再補上那一列時也不會衝突（DB 有就用 DB 的）。
  */
-export const RANK_ORDER = ["INTERN", "C1", "C2", "C3", "S1", "S2", "S3", "CHIEF"] as const;
+export const RANK_ORDER = ["INTERN", "PARTNER", "C1", "C2", "C3", "S1", "S2", "S3", "CHIEF"] as const;
 
 export const BUILTIN_RANK_SEQ: Record<string, number> = {
-  INTERN: 0, C1: 1, C2: 2, C3: 3, S1: 4, S2: 5, S3: 6, CHIEF: 7,
+  INTERN: 0, PARTNER: 1, C1: 2, C2: 3, C3: 4, S1: 5, S2: 6, S3: 7, CHIEF: 8,
 };
 
 /**
@@ -56,6 +66,7 @@ export const BUILTIN_RANK_SEQ: Record<string, number> = {
  */
 export const RANK_PUBLIC_LABEL: Record<string, string> = {
   INTERN: "實習教練",
+  PARTNER: "結業合作夥伴",
   C1: "認證教練",
   C2: "認證教練",
   C3: "認證教練",
@@ -78,6 +89,7 @@ export function publicRankLabel(rankCode: string | null | undefined): string | n
 /** 內部用（後台職級表、期限設定）：帶階數，分得出 C2 與 C3。 */
 export const RANK_GROUP_LABEL: Record<string, string> = {
   INTERN: "實習教練",
+  PARTNER: "結業合作夥伴",
   C1: "認證教練 C1",
   C2: "認證教練 C2",
   C3: "認證教練 C3",

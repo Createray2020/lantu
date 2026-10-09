@@ -7,12 +7,12 @@
 //   acct_receipts 逐筆收款（對帳表的每一列，2026/10/08）；acct_payouts 某月某受款人「已匯」
 // 計算全在 acctEngine.ts（純函式），這裡只管進出 DB 與正規化。
 import { unstable_cache, updateTag } from "next/cache";
-import { and, asc, desc, eq, gte, isNotNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { acctParams, acctMonths, acctTargets, acctEntries, acctReceipts, acctPayouts, coaches } from "@/Shared/db/schema";
+import { acctParams, acctMonths, acctTargets, acctEntries, acctReceipts, acctPayouts, payees, coaches, compCases, compPayouts } from "@/Shared/db/schema";
 import {
-  ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, isYm, normGoal, normItems, normMonth, normParams, normTarget, normReceipt, normPayoutMark, prevYm, ymOf,
-  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark,
+  ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, annualFeeOf, isYm, normGoal, normItems, normMonth, normParams, normTarget, normReceipt, normPayoutMark, normPayee, prevYm, ymOf,
+  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark, type PayeeRec, type CoachLite, type ReceiptRow,
 } from "./acctEngine";
 
 export const ACCT_TAG = "acct-params";
@@ -27,7 +27,8 @@ async function loadState(): Promise<AcctState> {
   const sys: Record<string, SysRow[]> = {};
   const receipts: Record<string, Receipt[]> = {};
   const payouts: Record<string, Record<string, PayoutMark>> = {};
-  let coachList: { id: string; name: string }[] = [];
+  let coachList: CoachLite[] = [];
+  let payeeBook: PayeeRec[] = [];
   try {
     const rows = await db.select({ key: acctParams.key, value: acctParams.value }).from(acctParams);
     for (const r of rows) {
@@ -53,10 +54,34 @@ async function loadState(): Promise<AcctState> {
     }
     const ps = await db.select().from(acctPayouts);
     for (const p of ps) if (isYm(p.ym)) (payouts[p.ym] ??= {})[p.payee] = normPayoutMark({ paidOn: p.paidOn, amount: p.amount, note: p.note });
-    const cl = await db.select({ id: coaches.id, name: coaches.name, displayName: coaches.displayName, isTest: coaches.isTest }).from(coaches).orderBy(desc(coaches.createdAt));
-    coachList = cl.filter((c) => !c.isTest).map((c) => ({ id: c.id, name: (c.displayName || c.name || "").trim() })).filter((c) => c.name);
+    const cl = await db.select({ id: coaches.id, name: coaches.name, displayName: coaches.displayName, isTest: coaches.isTest, rankCode: coaches.rankCode, uplineId: coaches.uplineId }).from(coaches).orderBy(desc(coaches.createdAt));
+    coachList = cl.filter((c) => !c.isTest).map((c) => ({ id: c.id, name: (c.displayName || c.name || "").trim(), rankCode: c.rankCode ?? null, uplineId: c.uplineId ?? null })).filter((c) => c.name);
+    // 顧問費：從「案件與分潤」帶進來（V7.2 §九：收款與分配要在一起看）。公司收訖（paid_at）落在哪個月就算哪個月的收款；
+    // 拆分照 comp_payouts 已算好的列（含差階、平階、代管、沖回），公司列當「留在公司」。
+    const caseItem = items.find((it) => it.source === "case");
+    if (caseItem) {
+      const cs = await db.select({ id: compCases.id, clientName: compCases.clientName, fee: compCases.fee, refund: compCases.refundAmount, paidAt: compCases.paidAt, status: compCases.status, note: compCases.note })
+        .from(compCases).where(isNotNull(compCases.paidAt));
+      const ids = cs.map((c) => c.id);
+      const ps = ids.length ? await db.select({ caseId: compPayouts.caseId, payeeId: compPayouts.payeeId, name: compPayouts.payeeName, kind: compPayouts.kind, role: compPayouts.role, rankCode: compPayouts.rankCode, amount: compPayouts.amount, status: compPayouts.status, totalPct: compPayouts.totalPct })
+        .from(compPayouts).where(inArray(compPayouts.caseId, ids)) : [];
+      for (const c of cs) {
+        const on = String(c.paidAt); const ym = on.slice(0, 7);
+        if (!isYm(ym)) continue;
+        const allocs: ReceiptRow[] = ps.filter((x) => x.caseId === c.id && x.status !== "void").map((x) => ({
+          to: x.name, v: x.amount, mode: x.kind === "advisor" ? "pct" : "keep", coachId: x.payeeId ?? null,
+          label: x.kind === "advisor" ? `${x.role ?? ""}${x.rankCode ? `（${x.rankCode}）` : ""} ${Math.round(x.totalPct * 10) / 10}%`.trim() : (x.kind === "company_lead" ? "公司派案推廣端" : x.kind === "company_remainder" ? "鏈不完整歸公司" : "公司營運"),
+        }));
+        (receipts[ym] ??= []).push({
+          id: `case:${c.id}`, ym, itemId: caseItem.id, on, amount: c.fee, last5: "", payer: c.clientName, payerCoachId: null, sharers: [], payees: {},
+          note: c.note ?? "", void: c.status === "void" || c.status === "cancelled", refund: c.refund ?? 0, source: "case", caseId: c.id, allocs,
+        });
+      }
+    }
+    const pb = await db.select().from(payees);
+    payeeBook = pb.map((p) => { const r = normPayee(p, p.id); if (r.coachId && !r.name) r.name = coachList.find((c) => c.id === r.coachId)?.name ?? ""; return r; });
   } catch { /* 表還沒建：空狀態 */ }
-  return { items, months, targets, draft, sys, receipts, payouts, coachList, params, goal };
+  return { items, months, targets, draft, sys, receipts, payouts, coachList, payeeBook, params, goal };
 }
 export const getAcctState = unstable_cache(loadState, ["lantu-acct-state"], { tags: [ACCT_TAG] });
 
@@ -131,13 +156,16 @@ async function itemForSource(source: AcctSource): Promise<AcctItem | null> {
  * 記一筆系統入帳。永遠不丟錯（呼叫端是核准／開通流程，帳務不能擋住那些事）。
  * 測試帳號不記；同一個人同一種事件只記一次（唯一鍵 onConflictDoNothing）。回 true＝這次真的寫了一筆。
  */
-export async function recordAcctEvent(source: AcctSource, coachId: string, at: Date = new Date()): Promise<boolean> {
+export async function recordAcctEvent(source: AcctSource, coachId: string, at: Date = new Date(), opts?: { early?: boolean; rankCode?: string | null }): Promise<boolean> {
   try {
-    const [c] = await db.select({ isTest: coaches.isTest }).from(coaches).where(eq(coaches.id, coachId));
+    const [c] = await db.select({ isTest: coaches.isTest, rankCode: coaches.rankCode }).from(coaches).where(eq(coaches.id, coachId));
     if (!c || c.isTest) return false;
     const it = await itemForSource(source);
     if (!it) return false;
-    const r = await db.insert(acctEntries).values({ ym: ymOf(at), itemId: it.id, coachId, source, amount: it.price, createdAt: at })
+    // 年度合作費依職級（V7.2 §31）：提前報聘首期 6,000；否則核定職級費率；沒設定的職級退回項目單價
+    let amount = it.price;
+    if (source === "apply") { const S = await loadState(); const fee = annualFeeOf(S.params, opts?.rankCode ?? c.rankCode, !!opts?.early); if (fee > 0) amount = fee; }
+    const r = await db.insert(acctEntries).values({ ym: ymOf(at), itemId: it.id, coachId, source, amount, createdAt: at })
       .onConflictDoNothing({ target: [acctEntries.coachId, acctEntries.source] }).returning({ id: acctEntries.id });
     if (r.length) updateTag(ACCT_TAG);
     return r.length > 0;
@@ -169,10 +197,11 @@ export async function backfillAcctMonth(ym: string): Promise<{ apply: number; li
 /** 存一筆收款（新增或改）。那個月還沒開就順手開（固定支出照 ensureAcctMonth 的規則複製）。回存進去的 id。 */
 export async function saveAcctReceipt(id: string | null, value: unknown): Promise<string> {
   const r = normReceipt(value, id ?? "");
+  if (id?.startsWith("case:")) throw new Error("case-readonly");
   if (!r.on) throw new Error("invalid-date");
   if (!r.itemId) throw new Error("invalid-item");
   if (!(r.amount > 0)) throw new Error("invalid-amount");
-  const row = { ym: r.ym, itemId: r.itemId, receivedOn: r.on, amount: r.amount, last5: r.last5, payer: r.payer, payerCoachId: r.payerCoachId ?? null, sharers: r.sharers, payees: r.payees, note: r.note, void: r.void, updatedAt: new Date() };
+  const row = { ym: r.ym, itemId: r.itemId, receivedOn: r.on, amount: r.amount, last5: r.last5, payer: r.payer, payerCoachId: r.payerCoachId ?? null, sharers: r.sharers, payees: r.payees, note: r.note, void: r.void, refund: r.refund, updatedAt: new Date() };
   let out = id;
   if (id) await db.update(acctReceipts).set(row).where(eq(acctReceipts.id, id));
   else { const [x] = await db.insert(acctReceipts).values(row).returning({ id: acctReceipts.id }); out = x.id; }
@@ -181,6 +210,7 @@ export async function saveAcctReceipt(id: string | null, value: unknown): Promis
   return out!;
 }
 export async function deleteAcctReceipt(id: string): Promise<void> {
+  if (id.startsWith("case:")) throw new Error("case-readonly");
   await db.delete(acctReceipts).where(eq(acctReceipts.id, id));
   updateTag(ACCT_TAG);
 }
@@ -193,6 +223,34 @@ export async function markAcctPayout(ym: string, payee: string, value: unknown):
   if (!(m.amount > 0)) await db.delete(acctPayouts).where(and(eq(acctPayouts.ym, ym), eq(acctPayouts.payee, p)));
   else await db.insert(acctPayouts).values({ ym, payee: p, paidOn: m.paidOn || null, amount: m.amount, note: m.note, updatedAt: new Date() })
     .onConflictDoUpdate({ target: [acctPayouts.ym, acctPayouts.payee], set: { paidOn: m.paidOn || null, amount: m.amount, note: m.note, updatedAt: new Date() } });
+  updateTag(ACCT_TAG);
+}
+// ---------- 受款人簿 ----------
+/** 存一列受款人：id 給了就改、沒給就新增（教練列用 coachId 當唯一鍵 upsert）。回 id。 */
+export async function savePayee(id: string | null, value: unknown): Promise<string> {
+  const r = normPayee(value, id ?? "");
+  if (!r.coachId && !r.name) throw new Error("invalid-payee");
+  const row = { coachId: r.coachId, name: r.name, bankCode: r.bankCode, bankName: r.bankName, branch: r.branch, accountName: r.accountName, accountNo: r.accountNo, taxMode: r.taxMode, note: r.note, updatedAt: new Date() };
+  let out = id;
+  if (id) await db.update(payees).set(row).where(eq(payees.id, id));
+  else if (r.coachId) {
+    const [x] = await db.insert(payees).values(row).onConflictDoUpdate({ target: payees.coachId, set: row }).returning({ id: payees.id });
+    out = x.id;
+  } else { const [x] = await db.insert(payees).values(row).returning({ id: payees.id }); out = x.id; }
+  updateTag(ACCT_TAG);
+  return out!;
+}
+/** 教練自己的收款設定（教練端）：只能動自己那一列、不能改顯示名以外的歸屬。 */
+export async function saveMyPayee(coachId: string, value: unknown): Promise<string> {
+  const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  return savePayee(null, { ...v, coachId });
+}
+export async function getMyPayee(coachId: string): Promise<PayeeRec | null> {
+  const [p] = await db.select().from(payees).where(eq(payees.coachId, coachId));
+  return p ? normPayee(p, p.id) : null;
+}
+export async function deletePayee(id: string): Promise<void> {
+  await db.delete(payees).where(eq(payees.id, id));
   updateTag(ACCT_TAG);
 }
 export const currentYm = () => ymOf(new Date());

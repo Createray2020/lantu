@@ -7,6 +7,8 @@ import { getProfile } from "@/lib/coachProfile";
 import { publicRankLabel } from "@/lib/license";
 import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import ProfileEditor, { type ProfileForm } from "./ProfileEditor";
+import BankSettings from "./BankSettings";
+import { getMyPayee } from "@/lib/acctStore";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,7 @@ export default async function ProfilePage() {
   if (me.status !== "active") redirect("/dashboard");
 
   const version = await ensureActiveVersion();
-  const [params, p] = await Promise.all([loadParams(version.id), getProfile(me.id)]);
+  const [params, p, payee] = await Promise.all([loadParams(version.id), getProfile(me.id), getMyPayee(me.id).catch(() => null)]);
 
   const initial: ProfileForm = {
     headline: p?.headline ?? "",
@@ -72,6 +74,8 @@ export default async function ProfilePage() {
           rankLabel={publicRankLabel(me.rankCode)}
           published={p?.published !== false}
         />
+
+        <BankSettings initial={payee} />
       </section>
     </main>
   );

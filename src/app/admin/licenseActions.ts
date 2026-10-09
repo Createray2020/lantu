@@ -12,7 +12,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { addPeriod, INTERN_MONTHS, type LicenseUnit } from "@/lib/license";
+import { addPeriod, internEndISO, INTERN_DAYS, type LicenseUnit } from "@/lib/license";
 import { recordAcctEvent } from "@/lib/acctStore";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -36,8 +36,9 @@ export async function setLicenseAction(
     // 實習教練固定半年：不信任前端送來的數字，這裡再夾一次。
     const intern = input.rankCode === "INTERN";
     const unit: LicenseUnit = intern ? "month" : input.unit === "year" ? "year" : "month";
-    const qty = intern ? INTERN_MONTHS : Math.min(120, Math.max(1, Math.round(input.qty || 1)));
-    const until = addPeriod(input.licenseFrom, unit, qty);
+    // 實習：起算日（licenseFrom，Email 所載）＋180 天，不是日曆半年（V7.2 §38之1）；qty 記天數方便看
+    const qty = intern ? INTERN_DAYS : Math.min(120, Math.max(1, Math.round(input.qty || 1)));
+    const until = intern ? internEndISO(input.licenseFrom) : addPeriod(input.licenseFrom, unit, qty);
     // 第一次開通才算「培訓帳號」入帳（180 天一生一次）；之後延長只是改期限，不再收。
     const [before] = await db.select({ licenseUntil: coaches.licenseUntil }).from(coaches).where(eq(coaches.id, id));
     const firstOpen = !before?.licenseUntil;

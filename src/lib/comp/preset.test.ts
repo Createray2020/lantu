@@ -35,11 +35,11 @@ describe("mergePreset", () => {
     expect(r.thresholds).toHaveLength(V4_THRESHOLDS.length);
   });
 
-  it("A 軌六列、B 軌三列、真除四列，且 B 軌不含認證顧問階段", () => {
+  it("A 軌六列、B 軌三列、外部同業預認階三列（S1–S3），且 B 軌不含認證顧問階段", () => {
     const t = V4_THRESHOLDS;
     expect(t.filter((x) => x.kind === "promotion_a")).toHaveLength(6);
     expect(t.filter((x) => x.kind === "promotion_b")).toHaveLength(3);
-    expect(t.filter((x) => x.kind === "tenure")).toHaveLength(4);
+    expect(t.filter((x) => x.kind === "tenure")).toHaveLength(3);
     expect(t.filter((x) => x.kind === "promotion_b").every((x) => x.fromCode?.startsWith("S"))).toBe(true);
   });
 

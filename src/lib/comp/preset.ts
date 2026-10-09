@@ -14,15 +14,19 @@ import type { CompParams, CompSettings, ModuleRow, RankRow, ThresholdRow } from 
 // 資深教練 S1–S3／首席教練。實習教練的**權限與 C1 完全相同**（含客戶上限 20 位），
 // 差別只在「使用期限固定半年」，所以分潤率直接比照 C1，不另外開一組數字。
 // clientCap 是各級的客戶資料庫上限；留空＝不限制（見 lib/license.ts）。
+// 2026/10/09 V7.2（§6之1）：多一個合作身分「結業合作夥伴 PARTNER」——完成培訓但未報聘，
+// 比例比照實習（15／30），課程推薦 10%；不是正式職級、無完整年度權益。年度合作費依職級：
+// C1–C3 6,000／S1–S2 12,000／S3 18,000／CHIEF 24,000（§31），填在 priceYear。
 export const V4_RANKS: RankRow[] = [
   { code: "INTERN", seq: 0, groupName: "實習教練", tierLabel: "—", promoPct: 15, execPct: 30, clientCap: 20 },
-  { code: "C1", seq: 1, groupName: "認證教練", tierLabel: "一階", promoPct: 15, execPct: 30, clientCap: 20 },
-  { code: "C2", seq: 2, groupName: "認證教練", tierLabel: "二階", promoPct: 18, execPct: 33, clientCap: 20 },
-  { code: "C3", seq: 3, groupName: "認證教練", tierLabel: "三階", promoPct: 21, execPct: 36, clientCap: 20 },
-  { code: "S1", seq: 4, groupName: "資深教練", tierLabel: "一階", promoPct: 24, execPct: 43, clientCap: 50 },
-  { code: "S2", seq: 5, groupName: "資深教練", tierLabel: "二階", promoPct: 26, execPct: 50, clientCap: 50 },
-  { code: "S3", seq: 6, groupName: "資深教練", tierLabel: "三階", promoPct: 28, execPct: 57, clientCap: 100 },
-  { code: "CHIEF", seq: 7, groupName: "首席教練", tierLabel: "—", promoPct: 30, execPct: 60, clientCap: 100 },
+  { code: "PARTNER", seq: 1, groupName: "結業合作夥伴", tierLabel: "—", promoPct: 15, execPct: 30, clientCap: 20 },
+  { code: "C1", seq: 2, groupName: "認證教練", tierLabel: "一階", promoPct: 15, execPct: 30, clientCap: 20, priceYear: 6000 },
+  { code: "C2", seq: 3, groupName: "認證教練", tierLabel: "二階", promoPct: 18, execPct: 33, clientCap: 20, priceYear: 6000 },
+  { code: "C3", seq: 4, groupName: "認證教練", tierLabel: "三階", promoPct: 21, execPct: 36, clientCap: 20, priceYear: 6000 },
+  { code: "S1", seq: 5, groupName: "資深教練", tierLabel: "一階", promoPct: 24, execPct: 43, clientCap: 50, priceYear: 12000 },
+  { code: "S2", seq: 6, groupName: "資深教練", tierLabel: "二階", promoPct: 26, execPct: 50, clientCap: 50, priceYear: 12000 },
+  { code: "S3", seq: 7, groupName: "資深教練", tierLabel: "三階", promoPct: 28, execPct: 57, clientCap: 100, priceYear: 18000 },
+  { code: "CHIEF", seq: 8, groupName: "首席教練", tierLabel: "—", promoPct: 30, execPct: 60, clientCap: 100, priceYear: 24000 },
 ];
 
 export const V4_THRESHOLDS: ThresholdRow[] = [
@@ -40,14 +44,12 @@ export const V4_THRESHOLDS: ThresholdRow[] = [
     kind: "promotion_b", seq: 3, fromCode: "S3", toCode: "CHIEF",
     cases: 25, fees: 750_000, teamCases: 70, mentorCount: 2, mentorRankCode: "S1",
   },
-  // 真除（第十五條）
-  { kind: "tenure", seq: 1, toCode: "S1", cases: 3, fees: 90_000 },
-  { kind: "tenure", seq: 2, toCode: "S2", cases: 4, fees: 120_000 },
-  { kind: "tenure", seq: 3, toCode: "S3", cases: 5, fees: 150_000 },
-  {
-    kind: "tenure", seq: 4, toCode: "CHIEF", cases: 6, fees: 180_000,
-    mentorCount: 1, extraNote: "育成或帶領至少 1 位直轄顧問完成首案",
-  },
+  // 外部同業預認階的認階確認（V7.2 §23，2026/10/09 取代 V4 真除表）：
+  // 十二個月確認期內以實收顧問費為主、不設件數門檻；達標且品質確認即可提前正式認階。
+  // 最高只預認到 S3；S3 升 CHIEF 走一般晉升（§24-4），所以沒有 CHIEF 列。
+  { kind: "tenure", seq: 1, toCode: "S1", cases: null, fees: 150_000, extraNote: "外部同業：12 個月實收顧問費" },
+  { kind: "tenure", seq: 2, toCode: "S2", cases: null, fees: 450_000, extraNote: "外部同業：12 個月實收顧問費" },
+  { kind: "tenure", seq: 3, toCode: "S3", cases: null, fees: 750_000, extraNote: "外部同業：12 個月實收顧問費" },
 ];
 
 /**
@@ -121,13 +123,19 @@ export const V4_SETTINGS: CompSettings = {
   tenureCountLifetime: true,
   tenureStepDown: true,
   tenureStepDownMax: 1,
-  tenureFloorRankCode: "C3",
+  // V7.2 §24-3：未達 15 萬者不具資深顧問正式認階條件，回歸認證顧問一般制度
+  tenureFloorRankCode: "C1",
   tenureShowPublic: false,
+  // V7.2 §38之2 報聘門檻（跟年度維持的 1 件 ≥36,000 是兩個不同的判斷，不得混用 §29-4）
+  applyMinCases: 1,
+  applyMinFees: 30_000,
   rejoinAsRecruit: true,
   leaveKeepMetrics: false,
 
   // 頁 6（第十六～十九條）
   maintainCases: 1,
+  // V7.2 §29-1：每一報聘週年年度至少一件完整財務規劃案件，且該件實收 ≥36,000
+  maintainMinFee: 36_000,
   maintainUseSpotPrice: true,
   maintainYearStart: "01-01",
   trainHours: 8,

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 教練公開檔案的契約。這一份會直接出現在官網上，所以兩件事最重要：
 // 一是教練只能改自己的（action 根本不接 coachId），二是照片與長度上限擋得住。
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// acctStore（收款設定）在 import 時就呼叫 unstable_cache，mock 要一併給（帳務後台_定案企劃 的地雷）
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), unstable_cache: (fn: unknown) => fn, updateTag: vi.fn() }));
+vi.mock("@/lib/acctStore", () => ({ saveMyPayee: vi.fn(), getMyPayee: vi.fn() }));
 vi.mock("@/lib/coach", () => ({ ensureCoach: vi.fn(), isAdmin: vi.fn(), saveDisplayName: vi.fn() }));
 vi.mock("@/lib/coachProfile", () => ({ saveProfile: vi.fn(), setPublished: vi.fn() }));
 

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import SubmitButton from "@/components/ui/SubmitButton";
 import {
-  INTERN_MONTHS, RANK_GROUP_LABEL, addPeriod, licenseState,
+  INTERN_DAYS, internEndISO, RANK_GROUP_LABEL, addPeriod, licenseState,
   type LicenseUnit,
 } from "@/lib/license";
 import { setLicenseAction, setClientCapAction } from "./licenseActions";
@@ -48,8 +48,8 @@ export default function LicenseCell({
 
   const isIntern = rank === "INTERN";
   const effUnit: LicenseUnit = isIntern ? "month" : unit;
-  const effQty = isIntern ? INTERN_MONTHS : Math.max(1, Math.round(qty || 1));
-  const preview = from ? addPeriod(from, effUnit, effQty) : "";
+  const effQty = isIntern ? INTERN_DAYS : Math.max(1, Math.round(qty || 1));
+  const preview = from ? (isIntern ? internEndISO(from) : addPeriod(from, effUnit, effQty)) : "";
 
   const st = licenseState({ licenseUntil, status });
   const cap效 = clientCapOverride ?? capFromRank;
@@ -154,7 +154,7 @@ export default function LicenseCell({
             </select>
           </div>
           {isIntern && (
-            <p className="text-tx3">實習教練固定 {INTERN_MONTHS} 個月學習期，不可調整。</p>
+            <p className="text-tx3">實習教練固定 {INTERN_DAYS} 天（起算日＝Email 所載培訓起算日，可改），期滿未報聘轉結業合作夥伴。</p>
           )}
           <p className="text-tx2">
             到期日：<b className="text-brand2">{preview || "—"}</b>

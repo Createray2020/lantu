@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
-import { calcReceipt, payoutsOf, prevYm, nextYm, isYm, type AcctState, type AcctItem, type Receipt, type Sharer } from "@/lib/acctEngine";
+import { calcReceipt, payoutsOf, prevYm, nextYm, isYm, netOf, referralChain, isFormalRank, type AcctState, type AcctItem, type Receipt, type Sharer, type CoachLite } from "@/lib/acctEngine";
 import { saveAcctReceiptAction, deleteAcctReceiptAction } from "./actions";
 import { useAcct, card, h2, hint, btn, xbtn, F, NUM, uid } from "./AcctParts";
 
@@ -13,12 +13,13 @@ import { useAcct, card, h2, hint, btn, xbtn, F, NUM, uid } from "./AcctParts";
 // 每一筆的拆分由 acctEngine.calcReceipt 算，規則掛在參數設定的項目上。
 
 const EMPTY_FORM = (it: AcctItem | undefined, ym: string): Receipt => ({
-  id: "", ym, itemId: it?.id ?? "", on: `${ym}-01`, amount: it?.price ?? 0, last5: "", payer: "", payerCoachId: null, sharers: [], payees: {}, note: "", void: false,
+  id: "", ym, itemId: it?.id ?? "", on: `${ym}-01`, amount: it?.price ?? 0, last5: "", payer: "", payerCoachId: null, sharers: [], payees: {}, note: "", void: false, refund: 0, source: "manual",
 });
-const parseSharers = (text: string, coachList: { id: string; name: string }[]): Sharer[] =>
+/** 手填的分潤人（備援）：對得上名冊就帶 coachId 與目前職級。正規做法是用「推薦人」挑人讓系統展開輔導鏈。 */
+const parseSharers = (text: string, coachList: CoachLite[]): Sharer[] =>
   text.split(/[、,，/／\s]+/).map((x) => x.trim()).filter(Boolean).map((name) => {
     const c = coachList.find((k) => k.name === name);
-    return c ? { name, coachId: c.id } : { name };
+    return c ? { name, coachId: c.id, rankCode: c.rankCode ?? null } : { name };
   });
 
 export default function ReceiptsBoard({ initial, today }: { initial: AcctState; today: string }) {
@@ -127,7 +128,7 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
         <div key={g.key} className={card}>
           <div className="flex items-baseline justify-between mb-2">
             <h2 className={h2}>{g.title}</h2>
-            <span className="text-xs text-tx3">{g.rows.filter((r) => !r.void).length} 筆・{F(g.rows.filter((r) => !r.void).reduce((a, r) => a + r.amount, 0))}</span>
+            <span className="text-xs text-tx3">{g.rows.filter((r) => !r.void).length} 筆・{F(g.rows.filter((r) => !r.void).reduce((a, r) => a + netOf(r), 0))}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -135,27 +136,30 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
               <tbody>
                 {g.rows.map((r) => {
                   const it = S.items.find((i) => i.id === r.itemId)!;
-                  const rr = calcReceipt(it, r.amount, r.sharers, r.payees, S.params);
+                  const rr = calcReceipt(it, netOf(r), r.sharers, r.payees, S.params, {}, r.allocs);
+                  const isCase = r.source === "case";
                   return (
                     <tr key={r.id} className={`border-t border-line align-top ${r.void ? "text-tx3 line-through" : ""}`}>
                       <td className="py-1.5 whitespace-nowrap">{r.on}</td>
                       {g.items.length > 1 && <td className="whitespace-nowrap">{it.name}</td>}
-                      <td className="text-right whitespace-nowrap">{F(r.amount)}</td>
+                      <td className="text-right whitespace-nowrap">{F(r.amount)}{r.refund > 0 && <div className="text-10 text-danger">退 {F(r.refund)}</div>}</td>
                       <td className="pl-3 text-tx2">{r.last5 || "—"}</td>
                       <td className="whitespace-nowrap">{r.payer}{r.payerCoachId && <span className="text-10 text-tx3 ml-1">教練</span>}</td>
-                      <td className="text-tx2">{r.sharers.length ? r.sharers.map((s) => s.name).join("、") : <span className="text-tx3">—</span>}</td>
+                      <td className="text-tx2">{isCase ? <span className="text-tx3">案件</span> : r.sharers.length ? r.sharers.map((s) => `${s.name}${s.rankCode ? ` ${s.rankCode}` : ""}`).join(" → ") : <span className="text-tx3">—</span>}</td>
                       <td className="no-underline">
                         <div className="flex flex-wrap gap-1">
-                          {rr.rows.filter((x) => x.v > 0).map((x, i) => <span key={i} className={`text-10 rounded-full border px-2 py-0.5 whitespace-nowrap ${x.mode === "keep" ? "border-brand2 text-brand2" : "border-line text-tx2"}`} title={x.label}>{x.to} {F(x.v)}</span>)}
+                          {rr.rows.filter((x) => x.v !== 0).map((x, i) => <span key={i} className={`text-10 rounded-full border px-2 py-0.5 whitespace-nowrap ${x.mode === "keep" ? "border-brand2 text-brand2" : "border-line text-tx2"}`} title={x.label}>{x.to} {F(x.v)}</span>)}
                           <span className="text-10 rounded-full bg-panel3 text-brand2 px-2 py-0.5 whitespace-nowrap font-bold">公司 {F(rr.company)}</span>
                           {rr.warn && <span className="text-10 text-danger">⚠ {rr.warn}</span>}
                         </div>
                         {r.note && <div className="text-xs text-tx3 mt-0.5">{r.note}</div>}
                       </td>
                       <td className="text-right whitespace-nowrap">
-                        <button className="text-xs text-tx3 hover:text-tx px-1" onClick={() => setEditing(r)}>改</button>
-                        <button className="text-xs text-tx3 hover:text-tx px-1" onClick={() => toggleVoid(r)}>{r.void ? "恢復" : "作廢"}</button>
-                        <button className={xbtn} onClick={() => remove(r)}>✕</button>
+                        {isCase ? <Link href="/admin/cases" className="text-xs text-tx3 hover:text-brand2 px-1 no-underline">案件與分潤 ›</Link> : (<>
+                          <button className="text-xs text-tx3 hover:text-tx px-1" onClick={() => setEditing(r)}>改</button>
+                          <button className="text-xs text-tx3 hover:text-tx px-1" onClick={() => toggleVoid(r)}>{r.void ? "恢復" : "作廢"}</button>
+                          <button className={xbtn} onClick={() => remove(r)}>✕</button>
+                        </>)}
                       </td>
                     </tr>
                   );
@@ -182,18 +186,23 @@ function Kpi({ l, v, cls, sub }: { l: string; v: string; cls?: string; sub?: Rea
 
 /** 一筆收款的表單（新增與改共用）。改項目會把金額帶成單價；分潤人用「、」分，對得上名冊就連結。 */
 function ReceiptForm({ init, S, coachList, pending, onCancel, onSave }: {
-  init: Receipt; S: AcctState; coachList: { id: string; name: string }[]; pending: boolean; onCancel: () => void; onSave: (r: Receipt) => void;
+  init: Receipt; S: AcctState; coachList: CoachLite[]; pending: boolean; onCancel: () => void; onSave: (r: Receipt) => void;
 }) {
   const [r, setR] = useState<Receipt>(init);
   const [sharerText, setSharerText] = useState(init.sharers.map((s) => s.name).join("、"));
   const it = S.items.find((i) => i.id === r.itemId) ?? S.items[0];
   const restSplits = it.splits.filter((s) => s.mode === "rest");
   const hasPool = it.splits.some((s) => s.mode === "pool");
-  const preview = calcReceipt(it, r.amount, r.sharers, r.payees, S.params);
+  const preview = calcReceipt(it, netOf(r), r.sharers, r.payees, S.params);
+  const referrerId = r.sharers[0]?.coachId ?? "";
+  const [manualShare, setManualShare] = useState(() => init.sharers.length > 0 && !init.sharers[0]?.coachId);
+  const pickReferrer = (id: string) => set({ sharers: id ? referralChain(id, coachList) : [] });
+  const payerCoach = coachList.find((c) => c.id === r.payerCoachId);
+  const payerFormal = !!payerCoach && isFormalRank(payerCoach.rankCode);
   const set = (patch: Partial<Receipt>) => setR((x) => ({ ...x, ...patch }));
   const pickItem = (id: string) => { const n = S.items.find((i) => i.id === id); if (n) set({ itemId: id, amount: n.price || r.amount }); };
   const setPayer = (payer: string) => { const c = coachList.find((k) => k.name === payer.trim()); set({ payer, payerCoachId: c ? c.id : null }); };
-  const submit = () => onSave({ ...r, ym: r.on.slice(0, 7), itemId: it.id, sharers: parseSharers(sharerText, coachList) });
+  const submit = () => onSave({ ...r, ym: r.on.slice(0, 7), itemId: it.id, sharers: manualShare ? parseSharers(sharerText, coachList) : r.sharers });
   const ok = /^\d{4}-\d{2}-\d{2}$/.test(r.on) && r.amount > 0;
   return (
     <div className={`${card} border-brand2`}>
@@ -209,9 +218,24 @@ function ReceiptForm({ init, S, coachList, pending, onCancel, onSave }: {
           <input className={`${FIELD_SM} w-28`} value={r.last5} placeholder="或「信用卡分期」" onChange={(e) => set({ last5: e.target.value })} /></label>
         <label className="flex flex-col gap-1"><span className="text-xs text-tx3">匯款人</span>
           <input className={`${FIELD_SM} w-32`} list="acct-coach-names" value={r.payer} onChange={(e) => setPayer(e.target.value)} /></label>
-        {hasPool && (
+        <label className="flex flex-col gap-1"><span className="text-xs text-tx3">退款（部分退款填金額）</span>
+          <input className={`${FIELD_SM} w-24 text-right`} inputMode="numeric" value={r.refund || ""} placeholder="0" onChange={(e) => set({ refund: NUM(e.target.value) })} /></label>
+        {hasPool && !manualShare && (
+          <label className="flex flex-col gap-1"><span className="text-xs text-tx3">推薦人（系統沿他的輔導鏈算差階）</span>
+            <span className="flex items-center gap-2">
+              <select className={SELECT_SM} value={referrerId} onChange={(e) => pickReferrer(e.target.value)}>
+                <option value="">無（不計推薦）</option>
+                {coachList.map((c) => <option key={c.id} value={c.id}>{c.name}{c.rankCode ? `（${c.rankCode}）` : ""}</option>)}
+              </select>
+              <button type="button" className="text-xs text-tx3 hover:text-tx underline" onClick={() => { setManualShare(true); setSharerText(r.sharers.map((x) => x.name).join("、")); }}>改手填</button>
+            </span></label>
+        )}
+        {hasPool && manualShare && (
           <label className="flex flex-col gap-1"><span className="text-xs text-tx3">分潤人（職級低→高，用「、」分）</span>
-            <input className={`${FIELD_SM} w-56`} value={sharerText} placeholder="沒有就留空" onChange={(e) => { setSharerText(e.target.value); set({ sharers: parseSharers(e.target.value, coachList) }); }} /></label>
+            <span className="flex items-center gap-2">
+              <input className={`${FIELD_SM} w-56`} value={sharerText} placeholder="沒有就留空" onChange={(e) => { setSharerText(e.target.value); set({ sharers: parseSharers(e.target.value, coachList) }); }} />
+              <button type="button" className="text-xs text-tx3 hover:text-tx underline" onClick={() => { setManualShare(false); pickReferrer(r.sharers[0]?.coachId ?? ""); }}>改挑推薦人</button>
+            </span></label>
         )}
         {restSplits.map((s) => (
           <label key={s.to} className="flex flex-col gap-1"><span className="text-xs text-tx3">{s.to}（餘額 {s.v}%）匯給</span>
@@ -221,9 +245,12 @@ function ReceiptForm({ init, S, coachList, pending, onCancel, onSave }: {
           <input className={`${FIELD_SM} w-full`} value={r.note} onChange={(e) => set({ note: e.target.value })} /></label>
         <datalist id="acct-coach-names">{coachList.map((c) => <option key={c.id} value={c.name} />)}</datalist>
       </div>
+      {hasPool && r.sharers.length > 0 && (
+        <div className="text-xs text-tx3 mt-2">推薦端：{r.sharers.map((x) => `${x.name}${x.rankCode ? ` ${x.rankCode}` : ""}`).join(" → ")}{payerFormal && <span className="text-danger ml-2">⚠ 匯款人已是正式教練，依制度不計推薦</span>}</div>
+      )}
       <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-tx2">
         <span className="text-tx3">這一筆會拆成：</span>
-        {preview.rows.filter((x) => x.v > 0).map((x, i) => <span key={i} className={`rounded-full border px-2 py-0.5 ${x.mode === "keep" ? "border-brand2 text-brand2" : "border-line"}`}>{x.to} {F(x.v)}<span className="text-tx3 ml-1">{x.label}</span></span>)}
+        {preview.rows.filter((x) => x.v !== 0).map((x, i) => <span key={i} className={`rounded-full border px-2 py-0.5 ${x.mode === "keep" ? "border-brand2 text-brand2" : "border-line"}`}>{x.to} {F(x.v)}<span className="text-tx3 ml-1">{x.label}</span></span>)}
         <span className="rounded-full bg-panel3 text-brand2 px-2 py-0.5 font-bold">公司實收 {F(preview.company)}</span>
         {preview.warn && <span className="text-danger">⚠ {preview.warn}</span>}
       </div>

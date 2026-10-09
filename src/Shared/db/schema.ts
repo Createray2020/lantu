@@ -1340,7 +1340,8 @@ export const acctReceipts = pgTable('acct_receipts', {
   sharers: jsonb('sharers').$type<{ name: string; coachId?: string | null }[]>().default([]).notNull(),
   payees: jsonb('payees').$type<Record<string, string>>().default({}).notNull(),
   note: text('note').default('').notNull(),
-  void: boolean('void').default(false).notNull(),    // 作廢（退費）：不計入，但留痕
+  void: boolean('void').default(false).notNull(),    // 作廢（全額退費）：不計入，但留痕
+  refund: doublePrecision('refund').default(0).notNull(),  // 部分退款：以 amount − refund 重算（V7.2 §41）
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
@@ -1356,4 +1357,22 @@ export const acctPayouts = pgTable('acct_payouts', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex('acct_payouts_ym_payee_uq').on(t.ym, t.payee),
+]);
+// 受款人簿（2026/10/08 Ray：每個人的個人資料可填銀行帳號，分潤直接對上變成每個人的對帳表）。
+// 教練一人一列（coach_id 唯一，教練端「收款設定」自填、後台可改）；外部受款人（創造共好、講師、場地）coach_id 為空。
+// tax_mode：invoice＝開發票（實匯＝應付、要收發票）／withhold＝扣執行業務所得（同月合計達起扣點才扣 10%＋補充保費 2.11%）／空＝未設定。
+export const payees = pgTable('payees', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').references(() => coaches.id, { onDelete: 'cascade' }),
+  name: text('name').default('').notNull(),          // 顯示名（教練＝displayName 或 name；外部＝自填）
+  bankCode: text('bank_code').default('').notNull(),
+  bankName: text('bank_name').default('').notNull(),
+  branch: text('branch').default('').notNull(),
+  accountName: text('account_name').default('').notNull(),
+  accountNo: text('account_no').default('').notNull(),
+  taxMode: text('tax_mode').default('').notNull(),
+  note: text('note').default('').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('payees_coach_uq').on(t.coachId),
 ]);

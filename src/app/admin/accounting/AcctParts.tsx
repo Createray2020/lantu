@@ -306,7 +306,7 @@ export function ItemsEditor({ items, onSave, params = ACCT_DEFAULT_PARAMS }: { i
       {items.map((it, i) => {
         const price = it.price;
         // 示範數字：分潤池用「2 位分潤人」那一階（最常見），其餘照公式
-        const demoSharers = it.splits.some((s) => s.mode === "pool") ? [{ name: "分潤一" }, { name: "分潤二" }].slice(0, Math.min(2, params.poolTiers.length)) : [];
+        const demoSharers = it.splits.some((s) => s.mode === "pool") ? [{ name: "推薦人 S3", rankCode: "S3" }, { name: "上層 CHIEF", rankCode: "CHIEF" }] : [];
         const u = unitOf(it, {}, undefined, params, demoSharers);
         const rowVal = (s: { to: string; mode: SplitMode; v: number }) => {
           if (s.mode === "pool") return u.rows.filter((r) => demoSharers.some((d) => d.name === r.to)).reduce((a, r) => a + r.v, 0);
@@ -327,6 +327,7 @@ export function ItemsEditor({ items, onSave, params = ACCT_DEFAULT_PARAMS }: { i
                 <option value="">無（只手填）</option>
                 <option value="apply" disabled={items.some((x, k) => k !== i && x.source === "apply")}>報聘核准</option>
                 <option value="license" disabled={items.some((x, k) => k !== i && x.source === "license")}>培訓帳號開通</option>
+                <option value="case" disabled={items.some((x, k) => k !== i && x.source === "case")}>顧問費案件（案件與分潤帶入）</option>
               </select>
               <button className={`${xbtn} ml-auto`} onClick={async () => { if (await confirmDialog(`刪除「${it.name}」？各月的數量也不再計入。`, { danger: true })) onSave(items.filter((_, j) => j !== i)); }}>✕</button>
             </div>
@@ -339,9 +340,9 @@ export function ItemsEditor({ items, onSave, params = ACCT_DEFAULT_PARAMS }: { i
                     {(Object.keys(SPLIT_MODE_LABEL) as SplitMode[]).map((m) => <option key={m} value={m}>{SPLIT_MODE_LABEL[m]}</option>)}
                   </select>
                   {s.mode === "pool"
-                    ? <span className="text-xs text-tx3">每筆依分潤人數查切法表（{params.poolTiers.map((t, n) => `${n + 1} 人 ${t.join("／")}`).join("；")}）</span>
+                    ? <span className="text-xs text-tx3">每筆依推薦人職級與輔導鏈算差階（上限 {params.referralCap}%）</span>
                     : <input className={`${FIELD_SM} w-20 text-right`} inputMode="decimal" defaultValue={s.v} onBlur={(e) => { const v = NUM(e.target.value); if (v !== s.v) set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, v } : x) }); }} />}
-                  <span className="text-xs text-tx3">＝ {F(rowVal(s))}{s.mode === "pool" ? "（2 人時）" : s.mode === "keep" ? "（留在公司）" : ""}</span>
+                  <span className="text-xs text-tx3">＝ {F(rowVal(s))}{s.mode === "pool" ? "（例：S3 推薦、CHIEF 上層）" : s.mode === "keep" ? "（留在公司）" : ""}</span>
                   <button className={xbtn} onClick={() => set(i, { splits: it.splits.filter((_, k) => k !== j) })}>✕</button>
                 </div>
               ))}

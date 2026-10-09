@@ -153,6 +153,14 @@ export const TABS: TabSpec[] = [
     intro: "同業招募依過往實績核定職級；S1 以上核定者須於真除期間達標，未達則認階轉正。",
     sections: [
       {
+        title: "報聘門檻（V7.2 第 38 之 2 條）",
+        note: "報聘門檻與年度維持門檻是兩個判斷：報聘＝至少一件且累計 30,000；維持＝一件完整規劃且該件 ≥36,000（第 29 條）。",
+        fields: [
+          { key: "applyMinCases", label: "報聘至少正式案件數", type: "num", unit: "件", hint: "V7.2＝1" },
+          { key: "applyMinFees", label: "報聘累計實收顧問費", type: "money", hint: "V7.2＝30,000" },
+        ],
+      },
+      {
         title: "職級核定（第十四、二十四條）",
         fields: [
           { key: "recruitByThreshold", label: "依過往實績對照 A 軌門檻表核定", type: "bool" },
@@ -162,10 +170,11 @@ export const TABS: TabSpec[] = [
         ],
       },
       {
-        title: "真除制度（第十五條）",
+        title: "外部同業預認階的認階確認（V7.2 第 22～24 條，取代 V4 真除）",
+        note: "預認最高 S3；確認期以實收顧問費為主、不設件數；達標且品質確認可提前正式認階。門檻表在「預認階確認門檻」頁籤。",
         fields: [
-          { key: "tenureMinRankCode", label: "適用真除的最低核定職級", type: "rank", hint: "V4＝S1，以下不需真除" },
-          { key: "tenureMonths", label: "真除期間（自到職日起）", type: "num", unit: "個月", hint: "V4＝12" },
+          { key: "tenureMinRankCode", label: "適用預認階確認的最低核定職級", type: "rank", hint: "V7.2＝S1" },
+          { key: "tenureMonths", label: "認階確認期（自預認階生效日起）", type: "num", unit: "個月", hint: "V7.2＝12" },
           { key: "tenureFullRate", label: "真除期間分潤按核定職級全額計算", type: "bool" },
           { key: "tenureCountLifetime", label: "真除期間業績計入本人終身累計", type: "bool" },
           { key: "tenureStepDown", label: "未達標時認階轉正（往下對照最高達成階）", type: "bool" },
@@ -194,7 +203,7 @@ export const TABS: TabSpec[] = [
         fields: [
           { key: "maintainCases", label: "年度最低完成收費個案數", type: "num", unit: "案", hint: "V4＝1" },
           { key: "maintainUseSpotPrice", label: "最低顧問費引用單點諮詢定價", type: "bool" },
-          { key: "maintainMinFee", label: "自訂最低顧問費（未引用定價時）", type: "money" },
+          { key: "maintainMinFee", label: "該件最低實收顧問費", type: "money", hint: "V7.2＝36,000（完整財務規劃案件）" },
           { key: "maintainYearStart", label: "年度起算日", type: "mmdd", hint: "V4＝01-01" },
         ],
       },

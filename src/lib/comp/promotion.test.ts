@@ -218,39 +218,38 @@ describe("晉升判定（§10–§13）", () => {
   });
 });
 
-describe("真除與認階轉正（§15-4）", () => {
+describe("外部同業預認階的認階確認（V7.2 §23–24，取代 V4 真除）", () => {
   const a = { id: "x", rankCode: "S3", uplineId: "chief", tenureRankCode: "S3", tenureUntil: "2027-01-31" };
 
-  it("達成核定職級門檻 → 直接轉正", () => {
-    const r = evalTenure(a, { cases: 5, fees: 150_000 }, P, "2027-02-01");
+  it("12 個月實收 75 萬 → 正式 S3；件數不設門檻，一件也行", () => {
+    const r = evalTenure(a, { cases: 1, fees: 750_000 }, P, "2027-02-01");
     expect(r.met).toBe(true);
     expect(r.settledCode).toBe("S3");
   });
 
-  it("核定 S3 但只完成 4 案／12 萬 → 認階為 S2（辦法舉例）", () => {
-    const r = evalTenure(a, { cases: 4, fees: 120_000 }, P, "2027-02-01");
+  it("預認 S3 但只達 45 萬未滿 75 萬 → 正式認階 S2（§24-2）", () => {
+    const r = evalTenure(a, { cases: 2, fees: 450_000 }, P, "2027-02-01");
     expect(r.met).toBe(false);
     expect(r.settledCode).toBe("S2");
     expect(r.note).toContain("認階");
   });
 
-  it("只完成 3 案／9 萬 → 認階為 S1", () => {
-    expect(evalTenure(a, { cases: 3, fees: 90_000 }, P, "2027-02-01").settledCode).toBe("S1");
+  it("達 15 萬未滿 45 萬 → S1", () => {
+    expect(evalTenure(a, { cases: 1, fees: 150_000 }, P, "2027-02-01").settledCode).toBe("S1");
   });
 
-  it("未達最低真除門檻 → 落到保底職級 C3", () => {
-    expect(evalTenure(a, { cases: 1, fees: 10_000 }, P, "2027-02-01").settledCode).toBe("C3");
+  it("未達 15 萬 → 不具資深正式認階條件，回歸認證顧問一般制度（保底 C1）", () => {
+    expect(evalTenure(a, { cases: 1, fees: 10_000 }, P, "2027-02-01").settledCode).toBe("C1");
   });
 
   it("關閉認階轉正 → 未達標直接落保底", () => {
     const p: CompParams = { ...P, settings: { ...P.settings, tenureStepDown: false } };
-    expect(evalTenure(a, { cases: 4, fees: 120_000 }, p, "2027-02-01").settledCode).toBe("C3");
+    expect(evalTenure(a, { cases: 4, fees: 450_000 }, p, "2027-02-01").settledCode).toBe("C1");
   });
 
-  it("首席的真除還要育成 1 位直轄顧問完成首案", () => {
-    const chiefA = { ...a, tenureRankCode: "CHIEF" };
-    expect(evalTenure(chiefA, { cases: 6, fees: 180_000, mentored: 0 }, P, "2027-02-01").met).toBe(false);
-    expect(evalTenure(chiefA, { cases: 6, fees: 180_000, mentored: 1 }, P, "2027-02-01").met).toBe(true);
+  it("最高只預認到 S3：門檻表沒有 CHIEF 列（S3 升 CHIEF 走一般晉升）", () => {
+    expect(P.thresholds.filter((t) => t.kind === "tenure").map((t) => t.toCode)).toEqual(["S1", "S2", "S3"]);
+    expect(P.thresholds.filter((t) => t.kind === "tenure").every((t) => t.cases == null)).toBe(true);
   });
 
   it("非真除狀態＝不適用", () => {

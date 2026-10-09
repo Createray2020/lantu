@@ -17,8 +17,11 @@
  */
 export type SplitMode = "pct" | "amt" | "pool" | "keep" | "rest";
 export type AcctSplit = { to: string; mode: SplitMode; v: number };
-/** 分潤人（職級由低到高）；coachId 對得上名冊就帶，之後可接職級分潤表。 */
-export type Sharer = { name: string; coachId?: string | null };
+/**
+ * 推薦端的人（職級由低到高）：[0]＝推薦人，之後是推薦人**原有輔導鏈**逐層往上（V7.2 §14）。
+ * rankCode＝報名付款當時的職級快照——之後升階不改歷史收益（§38之5）。
+ */
+export type Sharer = { name: string; coachId?: string | null; rankCode?: string | null };
 /**
  * 逐筆收款（acct_receipts）：對帳表的一列。
  * payees：某個拆分列（以 split.to 為鍵）這一筆實際匯給誰（講師一→王老師）；沒填就用拆分列的名字。
@@ -26,19 +29,64 @@ export type Sharer = { name: string; coachId?: string | null };
 export type Receipt = {
   id: string; ym: string; itemId: string; on: string; amount: number; last5: string;
   payer: string; payerCoachId?: string | null; sharers: Sharer[]; payees: Record<string, string>; note: string; void: boolean;
+  /** 退款（含部分退款）：以最終實收＝amount − refund 重算（V7.2 §41）。 */
+  refund: number;
+  /** case＝從「案件與分潤」帶進來的顧問費（唯讀，拆分已由 comp 引擎算好放在 allocs）；manual＝這裡手記 */
+  source: "manual" | "case";
+  caseId?: string | null;
+  /** 已算好的拆分（case 用）：直接當拆分結果，不再套項目的 splits */
+  allocs?: ReceiptRow[];
 };
+/** 名冊精簡列：職級與直屬主管用來展開推薦端輔導鏈。 */
+export type CoachLite = { id: string; name: string; rankCode?: string | null; uplineId?: string | null };
+/**
+ * 推薦人的推薦端名單（V7.2 §14）：本人在前，沿**原有輔導鏈**往上到頂；每一層帶當下職級快照。
+ * 不套代管（§13 代管是顧問費差階的規則，推薦端沿原有鏈）。鏈成環或超過 12 層就停。
+ */
+export function referralChain(coachId: string, coachList: CoachLite[]): Sharer[] {
+  const byId = new Map(coachList.map((c) => [c.id, c]));
+  const out: Sharer[] = [];
+  const seen = new Set<string>();
+  let cur = byId.get(coachId);
+  while (cur && !seen.has(cur.id) && out.length < 12) {
+    seen.add(cur.id);
+    out.push({ name: cur.name, coachId: cur.id, rankCode: cur.rankCode ?? null });
+    cur = cur.uplineId ? byId.get(cur.uplineId) : undefined;
+  }
+  return out;
+}
+/** 正式職級（不是實習／結業）：已報聘的人報名課程不計推薦（§14-3）。 */
+export const isFormalRank = (code: string | null | undefined) => !!code && code !== "INTERN" && code !== "PARTNER";
+/** 受款人簿（payees）的一列：教練一人一列（coachId），外部受款人（創造共好、講師、場地）coachId 為空。 */
+export type TaxMode = "" | "invoice" | "withhold";
+export type PayeeRec = {
+  id: string; coachId: string | null; name: string; bankCode: string; bankName: string; branch: string; accountName: string; accountNo: string;
+  taxMode: TaxMode; note: string;
+};
+export const TAX_MODE_LABEL: Record<TaxMode, string> = { "": "未設定", invoice: "開發票", withhold: "扣執行業務所得" };
+/** 扣繳參數：執行業務所得扣繳率、二代健保補充保費率、起扣點（同一人同月合計未達免扣）。 */
+export type TaxParams = { withholdRate: number; nhiRate: number; threshold: number };
+export const ACCT_DEFAULT_TAX: TaxParams = { withholdRate: 10, nhiRate: 2.11, threshold: 20000 };
 /** 某月某受款人的「已匯」紀錄（acct_payouts）。 */
 export type PayoutMark = { paidOn: string; amount: number; note: string };
-export type ReceiptRow = { to: string; v: number; mode: SplitMode; label: string };
+export type ReceiptRow = { to: string; v: number; mode: SplitMode; label: string; coachId?: string | null };
 export type ReceiptResult = { amount: number; rows: ReceiptRow[]; payout: number; keep: number; company: number; warn: string | null };
 /** source：這個項目由哪個系統事件自動入帳（apply＝報聘核准／license＝培訓帳號開通）；空＝只手填。 */
-export type AcctSource = "apply" | "license";
+export type AcctSource = "apply" | "license" | "case";
 export type AcctItem = { id: string; name: string; price: number; splits: AcctSplit[]; source?: AcctSource | ""; cat?: string };
 /** 系統入帳的一筆（acct_entries）：金額是事件當下的單價快照。 */
 export type SysRow = { id: string; itemId: string; coachId: string; coachName: string; source: AcctSource; amount: number; void: boolean; createdAt: string };
 export type AcctMonth = { qty: Record<string, number>; fixed: { name: string; amt: number }[] };
-/** poolTiers[n-1]＝n 位分潤人時各自占收款的 %（職級低→高）。Excel：1 人 [30]、2 人 [25,5]；3 人等 Ray 的制度表。 */
-export type AcctParams = { vatRate: number; poolTiers: number[][] };
+/**
+ * referralRates：各身分／職級的課程與專案推薦率（V7.2 §14：INTERN／PARTNER 10、C 20、S 25、CHIEF 30）；
+ * referralCap：整條推薦端上限（30）。poolTiers 是 2026/10/08 的舊切法表，V7.2 之後只當 rankCode 缺漏時的備援。
+ * annualFee：年度合作費依職級（§31）；earlyApplyFee：提前報聘首期 6,000。
+ */
+export type AcctParams = {
+  vatRate: number; poolTiers: number[][]; tax: TaxParams;
+  referralRates: Record<string, number>; referralCap: number;
+  annualFee: Record<string, number>; earlyApplyFee: number;
+};
 export type AcctGoal = { netTarget: number };
 /** 月目標：跟 AcctMonth 同一個形狀（目標筆數、目標固定支出），多一個目標淨利。另一張表存，不跟實際帳混。 */
 export type AcctTarget = AcctMonth & { net: number };
@@ -50,7 +98,8 @@ export type AcctState = {
   sys?: Record<string, SysRow[]>;      // 'YYYY-MM' → 系統入帳事件（含作廢的，作廢不計）
   receipts?: Record<string, Receipt[]>; // 'YYYY-MM' → 逐筆收款（對帳表），作廢不計
   payouts?: Record<string, Record<string, PayoutMark>>; // 'YYYY-MM' → 受款人 → 已匯
-  coachList?: { id: string; name: string }[]; // 名冊（給匯款人／分潤人對名字用）
+  coachList?: CoachLite[];             // 名冊（給匯款人／分潤人對名字、帶職級與輔導鏈用）
+  payeeBook?: PayeeRec[];              // 受款人簿
   params: AcctParams;
   goal: AcctGoal;
 };
@@ -66,7 +115,17 @@ export type MonthResult = {
 };
 
 export const ACCT_DEFAULT_TIERS: number[][] = [[30], [25, 5]];
-export const ACCT_DEFAULT_PARAMS: AcctParams = { vatRate: 5, poolTiers: ACCT_DEFAULT_TIERS };
+export const ACCT_DEFAULT_REFERRAL: Record<string, number> = { INTERN: 10, PARTNER: 10, C1: 20, C2: 20, C3: 20, S1: 25, S2: 25, S3: 25, CHIEF: 30 };
+export const ACCT_DEFAULT_ANNUAL_FEE: Record<string, number> = { C1: 6000, C2: 6000, C3: 6000, S1: 12000, S2: 12000, S3: 18000, CHIEF: 24000 };
+export const ACCT_DEFAULT_PARAMS: AcctParams = {
+  vatRate: 5, poolTiers: ACCT_DEFAULT_TIERS, tax: ACCT_DEFAULT_TAX,
+  referralRates: ACCT_DEFAULT_REFERRAL, referralCap: 30, annualFee: ACCT_DEFAULT_ANNUAL_FEE, earlyApplyFee: 6000,
+};
+/** 年度合作費：依職級；沒設定的職級（實習、結業）回 0。提前報聘用 earlyApplyFee。 */
+export function annualFeeOf(params: AcctParams, rankCode: string | null | undefined, early = false): number {
+  if (early) return params.earlyApplyFee;
+  return params.annualFee[rankCode ?? ""] ?? 0;
+}
 export const SPLIT_MODE_LABEL: Record<SplitMode, string> = { pct: "比例 %", amt: "固定金額", pool: "分潤池（依切法表）", keep: "公司自留 %", rest: "餘額再分 %" };
 export const ACCT_DEFAULT_GOAL: AcctGoal = { netTarget: 0 };
 
@@ -85,7 +144,13 @@ export const isYm = (s: unknown) => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(s ?? "
  * 一筆收款怎麼拆（對帳表一列的公式）。what-if 的 adj.split 只動 pct 列。
  * 順序：pct／amt／pool／keep 先算 → 餘額 ＝ 收款 − 這些 → rest 列吃餘額的比例。
  */
-export function calcReceipt(it: AcctItem, amount: number, sharers: Sharer[], payees: Record<string, string>, params: AcctParams, adj: AcctAdj = {}): ReceiptResult {
+export function calcReceipt(it: AcctItem, amount: number, sharers: Sharer[], payees: Record<string, string>, params: AcctParams, adj: AcctAdj = {}, allocs?: ReceiptRow[]): ReceiptResult {
+  // 案件帶進來的：拆分已由 comp 引擎算好（含差階、平階、代管），這裡照單全收
+  if (allocs) {
+    let payout = 0, keep = 0;
+    for (const r of allocs) { if (r.mode === "keep") keep += r.v; else payout += r.v; }
+    return { amount, rows: allocs, payout, keep, company: amount - payout, warn: null };
+  }
   const tiers = params.poolTiers?.length ? params.poolTiers : ACCT_DEFAULT_TIERS;
   const rows: ReceiptRow[] = [];
   let warn: string | null = null;
@@ -96,9 +161,26 @@ export function calcReceipt(it: AcctItem, amount: number, sharers: Sharer[], pay
     if (s.mode === "pool") {
       const n = sharers.length;
       if (!n) continue;
-      const tier = tiers[n - 1] ?? tiers[tiers.length - 1];
-      if (!tiers[n - 1]) warn = `${n} 位分潤人的切法表還沒設定，先用 ${tier.length} 人的`;
-      sharers.forEach((sh, i) => { const v = amount * (tier[i] ?? 0) / 100; first += v; rows.push({ to: sh.name.trim() || `分潤${i + 1}`, v, mode: "pool", label: `分潤${["一", "二", "三", "四", "五"][i] ?? i + 1} ${tier[i] ?? 0}%` }); });
+      const cap = params.referralCap ?? 30;
+      const rates = params.referralRates ?? ACCT_DEFAULT_REFERRAL;
+      const hasRanks = sharers.every((sh) => sh.rankCode && rates[sh.rankCode] !== undefined);
+      if (hasRanks) {
+        // V7.2 §14：推薦人先取自己的推薦率，上層逐層取正差額，整條不超過 cap；平階／倒掛為 0。
+        let acc = 0;
+        sharers.forEach((sh, i) => {
+          const r = Math.min(cap, rates[sh.rankCode!]);
+          const share = Math.max(0, r - acc);
+          acc = Math.max(acc, r);
+          const v = amount * share / 100;
+          first += v;
+          rows.push({ to: sh.name.trim() || `推薦${i + 1}`, v, mode: "pool", label: i === 0 ? `推薦人 ${sh.rankCode} ${r}%` : `差階 ${sh.rankCode} ${r}−${r - share}＝${share}%`, coachId: sh.coachId ?? null });
+        });
+      } else {
+        // 備援：沒有職級快照（舊資料／手填名字）→ 用切法表
+        const tier = tiers[n - 1] ?? tiers[tiers.length - 1];
+        warn = "分潤人沒有職級快照，先用切法表；請改用「推薦人」挑人讓系統帶職級";
+        sharers.forEach((sh, i) => { const v = amount * (tier[i] ?? 0) / 100; first += v; rows.push({ to: sh.name.trim() || `分潤${i + 1}`, v, mode: "pool", label: `分潤${["一", "二", "三", "四", "五"][i] ?? i + 1} ${tier[i] ?? 0}%`, coachId: sh.coachId ?? null }); });
+      }
       continue;
     }
     const v = s.mode === "amt" ? s.v : amount * Math.max(0, s.v + (s.mode === "pct" ? (adj.split ?? 0) : 0)) / 100;
@@ -107,11 +189,20 @@ export function calcReceipt(it: AcctItem, amount: number, sharers: Sharer[], pay
   }
   const remain = Math.max(0, amount - first);
   for (const s of it.splits) if (s.mode === "rest") rows.push({ to: nameOf(s), v: remain * s.v / 100, mode: "rest", label: `餘額 ${s.v}%` });
+  // V7.2 §40：分潤金額以元為單位四捨五入（what-if 試算時不取整，曲線才平滑）
+  if (!adj.split && !adj.price) for (const r of rows) r.v = Math.round(r.v);
   let payout = 0, keep = 0;
   for (const r of rows) { if (r.mode === "keep") keep += r.v; else payout += r.v; }
   return { amount, rows, payout, keep, company: amount - payout, warn };
 }
+/** 一筆收款的「最終實收」：金額 − 退款。 */
+export const netOf = (x: Pick<Receipt, "amount" | "refund">) => Math.max(0, x.amount - (x.refund || 0));
 
+function unitFromAllocs(price: number, allocs: ReceiptRow[]): UnitResult {
+  const rows = allocs.filter((r) => r.mode !== "keep").map((r) => ({ to: r.to, v: r.v }));
+  const split = rows.reduce((a, r) => a + r.v, 0);
+  return { price, split, rows, gp: price - split, gm: price ? (price - split) / price : 0 };
+}
 /** 單筆：售價、拆出多少、單筆毛利、毛利率。沒有收款資料時（手填筆數、目標）當作沒有分潤人。 */
 export function unitOf(it: AcctItem, adj: AcctAdj = {}, basePrice?: number, params: AcctParams = ACCT_DEFAULT_PARAMS, sharers: Sharer[] = [], payees: Record<string, string> = {}): UnitResult {
   const price = (basePrice ?? it.price) * (1 + (adj.price ?? 0) / 100);
@@ -141,7 +232,7 @@ export function calcData(items: AcctItem[], m: AcctMonth, params: AcctParams, ad
     // 逐筆收款（對帳表）：每一筆用自己的金額、分潤人、受款人算
     const rcs = receipts.filter((x) => x.itemId === it.id && !x.void);
     for (const x of rcs) {
-      const ux = unitOf(it, adj, x.amount, params, x.sharers, x.payees);
+      const ux = x.allocs ? unitFromAllocs(netOf(x), x.allocs) : unitOf(it, adj, netOf(x), params, x.sharers, x.payees);
       irev += ux.price * scale; isplit += ux.split * scale; igp += ux.gp * scale;
       for (const r of ux.rows) byTo[r.to] = (byTo[r.to] ?? 0) + r.v * scale;
     }
@@ -204,36 +295,87 @@ export function compareMonth(S: AcctState, ym: string): Compare | null {
 
 // ---------- 匯款對帳（誰、多少） ----------
 export type PayoutSrc = { receiptId: string; itemName: string; on: string; payer: string; v: number; label: string };
-export type PayoutLine = { payee: string; due: number; srcs: PayoutSrc[]; mark: PayoutMark | null; remaining: number };
-export type PayoutSummary = { lines: PayoutLine[]; due: number; paid: number; remaining: number; company: number; received: number; warns: string[] };
-/** 某一個月：每個受款人應匯多少、從哪幾筆來、匯了沒。公司自留（keep）與公司實收不在裡面。 */
+export type PayoutTax = { mode: TaxMode; withhold: number; nhi: number; net: number; applied: boolean };
+export type PayoutLine = {
+  key: string;            // 已匯紀錄的鍵：對得上受款人簿就是 p:<id>，否則 n:<名字>
+  payee: string;          // 顯示名
+  rec: PayeeRec | null;   // 受款人簿那一列（帳號、稅務方式）
+  due: number; srcs: PayoutSrc[]; mark: PayoutMark | null; remaining: number;
+  tax: PayoutTax;         // 扣繳：net＝實匯
+};
+export type PayoutSummary = { lines: PayoutLine[]; due: number; net: number; paid: number; remaining: number; company: number; received: number; warns: string[]; payDate: string };
+/** 結算發放日（V7.2 §40）：前一曆月入帳的分潤於次月 5 日發放；遇六日提前到週五。 */
+export function settlementDate(ym: string, day = 5): string {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m, day));   // 次月 day 日
+  const wd = d.getUTCDay();
+  if (wd === 6) d.setUTCDate(d.getUTCDate() - 1);
+  if (wd === 0) d.setUTCDate(d.getUTCDate() - 2);
+  return d.toISOString().slice(0, 10);
+}
+export const payeeKey = (rec: PayeeRec | null, name: string) => rec ? `p:${rec.id}` : `n:${name}`;
+/** 名字（或教練 id）對到受款人簿：先用 coachId，再用名字（受款人簿的名字或教練顯示名）。 */
+export function resolvePayee(book: PayeeRec[], name: string, coachId?: string | null, coachList: { id: string; name: string }[] = []): PayeeRec | null {
+  const n = name.trim();
+  if (coachId) { const r = book.find((p) => p.coachId === coachId); if (r) return r; }
+  const byName = book.find((p) => p.name.trim() === n);
+  if (byName) return byName;
+  const c = coachList.find((k) => k.name === n);
+  if (c) { const r = book.find((p) => p.coachId === c.id); if (r) return r; }
+  return null;
+}
+/** 扣繳：扣執行業務所得者，同月合計達起扣點才扣；其他一律實匯＝應付。 */
+export function taxOf(mode: TaxMode, due: number, t: TaxParams): PayoutTax {
+  if (mode !== "withhold" || due < t.threshold || due <= 0) return { mode, withhold: 0, nhi: 0, net: due, applied: false };
+  const withhold = Math.round(due * t.withholdRate / 100), nhi = Math.round(due * t.nhiRate / 100);
+  return { mode, withhold, nhi, net: due - withhold - nhi, applied: true };
+}
+/** 某一個月：每個受款人應付多少、從哪幾筆來、扣繳後實匯、匯了沒。公司自留（keep）與公司實收不在裡面。 */
 export function payoutsOf(S: AcctState, ym: string): PayoutSummary {
   const by: Record<string, PayoutLine> = {};
   const warns: string[] = [];
+  const book = S.payeeBook ?? [], tax = S.params.tax ?? ACCT_DEFAULT_TAX;
   let company = 0, received = 0;
+  const blank: PayoutTax = { mode: "", withhold: 0, nhi: 0, net: 0, applied: false };
   for (const x of S.receipts?.[ym] ?? []) {
     if (x.void) continue;
     const it = S.items.find((i) => i.id === x.itemId);
     if (!it) continue;
-    const rr = calcReceipt(it, x.amount, x.sharers, x.payees, S.params);
-    received += x.amount; company += rr.company;
+    const rr = calcReceipt(it, netOf(x), x.sharers, x.payees, S.params, {}, x.allocs);
+    received += netOf(x); company += rr.company;
     if (rr.warn) warns.push(`${x.on} ${x.payer}：${rr.warn}`);
+    if (x.sharers.length && x.payerCoachId) {
+      const pc = (S.coachList ?? []).find((c) => c.id === x.payerCoachId);
+      if (pc && isFormalRank(pc.rankCode)) warns.push(`${x.on} ${x.payer} 已是正式教練（${pc.rankCode}），依制度不計課程推薦——請把推薦人清空`);
+      if (x.sharers[0]?.coachId === x.payerCoachId) warns.push(`${x.on} ${x.payer} 推薦人是本人，依制度不計推薦`);
+    }
     for (const r of rr.rows) {
       if (r.mode === "keep" || !r.v) continue;
-      const l = (by[r.to] ??= { payee: r.to, due: 0, srcs: [], mark: null, remaining: 0 });
+      const rec = resolvePayee(book, r.to, r.coachId, S.coachList ?? []);
+      const key = payeeKey(rec, r.to);
+      const l = (by[key] ??= { key, payee: rec?.name || r.to, rec, due: 0, srcs: [], mark: null, remaining: 0, tax: blank });
       l.due += r.v;
       l.srcs.push({ receiptId: x.id, itemName: it.name, on: x.on, payer: x.payer, v: r.v, label: r.label });
     }
   }
   const marks = S.payouts?.[ym] ?? {};
-  let due = 0, paid = 0;
+  let due = 0, net = 0, paid = 0;
   const lines = Object.values(by).sort((a, b) => b.due - a.due).map((l) => {
-    const mark = marks[l.payee] ?? null;
+    const mark = marks[l.key] ?? null;
+    const t = taxOf(l.rec?.taxMode ?? "", l.due, tax);
     const p = mark ? mark.amount : 0;
-    due += l.due; paid += p;
-    return { ...l, mark, remaining: l.due - p };
+    due += l.due; net += t.net; paid += p;
+    return { ...l, mark, tax: t, remaining: t.net - p };
   });
-  return { lines, due, paid, remaining: due - paid, company, received, warns };
+  return { lines, due, net, paid, remaining: net - paid, company, received, warns, payDate: settlementDate(ym) };
+}
+/** 某受款人（key）在某月的對帳單；沒有這個人回 null。 */
+export function statementOf(S: AcctState, ym: string, key: string): PayoutLine | null {
+  return payoutsOf(S, ym).lines.find((l) => l.key === key) ?? null;
+}
+/** 某受款人所有有紀錄的月份（給「我的分潤」列月）。 */
+export function statementMonths(S: AcctState, key: string): string[] {
+  return Object.keys(S.receipts ?? {}).sort().reverse().filter((ym) => payoutsOf(S, ym).lines.some((l) => l.key === key));
 }
 
 /** 損益兩平營業額：固定支出 ÷（毛利率 − 營業稅率）。毛利率不夠蓋稅時回 Infinity。 */
@@ -290,7 +432,7 @@ export function normItems(v: unknown): AcctItem[] {
     const splits = Array.isArray(x.splits) ? (x.splits as Partial<AcctSplit>[]).filter((s) => s && typeof s === "object").map((s) => ({
       to: String(s.to ?? "").trim(), mode: (["pct", "amt", "pool", "keep", "rest"].includes(String(s.mode)) ? s.mode : "pct") as SplitMode, v: Math.max(0, num0(s.v)),
     })) : [];
-    const source = x.source === "apply" || x.source === "license" ? x.source : "";
+    const source = x.source === "apply" || x.source === "license" || x.source === "case" ? x.source : "";
     const cat = String(x.cat ?? "").trim();
     out.push({ id: String(x.id), name: String(x.name ?? "").trim(), price: Math.max(0, num0(x.price)), splits, ...(source ? { source } : {}), ...(cat ? { cat } : {}) });
   }
@@ -313,7 +455,21 @@ export function normParams(v: unknown): AcctParams {
   const vat = num0(p.vatRate);
   const tiers = Array.isArray(p.poolTiers) ? p.poolTiers.map((t) => Array.isArray(t) ? t.map((v) => Math.max(0, num0(v))) : []) : [];
   while (tiers.length && !tiers[tiers.length - 1].length) tiers.pop();
-  return { vatRate: vat >= 0 && vat <= 100 ? vat : ACCT_DEFAULT_PARAMS.vatRate, poolTiers: tiers.length ? tiers : ACCT_DEFAULT_TIERS.map((t) => [...t]) };
+  const tx = (p.tax && typeof p.tax === "object" ? p.tax : {}) as Partial<TaxParams>;
+  const pct = (v: unknown, d: number) => { if (v === undefined || v === null || v === "") return d; const x = Number(String(v).replace(/,/g, "")); return Number.isFinite(x) && x >= 0 && x <= 100 ? x : d; };
+  const tax: TaxParams = { withholdRate: pct(tx.withholdRate, ACCT_DEFAULT_TAX.withholdRate), nhiRate: pct(tx.nhiRate, ACCT_DEFAULT_TAX.nhiRate), threshold: tx.threshold === undefined ? ACCT_DEFAULT_TAX.threshold : Math.max(0, num0(tx.threshold)) };
+  const map = (v: unknown, d: Record<string, number>, max: number) => {
+    const out: Record<string, number> = { ...d };
+    if (v && typeof v === "object") for (const [k, x] of Object.entries(v as Record<string, unknown>)) { const n = num0(x); if (n >= 0 && n <= max) out[k] = n; }
+    return out;
+  };
+  const cap = num0(p.referralCap);
+  const early = p.earlyApplyFee === undefined ? ACCT_DEFAULT_PARAMS.earlyApplyFee : Math.max(0, num0(p.earlyApplyFee));
+  return {
+    vatRate: vat >= 0 && vat <= 100 ? vat : ACCT_DEFAULT_PARAMS.vatRate, poolTiers: tiers.length ? tiers : ACCT_DEFAULT_TIERS.map((t) => [...t]), tax,
+    referralRates: map(p.referralRates, ACCT_DEFAULT_REFERRAL, 100), referralCap: cap > 0 && cap <= 100 ? cap : 30,
+    annualFee: map(p.annualFee, ACCT_DEFAULT_ANNUAL_FEE, 1e9), earlyApplyFee: early,
+  };
 }
 export function normGoal(v: unknown): AcctGoal {
   const g = (v && typeof v === "object" ? v : {}) as Partial<AcctGoal>;
@@ -323,7 +479,7 @@ export const isIsoDate = (s: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(s ?? 
 export function normSharers(v: unknown): Sharer[] {
   if (!Array.isArray(v)) return [];
   return (v as unknown[]).map((x) => typeof x === "string" ? { name: x } : (x && typeof x === "object" ? x : {}) as Partial<Sharer>)
-    .map((x) => ({ name: String(x.name ?? "").trim(), ...(x.coachId ? { coachId: String(x.coachId) } : {}) })).filter((x) => x.name);
+    .map((x) => ({ name: String(x.name ?? "").trim(), ...(x.coachId ? { coachId: String(x.coachId) } : {}), ...(x.rankCode ? { rankCode: String(x.rankCode) } : {}) })).filter((x) => x.name);
 }
 export function normPayees(v: unknown): Record<string, string> {
   const out: Record<string, string> = {};
@@ -338,9 +494,21 @@ export function normReceipt(v: unknown, id: string): Receipt {
     id, ym: on ? on.slice(0, 7) : (isYm(r.ym) ? String(r.ym) : ""), itemId: String(r.itemId ?? ""), on, amount: Math.max(0, num0(r.amount)),
     last5: String(r.last5 ?? "").trim().slice(0, 20), payer: String(r.payer ?? "").trim(), payerCoachId: r.payerCoachId ? String(r.payerCoachId) : null,
     sharers: normSharers(r.sharers), payees: normPayees(r.payees), note: String(r.note ?? "").trim(), void: !!r.void,
+    refund: Math.max(0, num0(r.refund)), source: r.source === "case" ? "case" : "manual", caseId: r.caseId ? String(r.caseId) : null,
+    ...(Array.isArray(r.allocs) ? { allocs: r.allocs } : {}),
   };
 }
 export function normPayoutMark(v: unknown): PayoutMark {
   const m = (v && typeof v === "object" ? v : {}) as Partial<PayoutMark>;
   return { paidOn: isIsoDate(m.paidOn) ? String(m.paidOn) : "", amount: Math.max(0, num0(m.amount)), note: String(m.note ?? "").trim() };
 }
+export function normPayee(v: unknown, id: string): PayeeRec {
+  const p = (v && typeof v === "object" ? v : {}) as Partial<PayeeRec>;
+  const str = (x: unknown, max = 80) => String(x ?? "").trim().slice(0, max);
+  return {
+    id, coachId: p.coachId ? String(p.coachId) : null, name: str(p.name), bankCode: str(p.bankCode, 10).replace(/\D/g, ""), bankName: str(p.bankName), branch: str(p.branch),
+    accountName: str(p.accountName), accountNo: str(p.accountNo, 40).replace(/[^\d-]/g, ""), taxMode: p.taxMode === "invoice" || p.taxMode === "withhold" ? p.taxMode : "", note: str(p.note, 200),
+  };
+}
+/** 帳號摘要（對帳單／匯款頁顯示用）。 */
+export const bankLine = (r: PayeeRec | null) => r && (r.bankCode || r.bankName || r.accountNo) ? [r.bankCode && `(${r.bankCode})`, r.bankName, r.branch, r.accountNo].filter(Boolean).join(" ") : "";

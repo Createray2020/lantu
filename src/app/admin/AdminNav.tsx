@@ -56,6 +56,7 @@ export const ADMIN_GROUPS: { key: string; title: string; items: { href: string; 
       // 2026/10/08 對帳表進系統：逐筆收款是總帳的來源；分潤匯款回答「匯給誰、匯多少」。
       { href: "/admin/accounting/receipts", label: "收款明細" },
       { href: "/admin/accounting/payouts", label: "分潤匯款" },
+      { href: "/admin/accounting/payees", label: "受款人" },
     ],
   },
   {

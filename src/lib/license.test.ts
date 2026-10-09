@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   licenseState, addPeriod, diffDays, todayISO, clientCapOf, quotaState,
-  canBePicked, RANK_CLIENT_CAPS, INTERN_MONTHS, PICK_MIN_RANK,
+  canBePicked, RANK_CLIENT_CAPS, INTERN_DAYS, internEndISO, PICK_MIN_RANK,
   RANK_PUBLIC_LABEL, RANK_ORDER, publicRankLabel,
 } from "./license";
 import { V4_RANKS } from "./comp/preset";
@@ -68,8 +68,9 @@ describe("addPeriod：起日 + N 期 − 1 天", () => {
     expect(addPeriod("2026-08-22", "year", 1)).toBe("2027-08-21");
   });
 
-  it("實習教練半年", () => {
-    expect(addPeriod("2026-08-22", "month", INTERN_MONTHS)).toBe("2027-02-21");
+  it("實習教練 180 天（V7.2：Email 起算日起算，不是日曆半年）", () => {
+    expect(INTERN_DAYS).toBe(180);
+    expect(internEndISO("2026-08-22")).toBe("2027-02-17");
   });
 
   it("月底溢位往前收：1/31 + 1 個月＝2/28 的前一天", () => {
@@ -117,7 +118,7 @@ describe("clientCapOf：個人覆寫 > 職級表 > 內建級距", () => {
 
   it("內建級距與職級表同一組代號", () => {
     expect(Object.keys(RANK_CLIENT_CAPS).sort()).toEqual(
-      ["C1", "C2", "C3", "CHIEF", "INTERN", "S1", "S2", "S3"],
+      ["C1", "C2", "C3", "CHIEF", "INTERN", "PARTNER", "S1", "S2", "S3"],
     );
   });
 });
@@ -195,9 +196,10 @@ describe("publicRankLabel", () => {
 
   it("一律用「教練」，不准出現「顧問」", () => {
     // 業務制度辦法原文寫「顧問」，但全系統對外統一用教練（Ray 2026/08/22 拍板、08/24 再確認）。
-    for (const label of Object.values(RANK_PUBLIC_LABEL)) {
+    for (const [code, label] of Object.entries(RANK_PUBLIC_LABEL)) {
       expect(label, label).not.toContain("顧問");
-      expect(label, label).toContain("教練");
+      // 結業合作夥伴（PARTNER）是 V7.2 §2 的正式名稱，不是教練職級，所以例外
+      if (code !== "PARTNER") expect(label, label).toContain("教練");
     }
   });
 

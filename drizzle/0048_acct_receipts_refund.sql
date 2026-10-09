@@ -1,0 +1,1 @@
+ALTER TABLE "acct_receipts" ADD COLUMN "refund" double precision DEFAULT 0 NOT NULL;

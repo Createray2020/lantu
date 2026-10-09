@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget, saveAcctDraft, setAcctEntryVoid, backfillAcctMonth, saveAcctReceipt, deleteAcctReceipt, markAcctPayout } from "@/lib/acctStore";
+import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget, saveAcctDraft, setAcctEntryVoid, backfillAcctMonth, saveAcctReceipt, deleteAcctReceipt, markAcctPayout, savePayee, deletePayee } from "@/lib/acctStore";
 
 export type ActionResult = { ok: true; info?: string } | { ok: false; error: string };
 
@@ -15,6 +15,8 @@ const MSG: Record<string, string> = {
   "invalid-item": "要選一個營業項目",
   "invalid-amount": "匯款金額要大於 0",
   "invalid-payee": "受款人不能空白",
+  "payee-in-use": "這個受款人還有已匯紀錄",
+  "case-readonly": "顧問費案件請到「案件與分潤」改",
 };
 function fail(e: unknown): ActionResult {
   const raw = e instanceof Error ? e.message : String(e);
@@ -67,4 +69,10 @@ export async function deleteAcctReceiptAction(id: string): Promise<ActionResult>
 }
 export async function markAcctPayoutAction(ym: string, payee: string, mark: unknown): Promise<ActionResult> {
   try { await guard(); await markAcctPayout(ym, payee, mark); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function savePayeeAction(id: string | null, payee: unknown): Promise<ActionResult> {
+  try { await guard(); const pid = await savePayee(id, payee); refresh(); return { ok: true, info: pid }; } catch (e) { return fail(e); }
+}
+export async function deletePayeeAction(id: string): Promise<ActionResult> {
+  try { await guard(); await deletePayee(id); refresh(); return { ok: true }; } catch (e) { return fail(e); }
 }

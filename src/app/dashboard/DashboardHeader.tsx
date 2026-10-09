@@ -126,6 +126,12 @@ export default function DashboardHeader({
         我的檔案
       </Link>
       <Link
+        href="/dashboard/payouts"
+        className="text-tx2 hover:text-tx text-xs font-bold px-2.5 py-1.5 rounded-md border border-line2"
+      >
+        我的分潤
+      </Link>
+      <Link
         href="/portal"
         className="text-tx2 hover:text-tx text-xs font-bold px-2.5 py-1.5 rounded-md border border-line2"
       >

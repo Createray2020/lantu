@@ -8,7 +8,7 @@ import { coachApplications, coachApplySettings, coaches, coachDisplayName } from
 import { normalizeCode } from "./codes";
 import { ensureCoachCode } from "./coach";
 import { recordAcctEvent } from "./acctStore";
-import { addPeriod, todayISO, INTERN_MONTHS, type LicenseUnit } from "./license";
+import { addPeriod, addDaysISO, todayISO, internEndISO, type LicenseUnit } from "./license";
 import {
   APPLY_CONSENTS,
   DEFAULT_APPLY_SETTINGS,
@@ -308,19 +308,27 @@ export async function approveApplication(coachId: string, reviewerId: string): P
 
   // 三項都只在「原本是空的」時才寫進 set，不是寫回同一個值 ——
   // 寫回去看起來無害，但那是一次真的 UPDATE，會蓋掉別人在這幾秒內剛改好的值。
-  const newRank = coach.rankCode ? null : settings.defaultRankCode || null;
+  // 2026/10/09 V7.2：實習／結業合作夥伴報聘＝正式認階，職級改成核准預設值（§38之2，一件 30,000 對應 C2）。
+  // 空職級照舊用預設值；已是正式職級的人不動。
+  const coop = coach.rankCode === "INTERN" || coach.rankCode === "PARTNER";
+  const newRank = coach.rankCode && !coop ? null : settings.defaultRankCode || null;
   // 綁定推薦人；推薦人不能是自己（自我推薦會做出一個指向自己的環）。
   const introducer = app?.introducerId && app.introducerId !== coachId ? app.introducerId : null;
   const newUpline = coach.uplineId || !settings.bindUplineToIntroducer ? null : introducer;
-  const rankCode = coach.rankCode ?? newRank;
+  const rankCode = newRank ?? coach.rankCode;
 
+  // 年度合作期間（§31）：提前報聘（實習期還沒滿）→ 到期日＝原定 180 天期滿後再一年；
+  // 期滿後才報聘 → 自報聘日起一年。實習的 licenseUntil 就是期滿日，所以直接拿它判斷。
+  const today = todayISO();
+  const internEnd = coach.rankCode === "INTERN" && coach.licenseFrom ? internEndISO(coach.licenseFrom) : null;
+  const early = !!internEnd && internEnd >= today;
   let license: { licenseFrom: string; licenseUntil: string; licenseUnit: LicenseUnit; licenseQty: number } | null = null;
-  if (settings.licenseOn && !coach.licenseUntil) {
-    const from = todayISO();
-    const intern = rankCode === "INTERN";
-    const unit: LicenseUnit = intern ? "month" : settings.licenseUnit;
-    const qty = intern ? INTERN_MONTHS : settings.licenseQty;
-    license = { licenseFrom: from, licenseUntil: addPeriod(from, unit, qty), licenseUnit: unit, licenseQty: qty };
+  if (settings.licenseOn && (!coach.licenseUntil || coop)) {
+    const from = today;
+    const unit: LicenseUnit = settings.licenseUnit;
+    const qty = settings.licenseQty;
+    const base = early ? addDaysISO(internEnd!, 1) : from;
+    license = { licenseFrom: from, licenseUntil: addPeriod(base, unit, qty), licenseUnit: unit, licenseQty: qty };
   }
 
   await db
@@ -345,8 +353,9 @@ export async function approveApplication(coachId: string, reviewerId: string): P
   await ensureCoachCode(coachId);
 
   // 帳務：報聘核准記一筆；這一刻順便開通培訓帳號的話再記一筆（測試帳號、已記過的自己會跳過，永不丟錯）。
-  await recordAcctEvent("apply", coachId);
-  if (license) await recordAcctEvent("license", coachId);
+  // 年度合作費入帳：提前報聘首期 6,000，否則依核定職級費率（V7.2 §31）。
+  // 報聘開的合作期間不是「培訓帳號」，不再另記 license 事件（培訓帳號只在實習第一次開通時記）。
+  await recordAcctEvent("apply", coachId, new Date(), { early, rankCode: rankCode ?? null });
 
   return {
     ok: true,

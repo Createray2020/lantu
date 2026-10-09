@@ -6,6 +6,7 @@ import { licenseState, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { saveProfile, setPublished, type ProfileInput } from "@/lib/coachProfile";
 import { saveDisplayName } from "@/lib/coach";
 import { DISPLAY_NAME_MAX } from "@/lib/coachName";
+import { saveMyPayee } from "@/lib/acctStore";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -97,4 +98,17 @@ export async function setPublishedAction(
   } catch (e) {
     return fail(e);
   }
+}
+
+/** 教練自己的收款設定（受款人簿那一列）：銀行／分行／戶名／帳號／稅務方式。只動自己的。 */
+export async function saveMyPayeeAction(value: unknown): Promise<ActionResult> {
+  try {
+    const me = await ensureCoach();
+    if (!me) throw new Error("not-coach");
+    if (me.status !== "active") throw new Error("not-active");
+    await saveMyPayee(me.id, { ...(value && typeof value === "object" ? value : {}), name: me.displayName || me.name });
+    revalidatePath("/dashboard/profile");
+    revalidatePath("/dashboard/payouts");
+    return { ok: true };
+  } catch (e) { return fail(e); }
 }
