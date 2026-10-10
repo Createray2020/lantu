@@ -410,8 +410,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 export default function Home({ data }: { data: HomeView }) {
-  // pl＝期間在句子裡的叫法：單月仍說「本月」，多月說「2026 第四季」這種。
-  const multi = data.period.multi, pl = multi ? data.period.label : "本月";
+  // pl＝期間在句子裡的叫法：當月仍說「本月」，其他說「2026年8月」「2026 第四季」這種。
+  const multi = data.period.multi, pl = !multi && data.period.current ? "本月" : data.period.label;
   return (
     <div>
       {data.member && <MemberView d={data.member} today={data.today} pl={pl} multi={multi} />}

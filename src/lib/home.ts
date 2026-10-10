@@ -14,7 +14,7 @@ import type { CompParams } from "./comp/types";
 import { nextYm } from "./acctEngine";
 import {
   memberMoney, promoProgress, termInfo, teamMoney, applyFunnel, companyMonth, coachLine, payoutsOver, hasReceipts, periodOf, rangeOptions,
-  type MemberMoney, type PromoProgress, type TermInfo, type TeamMoney, type ApplyFunnel, type CompanyMonth, type ApplyLike, type Period, type RangeKey,
+  type MemberMoney, type PromoProgress, type TermInfo, type TeamMoney, type ApplyFunnel, type CompanyMonth, type ApplyLike, type Period, type RangeOptions,
 } from "./homeStats";
 import { getCoachDashboard } from "./dashboard";
 // ⚠️ 同 dashboard.ts：今天是哪一天用 Asia/Taipei 那一支，不要用 UTC 的 toISOString()。
@@ -301,7 +301,7 @@ export type HomeView = {
   /** 期間（本月／本季／半年／全年）：錢與損益按這段加總；晉升累計與到期倒數不受影響。 */
   period: Period;
   periodLabel: string;
-  rangeOptions: { key: RangeKey; label: string }[];
+  rangeOptions: RangeOptions;
   today: string;
   member?: MemberHome;
   manager?: ManagerHome;
@@ -348,7 +348,7 @@ export async function getHome(me: CoachRow, opts: { as?: string; focus?: string;
 
   const base = {
     rank: view, views, teamOptions, memberOptions,
-    period, periodLabel: period.label, rangeOptions: rangeOptions(todayIso), today: todayLabel(),
+    period, periodLabel: period.label, rangeOptions: rangeOptions(todayIso, Object.keys(S0.receipts ?? {})), today: todayLabel(),
     focusId: focus || me.id,
   };
 

@@ -18,36 +18,61 @@ export type CoachLike = {
   licenseFrom?: string | null; licenseUntil?: string | null; status?: string | null; isTest?: boolean | null;
 };
 
-// ---------- 期間（2026/10/10 Ray：首頁可切本月／第一～四季／上下半年／全年） ----------
+// ---------- 期間（2026/10/10 Ray：首頁可切本月／第一～四季／上下半年／全年；下午再補：可以選年份、選哪個月、哪一季） ----------
 // 一個期間＝一串 'YYYY-MM'。單月就是原本的首頁；多月時錢與損益跨月加總，晉升累計與到期倒數不受期間影響。
-export type RangeKey = "month" | "q1" | "q2" | "q3" | "q4" | "h1" | "h2" | "year";
-export const RANGE_KEYS: RangeKey[] = ["month", "q1", "q2", "q3", "q4", "h1", "h2", "year"];
-export type Period = { key: RangeKey; label: string; yms: string[]; from: string; to: string; multi: boolean; current: boolean };
+// 鍵的寫法（網址 ?range=）：'2026-08'＝月、'2026-q3'＝季、'2026-h1'＝半年、'2026'＝全年。
+// 舊寫法 month／q1～q4／h1／h2／year 也認得（＝今年的那一段）；認不得的一律退回本月。
+export type PeriodKind = "month" | "quarter" | "half" | "year";
+export type Period = {
+  key: string; kind: PeriodKind; year: number; n: number;   // n：月 1–12／季 1–4／半年 1–2／全年 1
+  label: string; yms: string[]; from: string; to: string; multi: boolean; current: boolean;
+};
 const pad2 = (n: number) => String(n).padStart(2, "0");
+export const periodKey = (kind: PeriodKind, year: number, n: number) =>
+  kind === "month" ? `${year}-${pad2(n)}` : kind === "quarter" ? `${year}-q${n}` : kind === "half" ? `${year}-h${n}` : `${year}`;
 export function periodOf(key: string | null | undefined, today: string): Period {
-  const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
-  const k: RangeKey = (RANGE_KEYS as string[]).includes(key ?? "") ? (key as RangeKey) : "month";
-  const span = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `${y}-${pad2(a + i)}`);
-  const q = Math.ceil(m / 3);
-  let yms: string[], label: string, current = true;
-  switch (k) {
-    case "q1": case "q2": case "q3": case "q4": { const n = Number(k[1]); yms = span(n * 3 - 2, n * 3); label = `${y} 第${"一二三四"[n - 1]}季`; current = n === q; break; }
-    case "h1": yms = span(1, 6); label = `${y} 上半年`; current = m <= 6; break;
-    case "h2": yms = span(7, 12); label = `${y} 下半年`; current = m > 6; break;
-    case "year": yms = span(1, 12); label = `${y} 全年`; break;
-    default: yms = [`${y}-${pad2(m)}`]; label = `${y}年${m}月`;
+  const ty = Number(today.slice(0, 4)), tm = Number(today.slice(5, 7)), tq = Math.ceil(tm / 3), th = tm <= 6 ? 1 : 2;
+  let kind: PeriodKind = "month", year = ty, n = tm;
+  const k = (key ?? "").trim().toLowerCase();
+  let m: RegExpMatchArray | null;
+  if ((m = k.match(/^(\d{4})-(\d{2})$/)) && Number(m[2]) >= 1 && Number(m[2]) <= 12) { kind = "month"; year = Number(m[1]); n = Number(m[2]); }
+  else if ((m = k.match(/^(\d{4})-q([1-4])$/))) { kind = "quarter"; year = Number(m[1]); n = Number(m[2]); }
+  else if ((m = k.match(/^(\d{4})-h([12])$/))) { kind = "half"; year = Number(m[1]); n = Number(m[2]); }
+  else if ((m = k.match(/^(\d{4})$/))) { kind = "year"; year = Number(m[1]); n = 1; }
+  else if ((m = k.match(/^q([1-4])$/))) { kind = "quarter"; n = Number(m[1]); }
+  else if ((m = k.match(/^h([12])$/))) { kind = "half"; n = Number(m[1]); }
+  else if (k === "year") { kind = "year"; n = 1; }
+  if (year < 2000 || year > 2100) { kind = "month"; year = ty; n = tm; }
+  const span = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `${year}-${pad2(a + i)}`);
+  let yms: string[], label: string, current: boolean;
+  switch (kind) {
+    case "quarter": yms = span(n * 3 - 2, n * 3); label = `${year} 第${"一二三四"[n - 1]}季`; current = year === ty && n === tq; break;
+    case "half": yms = span(n === 1 ? 1 : 7, n === 1 ? 6 : 12); label = `${year} ${n === 1 ? "上" : "下"}半年`; current = year === ty && n === th; break;
+    case "year": yms = span(1, 12); label = `${year} 全年`; current = year === ty; break;
+    default: yms = [`${year}-${pad2(n)}`]; label = `${year}年${n}月`; current = year === ty && n === tm;
   }
-  return { key: k, label, yms, from: yms[0], to: yms[yms.length - 1], multi: yms.length > 1, current };
+  return { key: periodKey(kind, year, n), kind, year, n, label, yms, from: yms[0], to: yms[yms.length - 1], multi: yms.length > 1, current };
 }
-/** 切換器上的選項：本月／第一季…（本季）／上半年／下半年／今年。 */
-export function rangeOptions(today: string): { key: RangeKey; label: string }[] {
-  const m = Number(today.slice(5, 7)), q = Math.ceil(m / 3);
+/** 切換器用的選項：年份（有收款的最早一年～今年）、每種期間的子選項，當期標「本月／本季／…」。 */
+export type RangeOptions = {
+  years: number[];
+  thisYear: number; thisMonth: number; thisQuarter: number; thisHalf: number;
+  kinds: { kind: PeriodKind; label: string }[];
+  months: { n: number; label: string }[]; quarters: { n: number; label: string }[]; halves: { n: number; label: string }[];
+};
+export function rangeOptions(today: string, receiptYms: string[] = []): RangeOptions {
+  const ty = Number(today.slice(0, 4)), tm = Number(today.slice(5, 7)), tq = Math.ceil(tm / 3), th = tm <= 6 ? 1 : 2;
+  const ys = receiptYms.map((k) => Number(k.slice(0, 4))).filter((y) => y >= 2000 && y <= ty);
+  const first = ys.length ? Math.min(...ys) : ty;
+  const years = Array.from({ length: ty - first + 1 }, (_, i) => ty - i);
   const Q = ["第一季", "第二季", "第三季", "第四季"];
-  return [
-    { key: "month", label: "本月" },
-    ...([1, 2, 3, 4] as const).map((n) => ({ key: `q${n}` as RangeKey, label: n === q ? `${Q[n - 1]}（本季）` : Q[n - 1] })),
-    { key: "h1", label: "上半年" }, { key: "h2", label: "下半年" }, { key: "year", label: "今年" },
-  ];
+  return {
+    years, thisYear: ty, thisMonth: tm, thisQuarter: tq, thisHalf: th,
+    kinds: [{ kind: "month", label: "月" }, { kind: "quarter", label: "季" }, { kind: "half", label: "半年" }, { kind: "year", label: "全年" }],
+    months: Array.from({ length: 12 }, (_, i) => ({ n: i + 1, label: `${i + 1} 月` })),
+    quarters: Q.map((l, i) => ({ n: i + 1, label: l })),
+    halves: [{ n: 1, label: "上半年" }, { n: 2, label: "下半年" }],
+  };
 }
 const ymList = (yms: string | string[]) => (typeof yms === "string" ? [yms] : yms);
 

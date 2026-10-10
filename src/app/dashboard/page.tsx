@@ -63,7 +63,7 @@ export default async function Dashboard({
           focusId={data.focusId}
           teamOptions={data.teamOptions}
           memberOptions={data.memberOptions}
-          range={data.period.key}
+          period={data.period}
           rangeOptions={data.rangeOptions}
         />
         <Home data={data} />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { memberMoney, promoProgress, termInfo, teamMoney, applyFunnel, companyMonth, periodOf, rangeOptions, payoutsOver, monthsOver, hasReceipts } from "./homeStats";
+import { memberMoney, promoProgress, termInfo, teamMoney, applyFunnel, companyMonth, periodOf, periodKey, rangeOptions, payoutsOver, monthsOver, hasReceipts } from "./homeStats";
 import { normReceipt, type AcctState, type AcctItem, type PayeeRec } from "./acctEngine";
 import type { CompParams } from "./comp/types";
 
@@ -130,22 +130,31 @@ describe("核心成員：公司", () => {
 
 // 2026/10/10 Ray：首頁可切本月／第一～四季（本季）／上下半年／全年。
 describe("期間（本月／本季／半年／全年）", () => {
-  it("periodOf：鍵對到月份串；不認得的鍵退回本月", () => {
-    expect(periodOf("month", "2026-10-10")).toMatchObject({ key: "month", yms: ["2026-10"], label: "2026年10月", multi: false, current: true });
-    expect(periodOf("q4", "2026-10-10")).toMatchObject({ key: "q4", yms: ["2026-10", "2026-11", "2026-12"], label: "2026 第四季", from: "2026-10", to: "2026-12", multi: true, current: true });
+  it("periodOf：鍵對到月份串；舊鍵當今年；不認得的鍵退回本月", () => {
+    expect(periodOf("month", "2026-10-10")).toMatchObject({ key: "2026-10", kind: "month", yms: ["2026-10"], label: "2026年10月", multi: false, current: true });
+    expect(periodOf("q4", "2026-10-10")).toMatchObject({ key: "2026-q4", kind: "quarter", year: 2026, n: 4, yms: ["2026-10", "2026-11", "2026-12"], label: "2026 第四季", from: "2026-10", to: "2026-12", multi: true, current: true });
     expect(periodOf("q1", "2026-10-10")).toMatchObject({ yms: ["2026-01", "2026-02", "2026-03"], current: false });
     expect(periodOf("h1", "2026-10-10").yms).toHaveLength(6);
     expect(periodOf("h2", "2026-10-10")).toMatchObject({ from: "2026-07", to: "2026-12", current: true });
-    expect(periodOf("year", "2026-10-10")).toMatchObject({ yms: Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, "0")}`), label: "2026 全年" });
-    expect(periodOf("zzz", "2026-10-10").key).toBe("month");
+    expect(periodOf("year", "2026-10-10")).toMatchObject({ key: "2026", yms: Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, "0")}`), label: "2026 全年" });
+    // 指定年份／月份
+    expect(periodOf("2026-08", "2026-10-10")).toMatchObject({ key: "2026-08", kind: "month", n: 8, yms: ["2026-08"], label: "2026年8月", current: false });
+    expect(periodOf("2025-q3", "2026-10-10")).toMatchObject({ kind: "quarter", year: 2025, n: 3, yms: ["2025-07", "2025-08", "2025-09"], label: "2025 第三季", current: false });
+    expect(periodOf("2025-h2", "2026-10-10")).toMatchObject({ kind: "half", year: 2025, label: "2025 下半年", current: false });
+    expect(periodOf("2025", "2026-10-10")).toMatchObject({ kind: "year", year: 2025, label: "2025 全年", current: false, multi: true });
+    expect(periodOf("2026-13", "2026-10-10").key).toBe("2026-10");
+    expect(periodOf("zzz", "2026-10-10").key).toBe("2026-10");
     expect(periodOf(undefined, "2026-03-05").yms).toEqual(["2026-03"]);
+    expect(periodKey("quarter", 2026, 2)).toBe("2026-q2");
   });
-  it("rangeOptions：本季標出來", () => {
-    const o = rangeOptions("2026-10-10");
-    expect(o.map((x) => x.key)).toEqual(["month", "q1", "q2", "q3", "q4", "h1", "h2", "year"]);
-    expect(o.find((x) => x.key === "q4")!.label).toBe("第四季（本季）");
-    expect(o.find((x) => x.key === "q3")!.label).toBe("第三季");
-    expect(rangeOptions("2026-02-01").find((x) => x.key === "q1")!.label).toBe("第一季（本季）");
+  it("rangeOptions：年份從有收款的最早一年到今年；當期資訊", () => {
+    const o = rangeOptions("2026-10-10", ["2025-11", "2026-08", "2026-09"]);
+    expect(o.years).toEqual([2026, 2025]);
+    expect(o).toMatchObject({ thisYear: 2026, thisMonth: 10, thisQuarter: 4, thisHalf: 2 });
+    expect(o.kinds.map((k) => k.kind)).toEqual(["month", "quarter", "half", "year"]);
+    expect(o.months).toHaveLength(12); expect(o.quarters[3].label).toBe("第四季"); expect(o.halves[0].label).toBe("上半年");
+    expect(rangeOptions("2026-02-01").years).toEqual([2026]);
+    expect(rangeOptions("2026-02-01", ["2027-01"]).years).toEqual([2026]);   // 未來年份不列
   });
   it("payoutsOver：跨月同一受款人併一條、已匯加總、發放日取最後一個月", () => {
     const q3 = payoutsOver(S, ["2026-07", "2026-08", "2026-09"]);
