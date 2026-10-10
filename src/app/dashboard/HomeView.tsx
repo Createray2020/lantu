@@ -124,35 +124,35 @@ const NoMoney = ({ children }: { children: React.ReactNode }) => (
 const Chip = ({ children, warn = false }: { children: React.ReactNode; warn?: boolean }) => (
   <div className={`inline-flex items-center gap-1.5 bg-panel2 border rounded-lg px-3 py-2 text-xs shadow-e1 ${warn ? "border-danger text-danger" : "border-line text-tx2"}`}>{children}</div>
 );
-const PAY_STATUS: Record<string, [string, string]> = { none: ["本月沒有分潤", "mut"], pending: ["未匯", "amber"], partial: ["部分已匯", "amber"], paid: ["已匯", "green"] };
+const PAY_STATUS: Record<string, [string, string]> = { none: ["沒有分潤", "mut"], pending: ["未匯", "amber"], partial: ["部分已匯", "amber"], paid: ["已匯", "green"] };
 
 // ══════════ 教練 ══════════
-function MemberView({ d, today }: { d: MemberHome; today: string }) {
+function MemberView({ d, today, pl, multi }: { d: MemberHome; today: string; pl: string; multi: boolean }) {
   const k = d.kpis, m = d.money, p = d.promo, t = d.term;
-  const [ps, pk] = PAY_STATUS[m.status];
+  const [ps, pk] = m.status === "none" ? [`${pl}沒有分潤`, "mut"] : PAY_STATUS[m.status];
   const promoLine = p.kind === "apply" ? `報聘門檻：${p.cases}／${p.needCases} 件・${nt(p.fees)}／${nt(p.needFees ?? 0)}`
     : p.kind === "promote" ? `${p.rankCode} → ${p.nextCode}：${p.cases}／${p.needCases ?? "—"} 件・${nt(p.fees)}／${p.needFees != null ? nt(p.needFees) : "—"}`
     : p.kind === "top" ? "已是最高職級" : "尚未核定職級";
   return (
     <>
       <Hero k={`早安，${d.coach.name}`}
-        h1={d.hasMoney || m.net > 0 ? `這個月實匯 ${nt(m.net)}` : `今天有 ${k.todayAppts} 場約訪、${k.openItems} 件待辦`}
+        h1={d.hasMoney || m.net > 0 ? `${pl}實匯 ${nt(m.net)}` : `今天有 ${k.todayAppts} 場約訪、${k.openItems} 件待辦`}
         sub={<>{today} · {p.rankLabel} · {promoLine}{p.met && p.kind !== "top" ? <b className="text-ok ml-1">已達門檻</b> : null}</>}
         right={<div className="min-w-[170px]"><div className="text-11 text-tx2">{p.kind === "apply" ? "離報聘" : p.nextCode ? `離 ${p.nextCode}` : "晉升"}</div><div className="text-15 font-extrabold text-brand2">{p.pct}%</div><div className="mt-1.5"><Bar pct={p.pct} /></div></div>} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
-        <Kpi icon="💵" label="本月實匯" value={nt(m.net)} note={m.withhold ? `應付 ${nt(m.due)}・扣繳 ${nt(m.withhold)}` : m.srcN ? `${m.srcN} 筆分潤` : "本月還沒有分潤"} top="var(--brand)" />
-        <Kpi icon="🏦" label="匯款狀態" value={ps} note={`${m.ym} 入帳・${m.payDate} 發放`} top={pk === "green" ? "var(--ok)" : "var(--tx2)"} />
+        <Kpi icon="💵" label={`${pl}實匯`} value={nt(m.net)} note={m.withhold ? `應付 ${nt(m.due)}・扣繳 ${nt(m.withhold)}` : m.srcN ? `${m.srcN} 筆分潤` : `${pl}還沒有分潤`} top="var(--brand)" />
+        <Kpi icon="🏦" label="匯款狀態" value={ps} note={multi ? `${m.months[0]?.ym}～${m.ym} 入帳・最後一月 ${m.payDate} 發放` : `${m.ym} 入帳・${m.payDate} 發放`} top={pk === "green" ? "var(--ok)" : "var(--tx2)"} />
         <Kpi icon="📄" label="累計正式案件" value={String(p.cases)} sm="案" note={`顧問費 ${nt(p.fees)}`} top="var(--c5)" />
         <Kpi icon="✅" label="待辦事項" value={String(k.openItems)} sm="項" top="var(--danger)" />
         <Kpi icon="📅" label="今日約訪" value={String(k.todayAppts)} sm="場" />
-        <Kpi icon="🧭" label="本月回訪到位" value={`${d.checkins.done}/${d.checkins.total}`} sm="場" note={d.checkins.total ? `部分 ${d.checkins.partial}・沒動 ${d.checkins.none}` : "本月還沒有回訪對帳"} top="var(--brand)" />
+        <Kpi icon="🧭" label={`${pl}回訪到位`} value={`${d.checkins.done}/${d.checkins.total}`} sm="場" note={d.checkins.total ? `部分 ${d.checkins.partial}・沒動 ${d.checkins.none}` : `${pl}還沒有回訪對帳`} top="var(--brand)" />
       </div>
 
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <div>
-          <Section title="💵 我的實匯（近 6 個月）" more="我的分潤" moreHref="/dashboard/payouts">
-            {m.months.some((x) => x.net > 0) ? <MonthBars rows={m.months.map((x) => ({ ym: x.ym, v: x.net }))} current={m.ym} /> : <NoMoney>近六個月還沒有分潤。有分潤的月份會在這裡長出來；每月 5 日結算前一個月。</NoMoney>}
+          <Section title={multi ? `💵 我的實匯（${pl}逐月）` : "💵 我的實匯（近 6 個月）"} more="我的分潤" moreHref="/dashboard/payouts">
+            {m.months.some((x) => x.net > 0) ? <MonthBars rows={m.months.map((x) => ({ ym: x.ym, v: x.net }))} current={multi ? "" : m.ym} /> : <NoMoney>{multi ? `${pl}還沒有分潤。` : "近六個月還沒有分潤。"}有分潤的月份會在這裡長出來；每月 5 日結算前一個月。</NoMoney>}
             {m.unverified.n > 0 && <div className="text-xs text-tx2 mt-2">另有 <b className="text-brand2">{m.unverified.n} 筆</b> 顧問費（{nt(m.unverified.amount)}）等公司查帳確認，確認後才算分潤與實績。</div>}
           </Section>
           <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
@@ -217,18 +217,18 @@ function MemberView({ d, today }: { d: MemberHome; today: string }) {
 }
 
 // ══════════ 主管 ══════════
-function ManagerView({ d }: { d: ManagerHome }) {
+function ManagerView({ d, pl, multi }: { d: ManagerHome; pl: string; multi: boolean }) {
   const tm = d.team;
   const max = Math.max(1, ...tm.rows.map((r) => r.net));
   return (
     <>
       <Hero k={`團隊概況 · ${d.teamName}`}
-        h1={d.hasMoney ? `團隊這個月實匯 ${nt(tm.total)}` : `${d.teamName}`}
-        sub={<>{d.memberCount} 位教練 · <b className="text-brand2">{d.pendingCount} 位</b> 報聘中{tm.nearPromo ? <> · <b className="text-ok">{tm.nearPromo} 位</b> 接近晉升門檻</> : null}{d.hasMoney ? null : <> · 本月還沒有收款</>}</>}
-        right={<div className="text-xs text-tx2">結算 {d.payDate} 發放</div>} />
+        h1={d.hasMoney ? `團隊${pl}實匯 ${nt(tm.total)}` : `${d.teamName}`}
+        sub={<>{d.memberCount} 位教練 · <b className="text-brand2">{d.pendingCount} 位</b> 報聘中{tm.nearPromo ? <> · <b className="text-ok">{tm.nearPromo} 位</b> 接近晉升門檻</> : null}{d.hasMoney ? null : <> · {pl}還沒有收款</>}</>}
+        right={<div className="text-xs text-tx2">{multi ? "最後一月結算" : "結算"} {d.payDate} 發放</div>} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
-        <Kpi icon="💰" label="團隊實匯（本月）" value={nt(tm.total)} top="var(--brand)" note={tm.unverified.n ? `另 ${tm.unverified.n} 筆顧問費待查帳` : undefined} />
+        <Kpi icon="💰" label={`團隊實匯（${pl}）`} value={nt(tm.total)} top="var(--brand)" note={tm.unverified.n ? `另 ${tm.unverified.n} 筆顧問費待查帳` : undefined} />
         <Kpi icon="🎯" label="接近晉升" value={String(tm.nearPromo)} sm="位" note="門檻達成 70% 以上" top="var(--ok)" />
         <Kpi icon="🧲" label="報聘中" value={String(d.pendingCount)} sm="位" top="var(--c5)" />
         <Kpi icon="🤝" label="我推薦的申請" value={String(d.funnel.referredByMe)} sm="位" />
@@ -236,7 +236,7 @@ function ManagerView({ d }: { d: ManagerHome }) {
 
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <div>
-          <Section title="🏆 團隊本月實匯與晉升進度" more="職級與晉升" moreHref="/dashboard/my-business">
+          <Section title={`🏆 團隊${pl}實匯與晉升進度`} more="職級與晉升" moreHref="/dashboard/my-business">
             {tm.rows.length === 0 ? <Empty>團隊還沒有成員</Empty> : tm.rows.map((r) => (
               <div key={r.id} className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 items-center py-2 border-b border-line last:border-0">
                 <div className="font-bold text-13">{r.name} <span className="text-11 text-tx3 font-normal">{r.rankCode ?? "未定級"}{r.nextCode ? ` → ${r.nextCode} ${r.pct}%` : ""}</span></div>
@@ -267,32 +267,32 @@ function ManagerView({ d }: { d: ManagerHome }) {
 }
 
 // ══════════ 核心成員 ══════════
-function OwnerView({ d }: { d: OwnerHome }) {
+function OwnerView({ d, pl, multi }: { d: OwnerHome; pl: string; multi: boolean }) {
   const c = d.company, r = c.r, po = c.payouts;
   const cmax = Math.max(1, ...c.chains.map((x) => x.net));
   return (
     <>
-      <Hero k="公司這個月"
-        h1={r && d.hasMoney ? `公司實收 ${nt(r.gp)}，淨利 ${nt(r.net)}` : "本月還沒有收款"}
+      <Hero k={multi ? `公司 ${pl}` : "公司這個月"}
+        h1={r && d.hasMoney ? `公司實收 ${nt(r.gp)}，淨利 ${nt(r.net)}` : `${pl}還沒有收款`}
         sub={<>{c.headcount} 位有效教練 · 收款 {nt(po.received)} · 要匯出去 {nt(po.net)}（已匯 {nt(po.paid)}）{po.pending.n ? <> · <b className="text-danger">{po.pending.n} 筆顧問費待查帳</b></> : null}</>}
         right={<>
           {c.bodies.map((b) => <div key={b.code} className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">{b.label} <b className="text-tx">{b.n}</b></div>)}
         </>} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 mb-4">
-        <Kpi icon="💎" label="營業額（本月）" value={nt(r?.rev ?? 0)} top="var(--brand)" />
+        <Kpi icon="💎" label={`營業額（${pl}）`} value={nt(r?.rev ?? 0)} top="var(--brand)" />
         <Kpi icon="🏢" label="公司實收" value={nt(r?.gp ?? 0)} note={r?.rev ? `${Math.round(r.gp / r.rev * 100)}%` : undefined} top="var(--ok)" />
         <Kpi icon="📈" label="淨利" value={nt(r?.net ?? 0)} note={r ? `固定 ${nt(r.fixed)}・稅 ${nt(r.vat)}` : undefined} top={r && r.net < 0 ? "var(--danger)" : "var(--ok)"} />
-        <Kpi icon="🏦" label="還要匯" value={nt(po.remaining)} note={`發放日 ${po.payDate}`} top="var(--danger)" />
+        <Kpi icon="🏦" label="還要匯" value={nt(po.remaining)} note={multi ? `最後一月發放日 ${po.payDate}` : `發放日 ${po.payDate}`} top="var(--danger)" />
         <Kpi icon="📇" label="合作到期／未設" value={`${c.expired}／${c.unlicensed}`} sm="位" top="var(--c5)" />
       </div>
 
       <div className="grid lg:grid-cols-[1.35fr_1fr] gap-4 items-start">
         <div>
-          <Section title="🧭 本月損益" more="本月帳務" moreHref="/admin/accounting/monthly">
-            {r && d.hasMoney ? <WaterfallChart r={r} /> : <NoMoney>本月還沒有收款，畫不出損益。</NoMoney>}
+          <Section title={`🧭 ${pl}損益`} more="本月帳務" moreHref="/admin/accounting/monthly">
+            {r && d.hasMoney ? <WaterfallChart r={r} /> : <NoMoney>{pl}還沒有收款，畫不出損益。</NoMoney>}
           </Section>
-          <Section title="📈 營業額 vs 公司實收（近 8 個月）">
+          <Section title={multi ? `📈 營業額 vs 公司實收（${pl}逐月）` : "📈 營業額 vs 公司實收（近 8 個月）"}>
             {c.trend.some((x) => x.rev > 0) ? <TwoLines rows={c.trend.map((x) => ({ ym: x.ym, a: x.rev, b: x.company }))} /> : <NoMoney>還沒有任何月份的收款。</NoMoney>}
           </Section>
           <Section title="📅 近期行程" more="全部行程" moreHref="/dashboard/calendar">
@@ -313,9 +313,9 @@ function OwnerView({ d }: { d: OwnerHome }) {
                 ))}
               </div>
             </div>
-            <div className="text-11 text-tx3 mt-2">合作有效＝未到期教練比例；維持資格＝本年度達標比例；推薦動能＝本月有推薦分潤的人數比例；回訪完成＝本月回訪對帳到位；對帳完成＝已匯／實匯。</div>
+            <div className="text-11 text-tx3 mt-2">合作有效＝未到期教練比例；維持資格＝本年度達標比例；推薦動能＝{pl}有推薦分潤的人數比例；回訪完成＝{pl}回訪對帳到位；對帳完成＝已匯／實匯。</div>
           </Section>
-          <Section title="🏢 各輔導鏈本月實匯">
+          <Section title={`🏢 各輔導鏈${pl}實匯`}>
             {c.chains.length === 0 ? <Empty>還沒有任何團隊</Empty> : c.chains.map((t) => (
               <div key={t.id} className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 items-center py-2.5 border-b border-line last:border-0">
                 <div><div className="font-bold text-13">{t.name}</div><div className="text-tx2 text-xs">{t.headcount} 位成員</div></div>
@@ -324,8 +324,8 @@ function OwnerView({ d }: { d: OwnerHome }) {
               </div>
             ))}
           </Section>
-          <Section title="🏅 本月實匯 Top 5" more="分潤匯款" moreHref="/admin/accounting/payouts">
-            {d.top5.length === 0 ? <Empty>本月還沒有分潤</Empty> : d.top5.map((x, i) => (
+          <Section title={`🏅 ${pl}實匯 Top 5`} more="分潤匯款" moreHref="/admin/accounting/payouts">
+            {d.top5.length === 0 ? <Empty>{pl}還沒有分潤</Empty> : d.top5.map((x, i) => (
               <div key={i} className="flex items-center gap-3 py-2 border-b border-line last:border-0"><span className="text-tx3 w-5 text-center font-extrabold">{i + 1}</span><span className="flex-1 font-bold text-13">{x.name}</span><span className="font-extrabold tabular-nums">{nt(x.net)}</span></div>
             ))}
           </Section>
@@ -410,11 +410,13 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 export default function Home({ data }: { data: HomeView }) {
+  // pl＝期間在句子裡的叫法：單月仍說「本月」，多月說「2026 第四季」這種。
+  const multi = data.period.multi, pl = multi ? data.period.label : "本月";
   return (
     <div>
-      {data.member && <MemberView d={data.member} today={data.today} />}
-      {data.manager && <ManagerView d={data.manager} />}
-      {data.owner && <OwnerView d={data.owner} />}
+      {data.member && <MemberView d={data.member} today={data.today} pl={pl} multi={multi} />}
+      {data.manager && <ManagerView d={data.manager} pl={pl} multi={multi} />}
+      {data.owner && <OwnerView d={data.owner} pl={pl} multi={multi} />}
       <div className="text-tx3 text-11 text-center mt-6 pt-4 border-t border-line">
         嵐途 LAN TU · {data.today} · {data.periodLabel} · 數字來自後台帳務、分潤匯款與業務制度
       </div>

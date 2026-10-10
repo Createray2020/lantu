@@ -240,13 +240,13 @@ export async function saveCheckin(coachId: string, sessionId: string, raw: unkno
   return { ok: true };
 }
 /** 教練首頁「回訪到位」：某段期間內有對帳的場次，依等級計數。 */
-export async function checkinStats(coachId: string, since: Date): Promise<{ done: number; partial: number; none: number; total: number }> {
+export async function checkinStats(coachId: string, since: Date, until?: Date): Promise<{ done: number; partial: number; none: number; total: number }> {
   // ⚠️ 除了 coach_id，還要 innerJoin(clients)＋ownedClient：客戶轉手之後舊教練不該再統計到那位客戶。
   const rows = await db
     .select({ checkin: consultSessions.checkin })
     .from(consultSessions)
     .innerJoin(clients, eq(clients.id, consultSessions.clientId))
-    .where(and(eq(consultSessions.coachId, coachId), ownedClient(coachId), isNotNull(consultSessions.checkin), gte(consultSessions.startedAt, since)));
+    .where(and(eq(consultSessions.coachId, coachId), ownedClient(coachId), isNotNull(consultSessions.checkin), gte(consultSessions.startedAt, since), until ? lt(consultSessions.startedAt, until) : undefined));
   const out = { done: 0, partial: 0, none: 0, total: 0 };
   for (const r of rows) {
     const c = normCheckin(r.checkin);

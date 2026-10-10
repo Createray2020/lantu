@@ -11,10 +11,10 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { announcements, coaches } from "@/Shared/db/schema";
 import type { CompParams } from "./comp/types";
-import { payoutsOf } from "./acctEngine";
+import { nextYm } from "./acctEngine";
 import {
-  memberMoney, promoProgress, termInfo, teamMoney, applyFunnel, companyMonth, coachLine,
-  type MemberMoney, type PromoProgress, type TermInfo, type TeamMoney, type ApplyFunnel, type CompanyMonth, type ApplyLike,
+  memberMoney, promoProgress, termInfo, teamMoney, applyFunnel, companyMonth, coachLine, payoutsOver, hasReceipts, periodOf, rangeOptions,
+  type MemberMoney, type PromoProgress, type TermInfo, type TeamMoney, type ApplyFunnel, type CompanyMonth, type ApplyLike, type Period, type RangeKey,
 } from "./homeStats";
 import { getCoachDashboard } from "./dashboard";
 // ⚠️ 同 dashboard.ts：今天是哪一天用 Asia/Taipei 那一支，不要用 UTC 的 toISOString()。
@@ -150,6 +150,10 @@ async function homeCtx() {
   try { const v = await ensureActiveVersion(); params = await loadParams(v.id); } catch { /* 制度還沒建：門檻全空 */ }
   return { S, params };
 }
+/** 期間的時間邊界（台北時間）：since＝第一個月 1 日、until＝最後一個月的下個月 1 日（不含）。 */
+function periodBounds(p: Period) {
+  return { since: new Date(`${p.from}-01T00:00:00+08:00`), until: new Date(`${nextYm(p.to)}-01T00:00:00+08:00`) };
+}
 async function pendingCoachRows(): Promise<CoachRow[]> {
   return db.select().from(coaches).where(eq(coaches.status, "pending"));
 }
@@ -163,7 +167,7 @@ async function applicationRows(): Promise<ApplyLike[]> {
 // ---------- 教練（member）----------
 export type MemberHome = {
   coach: { name: string; title: string | null };
-  /** 這個月有沒有任何收款（整個公司）。沒有＝錢的那幾塊顯示「本月還沒有收款」而不是 0。 */
+  /** 這段期間有沒有任何收款（整個公司）。沒有＝錢的那幾塊顯示「還沒有收款」而不是 0。 */
   hasMoney: boolean;
   money: MemberMoney;
   promo: PromoProgress;
@@ -177,12 +181,13 @@ export type MemberHome = {
   checkins: { done: number; partial: number; none: number; total: number };
 };
 
-export async function getMemberHome(coach: CoachRow, period: string): Promise<MemberHome> {
+export async function getMemberHome(coach: CoachRow, period: Period): Promise<MemberHome> {
   const d = await getCoachDashboard(coach.id);
   let checkins: MemberHome["checkins"] = { done: 0, partial: 0, none: 0, total: 0 };
   try {
     const { checkinStats } = await import("@/lib/consultSession");
-    checkins = await checkinStats(coach.id, new Date(`${period}-01T00:00:00+08:00`));
+    const { since, until } = periodBounds(period);
+    checkins = await checkinStats(coach.id, since, until);
   } catch { /* 統計不影響首頁 */ }
   const { S, params } = await homeCtx();
   const today = todayISO();
@@ -202,8 +207,8 @@ export async function getMemberHome(coach: CoachRow, period: string): Promise<Me
 
   return {
     coach: { name: coach.name ?? "教練", title: coach.title },
-    hasMoney: (S.receipts?.[period] ?? []).some((x) => !x.void && x.verified !== false),
-    money: memberMoney(S, coach, period),
+    hasMoney: hasReceipts(S, period.yms),
+    money: memberMoney(S, coach, period.yms),
     promo: promoProgress(S, params, coach),
     term: termInfo(coach, today),
     kpis: { openItems: d.counts.openItems, todayAppts: d.thisWeek.filter((a) => a.date === today).length, clients: d.counts.total },
@@ -227,19 +232,19 @@ export type ManagerHome = {
   announcements: Announcement[];
 };
 
-export async function getManagerHome(manager: CoachRow, all: CoachRow[], period: string): Promise<ManagerHome> {
+export async function getManagerHome(manager: CoachRow, all: CoachRow[], period: Period): Promise<ManagerHome> {
   const teamIds = downlineIds(manager.id, all);
   const memberIds = teamIds.filter((id) => id !== manager.id);
   const members = all.filter((c) => memberIds.includes(c.id));
   const { S, params } = await homeCtx();
-  const team = teamMoney(S, params, members, period);
+  const team = teamMoney(S, params, members, period.yms);
   const [pend, apps] = await Promise.all([pendingCoachRows(), applicationRows()]);
   const funnel = applyFunnel(apps, pend, new Set(teamIds), manager.id);
   return {
     teamName: manager.title || `${manager.name ?? ""}的團隊`,
     memberCount: memberIds.length,
-    hasMoney: (S.receipts?.[period] ?? []).some((x) => !x.void && x.verified !== false),
-    team, payDate: payoutsOf(S, period).payDate,
+    hasMoney: hasReceipts(S, period.yms),
+    team, payDate: payoutsOver(S, period.yms).payDate,
     funnel, pendingCount: funnel.steps[0].value,
     agenda: await agendaFor(rankOf(manager)),
     announcements: await listAnnouncements(),
@@ -256,11 +261,11 @@ export type OwnerHome = {
   announcements: Announcement[];
 };
 
-export async function getOwnerHome(owner: CoachRow, all: CoachRow[], period: string): Promise<OwnerHome> {
+export async function getOwnerHome(owner: CoachRow, all: CoachRow[], period: Period): Promise<OwnerHome> {
   const { S, params } = await homeCtx();
   void params;
   const today = todayISO();
-  const year = Number(period.slice(0, 4));
+  const year = Number(period.from.slice(0, 4));
   let maintainPass = 0, maintainTotal = 0;
   try {
     const { listMaintenance } = await import("./comp/caseRepo");
@@ -270,17 +275,15 @@ export async function getOwnerHome(owner: CoachRow, all: CoachRow[], period: str
   let checkinDone = 0, checkinTotal = 0;
   try {
     const { checkinStats } = await import("@/lib/consultSession");
-    const since = new Date(`${period}-01T00:00:00+08:00`);
-    for (const c of all) { const st = await checkinStats(c.id, since); checkinDone += st.done; checkinTotal += st.total; }
+    const { since, until } = periodBounds(period);
+    for (const c of all) { const st = await checkinStats(c.id, since, until); checkinDone += st.done; checkinTotal += st.total; }
   } catch { /* 統計不影響首頁 */ }
   const chains = teamsUnder(owner.id, all).map((t) => ({ id: t.manager.id, name: t.manager.title || `${t.manager.name ?? ""}團隊`, memberIds: t.memberIds }));
-  const company = companyMonth(S, all, period, today, { maintainPass, maintainTotal, checkinDone, checkinTotal, chains });
-  const sum = company.payouts;
-  const top5 = all.map((c) => ({ name: c.name ?? "", net: coachLine(S, period, c)?.tax.net ?? 0 })).filter((x) => x.net > 0).sort((a, b) => b.net - a.net).slice(0, 5);
-  void sum;
+  const company = companyMonth(S, all, period.yms, today, { maintainPass, maintainTotal, checkinDone, checkinTotal, chains });
+  const top5 = all.map((c) => ({ name: c.name ?? "", net: coachLine(S, period.yms, c)?.tax.net ?? 0 })).filter((x) => x.net > 0).sort((a, b) => b.net - a.net).slice(0, 5);
   const [pend, apps] = await Promise.all([pendingCoachRows(), applicationRows()]);
   return {
-    hasMoney: (S.receipts?.[period] ?? []).some((x) => !x.void && x.verified !== false),
+    hasMoney: hasReceipts(S, period.yms),
     company, top5,
     funnel: applyFunnel(apps, pend, new Set(all.map((c) => c.id)), null),
     agenda: await agendaFor("owner"),
@@ -295,8 +298,10 @@ export type HomeView = {
   teamOptions: { id: string; name: string }[];
   memberOptions: { id: string; name: string }[];
   focusId: string;
-  period: string;
+  /** 期間（本月／本季／半年／全年）：錢與損益按這段加總；晉升累計與到期倒數不受影響。 */
+  period: Period;
   periodLabel: string;
+  rangeOptions: { key: RangeKey; label: string }[];
   today: string;
   member?: MemberHome;
   manager?: ManagerHome;
@@ -309,11 +314,12 @@ function allowedViews(rank: OrgRank): OrgRank[] {
   return ["member"];
 }
 
-export async function getHome(me: CoachRow, opts: { as?: string; focus?: string } = {}): Promise<HomeView> {
+export async function getHome(me: CoachRow, opts: { as?: string; focus?: string; range?: string } = {}): Promise<HomeView> {
   const all = await listActiveCoaches();
   const myRank = rankOf(me);
   const views = allowedViews(myRank);
-  const period = currentPeriod();
+  const todayIso = todayISO();
+  const period = periodOf(opts.range, todayIso);
 
   const wanted = (opts.as as OrgRank) || myRank;
   const view: OrgRank = views.includes(wanted) ? wanted : myRank;
@@ -333,7 +339,7 @@ export async function getHome(me: CoachRow, opts: { as?: string; focus?: string 
   // 依本月實匯排序（分潤匯款算出來的），不再看手填業績
   const { getAcctState } = await import("./acctStore");
   const S0 = await getAcctState();
-  const incomeOf = (c: CoachRow) => coachLine(S0, period, c)?.tax.net ?? 0;
+  const incomeOf = (c: CoachRow) => coachLine(S0, period.yms, c)?.tax.net ?? 0;
   const membersByIncome = [...members].sort((a, b) => incomeOf(b) - incomeOf(a));
   const memberOptions = membersByIncome.map((c) => ({ id: c.id, name: c.name || "" }));
 
@@ -342,7 +348,7 @@ export async function getHome(me: CoachRow, opts: { as?: string; focus?: string 
 
   const base = {
     rank: view, views, teamOptions, memberOptions,
-    period, periodLabel: periodLabel(period), today: todayLabel(),
+    period, periodLabel: period.label, rangeOptions: rangeOptions(todayIso), today: todayLabel(),
     focusId: focus || me.id,
   };
 

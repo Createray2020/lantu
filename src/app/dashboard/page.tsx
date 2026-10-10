@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function Dashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ as?: string; focus?: string }>;
+  searchParams: Promise<{ as?: string; focus?: string; range?: string }>;
 }) {
   const coach = await ensureCoach();
   if (!coach) {
@@ -48,7 +48,7 @@ export default async function Dashboard({
     );
   }
   const sp = await searchParams;
-  const data = await getHome(coach, { as: sp.as, focus: sp.focus });
+  const data = await getHome(coach, { as: sp.as, focus: sp.focus, range: sp.range });
 
   const hp = await headerProps(coach);
 
@@ -63,6 +63,8 @@ export default async function Dashboard({
           focusId={data.focusId}
           teamOptions={data.teamOptions}
           memberOptions={data.memberOptions}
+          range={data.period.key}
+          rangeOptions={data.rangeOptions}
         />
         <Home data={data} />
       </div>

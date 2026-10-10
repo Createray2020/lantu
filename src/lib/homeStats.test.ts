@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { memberMoney, promoProgress, termInfo, teamMoney, applyFunnel, companyMonth } from "./homeStats";
+import { memberMoney, promoProgress, termInfo, teamMoney, applyFunnel, companyMonth, periodOf, rangeOptions, payoutsOver, monthsOver, hasReceipts } from "./homeStats";
 import { normReceipt, type AcctState, type AcctItem, type PayeeRec } from "./acctEngine";
 import type { CompParams } from "./comp/types";
 
@@ -15,7 +15,7 @@ const intern = { id: "c-int", name: "小實", rankCode: "INTERN", uplineId: "c-c
 const book: PayeeRec[] = [{ id: "pa", coachId: "c-chiu", name: "邱浩軍", bankCode: "808", bankName: "玉山", branch: "", accountName: "邱", accountNo: "123", taxMode: "withhold", note: "" }];
 const rc = (id: string, itemId: string, on: string, amount: number, payer: string, extra: Record<string, unknown> = {}) => normReceipt({ itemId, on, amount, payer, ...extra }, id);
 const S: AcctState = {
-  items, months: { "2026-09": { qty: {}, fixed: [{ name: "記帳費", amt: 3000 }] } }, targets: {}, draft: null, params: P, goal: { netTarget: 0 },
+  items, months: { "2026-08": { qty: {}, fixed: [{ name: "記帳費", amt: 3000 }] }, "2026-09": { qty: {}, fixed: [{ name: "記帳費", amt: 3000 }] } }, targets: {}, draft: null, params: P, goal: { netTarget: 0 },
   coachList: [chiu, chen, intern].map((c) => ({ id: c.id, name: c.name, rankCode: c.rankCode, uplineId: c.uplineId })), payeeBook: book,
   receipts: { "2026-09": [
     rc("r1", "train", "2026-09-22", 9800, "A", { sharers: [{ name: "陳昱豪", coachId: "c-chen", rankCode: "S3" }, { name: "邱浩軍", coachId: "c-chiu", rankCode: "CHIEF" }] }),
@@ -125,5 +125,68 @@ describe("核心成員：公司", () => {
     expect(c.health[1].pct).toBe(50);
     expect(c.health[3].pct).toBe(75);
     expect(c.payouts.pending).toEqual({ n: 1, amount: 30000 });
+  });
+});
+
+// 2026/10/10 Ray：首頁可切本月／第一～四季（本季）／上下半年／全年。
+describe("期間（本月／本季／半年／全年）", () => {
+  it("periodOf：鍵對到月份串；不認得的鍵退回本月", () => {
+    expect(periodOf("month", "2026-10-10")).toMatchObject({ key: "month", yms: ["2026-10"], label: "2026年10月", multi: false, current: true });
+    expect(periodOf("q4", "2026-10-10")).toMatchObject({ key: "q4", yms: ["2026-10", "2026-11", "2026-12"], label: "2026 第四季", from: "2026-10", to: "2026-12", multi: true, current: true });
+    expect(periodOf("q1", "2026-10-10")).toMatchObject({ yms: ["2026-01", "2026-02", "2026-03"], current: false });
+    expect(periodOf("h1", "2026-10-10").yms).toHaveLength(6);
+    expect(periodOf("h2", "2026-10-10")).toMatchObject({ from: "2026-07", to: "2026-12", current: true });
+    expect(periodOf("year", "2026-10-10")).toMatchObject({ yms: Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, "0")}`), label: "2026 全年" });
+    expect(periodOf("zzz", "2026-10-10").key).toBe("month");
+    expect(periodOf(undefined, "2026-03-05").yms).toEqual(["2026-03"]);
+  });
+  it("rangeOptions：本季標出來", () => {
+    const o = rangeOptions("2026-10-10");
+    expect(o.map((x) => x.key)).toEqual(["month", "q1", "q2", "q3", "q4", "h1", "h2", "year"]);
+    expect(o.find((x) => x.key === "q4")!.label).toBe("第四季（本季）");
+    expect(o.find((x) => x.key === "q3")!.label).toBe("第三季");
+    expect(rangeOptions("2026-02-01").find((x) => x.key === "q1")!.label).toBe("第一季（本季）");
+  });
+  it("payoutsOver：跨月同一受款人併一條、已匯加總、發放日取最後一個月", () => {
+    const q3 = payoutsOver(S, ["2026-07", "2026-08", "2026-09"]);
+    const chiuLine = q3.lines.find((l) => l.key === "p:pa")!;
+    expect(chiuLine.due).toBe(2940 + 3490);
+    expect(chiuLine.tax.net).toBe(6430);
+    expect(chiuLine.mark).toMatchObject({ amount: 1000 });
+    expect(chiuLine.srcs).toHaveLength(3);
+    expect(q3.payDate).toBe("2026-10-05");
+    expect(q3.received).toBe(9800 + 9800 + 60000);
+    expect(q3.pending).toEqual({ n: 1, amount: 30000 });
+    // 單月就是 payoutsOf
+    expect(payoutsOver(S, "2026-09").lines.find((l) => l.key === "p:pa")!.due).toBe(3490);
+  });
+  it("monthsOver：損益跨月相加；沒帳的月份略過；整段沒帳回 null", () => {
+    const r = monthsOver(S, ["2026-07", "2026-08", "2026-09"])!;
+    expect(r.rev).toBe(9800 + 9800 + 60000);
+    expect(r.fixed).toBe(6000);
+    expect(r.gp).toBe(1960 + 1960 + 6000);
+    expect(r.gm).toBeCloseTo(r.gp / r.rev);
+    expect(r.byItem.find((x) => x.it.id === "train")!.rcN).toBe(2);
+    expect(monthsOver(S, ["2026-01", "2026-02"])).toBeNull();
+    expect(hasReceipts(S, ["2026-07", "2026-08"])).toBe(true);
+    expect(hasReceipts(S, ["2026-01"])).toBe(false);
+  });
+  it("memberMoney／teamMoney／companyMonth 吃期間：錢加總、逐月圖只畫期間內的月份", () => {
+    const yms = ["2026-07", "2026-08", "2026-09"];
+    const m = memberMoney(S, chiu, yms);
+    expect(m.net).toBe(6430);
+    expect(m.paid).toBe(1000);
+    expect(m.status).toBe("partial");
+    expect(m.ym).toBe("2026-09");
+    expect(m.months.map((x) => x.ym)).toEqual(yms);
+    expect(m.months.map((x) => x.net)).toEqual([0, 2940, 3490]);
+    const t = teamMoney(S, params, [chen, intern], yms);
+    expect(t.total).toBe(2450 + 51000);
+    const c = companyMonth(S, [chiu, chen, intern], yms, "2026-10-09");
+    expect(c.ym).toBe("2026-09");
+    expect(c.r!.rev).toBe(79600);
+    expect(c.trend.map((x) => x.ym)).toEqual(yms);
+    expect(c.trend[1].rev).toBe(9800);
+    expect(c.health[2].pct).toBe(Math.round(2 / 3 * 100));   // 推薦動能：Q3 內陳＋邱當過推薦人
   });
 });

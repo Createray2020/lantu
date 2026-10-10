@@ -61,6 +61,7 @@ vi.mock("./orgEvents", async () => {
 });
 
 import { getMemberHome } from "./home";
+import { periodOf } from "./homeStats";
 
 const ev = (over: any = {}) => ({
   id: "e1", date: "2026-09-15", start: "19:30", end: null, kind: "meeting",
@@ -88,7 +89,7 @@ describe("待辦動作", () => {
     h.state.dash.thisWeek = [{ clientId: "k1", clientName: "陳先生", date: "2026-09-16", type: "季檢視" }];
     h.state.dash.openItems = [{ id: "a1", clientId: "k1", clientName: "陳先生", title: "補保單影本", owner: null, dueDate: "2026-09-18", overdue: false }];
 
-    const home = await getMemberHome(coach, "2026-09");
+    const home = await getMemberHome(coach, periodOf("month", "2026-09-15"));
 
     expect(home.todos).toHaveLength(1);
     expect(home.todos[0].title).toContain("補保單影本");
@@ -103,7 +104,7 @@ describe("近期行程", () => {
     h.state.events = [ev({ id: "e2", date: "2026-09-18", title: "核心會議" }), ev({ id: "e1", date: "2026-09-15" })];
     h.state.dash.thisWeek = [{ clientId: "k1", clientName: "陳先生", date: "2026-09-16", type: "季檢視" }];
 
-    const { agenda } = await getMemberHome(coach, "2026-09");
+    const { agenda } = await getMemberHome(coach, periodOf("month", "2026-09-15"));
     expect(agenda.map((a) => a.date)).toEqual(["2026-09-15", "2026-09-16", "2026-09-18"]);
   });
 
@@ -115,7 +116,7 @@ describe("近期行程", () => {
     ];
     h.state.dash.thisWeek = [{ clientId: "k1", clientName: "陳先生", date: "2026-09-16", type: "季檢視" }];
 
-    const { agenda } = await getMemberHome(coach, "2026-09");
+    const { agenda } = await getMemberHome(coach, periodOf("month", "2026-09-15"));
     expect(agenda.map((a) => a.title)).toEqual([
       "Q3 結算截止", "早會", "下午會", "陳先生 · 季檢視",
     ]);
@@ -128,13 +129,13 @@ describe("近期行程", () => {
       { clientId: "k1", clientName: "近的", date: "2026-09-20", type: "初談" },
       { clientId: "k2", clientName: "遠的", date: "2026-09-30", type: "初談" },
     ];
-    const { agenda } = await getMemberHome(coach, "2026-09");
+    const { agenda } = await getMemberHome(coach, periodOf("month", "2026-09-15"));
     expect(agenda.map((a) => a.title)).toEqual(["近的 · 初談"]);
   });
 
   it("已經過去的約訪不進來（近期行程是往前看，逾期的事留在待辦）", async () => {
     h.state.dash.thisWeek = [{ clientId: "k1", clientName: "昨天", date: "2026-09-13", type: "初談" }];
-    const { agenda } = await getMemberHome(coach, "2026-09");
+    const { agenda } = await getMemberHome(coach, periodOf("month", "2026-09-15"));
     expect(agenda).toHaveLength(0);
   });
 
@@ -142,7 +143,7 @@ describe("近期行程", () => {
     h.state.events = [ev({ id: "e9", visibility: "manager", title: "主管月會" })];
     h.state.dash.thisWeek = [{ clientId: "k7", clientName: "陳先生", date: "2026-09-16", type: "季檢視" }];
 
-    const { agenda } = await getMemberHome(coach, "2026-09");
+    const { agenda } = await getMemberHome(coach, periodOf("month", "2026-09-15"));
     const meeting = agenda.find((a) => a.kind === "meeting")!;
     const appt = agenda.find((a) => a.kind === "appt")!;
     expect(meeting.href).toBe("/dashboard/calendar?e=e9");
@@ -153,7 +154,7 @@ describe("近期行程", () => {
 
   it("全體可見（all）不標層級，畫面才不會每一列都掛一顆沒資訊的標籤", async () => {
     h.state.events = [ev()];
-    const { agenda } = await getMemberHome(coach, "2026-09");
+    const { agenda } = await getMemberHome(coach, periodOf("month", "2026-09-15"));
     expect(agenda[0].visLabel).toBeNull();
   });
 });

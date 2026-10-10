@@ -18,9 +18,88 @@ export type CoachLike = {
   licenseFrom?: string | null; licenseUntil?: string | null; status?: string | null; isTest?: boolean | null;
 };
 
-/** 某位教練在某月的分潤線（對帳單那一條）。受款人簿對得上就用它的 key，否則用名字。 */
-export function coachLine(S: AcctState, ym: string, c: CoachLike): PayoutLine | null {
-  const sum = payoutsOf(S, ym);
+// ---------- 期間（2026/10/10 Ray：首頁可切本月／第一～四季／上下半年／全年） ----------
+// 一個期間＝一串 'YYYY-MM'。單月就是原本的首頁；多月時錢與損益跨月加總，晉升累計與到期倒數不受期間影響。
+export type RangeKey = "month" | "q1" | "q2" | "q3" | "q4" | "h1" | "h2" | "year";
+export const RANGE_KEYS: RangeKey[] = ["month", "q1", "q2", "q3", "q4", "h1", "h2", "year"];
+export type Period = { key: RangeKey; label: string; yms: string[]; from: string; to: string; multi: boolean; current: boolean };
+const pad2 = (n: number) => String(n).padStart(2, "0");
+export function periodOf(key: string | null | undefined, today: string): Period {
+  const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+  const k: RangeKey = (RANGE_KEYS as string[]).includes(key ?? "") ? (key as RangeKey) : "month";
+  const span = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `${y}-${pad2(a + i)}`);
+  const q = Math.ceil(m / 3);
+  let yms: string[], label: string, current = true;
+  switch (k) {
+    case "q1": case "q2": case "q3": case "q4": { const n = Number(k[1]); yms = span(n * 3 - 2, n * 3); label = `${y} 第${"一二三四"[n - 1]}季`; current = n === q; break; }
+    case "h1": yms = span(1, 6); label = `${y} 上半年`; current = m <= 6; break;
+    case "h2": yms = span(7, 12); label = `${y} 下半年`; current = m > 6; break;
+    case "year": yms = span(1, 12); label = `${y} 全年`; break;
+    default: yms = [`${y}-${pad2(m)}`]; label = `${y}年${m}月`;
+  }
+  return { key: k, label, yms, from: yms[0], to: yms[yms.length - 1], multi: yms.length > 1, current };
+}
+/** 切換器上的選項：本月／第一季…（本季）／上半年／下半年／今年。 */
+export function rangeOptions(today: string): { key: RangeKey; label: string }[] {
+  const m = Number(today.slice(5, 7)), q = Math.ceil(m / 3);
+  const Q = ["第一季", "第二季", "第三季", "第四季"];
+  return [
+    { key: "month", label: "本月" },
+    ...([1, 2, 3, 4] as const).map((n) => ({ key: `q${n}` as RangeKey, label: n === q ? `${Q[n - 1]}（本季）` : Q[n - 1] })),
+    { key: "h1", label: "上半年" }, { key: "h2", label: "下半年" }, { key: "year", label: "今年" },
+  ];
+}
+const ymList = (yms: string | string[]) => (typeof yms === "string" ? [yms] : yms);
+
+/** 一段期間的分潤匯款：單月＝payoutsOf；多月＝各月相加、同一受款人併成一條（已匯金額加總、發放日取最後一個月）。 */
+export function payoutsOver(S: AcctState, yms: string | string[]): PayoutSummary {
+  const list = ymList(yms);
+  if (list.length === 1) return payoutsOf(S, list[0]);
+  const by = new Map<string, PayoutLine>();
+  const out: PayoutSummary = { lines: [], due: 0, net: 0, paid: 0, remaining: 0, company: 0, received: 0, warns: [], payDate: settlementDate(list[list.length - 1]), pending: { n: 0, amount: 0 } };
+  for (const ym of list) {
+    const s = payoutsOf(S, ym);
+    out.due += s.due; out.net += s.net; out.paid += s.paid; out.remaining += s.remaining; out.company += s.company; out.received += s.received;
+    out.pending.n += s.pending.n; out.pending.amount += s.pending.amount;
+    for (const w of s.warns) if (!out.warns.includes(w)) out.warns.push(w);
+    for (const l of s.lines) {
+      const p = by.get(l.key);
+      if (!p) { by.set(l.key, { ...l, srcs: [...l.srcs], mark: l.mark ? { ...l.mark } : null, tax: { ...l.tax } }); continue; }
+      p.due += l.due; p.remaining += l.remaining; p.srcs.push(...l.srcs); p.rec = l.rec ?? p.rec;
+      p.tax = { mode: l.tax.mode, withhold: p.tax.withhold + l.tax.withhold, nhi: p.tax.nhi + l.tax.nhi, net: p.tax.net + l.tax.net, applied: p.tax.applied || l.tax.applied };
+      if (l.mark) p.mark = { paidOn: l.mark.paidOn, amount: (p.mark?.amount ?? 0) + l.mark.amount, note: "" };
+    }
+  }
+  out.lines = [...by.values()].sort((a, b) => b.due - a.due);
+  return out;
+}
+/** 一段期間的損益：單月＝calcMonth；多月＝營業額／拆分／實收／固定／稅／淨利相加，沒有任何一個月有帳就回 null。 */
+export function monthsOver(S: AcctState, yms: string | string[]): MonthResult | null {
+  const list = ymList(yms);
+  if (list.length === 1) return calcMonth(S, list[0]);
+  let out: MonthResult | null = null;
+  for (const ym of list) {
+    const m = calcMonth(S, ym);
+    if (!m) continue;
+    if (!out) { out = { ...m, byItem: m.byItem.map((x) => ({ ...x })), byTo: { ...m.byTo } }; continue; }
+    out.rev += m.rev; out.split += m.split; out.gp += m.gp; out.fixed += m.fixed; out.vat += m.vat; out.net += m.net;
+    for (const x of m.byItem) {
+      const p = out.byItem.find((o) => o.it.id === x.it.id);
+      if (p) { p.q += x.q; p.rev += x.rev; p.gp += x.gp; p.sysN += x.sysN; p.manualQ += x.manualQ; p.rcN += x.rcN; } else out.byItem.push({ ...x });
+    }
+    for (const [k, v] of Object.entries(m.byTo)) out.byTo[k] = (out.byTo[k] ?? 0) + v;
+  }
+  if (out) { out.gm = out.rev ? out.gp / out.rev : 0; out.nm = out.rev ? out.net / out.rev : 0; }
+  return out;
+}
+/** 期間內有沒有任何算得進帳的收款。 */
+export function hasReceipts(S: AcctState, yms: string | string[]): boolean {
+  return ymList(yms).some((ym) => (S.receipts?.[ym] ?? []).some((x) => !x.void && x.verified !== false));
+}
+
+/** 某位教練在某月（或某段期間）的分潤線（對帳單那一條）。受款人簿對得上就用它的 key，否則用名字。 */
+export function coachLine(S: AcctState, ym: string | string[], c: CoachLike): PayoutLine | null {
+  const sum = payoutsOver(S, ym);
   return lineOf(sum, c);
 }
 function lineOf(sum: PayoutSummary, c: CoachLike): PayoutLine | null {
@@ -30,20 +109,21 @@ function lineOf(sum: PayoutSummary, c: CoachLike): PayoutLine | null {
 
 // ---------- 教練：我的錢 ----------
 export type MemberMoney = {
-  ym: string; payDate: string;
-  due: number; withhold: number; net: number;    // 本月應付／扣繳／實匯
+  ym: string; payDate: string;                     // ym＝期間最後一個月；payDate＝那個月的發放日
+  due: number; withhold: number; net: number;    // 期間內應付／扣繳／實匯
   paid: number; status: "none" | "pending" | "partial" | "paid";
   srcN: number;
-  months: { ym: string; net: number }[];           // 近 6 個月實匯（舊→新）
+  months: { ym: string; net: number }[];           // 單月：近 6 個月實匯；多月：期間內各月（舊→新）
   unverified: { n: number; amount: number };       // 我記的顧問費還在待查帳
   payeeReady: boolean; taxMode: string;            // 收款設定填了沒
 };
-export function memberMoney(S: AcctState, c: CoachLike, ym: string): MemberMoney {
-  const sum = payoutsOf(S, ym);
+export function memberMoney(S: AcctState, c: CoachLike, yms: string | string[]): MemberMoney {
+  const list = ymList(yms), ym = list[list.length - 1];
+  const sum = payoutsOver(S, list);
   const l = lineOf(sum, c);
   const months: { ym: string; net: number }[] = [];
-  let k = ym;
-  for (let i = 0; i < 6; i++) { months.unshift({ ym: k, net: i === 0 ? (l?.tax.net ?? 0) : (lineOf(payoutsOf(S, k), c)?.tax.net ?? 0) }); k = prevYm(k); }
+  if (list.length > 1) for (const k of list) months.push({ ym: k, net: lineOf(payoutsOf(S, k), c)?.tax.net ?? 0 });
+  else { let k = ym; for (let i = 0; i < 6; i++) { months.unshift({ ym: k, net: i === 0 ? (l?.tax.net ?? 0) : (lineOf(payoutsOf(S, k), c)?.tax.net ?? 0) }); k = prevYm(k); } }
   // 待查帳：我建的顧問費（任何月份）
   let n = 0, amount = 0;
   for (const list of Object.values(S.receipts ?? {})) for (const x of list) if (!x.void && x.verified === false && (x.execCoachId === c.id || x.enteredBy === c.id)) { n++; amount += Math.max(0, x.amount - (x.refund || 0)); }
@@ -107,8 +187,8 @@ export type TeamMoney = {
   rows: { id: string; name: string; rankCode: string | null; net: number; due: number; cases: number; fees: number; nextCode: string | null; pct: number }[];
   total: number; unverified: { n: number; amount: number }; nearPromo: number;
 };
-export function teamMoney(S: AcctState, params: CompParams, members: CoachLike[], ym: string): TeamMoney {
-  const sum = payoutsOf(S, ym);
+export function teamMoney(S: AcctState, params: CompParams, members: CoachLike[], yms: string | string[]): TeamMoney {
+  const sum = payoutsOver(S, yms);
   let total = 0, un = 0, unAmt = 0, near = 0;
   const rows = members.map((m) => {
     const l = lineOf(sum, m);
@@ -146,8 +226,8 @@ export function applyFunnel(apps: ApplyLike[], pendingCoaches: CoachLike[], scop
 
 // ---------- 核心成員：公司損益與組織 ----------
 export type CompanyMonth = {
-  ym: string; r: MonthResult | null; payouts: PayoutSummary;
-  trend: { ym: string; rev: number; company: number; net: number }[];      // 近 8 個月（舊→新）
+  ym: string; r: MonthResult | null; payouts: PayoutSummary;              // ym＝期間最後一個月；r＝期間損益加總
+  trend: { ym: string; rev: number; company: number; net: number }[];      // 單月：近 8 個月；多月：期間內各月（舊→新）
   bodies: { code: string; label: string; n: number }[];
   expired: number; unlicensed: number; headcount: number;
   chains: { id: string; name: string; net: number; headcount: number }[];
@@ -157,12 +237,14 @@ const BODY_GROUPS: [string, string, (c: string) => boolean][] = [
   ["INTERN", "實習", (c) => c === "INTERN"], ["PARTNER", "結業合作", (c) => c === "PARTNER"],
   ["C", "認證 C", (c) => c.startsWith("C") && c !== "CHIEF"], ["S", "資深 S", (c) => c.startsWith("S")], ["CHIEF", "首席", (c) => c === "CHIEF"],
 ];
-export function companyMonth(S: AcctState, all: CoachLike[], ym: string, today: string, opts: { maintainPass?: number; maintainTotal?: number; checkinDone?: number; checkinTotal?: number; chains?: { id: string; name: string; memberIds: string[] }[] } = {}): CompanyMonth {
-  const r = calcMonth(S, ym);
-  const payouts = payoutsOf(S, ym);
+export function companyMonth(S: AcctState, all: CoachLike[], yms: string | string[], today: string, opts: { maintainPass?: number; maintainTotal?: number; checkinDone?: number; checkinTotal?: number; chains?: { id: string; name: string; memberIds: string[] }[] } = {}): CompanyMonth {
+  const list = ymList(yms), ym = list[list.length - 1];
+  const r = monthsOver(S, list);
+  const payouts = payoutsOver(S, list);
   const trend: CompanyMonth["trend"] = [];
-  let k = ym;
-  for (let i = 0; i < 8; i++) { const m = calcMonth(S, k); trend.unshift({ ym: k, rev: m?.rev ?? 0, company: m?.gp ?? 0, net: m?.net ?? 0 }); k = prevYm(k); }
+  const trendOf = (k: string) => { const m = calcMonth(S, k); return { ym: k, rev: m?.rev ?? 0, company: m?.gp ?? 0, net: m?.net ?? 0 }; };
+  if (list.length > 1) for (const k of list) trend.push(trendOf(k));
+  else { let k = ym; for (let i = 0; i < 8; i++) { trend.unshift(trendOf(k)); k = prevYm(k); } }
   const live = all.filter((c) => !c.isTest && c.status === "active");
   const bodies = BODY_GROUPS.map(([code, label, f]) => ({ code, label, n: live.filter((c) => f(c.rankCode ?? "")).length }));
   const expired = live.filter((c) => c.licenseUntil && c.licenseUntil < today).length;
@@ -171,7 +253,7 @@ export function companyMonth(S: AcctState, all: CoachLike[], ym: string, today: 
   // 制度量得出來的健康度（不是活動量）
   const pct = (a: number, b: number) => b ? Math.round(a / b * 100) : 0;
   const referrers = new Set<string>();
-  for (const x of S.receipts?.[ym] ?? []) if (!x.void && x.sharers[0]?.coachId) referrers.add(x.sharers[0].coachId);
+  for (const k of list) for (const x of S.receipts?.[k] ?? []) if (!x.void && x.sharers[0]?.coachId) referrers.add(x.sharers[0].coachId);
   const health = [
     { label: "合作有效", pct: pct(live.length - expired, live.length), color: "var(--brand)" },
     { label: "維持資格", pct: opts.maintainTotal ? pct(opts.maintainPass ?? 0, opts.maintainTotal) : 0, color: "var(--ok)" },
