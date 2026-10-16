@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcReceipt, payoutsOf, netOf, annualFeeOf, settlementDate, referralChain, taxOf, resolvePayee, statementOf, statementMonths, normPayee, type PayeeRec, normReceipt, normParams, calcMonth, type AcctItem, calcTarget, compareMonth, suggestQty, calcData, normItems as normItems2, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, cashLedger, cashFixedStatus, unpaidPayouts, unpaidCsvRows, UNPAID_CSV_HEADERS, type AcctState } from "./acctEngine";
+import { calcReceipt, payoutsOf, netOf, annualFeeOf, settlementDate, referralChain, taxOf, resolvePayee, statementOf, statementMonths, normPayee, type PayeeRec, normReceipt, normParams, calcMonth, type AcctItem, calcTarget, compareMonth, suggestQty, calcData, normItems as normItems2, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, cashLedger, cashFixedStatus, unpaidPayouts, unpaidCsvRows, UNPAID_CSV_HEADERS, isEachSplit, type AcctState } from "./acctEngine";
 
 // 原型（docs/帳務後台_原型.html）的示範資料——2026-09 那一個月。
 const S: AcctState = {
@@ -490,5 +490,44 @@ describe("現金帳與尚未匯款總表（2026/10/16）", () => {
     expect(rows[0].length).toBe(UNPAID_CSV_HEADERS.length);
     expect(rows[2]).toEqual(["2026-09", "2026-10-05", "邱浩軍", "808", "玉山", "中和", "邱浩軍", "0012345678", "扣執行業務所得", "2940", "0", "2940", "1000", "1940"]);
     expect(rows[0][8]).toBe("未建受款人");
+  });
+});
+
+describe("拆分列：角色＋預設受款人（2026/10/16）", () => {
+  const lecture: AcctItem = { id: "lec", name: "每月講座", price: 10000, splits: [{ to: "", role: "講師費", mode: "pct", v: 40 }, { to: "場地公司", role: "場地費", mode: "amt", v: 1000 }, { to: "公司", mode: "keep", v: 10 }, { to: "", role: "助教費", mode: "rest", v: 20 }] };
+  it("沒預設受款人、這筆也沒指定 → 列標「未指定」並警示；金額照算", () => {
+    const r = calcReceipt(lecture, 10000, [], {}, P);
+    expect(r.rows.map((x) => [x.to, x.v, x.key])).toEqual([["（講師費 未指定）", 4000, "講師費"], ["場地公司", 1000, "場地費"], ["公司", 1000, "公司"], ["（助教費 未指定）", 800, "助教費"]]);
+    expect(r.warn).toBe("講師費、助教費 還沒指定匯給誰");
+    expect(r.rows[1].label).toBe("場地費 固定");
+  });
+  it("每筆指定用角色當鍵；有預設的可以蓋過；舊資料用受款人名當鍵也認", () => {
+    const r = calcReceipt(lecture, 10000, [], { 講師費: "王老師", 場地費: "另一間", 助教費: "小陳" }, P);
+    expect(r.rows.map((x) => x.to)).toEqual(["王老師", "另一間", "公司", "小陳"]);
+    expect(r.warn).toBeNull();
+    const legacy: AcctItem = { id: "t", name: "培訓", price: 9800, splits: [{ to: "講師一", mode: "rest", v: 100 }] };
+    expect(calcReceipt(legacy, 1000, [], { 講師一: "王老師" }, P).rows[0].to).toBe("王老師");
+    expect(calcReceipt(legacy, 1000, [], {}, P).rows[0].to).toBe("講師一");
+    // 角色改名前記的收款（鍵＝舊受款人名）：拆回角色後照樣對得到
+    const renamed: AcctItem = { id: "t", name: "培訓", price: 9800, splits: [{ to: "邱浩軍", role: "講師一", mode: "rest", v: 100 }] };
+    expect(calcReceipt(renamed, 1000, [], { 邱浩軍: "王老師" }, P).rows[0].to).toBe("王老師");
+    expect(calcReceipt(renamed, 1000, [], {}, P).rows[0].to).toBe("邱浩軍");
+  });
+  it("normItems 保留 role、去空白；keep 列沒名字算公司", () => {
+    const it = normItems([{ id: "x", name: "x", price: 1, splits: [{ to: " 甲 ", role: " 講師費 ", mode: "pct", v: 10 }, { to: "", mode: "keep", v: 5 }] }])[0];
+    expect(it.splits[0]).toEqual({ to: "甲", role: "講師費", mode: "pct", v: 10 });
+    expect(it.splits[1].role).toBeUndefined();
+    expect(calcReceipt(it, 100, [], {}, P).rows[1].to).toBe("公司");
+    expect(unitOf(it).rows[0].key).toBe("講師費");
+  });
+});
+
+describe("個別型拆分 each（2026/10/16 Ray：常態型／個別型兩區塊）", () => {
+  it("each 列即使有 to 也不當預設；normItems 清掉 to、保留 each；isEachSplit 判定", () => {
+    const it = normItems([{ id: "x", name: "x", price: 1, splits: [{ to: "舊的人", role: "講師費", mode: "pct", v: 40, each: true }, { to: "甲", role: "場地費", mode: "amt", v: 100 }, { to: "", mode: "keep", v: 5 }] }])[0];
+    expect(it.splits[0]).toEqual({ to: "", role: "講師費", each: true, mode: "pct", v: 40 });
+    expect(it.splits.map(isEachSplit)).toEqual([true, false, false]);
+    expect(calcReceipt(it, 1000, [], {}, P).warn).toBe("講師費 還沒指定匯給誰");
+    expect(calcReceipt(it, 1000, [], { 講師費: "王老師" }, P).rows[0].to).toBe("王老師");
   });
 });

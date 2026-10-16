@@ -7,8 +7,8 @@ import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
 import Link from "next/link";
 import {
-  calcData, suggestQty, isYm, unitOf, SPLIT_MODE_LABEL, ACCT_DEFAULT_PARAMS,
-  type AcctState, type AcctItem, type AcctMonth, type AcctTarget, type AcctAdj, type MonthResult, type Compare, type SysRow, type AcctSource, type AcctParams, type SplitMode,
+  calcData, suggestQty, isYm, unitOf, splitKey, SPLIT_MODE_LABEL, ACCT_DEFAULT_PARAMS,
+  type AcctState, type AcctItem, type AcctSplit, type AcctMonth, type AcctTarget, type AcctAdj, type MonthResult, type Compare, type SysRow, type AcctSource, type AcctParams, type SplitMode,
 } from "@/lib/acctEngine";
 
 // 帳務三頁共用的元件與常數（2026/09/29 拆頁：參數設定／目標設定／本月帳務）。
@@ -308,10 +308,10 @@ export function ItemsEditor({ items, onSave, params = ACCT_DEFAULT_PARAMS }: { i
         // 示範數字：分潤池用「2 位分潤人」那一階（最常見），其餘照公式
         const demoSharers = it.splits.some((s) => s.mode === "pool") ? [{ name: "推薦人 S3", rankCode: "S3" }, { name: "上層 CHIEF", rankCode: "CHIEF" }] : [];
         const u = unitOf(it, {}, undefined, params, demoSharers);
-        const rowVal = (s: { to: string; mode: SplitMode; v: number }) => {
+        const rowVal = (s: { to: string; role?: string; mode: SplitMode; v: number }) => {
           if (s.mode === "pool") return u.rows.filter((r) => demoSharers.some((d) => d.name === r.to)).reduce((a, r) => a + r.v, 0);
           if (s.mode === "keep") return price * s.v / 100;
-          return u.rows.find((r) => r.to === s.to)?.v ?? 0;
+          return u.rows.find((r) => r.key === splitKey(s))?.v ?? 0;
         };
         const split = u.split, gp = u.gp, gm = u.gm;
         return (
@@ -331,23 +331,43 @@ export function ItemsEditor({ items, onSave, params = ACCT_DEFAULT_PARAMS }: { i
               </select>
               <button className={`${xbtn} ml-auto`} onClick={async () => { if (await confirmDialog(`刪除「${it.name}」？各月的數量也不再計入。`, { danger: true })) onSave(items.filter((_, j) => j !== i)); }}>✕</button>
             </div>
-            <div className="rounded-lg bg-panel2 p-2 mt-2">
-              {it.splits.map((s, j) => (
-                <div key={j} className="flex flex-wrap items-center gap-2 mb-1.5">
-                  <span className="text-10 tracking-wider text-tx3 rounded-full border border-line px-2 py-0.5">分給</span>
-                  <input className={`${FIELD_SM} w-28`} defaultValue={s.to} placeholder="對象" onBlur={(e) => { if (e.target.value !== s.to) set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, to: e.target.value } : x) }); }} />
-                  <select className={SELECT_SM} value={s.mode} onChange={(e) => set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, mode: e.target.value as SplitMode } : x) })}>
-                    {(Object.keys(SPLIT_MODE_LABEL) as SplitMode[]).map((m) => <option key={m} value={m}>{SPLIT_MODE_LABEL[m]}</option>)}
-                  </select>
-                  {s.mode === "pool"
-                    ? <span className="text-xs text-tx3">每筆依推薦人職級與輔導鏈算差階（上限 {params.referralCap}%）</span>
-                    : <input className={`${FIELD_SM} w-20 text-right`} inputMode="decimal" defaultValue={s.v} onBlur={(e) => { const v = NUM(e.target.value); if (v !== s.v) set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, v } : x) }); }} />}
-                  <span className="text-xs text-tx3">＝ {F(rowVal(s))}{s.mode === "pool" ? "（例：S3 推薦、CHIEF 上層）" : s.mode === "keep" ? "（留在公司）" : ""}</span>
-                  <button className={xbtn} onClick={() => set(i, { splits: it.splits.filter((_, k) => k !== j) })}>✕</button>
+            {/* 兩個區塊（2026/10/16 Ray）：常態型＝每月同樣的角色與受款人；個別型＝比例一樣、每筆收款才指定匯給誰 */}
+            {([false, true] as const).map((each) => {
+              const rowsOf = it.splits.map((s, j) => ({ s, j })).filter(({ s }) => (s.mode !== "pool" && s.mode !== "keep" && !!s.each) === each);
+              const patchRow = (j: number, patch: Partial<AcctSplit>) => set(i, { splits: it.splits.map((x, k) => k === j ? { ...x, ...patch } : x) });
+              return (
+                <div key={String(each)} className="rounded-lg bg-panel2 p-2 mt-2">
+                  <div className="flex items-baseline gap-2 mb-1.5">
+                    <span className="text-xs font-bold text-tx2">{each ? "個別型" : "常態型"}</span>
+                    <span className="text-10 text-tx3">{each ? "比例固定，但每筆收款才指定匯給誰（每場講師不同）" : "每個月都一樣的角色與受款人"}</span>
+                  </div>
+                  {rowsOf.map(({ s, j }) => (
+                    <div key={j} className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className="text-10 tracking-wider text-tx3 rounded-full border border-line px-2 py-0.5">{s.mode === "keep" ? "留在" : "分給"}</span>
+                      {s.mode === "keep"
+                        ? <input className={`${FIELD_SM} w-24`} defaultValue={s.to || "公司"} onBlur={(e) => { if (e.target.value !== s.to) patchRow(j, { to: e.target.value }); }} />
+                        : s.mode === "pool" ? <span className="text-xs text-tx2 w-24">推薦端（分潤池）</span> : (<>
+                        <input className={`${FIELD_SM} w-24`} defaultValue={s.role ?? ""} placeholder="角色／用途" title="這筆錢是什麼：講師費、場地費、系統費" onBlur={(e) => { const role = e.target.value.trim(); if (role !== (s.role ?? "")) patchRow(j, { role }); }} />
+                        {each
+                          ? <span className="text-xs text-tx3">→ 每筆指定受款人</span>
+                          : <><span className="text-10 text-tx3">→</span><input className={`${FIELD_SM} w-28`} defaultValue={s.to} placeholder="受款人" onBlur={(e) => { if (e.target.value.trim() !== s.to) patchRow(j, { to: e.target.value.trim() }); }} /></>}
+                      </>)}
+                      <select className={SELECT_SM} value={s.mode} onChange={(e) => patchRow(j, { mode: e.target.value as SplitMode })}>
+                        {(Object.keys(SPLIT_MODE_LABEL) as SplitMode[]).filter((m) => !each || (m !== "pool" && m !== "keep")).map((m) => <option key={m} value={m}>{SPLIT_MODE_LABEL[m]}</option>)}
+                      </select>
+                      {s.mode === "pool"
+                        ? <span className="text-xs text-tx3">每筆依推薦人職級與輔導鏈算差階（上限 {params.referralCap}%）</span>
+                        : <input className={`${FIELD_SM} w-20 text-right`} inputMode="decimal" defaultValue={s.v} onBlur={(e) => { const v = NUM(e.target.value); if (v !== s.v) patchRow(j, { v }); }} />}
+                      <span className="text-xs text-tx3">＝ {F(rowVal(s))}{s.mode === "pool" ? "（例：S3 推薦、CHIEF 上層）" : s.mode === "keep" ? "（留在公司）" : ""}</span>
+                      {!each && s.mode !== "pool" && s.mode !== "keep" && <button className="text-10 text-tx3 hover:text-tx underline" onClick={() => patchRow(j, { each: true, to: "" })}>改成個別型</button>}
+                      {each && <button className="text-10 text-tx3 hover:text-tx underline" onClick={() => patchRow(j, { each: false, to: s.to || s.role || "" })}>改成常態型</button>}
+                      <button className={xbtn} onClick={() => set(i, { splits: it.splits.filter((_, k) => k !== j) })}>✕</button>
+                    </div>
+                  ))}
+                  <button className="text-xs text-tx2 hover:text-tx" onClick={() => set(i, { splits: [...it.splits, each ? { to: "", role: "", mode: "pct", v: 0, each: true } : { to: "", role: "", mode: "pct", v: 0 }] })}>＋ {each ? "個別型拆分" : "常態型拆分"}</button>
                 </div>
-              ))}
-              <button className="text-xs text-tx2 hover:text-tx" onClick={() => set(i, { splits: [...it.splits, { to: "", mode: "pct", v: 0 }] })}>＋ 拆分</button>
-            </div>
+              );
+            })}
             <div className="flex justify-between items-center mt-2 text-sm">
               <span className="text-xs text-tx3">匯出去 {F(split)}</span>
               <span>公司實收 <b className="text-brand2">{F(gp)}</b> ・ 毛利率 <b>{P(gm * 100)}</b></span>

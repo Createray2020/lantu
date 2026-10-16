@@ -16,7 +16,18 @@
  * 公司實收 ＝ 收款 − 所有要匯出去的錢（pct／amt／pool／rest），keep 自然留在公司。
  */
 export type SplitMode = "pct" | "amt" | "pool" | "keep" | "rest";
-export type AcctSplit = { to: string; mode: SplitMode; v: number };
+/**
+ * 拆分列（2026/10/16 Ray：「講師邱浩軍」這種寫法沒彈性——每場講師不同）：
+ *   role＝角色／用途（講師費、場地費、系統費），記收款時的顯示名與 payees 的鍵；
+ *   to  ＝預設受款人（可空＝每筆收款都要指定）。舊資料只有 to：角色＝to（相容）。
+ */
+export type AcctSplit = { to: string; role?: string; mode: SplitMode; v: number; /** 個別型：每筆收款都要指定受款人（to 不用） */ each?: boolean };
+/** 個別型（每筆指定）＝明確標 each，或沒有預設受款人的會匯出去的列。 */
+export const isEachSplit = (s: AcctSplit) => s.mode !== "pool" && s.mode !== "keep" && (!!s.each || !s.to);
+/** 拆分列的鍵／顯示名：角色優先，沒有角色就用受款人名（舊資料）。 */
+export const splitKey = (s: Pick<AcctSplit, "to" | "role">) => (s.role || s.to || "").trim();
+/** 某筆收款這一列實際匯給誰：每筆指定（鍵＝角色，舊資料鍵＝受款人名也認）→ 預設受款人 → 空。 */
+export const splitPayee = (s: Pick<AcctSplit, "to" | "role" | "each">, payees: Record<string, string>) => ((s.role && payees[s.role]) || payees[s.to] || (s.each ? "" : s.to) || "").trim();
 /**
  * 推薦端的人（職級由低到高）：[0]＝推薦人，之後是推薦人**原有輔導鏈**逐層往上（V7.2 §14）。
  * rankCode＝報名付款當時的職級快照——之後升階不改歷史收益（§38之5）。
@@ -74,7 +85,7 @@ export type TaxParams = { withholdRate: number; nhiRate: number; threshold: numb
 export const ACCT_DEFAULT_TAX: TaxParams = { withholdRate: 10, nhiRate: 2.11, threshold: 20000 };
 /** 某月某受款人的「已匯」紀錄（acct_payouts）。 */
 export type PayoutMark = { paidOn: string; amount: number; note: string };
-export type ReceiptRow = { to: string; v: number; mode: SplitMode; label: string; coachId?: string | null };
+export type ReceiptRow = { to: string; v: number; mode: SplitMode; label: string; coachId?: string | null; key?: string };
 export type ReceiptResult = { amount: number; rows: ReceiptRow[]; payout: number; keep: number; company: number; warn: string | null };
 /** source：這個項目由哪個系統事件自動入帳（apply＝報聘核准／license＝培訓帳號開通）；空＝只手填。 */
 export type AcctSource = "apply" | "license" | "case";
@@ -112,7 +123,7 @@ export type AcctState = {
 /** what-if 拉桿：單價 %、拆分比例 ±點、數量 %、固定支出 %（都是相對現況） */
 export type AcctAdj = { price?: number; split?: number; qty?: number; fix?: number };
 
-export type UnitResult = { price: number; split: number; rows: { to: string; v: number }[]; gp: number; gm: number };
+export type UnitResult = { price: number; split: number; rows: { to: string; v: number; key?: string }[]; gp: number; gm: number };
 export type ItemResult = { it: AcctItem; q: number; u: UnitResult; rev: number; gp: number; sysN: number; manualQ: number; rcN: number };
 export type MonthResult = {
   rev: number; split: number; gp: number; gm: number;
@@ -161,7 +172,10 @@ export function calcReceipt(it: AcctItem, amount: number, sharers: Sharer[], pay
   const rows: ReceiptRow[] = [];
   let warn: string | null = null;
   let first = 0;
-  const nameOf = (s: AcctSplit) => (payees[s.to] || s.to).trim();
+  // 這一列實際匯給誰；沒指定（角色沒預設受款人、這筆也沒填）→ 標「未指定」並警示，金額照算讓人看得到
+  const missing: string[] = [];
+  const nameOf = (s: AcctSplit) => { const n = splitPayee(s, payees); if (n) return n; const k = splitKey(s) || "拆分"; missing.push(k); return `（${k} 未指定）`; };
+  const tag = (s: AcctSplit, base: string) => (s.role ? `${s.role} ${base}` : base);
   for (const s of it.splits) {
     if (s.mode === "rest") continue;
     if (s.mode === "pool") {
@@ -191,10 +205,11 @@ export function calcReceipt(it: AcctItem, amount: number, sharers: Sharer[], pay
     }
     const v = s.mode === "amt" ? s.v : amount * Math.max(0, s.v + (s.mode === "pct" ? (adj.split ?? 0) : 0)) / 100;
     first += v;
-    rows.push({ to: nameOf(s), v, mode: s.mode, label: s.mode === "keep" ? `公司自留 ${s.v}%` : s.mode === "amt" ? "固定" : `${s.v}%` });
+    rows.push({ to: s.mode === "keep" ? (s.to || "公司") : nameOf(s), v, mode: s.mode, label: s.mode === "keep" ? `公司自留 ${s.v}%` : tag(s, s.mode === "amt" ? "固定" : `${s.v}%`), key: splitKey(s) });
   }
   const remain = Math.max(0, amount - first);
-  for (const s of it.splits) if (s.mode === "rest") rows.push({ to: nameOf(s), v: remain * s.v / 100, mode: "rest", label: `餘額 ${s.v}%` });
+  for (const s of it.splits) if (s.mode === "rest") rows.push({ to: nameOf(s), v: remain * s.v / 100, mode: "rest", label: tag(s, `餘額 ${s.v}%`), key: splitKey(s) });
+  if (missing.length && !warn) warn = `${missing.join("、")} 還沒指定匯給誰`;
   // V7.2 §40：分潤金額以元為單位四捨五入（what-if 試算時不取整，曲線才平滑）
   if (!adj.split && !adj.price) for (const r of rows) r.v = Math.round(r.v);
   let payout = 0, keep = 0;
@@ -213,7 +228,7 @@ function unitFromAllocs(price: number, allocs: ReceiptRow[]): UnitResult {
 export function unitOf(it: AcctItem, adj: AcctAdj = {}, basePrice?: number, params: AcctParams = ACCT_DEFAULT_PARAMS, sharers: Sharer[] = [], payees: Record<string, string> = {}): UnitResult {
   const price = (basePrice ?? it.price) * (1 + (adj.price ?? 0) / 100);
   const rr = calcReceipt(it, price, sharers, payees, params, adj);
-  const rows = rr.rows.filter((r) => r.mode !== "keep").map((r) => ({ to: r.to, v: r.v }));
+  const rows = rr.rows.filter((r) => r.mode !== "keep").map((r) => ({ to: r.to, v: r.v, key: r.key }));
   return { price, split: rr.payout, rows, gp: rr.company, gm: price ? rr.company / price : 0 };
 }
 
@@ -438,7 +453,7 @@ export function normItems(v: unknown): AcctItem[] {
   for (const x of v as Partial<AcctItem>[]) {
     if (!x || typeof x !== "object" || !x.id) continue;
     const splits = Array.isArray(x.splits) ? (x.splits as Partial<AcctSplit>[]).filter((s) => s && typeof s === "object").map((s) => ({
-      to: String(s.to ?? "").trim(), mode: (["pct", "amt", "pool", "keep", "rest"].includes(String(s.mode)) ? s.mode : "pct") as SplitMode, v: Math.max(0, num0(s.v)),
+      to: s.each ? "" : String(s.to ?? "").trim(), ...(String(s.role ?? "").trim() ? { role: String(s.role).trim().slice(0, 40) } : {}), ...(s.each ? { each: true } : {}), mode: (["pct", "amt", "pool", "keep", "rest"].includes(String(s.mode)) ? s.mode : "pct") as SplitMode, v: Math.max(0, num0(s.v)),
     })) : [];
     const source = x.source === "apply" || x.source === "license" || x.source === "case" ? x.source : "";
     const cat = String(x.cat ?? "").trim();

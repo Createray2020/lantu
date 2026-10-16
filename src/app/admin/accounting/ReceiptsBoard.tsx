@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
-import { calcReceipt, payoutsOf, prevYm, nextYm, isYm, netOf, referralChain, isFormalRank, type AcctState, type AcctItem, type Receipt, type Sharer, type CoachLite } from "@/lib/acctEngine";
+import { calcReceipt, payoutsOf, prevYm, nextYm, isYm, netOf, referralChain, isFormalRank, splitKey, splitPayee, type AcctState, type AcctItem, type Receipt, type Sharer, type CoachLite } from "@/lib/acctEngine";
 import { saveAcctReceiptAction, deleteAcctReceiptAction, verifyAcctReceiptAction } from "./actions";
 import { useAcct, card, h2, hint, btn, xbtn, F, NUM, uid } from "./AcctParts";
 
@@ -232,7 +232,10 @@ function ReceiptForm({ init, S, coachList, pending, onCancel, onSave }: {
   const [r, setR] = useState<Receipt>(init);
   const [sharerText, setSharerText] = useState(init.sharers.map((s) => s.name).join("、"));
   const it = S.items.find((i) => i.id === r.itemId) ?? S.items[0];
-  const restSplits = it.splits.filter((s) => s.mode === "rest");
+  // 要問「這次匯給誰」的列：每一個會匯出去的拆分（pct／amt／rest）；有預設受款人的帶預設、可改，沒有的必填（2026/10/16）
+  const payeeSplits = it.splits.filter((s) => s.mode !== "pool" && s.mode !== "keep");
+  const payeeNames = Array.from(new Set([...coachList.map((c) => c.name), ...(S.payeeBook ?? []).map((p) => p.name)])).filter(Boolean);
+  const missingPayee = payeeSplits.filter((s) => !splitPayee(s, r.payees));
   const hasPool = it.splits.some((s) => s.mode === "pool");
   const preview = calcReceipt(it, netOf(r), r.sharers, r.payees, S.params);
   const referrerId = r.sharers[0]?.coachId ?? "";
@@ -244,7 +247,7 @@ function ReceiptForm({ init, S, coachList, pending, onCancel, onSave }: {
   const pickItem = (id: string) => { const n = S.items.find((i) => i.id === id); if (n) set({ itemId: id, amount: n.price || r.amount }); };
   const setPayer = (payer: string) => { const c = coachList.find((k) => k.name === payer.trim()); set({ payer, payerCoachId: c ? c.id : null }); };
   const submit = () => onSave({ ...r, ym: r.on.slice(0, 7), itemId: it.id, sharers: manualShare ? parseSharers(sharerText, coachList) : r.sharers });
-  const ok = /^\d{4}-\d{2}-\d{2}$/.test(r.on) && r.amount > 0;
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(r.on) && r.amount > 0 && missingPayee.length === 0;
   return (
     <div className={`${card} border-brand2`}>
       <h2 className={h2}>{r.id ? "改這一筆" : "記一筆收款"}</h2>
@@ -278,13 +281,19 @@ function ReceiptForm({ init, S, coachList, pending, onCancel, onSave }: {
               <button type="button" className="text-xs text-tx3 hover:text-tx underline" onClick={() => { setManualShare(false); pickReferrer(r.sharers[0]?.coachId ?? ""); }}>改挑推薦人</button>
             </span></label>
         )}
-        {restSplits.map((s) => (
-          <label key={s.to} className="flex flex-col gap-1"><span className="text-xs text-tx3">{s.to}（餘額 {s.v}%）匯給</span>
-            <input className={`${FIELD_SM} w-32`} list="acct-coach-names" value={r.payees[s.to] ?? ""} placeholder={s.to} onChange={(e) => set({ payees: { ...r.payees, [s.to]: e.target.value } })} /></label>
-        ))}
+        {payeeSplits.map((s, idx) => {
+          const k = splitKey(s) || `拆分${idx + 1}`;
+          const cur = r.payees[k] ?? (s.role ? r.payees[s.to] : undefined) ?? "";
+          const need = (s.each || !s.to) && !cur.trim();
+          return (
+            <label key={`${k}-${idx}`} className="flex flex-col gap-1"><span className={`text-xs ${need ? "text-danger" : "text-tx3"}`}>{k}（{s.mode === "rest" ? `餘額 ${s.v}%` : s.mode === "amt" ? `固定 ${F(s.v)}` : `${s.v}%`}）{!s.each && s.to ? "匯給" : "這次匯給誰？"}</span>
+              <input className={`${FIELD_SM} w-32 ${need ? "border-danger" : ""}`} list="acct-payee-names" value={cur} placeholder={!s.each && s.to ? s.to : "必填"} onChange={(e) => set({ payees: { ...r.payees, [k]: e.target.value } })} /></label>
+          );
+        })}
         <label className="flex flex-col gap-1 flex-1 min-w-40"><span className="text-xs text-tx3">備註</span>
           <input className={`${FIELD_SM} w-full`} value={r.note} onChange={(e) => set({ note: e.target.value })} /></label>
         <datalist id="acct-coach-names">{coachList.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+        <datalist id="acct-payee-names">{payeeNames.map((n) => <option key={n} value={n} />)}</datalist>
       </div>
       {hasPool && r.sharers.length > 0 && (
         <div className="text-xs text-tx3 mt-2">推薦端：{r.sharers.map((x) => `${x.name}${x.rankCode ? ` ${x.rankCode}` : ""}`).join(" → ")}{payerFormal && <span className="text-danger ml-2">⚠ 匯款人已是正式教練，依制度不計推薦</span>}</div>
