@@ -30,6 +30,7 @@ beforeAll(async () => {
 
 function fresh() {
   const c = w.migrateCase(w.sampleCase());
+  c.retire.prepared = []; c.autoOff = { labor: true };   // 2026/10/16 退休金進投影後示範客戶一生無缺口；這組測的是動作讓缺口下降
   w.app.cases = [c];
   w.app.activeId = c.id;
   w.render();

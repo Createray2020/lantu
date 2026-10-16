@@ -578,6 +578,47 @@ function preparedPV(c,p){
  return (back>0&&rr>-1)?pv/Math.pow(1+rr,back):pv;
 }
 
+// ===== 已備退休金進投影（2026/10/16 Ray 拍板）=====
+// retire.prepared 過去只進 retireNeed() 的退休缺口，projection() 一毛都沒算 → 退休後收入永遠 0、
+// 延後退休也不會讓年金變多、起領歲也不會跟著移（Ray：拉到 70 怎麼只是把負的那段變不見）。現在：
+//  ・勞保／國保概算列（laborAuto lp/np）：有年金資格 → 退休後逐年 monthly×12 當收入
+//    （estimateSocialPension 的年資吃 profile.retireAge，延後退休自動變多）；未滿 15 年 → 老年一次金在退休那年進存量。
+//    勞退概算列（fund）：專戶累積在退休那年一次進存量。
+//  ・手打列照「領取方式」：一次領＝起領歲那年進存量；月領＝逐年收入、以退休通膨成長（與 preparedPV 同口徑）；
+//    疑似填成總額的月領列（preparedSuspect）視同一次領，與 retireNeed 一致。
+//  ・年金從「起領歲的下一年」起算（age>from），與退休期支出「age>退休年齡才計」對齊；一次領落在 age===from。
+//  ・起領歲早於退休歲的一律從退休歲起算（與 preparedPV 同）。
+// ⚠️ 勞退專戶若教練同時也手打進資產表，會算兩次——syncLaborPrepared 的 manualLaborPrepared 只擋 prepared 表，不擋資產表。
+function pensionSchedule(c){
+ var r=(c||{}).retire||{},pr=(c||{}).profile||{};
+ var ra=n(pr.retireAge)||DEFAULT_RETIRE_AGE,g=n(r.retireInflation)/100;
+ var out=[],est=null;
+ (r.prepared||[]).forEach(function(p){
+  if(!p)return;
+  var from=Math.max(ra,n(p.age)||ra),name=p.item||'已備退休金';
+  if(p.laborAuto==='lp'||p.laborAuto==='np'){
+   est=est||estimateSocialPension(c);
+   if(est.eligible&&est.monthly>0)out.push({name:name,from:from,mode:'annual',amount:est.monthly*12,grow:0});
+   else if(est.lump>0)out.push({name:name,from:from,mode:'lump',amount:est.lump});
+   return;
+  }
+  if(p.laborAuto==='fund'){est=est||estimateSocialPension(c);if(est.fund>0)out.push({name:name,from:from,mode:'lump',amount:est.fund});return;}
+  var amt=n(p.amount);if(!(amt>0))return;
+  if(((p.method)||'一次領')==='月領'&&!preparedSuspect(p))out.push({name:name,from:from,mode:'annual',amount:amt*12,grow:g});
+  else out.push({name:name,from:from,mode:'lump',amount:amt});
+ });
+ return out;
+}
+// 某一年的退休金：inc＝年金收入、lump＝一次領進存量。sch 用 pensionSchedule(c) 算一次，不要在迴圈裡重算。
+function pensionAt(sch,age){
+ var inc=0,lump=0;
+ (sch||[]).forEach(function(x){
+  if(x.mode==='lump'){if(age===x.from)lump+=x.amount;return;}
+  if(age>x.from)inc+=x.amount*Math.pow(1+n(x.grow),age-x.from-1);
+ });
+ return {inc:inc,lump:lump};
+}
+
 function retireNeed(c){
  var r=c.retire||{},age=n(c.profile.age),ra=n(c.profile.retireAge),le=n(c.profile.lifeExp);
  var infl=n(c.params.inflation)/100, g=n(r.retireInflation)/100, rr=n(r.retireReturn)/100;
@@ -1677,11 +1718,13 @@ function projection(c,lump,rateOverride){
  var acts=planActionsOn(c), pots={};
  acts.forEach(function(x){pots[x.id]=0});
  var evts=[], legacyTarget=legacyNeed(c);
+ var penS=pensionSchedule(c);   // 已備退休金的領取時程，算一次
  for(var age=a0;age<=aEnd;age++){
   var t=age-a0;
   var workIncome=sum(c.incomes,function(i){return (i.type==='工作'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
   var finIncome=sum(c.incomes,function(i){return (i.type==='理財'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0})+assetPassiveAt(c,mats,age);
   var otherIncome=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&inSpan(i,age))?n(i.amount)*Math.pow(1+n(i.growth)/100,t):0});
+  var pen=pensionAt(penS,age);otherIncome+=pen.inc;   // 已備退休金：年金逐年進收入、一次領進 inflowY（2026/10/16）
   var income=workIncome+finIncome+otherIncome;
   // 三段式：w＝已退休賺薪成員的支出比例權重。生活/消費依 w 從工作期換到退休期。
   var inflF=Math.pow(1+infl,t);
@@ -1689,7 +1732,7 @@ function projection(c,lump,rateOverride){
   var expense=workPhaseExpense(c,age,inflF,w);
   var debt=sum(c.liabilities,function(l){return soldLiab(hSales,l,age)?0:debtPayAt(l,age,a0)})+sum(gLoans,function(L){return goalLoanPayAt(L,age,a0)});
   var saleIn=houseSaleIn(hSales,age);
-  var inflowY=yearInflow(mats,age)+yearInflow(fIn,age);   // 到期回收＋預期入帳：那一年進主池
+  var inflowY=yearInflow(mats,age)+yearInflow(fIn,age)+pen.lump;   // 到期回收＋預期入帳＋退休金一次領：那一年進主池
   // 有貸款計畫的那幾筆只扣頭期款，貸款那一段走上面的 debt。
   // 有貸款計畫的目標走付款時程（可能跨好幾年：預售的訂簽開→工程期款→交屋）；其餘照舊在目標那一年一次扣。
   var goalOut=sum(gLoans,function(L){return housePayAt(L,age)});
@@ -1765,13 +1808,15 @@ function projection(c,lump,rateOverride){
    evts.push({kind:'goal',age:age,name:(gg.name||gg.type||'目標'),amount:n(gg.present),ok:totalInv>=0});
   });
 
-  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst,liab:remDebt,fixed:fixedAt,inflow:inflowY});
+  rows.push({age:age,income:income,work:workIncome,fin:finIncome,other:otherIncome,expense:expense+edu+retireDraw,debt:debt,goal:goalOut,life:life,bal:bal,invest:invest,pot:potSum,total:totalInv,net:netEst,liab:remDebt,fixed:fixedAt,inflow:inflowY,pension:pen.inc,penLump:pen.lump});
  }
  // 未來入帳：到期回收與預期入帳各插一支旗（分期用 span 表示那幾年）。是流入，ok 一律 true。
  mats.concat(fIn).forEach(function(x){
   if(!(x.total>0))return;
   evts.push({kind:'inflow',age:x.age,span:(x.years>1?x.age+x.years-1:undefined),name:x.name,amount:x.total,ok:true});
  });
+ // 已備退休金一次領：退休那年進存量，也插一支入帳旗（明細卡才叫得出名字）。
+ penS.forEach(function(x){if(x.mode==='lump'&&x.amount>0&&x.from<=aEnd)evts.push({kind:'inflow',age:x.from,name:x.name,amount:x.amount,ok:true});});
  // 子女教育是連續好幾年的支出，不是單一事件——逐年插旗會在圖上排出六支「子女教育」，
  // 把整張時間軸擠爆。合併成一個區段：起於第一個繳費年，全程不轉負才算做得到。
  var eduAges=Object.keys(eduByYear).map(Number).filter(function(a){return eduByYear[a]>0}).sort(function(x,y){return x-y});
@@ -2015,21 +2060,42 @@ function leverRange(c,id,gate){
  return {lo:0,hi:CAP_VISION_CUT};
 }
 
+// 延後／提前退休時，已備退休金跟著動（2026/10/16）：
+//  ・起領歲綁在舊退休歲的列（age===oldRA）移到新退休歲；刻意填別的歲數的不動（與工作收入 end 同一條規則）。
+//  ・勞保／勞退概算列（laborAuto）依新退休歲重算：年資變多、領取年數變少，金額才會跟著變。
+function refreshLaborPrepared(c,oldRA,newRA){
+ var list=((c||{}).retire||{}).prepared||[];
+ if(!list.length)return;
+ var e=null;
+ list.forEach(function(p){
+  if(!p)return;
+  if(n(p.age)===oldRA)p.age=newRA;
+  if(!p.laborAuto)return;
+  e=e||estimateSocialPension(c);
+  p.amount=Math.round(p.laborAuto==='fund'?n(e.fund):n(e.lump));
+ });
+}
 // 延後退休：本人與其他賺薪成員一起推，工作收入的結束歲跟著延長。
 // scenario() 與 applyLevers() 共用同一份，避免兩邊各推各的。
 function applyRetireDelay(c,years){
  years=n(years);if(!years)return c;
  var oldRA=n(c.profile.retireAge),newRA=oldRA+years;
+ // 推之前先記下每位賺薪成員的退休時點（本人年齡），下面工作收入列靠它判斷「綁在退休歲上」。
+ var a0=n(c.profile.age),pts={};
+ (c.members||[]).forEach(function(m){if(!m||!isEarnerRole(m.role))return;var isP=m.role==='本人';var ra=isP?oldRA:n(m.retireAge);if(!(ra>0))return;pts[m.name||'']=isP?oldRA:a0+(ra-n(m.age));});
  c.profile.retireAge=newRA;
  (c.members||[]).forEach(function(m){if(m&&m.role!=='本人'&&n(m.retireAge)>0)m.retireAge=n(m.retireAge)+years});
- // 往後推：結束歲早於新退休歲的工作收入一律延長到新退休歲（原規則）。
- // 往前拉（years<0，只有分析頁首屏拉桿會走到）：只把「原本綁在退休歲」的工作收入列
- // （end===舊退休歲）一起拉前；刻意填到退休後才結束的顧問費之類不動。
+ // 工作收入列：只有「綁在退休歲上」的列跟著移——end 等於這一列 owner 的退休時點（換算成本人年齡；
+ // owner 沒對到成員、或該成員沒填退休年齡 → 以本人退休歲為準）。兩個方向同一條規則，移 years 年。
+ //   ⚠️ 2026/10/16 之前往後推是「end＜新退休歲一律延長到新退休歲」——會把早就刻意結束的列
+ //   （例如 41～50 歲的專案收入）復活到新退休歲，延後退休的效果被憑空灌水
+ //   （RAYLEI 實測 60～65 歲收入 216 萬→456 萬）。刻意填到退休後才結束的顧問費之類兩個方向都不動。
  (c.incomes||[]).forEach(function(i){
   if(i.type!=='工作')return;
-  if(years>0){if(n(i.end)<newRA)i.end=newRA;}
-  else if(n(i.end)===oldRA)i.end=newRA;
+  var bound=(i.owner&&pts[i.owner]!=null)?pts[i.owner]:oldRA;
+  if(n(i.end)===bound)i.end=n(i.end)+years;
  });
+ refreshLaborPrepared(c,oldRA,newRA);
  return c;
 }
 
@@ -2475,13 +2541,14 @@ function monteCarlo(c,N){N=(n(N)>0)?Math.round(n(N)):1000;var rng=mulberry32(has
  var fInMC=expectedInflows(c,hSalesMC);
  var matsMC=assetMaturities(c,hSalesMC.concat(fInMC.filter(function(x){return !!x.aid})));
  var passiveAt=[];for(var pa=a0;pa<=aEnd;pa++)passiveAt[pa]=assetPassiveAt(c,matsMC,pa);
- var inflowAt=[];for(var ia=a0;ia<=aEnd;ia++)inflowAt[ia]=yearInflow(matsMC,ia)+yearInflow(fInMC,ia);
+ var penMC=pensionSchedule(c);   // 已備退休金（2026/10/16）：與 projection 同一份時程
+ var inflowAt=[];for(var ia=a0;ia<=aEnd;ia++)inflowAt[ia]=yearInflow(matsMC,ia)+yearInflow(fInMC,ia)+pensionAt(penMC,ia).lump;
  var matrix=[],finals=[],neg=0;
  for(var s=0;s<N;s++){var invest=liquid0,cumI=1,cumG=1,broke=false,traj=[];
   for(var age=a0;age<=aEnd;age++){var t=age-a0;
    var ret=gauss(rng,bR,sR)/100,infl=gauss(rng,bI,sI)/100,sg=gauss(rng,bG,sG)/100;
    var work=(function(){var w=0;c.incomes.forEach(function(i){if(i.type==='工作'&&inSpan(i,age))w+=n(i.amount)*cumG});return w})();
-   var other=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&inSpan(i,age))?n(i.amount):0});
+   var other=sum(c.incomes,function(i){return (i.type!=='工作'&&i.type!=='理財'&&inSpan(i,age))?n(i.amount):0})+pensionAt(penMC,age).inc;
    var fin=sum(c.incomes,function(i){return (i.type==='理財'&&inSpan(i,age))?n(i.amount):0})+passiveAt[age];
    var income=work+other+fin;
    var wMC=retiredWeight(c,age);
@@ -3133,6 +3200,9 @@ export {
   leverGate,
   leverRange,
   applyRetireDelay,
+  refreshLaborPrepared,
+  pensionSchedule,
+  pensionAt,
   applyLevers,
   gapWith,
   solveLever,

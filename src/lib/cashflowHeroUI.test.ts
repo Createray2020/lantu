@@ -19,6 +19,7 @@ beforeAll(async () => {
   await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
   w.app.role = "coach";
   w.app.cases = [w.migrateCase(w.sampleCase())];
+  w.app.cases[0].retire.prepared = []; w.app.cases[0].autoOff = { labor: true };   // 2026/10/16 退休金進投影後示範客戶一生無缺口；這組要有存量用完的年份才有意義
   w.app.activeId = w.app.cases[0].id;
   w.localStorage.clear();
   w.app.activeTab = "analysis";
@@ -138,5 +139,26 @@ describe("年度明細卡：滑到哪一歲就換、點一下鎖住", () => {
     expect(w.__charts.cf2, "模組那張用 cf2").toBeTruthy();
     expect($("#cf2Detail")).toBeTruthy();
     expect($("#cfDetail")).toBeTruthy();
+  });
+
+  it("拉桿作用時：兩軸刻度鎖在「存檔值 ∪ 假設值」、畫一條存檔值存量的對照線（2026/10/16）", () => {
+    // Ray：拉到 70 歲退休「只是負的變正、看不出整體改善」——真因是兩軸每次重畫都依當前 rows 自動縮放。
+    w.anTuneReset();
+    const c = w.activeCase();
+    expect($("#anHeroChart svg path.cfref"), "沒拉過不畫對照線").toBeNull();
+    const rightMax0 = $$("#anHeroChart svg text").map((t) => t.textContent);
+    const inv0 = Math.max(...w.metrics(c).proj.rows.map((r: { invest: number }) => r.invest));
+    w.anTune("age", String(w.n(c.profile.retireAge) + 5));
+    const ref = $("#anHeroChart svg path.cfref");
+    expect(ref, "拉桿作用時有對照線").toBeTruthy();
+    expect(ref.getAttribute("stroke-dasharray")).toBeTruthy();
+    expect($("#anHeroChart").textContent).toContain("存檔值存量（對照）");
+    // 刻度是聯集：假設值的存量更高，右軸上限跟著假設值走；存檔值那條線完整落在圖內（沒有被裁掉）
+    const inv1 = Math.max(...w.metrics(w.anTuneCase(c)).proj.rows.map((r: { invest: number }) => r.invest));
+    expect(inv1).toBeGreaterThan(inv0);
+    expect(w.__charts.cf.rows.length).toBe(w.metrics(w.anTuneCase(c)).proj.rows.length);
+    expect(rightMax0.length).toBeGreaterThan(0);
+    w.anTuneReset();
+    expect($("#anHeroChart svg path.cfref")).toBeNull();
   });
 });

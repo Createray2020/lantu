@@ -255,6 +255,7 @@ describe("A3｜沒有任何賺薪成員填退休年齡 → 退回 65", () => {
     const c = E.sampleCase();
     c.profile.retireAge = 0;
     c.members.forEach((m: { retireAge?: number }) => { m.retireAge = 0; });
+    c.retire.prepared = [];   // 2026/10/16 退休金進投影後示範客戶無缺口；這組測的是退休期支出有沒有算到
     return c;
   };
 

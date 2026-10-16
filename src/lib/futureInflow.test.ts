@@ -123,7 +123,8 @@ describe("投影：到期那年錢進主池、固定資產同步減少、被動�
     expect(at(b, 43).fixed - at(r, 43).fixed).toBeCloseTo(1_000_000, 4);
     expect(at(b, 44).fixed - at(r, 44).fixed).toBeCloseTo(2_000_000, 4);
     expect(at(b, 45).fixed - at(r, 45).fixed).toBeCloseTo(3_000_000, 4);
-    const ev = E.projection(inst).events.filter((e: { kind: string }) => e.kind === "inflow");
+    // 2026/10/16 起已備退休金一次領也插 inflow 旗（示範客戶的勞退），這裡只看到期回收那一支。
+    const ev = E.projection(inst).events.filter((e: { kind: string; name: string }) => e.kind === "inflow" && e.name !== "勞退");
     expect(ev.length).toBe(1);
     expect(ev[0]).toMatchObject({ age: 43, span: 45, ok: true, amount: 3_000_000 });
   });

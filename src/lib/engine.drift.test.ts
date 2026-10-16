@@ -433,39 +433,72 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     expect(after.members[after.members.length - 1].retireAge).toBe(65);
   });
 
-  it("延後退休：工作收入的結束歲跟著退休歲走，兩個方向都要對（2026/09/26）", () => {
-    // 真因：分析頁首屏拉桿只改 profile.retireAge、沒動工作收入 end，
-    // 拉到 73 之後 66～73 變成「薪水已停、生活費還是工作期全額」的一段假紅柱。
-    // 首屏拉桿從此走 applyRetireDelay()，跟調整方案那根槓桿共用同一份推法。
+  it("延後退休：只有「綁在 owner 退休時點」的工作收入列跟著移，兩個方向同一條規則（2026/10/16）", () => {
+    // 2026/09/26 真因：分析頁首屏拉桿只改 profile.retireAge、沒動工作收入 end，
+    // 拉到 73 之後 66～73 變成「薪水已停、生活費還是工作期全額」的一段假紅柱。首屏拉桿從此走 applyRetireDelay()。
     expect(HTML).toContain("applyRetireDelay(b,AN_TUNE.age-n(c.profile.retireAge));");
     expect(HTML).not.toContain("b.profile.retireAge=AN_TUNE.age;");
     // 同一類的坑：報酬率拉桿要關掉 useAllocReturn，起始值用 effReturn(c)，否則配置模式下拉了沒反應
     expect(HTML).toContain("b.plan=b.plan||{};b.plan.useAllocReturn=false;");
     expect(HTML).toContain("AN_TUNE={id:c.id,ret:effReturn(c),age:n(c.profile.retireAge),le:effHorizon(c)};");
     expect(HTML).not.toContain("AN_TUNE={id:c.id,ret:n(c.params.invReturn)");
-    expect(HTML).toContain("else if(n(i.end)===oldRA)i.end=newRA;");
+    // 2026/10/16 真因二：舊規則「end＜新退休歲一律延長」把早就刻意結束的列復活（RAYLEI 41～50 歲的專案收入
+    // 被延到 70，60～65 歲收入 216 萬→456 萬），延後退休的效果被灌水。
+    expect(HTML).not.toContain("if(n(i.end)<newRA)i.end=newRA;");
+    expect(HTML).toContain("var bound=(i.owner&&pts[i.owner]!=null)?pts[i.owner]:oldRA;");
+    expect(HTML).toContain("if(n(i.end)===bound)i.end=n(i.end)+years;");
+    expect(HTML).toContain("refreshLaborPrepared(c,oldRA,newRA);");
 
     const mk = () => {
       const c = E.sampleCase();
       c.profile.retireAge = 65;
+      c.profile.age = 40;
+      c.members = [
+        { name: "王大明", role: "本人", age: 40, expRatio: 60 },
+        { name: "王太太", role: "配偶", age: 38, retireAge: 60, expRatio: 40 },   // 本人 62 歲時退休
+      ];
       c.incomes = [
-        { name: "薪資", type: "工作", amount: 1200000, start: 40, end: 65 },   // 綁退休歲
-        { name: "顧問費", type: "工作", amount: 200000, start: 60, end: 70 },  // 刻意退休後才停
-        { name: "早期副業", type: "工作", amount: 100000, start: 40, end: 50 },
-        { name: "租金", type: "理財", amount: 240000, start: 40, end: 85 },
+        { owner: "王大明", name: "薪資", type: "工作", amount: 1200000, start: 40, end: 65 },   // 綁本人退休歲
+        { owner: "王太太", name: "配偶薪資", type: "工作", amount: 700000, start: 40, end: 62 }, // 綁配偶退休時點
+        { owner: "王大明", name: "顧問費", type: "工作", amount: 200000, start: 60, end: 70 },  // 刻意退休後才停
+        { owner: "王大明", name: "早期副業", type: "工作", amount: 100000, start: 40, end: 50 }, // 早就結束
+        { name: "無主列", type: "工作", amount: 50000, start: 40, end: 65 },                     // 沒 owner → 以本人為準
+        { owner: "王大明", name: "租金", type: "理財", amount: 240000, start: 40, end: 85 },
       ];
       return c;
     };
-    // 往後推 8 年：結束歲早於 73 的工作收入全部延到 73（原規則）
+    // 往後推 8 年：綁退休時點的三列各移 8 年；顧問費 70、副業 50 不動（不再被復活）
     const late = E.applyRetireDelay(mk(), 8);
     expect(late.profile.retireAge).toBe(73);
-    expect(late.incomes.map((i: any) => E.n(i.end))).toEqual([73, 73, 73, 85]);
-    // 往前拉 5 年：只有原本 end===65 的那列跟到 60；顧問費 70、副業 50 不動
+    expect(late.members[1].retireAge).toBe(68);
+    expect(late.incomes.map((i: any) => E.n(i.end))).toEqual([73, 70, 70, 50, 73, 85]);
+    // 往前拉 5 年：同一條規則
     const early = E.applyRetireDelay(mk(), -5);
     expect(early.profile.retireAge).toBe(60);
-    expect(early.incomes.map((i: any) => E.n(i.end))).toEqual([60, 70, 50, 85]);
+    expect(early.incomes.map((i: any) => E.n(i.end))).toEqual([60, 57, 70, 50, 60, 85]);
     // 0 年：原件原樣
-    expect(E.applyRetireDelay(mk(), 0).incomes.map((i: any) => E.n(i.end))).toEqual([65, 70, 50, 85]);
+    expect(E.applyRetireDelay(mk(), 0).incomes.map((i: any) => E.n(i.end))).toEqual([65, 62, 70, 50, 65, 85]);
+  });
+
+  it("延後退休：已備退休金的起領歲跟著移、勞保／勞退概算列依新退休歲重算（2026/10/16）", () => {
+    const c = E.sampleCase();
+    c.profile.retireAge = 65; c.profile.age = 40; c.profile.lifeExp = 85;
+    c.members = [{ name: "王大明", role: "本人", age: 40, insType: "勞保", insSalary: 45800, monthlySalary: 80000, worked: 15, expRatio: 100 }];
+    c.retire.prepared = [
+      { item: "勞保老年年金(概算)", laborAuto: "lp", age: 65, amount: 1, method: "一次領" },
+      { item: "勞退新制(概算)", laborAuto: "fund", age: 65, amount: 1, method: "一次領" },
+      { item: "商業年金", age: 65, amount: 20000, method: "月領" },
+      { item: "另一筆", age: 70, amount: 500000, method: "一次領" },
+    ];
+    const e0 = E.estimateSocialPension(c);
+    const a = E.applyRetireDelay(JSON.parse(JSON.stringify(c)), 5);
+    const e1 = E.estimateSocialPension(a);
+    expect(a.retire.prepared.map((p: any) => p.age)).toEqual([70, 70, 70, 70]);   // 70 那列本來就 70
+    expect(a.retire.prepared[0].amount).toBe(Math.round(e1.lump));
+    expect(a.retire.prepared[1].amount).toBe(Math.round(e1.fund));
+    expect(e1.years).toBe(e0.years + 5);          // 年資多 5 年
+    expect(e1.monthly).toBeGreaterThan(e0.monthly);
+    expect(a.retire.prepared[2].amount).toBe(20000); // 手打列金額不動
   });
 
   it("現值缺口的封閉解：兩邊是同一條公式", () => {

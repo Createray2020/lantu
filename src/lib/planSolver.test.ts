@@ -146,8 +146,12 @@ describe("七根槓桿", () => {
     expect(a.profile.retireAge).toBe(E.n(c.profile.retireAge) + 4);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(a.members.find((m: any) => m.role === "配偶").retireAge).toBe(64);
+    // 2026/10/16：只有「綁在 owner 退休時點」的列跟著移——王大明 65→69；
+    // 王太太的列 end=60，但她 60 歲退休換算成本人年齡是 42+... 不是 60 → 刻意結束的列，不動（不再被復活到新退休歲）。
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    a.incomes.filter((i: any) => i.type === "工作").forEach((i: any) => expect(E.n(i.end)).toBeGreaterThanOrEqual(a.profile.retireAge));
+    const ends = Object.fromEntries(a.incomes.filter((i: any) => i.type === "工作").map((i: any) => [i.owner, E.n(i.end)]));
+    expect(ends["王大明"]).toBe(a.profile.retireAge);
+    expect(ends["王太太"]).toBe(60);
   });
 
   it("調整願景吃的是既有的 minPresent / imp，不是新欄位", () => {
@@ -240,6 +244,8 @@ describe("七根槓桿", () => {
 describe("單槓桿反解", () => {
   it("解出來的值剛好填平：再少一點就補不平", () => {
     const c = E.sampleCase();
+    // 2026/10/16 退休金進投影後，示範客戶（勞退 300 萬一次領）一生沒有缺口；這條測試要的是「有缺口的個案」，把已備清掉。
+    c.retire.prepared = [];
     const r = E.solveLever(c, "expense", {});
     expect(r.feasible).toBe(true);
     expect(r.needed).toBe(true);
@@ -479,6 +485,7 @@ describe("方案 → 具體行動（planActions）", () => {
 
   it("採用的方案真的把缺口補平時，gapAfter 為 0", () => {
     const c = E.sampleCase();
+    c.retire.prepared = [];   // 見上：示範客戶已無缺口
     const rx = E.prescriptions(c).find((x: { ok: boolean }) => x.ok);
     if (rx) {
       const r = E.planActions(c, rx.levers);
@@ -529,6 +536,7 @@ describe("配置與對帳（缺口 → 用什麼填）", () => {
 
   it("對帳：覆蓋率＝新增投入現值 ÷ 缺口，補得起來才標 ok", () => {
     const c = E.sampleCase();
+    c.retire.prepared = [];   // 見上：示範客戶已無缺口
     const gap = E.gapPV(c);
     expect(gap).toBeGreaterThan(0);
     c.plan.invest = [{ name: "", src: "新增投入", principal: gap * 0.5, yearly: 0, years: 0, ret: 5 }];

@@ -232,6 +232,8 @@ describe("⚠️ 示範案例的數字一位都不能動（四條的擋重複全
     expect(Math.round(w.metrics(c).incTotal)).toBe(1_900_000);
     expect(Math.round(w.retireNeed(c).prepared)).toBe(3_000_000);
     expect(Math.round(w.retireNeed(c).gap)).toBe(14_943_403);
-    expect(Math.round(w.projection(c).shortPV)).toBe(362_910);
+    // 2026/10/16 已備退休金進投影：勞退 300 萬在 65 歲進存量，示範客戶一生不再有缺口（改版前 362,910）。
+    expect(Math.round(w.projection(c).shortPV)).toBe(0);
+    expect(w.projection(c).rows.find((r: { age: number }) => r.age === 65).penLump).toBe(3_000_000);
   });
 });

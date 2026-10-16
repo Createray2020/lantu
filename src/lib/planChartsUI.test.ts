@@ -24,6 +24,7 @@ beforeAll(async () => {
   w.app.activeTab = "data";
   w.app.dataTab = "plan";
   w.app.cases = [w.migrateCase(w.sampleCase())];
+  w.app.cases[0].retire.prepared = []; w.app.cases[0].autoOff = { labor: true };   // 2026/10/16 退休金進投影後示範客戶一生無缺口；這組測的是有缺口時的圖與拉桿
   w.app.activeId = w.app.cases[0].id;
   w.render();
 });

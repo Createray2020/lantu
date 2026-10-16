@@ -35,6 +35,7 @@ beforeAll(async () => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function useSample(role: "coach" | "client", tab: string, dataTab?: string): any {
   const c = w.migrateCase(w.sampleCase());
+  c.retire.prepared = []; c.autoOff = { labor: true };   // 2026/10/16 退休金進投影後示範客戶一生無缺口；拉桿那條測試要有數字可變
   w.app.cases = [c];
   w.app.activeId = c.id;
   w.app.role = role;
