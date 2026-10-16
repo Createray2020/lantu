@@ -9867,7 +9867,7 @@ function flowBodyHTML(c){
    '<div class="tw"><table><tr><th>階段</th><th>年齡</th><th>包含的願景</th><th class="r">里程碑：可投資資產</th><th class="r">年儲蓄需要</th><th>檢查點</th></tr>'+
    st.map(function(x,i){var isCur=curS&&curS.id===x.id;return '<tr'+(isCur?' style="background:var(--card)"':'')+'><td><b>'+(editable?'<input value="'+esc(x.name)+'" onchange="flowSetStage('+i+',\'name\',this.value)" style="width:110px">':esc(x.name))+'</b>'+(isCur?' <span class="flpill w">目前</span>':'')+'</td><td>'+x.fromAge+'–'+x.toAge+'</td><td>'+esc((x.goals||[]).join('、')||'—')+'</td><td class="r">'+(editable?'<input value="'+fmt(x.milestone)+'" onchange="flowSetStage('+i+',\'milestone\',this.value.replace(/,/g,\'\'))" style="width:120px;text-align:right">':fmt(x.milestone))+'</td><td class="r">'+fmt(x.annualSave)+'</td><td>每年 1 月</td></tr>'}).join('')+'</table></div>'+
    '<div class="hint" style="margin-top:8px">初稿由引擎切（目標年齡分段、金線段末值當里程碑）；定案後可改名、改數字。這張表同時是回訪對帳的依據。</div>'+
-   flowGate('階段目標表定案','<button class="tbtn amber" onclick="flowConfirmStages()">客戶認了 → 調整台</button>','教練拆、客戶認');
+   flowGate('階段目標表定案','<button class="tbtn amber" onclick="flowConfirmStages()">客戶確認 → 調整台</button>','教練拆、客戶確認');
  }
  if(s==='S4')return flowTuneHTML(c);
  if(s==='S4_v1'){var RS=routeSim(c);
