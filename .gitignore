@@ -62,3 +62,6 @@ scripts/templates/raw.json
 scripts/templates/built.json
 scripts/templates/shots/
 .tpl/
+scripts/practice/raw.json
+scripts/practice/built.json
+scripts/practice/shots/

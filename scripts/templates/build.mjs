@@ -18,7 +18,8 @@ import { execFileSync } from "node:child_process";
 import { chromium } from "playwright";
 
 const ROOT = process.cwd();
-const HERE = join(ROOT, "scripts/templates");
+// TPL_DIR：換一個個案目錄（例：scripts/practice，裡面要有自己的 dump.ts）；預設就是共用範本。
+const HERE = join(ROOT, process.env.TPL_DIR || "scripts/templates");
 const CHROME = process.env.CHROME_PATH || "/opt/pw-browsers/chromium";
 
 // cases.ts 是 TypeScript 且 import 了引擎，交給 tsx 產出純 JSON 再讀進來。
