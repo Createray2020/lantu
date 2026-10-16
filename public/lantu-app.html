@@ -9499,13 +9499,14 @@ function actionFlowHTML(c){
    ⚠️ 後果引擎 consequences() 只回清單、不改 c；客戶按「接受」才 applyConsequences() 寫進去並打 byConsequence 印記。
    ============================================================ */
 var FLOW_STEPS_GAP=[
- ['S0','判定','缺口線'],['S1','缺口呈現','◇ D1 願景是他要的？'],['S2','願景鎖定','客戶排序'],
+ ['S0','判定','缺口線'],['S1','缺口呈現','哪一年・差多少・影響誰'],['S2','願景鎖定','客戶微調・排序・鎖定'],
  ['S2g','護欄','保障・預備金'],['S3','階段目標','里程碑'],['S4','調整台','收入・支出拉桿 ◇ 補平？'],
  ['S6','後果','◇ D3 加碼或接受'],['S6x','行動清單與下一步','收尾三題'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
 var FLOW_STEPS_SUR=[
  ['P0','判定','餘裕線'],['P1','餘裕呈現','保守重算'],['P2','願景再確認','◇ D1′ 要升級？'],
  ['P2g','護欄','保障・預備金'],['P3','餘裕分配','三向'],['P3x','行動清單與下一步','收尾三題'],['S7','執行期','客戶去做'],['S8','回訪對帳','◇ D4 到位？']];
-var FLOW_GATES={S1:1,S4:1,S6:1,P2:1};
+// 2026/10/16 Ray：D1「願景是他要的嗎？」拿掉——願景本來就是客戶自己的，要不要改在 Step 2 同一頁微調，不改就直接鎖定；不再有「回願景澄清」跳頁這條路。
+var FLOW_GATES={S4:1,S6:1,P2:1};
 var FLOW_LOCKED={};
 var FLOW_RULES=['願景不動','收入優先、支出其次','取捨以客戶願景為尺','後果只呈現、不代決定','報酬率保守假設','同一筆錢只用一次'];
 var CONS_LIFE_PLUS=5;   // 保守情境：壽命再加幾年
@@ -9839,20 +9840,20 @@ function flowBodyHTML(c){
    '<div style="margin-top:12px"><b class="k" style="color:var(--amber2)">哪些願景受影響</b> <span class="hint">依客戶的必達順序</span></div>'+
    '<div class="tw"><table><tr><th>順位</th><th>願景</th><th>年齡</th><th class="r">金額</th><th>照現在走</th></tr>'+
    G.items.map(function(x){return '<tr'+(x.rank>=99?' class="dim"':'')+'><td>'+x.pos+'</td><td>'+esc(x.name)+'</td><td>'+x.age+(x.span?'–'+x.span:'')+'</td><td class="r">'+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+'</td><td>'+flowMark(x.ok)+'</td></tr>'}).join('')+'</table></div>'+
-   flowGate('D1　這個願景是他自己要的嗎？',
-    '<button class="tbtn amber" onclick="flowDecide(\'S1\',\'d1\',{ok:true},\'客戶確認願景是自己要的，看見缺口 '+cfAxis(G.shortPV)+'\',\'S2\')">是，他要的 → 鎖定願景</button>'+
-    '<button class="tbtn ghost" onclick="flowDecide(\'S1\',\'d1\',{ok:false},\'願景還沒對準，回意圖分頁澄清\',\'S1\');app.dataTab=\'intent\';render()">不是 → 回願景澄清</button>','客戶');
+   flowGate('看完缺口，下一步鎖定願景',
+    '<button class="tbtn amber" onclick="flowDecide(\'S1\',\'d1\',{ok:true},\'客戶看見缺口 '+cfAxis(G.shortPV)+'，進願景鎖定\',\'S2\')">下一步 → 鎖定願景</button>'+
+    '<span class="hint">要不要改願景，到下一步同一頁「微調」；不改就直接鎖定。</span>','客戶');
  }
  if(s==='S2'){var items=flowVisionList(c),must=((c.intent||{}).mustHave)||[];
   var seen={};
-  return flowAsk('哪幾件是他非到不可的？排序是為了後面知道先保哪個，不是為了砍。')+
+  return flowAsk('這份願景要不要改？要改就按該項「微調」（時間／金額，同一頁改完）；不改就直接鎖定。排序是為了後面知道先保哪個，不是為了砍。')+
    '<div class="hint" style="margin-bottom:8px">順序＝意圖分頁的必達優先序（同一份資料，▲▼ 直接調）；勾選＝要做（＝願景選定閘）。</div>'+
    items.map(function(x){var t=x.target,mi=t?must.indexOf(t):-1,arrows='';
     if(t&&mi>=0&&!seen[t]){seen[t]=1;arrows='<span class="flowarr"><button class="tbtn sm" onclick="flowMoveTarget(\''+esc(t)+'\',-1)" '+(mi<=0?'disabled':'')+'>▲</button><button class="tbtn sm" onclick="flowMoveTarget(\''+esc(t)+'\',1)" '+(mi>=must.length-1?'disabled':'')+'>▼</button></span>'}
     var chk=x.ref?'<input type="checkbox" checked onchange="set(\''+x.ref.arr+':'+x.ref.i+'\',\'on\',this.checked,\'bool\');render()">':(x.kind==='legacy'?'<input type="checkbox" checked onchange="setObj(\'legacy\',\'on\',this.checked);render()">':'<span style="width:17px;display:inline-block"></span>');
     return '<div class="vitem"><span class="pr">'+x.pos+'</span>'+chk+'<div class="vt"><div class="vn">'+esc(x.name)+'</div><div class="vm">'+x.age+(x.span?'–'+x.span:'')+' 歲　'+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+(x.rank>=99?'　<span class="hint">未列必達</span>':'')+'</div></div>'+
      '<button class="tbtn sm" onclick="flowVisionOpen(\''+esc(x.key)+'\')">微調</button>'+flowMark(x.ok)+arrows+'</div>'}).join('')+
-   flowGate('鎖定願景清單（定案版）','<button class="tbtn amber" onclick="flowLockVision()">鎖定 · 打版本印記</button><span class="hint">鎖定會記 visionLock，之後願景只能由客戶自己升級或放手</span>','客戶');
+   flowGate('願景不改、或改完了 → 鎖定','<button class="tbtn amber" onclick="flowLockVision()">確認 · 鎖定願景</button><span class="hint">鎖定會記 visionLock；之後要再改，方案頁右緣的願景抽屜隨時可以改，不用回頭。</span>','客戶');
  }
  if(s==='S2g'){var Gd=guardCheck(c);
   return flowAsk('一次意外會不會讓後面所有努力白做？——護欄先立，保障額度依剛鎖定的願景算。')+
@@ -9999,13 +10000,13 @@ function flowD4(grade){
 function flowD4Vision(still){
  var c=activeCase();var f=flowOf(c);if(!f)return;f.askVision=false;
  if(still)flowDecide('S8','d4v',{still:true},'客戶確認願景還是要的，看後果',f.track==='gap'?'S6':'P3');
- else {flowDecide('S8','d4v',{still:false},'客戶說願景不再是他要的，回願景澄清','S1');app.dataTab='intent';render();}
+ else flowDecide('S8','d4v',{still:false},'客戶說願景不再是他要的，回 Step 2 改願景','S2');   // 2026/10/16：留在方案頁，不跳意圖分頁
 }
 /* 餘裕線 */
 function flowRejudge(){var c=activeCase();var f=flowOf(c);if(!f)return;var T=flowTrack(c);f.track=T.track;f.step=T.track==='gap'?'S0':'P0';save();render()}
 function flowUpgradeVision(yes){
  var c=activeCase();var f=flowOf(c);if(!f)return;
- if(yes){flowDecide('P2','d1p',{upgrade:true},'客戶要升級願景，回意圖分頁加進去後重判',null);f.pendingRejudge=true;save();app.dataTab='intent';render();}
+ if(yes){flowDecide('P2','d1p',{upgrade:true},'客戶要升級願景，回意圖分頁加進去後重判',null);f.pendingRejudge=true;save();app.activeTab='data';app.dataTab='intent';render();}   // ⚠️ 方案是頂層分頁，只切 dataTab 等於原地不動
  else flowDecide('P2','d1p',{upgrade:false},'客戶不升級願景，先補護欄','P2g');
 }
 function flowEarlyRetire(c){
@@ -10109,7 +10110,7 @@ function flowBodyHTML2(c){
    '<div style="margin-top:8px" data-calc="trackingChart">'+trackingChartSVG(c)+'</div>'+
    tableSec('逐年實際淨資產','tracking',c.tracking,[['year','西元年','num'],['age','年齡','num'],['net','實際淨資產','money']])+'</details>'+
    (f.askVision
-    ?flowGate('完全沒動——這個願景還是你要的嗎？','<button class="tbtn amber" onclick="flowD4Vision(true)">還是要的 → 看後果</button><button class="tbtn ghost" onclick="flowD4Vision(false)">不是了 → 回願景澄清</button>','客戶')
+    ?flowGate('完全沒動——這個願景還是你要的嗎？','<button class="tbtn amber" onclick="flowD4Vision(true)">還是要的 → 看後果</button><button class="tbtn ghost" onclick="flowD4Vision(false)">不是了 → 回 Step 2 改願景</button>','客戶')
     :flowGate('D4　執行到位嗎？','<button class="tbtn '+(K.grade==='done'?'amber':'ghost')+'" onclick="flowD4(\'done\')">到位 → 更新現況、下一階段</button><button class="tbtn '+(K.grade==='partial'?'amber':'ghost')+'" onclick="flowD4(\'partial\')">動了但不夠 → 看後果</button><button class="tbtn '+(K.grade==='none'?'amber':'ghost')+'" onclick="flowD4(\'none\')">完全沒動 → 問願景</button>','教練判、客戶認'));
  }
  if(s==='P2'){

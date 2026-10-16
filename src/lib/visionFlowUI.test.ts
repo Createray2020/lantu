@@ -87,17 +87,42 @@ describe("流程推進與閘門", () => {
     v2Folds.forEach((t) => expect(h).toContain(t));
     expect(h).not.toContain('onclick="flowStart()"');
   });
-  it("S0 → S1 顯示三個數字與受影響願景；D1 決定寫進 decisions 並前進到 S2", () => {
+  it("S0 → S1 顯示三個數字與受影響願景；S1 只有一顆「下一步 → 鎖定願景」，沒有 D1 問句（2026/10/16）", () => {
     w.flowGo("S1");
-    expect(pane()).toContain("首次入不敷出");
+    const h = pane();
+    expect(h).toContain("首次入不敷出");
     const G = w.gapView(cur());
     expect(G.items.length).toBeGreaterThan(0);
     expect(G.items[0].pos).toBe(1);
-    w.flowDecide("S1", "d1", { ok: true }, "客戶確認願景", "S2");
+    // D1 拿掉：願景本來就是客戶自己的，要不要改在 Step 2 同一頁微調；不再有「回願景澄清」跳頁
+    expect(h).toContain("下一步 → 鎖定願景");
+    expect(h).not.toContain("回願景澄清");
+    expect(h).not.toContain("這個願景是他自己要的嗎");
+    expect(w.FLOW_GATES.S1).toBeUndefined();
+    const btn = [...w.document.querySelectorAll(".flowgate button")].find((b: Element) => b.textContent?.includes("鎖定願景")) as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    btn.click();
     expect(cur().flow.step).toBe("S2");
     expect(cur().flow.decisions.d1.ok).toBe(true);
     expect(cur().flow.decisions.d1.step).toBe("S1");
     expect(pane()).toContain("這一場的決定");
+    // Step 2 就是「要不要改」的頁：每項有微調、有確認鎖定；整個流程留在方案分頁
+    const h2 = pane();
+    expect(h2).toContain("微調");
+    expect(h2).toContain("確認 · 鎖定願景");
+    expect(w.app.activeTab).toBe("plan");
+  });
+
+  it("S8 完全沒動 →「不是了」回 Step 2 改願景，留在方案分頁（不再跳意圖分頁）", () => {
+    cur().flow.step = "S8";
+    cur().flow.askVision = true;
+    w.render();
+    expect(pane()).toContain("不是了 → 回 Step 2 改願景");
+    expect(pane()).not.toContain("回願景澄清");
+    w.flowD4Vision(false);
+    expect(cur().flow.step).toBe("S2");
+    expect(w.app.activeTab).toBe("plan");
+    expect(cur().flow.decisions.d4v.still).toBe(false);
   });
   it("S2 鎖定願景 → visionLock 有順序印記，前進到 S2′", () => {
     w.flowLockVision();
