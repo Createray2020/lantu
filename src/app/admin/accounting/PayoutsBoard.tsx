@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
-import { payoutsOf, prevYm, nextYm, isYm, bankLine, TAX_MODE_LABEL, type AcctState, type PayoutLine } from "@/lib/acctEngine";
+import { payoutsOf, unpaidPayouts, prevYm, nextYm, isYm, bankLine, TAX_MODE_LABEL, type AcctState, type PayoutLine } from "@/lib/acctEngine";
 import { markAcctPayoutAction } from "./actions";
 import { useAcct, card, h2, hint, btn, xbtn, F, NUM } from "./AcctParts";
 
@@ -18,6 +18,8 @@ export default function PayoutsBoard({ initial, today }: { initial: AcctState; t
   const sum = useMemo(() => payoutsOf(S, ym), [S, ym]);
   const max = Math.max(1, ...sum.lines.map((l) => l.tax.net));
   const missing = sum.lines.filter((l) => !l.rec || !bankLine(l.rec) || !l.rec.taxMode);
+  // 2026/10/16 Ray：不管哪個月，還沒匯的全部列在最上面（按結算月時間軸），一鍵匯出給會計
+  const unpaid = useMemo(() => unpaidPayouts(S), [S]);
 
   const mark = (l: PayoutLine, paidOn: string, amount: number) => {
     const m = amount > 0 ? { paidOn, amount, note: l.mark?.note ?? "" } : null;
@@ -32,6 +34,43 @@ export default function PayoutsBoard({ initial, today }: { initial: AcctState; t
 
   return (
     <div className="space-y-4">
+      <div className={`${card} ${unpaid.n ? "border-danger" : ""}`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className={`${h2} ${unpaid.n ? "border-danger" : ""}`}>所有月份還沒匯的：{unpaid.n} 筆・{F(unpaid.total)}</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-tx3">{unpaid.byYm.map((g) => `${g.ym} ${g.n} 筆 ${F(g.total)}`).join("・") || "全部匯完了"}</span>
+            {unpaid.n > 0 && <a href="/api/acct/unpaid" className={`${btn} border-brand2 text-brand2 no-underline`}>匯出給會計（CSV）</a>}
+          </div>
+        </div>
+        {unpaid.n > 0 && (
+          <div className="overflow-x-auto mt-3">
+            <table className="w-full text-sm">
+              <thead><tr className="text-xs text-tx3"><th className="text-left py-1 whitespace-nowrap">結算月</th><th className="text-left">發放日</th><th className="text-left">受款人</th><th className="text-left">匯入</th><th className="text-left">戶名</th><th className="text-right">實匯</th><th className="text-right">已匯</th><th className="text-right">還要匯</th><th /></tr></thead>
+              <tbody>
+                {unpaid.rows.map(({ ym: k, payDate, line: l }) => {
+                  const bank = bankLine(l.rec);
+                  const late = payDate < today;
+                  return (
+                    <tr key={`${k}-${l.key}`} className="border-t border-line">
+                      <td className="py-1.5 whitespace-nowrap"><button className="hover:text-brand2 underline" onClick={() => setYm(k)}>{k}</button></td>
+                      <td className={`whitespace-nowrap text-xs ${late ? "text-danger" : "text-tx2"}`}>{payDate}{late ? "（已過）" : ""}</td>
+                      <td className="whitespace-nowrap">{l.payee}</td>
+                      <td className="text-xs text-tx2 max-w-56 truncate" title={bank}>{bank || <span className="text-danger">未填帳號</span>}</td>
+                      <td className="text-xs text-tx2 whitespace-nowrap">{l.rec?.accountName || "—"}</td>
+                      <td className="text-right tabular-nums">{F(l.tax.net)}</td>
+                      <td className="text-right tabular-nums text-tx3">{l.mark ? F(l.mark.amount) : "—"}</td>
+                      <td className="text-right tabular-nums font-bold text-danger">{F(l.remaining)}</td>
+                      <td className="text-right whitespace-nowrap"><Link href={`/admin/accounting/payouts/statement?key=${encodeURIComponent(l.key)}&ym=${k}`} className="text-xs text-tx3 hover:text-brand2 underline">對帳單</Link></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className={`${hint} mt-2`}>匯出的表帶銀行／分行／戶名／帳號／應付／扣繳／實匯／還要匯，會計直接照打；匯完回到該月標「已匯」就會從這張表消失。</p>
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-tx2">看哪一個月</span>
         <button className={btn} onClick={() => setYm(prevYm(ym))}>‹</button>

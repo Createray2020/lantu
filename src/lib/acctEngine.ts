@@ -105,6 +105,7 @@ export type AcctState = {
   payouts?: Record<string, Record<string, PayoutMark>>; // 'YYYY-MM' → 受款人 → 已匯
   coachList?: CoachLite[];             // 名冊（給匯款人／分潤人對名字、帶職級與輔導鏈用）
   payeeBook?: PayeeRec[];              // 受款人簿
+  cash?: CashState;                    // 現金帳（期初餘額＋手記的日記帳；收款與分潤已匯自動進）
   params: AcctParams;
   goal: AcctGoal;
 };
@@ -493,7 +494,7 @@ export function normPayees(v: unknown): Record<string, string> {
   if (v && typeof v === "object") for (const [k, val] of Object.entries(v as Record<string, unknown>)) { const n = String(val ?? "").trim(); if (n) out[k] = n; }
   return out;
 }
-/** 一筆收款的正規化（id／ym 由呼叫端給）。 */
+/** 一筆收款的正規化（id／ym 由呼叫端給）。acct_receipts 沒有 source 欄：帶執案教練（或 enteredBy）的就是教練記的顧問費（2026/10/16 修：之前一律變 manual，待查帳的「確認入帳」鈕永遠不出現）。 */
 export function normReceipt(v: unknown, id: string): Receipt {
   const r = (v && typeof v === "object" ? v : {}) as Partial<Receipt>;
   const on = isIsoDate(r.on) ? String(r.on) : "";
@@ -501,7 +502,7 @@ export function normReceipt(v: unknown, id: string): Receipt {
     id, ym: on ? on.slice(0, 7) : (isYm(r.ym) ? String(r.ym) : ""), itemId: String(r.itemId ?? ""), on, amount: Math.max(0, num0(r.amount)),
     last5: String(r.last5 ?? "").trim().slice(0, 20), payer: String(r.payer ?? "").trim(), payerCoachId: r.payerCoachId ? String(r.payerCoachId) : null,
     sharers: normSharers(r.sharers), payees: normPayees(r.payees), note: String(r.note ?? "").trim(), void: !!r.void,
-    refund: Math.max(0, num0(r.refund)), source: r.source === "case" ? "case" : r.source === "coach" ? "coach" : "manual", caseId: r.caseId ? String(r.caseId) : null,
+    refund: Math.max(0, num0(r.refund)), source: r.source === "case" ? "case" : (r.source === "coach" || (!r.source && (r.execCoachId || r.enteredBy))) ? "coach" : "manual", caseId: r.caseId ? String(r.caseId) : null,
     clientId: r.clientId ? String(r.clientId) : null, execCoachId: r.execCoachId ? String(r.execCoachId) : null, promoCoachId: r.promoCoachId ? String(r.promoCoachId) : null,
     verified: r.verified !== false, enteredBy: r.enteredBy ? String(r.enteredBy) : null,
     ...(Array.isArray(r.allocs) ? { allocs: r.allocs as ReceiptRow[] } : {}),
@@ -541,3 +542,106 @@ export function normPayee(v: unknown, id: string): PayeeRec {
 }
 /** 帳號摘要（對帳單／匯款頁顯示用）。 */
 export const bankLine = (r: PayeeRec | null) => r && (r.bankCode || r.bankName || r.accountNo) ? [r.bankCode && `(${r.bankCode})`, r.bankName, r.branch, r.accountNo].filter(Boolean).join(" ") : "";
+
+// ---------- 現金帳（2026/10/16 Ray：要看得到實際帳戶明細、現金流量表、帳戶裡應該有多少錢） ----------
+/**
+ * 一個公司帳戶（Ray 拍板：先一個，之後要拆再拆）。
+ * 日記帳三個來源：收款（已確認、未作廢，按實收 amount − refund）自動流入；分潤「已匯」紀錄自動流出；其餘手記（acct_cash）。
+ * 固定支出不自動視為已付（Ray 拍板「逐筆記實付」）：本月帳務的固定支出列只是損益上的數字，付了才在這裡記一筆。
+ * 餘額＝期初 ＋ 全部流入 − 全部流出；期初存 acct_params.cash（金額＋日期）。
+ */
+export type CashKind = "in" | "out";
+export type CashEntry = { id: string; on: string; kind: CashKind; amount: number; cat: string; name: string; note: string };
+export type CashOpening = { amount: number; from: string };
+export type CashState = { opening: CashOpening; entries: CashEntry[] };
+export const CASH_CAT_FIXED = "固定支出";
+export const CASH_CAT_RECEIPT = "收款";
+export const CASH_CAT_PAYOUT = "分潤匯款";
+export const CASH_CATS_OUT = [CASH_CAT_FIXED, "稅費", "人事", "行銷", "設備", "其他支出"];
+export const CASH_CATS_IN = ["其他收入", "股東投入", "退款收回"];
+export type CashRow = CashEntry & { src: "receipt" | "payout" | "manual"; ym: string; balance: number };
+export type CashMonth = { ym: string; opening: number; inflow: number; outflow: number; closing: number; byCat: Record<string, number>; n: number };
+export type CashLedger = { rows: CashRow[]; opening: CashOpening; balance: number; inflow: number; outflow: number; months: CashMonth[]; warns: string[] };
+
+export function normCashEntry(v: unknown, id: string): CashEntry {
+  const e = (v && typeof v === "object" ? v : {}) as Partial<CashEntry>;
+  return {
+    id, on: isIsoDate(e.on) ? String(e.on) : "", kind: e.kind === "in" ? "in" : "out", amount: Math.max(0, num0(e.amount)),
+    cat: String(e.cat ?? "").trim().slice(0, 40), name: String(e.name ?? "").trim().slice(0, 120), note: String(e.note ?? "").trim().slice(0, 400),
+  };
+}
+export function normCashOpening(v: unknown): CashOpening {
+  const o = (v && typeof v === "object" ? v : {}) as Partial<CashOpening>;
+  return { amount: num0(o.amount), from: isIsoDate(o.from) ? String(o.from) : "" };
+}
+export const ACCT_DEFAULT_CASH: CashState = { opening: { amount: 0, from: "" }, entries: [] };
+/** 已匯紀錄的鍵（p:<id>／n:<名字>）→ 顯示名。 */
+function payeeNameOfKey(S: AcctState, key: string): string {
+  if (key.startsWith("p:")) return (S.payeeBook ?? []).find((p) => p.id === key.slice(2))?.name || key.slice(2);
+  return key.startsWith("n:") ? key.slice(2) : key;
+}
+/** 全部日記帳（自動＋手記）按日期排、累計餘額；逐月流入／流出／期末。 */
+export function cashLedger(S: AcctState): CashLedger {
+  const cash = S.cash ?? ACCT_DEFAULT_CASH;
+  const raw: Omit<CashRow, "balance">[] = [];
+  for (const ym of Object.keys(S.receipts ?? {})) for (const x of S.receipts![ym]) {
+    if (x.void || x.verified === false || !x.on) continue;
+    const it = S.items.find((i) => i.id === x.itemId);
+    raw.push({ id: `r:${x.id}`, on: x.on, kind: "in", amount: netOf(x), cat: CASH_CAT_RECEIPT, name: `${it?.name ?? "收款"}・${x.payer}`, note: x.note, src: "receipt", ym: x.on.slice(0, 7) });
+  }
+  for (const ym of Object.keys(S.payouts ?? {})) for (const [key, m] of Object.entries(S.payouts![ym])) {
+    if (!(m.amount > 0)) continue;
+    const on = m.paidOn || settlementDate(ym);
+    raw.push({ id: `p:${ym}:${key}`, on, kind: "out", amount: m.amount, cat: CASH_CAT_PAYOUT, name: `${payeeNameOfKey(S, key)}（${ym} 分潤）`, note: m.note, src: "payout", ym: on.slice(0, 7) });
+  }
+  for (const e of cash.entries) if (e.on && e.amount > 0) raw.push({ ...e, src: "manual", ym: e.on.slice(0, 7) });
+  const order = { receipt: 0, manual: 1, payout: 2 };
+  raw.sort((a, b) => a.on.localeCompare(b.on) || order[a.src] - order[b.src] || a.id.localeCompare(b.id));
+  const warns: string[] = [];
+  if (cash.opening.from && raw.some((r) => r.on < cash.opening.from)) warns.push(`有 ${raw.filter((r) => r.on < cash.opening.from).length} 筆日期早於期初日 ${cash.opening.from}，餘額仍把它們算進去——期初日應該是「餘額從哪一天起算」`);
+  let bal = cash.opening.amount, inflow = 0, outflow = 0;
+  const rows: CashRow[] = raw.map((r) => { if (r.kind === "in") { bal += r.amount; inflow += r.amount; } else { bal -= r.amount; outflow += r.amount; } return { ...r, balance: bal }; });
+  const months: CashMonth[] = [];
+  let open = cash.opening.amount;
+  for (const r of rows) {
+    let m = months[months.length - 1];
+    if (!m || m.ym !== r.ym) { m = { ym: r.ym, opening: open, inflow: 0, outflow: 0, closing: open, byCat: {}, n: 0 }; months.push(m); }
+    if (r.kind === "in") m.inflow += r.amount; else m.outflow += r.amount;
+    m.byCat[r.cat] = (m.byCat[r.cat] ?? 0) + (r.kind === "in" ? r.amount : -r.amount);
+    m.closing = r.balance; m.n++; open = m.closing;
+  }
+  return { rows, opening: cash.opening, balance: bal, inflow, outflow, months, warns };
+}
+/** 某月固定支出列（本月帳務）有沒有在現金帳記實付：同月、類別＝固定支出、名稱相同。 */
+export function cashFixedStatus(S: AcctState, ym: string): { name: string; amt: number; paid: CashEntry | null }[] {
+  const fixed = S.months?.[ym]?.fixed ?? [];
+  const paid = (S.cash?.entries ?? []).filter((e) => e.kind === "out" && e.cat === CASH_CAT_FIXED && e.on.slice(0, 7) === ym);
+  return fixed.filter((f) => f.name).map((f) => ({ name: f.name, amt: Number(f.amt) || 0, paid: paid.find((e) => e.name === f.name) ?? null }));
+}
+
+// ---------- 尚未匯款總表（2026/10/16 Ray：不管哪個月還沒匯的，按時間軸排、一鍵匯出給會計） ----------
+export type UnpaidRow = { ym: string; payDate: string; line: PayoutLine };
+export type Unpaid = { rows: UnpaidRow[]; total: number; n: number; byYm: { ym: string; payDate: string; n: number; total: number }[] };
+export function unpaidPayouts(S: AcctState): Unpaid {
+  const rows: UnpaidRow[] = [];
+  for (const ym of Object.keys(S.receipts ?? {}).sort()) {
+    const sum = payoutsOf(S, ym);
+    for (const line of sum.lines) if (line.remaining > 0.5) rows.push({ ym, payDate: sum.payDate, line });
+  }
+  const byYm: Unpaid["byYm"] = [];
+  for (const r of rows) {
+    let m = byYm[byYm.length - 1];
+    if (!m || m.ym !== r.ym) { m = { ym: r.ym, payDate: r.payDate, n: 0, total: 0 }; byYm.push(m); }
+    m.n++; m.total += r.line.remaining;
+  }
+  return { rows, total: rows.reduce((a, r) => a + r.line.remaining, 0), n: rows.length, byYm };
+}
+export const UNPAID_CSV_HEADERS = ["結算月", "發放日", "受款人", "銀行代碼", "銀行", "分行", "戶名", "帳號", "稅務方式", "應付", "扣繳", "實匯", "已匯", "還要匯"] as const;
+/** 匯出給會計的列（裸數字，不加千分位；金額取整）。 */
+export function unpaidCsvRows(S: AcctState): string[][] {
+  return unpaidPayouts(S).rows.map(({ ym, payDate, line: l }) => [
+    ym, payDate, l.payee, l.rec?.bankCode ?? "", l.rec?.bankName ?? "", l.rec?.branch ?? "", l.rec?.accountName ?? "", l.rec?.accountNo ?? "",
+    l.rec ? TAX_MODE_LABEL[l.rec.taxMode] : "未建受款人",
+    String(Math.round(l.due)), String(Math.round(l.tax.withhold + l.tax.nhi)), String(Math.round(l.tax.net)), String(Math.round(l.mark?.amount ?? 0)), String(Math.round(l.remaining)),
+  ]);
+}

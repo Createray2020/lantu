@@ -274,7 +274,7 @@ function OwnerView({ d, pl, multi }: { d: OwnerHome; pl: string; multi: boolean 
     <>
       <Hero k={multi ? `公司 ${pl}` : "公司這個月"}
         h1={r && d.hasMoney ? `公司實收 ${nt(r.gp)}，淨利 ${nt(r.net)}` : `${pl}還沒有收款`}
-        sub={<>{c.headcount} 位有效教練 · 收款 {nt(po.received)} · 要匯出去 {nt(po.net)}（已匯 {nt(po.paid)}）{po.pending.n ? <> · <b className="text-danger">{po.pending.n} 筆顧問費待查帳</b></> : null}</>}
+        sub={<>{c.headcount} 位有效教練 · 收款 {nt(po.received)} · 要匯出去 {nt(po.net)}（已匯 {nt(po.paid)}）{po.pending.n ? <> · <Link href="/admin/accounting/receipts" className="text-danger font-bold underline hover:text-brand2">{po.pending.n} 筆顧問費待查帳 → 去確認</Link></> : null}</>}
         right={<>
           {c.bodies.map((b) => <div key={b.code} className="inline-flex items-center gap-1.5 bg-panel2 border border-line rounded-lg px-3 py-2 text-xs text-tx2 shadow-e1">{b.label} <b className="text-tx">{b.n}</b></div>)}
         </>} />

@@ -9,10 +9,10 @@
 import { unstable_cache, updateTag } from "next/cache";
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { acctParams, acctMonths, acctTargets, acctEntries, acctReceipts, acctPayouts, payees, coaches, compCases, compPayouts } from "@/Shared/db/schema";
+import { acctParams, acctMonths, acctTargets, acctEntries, acctReceipts, acctPayouts, acctCash, payees, coaches, compCases, compPayouts } from "@/Shared/db/schema";
 import {
-  ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, annualFeeOf, isYm, normGoal, normItems, normMonth, normParams, normTarget, normReceipt, normPayoutMark, normPayee, prevYm, ymOf,
-  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark, type PayeeRec, type CoachLite, type ReceiptRow,
+  ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, ACCT_DEFAULT_CASH, annualFeeOf, isYm, normGoal, normItems, normMonth, normParams, normTarget, normReceipt, normPayoutMark, normPayee, normCashEntry, normCashOpening, prevYm, ymOf,
+  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark, type PayeeRec, type CoachLite, type ReceiptRow, type CashState,
 } from "./acctEngine";
 
 export const ACCT_TAG = "acct-params";
@@ -28,6 +28,7 @@ async function loadState(): Promise<AcctState> {
   const receipts: Record<string, Receipt[]> = {};
   const payouts: Record<string, Record<string, PayoutMark>> = {};
   let coachList: CoachLite[] = [];
+  const cash: CashState = { opening: { ...ACCT_DEFAULT_CASH.opening }, entries: [] };
   let payeeBook: PayeeRec[] = [];
   try {
     const rows = await db.select({ key: acctParams.key, value: acctParams.value }).from(acctParams);
@@ -36,6 +37,7 @@ async function loadState(): Promise<AcctState> {
       if (r.key === "params") params = normParams(r.value);
       if (r.key === "goal") goal = normGoal(r.value);
       if (r.key === "draft" && r.value) draft = normTarget(r.value);
+      if (r.key === "cash") cash.opening = normCashOpening(r.value);
     }
     const ms = await db.select().from(acctMonths).orderBy(asc(acctMonths.ym));
     for (const m of ms) if (isYm(m.ym)) months[m.ym] = normMonth({ qty: m.qty, fixed: m.fixed });
@@ -79,9 +81,11 @@ async function loadState(): Promise<AcctState> {
       }
     }
     const pb = await db.select().from(payees);
+    const cs = await db.select().from(acctCash).orderBy(asc(acctCash.on), asc(acctCash.createdAt));
+    cash.entries = cs.map((c) => normCashEntry({ ...c, on: String(c.on) }, c.id));
     payeeBook = pb.map((p) => { const r = normPayee(p, p.id); if (r.coachId && !r.name) r.name = coachList.find((c) => c.id === r.coachId)?.name ?? ""; return r; });
   } catch { /* 表還沒建：空狀態 */ }
-  return { items, months, targets, draft, sys, receipts, payouts, coachList, payeeBook, params, goal };
+  return { items, months, targets, draft, sys, receipts, payouts, coachList, payeeBook, cash, params, goal };
 }
 export const getAcctState = unstable_cache(loadState, ["lantu-acct-state"], { tags: [ACCT_TAG] });
 
@@ -282,6 +286,28 @@ export async function markAcctPayout(ym: string, payee: string, value: unknown):
   if (!(m.amount > 0)) await db.delete(acctPayouts).where(and(eq(acctPayouts.ym, ym), eq(acctPayouts.payee, p)));
   else await db.insert(acctPayouts).values({ ym, payee: p, paidOn: m.paidOn || null, amount: m.amount, note: m.note, updatedAt: new Date() })
     .onConflictDoUpdate({ target: [acctPayouts.ym, acctPayouts.payee], set: { paidOn: m.paidOn || null, amount: m.amount, note: m.note, updatedAt: new Date() } });
+  updateTag(ACCT_TAG);
+}
+// ---------- 現金帳（2026/10/16） ----------
+export async function saveCashOpening(value: unknown): Promise<void> {
+  await putParam("cash", normCashOpening(value));
+  updateTag(ACCT_TAG);
+}
+/** 存一筆手記：id 給了就改、沒給就新增。回 id。 */
+export async function saveCashEntry(id: string | null, value: unknown): Promise<string> {
+  const e = normCashEntry(value, id ?? "");
+  if (!e.on) throw new Error("invalid-date");
+  if (!(e.amount > 0)) throw new Error("invalid-amount");
+  if (!e.name) throw new Error("invalid-name");
+  const row = { on: e.on, kind: e.kind, amount: e.amount, cat: e.cat, name: e.name, note: e.note, updatedAt: new Date() };
+  let out = id;
+  if (id) await db.update(acctCash).set(row).where(eq(acctCash.id, id));
+  else { const [x] = await db.insert(acctCash).values(row).returning({ id: acctCash.id }); out = x.id; }
+  updateTag(ACCT_TAG);
+  return out!;
+}
+export async function deleteCashEntry(id: string): Promise<void> {
+  await db.delete(acctCash).where(eq(acctCash.id, id));
   updateTag(ACCT_TAG);
 }
 // ---------- 受款人簿 ----------

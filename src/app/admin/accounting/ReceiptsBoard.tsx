@@ -82,6 +82,9 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
     return parts.filter((p) => p.v > 0);
   }, [sum]);
 
+  // 待查帳總表（2026/10/16 Ray：匯款進來有「待查帳」卻沒地方按確認）——不分月份，全部列在最上面
+  const pendingAll = useMemo(() => Object.values(S.receipts ?? {}).flat().filter((r) => r.verified === false && !r.void).sort((a, b) => a.on.localeCompare(b.on)), [S.receipts]);
+
   if (!S.items.length) {
     return <div className={card}><p className="text-sm text-tx2">還沒有營業項目。先到 <Link className="text-brand2 underline" href="/admin/accounting">參數設定</Link> 把項目與拆分建起來。</p></div>;
   }
@@ -98,6 +101,33 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
         <button className={`${btn} border-brand2 text-brand2`} disabled={!!editing} onClick={() => setEditing(EMPTY_FORM(S.items[0], ym))}>＋ 記一筆收款</button>
         <span className="text-xs text-tx3 ml-auto">{status}</span>
       </div>
+
+      {pendingAll.length > 0 && (
+        <div className={`${card} border-danger`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+            <h2 className={`${h2} border-danger`}>待查帳：{pendingAll.length} 筆・{F(pendingAll.reduce((a, r) => a + netOf(r), 0))}</h2>
+            <span className="text-xs text-tx3">教練記的顧問費，對過銀行明細就按「確認入帳」；確認後才進營業額、分潤匯款與實績</span>
+          </div>
+          <table className="w-full text-sm">
+            <thead><tr className="text-xs text-tx3"><th className="text-left py-1">收款日</th><th className="text-left">客戶</th><th className="text-left">執案教練</th><th className="text-left">後五碼</th><th className="text-right">金額</th><th /></tr></thead>
+            <tbody>
+              {pendingAll.map((r) => (
+                <tr key={r.id} className="border-t border-line">
+                  <td className="py-1.5 whitespace-nowrap">{r.on}</td>
+                  <td>{r.payer}</td>
+                  <td className="text-tx2">{coachList.find((c) => c.id === r.execCoachId)?.name ?? "—"}</td>
+                  <td className="text-tx2">{r.last5 || "—"}</td>
+                  <td className="text-right tabular-nums">{F(netOf(r))}</td>
+                  <td className="text-right whitespace-nowrap">
+                    <button className={`${btn} border-ok text-ok`} disabled={pending} onClick={() => verify(r, true)}>確認入帳</button>
+                    <button className={`${xbtn} ml-1`} disabled={pending} onClick={() => { setYm(r.ym); setEditing(r); }}>改</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* 首屏：錢去了哪裡 */}
       <div className={card}>

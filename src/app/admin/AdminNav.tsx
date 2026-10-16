@@ -57,6 +57,8 @@ export const ADMIN_GROUPS: { key: string; title: string; items: { href: string; 
       { href: "/admin/accounting/receipts", label: "收款明細" },
       { href: "/admin/accounting/payouts", label: "分潤匯款" },
       { href: "/admin/accounting/payees", label: "受款人" },
+      // 2026/10/16 現金帳：帳戶裡實際進出與應有餘額（收款／已匯自動，其他手記）。
+      { href: "/admin/accounting/cash", label: "現金帳" },
     ],
   },
   {

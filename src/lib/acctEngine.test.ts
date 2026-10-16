@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcReceipt, payoutsOf, netOf, annualFeeOf, settlementDate, referralChain, taxOf, resolvePayee, statementOf, statementMonths, normPayee, type PayeeRec, normReceipt, normParams, calcMonth, type AcctItem, calcTarget, compareMonth, suggestQty, calcData, normItems as normItems2, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, type AcctState } from "./acctEngine";
+import { calcReceipt, payoutsOf, netOf, annualFeeOf, settlementDate, referralChain, taxOf, resolvePayee, statementOf, statementMonths, normPayee, type PayeeRec, normReceipt, normParams, calcMonth, type AcctItem, calcTarget, compareMonth, suggestQty, calcData, normItems as normItems2, unitOf, breakeven, goalSolve, leverSensitivity, prevYm, nextYm, normItems, normMonth, normTarget, cashLedger, cashFixedStatus, unpaidPayouts, unpaidCsvRows, UNPAID_CSV_HEADERS, type AcctState } from "./acctEngine";
 
 // 原型（docs/帳務後台_原型.html）的示範資料——2026-09 那一個月。
 const S: AcctState = {
@@ -418,5 +418,77 @@ describe("受款人簿與扣繳", () => {
     expect(normParams({ vatRate: 5 }).referralRates.CHIEF).toBe(30);
     expect(normParams({ vatRate: 5, referralRates: { CHIEF: 35 }, referralCap: 40, annualFee: { S3: 20000 } })).toMatchObject({ referralCap: 40, referralRates: { CHIEF: 35, S3: 25 }, annualFee: { S3: 20000, C1: 6000 } });
     expect(normParams({ vatRate: 5, tax: { withholdRate: "x", nhiRate: 2.11, threshold: 0 } }).tax).toEqual({ withholdRate: 10, nhiRate: 2.11, threshold: 0 });
+  });
+});
+
+describe("現金帳與尚未匯款總表（2026/10/16）", () => {
+  const rc = (id: string, itemId: string, on: string, amount: number, payer: string, extra: Record<string, unknown> = {}) => normReceipt({ itemId, on, amount, payer, sharers: [], payees: {}, ...extra }, id);
+  const book: PayeeRec[] = [
+    { id: "pa", coachId: "c-chiu", name: "邱浩軍", bankCode: "808", bankName: "玉山", branch: "中和", accountName: "邱浩軍", accountNo: "0012345678", taxMode: "withhold", note: "" },
+  ];
+  const S5: AcctState = {
+    items: [ITEMS.annual, ITEMS.train], months: { "2026-09": { qty: {}, fixed: [{ name: "記帳費", amt: 3000 }, { name: "商業登記", amt: 2000 }] } },
+    targets: {}, draft: null, params: P, goal: { netTarget: 0 }, payeeBook: book, coachList: [{ id: "c-chiu", name: "邱浩軍" }],
+    receipts: {
+      "2026-08": [rc("r0", "annual", "2026-08-20", 6000, "八月的人")],
+      "2026-09": [
+        rc("r1", "annual", "2026-09-02", 6000, "A"),
+        rc("r2", "train", "2026-09-22", 9800, "B", { sharers: [{ name: "邱浩軍", coachId: "c-chiu", rankCode: "CHIEF" }] }),
+        rc("r3", "annual", "2026-09-10", 6000, "待查的", { execCoachId: "c-chiu", verified: false }),
+        { ...rc("r4", "annual", "2026-09-11", 6000, "作廢的"), void: true },
+      ],
+    },
+    payouts: { "2026-08": { "n:創造共好": { paidOn: "2026-09-05", amount: 4800, note: "" } }, "2026-09": { "p:pa": { paidOn: "", amount: 1000, note: "" } } },
+    cash: { opening: { amount: 10000, from: "2026-08-01" }, entries: [
+      { id: "e1", on: "2026-09-15", kind: "out", amount: 3000, cat: "固定支出", name: "記帳費", note: "" },
+      { id: "e2", on: "2026-09-03", kind: "in", amount: 500, cat: "其他收入", name: "利息", note: "" },
+    ] },
+  };
+  it("normReceipt：沒帶 source 但有執案教練 → coach（待查帳的確認鈕靠這個出現）", () => {
+    expect(normReceipt({ itemId: "annual", on: "2026-09-10", amount: 6000, execCoachId: "c-x" }, "x").source).toBe("coach");
+    expect(normReceipt({ itemId: "annual", on: "2026-09-10", amount: 6000 }, "x").source).toBe("manual");
+    expect(normReceipt({ itemId: "annual", on: "2026-09-10", amount: 6000, source: "case", execCoachId: "c-x" }, "x").source).toBe("case");
+  });
+  it("日記帳：已確認收款流入、已匯流出、手記列；作廢與待查帳不進；按日期累計餘額", () => {
+    const L = cashLedger(S5);
+    expect(L.rows.map((r) => r.id)).toEqual(["r:r0", "r:r1", "e2", "p:2026-08:n:創造共好", "e1", "r:r2", "p:2026-09:p:pa"]);
+    expect(L.rows.find((r) => r.id === "p:2026-09:p:pa")!.on).toBe("2026-10-05");   // 沒填匯款日＝發放日
+    expect(L.rows.find((r) => r.id === "p:2026-09:p:pa")!.name).toContain("邱浩軍");
+    expect(L.inflow).toBe(6000 + 6000 + 500 + 9800);
+    expect(L.outflow).toBe(4800 + 3000 + 1000);
+    expect(L.balance).toBe(10000 + L.inflow - L.outflow);
+    expect(L.rows[L.rows.length - 1].balance).toBe(L.balance);
+    expect(L.warns).toEqual([]);
+  });
+  it("逐月現金流量：期初接上月期末、流入流出分開、期末＝最後一筆餘額", () => {
+    const L = cashLedger(S5);
+    expect(L.months.map((m) => m.ym)).toEqual(["2026-08", "2026-09", "2026-10"]);
+    const [aug, sep, oct] = L.months;
+    expect(aug.opening).toBe(10000); expect(aug.inflow).toBe(6000); expect(aug.outflow).toBe(0); expect(aug.closing).toBe(16000);
+    expect(sep.opening).toBe(16000); expect(sep.inflow).toBe(6000 + 500 + 9800); expect(sep.outflow).toBe(4800 + 3000);
+    expect(sep.closing).toBe(16000 + 16300 - 7800);
+    expect(sep.byCat["固定支出"]).toBe(-3000);
+    expect(oct.opening).toBe(sep.closing); expect(oct.closing).toBe(sep.closing - 1000);
+  });
+  it("固定支出實付狀態：同月同名的固定支出手記＝已付", () => {
+    const f = cashFixedStatus(S5, "2026-09");
+    expect(f.map((x) => [x.name, !!x.paid])).toEqual([["記帳費", true], ["商業登記", false]]);
+    expect(cashFixedStatus(S5, "2026-10")).toEqual([]);
+  });
+  it("期初日之後才有進出才不警示；有更早的列就提醒", () => {
+    const L = cashLedger({ ...S5, cash: { opening: { amount: 0, from: "2026-09-01" }, entries: [] } });
+    expect(L.warns.length).toBe(1);
+  });
+  it("尚未匯款總表：跨月、只列還要匯 > 0 的、按結算月排、帶發放日；匯出列帶帳號與扣繳", () => {
+    const u = unpaidPayouts(S5);
+    // 2026-08：創造共好 4,800 已全匯 → 不列；2026-09：創造共好 4,800＋600、講師一 3,440、邱浩軍 2,940 − 已匯 1,000、講師二 860（同月按應付高→低）
+    expect(u.rows.map((r) => [r.ym, r.line.payee, Math.round(r.line.remaining)])).toEqual([["2026-09", "創造共好", 5400], ["2026-09", "講師一", 3440], ["2026-09", "邱浩軍", 1940], ["2026-09", "講師二", 860]]);
+    expect(u.byYm).toEqual([{ ym: "2026-09", payDate: "2026-10-05", n: 4, total: u.total }]);
+    expect(Math.round(u.total)).toBe(11640);
+    const rows = unpaidCsvRows(S5);
+    expect(rows.length).toBe(4);
+    expect(rows[0].length).toBe(UNPAID_CSV_HEADERS.length);
+    expect(rows[2]).toEqual(["2026-09", "2026-10-05", "邱浩軍", "808", "玉山", "中和", "邱浩軍", "0012345678", "扣執行業務所得", "2940", "0", "2940", "1000", "1940"]);
+    expect(rows[0][8]).toBe("未建受款人");
   });
 });

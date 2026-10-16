@@ -351,6 +351,13 @@
       "when": 1791558702799,
       "tag": "0049_acct_receipts_consult",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792094568893,
+      "tag": "0050_acct_cash",
+      "breakpoints": true
     }
   ]
 }

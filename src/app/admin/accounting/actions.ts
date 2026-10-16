@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget, saveAcctDraft, setAcctEntryVoid, backfillAcctMonth, saveAcctReceipt, deleteAcctReceipt, markAcctPayout, savePayee, deletePayee, verifyAcctReceipt } from "@/lib/acctStore";
+import { saveAcctItems, saveAcctParams, saveAcctGoal, saveAcctMonth, ensureAcctMonth, deleteAcctMonth, saveAcctTarget, deleteAcctTarget, saveAcctDraft, setAcctEntryVoid, backfillAcctMonth, saveAcctReceipt, deleteAcctReceipt, markAcctPayout, savePayee, deletePayee, verifyAcctReceipt, saveCashOpening, saveCashEntry, deleteCashEntry } from "@/lib/acctStore";
 
 export type ActionResult = { ok: true; info?: string } | { ok: false; error: string };
 
@@ -78,4 +78,15 @@ export async function deletePayeeAction(id: string): Promise<ActionResult> {
 }
 export async function verifyAcctReceiptAction(id: string, v: boolean): Promise<ActionResult> {
   try { await guard(); await verifyAcctReceipt(id, v); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+
+// 現金帳（2026/10/16）
+export async function saveCashOpeningAction(value: unknown): Promise<ActionResult> {
+  try { await guard(); await saveCashOpening(value); refresh(); return { ok: true }; } catch (e) { return fail(e); }
+}
+export async function saveCashEntryAction(id: string | null, value: unknown): Promise<ActionResult> {
+  try { await guard(); const x = await saveCashEntry(id, value); refresh(); return { ok: true, info: x }; } catch (e) { return fail(e); }
+}
+export async function deleteCashEntryAction(id: string): Promise<ActionResult> {
+  try { await guard(); await deleteCashEntry(id); refresh(); return { ok: true }; } catch (e) { return fail(e); }
 }

@@ -1368,6 +1368,22 @@ export const acctPayouts = pgTable('acct_payouts', {
 }, (t) => [
   uniqueIndex('acct_payouts_ym_payee_uq').on(t.ym, t.payee),
 ]);
+// 現金帳手記（2026/10/16 Ray：要看得到實際帳戶明細、現金流量表、帳戶裡應該有多少錢）。
+// 收款（已確認）與分潤「已匯」自動進日記帳、不存這裡；這張表只存手記的那些（固定支出實付、稅費、其他收支）。
+// 期初餘額存 acct_params key='cash'（{amount, from}）。計算在 acctEngine.cashLedger。
+export const acctCash = pgTable('acct_cash', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  on: date('on').notNull(),
+  kind: text('kind').default('out').notNull(),       // in／out
+  amount: doublePrecision('amount').default(0).notNull(),
+  cat: text('cat').default('').notNull(),            // 固定支出／稅費／其他支出／其他收入…
+  name: text('name').default('').notNull(),
+  note: text('note').default('').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('acct_cash_on_idx').on(t.on),
+]);
 // 受款人簿（2026/10/08 Ray：每個人的個人資料可填銀行帳號，分潤直接對上變成每個人的對帳表）。
 // 教練一人一列（coach_id 唯一，教練端「收款設定」自填、後台可改）；外部受款人（創造共好、講師、場地）coach_id 為空。
 // tax_mode：invoice＝開發票（實匯＝應付、要收發票）／withhold＝扣執行業務所得（同月合計達起扣點才扣 10%＋補充保費 2.11%）／空＝未設定。
