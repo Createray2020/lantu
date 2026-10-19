@@ -30,6 +30,7 @@ export type Visitor = {
   lastLoginAt: Date | null;
   loginCount: number;
   clientCode: string | null;   // 客戶編號（存過護照才有）
+  referrer: string | null;     // 推薦來源（教練編號＋名字；護照連結帶進來的，不是歸屬）
   passport: PassportState;
   coach: CoachState;
   apply: ApplyState;
@@ -47,7 +48,7 @@ export type VisitorStats = {
 
 // ── 純函式：把各表撈回來的東西併成一列一位訪客 ──────────────────────
 export type ShapeInput = {
-  users: { id: string; name: string | null; email: string | null; status: string; createdAt: Date; lastLoginAt: Date | null; loginCount: number }[];
+  users: { id: string; name: string | null; email: string | null; status: string; createdAt: Date; lastLoginAt: Date | null; loginCount: number; referrerCoachId?: string | null; referrerCode?: string | null }[];
   clients: { id: string; clientUserId: string | null; coachId: string | null; code: string | null }[];
   plans: { clientId: string; updatedAt: Date; healthGrade: string | null }[];
   pendingLinks: { clientId: string; coachId: string }[];
@@ -106,6 +107,7 @@ export function shapeVisitors(input: ShapeInput): Visitor[] {
       lastLoginAt: u.lastLoginAt,
       loginCount: u.loginCount,
       clientCode: client?.code ?? null,
+      referrer: u.referrerCode ? (u.referrerCode + (u.referrerCoachId && input.coachNames[u.referrerCoachId] ? " " + input.coachNames[u.referrerCoachId] : "")) : null,
       passport: { saved: !!plan, updatedAt: plan?.updatedAt ?? null, healthGrade: plan?.healthGrade ?? null },
       coach,
       apply,
@@ -144,6 +146,7 @@ export async function listVisitors(): Promise<Visitor[]> {
       id: clientUsers.id, name: clientUsers.name, email: clientUsers.email,
       status: clientUsers.status, createdAt: clientUsers.createdAt,
       lastLoginAt: clientUsers.lastLoginAt, loginCount: clientUsers.loginCount,
+      referrerCoachId: clientUsers.referrerCoachId, referrerCode: clientUsers.referrerCode,
     })
     .from(clientUsers)
     .orderBy(desc(clientUsers.createdAt));

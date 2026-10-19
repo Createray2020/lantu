@@ -27,6 +27,7 @@ export default async function VisitorsPage() {
     lastLoginAt: v.lastLoginAt ? v.lastLoginAt.toISOString() : null,
     loginCount: v.loginCount,
     clientCode: v.clientCode,
+    referrer: v.referrer,
     passportSaved: v.passport.saved,
     passportAt: v.passport.updatedAt ? v.passport.updatedAt.toISOString() : null,
     healthGrade: v.passport.healthGrade,

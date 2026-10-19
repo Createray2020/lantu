@@ -13,6 +13,7 @@ export type VisitorRow = {
   lastLoginAt: string | null;
   loginCount: number;
   clientCode: string | null;
+  referrer: string | null;
   passportSaved: boolean;
   passportAt: string | null;
   healthGrade: string | null;
@@ -84,7 +85,7 @@ export default function VisitorsBoard({ rows, stats, now }: { rows: VisitorRow[]
       if (tab === "applying" && !(r.applyState === "introducer" || r.applyState === "review")) return false;
       if (tab === "idle" && r.loginCount > 1) return false;
       if (!kw) return true;
-      return [r.name, r.email, r.clientCode, r.coachName].some((v) => (v ?? "").toLowerCase().includes(kw));
+      return [r.name, r.email, r.clientCode, r.coachName, r.referrer].some((v) => (v ?? "").toLowerCase().includes(kw));
     });
   }, [rows, tab, q, now]);
 
@@ -159,6 +160,7 @@ export default function VisitorsBoard({ rows, stats, now }: { rows: VisitorRow[]
                   </div>
                   <div className="text-tx3 text-11">{r.email || "—"}</div>
                   {r.clientCode && <div className="text-tx3 text-11">編號 {r.clientCode}</div>}
+                  {r.referrer && <div className="text-tx3 text-11" title="護照連結帶進來的推薦來源，不是指定教練">推薦來源 {r.referrer}</div>}
                 </td>
                 <td className="px-3 py-2 text-tx2 whitespace-nowrap">{fmtDay(r.createdAt)}</td>
                 <td className="px-3 py-2 whitespace-nowrap">

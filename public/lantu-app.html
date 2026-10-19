@@ -5118,8 +5118,19 @@ function stageBandInner(h){
  var mt='<div style="margin-top:12px"><div class="subhd">三項指標怎麼算</div><table class="rtable">'+
   STAGE_METRICS.map(function(m){return '<tr><td class="k" style="white-space:nowrap">'+m[0]+'</td><td style="font-size:12.5px">'+m[1]+'</td></tr>'}).join('')+'</table></div>';
  var note='<div class="hint" style="display:block;margin:8px 0 0;line-height:1.6">判定是<b>關卡制</b>不是分數區間：依序檢查「安全度與收支 → 財務自由度 → 願景達成度」，任何一關未過就停在該階段。階段代表的是旅程位置與當前該做的事，<b>不是好壞評價</b>——同一階段的成因可能完全不同，上方那句話會指出本次最關鍵的那一項。</div>';
- return head+scores+tbl+mt+note;
+ // 2026/10/20：判定依據與參考來源＋免責（上線前待辦本來就缺這一句）。
+ var src='<div style="margin-top:10px"><div class="subhd">判定依據與參考來源</div><div class="hint" style="display:block;line-height:1.8">'+
+  STAGE_SOURCES.map(function(x){return '<a href="'+x[1]+'" target="_blank" rel="noopener" style="color:var(--amber2)">'+x[0]+'</a>'}).join('　·　')+
+  '<div style="margin-top:4px">'+STAGE_DISCLAIMER+'</div></div></div>';
+ return head+scores+tbl+mt+note+src;
 }
+var STAGE_SOURCES=[
+ ['中華民國財金智慧教育推廣協會 KEYs 關鍵理財網','https://www.holdingkeys.org/'],
+ ['勞動部勞工保險局（勞保／勞退）','https://www.bli.gov.tw/'],
+ ['衛生福利部中央健康保險署（健保費率）','https://www.nhi.gov.tw/'],
+ ['金融監督管理委員會（保險與金融消費）','https://www.fsc.gov.tw/']
+];
+var STAGE_DISCLAIMER='本判定為財務教練健診的參考框架，不是金融機構授信評分，也不構成投資、稅務或法律建議；數字以客戶填寫的資料與公開法定參數計算，實際情況請與教練討論。';
 function stageDetailHTML(h){return detailBox('財務階段是怎麼判定的',stageBandInner(h));}
 // 報告書用：PDF 展不開，改成固定小字的一行式對照
 function stageReportNote(h){
@@ -5129,7 +5140,7 @@ function stageReportNote(h){
  }).join('<span style="color:#b8c4c8;margin:0 6px">→</span>');
  return '<div style="margin-top:10px;font-size:10.5px;line-height:1.8;color:#5a6b72">'+
   '<b style="color:#33474e">財務階段判定標準</b>　'+line+
-  '<div style="margin-top:3px">安全度＝收支平衡×25＋預備金×15＋信用×15＋負債平衡×15＋風險保全×30（滿分 100）；自由度＝理財收入÷總支出；願景達成度＝1−(現值缺口÷一生需求現值)。依序檢查，任一關未過即停在該階段；階段代表旅程位置，非好壞評價。</div></div>';
+  '<div style="margin-top:3px">安全度＝收支平衡×25＋預備金×15＋信用×15＋負債平衡×15＋風險保全×30（滿分 100）；自由度＝理財收入÷總支出；願景達成度＝1−(現值缺口÷一生需求現值)。依序檢查，任一關未過即停在該階段；階段代表旅程位置，非好壞評價。</div><div style="margin-top:3px">'+STAGE_DISCLAIMER+'</div></div>';
 }
 var GRADE_STRAT={A:STAGE.A.task,B:STAGE.B.task,C:STAGE.C.task,D:STAGE.D.task};
 function advice(c){
@@ -7042,6 +7053,31 @@ function retireLineHTML(c){
 // ⚠️⚠️ 這一支是 data-calc="retireHero" 的重繪內容，**整支被 innerHTML 換掉**：
 //    裡面永遠不可以放輸入框（三個參數輸入框留在容器外面，見 retireSec）。
 //    首屏只留「總需求／已準備／缺口」三格——餘年與月生活費終值是中間值，收進明細。
+/* ===== 退休三情境速覽（2026/10/20）=====
+   保守／穩健／積極三欄，報酬率直接用風險屬性問卷的 RISK_TIERS.rr（3／5／6.5%）。
+   每欄都是 clone 後 params.invReturn=rr＋plan.useAllocReturn=false（同 anTuneCase 的做法——
+   useAllocReturn 開著時 effReturn 根本不看 invReturn），其餘一字不動，只是「看看如果」。
+   KYC 算得出屬性時標「你的屬性」。純唯讀，絕不寫回；正本仍是 effReturn(c)。 */
+var RETIRE_SCEN=[['保守',0],['穩健',1],['積極',2]];
+function retireScenarios(c){
+ var rp=riskProfile(c),mine=rp?rp.tier.name:null;
+ return RETIRE_SCEN.map(function(s){
+  var tier=RISK_TIERS[s[1]],t=JSON.parse(JSON.stringify(c));
+  t.params=t.params||{};t.params.invReturn=tier.rr;t.plan=t.plan||{};t.plan.useAllocReturn=false;
+  var p=projection(t),ok=null;(p.events||[]).forEach(function(e){if(e.kind==='retire')ok=e.ok});
+  return {name:s[0],rr:tier.rr,mine:mine===tier.name,turnNeg:p.turnNeg,shortPV:n(p.shortPV),retireOk:ok};
+ });
+}
+function retireScenHTML(c){
+ var rows;try{rows=retireScenarios(c);}catch(e){return '';}
+ var cur=effReturn(c);
+ return '<div class="sec" id="retireScen"><h4>三種報酬率，退休差多少 <span class="hint">目前規劃用 '+cur.toFixed(1)+'%；下面三欄只是對照，不會改任何存檔值</span></h4><div class="kpis">'+
+  rows.map(function(r){
+   return '<div class="kpi"'+(r.mine?' style="outline:1px solid var(--amber2)"':'')+'><div class="lb">'+r.name+' '+r.rr.toFixed(1)+'%'+(r.mine?' <span style="color:var(--amber2)">· 你的屬性</span>':'')+'</div>'+
+    '<div class="vv">'+(r.turnNeg?'<span class="w">'+r.turnNeg+' 歲</span>':'<span class="o">期間內夠用</span>')+'</div>'+
+    '<small>'+(r.turnNeg?'存量用完的年齡':'存量期間內未用完')+(r.shortPV>0.5?' · 現值缺口 '+cfAxis(r.shortPV):'')+' · 退休生活 '+(r.retireOk===false?'<b class="w">✕</b>':'<b class="o">✓</b>')+'</small></div>';
+  }).join('')+'</div></div>';
+}
 function retireHeroHTML(c){
  var rn=retireNeed(c);
  if(rn.valid===false)return retireInvalidHTML(c);
@@ -7052,7 +7088,7 @@ function retireHeroHTML(c){
  var mid='<div class="big3" style="margin-bottom:0">'+
   '<div class="b"><div class="l">退休後餘年</div><div class="v">'+rn.余年+' 年</div></div>'+
   '<div class="b"><div class="l">退休月生活費(終值)</div><div class="v">'+fmt(rn.monthFV)+'</div></div></div>';
- return retireAssumedHTML(c)+big+
+ return retireAssumedHTML(c)+big+retireScenHTML(c)+
   foldHTML('中間值與計算明細（餘年 · 月生活費終值 · 逐步試算）',mid+retireDetailHTML(c));
 }
 /* ===== 前置條件列 =====
@@ -10513,6 +10549,37 @@ function flowEntryHTML(c){
   '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="muted">下面的九個折疊維持原樣。</span><button class="tbtn amber" onclick="flowStart()">開始願景處理流程 →</button></div></div>';
 }
 
+/* ===== 本季先動這三件（2026/10/20）=====
+   動作清單完整但一進去就是全部。首屏上方給三張卡：改善最大、投入最輕的三個動作。
+   改善幅度＝「把這一個動作關掉，現值缺口會多出多少」（clone 投影，不寫回）；
+   可負擔性＝每月投入相對月結餘。只是排序與摘要，清單本體與任何引擎都不動。 */
+function planTop3(c){
+ var acts=planActionsOn(c);if(!acts.length)return [];
+ var base=gapPV(c),L=actionLedger(c),left=Math.max(1,n(L.left)+sum(acts,function(a){return a.cat==='regular'?n(a.payMonthly):0}));
+ var catName={};ACT_CATS.forEach(function(x){catName[x.k]=x.n});
+ var out=acts.map(function(a){
+  var t=JSON.parse(JSON.stringify(c));
+  t.actions=(t.actions||[]).map(function(x){return (x&&x.id===a.id)?Object.assign({},x,{on:false}):x});
+  var gain=Math.max(0,gapPV(t)-base);
+  var cover=a.cat==='insure'?n(a.cover):0;
+  var cost=n(a.payMonthly)||0,lump=n(a.payLump)||0;
+  // 保障動作不進現值缺口（它補的是保障缺口），用保額當它的「改善」排在同一把尺上。
+  var score=(gain+cover)/(1+cost/left+(lump>0?0.5:0));
+  return {a:a,cat:catName[a.cat]||a.cat||'動作',gain:gain,cover:cover,cost:cost,lump:lump,score:score};
+ });
+ out.sort(function(x,y){return y.score-x.score});
+ return out.slice(0,3);
+}
+function planTop3HTML(c){
+ var top;try{top=planTop3(c);}catch(e){return '';}
+ if(!top.length)return '';
+ var cards=top.map(function(x,i){
+  var money=x.cost>0?'每月 '+fmt(x.cost):(x.lump>0?'單筆 '+fmt(x.lump):(n(x.a.getMonthly)>0?'每月 '+fmt(n(x.a.getMonthly)):(n(x.a.getLump)>0?'一次 '+fmt(n(x.a.getLump)):'—')));
+  var eff=x.cover>0?'補保障缺口 '+cfAxis(x.cover):(x.gain>0.5?'現值缺口少 '+cfAxis(x.gain):'改善在圖上看');
+  return '<div class="kpi" style="text-align:left"><div class="lb">'+(i+1)+'　'+esc(x.cat)+'</div><div class="vv" style="font-size:15px;line-height:1.4">'+esc(x.a.name||x.cat)+'</div><small>'+money+' · '+eff+'</small></div>';
+ }).join('');
+ return '<div class="sec" id="planTop3"><h4>本季先動這三件 <span class="hint">從動作清單裡挑改善最大、投入最輕的三個；完整清單在下面「調整動作清單」折疊裡</span></h4><div class="kpis">'+cards+'</div></div>';
+}
 function planSec(c){
  var p=c.plan||{};
  var led=gapLedger(c),solo=soloSolve(c),gate=solo.gate,rxs=prescriptions(c);
@@ -10545,7 +10612,7 @@ function planSec(c){
   foldSec('真實追蹤','逐年實際淨資產疊到規劃線（有流程時在 S8 回訪對帳裡對帳）',trackingSec(c));
  // 2026/09/28 Ray：方案最上面用「全生涯財務流」開頭（同分析頁那張圖），缺口從這裡抓；願景歷程收進折疊第一格。
  var vf=foldSec('願景歷程','灰線＝現況、金線＝套用動作後；旗子 ✓ 做得到、✕ 做不到',planHeroV2(c),false);
- return '<div data-ivsec="flow" data-ivname="願景處理流程">'+flowTuneHeroHTML(c)+
+ return '<div data-ivsec="flow" data-ivname="願景處理流程">'+flowTuneHeroHTML(c)+planTop3HTML(c)+
   (fl?flowSec(c)+foldSec('更多診斷（v2 既有折疊，原樣保留）','願景歷程、配額對帳、動作清單、資金勾稽、拉桿與處方…都在這裡',vf+folds,false):flowEntryHTML(c)+vf+folds)+
   '</div>';
 }
@@ -17426,15 +17493,36 @@ function reportPane(c){
     (hasBiz?btn('biz','企業主財務診斷書'):'')+'</div>'+
     '<div class="hint" style="margin-top:8px">報告書回答「你現在怎麼樣」，方案書回答「所以要做什麼」——後者是要跟客戶逐條對過去的東西，混在一起會被前面的篇幅淹掉。'+
     (hasBiz?'<b>合規閘燈號只出現在診斷書，不會進客戶版報告書。</b>':'')+'</div></div>';
+ sw+=rThemePickHTML();
  if(isBiz)return '<div style="margin-bottom:10px" class="muted">企業主財務診斷書預覽，右上「列印報告」輸出 PDF。</div>'+sw+
   '<div class="sec"><h4>教練總結（診斷書用）</h4><textarea onchange="setCase(\'bizReportNote\',this.value)" placeholder="例：目前最急的是連帶保證的保障缺口與公私帳分離，投資與傳承建議暫緩…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.bizReportNote||'')+'</textarea></div>'+
-  bizReportHTML(c);
+  rTheme(bizReportHTML(c));
  if(isPlan)return '<div style="margin-bottom:10px" class="muted">調整方案書預覽，右上「列印報告」輸出 PDF。內容全部取自「調整方案」分頁採用的方案。</div>'+sw+
   '<div class="sec"><h4>教練總結（方案書用）</h4><textarea onchange="setCase(\'planNote\',this.value)" placeholder="例：這一輪先把支出結構調下來，投資報酬率的部分等預備金補滿再談…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.planNote||'')+'</textarea></div>'+
-  planReportHTML(c);
+  rTheme(planReportHTML(c));
  return '<div style="margin-bottom:10px" class="muted">客戶交付報告預覽（圖表化），右上「列印報告」輸出 PDF。</div>'+sw+
  '<div class="sec"><h4>教練總結 <span class="hint">教練可編輯；填寫後會出現在報告書結尾（客戶版）</span></h4><textarea onchange="setCase(\'reportNote\',this.value)" placeholder="例：整體財務結構穩健，建議優先補強壽險缺口與提高緊急預備金…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.reportNote||'')+'</textarea></div>'+
- reportHTML(c)}
+ rTheme(reportHTML(c))}
+/* ===== 報告書配色（2026/10/20）=====
+   報告書的顏色全是行內 hex（列印用淺色稿，不走全站 token），CSS 蓋不到，所以配色是對
+   輸出的 HTML 做色碼對照替換。三套：經典（原樣）／墨金／高對比。選擇存 localStorage，
+   三份報告書（客戶版／方案書／診斷書）都吃同一個選擇。 */
+var R_THEMES={
+ classic:{name:'經典',map:{}},
+ ink:{name:'墨金',map:{'#0d2b45':'#10233a','#c99a5b':'#b8893f','#faf7f1':'#f4efe4','#fffdf8':'#faf6ec','#e4dccf':'#d8ccb8','#33474e':'#2b3a40','#5a6b72':'#55636b','#a9bccf':'#8fa3b8','#8a6f3c':'#7a5f2c'}},
+ hc:{name:'高對比',map:{'#0d2b45':'#000000','#c99a5b':'#8a5a12','#faf7f1':'#ffffff','#fffdf8':'#ffffff','#e4dccf':'#8c8c8c','#33474e':'#111111','#5a6b72':'#333333','#a9bccf':'#555555','#8a6f3c':'#5a3a00','#3f7d54':'#146b2a','#b5852f':'#8a5500','#b05a4a':'#b00020','#6f8f74':'#146b2a','#e2e8ea':'#bfbfbf','#b8c4c8':'#777777','#7f97ac':'#2f4f6f'}}
+};
+function rThemeKey(){try{var k=localStorage.getItem('lantu.reportTheme');return R_THEMES[k]?k:'classic';}catch(e){return 'classic';}}
+function rThemePick(k){try{localStorage.setItem('lantu.reportTheme',R_THEMES[k]?k:'classic');}catch(e){}render();}
+function rTheme(html){
+ var m=R_THEMES[rThemeKey()].map,ks=Object.keys(m);if(!ks.length)return html;
+ return String(html).replace(/#[0-9a-fA-F]{6}\b/g,function(h){var l=h.toLowerCase();return m.hasOwnProperty(l)?m[l]:h;});
+}
+function rThemePickHTML(){
+ var cur=rThemeKey();
+ return '<div class="sec"><h4>報告配色 <span class="hint">三份報告書共用；只改顏色，內容與版面不變</span></h4><div style="display:flex;gap:8px;flex-wrap:wrap">'+
+  Object.keys(R_THEMES).map(function(k){return '<button class="tbtn'+(cur===k?' amber':'')+'" onclick="rThemePick(\''+k+'\')">'+R_THEMES[k].name+'</button>'}).join('')+'</div></div>';
+}
 /* ===== 報告用淺色圖表元件 ===== */
 var RCOL=['#0d2b45','#c99a5b','#7f97ac','#8ba888','#b07d3d','#b05a4a','#5a7186','#cbb488'];
 function rGauge(t,v){v=Math.max(0,Math.min(100,v));var col=v>=70?'#6f8f74':v>=40?'#c99a5b':'#b05a4a';

@@ -358,6 +358,13 @@
       "when": 1792094568893,
       "tag": "0050_acct_cash",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792441285908,
+      "tag": "0051_client_referral",
+      "breakpoints": true
     }
   ]
 }

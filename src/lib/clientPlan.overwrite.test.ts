@@ -43,7 +43,7 @@ const { emptyPassport } = await import("./passport");
 
 // 2026/09/09 新增訪客足跡三欄（見 schema 的 client_users）——這裡是型別完整的假使用者。
 const user = { id: "u1", name: "小明", email: null, status: "active", createdAt: new Date(),
-  lastLoginAt: null, loginCount: 0, lastSessionId: null };
+  lastLoginAt: null, loginCount: 0, lastSessionId: null, referrerCoachId: null, referrerCode: null, referredAt: null };
 
 beforeEach(() => { state.clientRows = []; state.planRows = []; state.writes = []; });
 

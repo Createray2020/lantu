@@ -3,6 +3,8 @@
 // 註：教練與客戶不互斥——同一個帳號可同時是教練也是客戶（自己的財務規劃）。
 //     介面看你進到哪個區域（/portal＝客戶、/dashboard＝教練），不由身分綁死。
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
+import { REF_COOKIE, attachReferral } from "./referral";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clientLoginEvents, clientUsers } from "@/Shared/db/schema";
@@ -38,6 +40,19 @@ export async function ensureClientUser(): Promise<ClientUser | null> {
   // 與 ensureCoach 的 pending/suspended 判斷對稱。
   if (row && row.status !== "active") return null;
   if (row) await recordLogin(row);
+  // 推薦來源：護照連結帶進來的 cookie，列上還沒有來源時補上（first-touch）。失敗只吞掉。
+  if (row && !row.referrerCoachId) {
+    try {
+      const ref = (await cookies()).get(REF_COOKIE)?.value ?? null;
+      if (ref) {
+        const r = await attachReferral(row.id, ref);
+        if (r) return { ...row, referrerCoachId: r.coachId, referrerCode: r.code, referredAt: r.at };
+      }
+    } catch (e) {
+      // 測試或非請求情境下 cookies() 會丟「outside a request scope」，那不是錯誤，不印。
+      if (!/request scope/.test(String((e as Error)?.message))) console.error("[ensureClientUser] 推薦來源寫入失敗", e);
+    }
+  }
   return row;
 }
 

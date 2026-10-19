@@ -9,6 +9,10 @@ import { ensureActiveVersion, loadParams } from "@/lib/comp/repo";
 import ProfileEditor, { type ProfileForm } from "./ProfileEditor";
 import BankSettings from "./BankSettings";
 import { getMyPayee } from "@/lib/acctStore";
+import { headers } from "next/headers";
+import QRCode from "qrcode";
+import ReferralCard from "./ReferralCard";
+import { countReferred, referralPath } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +40,19 @@ export default async function ProfilePage() {
 
 
   const hp = await headerProps(me);
+  // 推薦連結：用這次請求的 host 組絕對網址（Vercel 預覽與正式網域都對）。沒有教練編號就不給卡。
+  let referral: { url: string; qrSvg: string; referred: number } | null = null;
+  if (me.code) {
+    const h = await headers();
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+    const url = `${proto}://${host}${referralPath(me.code)}`;
+    const [qrSvg, referred] = await Promise.all([
+      QRCode.toString(url, { type: "svg", margin: 1, errorCorrectionLevel: "M" }).catch(() => ""),
+      countReferred(me.id).catch(() => 0),
+    ]);
+    referral = { url, qrSvg, referred };
+  }
 
   return (
     <main className="flex-1 bg-canvas text-tx min-h-screen">
@@ -64,6 +81,8 @@ export default async function ProfilePage() {
             輸入就能直接把連結申請送給你（一樣要你按接受才會掛上）。
           </p>
         </div>
+
+        {referral && <ReferralCard url={referral.url} qrSvg={referral.qrSvg} referred={referral.referred} />}
 
         <ProfileEditor
           initial={initial}

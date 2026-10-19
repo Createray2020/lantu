@@ -126,6 +126,13 @@ export const clientUsers = pgTable('client_users', {
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   loginCount: integer('login_count').default(0).notNull(),
   lastSessionId: text('last_session_id'),
+  // ── 推薦來源標記（2026/10/20 Ray 定案：只記來源、不碰歸屬）──────────────
+  // 教練分享帶 FC 碼的護照連結（/r/FC2609002），客戶第一次建帳號時記下是誰帶進來的。
+  // ⚠️ 這三欄**不是**客戶歸屬：歸屬仍走派案閘／客戶輸入教練編號／教練接受連結那條路。
+  //    first-touch：一旦有值就不再覆蓋（之後要不要讓它影響派案或分潤，是帳務後台的題目）。
+  referrerCoachId: text('referrer_coach_id').references(() => coaches.id, { onDelete: 'set null' }),
+  referrerCode: text('referrer_code'),
+  referredAt: timestamp('referred_at', { withTimezone: true }),
 });
 
 // 訪客登入事件（2026/09/09 Ray 拍板：**全部保留、不設保存期限**，因為之後要做訪客行為分析）。

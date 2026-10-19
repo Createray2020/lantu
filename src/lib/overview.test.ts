@@ -115,3 +115,73 @@ describe("落點真的畫得出來（jsdom）", () => {
     expect(h.indexOf("本次健診總覽")).toBeLessThan(h.indexOf("財務健康總覽"));
   });
 });
+
+// ── 第二批（2026/10/20）：④ 方案頁三件摘要卡、⑦ 退休三情境、⑤ 階段說明參考來源、⑥ 報告書配色 ──
+describe("第二批落點（jsdom）", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let w: any;
+  async function boot(tab: string, dataTab?: string) {
+    const dom = new JSDOM(HTML, { runScripts: "dangerously", url: "https://lantu.test/" });
+    w = dom.window;
+    await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
+    w.app.role = "coach"; w.app.activeTab = tab; if (dataTab) w.app.dataTab = dataTab;
+    w.app.cases = [w.migrateCase(w.sampleCase())]; w.app.activeId = w.app.cases[0].id;
+    w.render();
+    return w.document.querySelector("#app").innerHTML as string;
+  }
+  it("④ 方案頁：沒有動作時不出現；有三個以上動作時剛好三張卡、改善大的排前面、清單本體不動", async () => {
+    let h = await boot("plan");
+    expect(h).not.toContain('id="planTop3"');
+    const c = w.app.cases[0];
+    c.actions = [
+      { id: "x1", on: true, cat: "regular", name: "定期定額 3 千", payMonthly: 3000, payFrom: 41, payTo: 60, growth: 5 },
+      { id: "x2", on: true, cat: "regular", name: "定期定額 3 萬", payMonthly: 30000, payFrom: 41, payTo: 60, growth: 5 },
+      { id: "x3", on: true, cat: "insure", name: "補壽險", payMonthly: 2000, cover: 5000000 },
+      { id: "x4", on: false, cat: "income", name: "關掉的", getMonthly: 99999 },
+    ];
+    w.render(); h = w.document.querySelector("#app").innerHTML;
+    expect(h).toContain('id="planTop3"');
+    const cards = w.document.querySelectorAll("#planTop3 .kpi");
+    expect(cards.length).toBe(3);
+    expect(w.document.getElementById("planTop3").textContent).not.toContain("關掉的");   // 清單本體會列，摘要卡不會
+    const top = w.planTop3(c);
+    expect(top[0].a.name).not.toBe("定期定額 3 千");          // 3 萬的改善一定大於 3 千
+    expect(JSON.stringify(c.actions).includes('"on":false')).toBe(true); // 沒寫回
+    expect(h).toContain("調整動作清單（3 個）");
+  });
+  it("⑦ 退休分頁：三欄報酬率＝RISK_TIERS 前三檔，純唯讀", async () => {
+    await boot("data", "retire");
+    const c = w.app.cases[0];
+    const before = JSON.stringify(c);
+    const rows = w.retireScenarios(c);
+    expect(rows.map((r: { rr: number }) => r.rr)).toEqual([3, 5, 6.5]);
+    expect(JSON.stringify(c)).toBe(before);
+    const html = w.retireHeroHTML(c) as string;
+    expect(html).toContain('id="retireScen"');
+    expect((html.match(/#retireScen|class="kpi"/g) || []).length).toBeGreaterThanOrEqual(3);
+  });
+  it("⑤ 階段說明：有參考來源連結與免責；報告書版也有免責", async () => {
+    await boot("analysis");
+    const c = w.app.cases[0];
+    const h = w.stageBandInner(w.health(c)) as string;
+    expect(h).toContain("判定依據與參考來源");
+    expect(h).toContain("holdingkeys.org");
+    expect(h).toContain("不構成投資、稅務或法律建議");
+    expect(w.stageReportNote(w.health(c))).toContain("不構成投資、稅務或法律建議");
+  });
+  it("⑥ 報告書配色：經典原樣、高對比把 navy 換成黑；選擇記在 localStorage", async () => {
+    await boot("report");
+    const c = w.app.cases[0];
+    const raw = w.reportHTML(c) as string;
+    expect(raw).toContain("#0d2b45");
+    expect(w.rTheme(raw)).toBe(raw);                      // classic
+    w.localStorage.setItem("lantu.reportTheme", "hc");
+    const hc = w.rTheme(raw) as string;
+    expect(hc).not.toContain("#0d2b45");
+    expect(hc).toContain("#000000");
+    expect(hc.length).toBe(raw.length);                   // 只換色碼，長度不變＝沒碰到內容
+    w.render();
+    expect(w.document.querySelector("#app").innerHTML).toContain("報告配色");
+    w.localStorage.removeItem("lantu.reportTheme");
+  });
+});
