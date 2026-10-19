@@ -14128,14 +14128,19 @@ function checkupDatesHTML(c){
 var STRESS_SPAN=24;
 function stressCalc(c){
  var m=metrics(c),months=n((c.params||{}).stressMonths)||3,oneOff=n((c.params||{}).stressOneOff)||0;
+ var cause=(c.params||{}).stressCause==='ill'?'ill':'job';
  var cash=n(m.liquid),mExp=n(m.monthExp),mInc=n(m.incTotal)/12,emReq=mExp*(n((c.params||{}).emergencyMonths)||6);
+ // 保單接進來（2026/10/20）：中斷原因是傷病時，主要成員的「薪資補償（月）」＋「薪資補償（日）」×30 當作中斷期間的月給付；
+ // 失業不理賠，給付 0。讀的是保障中心同一個 existingCover（保單表＋既有保障），不另估。
+ var pm=(primaryMember(c)||{}).name||'',comp=0;
+ if(cause==='ill'){try{comp=n(existingCover(c,pm,'薪資補償（月）'))+n(existingCover(c,pm,'薪資補償（日）'))*30;}catch(e){comp=0;}}
  var rows=[],zeroAt=null,low=cash;
  for(var i=1;i<=STRESS_SPAN;i++){
-  cash-=mExp;if(i>months)cash+=mInc;if(i===1)cash-=oneOff;
+  cash-=mExp;if(i>months)cash+=mInc;else cash+=comp;if(i===1)cash-=oneOff;
   rows.push({m:i,cash:cash});if(cash<low)low=cash;
   if(zeroAt===null&&cash<0)zeroAt=i;
  }
- return {months:months,oneOff:oneOff,start:n(m.liquid),mExp:mExp,mInc:mInc,emReq:emReq,rows:rows,zeroAt:zeroAt,low:low,
+ return {months:months,oneOff:oneOff,cause:cause,comp:comp,start:n(m.liquid),mExp:mExp,mInc:mInc,emReq:emReq,rows:rows,zeroAt:zeroAt,low:low,
   recover:mInc>mExp};
 }
 function stressSVG(S){
@@ -14161,24 +14166,34 @@ function stressSVG(S){
 }
 function stressDerivedHTML(c){
  var S=stressCalc(c);
+
+ var why=S.cause==='ill'?'傷病中斷':'失業中斷';
  var verdict=S.zeroAt
-  ?'<b class="w">第 '+S.zeroAt+' 個月見底</b>——收入中斷 '+S.months+' 個月'+(S.oneOff>0?'加 '+fmt(S.oneOff)+' 臨時支出':'')+'，可動用現金撐不到收入恢復。'
-  :'<b class="o">撐得過</b>——收入中斷 '+S.months+' 個月'+(S.oneOff>0?'加 '+fmt(S.oneOff)+' 臨時支出':'')+'，最低水位 '+cfAxis(S.low)+(S.low<S.emReq?'（已低於緊急預備金門檻）':'')+'。';
+  ?'<b class="w">第 '+S.zeroAt+' 個月見底</b>——'+why+' '+S.months+' 個月'+(S.oneOff>0?'加 '+fmt(S.oneOff)+' 臨時支出':'')+'，可動用現金撐不到收入恢復。'
+  :'<b class="o">撐得過</b>——'+why+' '+S.months+' 個月'+(S.oneOff>0?'加 '+fmt(S.oneOff)+' 臨時支出':'')+'，最低水位 '+cfAxis(S.low)+(S.low<S.emReq?'（已低於緊急預備金門檻）':'')+'。';
+ if(S.cause==='ill'&&S.comp<=0)verdict+=' 保單表沒有薪資補償類給付，傷病期間與失業一樣全靠現金。';
  if(!S.recover&&!S.zeroAt)verdict+=' 但收入恢復後月結餘仍為負，水位不會回升。';
  return '<div class="kpis">'+
-  [['可動用現金',cfAxis(S.start),'現金＋可變現資產'],['每月流出',cfAxis(S.mExp),'生活＋保險＋負債月付'],['收入恢復後月入',cfAxis(S.mInc),'目前月收入']]
+  [['可動用現金',cfAxis(S.start),'現金＋可變現資產'],['每月流出',cfAxis(S.mExp),'生活＋保險＋負債月付'],
+   S.cause==='ill'?['中斷期間保單月給付',S.comp>0?cfAxis(S.comp):'0','薪資補償（月）＋（日）×30，來自保單表']:['收入恢復後月入',cfAxis(S.mInc),'目前月收入']]
   .map(function(k){return '<div class="kpi"><div class="lb">'+k[0]+'</div><div class="vv">'+k[1]+'</div><small>'+k[2]+'</small></div>'}).join('')+'</div>'+
   stressSVG(S)+
   '<div class="hint" style="display:block;margin-top:6px;line-height:1.8;border-left:3px solid var(--amber2);padding-left:10px">'+verdict+'</div>';
 }
 function stressSec(c){
- var pa=c.params||{},cur=n(pa.stressMonths)||3;
+ var pa=c.params||{},cur=n(pa.stressMonths)||3,cause=pa.stressCause==='ill'?'ill':'job';
  var btn=function(mo){return '<button class="tbtn'+(cur===mo?' amber':'')+'" onclick="setMeta(\'params\',\'stressMonths\','+mo+',\'num\');stressRefreshBtns('+mo+')">'+mo+' 個月</button>'};
+ var cbtn=function(k,label){return '<button class="tbtn'+(cause===k?' amber':'')+'" onclick="setMeta(\'params\',\'stressCause\',\''+k+'\',\'text\');stressRefreshCause(\''+k+'\')">'+label+'</button>'};
  var bind='oninput="setMeta(\'params\',\'stressOneOff\',this.value,\'num\')"';
  var inner='<div class="fgrid" style="align-items:end"><div class="f"><label>收入中斷</label><div id="stressBtns" style="display:flex;gap:6px">'+btn(1)+btn(3)+btn(6)+'</div></div>'+
+  '<div class="f"><label>中斷原因</label><div id="stressCause" style="display:flex;gap:6px">'+cbtn('job','失業（保單不理賠）')+cbtn('ill','傷病（薪資補償給付）')+'</div></div>'+
   '<div class="f"><label>臨時支出（一次性）</label>'+moneyCell(bind,pa.stressOneOff)+'</div></div>'+
   '<div data-calc="stressTest">'+stressDerivedHTML(c)+'</div>';
  return foldKeep('stress','壓力測試 · 如果明天沒收入','收入中斷 1／3／6 個月＋一筆臨時支出，可動用現金撐到第幾個月',inner,false);
+}
+function stressRefreshCause(k){
+ var box=document.getElementById('stressCause');if(!box)return;
+ var bs=box.querySelectorAll('button');for(var i=0;i<bs.length;i++){bs[i].classList.toggle('amber',i===(k==='ill'?1:0));}
 }
 function stressRefreshBtns(mo){
  var box=document.getElementById('stressBtns');if(!box)return;
@@ -18282,7 +18297,7 @@ function clientView(){var c=activeCase();if(!c)return '<div style="padding:60px;
   var gau=[['財務安全度',h.safety],['財務自由度',h.freedom],['願景達成度',h.vision]].map(function(g){return gauge(g[0],g[1])}).join('');
   var rtC=function(s){return s==='good'?'var(--ok)':s==='warn'?'var(--amber2)':s==='bad'?'var(--warn)':'var(--mut)'};
   var rt=Object.keys(r).map(function(k){var x=r[k];return '<tr><td class="k">'+k+'</td><td style="color:'+rtC(x.status)+';font-weight:800">'+x.v+'</td><td class="muted" style="font-size:12px">'+x.ideal+'</td></tr>'}).join('');
-  body=(dashOn('hero')?('<div class="hero2"><div class="k">MY FINANCIAL DASHBOARD</div><h1>'+esc(c.profile.name)+'，您好</h1><div class="muted">您目前在 <b style="color:'+stageColor(h.grade)+'">'+stageName(h.grade)+'</b>——'+stageTask(h.grade)+'。<div style="font-size:12px;margin-top:5px;opacity:.85">'+stageReason(h)+'</div>'+stageDetailHTML(h)+'</div></div>'):'')+
+  body=(dashOn('hero')?('<div class="hero2"><div class="k">MY FINANCIAL DASHBOARD</div><h1>'+esc(c.profile.name)+'，您好</h1><div class="muted">您目前在 <b style="color:'+stageColor(h.grade)+'">'+stageName(h.grade)+'</b>——'+stageTask(h.grade)+'。<div style="font-size:12px;margin-top:5px;opacity:.85">'+stageReason(h)+'</div>'+anVerdictHTML(c)+stageDetailHTML(h)+'</div></div>'):'')+
    (dashOn('kpi')?('<div class="kpis">'+kp+'</div>'):'')+
    // ⚠️ 第三個參數不能省：cashflowCharts() 的第一段是 `c ? '生涯資產模擬藍圖…'+careerBlueprint(c,proj,theme) : ''`，
    //    少傳 c 的話客戶端整張「生涯資產模擬藍圖」不畫（教練端 :8849 一直是帶 c 的）。

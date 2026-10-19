@@ -98,7 +98,7 @@ describe("落點真的畫得出來（jsdom）", () => {
     expect(w.app.cases[0].params.stressMonths).toBe(6);
     const after = w.document.querySelector('[data-calc="stressTest"]').innerHTML;
     expect(after).not.toBe(before);
-    expect(after).toContain("收入中斷 6 個月");
+    expect(after).toContain("失業中斷 6 個月");
   });
   it("分析頁首屏：結論句掛在 KPI 下方（有受影響願景才有字）", async () => {
     const h = await boot("analysis");
@@ -183,5 +183,43 @@ describe("第二批落點（jsdom）", () => {
     w.render();
     expect(w.document.querySelector("#app").innerHTML).toContain("報告配色");
     w.localStorage.removeItem("lantu.reportTheme");
+  });
+});
+
+// ── 補充（2026/10/20）：壓力測試接保單、願景句進客戶端儀表 ──
+describe("壓力測試接保單／客戶端儀表願景句（jsdom）", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let w: any;
+  async function boot(role: string, tab: string, dataTab?: string) {
+    const dom = new JSDOM(HTML, { runScripts: "dangerously", url: "https://lantu.test/" });
+    w = dom.window;
+    await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
+    w.app.role = role; w.app.activeTab = tab; if (dataTab) w.app.dataTab = dataTab;
+    w.app.cases = [w.migrateCase(w.sampleCase())]; w.app.activeId = w.app.cases[0].id;
+    w.render();
+    return w.document.querySelector("#app").innerHTML as string;
+  }
+  it("失業不理賠、傷病吃薪資補償；兩者都讀 existingCover 同一個數字", async () => {
+    await boot("coach", "data", "coverage");
+    const c = w.app.cases[0];
+    const pm = w.primaryMember(c).name;
+    c.params.stressCause = "job";
+    const job = w.stressCalc(c);
+    expect(job.comp).toBe(0);
+    c.params.stressCause = "ill";
+    const ill = w.stressCalc(c);
+    const expect_ = w.n(w.existingCover(c, pm, "薪資補償（月）")) + w.n(w.existingCover(c, pm, "薪資補償（日）")) * 30;
+    expect(ill.comp).toBe(expect_);
+    // 有給付時，中斷期間的水位一定不低於失業情境
+    for (let i = 0; i < ill.rows.length; i++) expect(ill.rows[i].cash).toBeGreaterThanOrEqual(job.rows[i].cash);
+    const h = w.stressSec(c) as string;
+    expect(h).toContain("失業（保單不理賠）");
+    expect(h).toContain("傷病（薪資補償給付）");
+  });
+  it("客戶端儀表 hero 裡有願景句（同一支 anVerdictHTML）", async () => {
+    const h = await boot("client", "analysis");
+    const c = w.app.cases[0];
+    const txt = w.overviewVisionText(w.overview(c));
+    if (txt) expect(h).toContain(txt.slice(0, 20)); else expect(h).not.toContain("最早受影響的願景");
   });
 });
