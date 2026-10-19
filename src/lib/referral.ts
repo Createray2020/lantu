@@ -5,9 +5,9 @@
 // ⚠️ 這不是客戶歸屬。歸屬仍走派案閘／客戶自己輸入教練編號／教練接受連結那條路；
 //    C 階教練的推薦照樣轉派。推薦人拿到的是紀錄，不是客戶。
 // ⚠️ first-touch：client_users.referrer_coach_id 一有值就不再覆蓋。
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clientUsers } from "@/Shared/db/schema";
+import { clientUsers, clients, plans } from "@/Shared/db/schema";
 import { findCoachByCode } from "./coachLink";
 import { normalizeCode } from "./codes";
 
@@ -42,4 +42,48 @@ export async function countReferred(coachId: string): Promise<number> {
     .from(clientUsers)
     .where(eq(clientUsers.referrerCoachId, coachId));
   return r[0]?.n ?? 0;
+}
+
+/** 教練「我的推薦」小統計：帶進幾位、幾位存了護照、幾位後來掛上教練（不一定是他）、幾位掛在他名下。 */
+export type ReferralStats = {
+  total: number;
+  passport: number;
+  linked: number;
+  mine: number;
+  recent: { name: string; at: Date | null; state: "註冊" | "存了護照" | "已掛教練" | "掛在我名下" }[];
+};
+export async function referralStats(coachId: string): Promise<ReferralStats> {
+  const users = await db
+    .select({ id: clientUsers.id, name: clientUsers.name, at: clientUsers.referredAt })
+    .from(clientUsers)
+    .where(eq(clientUsers.referrerCoachId, coachId))
+    .orderBy(desc(clientUsers.referredAt));
+  if (!users.length) return { total: 0, passport: 0, linked: 0, mine: 0, recent: [] };
+  const ids = users.map((u) => u.id);
+  const clientRows = await db
+    .select({ id: clients.id, clientUserId: clients.clientUserId, coachId: clients.coachId })
+    .from(clients)
+    .where(inArray(clients.clientUserId, ids));
+  const clientIds = clientRows.map((c) => c.id);
+  const planRows = clientIds.length
+    ? await db.select({ clientId: plans.clientId }).from(plans)
+        .where(and(inArray(plans.clientId, clientIds), eq(plans.track, "client")))
+    : [];
+  const hasPassport = new Set(planRows.map((p) => p.clientId));
+  const byUser = new Map(clientRows.filter((c) => c.clientUserId).map((c) => [c.clientUserId as string, c]));
+  let passport = 0, linked = 0, mine = 0;
+  const recent = users.slice(0, 8).map((u) => {
+    const c = byUser.get(u.id);
+    const pp = !!(c && hasPassport.has(c.id));
+    const lk = !!(c && c.coachId);
+    const me = !!(c && c.coachId === coachId);
+    return { name: u.name || "（未填姓名）", at: u.at, state: (me ? "掛在我名下" : lk ? "已掛教練" : pp ? "存了護照" : "註冊") as ReferralStats["recent"][number]["state"] };
+  });
+  for (const u of users) {
+    const c = byUser.get(u.id);
+    if (c && hasPassport.has(c.id)) passport++;
+    if (c && c.coachId) linked++;
+    if (c && c.coachId === coachId) mine++;
+  }
+  return { total: users.length, passport, linked, mine, recent };
 }

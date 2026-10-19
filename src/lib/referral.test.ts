@@ -12,14 +12,18 @@ const h = vi.hoisted(() => {
     row: { id: "u1", referrerCoachId: null as string | null, referrerCode: null as string | null, referredAt: null as Date | null },
     updates: [] as any[],
     inserts: [] as any[],
+    // referralStats 用：被推薦的使用者／他們的 clients 列／護照 plans
+    refUsers: [] as any[], refClients: [] as any[], refPlans: [] as any[],
   };
   const db = {
     select: () => ({
       from: (t: any) => ({
         where: () => {
+          const rowsOf = () => t?._n === "clients" ? state.refClients : t?._n === "plans" ? state.refPlans : t?._n === "client_users" ? [{ n: state.row.referrerCoachId ? 1 : 0 }] : [];
           const q: any = {
             limit: async () => (t?._n === "coaches" && state.coach ? [state.coach] : []),
-            then: (res: any, rej: any) => Promise.resolve(t?._n === "client_users" ? [{ n: state.row.referrerCoachId ? 1 : 0 }] : []).then(res, rej),
+            orderBy: async () => state.refUsers,
+            then: (res: any, rej: any) => Promise.resolve(rowsOf()).then(res, rej),
           };
           return q;
         },
@@ -46,11 +50,12 @@ vi.mock("@/Shared/db/schema", () => ({
   clientUsers: { _n: "client_users", id: { name: "id" }, referrerCoachId: { name: "referrer_coach_id" } },
   coaches: { _n: "coaches", id: { name: "id" }, code: { name: "code" }, status: { name: "status" }, title: { name: "title" } },
   coachLinkRequests: { _n: "coach_link_requests" },
-  clients: { _n: "clients" },
+  clients: { _n: "clients", clientUserId: { name: "client_user_id" } },
+  plans: { _n: "plans", clientId: { name: "client_id" }, track: { name: "track" } },
   coachDisplayName: { name: "name" },
 }));
 
-import { attachReferral, countReferred, referralPath, REF_COOKIE } from "./referral";
+import { attachReferral, countReferred, referralPath, referralStats, REF_COOKIE } from "./referral";
 
 beforeEach(() => {
   h.state.row = { id: "u1", referrerCoachId: null, referrerCode: null, referredAt: null };
@@ -85,5 +90,24 @@ describe("推薦來源", () => {
   it("countReferred 回數字", async () => {
     h.state.row.referrerCoachId = "c1";
     expect(await countReferred("c1")).toBe(1);
+  });
+  it("referralStats：帶進／護照／已掛教練／掛在我名下四個數字與近況列，各算各的", async () => {
+    h.state.refUsers = [
+      { id: "u1", name: "甲", at: new Date("2026-10-01") },
+      { id: "u2", name: "乙", at: new Date("2026-10-02") },
+      { id: "u3", name: null, at: null },
+    ];
+    h.state.refClients = [
+      { id: "k1", clientUserId: "u1", coachId: "c1" },    // 掛在我名下
+      { id: "k2", clientUserId: "u2", coachId: "c9" },    // 掛別的教練（派案閘派過去的）
+    ];
+    h.state.refPlans = [{ clientId: "k1" }, { clientId: "k2" }];
+    const st = await referralStats("c1");
+    expect(st.total).toBe(3);
+    expect(st.passport).toBe(2);
+    expect(st.linked).toBe(2);
+    expect(st.mine).toBe(1);
+    expect(st.recent.map((r) => r.state)).toEqual(["掛在我名下", "已掛教練", "註冊"]);
+    expect(st.recent[2].name).toBe("（未填姓名）");
   });
 });
