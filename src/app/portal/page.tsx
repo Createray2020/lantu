@@ -9,6 +9,8 @@ import FlowActions from "./FlowActions";
 import { listClientTodos } from "@/lib/clientTodos";
 import { pendingInvite } from "@/lib/clientRiskQuiz";
 import Todos from "./Todos";
+import Overview from "./Overview";
+import { clientOverviewOf } from "@/lib/clientOverview";
 import RiskQuizGate from "./RiskQuizGate";
 import CoachEntry from "./CoachEntry";
 import { getApplication } from "@/lib/coachApplyStore";
@@ -44,6 +46,8 @@ export default async function Portal() {
   const planCase = await getClientPlanCase(client.id);
   const todos = planCase ? await listClientTodos(planCase.clientId) : [];
   const flowActions = planCase ? flowActionsOf(planCase.data) : [];
+  // 首頁第一眼：階段＋最早受影響的願景＋下一步（engine.overview，算不出來整塊不出現）。
+  const ov = planCase ? clientOverviewOf(planCase.data) : null;
   // 教練按了「邀請客戶填寫」而客戶還沒送出 → 一進首頁就跳浮動框（關掉還能從橫幅再開）。
   const quizInvited = planCase ? await pendingInvite(planCase.clientId) : false;
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
@@ -170,6 +174,7 @@ export default async function Portal() {
           </div>
         )}
         <RiskQuizGate invited={quizInvited} />
+        <Overview ov={ov} />
         <Todos items={todos} />
         <FlowActions items={flowActions} />
         {r ? (

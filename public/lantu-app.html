@@ -5035,6 +5035,57 @@ var STAGE_ORDER=['D','C','B','A'];
 function stageName(g){return (STAGE[g]||{}).name||'未評估'}
 function stageTask(g){return (STAGE[g]||{}).task||''}
 function stageColor(g,light){var st=STAGE[g];return st?(light?st.cl:st.c):(light?'#6b7d8f':'var(--mut)')}
+
+/* ===== 健診總覽 overview(c)（2026/10/20）=====
+   把「這位客戶現在怎麼樣」收成一句話能講完的四件事：階段、最早受影響的願景（延後幾年才做得到）、
+   站穩的三件、優先動的三件。全部是既有結果的讀取與排序——health / projection / ratios / gapTotals
+   任何公式都不在這裡重算；分析頁首屏結論句、報告書「本次健診總覽」、客戶端首頁三處共用。
+   ⚠️ 雙實作：engine.ts 與 lantu-app.html 各一份，engine.drift.test 守著。
+   ⚠️ 延後掃描只動 clone（跟 consequences() 一樣），絕不寫回 c。 */
+var OVERVIEW_DELAY_MAX=15;
+function overviewDelay(c,ev){
+ if(!ev||ev.ok)return 0;
+ var kind=ev.kind,aEnd=effHorizon(c);
+ function okAfter(t){var p=projection(t),hit=null;
+  for(var i=0;i<p.events.length;i++){var e=p.events[i];if(e.kind===kind&&e.name===ev.name){hit=e;break;}}
+  return hit?hit.ok:true;}
+ var max=Math.min(OVERVIEW_DELAY_MAX,Math.max(0,(kind==='retire'?aEnd-1:aEnd)-ev.age));
+ for(var y=1;y<=max;y++){
+  var t=JSON.parse(JSON.stringify(c)),moved=false;
+  if(kind==='goal'){(t.goals||[]).forEach(function(g){if(moved||!visionOn(g))return;if((g.name||g.type||'目標')===ev.name&&n(g.start)===ev.age){g.start=n(g.start)+y;if(n(g.end)>0)g.end=n(g.end)+y;moved=true;}});}
+  else if(kind==='retire'){applyRetireDelay(t,y);moved=true;}
+  else return null;             // 子女教育／傳承：不是延後能解的
+  if(!moved)return null;
+  if(okAfter(t))return y;
+ }
+ return null;                   // 掃到上限還不行＝延後不夠，要降規或放手
+}
+function overview(c){
+ var h=health(c),m=metrics(c),p=m.proj,r=ratios(c),gt=gapTotals(c);
+ var st=STAGE[h.grade]||{};
+ var need=n((c.params||{}).emergencyMonths)||6,mo=m.monthExp>0?m.liquid/m.monthExp:0,emOk=mo>=need;
+ var good=[],todo=[];
+ if(emOk)good.push('緊急預備金已備妥（'+mo.toFixed(1)+' 個月）');else todo.push('補足緊急預備金（目前 '+mo.toFixed(1)+'／'+need+' 個月）');
+ if(gt.lump>0)todo.push('補足保障缺口 '+fmt(gt.lump));else good.push('保障一次性給付足額');
+ if(p.turnNeg)todo.push('存量 '+p.turnNeg+' 歲用完，處理現金流缺口');else good.push('存量期間內未用完');
+ Object.keys(r).forEach(function(k){var x=r[k];if(x.status==='good')good.push(k+' 達標（'+x.v+'）');else if(x.status==='bad')todo.push(k+' 需改善（'+x.v+'，理想 '+x.ideal+'）');});
+ var acts=(c.actions||[]).filter(function(a){return a&&a.on!==false&&a.name}).map(function(a){return a.name});
+ if(acts.length)todo=acts.concat(todo);
+ var ff=p.firstFail||null,vision=null;
+ if(ff){var dy=overviewDelay(c,ff);vision={name:ff.name,kind:ff.kind,age:ff.age,delay:dy,to:(dy!=null?ff.age+dy:null)};}
+ return {grade:h.grade,stage:st.name||'未評估',task:st.task||'',desc:st.desc||'',safety:h.safety,
+  good:good.slice(0,3),todo:todo.slice(0,3),vision:vision,emMonths:mo,emNeed:need};
+}
+// 一句話：沒有受影響的願景就回空字串（不說「一切都好」——那是教練的話，不是系統的）。
+function overviewVisionText(ov){
+ var v=ov&&ov.vision;if(!v)return '';
+ var s='若維持現況，最早受影響的願景是「'+v.name+'」（'+v.age+' 歲）';
+ if(v.delay)s+='；延後 '+v.delay+' 年到 '+v.to+' 歲才做得到。';
+ else if(v.kind==='edu')s+='；教育年限跟著孩子走、不能延後，要從收入端或支出取捨處理。';
+ else if(v.kind==='legacy')s+='；期末資產不足以留下預計的傳承金額。';
+ else s+='；延後 '+OVERVIEW_DELAY_MAX+' 年內仍做不到，要談降規或放手。';
+ return s;
+}
 // 為什麼在這個階段：指出當前最關鍵的那一項，避免「同一階段不同成因」造成誤解
 function stageReason(h){
  if(!h)return '';
@@ -5327,7 +5378,9 @@ var CALC={
  // 健保費試算：改投保薪資／眷口／類別時，同一張成員卡上的試算與明細當場重算。
  nhi:function(c,i){return nhiMemberCalcHTML(c,+i);},
  nhiSummary:function(c){return nhiSummaryHTML(c);},
- propIns:function(c){return propInsHTML(c);}
+ propIns:function(c){return propInsHTML(c);},
+ // 壓力測試：改收入中斷月數／臨時支出時只重畫圖與結論（輸入框在容器外）。
+ stressTest:function(c){return stressDerivedHTML(c);}
 };
 // ⚠️⚠️ 重入鎖。2026/09/10：下面還原焦點的 x.focus() 會讓「剛被 innerHTML 換掉的那個舊
 //    input」補噴一次 change → set() → syncDerived() → **syncCalcNodes 自己重入**，
@@ -14000,6 +14053,70 @@ function checkupDatesHTML(c){
  return '<div class="ckdates"><span>保單運算日 <b>'+run+'</b></span><span>需求統計日 <b>'+
   esc(raw.replace(/-/g,'. '))+'</b>'+away+'</span></div>';
 }
+/* ===== 壓力測試（2026/10/20）=====
+   「如果明天沒收入」——收入中斷 1／3／6 個月，再加一筆臨時支出，可動用現金撐到第幾個月。
+   讀的全是既有數字：可動用現金 m.liquid、月支出 m.monthExp（已含負債月付）、月收入 m.incTotal/12、
+   緊急預備金門檻 params.emergencyMonths。不另算第二份預備金。
+   ⚠️ 輸入框住在 data-calc 容器外面（賓士圖的教訓），只有圖走 CALC.stressTest 重畫。 */
+var STRESS_SPAN=24;
+function stressCalc(c){
+ var m=metrics(c),months=n((c.params||{}).stressMonths)||3,oneOff=n((c.params||{}).stressOneOff)||0;
+ var cash=n(m.liquid),mExp=n(m.monthExp),mInc=n(m.incTotal)/12,emReq=mExp*(n((c.params||{}).emergencyMonths)||6);
+ var rows=[],zeroAt=null,low=cash;
+ for(var i=1;i<=STRESS_SPAN;i++){
+  cash-=mExp;if(i>months)cash+=mInc;if(i===1)cash-=oneOff;
+  rows.push({m:i,cash:cash});if(cash<low)low=cash;
+  if(zeroAt===null&&cash<0)zeroAt=i;
+ }
+ return {months:months,oneOff:oneOff,start:n(m.liquid),mExp:mExp,mInc:mInc,emReq:emReq,rows:rows,zeroAt:zeroAt,low:low,
+  recover:mInc>mExp};
+}
+function stressSVG(S){
+ var W=760,H=180,pl=56,pr=14,pt=14,pb=26,iw=W-pl-pr,ih=H-pt-pb;
+ var vals=S.rows.map(function(r){return r.cash}).concat([S.start,S.emReq,0]);
+ var mx=Math.max.apply(null,vals),mn=Math.min.apply(null,vals);if(mx===mn){mx=mn+1;}
+ var pad=(mx-mn)*0.08;mx+=pad;mn-=pad;
+ var X=function(i){return pl+iw*i/STRESS_SPAN},Y=function(v){return pt+ih*(1-(v-mn)/(mx-mn))};
+ var d='M'+X(0)+' '+Y(S.start);S.rows.forEach(function(r){d+=' L'+X(r.m)+' '+Y(r.cash)});
+ var col=S.zeroAt?'var(--warn)':'var(--ok)';
+ var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">';
+ s+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="var(--mut)" stroke-width="1"/>';
+ s+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(S.emReq)+'" y2="'+Y(S.emReq)+'" stroke="var(--amber2)" stroke-width="1" stroke-dasharray="4 4"/>';
+ s+='<text x="'+(W-pr)+'" y="'+(Y(S.emReq)-4)+'" text-anchor="end" font-size="11" fill="var(--amber2)">緊急預備金門檻 '+cfAxis(S.emReq)+'</text>';
+ if(S.months<STRESS_SPAN)s+='<rect x="'+X(0)+'" y="'+pt+'" width="'+(X(S.months)-X(0))+'" height="'+ih+'" fill="var(--warn)" opacity=".08"/>';
+ s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="2.4" stroke-linejoin="round"/>';
+ if(S.zeroAt){s+='<circle cx="'+X(S.zeroAt)+'" cy="'+Y(S.rows[S.zeroAt-1].cash)+'" r="4.5" fill="var(--warn)"/>';
+  s+='<text x="'+X(S.zeroAt)+'" y="'+(Y(S.rows[S.zeroAt-1].cash)+16)+'" text-anchor="middle" font-size="11" fill="var(--warn)">第 '+S.zeroAt+' 個月見底</text>';}
+ [0,6,12,18,24].forEach(function(mo){s+='<text x="'+X(mo)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11" fill="var(--mut)">'+(mo===0?'今天':mo+' 月')+'</text>'});
+ s+='<text x="'+(pl-6)+'" y="'+(Y(S.start)+4)+'" text-anchor="end" font-size="11" fill="var(--mut)">'+cfAxis(S.start)+'</text>';
+ s+='<text x="'+(pl-6)+'" y="'+(Y(0)+4)+'" text-anchor="end" font-size="11" fill="var(--mut)">0</text>';
+ return s+'</svg>';
+}
+function stressDerivedHTML(c){
+ var S=stressCalc(c);
+ var verdict=S.zeroAt
+  ?'<b class="w">第 '+S.zeroAt+' 個月見底</b>——收入中斷 '+S.months+' 個月'+(S.oneOff>0?'加 '+fmt(S.oneOff)+' 臨時支出':'')+'，可動用現金撐不到收入恢復。'
+  :'<b class="o">撐得過</b>——收入中斷 '+S.months+' 個月'+(S.oneOff>0?'加 '+fmt(S.oneOff)+' 臨時支出':'')+'，最低水位 '+cfAxis(S.low)+(S.low<S.emReq?'（已低於緊急預備金門檻）':'')+'。';
+ if(!S.recover&&!S.zeroAt)verdict+=' 但收入恢復後月結餘仍為負，水位不會回升。';
+ return '<div class="kpis">'+
+  [['可動用現金',cfAxis(S.start),'現金＋可變現資產'],['每月流出',cfAxis(S.mExp),'生活＋保險＋負債月付'],['收入恢復後月入',cfAxis(S.mInc),'目前月收入']]
+  .map(function(k){return '<div class="kpi"><div class="lb">'+k[0]+'</div><div class="vv">'+k[1]+'</div><small>'+k[2]+'</small></div>'}).join('')+'</div>'+
+  stressSVG(S)+
+  '<div class="hint" style="display:block;margin-top:6px;line-height:1.8;border-left:3px solid var(--amber2);padding-left:10px">'+verdict+'</div>';
+}
+function stressSec(c){
+ var pa=c.params||{},cur=n(pa.stressMonths)||3;
+ var btn=function(mo){return '<button class="tbtn'+(cur===mo?' amber':'')+'" onclick="setMeta(\'params\',\'stressMonths\','+mo+',\'num\');stressRefreshBtns('+mo+')">'+mo+' 個月</button>'};
+ var bind='oninput="setMeta(\'params\',\'stressOneOff\',this.value,\'num\')"';
+ var inner='<div class="fgrid" style="align-items:end"><div class="f"><label>收入中斷</label><div id="stressBtns" style="display:flex;gap:6px">'+btn(1)+btn(3)+btn(6)+'</div></div>'+
+  '<div class="f"><label>臨時支出（一次性）</label>'+moneyCell(bind,pa.stressOneOff)+'</div></div>'+
+  '<div data-calc="stressTest">'+stressDerivedHTML(c)+'</div>';
+ return foldKeep('stress','壓力測試 · 如果明天沒收入','收入中斷 1／3／6 個月＋一筆臨時支出，可動用現金撐到第幾個月',inner,false);
+}
+function stressRefreshBtns(mo){
+ var box=document.getElementById('stressBtns');if(!box)return;
+ var bs=box.querySelectorAll('button');for(var i=0;i<bs.length;i++){bs[i].classList.toggle('amber',bs[i].textContent===(mo+' 個月'));}
+}
 function policyCheckupSec(c){
  var pm=premiumCheckup(c);
  var cov=coverageCheckupRows(c);
@@ -15121,7 +15238,7 @@ function coverageHubSec(c){
    pick('needs','需求','需求卡 '+nNeed+' 位 · 已備補充 · 預算取捨')+
    pick('prop','產險','需求參數 · 保額覆寫 · 比對')+'</div>'+
   '<div id="covBodies">'+
-  tab('check',policyCheckupSec(c)+
+  tab('check',policyCheckupSec(c)+stressSec(c)+
    '<div data-calc="coverageDerived">'+parts.derived+'</div>'+masterAnalysisSec(c))+
   tab('policies',policiesSec(c)+lifeAssetSec(c)+premiumReportSec(c)+paybackReportSec(c))+
   tab('needs',coverBudgetSec(c)+
@@ -16188,6 +16305,8 @@ function anHeroRefresh(){
  if(ch)ch.innerHTML=annualBalanceSVG(metrics(t).proj,'dark','cf',anTuned(c)?metrics(c).proj:null);
  var kp=document.getElementById('anHeroKpis');
  if(kp)kp.innerHTML=anKpiHTML(t);
+ var vd=document.getElementById('anHeroVerdict');
+ if(vd)vd.innerHTML=anVerdictHTML(t);
  var fl=document.getElementById('anHeroFlag');
  if(fl)fl.innerHTML=anTuned(c)?'<span style="color:var(--amber2)">目前顯示的是假設值（報酬率 '+AN_TUNE.ret.toFixed(1)+'%、退休 '+AN_TUNE.age+' 歲、壽命 '+(AN_TUNE.le!=null?AN_TUNE.le:effHorizon(c))+' 歲），不是存檔值。</span>':'';
 }
@@ -16209,7 +16328,15 @@ function anHeroHTML(c){
   anTuneHTML(c)+
   '<div id="anHeroFlag" style="font-size:12px;margin:2px 0 6px">'+(anTuned(c)?'<span style="color:var(--amber2)">目前顯示的是假設值（報酬率 '+AN_TUNE.ret.toFixed(1)+'%、退休 '+AN_TUNE.age+' 歲、壽命 '+(AN_TUNE.le!=null?AN_TUNE.le:effHorizon(c))+' 歲），不是存檔值。</span>':'')+'</div>'+
   '<div id="anHeroKpis">'+anKpiHTML(t)+'</div>'+
+  '<div id="anHeroVerdict">'+anVerdictHTML(t)+'</div>'+
   '</div>';
+}
+// 首屏結論句（2026/10/20）：把缺口換算成「願景會延後幾年」。尺是客戶自己的願景，不是分數；
+// 拉桿時跟著重算，現場就能指著說「延兩年，購屋就回到 40 歲」。沒有受影響的願景就不出現。
+function anVerdictHTML(t){
+ var txt='';try{txt=overviewVisionText(overview(t));}catch(e){txt='';}
+ if(!txt)return '';
+ return '<div class="hint" style="display:block;margin-top:6px;line-height:1.8;border-left:3px solid var(--amber2);padding-left:10px">'+txt+'</div>';
 }
 
 /* ===== 分析頁分段（2026/09/26）=====
@@ -17877,6 +18004,25 @@ function bgReportHTML(c){
  return '<div style="margin-top:12px;color:#0d2b45;font-weight:700;font-size:13px">客戶背景側寫（職涯歷程・理財經驗・學經歷）</div>'+
   '<table style="margin-top:4px"><tr><th style="width:96px">成員</th><th>背景</th></tr>'+out.join('')+'</table>';
 }
+/* 報告書第一章「本次健診總覽」（2026/10/20）：先講站穩的、再講優先動的、最後一句願景延後。
+   客戶翻開報告書先看到的是這一頁，十九章是給想往下翻的人。全部讀 overview(c)，不另算。 */
+function rOverview(c){
+ var ov;try{ov=overview(c);}catch(e){return '';}
+ var li=function(arr,col){return arr.length?'<ul style="margin:4px 0 0;padding-left:18px;line-height:1.9;font-size:13px;color:#33474e">'+arr.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>':'<div style="color:#5a6b72;font-size:13px">—</div>'};
+ var vt=overviewVisionText(ov);
+ return '<h2>§、本次健診總覽</h2>'+
+  '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">'+
+   '<div style="flex:1;min-width:220px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px">'+
+    '<div style="color:#5a6b72;font-size:12px">目前所在階段</div>'+
+    '<div style="font-size:26px;font-weight:800;letter-spacing:.04em;margin:4px 0 6px;color:'+stageColor(ov.grade,1)+'">'+esc(ov.stage)+'</div>'+
+    '<div style="font-size:13px;color:#33474e;line-height:1.7">'+esc(ov.desc)+'</div>'+
+    (ov.task?'<div style="font-size:12px;color:#5a6b72;margin-top:6px">這一階段的功課：'+esc(ov.task)+'</div>':'')+
+   '</div>'+
+   '<div style="flex:1;min-width:220px"><div style="color:#3f7d54;font-weight:700;font-size:13px">已經站穩的</div>'+li(ov.good)+
+    '<div style="color:#b5852f;font-weight:700;font-size:13px;margin-top:10px">優先動的三件</div>'+li(ov.todo)+'</div>'+
+  '</div>'+
+  (vt?'<div style="margin-top:12px;padding:10px 14px;border-left:3px solid #c99a5b;background:#fffdf8;font-size:13px;color:#33474e;line-height:1.8">'+esc(vt)+'</div>':'');
+}
 function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGaps(c),adv=advice(c),proj=m.proj,p=c.profile,rn=retireNeed(c);
  var ct=crossTable(c),it=incomeTax(c),es=estateTax(c),al=allocInfo(c),s=scenario(c),mc=monteCarlo(c);
  var ptax=propertyTax(c),lg=legacyNeed(c),acts=actionList(c);
@@ -17901,7 +18047,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  // 舊版是把「一、二、三…」寫死在字串裡、目錄再手抄一份 —— 只要有一章因為沒資料被略過
  // （例如還沒開始追蹤的客戶沒有「真實追蹤」），目錄就會列出一個翻不到的章名，
  // 而且往中間插一章要手改十幾個編號。章名只寫一次，編號自動接。
- var body='<h2>§、財務健康總覽</h2>'+
+ var body=rOverview(c)+'<h2>§、財務健康總覽</h2>'+
   '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+rGauge('財務安全度',h.safety)+rGauge('財務自由度',h.freedom)+rGauge('願景達成度',h.vision)+'</div>'+
   '<div style="display:flex;gap:24px;flex-wrap:wrap"><div style="flex:1;min-width:230px">'+rBars([{label:'收支平衡',val:hp['收支平衡']},{label:'預備金',val:hp['預備金']},{label:'信用',val:hp['信用']},{label:'負債平衡',val:hp['負債平衡']},{label:'風險保全',val:hp['風險保全'],color:'#c99a5b'}])+'</div>'+
    '<div style="min-width:172px;text-align:center"><div style="color:#5a6b72;font-size:12px">財務階段</div><div style="font-size:30px;font-weight:800;letter-spacing:.04em;margin:4px 0 2px;color:'+stageColor(h.grade,1)+'">'+stageName(h.grade)+'</div><div style="font-size:12px;color:#33474e;line-height:1.6">'+stageTask(h.grade)+'</div><div style="font-size:11px;color:#5a6b72;margin-top:4px">'+stageReason(h)+'</div></div></div>'+stageReportNote(h)+

@@ -2640,6 +2640,57 @@ var STAGE_ORDER=['D','C','B','A'];
 function stageName(g){return (STAGE[g]||{}).name||'未評估'}
 function stageTask(g){return (STAGE[g]||{}).task||''}
 function stageColor(g,light){var st=STAGE[g];return st?(light?st.cl:st.c):(light?'#6b7d8f':'var(--mut)')}
+
+/* ===== 健診總覽 overview(c)（2026/10/20）=====
+   把「這位客戶現在怎麼樣」收成一句話能講完的四件事：階段、最早受影響的願景（延後幾年才做得到）、
+   站穩的三件、優先動的三件。全部是既有結果的讀取與排序——health / projection / ratios / gapTotals
+   任何公式都不在這裡重算；分析頁首屏結論句、報告書「本次健診總覽」、客戶端首頁三處共用。
+   ⚠️ 雙實作：engine.ts 與 lantu-app.html 各一份，engine.drift.test 守著。
+   ⚠️ 延後掃描只動 clone（跟 consequences() 一樣），絕不寫回 c。 */
+var OVERVIEW_DELAY_MAX=15;
+function overviewDelay(c,ev){
+ if(!ev||ev.ok)return 0;
+ var kind=ev.kind,aEnd=effHorizon(c);
+ function okAfter(t){var p=projection(t),hit=null;
+  for(var i=0;i<p.events.length;i++){var e=p.events[i];if(e.kind===kind&&e.name===ev.name){hit=e;break;}}
+  return hit?hit.ok:true;}
+ var max=Math.min(OVERVIEW_DELAY_MAX,Math.max(0,(kind==='retire'?aEnd-1:aEnd)-ev.age));
+ for(var y=1;y<=max;y++){
+  var t=JSON.parse(JSON.stringify(c)),moved=false;
+  if(kind==='goal'){(t.goals||[]).forEach(function(g){if(moved||!visionOn(g))return;if((g.name||g.type||'目標')===ev.name&&n(g.start)===ev.age){g.start=n(g.start)+y;if(n(g.end)>0)g.end=n(g.end)+y;moved=true;}});}
+  else if(kind==='retire'){applyRetireDelay(t,y);moved=true;}
+  else return null;             // 子女教育／傳承：不是延後能解的
+  if(!moved)return null;
+  if(okAfter(t))return y;
+ }
+ return null;                   // 掃到上限還不行＝延後不夠，要降規或放手
+}
+function overview(c){
+ var h=health(c),m=metrics(c),p=m.proj,r=ratios(c),gt=gapTotals(c);
+ var st=STAGE[h.grade]||{};
+ var need=n((c.params||{}).emergencyMonths)||6,mo=m.monthExp>0?m.liquid/m.monthExp:0,emOk=mo>=need;
+ var good=[],todo=[];
+ if(emOk)good.push('緊急預備金已備妥（'+mo.toFixed(1)+' 個月）');else todo.push('補足緊急預備金（目前 '+mo.toFixed(1)+'／'+need+' 個月）');
+ if(gt.lump>0)todo.push('補足保障缺口 '+fmt(gt.lump));else good.push('保障一次性給付足額');
+ if(p.turnNeg)todo.push('存量 '+p.turnNeg+' 歲用完，處理現金流缺口');else good.push('存量期間內未用完');
+ Object.keys(r).forEach(function(k){var x=r[k];if(x.status==='good')good.push(k+' 達標（'+x.v+'）');else if(x.status==='bad')todo.push(k+' 需改善（'+x.v+'，理想 '+x.ideal+'）');});
+ var acts=(c.actions||[]).filter(function(a){return a&&a.on!==false&&a.name}).map(function(a){return a.name});
+ if(acts.length)todo=acts.concat(todo);
+ var ff=p.firstFail||null,vision=null;
+ if(ff){var dy=overviewDelay(c,ff);vision={name:ff.name,kind:ff.kind,age:ff.age,delay:dy,to:(dy!=null?ff.age+dy:null)};}
+ return {grade:h.grade,stage:st.name||'未評估',task:st.task||'',desc:st.desc||'',safety:h.safety,
+  good:good.slice(0,3),todo:todo.slice(0,3),vision:vision,emMonths:mo,emNeed:need};
+}
+// 一句話：沒有受影響的願景就回空字串（不說「一切都好」——那是教練的話，不是系統的）。
+function overviewVisionText(ov){
+ var v=ov&&ov.vision;if(!v)return '';
+ var s='若維持現況，最早受影響的願景是「'+v.name+'」（'+v.age+' 歲）';
+ if(v.delay)s+='；延後 '+v.delay+' 年到 '+v.to+' 歲才做得到。';
+ else if(v.kind==='edu')s+='；教育年限跟著孩子走、不能延後，要從收入端或支出取捨處理。';
+ else if(v.kind==='legacy')s+='；期末資產不足以留下預計的傳承金額。';
+ else s+='；延後 '+OVERVIEW_DELAY_MAX+' 年內仍做不到，要談降規或放手。';
+ return s;
+}
 // 為什麼在這個階段：指出當前最關鍵的那一項
 function stageReason(h){
  if(!h)return '';
@@ -3101,6 +3152,9 @@ export {
   stageGate,
   stageDesc,
   stageName,
+  overview,
+  overviewVisionText,
+  overviewDelay,
   stageTask,
   stageColor,
   stageReason,
