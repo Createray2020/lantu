@@ -38,7 +38,7 @@ const READ_SCOPE = /readableClient|readablePlan|readableClientId|getClientForRea
 describe("寫入路徑一律只認主責", () => {
   const WRITERS: Record<string, string[]> = {
     "src/lib/clients.ts": ["createClient", "updateClient", "setClientStatus"],
-    "src/lib/plans.ts": ["updatePlanData", "updatePlanMeta", "clonePlan", "createPlan", "deletePlan"],
+    "src/lib/plans.ts": ["updatePlanData", "updatePlanMeta", "clonePlan", "createPlan", "deletePlan", "importPassportIntoPlan"],
   };
 
   for (const [file, names] of Object.entries(WRITERS)) {
@@ -70,6 +70,15 @@ describe("讀取路徑確實放寬了（不然這個功能等於沒做）", () =
     expect(clients["getClientForRead"]).toMatch(/readableClient/);
     const plans = functionsOf(R("src/lib/plans.ts"));
     expect(plans["readablePlan"]).toMatch(/readableClient/);
+  });
+
+  it("帶入年度版（寫入）走 ownedPlan；掛教練時的 seed 是系統側動作、只讀客戶軌不帶教練維度", () => {
+    const plans = functionsOf(R("src/lib/plans.ts"));
+    expect(plans["importPassportIntoPlan"]).toMatch(/ownedPlan\(/);
+    expect(plans["seedCoachPlanFromPassport"]).toMatch(/track, "client"/);
+    expect(plans["seedCoachPlanFromPassport"]).not.toMatch(/readableClient|ownedClient/);
+    // 教練端 action 只能透過主責入口帶入
+    expect(R("src/app/dashboard/actions.ts")).toMatch(/importPassportIntoPlan/);
   });
 
   it("版本紀錄入口不限 track（客戶人生護照也進得去），且仍走可讀範圍", () => {

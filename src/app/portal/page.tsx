@@ -187,7 +187,11 @@ export default async function Portal() {
                   客戶編號 {setup.code}
                 </div>
               )}
-              <p className="text-tx2 text-sm">依你目前的存錢規劃，每月應存合計</p>
+              <p className="text-tx2 text-sm">
+                {own?.source === "coach"
+                  ? `依${own.coachName ? `教練 ${own.coachName}` : "教練"}目前的規劃，每月應存合計`
+                  : "依你目前的存錢規劃，每月應存合計"}
+              </p>
               <div className="font-serif text-4xl text-brand2 mt-2">{r.totalMonthlyWan.toFixed(1)} 萬</div>
             </div>
 

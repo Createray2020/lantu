@@ -71,6 +71,10 @@ vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 // 配號走 DB（code_counters）——這裡的假 schema 沒有那張表，且發號規則另有 codes.test.ts 守著。
 vi.mock("@/lib/codeAlloc", () => ({ allocCode: async (kind: string) => (kind === "coach" ? "FC2608001" : "2608001") }));
+// 掛上教練的那一刻會把護照複製成第一份年度版（lib/plans）。這裡只驗「有沒有被叫、帶哪個 clientId」，
+// 複製本身的規則在 plans / passportSync 那邊的測試守。
+const seeded: string[] = [];
+vi.mock("@/lib/plans", () => ({ seedCoachPlanFromPassport: async (clientId: string) => { seeded.push(clientId); return null; } }));
 vi.mock("@/lib/quota", () => ({
   clientQuota: async () => ({ cap: h.quota.cap, used: h.quota.used, left: null, full: h.quota.full }),
 }));
@@ -80,6 +84,7 @@ import { redeemInvite, respondToLinkRequest } from "./coachLink";
 const USER: any = { id: "user_c1", email: "c@example.com", name: "湘淇 楊", status: "active" };
 
 beforeEach(() => {
+  seeded.length = 0;
   h.store.clients = [];
   h.store.coaches = [{ id: "coach_1", name: "Ray", status: "active" }];
   h.store.clr = [];
@@ -198,5 +203,28 @@ describe("客戶數上限：接受申請與邀請碼都要過", () => {
     const r = await respondToLinkRequest("rq1", "coach_1", true);
     expect(r.ok).toBe(true);
     expect(h.log.some((l: any) => l.op === "update" && l.table === "clients" && l.values.coachId === "coach_1")).toBe(true);
+  });
+});
+
+describe("掛上教練那一刻要把護照複製成第一份年度版", () => {
+  it("邀請碼綁上 → seed 一次、帶那位客戶的 clientId", async () => {
+    h.store.clients = [{ id: "cl_1", clientUserId: USER.id, coachId: null }];
+    const r = await redeemInvite("abc123", USER);
+    expect(r.ok).toBe(true);
+    expect(seeded).toEqual(["cl_1"]);
+  });
+  it("已綁同一位再開一次 → 不重複 seed", async () => {
+    h.store.clients = [{ id: "cl_1", clientUserId: USER.id, coachId: "coach_1" }];
+    await redeemInvite("abc123", USER);
+    expect(seeded).toEqual([]);
+  });
+  it("教練接受申請 → seed；婉拒 → 不 seed", async () => {
+    h.store.clients = [{ id: "cl_2", clientUserId: "u2", coachId: null }];
+    h.store.clr = [{ id: "req_1", coachId: "coach_1", clientId: "cl_2", status: "pending" }, { id: "req_2", coachId: "coach_1", clientId: "cl_2", status: "pending" }];
+    await respondToLinkRequest("req_2", "coach_1", false);
+    expect(seeded).toEqual([]);
+    const r = await respondToLinkRequest("req_1", "coach_1", true);
+    expect(r.ok).toBe(true);
+    expect(seeded).toEqual(["cl_2"]);
   });
 });

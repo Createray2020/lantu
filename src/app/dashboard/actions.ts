@@ -168,6 +168,22 @@ export async function savePlanDataAction(planId: string, data: unknown): Promise
   return snap;
 }
 
+/** 把客戶的願望（或護照份）帶入年度版：只補空白。preview=true 只回會帶入哪些，不寫。 */
+export async function importPassportAction(
+  planId: string,
+  opts: { revisionId?: string; preview?: boolean },
+): Promise<{ ok: true; imported: string[] } | { ok: false; error: string }> {
+  try {
+    const me = await requireWritableCoach();
+    const r = await Plans.importPassportIntoPlan(me.id, planId, opts);
+    if (!r.ok) return { ok: false, error: MSG[r.error] ?? r.error };
+    if (!opts.preview) revalidatePath("/dashboard/clients");
+    return r;
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function clonePlanAction(planId: string): Promise<IdResult> {
   try {
     const cid = await coachId();

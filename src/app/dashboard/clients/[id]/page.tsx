@@ -5,6 +5,7 @@ import { comparePlans } from "@/lib/plans";
 import { clientAccess } from "@/lib/clientScope";
 import { listCollaborators } from "@/lib/clientCollab";
 import { pendingDraft } from "@/lib/consultSession";
+import { wishesForCoach } from "@/lib/clientPlan";
 import DashboardHeader from "../../DashboardHeader";
 import { headerProps } from "../../headerProps";
 import ReadOnlyBanner from "../../ReadOnlyBanner";
@@ -84,6 +85,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     reviewId: i.reviewId,
   }));
 
+  const wishes = await wishesForCoach(id);
   const hp = await headerProps(coach);
   // 唯讀有兩種來源：期限到期（紅）與共同執案（藍）。兩條橫幅分開，
   // 協作教練不該看到「請聯繫管理員延長期限」那句與他無關的話。
@@ -104,6 +106,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         compare={compare}
         readOnly={readOnly}
         isOwner={isOwner}
+        wishes={wishes}
         collaborators={collaborators.map((c) => ({
           id: c.id,
           coachName: c.coachName,

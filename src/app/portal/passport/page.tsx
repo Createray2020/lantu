@@ -24,7 +24,15 @@ export default async function PassportPage({
     <div className="min-h-screen bg-canvas text-tx">
       {/* baseYear 由伺服器算（台北時區的今年）——在 client component 讀時鐘會有跨年的 hydration 不一致。
           只用在「新建」的護照上；已存檔的護照沿用它自己存著的 baseYear。 */}
-      <PassportWizard initial={own?.passport ?? null} mode="private" restore={sp.restore === "1"} baseYear={currentPassportYear()} />
+      {/* 掛了教練（教練軌存在）→ 沙盒：initial 是教練規劃的投影，拉動不存不留，存＝願望快照。
+          ?restore=1 那一趟草稿仍照吃（註冊回來），但沙盒下不會導去 setup。 */}
+      <PassportWizard
+        initial={own?.passport ?? null}
+        mode="private"
+        restore={sp.restore === "1"}
+        baseYear={currentPassportYear()}
+        sandbox={own?.source === "coach" ? { coachName: own.coachName, wishSavedAt: own.wishSavedAt } : null}
+      />
     </div>
   );
 }

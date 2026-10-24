@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import Modal from "@/components/ui/Modal";
 import {
   computePassport, emptyPassport, passportBaseYear, rollPassportForward, BASE_YEAR, ntfmt, wan,
   type PassportInputs, type PassportFaces, type LoanResult,
@@ -183,13 +184,17 @@ const LAST = STEPS.length - 1;
 /* ---------- 主元件 ---------- */
 // mode="public"：官網 /passport，未登入可玩。按存檔＝把草稿存進 sessionStorage 再導去註冊。
 // mode="private"：/portal/passport，登入後的正式頁。restore=true 時才吃草稿（註冊回來那一趟）。
+// sandbox：已掛教練、教練軌存在。initial 是從教練規劃反推的投影；拉動只是試算，
+//   不存就不留（下次進來回到投影）；「存成我的願望」寫進客戶軌給教練看，教練軌一個字都不動。
+export type SandboxInfo = { coachName: string | null; wishSavedAt: string | null };
 export default function PassportWizard({
-  initial, mode = "private", restore = false, signedIn = false, baseYear = BASE_YEAR,
+  initial, mode = "private", restore = false, signedIn = false, baseYear = BASE_YEAR, sandbox = null,
 }: {
   initial: PassportInputs | null;
   mode?: "public" | "private";
   restore?: boolean;
   signedIn?: boolean;
+  sandbox?: SandboxInfo | null;
   /**
    * 「今年」。⚠️ 由 server component 用 `currentPassportYear()` 算好傳進來——
    * 在這裡直接 `new Date()` 會有 hydration 不一致（跨年那一刻伺服器與瀏覽器差一年）。
@@ -205,6 +210,9 @@ export default function PassportWizard({
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [existingAt, setExistingAt] = useState<string | null>(null);
   const [showAssume, setShowAssume] = useState(false);
+  // 沙盒說明視窗：第一次動滑桿跳一次，之後不再煩。
+  const [sandboxNoteShown, setSandboxNoteShown] = useState(false);
+  const [showSandboxNote, setShowSandboxNote] = useState(false);
   // 手機的目前步驟。桌機不看它（所有面向都用 sm:block 常駐顯示）。
   const [step, setStep] = useState(0);
 
@@ -265,6 +273,7 @@ export default function PassportWizard({
   );
 
   function set<K extends keyof PassportFaces>(face: K, key: keyof PassportFaces[K], v: number) {
+    if (sandbox && !sandboxNoteShown) { setSandboxNoteShown(true); setShowSandboxNote(true); }
     setEdited((prev) => {
       const base = prev ?? initial ?? emptyPassport(baseYear);
       return { ...base, [face]: { ...base[face], [key]: v } };
@@ -296,12 +305,14 @@ export default function PassportWizard({
     try {
       // 25 秒逾時保護：就算後端沒回應也不會永遠乾等。
       const res = (await Promise.race([
-        savePassportAction(p, overwrite ? { overwrite: true } : undefined),
+        savePassportAction(p, overwrite || sandbox ? { overwrite: true } : undefined),
         new Promise((_, rej) => setTimeout(() => rej(new Error("連線逾時，請檢查網路後再試")), 25000)),
       ])) as Awaited<ReturnType<typeof savePassportAction>>;
       if (res.ok) {
         setStatus("success");
         clearDraft();
+        // 沙盒：存的是「願望」，留在原地讓客戶看見已存；教練規劃沒動，不需要導去 setup。
+        if (sandbox) return;
         // 硬導頁到下一步（比 router.push+refresh 穩，避免導頁被當前頁重刷蓋掉）。
         window.location.href = "/portal/setup";
       } else if ("needsConfirm" in res && res.needsConfirm) {
@@ -358,7 +369,7 @@ export default function PassportWizard({
 
       {/* ⚠️ 這條警示刻意留在分步之外：它講的是「年齡沒跟著年份前進」，
           客戶在哪一步都該看得到，不能只在最後一步才冒出來——那時候他已經照舊年齡填完了。 */}
-      {stale && (
+      {stale && !sandbox && (
         <div className="mb-4 mx-auto max-w-lg rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-xs leading-relaxed text-brand2">
           這份護照是 <b>{by}</b> 年做的，現在是 <b>{baseYear}</b> 年。
           各項目標填的是<b>西元年份</b>，所以它們沒有跑掉——但你的<b>目前年齡</b>還停在 {p.retire.curAge} 歲。
@@ -371,6 +382,44 @@ export default function PassportWizard({
           </button>
           <span className="block mt-1 text-11 text-brand2">按了之後記得再存一次檔。</span>
         </div>
+      )}
+
+      {sandbox && (
+        <div className="rounded-xl border border-brand/40 bg-panel px-4 py-3 mb-4 text-sm flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-brand font-semibold">
+              這些數字依{sandbox.coachName ? `教練 ${sandbox.coachName}` : "教練"}的規劃反推
+            </div>
+            <div className="text-11 text-tx2 mt-0.5">
+              拉動只是試算、不會改到教練的規劃；離開就回到教練版。想讓教練知道你的想法，按下方「存成我的願望」。
+              {sandbox.wishSavedAt && (
+                <span className="text-tx3">（上次存的願望：{new Date(sandbox.wishSavedAt).toLocaleString("zh-TW", { hour12: false })}）</span>
+              )}
+            </div>
+          </div>
+          {edited && (
+            <button type="button" onClick={() => { setEdited(null); if (status !== "saving") setStatus("idle"); }}
+              className="shrink-0 text-xs text-tx2 hover:text-tx border border-line2 rounded-lg px-3 py-1.5">
+              回復教練版
+            </button>
+          )}
+        </div>
+      )}
+      {showSandboxNote && (
+        <Modal onClose={() => setShowSandboxNote(false)} labelledBy="pwSandboxTitle" width="max-w-md">
+          <div className="p-6">
+            <div className="text-brand text-xs tracking-[0.3em] mb-2">試算模式</div>
+            <h2 id="pwSandboxTitle" className="font-serif text-xl mb-3">這裡拉動不會改到教練的規劃</h2>
+            <ul className="text-sm text-tx2 space-y-2 list-disc pl-5">
+              <li>人生護照是五個面向的快速試算；拉完不存，下次進來會回到教練目前的版本。</li>
+              <li>想把這組想法留給教練，按「存成我的願望」——會帶時間標記，教練在你的頁面看得到。</li>
+              <li>完整的模擬（收支、資產、保障一起算）請到<Link href="/portal/plan" className="text-brand2 underline underline-offset-4 mx-1">我的財務藍圖</Link>裡做。</li>
+            </ul>
+            <div className="mt-5 text-right">
+              <button type="button" onClick={() => setShowSandboxNote(false)} className="font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg">知道了</button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* 標頭＋每月應存彙總 */}
@@ -538,7 +587,7 @@ export default function PassportWizard({
             ) : status === "saving" ? (
               <div className="text-brand2 text-sm">儲存中，請稍候…</div>
             ) : status === "success" ? (
-              <div className="text-ok text-sm">已儲存，正在開啟你的規劃…</div>
+              <div className="text-ok text-sm">{sandbox ? "已存成你的願望，教練會在你的頁面看到。" : "已儲存，正在開啟你的規劃…"}</div>
             ) : (
               <>
                 <div className="text-11 tracking-[0.2em] text-tx3">合計 每月應存</div>
@@ -589,7 +638,7 @@ export default function PassportWizard({
               )}
               {mode === "public"
                 ? (signedIn ? "存下我的規劃" : "免費註冊，存下我的規劃")
-                : status === "saving" ? "儲存中…" : status === "success" ? "已儲存 ✓" : status === "error" ? "重試存檔" : "存檔，建立我的規劃"}
+                : status === "saving" ? "儲存中…" : status === "success" ? "已儲存 ✓" : status === "error" ? "重試存檔" : sandbox ? "存成我的願望" : "存檔，建立我的規劃"}
             </button>
           )}
         </div>

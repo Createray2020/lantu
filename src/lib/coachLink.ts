@@ -1,6 +1,7 @@
 // 客戶↔教練 連結（雙向確認）資料層。
 // 客戶端「選擇教練」→ 建 pending 申請；教練端「接受」→ 設 clients.coachId、申請 accepted。
 import { randomBytes } from "node:crypto";
+import { seedCoachPlanFromPassport } from "@/lib/plans";
 import { and, eq, desc, count } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, coaches, coachLinkRequests, coachInvites, coachDisplayName } from "@/Shared/db/schema";
@@ -154,6 +155,8 @@ export async function respondToLinkRequest(requestId: string, coachId: string, a
     if (blocked) return { ok: false, error: blocked };
     await db.update(clients).set({ coachId, updatedAt: new Date() }).where(eq(clients.id, req.clientId));
     await db.update(coachLinkRequests).set({ status: "accepted", respondedAt: new Date() }).where(eq(coachLinkRequests.id, requestId));
+    // 掛上的那一刻就把護照複製成第一份年度版——教練不從空白起填，客戶前台從此投影教練軌。
+    await seedCoachPlanFromPassport(req.clientId);
   } else {
     await db.update(coachLinkRequests).set({ status: "rejected", respondedAt: new Date() }).where(eq(coachLinkRequests.id, requestId));
   }
@@ -234,5 +237,7 @@ export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok
     .set({ status: "rejected", respondedAt: new Date() })
     .where(and(eq(coachLinkRequests.clientId, client.id), eq(coachLinkRequests.status, "pending")));
   await db.update(coachInvites).set({ usedByClientUserId: user.id, usedAt: new Date() }).where(eq(coachInvites.code, code));
+  // 已有護照 → 立刻複製成第一份年度版；還沒有 → savePassport 存檔時會補做。
+  await seedCoachPlanFromPassport(client.id);
   return { ok: true, coachName: inv.coachName };
 }

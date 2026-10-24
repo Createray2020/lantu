@@ -2,9 +2,11 @@
 // coachId=null（還沒掛教練）；掛上教練、被授權後才「真的進入規劃」。
 import { and, eq, asc, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clients, coachDisplayName, coaches, plans } from "@/Shared/db/schema";
+import { clients, coachDisplayName, coaches, plans, planRevisions } from "@/Shared/db/schema";
+import { passportFromCase, diffPassports, type FaceDiff } from "@/lib/passportSync";
+import { seedCoachPlanFromPassport } from "@/lib/plans";
 import { newCase } from "@/lib/engine";
-import { computePassport, passportBaseYear, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
+import { computePassport, passportBaseYear, currentPassportYear, type PassportInputs, type PassportResult, type CrossInputs } from "@/lib/passport";
 import { normalizeIntent, DEFAULT_TARGET, type Intent } from "@/lib/intent";
 // 客戶端寫 plan.data 時也必須重算快照。舊版只 set({data})，教練列表上的階段/淨值會一直停在
 // 客戶「上次由教練存檔」時的舊值（實測正式庫有一筆淨值差 500 萬）。
@@ -159,6 +161,16 @@ export type ClientOwnPlan = {
   planId: string;
   passport: PassportInputs | null;
   result: PassportResult | null;
+  /**
+   * 這五面向是從哪裡來的：
+   *   client ＝ 客戶自己存的護照（還沒掛教練、或教練軌還不存在）
+   *   coach  ＝ 從教練最新一份年度版反推（2026/10/24 定案：掛上教練後教練軌是唯一真相）
+   */
+  source: "client" | "coach";
+  coachName: string | null;
+  /** 客戶上一次存的「願望」（客戶軌護照份的 inputs）；source=coach 時才有意義，用來跟投影比。 */
+  wish: PassportInputs | null;
+  wishSavedAt: string | null;
 };
 
 // 取這個客戶自己的 plan（若有）。
@@ -167,14 +179,115 @@ export async function getClientOwnPlan(clientUserId: string): Promise<ClientOwnP
   const client = cRows[0];
   if (!client) return null;
   const plan = await ownPlanRow(client.id);
-  if (!plan) return { clientId: client.id, planId: "", passport: null, result: null };
-  const data = plan.data as any;
+  const own = plan?.data as any;
+  const ownInputs: PassportInputs | null = own?.passport?.inputs ?? null;
+
+  // 有教練軌就投影教練軌（最新年度、最新建立的那一份）。
+  const coachRows = await db
+    .select({ id: plans.id, data: plans.data })
+    .from(plans)
+    .where(and(eq(plans.clientId, client.id), eq(plans.track, COACH_TRACK)))
+    .orderBy(desc(plans.year), desc(plans.createdAt))
+    .limit(1);
+  const coachPlan = coachRows[0];
+  if (coachPlan) {
+    let coachName: string | null = null;
+    if (client.coachId) {
+      const co = await db.select({ name: coachDisplayName }).from(coaches).where(eq(coaches.id, client.coachId)).limit(1);
+      coachName = co[0]?.name ?? null;
+    }
+    const projected = passportFromCase(coachPlan.data, ownInputs, currentPassportYear());
+    return {
+      clientId: client.id,
+      planId: plan?.id ?? "",
+      passport: projected,
+      result: computePassport(projected),
+      source: "coach",
+      coachName,
+      wish: ownInputs,
+      wishSavedAt: own?.passport?.savedAt ?? null,
+    };
+  }
+
+  if (!plan) return { clientId: client.id, planId: "", passport: null, result: null, source: "client", coachName: null, wish: null, wishSavedAt: null };
   return {
     clientId: client.id,
     planId: plan.id,
-    passport: data?.passport?.inputs ?? null,
-    result: data?.passport?.result ?? null,
+    passport: ownInputs,
+    result: own?.passport?.result ?? null,
+    source: "client",
+    coachName: null,
+    wish: null,
+    wishSavedAt: null,
   };
+}
+
+/**
+ * 教練端「客戶的想法」分頁要的整包：教練軌最新一份的投影（基準）＋每一筆願望快照與基準的差異。
+ * 呼叫端已經過 readableClient（getClientDetail），這裡不再驗。
+ */
+export type WishForCoach = {
+  revisionId: string;
+  savedAt: string;
+  editorName: string | null;
+  summary: { house: string; car: string; retire: string; support: string; travel: string; total: string };
+  diffs: FaceDiff[];
+};
+export type WishesForCoach = {
+  /** 教練軌最新一份 plan；null＝還沒有年度版（帶入鈕沒有目標） */
+  targetPlanId: string | null;
+  targetPlanYear: number | null;
+  wishes: WishForCoach[];
+};
+export async function wishesForCoach(clientId: string): Promise<WishesForCoach> {
+  const wishes = await listClientWishes(clientId);
+  const coachRows = await db
+    .select({ id: plans.id, data: plans.data, year: plans.year })
+    .from(plans)
+    .where(and(eq(plans.clientId, clientId), eq(plans.track, COACH_TRACK)))
+    .orderBy(desc(plans.year), desc(plans.createdAt))
+    .limit(1);
+  const target = coachRows[0] ?? null;
+  const latestWish = wishes[0]?.inputs ?? null;
+  const baseline = target ? passportFromCase(target.data, latestWish, currentPassportYear()) : null;
+  const wan = (n: number) => `${Math.round(n / 10000).toLocaleString()} 萬`;
+  return {
+    targetPlanId: target?.id ?? null,
+    targetPlanYear: target?.year ?? null,
+    wishes: wishes.map((w) => {
+      const r = computePassport(w.inputs);
+      return {
+        revisionId: w.revisionId,
+        savedAt: w.savedAt.toISOString(),
+        editorName: w.editorName,
+        summary: {
+          house: r.house.price > 0 ? `${wan(r.house.price)}・${w.inputs.house.buyYear} 年` : "—",
+          car: r.car.price > 0 ? `${wan(r.car.price)}・${w.inputs.car.buyYear} 年` : "—",
+          retire: `${w.inputs.retire.retireAge} 歲・月 ${Math.round(r.retire.presentMonthly).toLocaleString()} 元`,
+          support: r.support.kids > 0 ? `${r.support.kids.toFixed(1)} 個・${w.inputs.support.birthYear} 年` : "—",
+          travel: r.travel.fund > 0 ? `${wan(r.travel.fund)}・${w.inputs.travel.travelYear} 年` : "—",
+          total: `${r.totalMonthlyWan.toFixed(1)} 萬`,
+        },
+        diffs: baseline ? diffPassports(baseline, w.inputs) : [],
+      };
+    }),
+  };
+}
+
+/** 客戶的願望快照（客戶軌護照份的每一次存檔），新→舊。給教練端「客戶的想法」分頁。 */
+export type WishSnapshot = { revisionId: string; savedAt: Date; inputs: PassportInputs; editorName: string | null };
+export async function listClientWishes(clientId: string, limit = 20): Promise<WishSnapshot[]> {
+  const plan = await ownPlanRow(clientId);
+  if (!plan) return [];
+  const rows = await db
+    .select({ id: planRevisions.id, createdAt: planRevisions.createdAt, data: planRevisions.data, editorName: planRevisions.editorName })
+    .from(planRevisions)
+    .where(eq(planRevisions.planId, plan.id))
+    .orderBy(desc(planRevisions.createdAt))
+    .limit(limit);
+  return rows
+    .map((r) => ({ revisionId: r.id, savedAt: r.createdAt, inputs: (r.data as any)?.passport?.inputs as PassportInputs | undefined, editorName: r.editorName }))
+    .filter((r): r is WishSnapshot => !!r.inputs);
 }
 
 // 存檔結果：已有護照份而呼叫端沒帶 overwrite 時，先回 needs-confirm 讓使用者決定，不直接蓋。
@@ -221,6 +334,9 @@ export async function savePassport(
     planId = ins[0].id;
   }
   await logRevision(planId, "client", user.id, user.name, data);
+  // 已掛教練但教練軌還不存在（走邀請連結、先綁後填的那條路）→ 現在補建第一份年度版。
+  // 教練軌已存在時這支什麼都不做：客戶這次存的是「願望」，不碰教練的規劃。
+  if (existing[0]?.coachId) await seedCoachPlanFromPassport(clientId);
   return { status: "saved", result: data.passport.result as PassportResult };
 }
 

@@ -5,6 +5,8 @@ import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD } from "@/components/ui/Field";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Wishes from "./Wishes";
+import type { WishesForCoach } from "@/lib/clientPlan";
 import {
   clonePlanAction,
   createPlanAction,
@@ -66,6 +68,7 @@ export default function ClientDetail({
   readOnly = false,
   isOwner = true,
   collaborators = [],
+  wishes,
 }: {
   client: ClientLite;
   plans: PlanLite[];
@@ -79,9 +82,11 @@ export default function ClientDetail({
   /** 我是不是這位客戶的主責教練。只有主責看得到「共同執案」面板。 */
   isOwner?: boolean;
   collaborators?: CollaboratorLite[];
+  /** 客戶在人生護照上存的願望快照（含與教練軌的差異）。 */
+  wishes: WishesForCoach;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"overview" | "plans" | "reviews">("overview");
+  const [tab, setTab] = useState<"overview" | "plans" | "reviews" | "wishes">("overview");
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
 
@@ -193,7 +198,12 @@ export default function ClientDetail({
         <button className={tabBtn("overview")} onClick={() => setTab("overview")}>概況</button>
         <button className={tabBtn("plans")} onClick={() => setTab("plans")}>年度版本</button>
         <button className={tabBtn("reviews")} onClick={() => setTab("reviews")}>諮詢紀錄</button>
+        <button className={tabBtn("wishes")} onClick={() => setTab("wishes")}>
+          客戶的想法{wishes.wishes.length > 0 && <span className="ml-1 text-10 text-brand2">{wishes.wishes.length}</span>}
+        </button>
       </div>
+
+      {tab === "wishes" && <Wishes data={wishes} readOnly={readOnly} passportExists={!!passportPlan} />}
 
       {tab === "overview" && (
         <Overview
@@ -461,7 +471,7 @@ function Plans({ plans, compare, pending, readOnly = false, onOpen, onClone, onN
           // 中間一片空白，容易被當成頁面壞掉。
           <div className="rounded-lg border border-dashed border-line2 px-4 py-6 text-center">
             <div className="text-sm text-tx2">還沒有年度版本</div>
-            <div className="text-xs text-tx3 mt-1">按上方「＋ 空白版本」建立第一份，或從人生護照帶進來。</div>
+            <div className="text-xs text-tx3 mt-1">按上方「＋ 空白版本」建立第一份；有人生護照的客戶，建好後到「客戶的想法」分頁可以帶入。</div>
           </div>
         )}
         {plans.map((p, idx) => (

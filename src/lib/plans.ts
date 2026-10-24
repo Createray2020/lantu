@@ -7,7 +7,9 @@
 const COACH_TRACK = "coach";
 import { and, asc, eq, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clients, plans } from "@/Shared/db/schema";
+import { clients, coachDisplayName, coaches, plans } from "@/Shared/db/schema";
+import { logRevision, getRevision } from "./revisions";
+import { mergePassportIntoCase } from "./passportSync";
 import { newCaseData, planMetrics, planSnapshot, type PlanMetrics } from "./snapshot";
 import { ownedClient, readableClient } from "./clientScope";
 import { caseBirthDate } from "./birthSync";
@@ -76,6 +78,86 @@ async function readableClientId(coachId: string, clientId: string): Promise<bool
 /** 主責才拿得到。⚠️ 寫入路徑（回復版本等）一律用這支，不要換成 getPlanForRead()。 */
 export async function getPlan(coachId: string, planId: string): Promise<Plan | null> {
   return ownedPlan(coachId, planId);
+}
+
+/**
+ * 掛上教練那一刻：把客戶的人生護照複製成第一份年度版（track=coach）。
+ * 教練才不會從空白起填、客戶前台也才有教練軌可投影（見 lib/passportSync.ts 的定案說明）。
+ *
+ * 冪等：已經有任何 coach 軌 plan 就什麼都不做（既有客戶不回填，由教練自己按「帶入」）；
+ * 沒有護照份也不做。系統側動作、沒有「哪位教練」的維度，所以不驗 ownedClient。
+ * 回傳新建的 planId，沒建就 null。
+ */
+export async function seedCoachPlanFromPassport(clientId: string): Promise<string | null> {
+  const coachRows = await db
+    .select({ id: plans.id })
+    .from(plans)
+    .where(and(eq(plans.clientId, clientId), eq(plans.track, COACH_TRACK)))
+    .limit(1);
+  if (coachRows[0]) return null;
+  const [pp] = await db
+    .select({ id: plans.id, data: plans.data, year: plans.year })
+    .from(plans)
+    .where(and(eq(plans.clientId, clientId), eq(plans.track, "client")))
+    .orderBy(asc(plans.createdAt))
+    .limit(1);
+  if (!pp) return null;
+  const data = structuredClone(pp.data);
+  const snap = planSnapshot(data);
+  const [row] = await db
+    .insert(plans)
+    .values({
+      clientId,
+      year: pp.year,
+      track: COACH_TRACK,
+      label: "年度版（自人生護照帶入）",
+      status: "draft",
+      basedOnDate: todayISO(),
+      data,
+      healthGrade: snap.healthGrade,
+      netWorth: snap.netWorth,
+    })
+    .returning({ id: plans.id });
+  await logRevision(row.id, "coach", null, "系統（自人生護照帶入）", data);
+  return row.id;
+}
+
+/**
+ * 教練按「帶入年度版」：把客戶護照份（或指定的一筆願望快照）的五面向合併進這份年度版。
+ * 只補空白、不蓋教練填過的（規則在 mergePassportIntoCase）。主責限定——這是寫入。
+ */
+export async function importPassportIntoPlan(
+  coachId: string,
+  planId: string,
+  opts?: { revisionId?: string; preview?: boolean },
+): Promise<{ ok: true; imported: string[] } | { ok: false; error: string }> {
+  const plan = await ownedPlan(coachId, planId);
+  if (!plan) return { ok: false, error: "forbidden" };
+  let src: unknown = null;
+  if (opts?.revisionId) {
+    const rev = await getRevision(opts.revisionId);
+    if (!rev || rev.clientId !== plan.clientId || rev.track !== "client") return { ok: false, error: "找不到這筆願望" };
+    src = rev.data;
+  } else {
+    const [pp] = await db
+      .select({ data: plans.data })
+      .from(plans)
+      .where(and(eq(plans.clientId, plan.clientId), eq(plans.track, "client")))
+      .orderBy(asc(plans.createdAt))
+      .limit(1);
+    if (!pp) return { ok: false, error: "這位客戶沒有人生護照" };
+    src = pp.data;
+  }
+  const { data, imported } = mergePassportIntoCase(plan.data, src);
+  if (opts?.preview) return { ok: true, imported };
+  if (!imported.length) return { ok: true, imported };
+  const snap = planSnapshot(data);
+  await db.update(plans)
+    .set({ data, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })
+    .where(eq(plans.id, planId));
+  const [co] = await db.select({ name: coachDisplayName }).from(coaches).where(eq(coaches.id, coachId)).limit(1);
+  await logRevision(planId, "coach", coachId, co?.name ?? null, data);
+  return { ok: true, imported };
 }
 
 /** 讀取用：協作教練也拿得到（畫面端必須連帶把 readOnly 打開）。 */
