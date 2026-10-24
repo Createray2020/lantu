@@ -83,6 +83,24 @@ export async function getPlanForRead(coachId: string, planId: string): Promise<P
   return readablePlan(coachId, planId);
 }
 
+/**
+ * 版本紀錄入口專用：主責或協作教練、**不限 track**、不撈 data。
+ * 客戶詳情頁的「看版本紀錄」掛在客戶自己的人生護照（track='client'）上，
+ * 而 readablePlan() 硬帶 track='coach' —— 所以護照那顆按下去一律 404（主責也一樣）。
+ * 版本紀錄本身早就是 client 層級（兩軌合併），這裡只是「拿 clientId＋確認可讀」的門票；
+ * 回傳沒有 data，想拿 data 寫回的人請走 getPlan()，那支仍然只認主責＋教練軌。
+ */
+export type TimelinePlan = { id: string; clientId: string; track: string };
+export async function getPlanForTimeline(coachId: string, planId: string): Promise<TimelinePlan | null> {
+  const [row] = await db
+    .select({ id: plans.id, clientId: plans.clientId, track: plans.track })
+    .from(plans)
+    .innerJoin(clients, eq(plans.clientId, clients.id))
+    .where(and(eq(plans.id, planId), readableClient(coachId)))
+    .limit(1);
+  return row ?? null;
+}
+
 // 存回 iframe 編輯的整份案件，同時用引擎重算快照。
 export async function updatePlanData(coachId: string, planId: string, data: unknown): Promise<{ netWorth: number | null; healthGrade: string | null }> {
   // ⚠️ 形狀先擋，不能讓 undefined 走進去。

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
-import { getPlanForRead } from "@/lib/plans";
+import { getPlanForTimeline } from "@/lib/plans";
 import { clientAccess } from "@/lib/clientScope";
 import { listClientTimeline } from "@/lib/revisions";
 import RevisionTimeline, { type TimelineItem } from "@/components/RevisionTimeline";
@@ -18,8 +18,11 @@ export default async function HistoryPage({ params }: { params: Promise<{ planId
   const { planId } = await params;
   // 必須驗這份 plan 屬於自己。舊版只檢查「是 active 教練」，
   // 拿到別人的 planId 就能看到 editorName（客戶端存檔寫的是客戶真實姓名）與完整編輯時間軸。
-  const plan = await getPlanForRead(coach.id, planId);
+  // 不限 track：客戶詳情頁的「看版本紀錄」掛在客戶自己的人生護照上，那份是 track='client'，
+  // 走 getPlanForRead()（硬帶 track='coach'）會直接 404。這裡只需要 clientId＋可讀範圍。
+  const plan = await getPlanForTimeline(coach.id, planId);
   if (!plan) notFound();
+  const isPassport = plan.track === "client";
   // 協作教練看得到整條時間軸，但不能回復任何一版 —— 回復是寫入。
   const isOwner = (await clientAccess(coach.id, plan.clientId)) === "owner";
 
@@ -33,7 +36,12 @@ export default async function HistoryPage({ params }: { params: Promise<{ planId
   return (
     <div className="min-h-screen bg-canvas text-tx">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
-        <Link href={`/dashboard/plans/${planId}/edit`} className="text-sm text-tx2 hover:text-tx">← 返回編輯</Link>
+        {isPassport ? (
+          // 人生護照沒有教練編輯頁，回客戶詳情
+          <Link href={`/dashboard/clients/${plan.clientId}`} className="text-sm text-tx2 hover:text-tx">← 返回客戶</Link>
+        ) : (
+          <Link href={`/dashboard/plans/${planId}/edit`} className="text-sm text-tx2 hover:text-tx">← 返回編輯</Link>
+        )}
         <h1 className="font-serif text-2xl my-4">版本紀錄</h1>
         <p className="text-tx2 text-sm mb-5">
           年度版與客戶自己的人生護照是兩條並行的紀錄，這裡依時間合併呈現。

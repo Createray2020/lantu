@@ -72,6 +72,15 @@ describe("讀取路徑確實放寬了（不然這個功能等於沒做）", () =
     expect(plans["readablePlan"]).toMatch(/readableClient/);
   });
 
+  it("版本紀錄入口不限 track（客戶人生護照也進得去），且仍走可讀範圍", () => {
+    const plans = functionsOf(R("src/lib/plans.ts"));
+    expect(plans["getPlanForTimeline"]).toMatch(/readableClient/);
+    expect(plans["getPlanForTimeline"]).not.toMatch(/eq\(plans\.track/);
+    const page = R("src/app/dashboard/plans/[planId]/history/page.tsx");
+    expect(page).toContain("getPlanForTimeline(");
+    expect(page).not.toMatch(/import[^;]*getPlanForRead/);
+  });
+
   it("客戶詳情頁與報告書頁都有把 readOnly 接上（協作教練不能看到可寫的畫面）", () => {
     expect(R("src/app/dashboard/clients/[id]/page.tsx")).toMatch(/readOnly=\{/);
     expect(R("src/app/dashboard/plans/[planId]/edit/page.tsx")).toMatch(/readOnly=\{[^}]*isOwner/);
