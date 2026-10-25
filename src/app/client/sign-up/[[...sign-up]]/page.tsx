@@ -1,3 +1,4 @@
+import { safeBackPath } from "@/lib/safeRedirect";
 import Link from "next/link";
 import { SignUp } from "@clerk/nextjs";
 import AuthShell from "@/components/AuthShell";
@@ -11,7 +12,7 @@ import { getInviteByCode } from "@/lib/coachLink";
 //    同一條路上。所以這裡把 redirect_url 裡的邀請碼撈出來，把教練名字接著講一次。
 export default async function Page({ searchParams }: { searchParams: Promise<{ redirect_url?: string }> }) {
   const sp = await searchParams;
-  const back = sp.redirect_url && sp.redirect_url.startsWith("/") ? sp.redirect_url : undefined;
+  const back = safeBackPath(sp.redirect_url);
 
   // 只從自家的 redirect_url 取 code，取不到就當作沒有——查不到教練名字不影響註冊。
   const code = back?.startsWith("/portal/join") ? new URLSearchParams(back.split("?")[1] ?? "").get("code") : null;

@@ -1,3 +1,4 @@
+import { safeBackPath } from "@/lib/safeRedirect";
 import Link from "next/link";
 import { SignIn } from "@clerk/nextjs";
 import AuthShell from "@/components/AuthShell";
@@ -9,7 +10,7 @@ import { getInviteByCode } from "@/lib/coachLink";
 // 登入後必須回到原本那條邀請連結，否則 code 掉了就永遠綁不到教練。
 export default async function Page({ searchParams }: { searchParams: Promise<{ redirect_url?: string }> }) {
   const sp = await searchParams;
-  const back = sp.redirect_url && sp.redirect_url.startsWith("/") ? sp.redirect_url : undefined;
+  const back = safeBackPath(sp.redirect_url);
 
   const code = back?.startsWith("/portal/join") ? new URLSearchParams(back.split("?")[1] ?? "").get("code") : null;
   const inv = code ? await getInviteByCode(code).catch(() => null) : null;

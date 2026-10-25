@@ -35,11 +35,17 @@ async function guard() {
 }
 
 // dataURL(PNG) 白名單驗證：只收 image/png dataURL，容量上限 ~3MB（base64）。
+// 2026/10/25 資安盤點 #10：只驗前綴不夠——規劃器把 logoUrl 拼進 <img src="…">，
+// base64 段混進引號就能逃出屬性。這裡把 base64 字元集與 PNG magic bytes 都驗死。
 function validPng(v: FormDataEntryValue | null): string | null {
   const s = typeof v === "string" ? v.trim() : "";
   if (!s) return null;
-  if (!/^data:image\/png;base64,/.test(s)) throw new Error("invalid-logo-format");
+  const m = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(s);
+  if (!m) throw new Error("invalid-logo-format");
   if (s.length > 3_500_000) throw new Error("logo-too-large");
+  const head = Buffer.from(m[1].slice(0, 16), "base64");
+  const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (head.length < 8 || PNG_MAGIC.some((b, i) => head[i] !== b)) throw new Error("invalid-logo-format");
   return s;
 }
 

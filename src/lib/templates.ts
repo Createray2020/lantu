@@ -22,6 +22,7 @@
 //     教練把範本複製成**自己的一位正常客戶**。從落地那一刻起它就是一般客戶：
 //     有客戶編號、is_template=false、coach_id＝他、計入額度、只受 ownedClient() 管轄。
 
+import { assertPlanDataSafe } from "./planGuard";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
@@ -332,6 +333,7 @@ export async function updateTemplatePlan(planId: string, data: unknown): Promise
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("bad-plan-data");
   }
+  assertPlanDataSafe(data); // 2026/10/25 資安盤點 #19
   const snap = planSnapshot(data);
   await db
     .update(plans)

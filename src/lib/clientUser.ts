@@ -17,7 +17,8 @@ export async function ensureClientUser(): Promise<ClientUser | null> {
   const user = await currentUser();
   if (!user) return null;
 
-  const email = user.emailAddresses?.[0]?.emailAddress?.toLowerCase() ?? null;
+  // 只認主要 email（與 lib/coach.ts 的 identity() 一致；emailAddresses[0] 可能是未驗證的次要信箱）。
+  const email = user.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null;
   const name =
     [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || null;
 

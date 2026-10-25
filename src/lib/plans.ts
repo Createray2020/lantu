@@ -5,6 +5,7 @@
 // track 條件寫在 ownedPlan / ownedPlanLite / ownedTrackedRows 裡面而不是交給呼叫端加，
 // 因為「忘記加 where」正是這個模型出過事的地方——邊界要守在資料層，不是守在每個呼叫點。
 const COACH_TRACK = "coach";
+import { assertPlanDataSafe } from "./planGuard";
 import { and, asc, eq, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, coachDisplayName, coaches, plans } from "@/Shared/db/schema";
@@ -192,6 +193,7 @@ export async function updatePlanData(coachId: string, planId: string, data: unkn
   // 後面 logRevision(..., undefined) 撞 plan_revisions.data 的 notNull，
   // 又被 lib/revisions.ts 的 try/catch 靜默吞掉，連版本歷史都不會留下線索。
   if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("bad-plan-data");
+  assertPlanDataSafe(data); // 2026/10/25 資安盤點 #19：擋明顯的 XSS payload，見 lib/planGuard.ts
   const plan = await ownedPlanLite(coachId, planId);
   if (!plan) throw new Error("forbidden");
   const snap = planSnapshot(data);

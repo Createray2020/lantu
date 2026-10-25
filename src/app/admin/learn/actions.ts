@@ -7,6 +7,7 @@ import { asc, eq, max } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { learnCourses, learnLessons } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin } from "@/lib/coach";
+import { isSafeExternalUrl } from "@/lib/siteNav";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -129,12 +130,15 @@ export async function saveLessonAction(id: string, patch: LessonPatch): Promise<
   try {
     await guard();
     if (!patch.title.trim()) return { ok: false, error: "單元名稱不能空白" };
+    // 2026/10/25 資安盤點 #17：CourseView 用 <a href={lesson.url}> 直接開，javascript: 會執行。只收 https。
+    const url = patch.url?.trim() || null;
+    if (url && !isSafeExternalUrl(url)) return { ok: false, error: "連結必須是 https:// 開頭的網址" };
     await db
       .update(learnLessons)
       .set({
         title: patch.title.trim(),
         kind: patch.kind,
-        url: patch.url?.trim() || null,
+        url,
         body: patch.body ?? null,
         durationMin: patch.durationMin ?? null,
         note: patch.note?.trim() || null,

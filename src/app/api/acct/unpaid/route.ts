@@ -5,11 +5,12 @@
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import { getAcctState } from "@/lib/acctStore";
 import { unpaidCsvRows, UNPAID_CSV_HEADERS } from "@/lib/acctEngine";
-import { toCsv } from "@/lib/comp/csv";
+import { CsvRaw, toCsv } from "@/lib/comp/csv";
 
 export const dynamic = "force-dynamic";
 
-const asText = (s: string) => (s && /^\d/.test(s) ? `="${s}"` : s);
+// 只有「全數字」的帳號／代碼才包成公式文字；包成 CsvRaw 讓 toCsv 的公式注入防護放行這一格。
+const asText = (s: string) => (s && /^[\d-]+$/.test(s) ? new CsvRaw(`="${s}"`) : s);
 
 export async function GET() {
   const me = await ensureCoach();

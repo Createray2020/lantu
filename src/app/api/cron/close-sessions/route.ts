@@ -8,6 +8,7 @@
 // 不該自動變成一份正式的諮詢紀錄躺在客戶的時間軸上。
 //
 // 授權同 comp-recompute：Vercel Cron 帶 Bearer $CRON_SECRET，沒設就一律拒絕。
+import { timingSafeEqual } from "node:crypto";
 import { autoCloseStaleSessions } from "@/lib/consultSession";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,10 @@ export const maxDuration = 60;
 function authorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  return (req.headers.get("authorization") ?? "") === `Bearer ${secret}`;
+  // timingSafeEqual：長度不同先回 false（它要求等長），等長才做常數時間比對。
+  const a = Buffer.from(req.headers.get("authorization") ?? "");
+  const b = Buffer.from(`Bearer ${secret}`);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export async function GET(req: Request) {

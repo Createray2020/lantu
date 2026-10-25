@@ -1,5 +1,6 @@
 // 自助客戶（人生護照）的資料層：把五面向存成「客戶自己的 clients 列＋一份 plan（基礎方案）」。
 // coachId=null（還沒掛教練）；掛上教練、被授權後才「真的進入規劃」。
+import { assertPlanDataSafe } from "./planGuard";
 import { and, eq, asc, desc } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, coachDisplayName, coaches, plans, planRevisions } from "@/Shared/db/schema";
@@ -319,6 +320,7 @@ export async function savePassport(
   }
 
   const data = buildCase(inputs, name);
+  assertPlanDataSafe(data); // 2026/10/25 資安盤點 #19
   let planId: string;
   const snap = planSnapshot(data);
   if (existingPlan) {
@@ -389,6 +391,7 @@ export async function saveClientSetup(user: ClientUser, basics: ClientBasics, cr
   //    直接整包取代會洗掉教練端存在同一個物件裡的欄位（自訂關注議題 purposesCustom、投資經驗…）。
   if (intent) c.intent = normalizeIntent({ ...(c.intent || {}), ...intent });
   c.setup = { basics, cross, savedAt: new Date().toISOString() };
+  assertPlanDataSafe(c); // 2026/10/25 資安盤點 #19
   const snap = planSnapshot(c);
   await db.update(plans)
     .set({ data: c, healthGrade: snap.healthGrade, netWorth: snap.netWorth, updatedAt: new Date() })

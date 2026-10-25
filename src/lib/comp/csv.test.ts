@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { csvToObjects, normalizeDate, normalizeNumber, parseCsv, toCsv } from "./csv";
+import { CsvRaw, csvToObjects, normalizeDate, normalizeNumber, parseCsv, toCsv } from "./csv";
 import { IMPORT_HEADERS, validateImport, type Peer } from "./importCases";
 import { V4_MODULES } from "./preset";
 
@@ -17,6 +17,20 @@ describe("toCsv", () => {
 
   it("null／undefined 輸出空字串而不是 'null'", () => {
     expect(toCsv(["a", "b"], [[null, undefined]])).toContain("\r\n,");
+  });
+
+  it("公式注入防護：= + - @ tab 開頭的值前綴單引號", () => {
+    const csv = toCsv(["a"], [['=HYPERLINK("http://evil","x")'], ["+1"], ["-5"], ["@SUM"], ["\tx"]]);
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil"",""x"")"`);
+    expect(csv).toContain("\r\n'+1\r\n'-5\r\n'@SUM\r\n");
+    expect(csv).toContain("\r\n'\tx");
+  });
+
+  it("CsvRaw 包起來的值不做公式防護（銀行帳號 =\"0123\" 要保留）", () => {
+    const csv = toCsv(["a"], [[new CsvRaw('="0123"')], ["王小明"]]);
+    expect(csv).toContain(`"=""0123"""`);
+    expect(csv).toContain("王小明");
+    expect(csv).not.toContain("'=");
   });
 });
 

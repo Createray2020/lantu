@@ -4,10 +4,29 @@
 // CSV 加上 BOM 之後 Excel 直接雙擊就正確顯示中文，而且不必為了一個匯出多背一個套件。
 // 真的需要多工作表／格式的 .xlsx 再換 exceljs。
 
+/**
+ * 刻意要當「公式」輸出的欄位（例如銀行帳號用 ="0123" 保前導零）。
+ * 其他所有字串都會被 cell() 做公式注入防護，只有包成 CsvRaw 的不會。
+ */
+export class CsvRaw {
+  constructor(public readonly value: string) {}
+}
+
+/**
+ * CSV 公式注入防護（2026/10/25 資安盤點 #7）：
+ * 受款人戶名、客戶姓名是教練／客戶自填的，開頭若是 = + - @ 或 tab/CR，
+ * 會計用 Excel 雙擊開檔就會被當公式執行（=HYPERLINK、=cmd|…）。
+ * 前綴一個單引號——Excel/Numbers/Google Sheets 都把它當「這是文字」且不顯示。
+ */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+function guardFormula(s: string): string {
+  return FORMULA_LEAD.test(s) ? `'${s}` : s;
+}
+
 /** Excel 相容：欄位含逗號、引號、換行時加引號，內部引號成對。 */
 function cell(v: unknown): string {
   if (v === null || v === undefined) return "";
-  const s = String(v);
+  const s = v instanceof CsvRaw ? v.value : guardFormula(String(v));
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

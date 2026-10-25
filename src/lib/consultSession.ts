@@ -157,7 +157,9 @@ export async function startSession(
   let before: SessionMetrics | null = null;
   let revisionId: string | null = null;
   if (planId) {
-    const [p] = await db.select({ data: plans.data }).from(plans).where(eq(plans.id, planId)).limit(1);
+    // 2026/10/25 資安盤點 #11：planId 必須是這位客戶的，否則別人客戶的指標會被算進自己的場次。
+    try { await assertPlanOfClient(planId, clientId); } catch { return { ok: false, error: "這份規劃不屬於這位客戶" }; }
+    const [p] = await db.select({ data: plans.data }).from(plans).where(and(eq(plans.id, planId), eq(plans.clientId, clientId))).limit(1);
     if (p) before = sessionMetrics(p.data);
     revisionId = await latestRevision(planId);
   }
@@ -302,7 +304,7 @@ export async function draftForClosedSession(coachId: string, sessionId: string):
   // 自動封場有存後指標，superseded 沒有——沒有就拿現在的規劃現算一份。
   let after = (s.metricsAfter as SessionMetrics | null) ?? null;
   if (!after && s.planId) {
-    const [p] = await db.select({ data: plans.data }).from(plans).where(eq(plans.id, s.planId)).limit(1);
+    const [p] = await db.select({ data: plans.data }).from(plans).where(and(eq(plans.id, s.planId), eq(plans.clientId, s.clientId))).limit(1);
     if (p) after = sessionMetrics(p.data);
   }
   const draft = buildSummary(fresh, s.metricsBefore as SessionMetrics | null, after, s.closingNote);
@@ -374,7 +376,7 @@ export async function endSession(coachId: string, sessionId: string, input: EndI
   // 2) 後指標
   let after: SessionMetrics | null = null;
   if (s.planId) {
-    const [p] = await db.select({ data: plans.data }).from(plans).where(eq(plans.id, s.planId)).limit(1);
+    const [p] = await db.select({ data: plans.data }).from(plans).where(and(eq(plans.id, s.planId), eq(plans.clientId, s.clientId))).limit(1);
     if (p) after = sessionMetrics(p.data);
   }
 
@@ -573,13 +575,13 @@ export function buildSummary(
 export async function autoCloseStaleSessions(olderThanHours = 20): Promise<number> {
   const cutoff = new Date(Date.now() - olderThanHours * 3600 * 1000);
   const stale = await db
-    .select({ id: consultSessions.id, planId: consultSessions.planId })
+    .select({ id: consultSessions.id, clientId: consultSessions.clientId, planId: consultSessions.planId })
     .from(consultSessions)
     .where(and(isNull(consultSessions.endedAt), lt(consultSessions.startedAt, cutoff)));
   for (const s of stale) {
     let after: SessionMetrics | null = null;
     if (s.planId) {
-      const [p] = await db.select({ data: plans.data }).from(plans).where(eq(plans.id, s.planId)).limit(1);
+      const [p] = await db.select({ data: plans.data }).from(plans).where(and(eq(plans.id, s.planId), eq(plans.clientId, s.clientId))).limit(1);
       if (p) after = sessionMetrics(p.data);
     }
     await db

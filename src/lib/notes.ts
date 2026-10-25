@@ -4,7 +4,7 @@
 // 理由與三道配套寫在 clientScope.ts 的那支函式上，動這裡之前先讀它。
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clientNotes, clients } from "@/Shared/db/schema";
+import { clientNotes, clients, consultSessions } from "@/Shared/db/schema";
 import { annotatableClient, clientAccess, type ClientAccess } from "./clientScope";
 
 export const NOTE_KINDS = ["basis", "decision", "todo"] as const;
@@ -109,12 +109,14 @@ export async function addNote(
   if (!body) return { ok: false, error: "註記內容是空的" };
   const blockKey = (input.blockKey ?? "").trim();
   if (!blockKey) return { ok: false, error: "缺少區塊代號" };
+  const sessionId = await sessionOfClient(input.sessionId, clientId);
+  if (sessionId === "mismatch") return { ok: false, error: "諮詢場次不屬於這位客戶" };
 
   const [row] = await db
     .insert(clientNotes)
     .values({
       clientId,
-      sessionId: input.sessionId ?? null,
+      sessionId,
       blockKey,
       kind: normKind(input.kind),
       body,
@@ -141,18 +143,32 @@ export async function addNote(
   return { ok: true, note: row };
 }
 
+// 2026/10/25 資安盤點 #16：註記要掛的 sessionId 必須是這位客戶的場次，
+// 否則知道別人 session uuid 的協作教練可以把註記塞進別人的諮詢摘要。不是就回 null 讓呼叫端拒絕。
+async function sessionOfClient(sessionId: string | null | undefined, clientId: string): Promise<string | null | "mismatch"> {
+  if (!sessionId) return null;
+  const [sess] = await db
+    .select({ id: consultSessions.id })
+    .from(consultSessions)
+    .where(and(eq(consultSessions.id, sessionId), eq(consultSessions.clientId, clientId)))
+    .limit(1);
+  return sess ? sess.id : "mismatch";
+}
+
 /** 客戶自己在客戶端寫的註記。永遠 visible=false、authorAccess='client'。 */
 export async function addClientNote(clientId: string, clientUserId: string, input: NoteInput): Promise<AddOutcome> {
   const body = (input.body ?? "").trim().slice(0, MAX_BODY);
   if (!body) return { ok: false, error: "註記內容是空的" };
   const blockKey = (input.blockKey ?? "").trim();
   if (!blockKey) return { ok: false, error: "缺少區塊代號" };
+  const sessionId = await sessionOfClient(input.sessionId, clientId);
+  if (sessionId === "mismatch") return { ok: false, error: "諮詢場次不屬於這位客戶" };
 
   const [row] = await db
     .insert(clientNotes)
     .values({
       clientId,
-      sessionId: input.sessionId ?? null,
+      sessionId,
       blockKey,
       kind: normKind(input.kind),
       body,

@@ -3306,7 +3306,7 @@ function retireDetailHTML(c){var r=c.retire||{},rn=retireNeed(c),age=n(c.profile
  // ⚠️ 月領那一列一定要當場顯示「≈ 換算總額」，教練才看得懂這一列被當成什麼在算。
  //    金額看起來是總額（suspect）時反過來示警，並且**不換算**（見 preparedSuspect）。
  var prepRows=(rn.preparedRows||[]).map(function(p){
-  var label=(p.item||'已備')+(p.age?'（'+p.age+'歲'+(p.method?'·'+p.method:'')+'）':'');
+  var label=esc(p.item||'已備')+(p.age?'（'+n(p.age)+'歲'+(p.method?'·'+esc(p.method):'')+'）':'');
   if(p.suspect)return [label+' ⚠️ 金額 '+fmt(p.amount)+' 看起來是「總額」不是「月額」，暫不換算（請改成每月金額，或在下表勾「確認為月額」）',Math.round(p.pv),'var(--warn)'];
   if(p.converted)return [label+' 月領 '+fmt(p.amount)+' 元/月 × 12 → 退休期年金現值 ≈',Math.round(p.pv),'var(--ok)'];
   return [label,Math.round(p.pv)];
@@ -16234,7 +16234,7 @@ function analysisModules(c){
 
   {k:'gap',t:'保障缺口（毛需求 − 已備）',g:'risk',hint:'需求與上方「保障準備度」是同一個數字；已備含逐張保單、已備補充、方案動作，本人壽險再加家庭可變現資產',
    html:function(){
-    var gt=gaps().map(function(g){return '<tr><td class="k">'+g.member+'</td><td>'+g.kind+'</td><td class="muted" style="font-size:11.5px">'+kindUnit(g.kind)+'</td><td>'+fmt(g.need)+'</td><td>'+fmt(g.have)+'</td><td class="'+(g.gap>0?'bad':'good')+'">'+fmt(g.gap)+'</td></tr>'}).join('');
+    var gt=gaps().map(function(g){return '<tr><td class="k">'+esc(g.member)+'</td><td>'+esc(g.kind)+'</td><td class="muted" style="font-size:11.5px">'+kindUnit(g.kind)+'</td><td>'+fmt(g.need)+'</td><td>'+fmt(g.have)+'</td><td class="'+(g.gap>0?'bad':'good')+'">'+fmt(g.gap)+'</td></tr>'}).join('');
     var T=gapTotals(c),TT=gapTotalsText(c,T);
     // ⚠️ 兩個總額刻意不相加：一次性給付（元）與定期給付（元/日・元/月）不是同一種錢。
     var tot='<div class="big3" style="margin-bottom:10px">'+
@@ -16418,7 +16418,8 @@ function anHeroHTML(c){
 function anVerdictHTML(t){
  var txt='';try{txt=overviewVisionText(overview(t));}catch(e){txt='';}
  if(!txt)return '';
- return '<div class="hint" style="display:block;margin-top:6px;line-height:1.8;border-left:3px solid var(--amber2);padding-left:10px">'+txt+'</div>';
+ // overviewVisionText 回的是純文字（與 engine.ts 逐字同源、客戶端 React 也直接當文字用），拼進 HTML 這一端才 esc。
+ return '<div class="hint" style="display:block;margin-top:6px;line-height:1.8;border-left:3px solid var(--amber2);padding-left:10px">'+esc(txt)+'</div>';
 }
 
 /* ===== 分析頁分段（2026/09/26）=====
@@ -16846,7 +16847,7 @@ function shortTermHTML(c){var ct=crossTable(c),pas=assetPassive(c);
  var expList={};(c.expenses||[]).forEach(function(e){expList[e.cat]=(expList[e.cat]||0)+n(e.amount)});
  expList['負債本息']=annualDebtPay(c);
  var exp=Object.keys(expList).map(function(k){return [k,expList[k]]});var expTot=sum(exp,function(x){return x[1]})||1;
- function rowP(arr,tot){return arr.map(function(x){return '<tr><td class="k">'+x[0]+'</td><td>'+fmt(x[1])+'</td><td>'+(x[1]/tot*100).toFixed(1)+'%</td></tr>'}).join('')}
+ function rowP(arr,tot){return arr.map(function(x){return '<tr><td class="k">'+esc(x[0])+'</td><td>'+fmt(x[1])+'</td><td>'+(x[1]/tot*100).toFixed(1)+'%</td></tr>'}).join('')}
  var bal=incTot-expTot;
  var incPie=pieSVG(inc.map(function(x){return {name:x[0],pct:x[1]/incTot*100,benefit:''}}));
  var expPie=pieSVG(exp.map(function(x){return {name:x[0],pct:x[1]/expTot*100,benefit:''}}));
@@ -17120,7 +17121,7 @@ function bizReportHTML(c){
   ['第三階段 · 傳承','1～3 年','退場路徑選定、股權與傳承架構、家族治理']
  ].map(function(x){return '<tr><td><b>'+x[0]+'</b></td><td style="white-space:nowrap">'+x[1]+'</td><td>'+x[2]+'</td></tr>'}).join('');
  return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 企業主財務規劃</div><h1>企業主財務診斷書</h1></div>'+
-  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
+  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+esc(window.LANTU_BRAND.logoUrl)+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
   '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+(co.name?' · '+esc(co.name):'')+docCodeHTML()+'</div></div>'+
 
   '<h2>一、核心命題</h2>'+
@@ -17416,7 +17417,7 @@ function planReportHTML(c){
      : '照這一組動作走，做得到 <b>'+ff.age+' 歲以前</b>的所有事；第一個做不到的是 <b style="color:'+RP.bad+'">'+ff.age+' 歲的「'+esc(ff.name)+'」</b>。');
 
  return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>調整方案書</h1></div>'+
-  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
+  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+esc(window.LANTU_BRAND.logoUrl)+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
   '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+'　現年 '+n(p.age)+' 歲　目前階段：'+stageName(hb.grade)+docCodeHTML()+'</div></div>'+
 
   flowReportChapterHTML(c)+
@@ -17603,7 +17604,7 @@ function rFan(mc){var W=740,H=180,pad=40,years=mc.years,all=[];mc.bands.forEach(
  return '<svg width="100%" viewBox="0 0 '+W+' '+H+'"'+svgFit(W)+'>'+rAxisY(mn,mx,pad,W,H)+'<path d="'+top+' '+bot+' Z" fill="rgba(201,154,91,.14)"/><line x1="'+pad+'" y1="'+zeroY+'" x2="'+(W-pad)+'" y2="'+zeroY+'" stroke="#d9b8ac" stroke-dasharray="4 4"/><path d="'+med+'" fill="none" stroke="#c99a5b" stroke-width="2.5"/>'+ticks+'</svg>';}
 function rGapBars(gaps){var pos=gaps.filter(function(g){return g.gap>0});if(!pos.length)return '<p style="color:#6f8f74">目前無明顯保障缺口，現有保障大致足夠。</p>';
  var mx=Math.max.apply(null,pos.map(function(g){return g.gap}))||1;
- return pos.map(function(g){var w=g.gap/mx*100;return '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#33474e"><span>'+g.member+' · '+g.kind+'</span><span style="color:#b05a4a;font-weight:700">缺口 '+fmt(g.gap)+' '+kindUnit(g.kind)+'</span></div><div style="height:8px;background:#e2e8ea;border-radius:5px"><div style="height:100%;width:'+w.toFixed(0)+'%;background:#b05a4a;border-radius:5px"></div></div></div>'}).join('');}
+ return pos.map(function(g){var w=g.gap/mx*100;return '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#33474e"><span>'+esc(g.member)+' · '+esc(g.kind)+'</span><span style="color:#b05a4a;font-weight:700">缺口 '+fmt(g.gap)+' '+kindUnit(g.kind)+'</span></div><div style="height:8px;background:#e2e8ea;border-radius:5px"><div style="height:100%;width:'+w.toFixed(0)+'%;background:#b05a4a;border-radius:5px"></div></div></div>'}).join('');}
 
 /* ══════════════════════════════════════════════════════════════════════════
    報告書 · 各分類的「結果」章節（2026/08/24）
@@ -18132,7 +18133,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  var trkHTML=rTracking(c);
  var actRep=acts.map(function(a){return '<tr><td style="text-align:center;font-weight:700;color:#c99a5b">'+a.axis+'</td><td>'+esc(a.title)+'</td><td>'+esc(a.detail)+'</td></tr>'}).join('');
  var allocRep=al.list.filter(function(x){return n(x.pct)>0}).map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+n(x.pct)+'%</td><td>'+n(x.ret)+'%</td><td>'+esc(x.benefit)+'</td></tr>'}).join('');
- var memRows=(c.members||[]).map(function(x,xi){return '<tr><td>'+esc(x.name)+'</td><td>'+x.role+'</td><td>'+n(x.age)+' 歲</td><td>'+n(x.depRatio)+'%</td><td>'+(isEarnerRole(x.role)?jobLineText(c,x,xi===primaryIdx(c)):'—')+'</td></tr>'}).join('');
+ var memRows=(c.members||[]).map(function(x,xi){return '<tr><td>'+esc(x.name)+'</td><td>'+esc(x.role)+'</td><td>'+n(x.age)+' 歲</td><td>'+n(x.depRatio)+'%</td><td>'+(isEarnerRole(x.role)?jobLineText(c,x,xi===primaryIdx(c)):'—')+'</td></tr>'}).join('');
  var rColorR=function(s){return s==='good'?'#3f7d54':s==='warn'?'#b5852f':s==='bad'?'#b05a4a':'#777'};
  var ratioTblR=function(gn){var keys=Object.keys(r).filter(function(k){return r[k].group===gn});return '<table><tr><th>指標</th><th>現況</th><th>理想值</th></tr>'+keys.map(function(k){var x=r[k];return '<tr><td>'+k+'</td><td style="color:'+rColorR(x.status)+';font-weight:700">'+x.v+'</td><td style="color:#5a6b72">'+x.ideal+'</td></tr>'}).join('')+'</table>'};
  var advRows=adv.map(function(a){return '<li style="margin-bottom:4px"><b>'+a[0]+'</b>：'+a[1]+'</li>'}).join('');
@@ -18143,7 +18144,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  var assetPie=[{name:'流動資產',pct:aLiq},{name:'固定資產',pct:aFix}];
  var hp=h.parts;
  var head='<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>財務規劃報告書</h1></div>'+
-  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+window.LANTU_BRAND.logoUrl+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>')+'</div>'+
+  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+esc(window.LANTU_BRAND.logoUrl)+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>')+'</div>'+
   '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務階段 <b style="color:var(--amber2)">'+stageName(h.grade)+'</b>'+docCodeHTML()+'<span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>';
 
  // 章節先組起來，編號與目錄最後才由 rNumberSections() 依「實際印出來的章」自動產生。
@@ -18473,7 +18474,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
   function applyMark(logoUrl){
     var m=document.getElementById('brandMark');
     if(m&&logoUrl){
-      m.innerHTML='<img src="'+logoUrl+'" alt="嵐途 LAN TU" style="height:34px;width:auto;max-width:180px;object-fit:contain;display:block"/>';
+      m.innerHTML='<img src="'+esc(logoUrl)+'" alt="嵐途 LAN TU" style="height:34px;width:auto;max-width:180px;object-fit:contain;display:block"/>';
     }
   }
   try{

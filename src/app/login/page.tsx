@@ -1,3 +1,4 @@
+import { safeBackPath } from "@/lib/safeRedirect";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
@@ -48,7 +49,7 @@ export default async function LoginPage({
   searchParams: Promise<{ redirect_url?: string }>;
 }) {
   const sp = await searchParams;
-  const back = sp.redirect_url && sp.redirect_url.startsWith("/") ? sp.redirect_url : undefined;
+  const back = safeBackPath(sp.redirect_url);
   const { userId } = await auth();
 
   if (!userId) {

@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { applyAsCoach } from "@/lib/coach";
+import { applyAsCoach, ensureCoach } from "@/lib/coach";
 import { getApplySettings, lookupCoachByCode, submitApplication } from "@/lib/coachApplyStore";
 import { canSubmit, routeMeta, type ApplyDraft } from "@/lib/coachApply";
 
@@ -18,6 +18,14 @@ export async function applyAsCoachAction(draft: ApplyDraft) {
   const settings = await getApplySettings();
   // 前端已經擋過一次，這裡再擋一次 —— 只擋前端等於沒擋。
   if (!draft || !canSubmit(draft, settings)) return { ok: false as const, error: "資料未填完整" };
+
+  // 2026/10/25 資安盤點 #14：只有「還沒申請過」或「仍在待審」才能送——
+  // 已核准的教練重送會把自己的推薦人紀錄洗掉、停權者可以反覆製造待審紀錄。
+  // 與 applyAsCoach() 的 applyFields 同一條件。
+  const existing = await ensureCoach();
+  if (existing && existing.status !== "pending") {
+    return { ok: false as const, error: existing.status === "active" ? "你已經是教練了，不需要再申請" : "這個帳號目前無法送出申請" };
+  }
 
   const needsIntro = routeMeta(draft.route).needsIntroducer;
   const introducer = needsIntro ? await lookupCoachByCode(draft.introducerCode) : null;

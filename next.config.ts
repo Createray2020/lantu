@@ -19,6 +19,25 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: "/favicon.ico", destination: "/api/brand/icon" }];
   },
+  // 安全標頭（2026/10/25 資安盤點 #3）。
+  // frame-ancestors 'self'：規劃器 /lantu-app.html 是靜態檔、匿名可取，而它用 document.referrer
+  // 推父層 origin——沒有這條，任何網站都能把它框進去、送 lantu:init 餵資料。
+  // 官網、教練端、客戶端的 iframe 全部同源，所以 'self' 不影響任何現有用法。
+  // 完整 CSP（script-src 等）要先盤 Clerk 與規劃器的內聯腳本，另案處理。
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

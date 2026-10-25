@@ -9,6 +9,7 @@
 // 授權：Vercel Cron 會帶 `Authorization: Bearer $CRON_SECRET`。
 // 沒設 CRON_SECRET 時一律拒絕 —— 這支會改職級與寫資料，不能裸奔。
 
+import { timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches } from "@/Shared/db/schema";
@@ -20,8 +21,10 @@ export const maxDuration = 60;
 function authorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
+  // timingSafeEqual：長度不同先回 false（它要求等長），等長才做常數時間比對。
+  const a = Buffer.from(req.headers.get("authorization") ?? "");
+  const b = Buffer.from(`Bearer ${secret}`);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export async function GET(req: Request) {
