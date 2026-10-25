@@ -244,8 +244,32 @@ describe("askAssistant：金鑰與模型", () => {
     expect(r.rejected[0].reason).toContain("公司股權");
     expect(r.usage).toEqual({ input: 1234, output: 56, model: expect.any(String) });
     const call = create.mock.calls[0][0] as unknown as { system: string; tool_choice: { name: string }; messages: unknown[] };
-    expect(call.tool_choice.name).toBe("reply");
+    expect(call.tool_choice).toEqual({ type: "auto" });
+    expect((call as unknown as { max_tokens: number }).max_tokens).toBeGreaterThanOrEqual(3000);
     expect(call.system).toContain("王小明");
+  });
+
+  it("模型沒呼叫工具、只回文字 → 文字當回答、ops 空", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-test";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = { messages: { create: async () => ({ content: [{ type: "text", text: "退休缺口約 120 萬。" }], usage: { input_tokens: 10, output_tokens: 5 } }) } } as any;
+    const r = await askAssistant({ data: mkCase(), messages: [{ role: "user", content: "x" }], canWrite: true }, client);
+    expect(r.ok).toBe(true);
+    if (r.ok) { expect(r.answer).toBe("退休缺口約 120 萬。"); expect(r.ops).toEqual([]); }
+  });
+
+  it("型號不認得 thinking 參數（400）→ 自動退回不帶 thinking 再打一次", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-test";
+    let calls = 0;
+    const create = async (req: { thinking?: unknown }) => {
+      calls++;
+      if (req.thinking) { const e = new Error("thinking: unsupported") as Error & { status: number }; e.status = 400; throw e; }
+      return { content: [{ type: "tool_use", id: "t", name: "reply", input: { answer: "ok" } }], usage: { input_tokens: 1, output_tokens: 1 } };
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await askAssistant({ data: mkCase(), messages: [{ role: "user", content: "x" }], canWrite: true }, { messages: { create } } as any);
+    expect(calls).toBe(2);
+    expect(r.ok && r.answer).toBe("ok");
   });
 
   it("模型噴錯 → model_error（不把例外丟到 action）", async () => {
