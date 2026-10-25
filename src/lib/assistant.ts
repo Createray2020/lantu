@@ -34,7 +34,7 @@ export type RawOp =
 export type ResolvedField = {
   field: string;
   label: string;
-  via: "set" | "cat" | "polsub" | "memrole";
+  via: "set" | "cat" | "polsub" | "memrole" | "debtuse";
   /** 給 set() 的第四個參數。 */
   type: "num" | "txt" | "bool";
   /** 真正要寫進 c 的值（金額已年化）。 */

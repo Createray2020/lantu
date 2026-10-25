@@ -818,6 +818,9 @@ export const financeCategories = pgTable('finance_categories', {
   riskAsset: boolean('risk_asset').default(false).notNull(),
   liquidity: text('liquidity'),              // 資產：流動 / 固定
   consumer: boolean('consumer').default(false).notNull(),
+  // 負債：選這個細類時預設寫進資料列的「用途」（自用／投資／消費／其他）。2026/10/25 Ray 定案負債看目的分類，
+  // consumer 從此是衍生值（debt_use==='消費'），留著只為舊 payload／舊程式相容。
+  debtUse: text('debt_use'),
   needsNote: boolean('needs_note').default(false).notNull(), // 選了要提示補明細（「其他」）
   sortOrder: integer('sort_order').default(0).notNull(),
   active: boolean('active').default(true).notNull(),

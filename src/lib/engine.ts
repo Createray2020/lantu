@@ -177,8 +177,25 @@ function sum(a,f){return (a||[]).reduce(function(s,x){return s+f(x)},0)}
 // public/lantu-app.html 有一份對照實作（engine.drift.test.ts 對拍），改這裡要一起改。
 function isRiskAsset(a){if(a&&(a.risk===true||a.risk===false))return a.risk;
  return !!a&&(a.type==='股票'||a.type==='基金'||a.type==='債券'||(a.type==='不動產'&&a.mainCat==='可投資資產'));}
-function isConsumerDebt(l){if(l&&(l.consumerDebt===true||l.consumerDebt===false))return l.consumerDebt;
+// ===== 負債用途（2026/10/25 Ray 定案：負債看「目的」分類，不看貸款形式）=====
+// 四格：自用／投資／消費／其他。row.use 有值就用（選細類時由後台字典的 debt_use 寫進來，教練可逐筆改）；
+// 舊資料沒有 use 時退回推導：consumerDebt 旗標或舊字串比對 → 消費；投資房貸／質押／質借／週轉／融資租賃／保單借款 → 投資；
+// 房貸／車貸／就學貸款 → 自用；大類「其他」與應付稅款 → 其他。既有客戶一筆都不用回填。
+// ⚠️ 不做 DB backfill 是刻意的：跟 risk 旗標同一套路，讀取時推導。
+var DEBT_USES=['自用','投資','消費','其他'];
+function legacyConsumerDebt(l){if(l&&(l.consumerDebt===true||l.consumerDebt===false))return l.consumerDebt;
  return !!l&&(l.mainCat==='信貸'||/信|卡|消費/.test(l.name||''));}
+function debtUse(l){if(!l)return '其他';
+ if(DEBT_USES.indexOf(l.use)>=0)return l.use;
+ if(legacyConsumerDebt(l))return '消費';
+ var s=l.subCat||'';
+ if(s==='投資房貸'||/質押|質借|週轉|融資租賃|保單借款/.test(s))return '投資';
+ if(/應付稅款/.test(s))return '其他';
+ if(l.mainCat==='房貸'||l.mainCat==='車貸'||/就學/.test(s))return '自用';
+ if(l.mainCat==='其他')return '其他';
+ return '自用';}
+// 消費性負債＝用途是「消費」。保留函式名是因為 UI／測試還在叫它。
+function isConsumerDebt(l){return debtUse(l)==='消費'}
 
 // Infinity 不擋的話會原字串印到畫面上（例：月數為 0 的貸款試算 → 「月繳 Infinity」）。
 function fmt(v){v=n(v);if(!isFinite(v))return '—';v=Math.round(v);return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')}
@@ -2935,10 +2952,11 @@ function crossTable(c){var m=metrics(c);
  var expOther=sum(c.expenses,function(e){return (activeNow(c,e)&&['生活','消費','稅賦','保險','孝親','貸款'].indexOf(e.cat)<0)?n(e.amount):0});
  var aSelf=sum(c.assets,function(a){return aLiquid(c,a)?0:aVal(a)});
  var aInv=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
- var dCons=sum(c.liabilities,function(l){return isConsumerDebt(l)?lBal(l):0});
- var dInv=m.debtTotal-dCons;
+ // 負債四格依用途（debtUse）。⚠️ dInv 改版前＝總負債−消費型，現在只算用途「投資」的；四格相加＝總負債。
+ var dByUse={自用:0,投資:0,消費:0,其他:0};(c.liabilities||[]).forEach(function(l){dByUse[debtUse(l)]+=lBal(l)});
+ var dSelf=dByUse['自用'],dInv=dByUse['投資'],dCons=dByUse['消費'],dOther=dByUse['其他'];
  return {incWork:incWork,incFin:incFin,incOther:incOther,incTotal:m.incTotal,expLive:expLive,expLoan:expLoan,expSupport:expSupport,expTax:expTax,expIns:expIns,expOther:expOther,expTotal:m.expTotal,saveInvest:m.saveInvest,
-  aSelf:aSelf,aInv:aInv,aTotal:m.assetTotal,dCons:dCons,dInv:dInv,dTotal:m.debtTotal,net:m.net,monthBal:(m.incTotal-m.expTotal)/12};
+  aSelf:aSelf,aInv:aInv,aTotal:m.assetTotal,dSelf:dSelf,dInv:dInv,dCons:dCons,dOther:dOther,dTotal:m.debtTotal,net:m.net,monthBal:(m.incTotal-m.expTotal)/12};
 }
 
 // @deprecated 已改用 stageColor（財務階段）；保留僅為既有 export 契約相容，勿用於新程式。
@@ -3290,6 +3308,9 @@ export {
   CAP_RATE_STARTER,
   applyPlanCaps,
   crossTable,
+  debtUse,
+  isConsumerDebt,
+  DEBT_USES,
   gradeColor,
   PURPOSES,
   TARGETS,

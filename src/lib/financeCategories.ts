@@ -9,6 +9,9 @@ import {
   CAT_PARENTS,
   DEFAULT_FINANCE_CATEGORIES,
   type CatKind,
+  defaultDebtUse,
+  isDebtUse,
+  type DebtUse,
 } from "./financeCategories.defaults";
 
 export const FIN_CAT_TAG = "finance-categories";
@@ -21,6 +24,7 @@ export type FinCatRow = {
   riskAsset: boolean;
   liquidity: string | null;
   consumer: boolean;
+  debtUse: DebtUse | null;
   needsNote: boolean;
   sortOrder: number;
   active: boolean;
@@ -30,7 +34,7 @@ export type FinCatRow = {
 // 給 iframe app 吃的精簡格式（欄位縮短：這份 JSON 每次開分頁都會傳）
 export type FinCatPayload = Record<
   CatKind,
-  Array<{ label: string; parent: string; risk?: boolean; liq?: string; consumer?: boolean; note?: boolean }>
+  Array<{ label: string; parent: string; risk?: boolean; liq?: string; use?: DebtUse; consumer?: boolean; note?: boolean }>
 >;
 
 export const isCatKind = (v: string): v is CatKind =>
@@ -49,6 +53,7 @@ export async function listCategories(): Promise<FinCatRow[]> {
     riskAsset: r.riskAsset,
     liquidity: r.liquidity,
     consumer: r.consumer,
+    debtUse: isDebtUse(r.debtUse) ? r.debtUse : null,
     needsNote: r.needsNote,
     sortOrder: r.sortOrder,
     active: r.active,
@@ -67,6 +72,7 @@ export function toPayload(rows: FinCatRow[]): FinCatPayload {
       parent: r.parent,
       ...(r.riskAsset ? { risk: true } : {}),
       ...(r.liquidity ? { liq: r.liquidity } : {}),
+      ...(r.kind === "liability" ? { use: r.debtUse ?? defaultDebtUse(r.parent) } : {}),
       ...(r.consumer ? { consumer: true } : {}),
       ...(r.needsNote ? { note: true } : {}),
     });
@@ -84,6 +90,7 @@ export function defaultPayload(): FinCatPayload {
       parent: s.parent,
       ...(s.risk ? { risk: true } : {}),
       ...(s.liq ? { liq: s.liq } : {}),
+      ...(s.kind === "liability" ? { use: s.use ?? defaultDebtUse(s.parent) } : {}),
       ...(s.consumer ? { consumer: true } : {}),
       ...(s.note ? { note: true } : {}),
     });
@@ -111,6 +118,7 @@ export type CatInput = {
   riskAsset?: boolean;
   liquidity?: string | null;
   consumer?: boolean;
+  debtUse?: string | null;
   needsNote?: boolean;
   sortOrder?: number;
   active?: boolean;
@@ -134,7 +142,9 @@ export function normalizeCatInput(input: CatInput): Omit<FinCatRow, "id" | "isSy
     label,
     riskAsset: kind === "asset" ? !!input.riskAsset : false,
     liquidity: kind === "asset" ? (liq || null) : null,
-    consumer: kind === "liability" ? !!input.consumer : false,
+    // 用途：負債必填（沒給就依大類預設）；consumer 是它的衍生值，不再獨立接受輸入。
+    debtUse: kind === "liability" ? (isDebtUse(input.debtUse) ? input.debtUse : defaultDebtUse(parent)) : null,
+    consumer: kind === "liability" ? (isDebtUse(input.debtUse) ? input.debtUse : defaultDebtUse(parent)) === "消費" : false,
     needsNote: !!input.needsNote,
     sortOrder: Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : 999,
     active: input.active !== false,
@@ -189,7 +199,8 @@ export async function seedDefaultCategories(): Promise<number> {
       label: s.label,
       riskAsset: !!s.risk,
       liquidity: s.liq ?? null,
-      consumer: !!s.consumer,
+      consumer: (s.use ?? defaultDebtUse(s.parent)) === "消費",
+      debtUse: s.kind === "liability" ? (s.use ?? defaultDebtUse(s.parent)) : null,
       needsNote: !!s.note,
       sortOrder: per[s.kind],
       active: true,

@@ -15,7 +15,7 @@
 // ⚠️ 細類（subType／subCat／type／mainCat）要走 setCat() 才會連動大類與 risk／cls／consumerDebt，
 //    所以這些欄位標 via:'cat'；保單險種細分走 setPolicySub()（會換 claimNote 範本），標 via:'polsub'。
 
-export type FieldVia = "set" | "cat" | "polsub" | "memrole";
+export type FieldVia = "set" | "cat" | "polsub" | "memrole" | "debtuse";
 export type FieldType = "text" | "num" | "money" | "bool" | "select" | "member" | "pct" | "date";
 
 export type FieldDef = {
@@ -172,6 +172,8 @@ export const ASSISTANT_ARRAYS: ArrayDef[] = [
       OWNER,
       { key: "mainCat", label: "主分類", aliases: ["大類", "貸款類型"], type: "select", cats: { kind: "liability", level: "parent" }, via: "cat" },
       { key: "subCat", label: "細項", aliases: ["細類"], type: "select", cats: { kind: "liability", level: "sub" }, via: "cat" },
+      // 用途＝借來的錢去了哪裡（2026/10/25 負債改看目的分類）。走 setDebtUse 才會同步 consumerDebt 衍生值。
+      { key: "use", label: "用途", aliases: ["借來做什麼", "貸款用途", "拿去"], type: "select", via: "debtuse", options: ["自用", "投資", "消費", "其他"], hint: "自用（自住房、自用車、就學）／投資／消費／其他（轉借親友、週轉）" },
       { key: "balance", label: "餘額", aliases: ["剩多少", "本金餘額", "還欠"], type: "money", hint: "原幣" },
       { key: "rate", label: "年利率%", aliases: ["利率"], type: "pct" },
       { key: "pay", label: "月付金", aliases: ["每月還", "月繳", "每月付"], type: "money", hint: "每月" },

@@ -329,6 +329,33 @@ describe("雙實作對拍：engine.ts ↔ lantu-app.html", () => {
     }
   });
 
+  // ── 2026/10/25 負債用途四格（自用／投資／消費／其他）──
+  it("debtUse()：推導規則兩邊逐字一致，crossTable 四格相加＝總負債", () => {
+    for (const line of [
+      "function debtUse(l){if(!l)return '其他';",
+      " if(DEBT_USES.indexOf(l.use)>=0)return l.use;",
+      " if(legacyConsumerDebt(l))return '消費';",
+      " if(s==='投資房貸'||/質押|質借|週轉|融資租賃|保單借款/.test(s))return '投資';",
+      " if(l.mainCat==='房貸'||l.mainCat==='車貸'||/就學/.test(s))return '自用';",
+      "function isConsumerDebt(l){return debtUse(l)==='消費'}",
+      "var dByUse={自用:0,投資:0,消費:0,其他:0};(c.liabilities||[]).forEach(function(l){dByUse[debtUse(l)]+=lBal(l)});",
+    ]) expect(HTML).toContain(line);
+    const c = E.sampleCase();
+    c.liabilities = [
+      { name: "房貸", mainCat: "房貸", subCat: "自住房貸", balance: 1000, currency: "台幣", fxRate: 1 },
+      { name: "增貸", mainCat: "房貸", subCat: "二胎房貸", use: "消費", balance: 200, currency: "台幣", fxRate: 1 },
+      { name: "投資房", mainCat: "房貸", subCat: "投資房貸", balance: 300, currency: "台幣", fxRate: 1 },
+      { name: "借給爸媽", mainCat: "信貸", subCat: "信用貸款", consumerDebt: true, use: "其他", balance: 50, currency: "台幣", fxRate: 1 },
+    ];
+    const ct = E.crossTable(c);
+    expect(ct.dSelf).toBe(1000);
+    expect(ct.dCons).toBe(200);
+    expect(ct.dInv).toBe(300);
+    expect(ct.dOther).toBe(50);
+    expect(ct.dSelf + ct.dInv + ct.dCons + ct.dOther).toBe(ct.dTotal);
+    expect(E.DEBT_USES).toEqual(["自用", "投資", "消費", "其他"]);
+  });
+
   // ── 2026/08 退休期三段式金流 ──
   it("三段權重 retiredWeight()：公式與降級路徑兩邊一致", () => {
     expect(HTML).toContain("var done=0;pts.forEach(function(p){if(age>p.at)done+=p.share;});");

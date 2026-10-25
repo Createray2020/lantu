@@ -27,7 +27,7 @@ function htmlConst(name: string): unknown {
   return Function(`"use strict";return (${m[1]});`)();
 }
 
-type HtmlCat = { label: string; parent: string; risk?: boolean; liq?: string; consumer?: boolean; note?: boolean };
+type HtmlCat = { label: string; parent: string; risk?: boolean; liq?: string; use?: string; consumer?: boolean; note?: boolean };
 
 describe("細類字典雙實作對拍：financeCategories.defaults.ts ↔ lantu-app.html", () => {
   const fallback = htmlConst("CAT_FALLBACK") as Record<CatKind, HtmlCat[]>;
@@ -48,6 +48,7 @@ describe("細類字典雙實作對拍：financeCategories.defaults.ts ↔ lantu-
         parent: s.parent,
         ...(s.risk ? { risk: true } : {}),
         ...(s.liq ? { liq: s.liq } : {}),
+        ...(s.use ? { use: s.use } : {}),
         ...(s.consumer ? { consumer: true } : {}),
         ...(s.note ? { note: true } : {}),
       }));
@@ -113,12 +114,38 @@ describe("normalizeCatInput：大類亂填是硬擋，不是靜默修正", () =>
     expect(v.consumer).toBe(false);
     expect(v.liquidity).toBeNull();
   });
+
+  // 2026/10/25：負債的 consumer 不再獨立輸入，是 debtUse==='消費' 的衍生值；沒給用途就依大類預設。
+  it("負債：debtUse 必有值（沒給依大類預設），consumer 跟著 debtUse 走、不接受獨立輸入", () => {
+    const a = normalizeCatInput({ kind: "liability", parent: "房貸", label: "增貸" });
+    expect(a.debtUse).toBe("自用");
+    expect(a.consumer).toBe(false);
+    const b = normalizeCatInput({ kind: "liability", parent: "信貸", label: "小額信貸" });
+    expect(b.debtUse).toBe("消費");
+    expect(b.consumer).toBe(true);
+    const c = normalizeCatInput({ kind: "liability", parent: "其他", label: "週轉金", debtUse: "投資", consumer: true });
+    expect(c.debtUse).toBe("投資");
+    expect(c.consumer).toBe(false);
+    const d = normalizeCatInput({ kind: "liability", parent: "其他", label: "x", debtUse: "亂填" });
+    expect(d.debtUse).toBe("其他");
+    expect(normalizeCatInput({ kind: "asset", parent: "自用資產", label: "房", debtUse: "消費" }).debtUse).toBeNull();
+  });
+
+  it("payload 的負債細類一律帶 use（前端 setCat 直接寫進資料列）", () => {
+    const p = defaultPayload();
+    for (const x of p.liability) expect(["自用", "投資", "消費", "其他"], x.label).toContain(x.use);
+    expect(p.liability.find((x) => x.label === "自住房貸")?.use).toBe("自用");
+    expect(p.liability.find((x) => x.label === "投資房貸")?.use).toBe("投資");
+    expect(p.liability.find((x) => x.label === "信用卡循環")?.use).toBe("消費");
+    expect(p.liability.find((x) => x.label === "私人借款(親友)")?.use).toBe("其他");
+    expect(p.asset.every((x) => x.use === undefined)).toBe(true);
+  });
 });
 
 describe("toPayload：停用的細類不會送到前端，但預設清單一定送得出去", () => {
   const row = (over: Partial<FinCatRow>): FinCatRow => ({
     id: "x", kind: "asset", parent: "可投資資產", label: "股票",
-    riskAsset: true, liquidity: "流動", consumer: false, needsNote: false,
+    riskAsset: true, liquidity: "流動", consumer: false, debtUse: null, needsNote: false,
     sortOrder: 1, active: true, isSystem: true, ...over,
   });
 

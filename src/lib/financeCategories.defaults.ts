@@ -8,9 +8,18 @@
 // parent  = 選這個細類時自動帶入的大類（進階欄仍可覆寫，例如不動產可自用可投資）
 // risk    = 資產：是否計入「風險性資產」（引擎會把這個旗標寫進該筆資料，取代舊的字串比對）
 // liq     = 資產：預設流動性（流動／固定）
-// consumer= 負債：是否算「消費性負債」（同上，寫進資料列）
+// use     = 負債：預設「用途」自用／投資／消費／其他（寫進資料列 row.use；2026/10/25 負債改看目的分類）
+// consumer= 負債：是否算「消費性負債」——衍生值 use==='消費'，留著只為相容
 // note    = 選了要提示補明細（目前只有「其他」）
 export type CatKind = "income" | "expense" | "saving" | "asset" | "liability";
+
+// 負債用途四格。引擎 debtUse() 的 fallback 與 public/lantu-app.html 的 DEBT_USES 要跟這裡一致。
+export const DEBT_USES = ["自用", "投資", "消費", "其他"] as const;
+export type DebtUse = (typeof DEBT_USES)[number];
+export const isDebtUse = (v: unknown): v is DebtUse => (DEBT_USES as readonly string[]).includes(String(v));
+// 細類沒指定用途時，依大類給預設：房貸／車貸→自用、信貸→消費、其他→其他。
+export const defaultDebtUse = (parent: string): DebtUse =>
+  parent === "信貸" ? "消費" : parent === "其他" ? "其他" : "自用";
 
 export type CatSeed = {
   kind: CatKind;
@@ -18,6 +27,7 @@ export type CatSeed = {
   label: string;
   risk?: boolean;
   liq?: "流動" | "固定";
+  use?: DebtUse;
   consumer?: boolean;
   note?: boolean;
 };
@@ -183,27 +193,27 @@ const asset: CatSeed[] = [
 ];
 
 const liability: CatSeed[] = [
-  { kind: "liability", parent: "房貸", label: "自住房貸" },
-  { kind: "liability", parent: "房貸", label: "投資房貸" },
-  { kind: "liability", parent: "房貸", label: "二胎房貸" },
-  { kind: "liability", parent: "房貸", label: "房屋修繕貸款" },
-  { kind: "liability", parent: "車貸", label: "汽車貸款" },
-  { kind: "liability", parent: "車貸", label: "機車貸款" },
-  { kind: "liability", parent: "信貸", label: "信用貸款", consumer: true },
-  { kind: "liability", parent: "信貸", label: "信用卡循環", consumer: true },
-  { kind: "liability", parent: "信貸", label: "現金卡/預借現金", consumer: true },
-  { kind: "liability", parent: "信貸", label: "分期付款", consumer: true },
-  { kind: "liability", parent: "信貸", label: "卡債協商", consumer: true },
-  { kind: "liability", parent: "信貸", label: "就學貸款" },
-  { kind: "liability", parent: "其他", label: "私人借款(親友)" },
-  { kind: "liability", parent: "其他", label: "民間借貸", consumer: true },
-  { kind: "liability", parent: "其他", label: "保單借款" },
-  { kind: "liability", parent: "其他", label: "股票質押借款" },
-  { kind: "liability", parent: "其他", label: "不動產質借" },
-  { kind: "liability", parent: "其他", label: "企業/營運週轉貸款" },
-  { kind: "liability", parent: "其他", label: "融資租賃" },
-  { kind: "liability", parent: "其他", label: "應付稅款" },
-  { kind: "liability", parent: "其他", label: "其他", note: true },
+  { kind: "liability", parent: "房貸", label: "自住房貸", use: "自用" },
+  { kind: "liability", parent: "房貸", label: "投資房貸", use: "投資" },
+  { kind: "liability", parent: "房貸", label: "二胎房貸", use: "自用" },
+  { kind: "liability", parent: "房貸", label: "房屋修繕貸款", use: "自用" },
+  { kind: "liability", parent: "車貸", label: "汽車貸款", use: "自用" },
+  { kind: "liability", parent: "車貸", label: "機車貸款", use: "自用" },
+  { kind: "liability", parent: "信貸", label: "信用貸款", use: "消費", consumer: true },
+  { kind: "liability", parent: "信貸", label: "信用卡循環", use: "消費", consumer: true },
+  { kind: "liability", parent: "信貸", label: "現金卡/預借現金", use: "消費", consumer: true },
+  { kind: "liability", parent: "信貸", label: "分期付款", use: "消費", consumer: true },
+  { kind: "liability", parent: "信貸", label: "卡債協商", use: "消費", consumer: true },
+  { kind: "liability", parent: "信貸", label: "就學貸款", use: "自用" },
+  { kind: "liability", parent: "其他", label: "私人借款(親友)", use: "其他" },
+  { kind: "liability", parent: "其他", label: "民間借貸", use: "消費", consumer: true },
+  { kind: "liability", parent: "其他", label: "保單借款", use: "投資" },
+  { kind: "liability", parent: "其他", label: "股票質押借款", use: "投資" },
+  { kind: "liability", parent: "其他", label: "不動產質借", use: "投資" },
+  { kind: "liability", parent: "其他", label: "企業/營運週轉貸款", use: "投資" },
+  { kind: "liability", parent: "其他", label: "融資租賃", use: "投資" },
+  { kind: "liability", parent: "其他", label: "應付稅款", use: "其他" },
+  { kind: "liability", parent: "其他", label: "其他", use: "其他", note: true },
 ];
 
 export const DEFAULT_FINANCE_CATEGORIES: readonly CatSeed[] = [

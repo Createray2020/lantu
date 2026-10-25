@@ -14,7 +14,7 @@ import {
   resetEduCostsAction,
   type ActionResult,
 } from "./actions";
-import { CAT_PARENTS, CAT_KIND_LABEL, type CatKind } from "@/lib/financeCategories.defaults";
+import { CAT_PARENTS, CAT_KIND_LABEL, DEBT_USES, defaultDebtUse, type CatKind } from "@/lib/financeCategories.defaults";
 import type { FinCatRow } from "@/lib/financeCategories";
 import type { EduCostRow } from "@/lib/eduCosts";
 
@@ -31,7 +31,7 @@ const KIND_HINT: Record<CatKind, string> = {
   asset:
     "大類決定淨值結構：自用資產不計入核心資產、可投資資產才是累積進度的分母。「計入風險性資產」另外決定資產配置與風險承受度的分子。",
   liability:
-    "大類決定負債品質：房貸看房貸負擔率、信貸／勾了「消費性負債」的會進消費性負債比。放錯會讓債務體質評級失真。",
+    "大類是貸款的形式（房貸看房貸負擔率）；「預設用途」是借來的錢去了哪裡（自用／投資／消費／其他），選了細類就寫進那一筆負債，教練仍可逐筆改。消費類負債多是收支管理的警訊，放錯會讓十字表與報告書的負債結構失真。",
 };
 
 const inputCls = FIELD;
@@ -43,7 +43,7 @@ type Draft = {
   label: string;
   riskAsset: boolean;
   liquidity: string;
-  consumer: boolean;
+  debtUse: string;
   needsNote: boolean;
   sortOrder: number;
   active: boolean;
@@ -54,7 +54,7 @@ const toDraft = (r: FinCatRow): Draft => ({
   label: r.label,
   riskAsset: r.riskAsset,
   liquidity: r.liquidity ?? "",
-  consumer: r.consumer,
+  debtUse: r.debtUse ?? defaultDebtUse(r.parent),
   needsNote: r.needsNote,
   sortOrder: r.sortOrder,
   active: r.active,
@@ -165,7 +165,7 @@ function CatTable({
     label: "",
     riskAsset: false,
     liquidity: kind === "asset" ? "流動" : "",
-    consumer: false,
+    debtUse: defaultDebtUse(parents[0]),
     needsNote: false,
     sortOrder: 999,
     active: true,
@@ -192,7 +192,7 @@ function CatTable({
               <th className="px-2 py-2 text-left font-medium">細類名稱</th>
               {kind === "asset" && <th className="px-2 py-2 text-left font-medium">風險性</th>}
               {kind === "asset" && <th className="px-2 py-2 text-left font-medium">流動性</th>}
-              {kind === "liability" && <th className="px-2 py-2 text-left font-medium">消費性</th>}
+              {kind === "liability" && <th className="px-2 py-2 text-left font-medium">預設用途</th>}
               <th className="px-2 py-2 text-left font-medium">提示補明細</th>
               <th className="px-2 py-2 text-left font-medium">狀態</th>
               <th className="px-2 py-2 text-right font-medium">操作</th>
@@ -257,13 +257,16 @@ function CatTable({
                     </td>
                   )}
                   {kind === "liability" && (
-                    <td className="px-2 py-1.5 w-20 text-center">
-                      <input
-                        type="checkbox"
-                        disabled={!isEdit}
-                        checked={isEdit ? draft!.consumer : r.consumer}
-                        onChange={(e) => patch({ consumer: e.target.checked })}
-                      />
+                    <td className="px-2 py-1.5 w-24">
+                      {isEdit ? (
+                        <select className={inputCls} value={draft!.debtUse} onChange={(e) => patch({ debtUse: e.target.value })}>
+                          {DEBT_USES.map((u) => (
+                            <option key={u}>{u}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        r.debtUse ?? defaultDebtUse(r.parent)
+                      )}
                     </td>
                   )}
                   <td className="px-2 py-1.5 w-24 text-center">
@@ -297,7 +300,7 @@ function CatTable({
                                   label: draft!.label,
                                   riskAsset: draft!.riskAsset,
                                   liquidity: draft!.liquidity,
-                                  consumer: draft!.consumer,
+                                  debtUse: draft!.debtUse,
                                   needsNote: draft!.needsNote,
                                   sortOrder: draft!.sortOrder,
                                   active: draft!.active,
@@ -402,9 +405,13 @@ function CatTable({
             </>
           )}
           {kind === "liability" && (
-            <label className="flex items-center gap-1 text-xs text-tx2">
-              <input type="checkbox" checked={nw.consumer} onChange={(e) => setNw({ ...nw, consumer: e.target.checked })} />
-              算消費性負債
+            <label className="text-xs text-tx2">
+              預設用途
+              <select className={inputCls + " mt-1 w-24"} value={nw.debtUse} onChange={(e) => setNw({ ...nw, debtUse: e.target.value })}>
+                {DEBT_USES.map((u) => (
+                  <option key={u}>{u}</option>
+                ))}
+              </select>
             </label>
           )}
           <label className="flex items-center gap-1 text-xs text-tx2">

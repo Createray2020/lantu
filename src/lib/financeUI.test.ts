@@ -64,21 +64,55 @@ describe("選細類會把大類與旗標一起寫進資料列（引擎讀不到�
     expect(w.isRiskAsset(a)).toBe(false);
   });
 
-  it("負債選「信用卡循環」→ 大類=信貸、消費性=true", () => {
+  it("負債選「信用卡循環」→ 大類=信貸、用途=消費、消費性=true", () => {
     w.setCat("liabilities", 0, "liability", "信用卡循環");
     const l = w.activeCase().liabilities[0];
     expect(l.subCat).toBe("信用卡循環");
     expect(l.mainCat).toBe("信貸");
+    expect(l.use).toBe("消費");
     expect(l.consumerDebt).toBe(true);
     expect(w.isConsumerDebt(l)).toBe(true);
   });
 
-  it("負債選「私人借款(親友)」→ 大類=其他、預設不算消費性負債", () => {
+  it("負債選「私人借款(親友)」→ 大類=其他、用途=其他、不算消費性負債", () => {
     w.setCat("liabilities", 0, "liability", "私人借款(親友)");
     const l = w.activeCase().liabilities[0];
     expect(l.mainCat).toBe("其他");
+    expect(l.use).toBe("其他");
     expect(l.consumerDebt).toBe(false);
     expect(w.isConsumerDebt(l)).toBe(false);
+  });
+
+  // 2026/10/25 Ray 定案：負債看目的，不看形式。同一筆增貸可以是買房也可以是消費，所以用途是列級、可逐筆改。
+  it("負債用途：細類給預設（自住房貸→自用、投資房貸→投資、保單借款→投資），setDebtUse 逐筆覆寫並同步 consumerDebt", () => {
+    w.setCat("liabilities", 0, "liability", "自住房貸");
+    expect(w.activeCase().liabilities[0].use).toBe("自用");
+    w.setCat("liabilities", 0, "liability", "投資房貸");
+    expect(w.activeCase().liabilities[0].use).toBe("投資");
+    w.setCat("liabilities", 0, "liability", "保單借款");
+    expect(w.activeCase().liabilities[0].use).toBe("投資");
+    // 增貸拿去消費：細類不動、用途改消費
+    w.setCat("liabilities", 0, "liability", "二胎房貸");
+    w.setDebtUse(0, "消費");
+    const l = w.activeCase().liabilities[0];
+    expect(l.subCat).toBe("二胎房貸");
+    expect(l.use).toBe("消費");
+    expect(l.consumerDebt).toBe(true);
+    expect(w.isConsumerDebt(l)).toBe(true);
+    w.setDebtUse(0, "其他");
+    expect(w.activeCase().liabilities[0].consumerDebt).toBe(false);
+    expect(w.debtUse(w.activeCase().liabilities[0])).toBe("其他");
+    // 亂值一律落「其他」
+    w.setDebtUse(0, "亂填");
+    expect(w.activeCase().liabilities[0].use).toBe("其他");
+  });
+
+  it("負債列的用途欄：選「其他」時提示債權端要登資產表的應收帳款/借出款", () => {
+    w.setCat("liabilities", 0, "liability", "自住房貸");
+    expect(w.debtUseCell(0, w.activeCase().liabilities[0])).not.toContain("債權登資產表");
+    w.setDebtUse(0, "其他");
+    expect(w.debtUseCell(0, w.activeCase().liabilities[0])).toContain("債權登資產表");
+    expect(w.debtUseCell(0, w.activeCase().liabilities[0])).toContain("應收帳款/借出款");
   });
 
   it("收入選細類會連動稅務大類（執行業務所得仍歸「工作」，費用率扣除照舊）", () => {
@@ -107,6 +141,24 @@ describe("舊資料相容：沒有旗標的資料沿用改版前的判定，數�
   it("旗標一旦寫進資料就優先於字串比對（顧問可個案覆寫）", () => {
     expect(w.isRiskAsset({ type: "股票", risk: false })).toBe(false);
     expect(w.isConsumerDebt({ mainCat: "房貸", consumerDebt: true })).toBe(true);
+  });
+
+  it("舊負債列沒有 use 時的用途推導：既有客戶一筆都不用回填", () => {
+    expect(w.debtUse({ mainCat: "房貸", name: "房貸" })).toBe("自用");
+    expect(w.debtUse({ mainCat: "房貸", subCat: "投資房貸" })).toBe("投資");
+    expect(w.debtUse({ mainCat: "車貸", subCat: "汽車貸款" })).toBe("自用");
+    expect(w.debtUse({ mainCat: "信貸", subCat: "就學貸款", consumerDebt: false })).toBe("自用");
+    expect(w.debtUse({ mainCat: "信貸", name: "銀行借款" })).toBe("消費");
+    expect(w.debtUse({ mainCat: "信貸", subCat: "信用貸款", consumerDebt: true })).toBe("消費");
+    expect(w.debtUse({ mainCat: "其他", subCat: "保單借款" })).toBe("投資");
+    expect(w.debtUse({ mainCat: "其他", subCat: "股票質押借款" })).toBe("投資");
+    expect(w.debtUse({ mainCat: "其他", subCat: "應付稅款" })).toBe("其他");
+    expect(w.debtUse({ mainCat: "其他", name: "總負債" })).toBe("其他");   // 人生護照客戶自己填的一行
+    expect(w.debtUse({ mainCat: "其他", name: "卡費" })).toBe("消費");
+    // use 一旦寫進去就優先
+    expect(w.debtUse({ mainCat: "房貸", subCat: "自住房貸", use: "消費" })).toBe("消費");
+    expect(w.isConsumerDebt({ mainCat: "房貸", subCat: "自住房貸", use: "消費" })).toBe(true);
+    expect(w.isConsumerDebt({ mainCat: "信貸", consumerDebt: true, use: "投資" })).toBe(false);
   });
 });
 
