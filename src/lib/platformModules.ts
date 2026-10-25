@@ -14,7 +14,7 @@ import { platformModules } from "@/Shared/db/schema";
 
 export const PLATFORM_MODULES_TAG = "platform-modules";
 
-export type ModuleKey = "learn";
+export type ModuleKey = "learn" | "assistant" | "assistant_write";
 
 export type ModuleDef = {
   key: ModuleKey;
@@ -39,6 +39,29 @@ export const MODULES: ModuleDef[] = [
       + "標記單元完成也會被擋下。後台「學習區管理」不受影響，course 與教材照樣可以先建好。",
     defaultEnabled: false,
     defaultNotice: "學習區正在建置中，課程與教材準備好之後會開放。",
+  },
+  // 2026/10/25 AI 助理（顧問端）。兩個開關分開：面板整個＝assistant；填寫（預覽卡套用）＝assistant_write。
+  // Ray 的決定是「寫入功能做完但先關著，schema 消停了再打開」——所以寫入預設關，面板預設也關
+  //（金鑰還沒進 Vercel 之前開著只會看到「尚未啟用」）。
+  {
+    key: "assistant",
+    label: "AI 助理（規劃器右緣面板）",
+    area: "教練端",
+    effect:
+      "關閉時，規劃器右緣沒有「助理」面板（記事本照常）。開啟但伺服器沒有 ANTHROPIC_API_KEY 時，"
+      + "面板會顯示「尚未啟用」而不是消失。",
+    defaultEnabled: false,
+    defaultNotice: "AI 助理尚未開放。",
+  },
+  {
+    key: "assistant_write",
+    label: "AI 助理：填寫（預覽卡套用）",
+    area: "教練端",
+    effect:
+      "關閉時助理只回答問題，不會提出填寫動作（教練要它填東西會被告知目前只能問答）。"
+      + "開啟後教練描述要填的內容，助理回預覽卡，教練勾選套用才寫進規劃。只有主責教練能套用，協作唯讀教練永遠只能問答。",
+    defaultEnabled: false,
+    defaultNotice: "助理目前只提供問答，填寫功能尚未開放。",
   },
 ];
 

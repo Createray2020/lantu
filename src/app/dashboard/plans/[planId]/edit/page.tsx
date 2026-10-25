@@ -6,6 +6,8 @@ import { clientAccess } from "@/lib/clientScope";
 import { getClientQuiz } from "@/lib/clientRiskQuiz";
 import { licenseState } from "@/lib/license";
 import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
+import { getModuleStates } from "@/lib/platformModules";
+import { assistantConfigured } from "@/lib/assistant";
 import PlanEditor from "./PlanEditor";
 
 export const dynamic = "force-dynamic";
@@ -23,13 +25,24 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
   if (!plan) notFound();
   // 客戶編號：三份可交付文件的表頭要印它，隨 lantu:init 一起送進 iframe。
   // 生日同車：規劃裡還空著時由 iframe 帶入 profile.birth，教練不必再打一次（反向回寫在 updatePlanData）。
-  const [client, access, quiz] = await Promise.all([
+  const [client, access, quiz, mods] = await Promise.all([
     getClientForRead(coach.id, plan.clientId),
     clientAccess(coach.id, plan.clientId),
     // 客戶自己填的風險屬性測驗：教練端要看得到結果，也要能一鍵套用進這份規劃。
     getClientQuiz(plan.clientId),
+    getModuleStates(),
   ]);
   const isOwner = access === "owner";
+  const expired = licenseState(coach).expired;
+  // AI 助理（2026/10/25）：面板開關、填寫開關、金鑰有沒有——都在這裡決定，隨 lantu:init 送進 iframe。
+  // 填寫＝主責＋未到期＋後台 assistant_write 開；協作唯讀教練永遠只能問答。真正的寫入閘仍是 savePlanDataAction。
+  const assistant = {
+    on: !!mods.assistant?.enabled,
+    write: !!mods.assistant_write?.enabled && isOwner && !expired,
+    configured: assistantConfigured(),
+    notice: mods.assistant?.notice ?? "",
+    writeNotice: !mods.assistant_write?.enabled ? (mods.assistant_write?.notice ?? "") : (!isOwner ? "共同執案（唯讀）：只能問答，填寫要由主責教練操作。" : ""),
+  };
 
   return (
     <PlanEditor
@@ -39,7 +52,8 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
       label={plan.label}
       data={plan.data}
       uiScale={coach.uiScale ?? DEFAULT_UI_SCALE}
-      readOnly={licenseState(coach).expired || !isOwner}
+      readOnly={expired || !isOwner}
+      assistant={assistant}
       readOnlyReason={!isOwner ? "collab" : "license"}
       clientCode={client?.code ?? null}
       birthDate={client?.birthDate ?? null}

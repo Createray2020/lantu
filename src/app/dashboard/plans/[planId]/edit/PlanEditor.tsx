@@ -24,6 +24,7 @@ import {
   saveCheckinAction,
   inviteRiskQuizAction,
 } from "../../../actions";
+import { askAssistantAction } from "../../../assistantActions";
 import type { NoteRow, NoteInput } from "@/lib/notes";
 import type { SessionRow, EndInput } from "@/lib/consultSession";
 import ConsultRecordForm from "../../../ConsultRecordForm";
@@ -51,6 +52,10 @@ const RO_NOTE = {
 const RO_BADGE = { license: "唯讀", collab: "協作唯讀" } as const;
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
+
+/** AI 助理的開關狀態（頁面算好、隨 lantu:init 送進 iframe）。 */
+export type AssistantInit = { on: boolean; write: boolean; configured: boolean; notice: string; writeNotice: string };
+const ASSISTANT_OFF: AssistantInit = { on: false, write: false, configured: false, notice: "", writeNotice: "" };
 
 /**
  * 註記的權限，跟「資料能不能改」是兩件事：
@@ -111,6 +116,7 @@ export default function PlanEditor({
   clientCode = null,
   birthDate = null,
   clientQuiz = null,
+  assistant = ASSISTANT_OFF,
 }: {
   planId: string;
   clientId: string;
@@ -133,6 +139,8 @@ export default function PlanEditor({
    * ⚠️ 只是送進去給教練看與「套用」，不是規劃內容——客戶端永遠不直接寫 plans.data。
    */
   clientQuiz?: { score: number | null; tier: string | null; answers: Record<string, number | number[]>; submittedAt: string | null; invitedAt: string | null } | null;
+  /** AI 助理（2026/10/25）。iframe 只顯示，不決定——開不開、能不能填都是這裡算好的。 */
+  assistant?: AssistantInit;
 }) {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -209,6 +217,7 @@ export default function PlanEditor({
           session: sessionRef.current,
           past: pastRef.current,
           noteAccess,
+          assistant,
         },
         window.location.origin,
       );
@@ -406,6 +415,26 @@ export default function PlanEditor({
           );
           if (r.ok) router.refresh();
         })();
+      } else if (msg.type === "lantu:ai") {
+        // AI 助理：iframe 不知道 planId、也不碰 API，這裡代打 action 後把結果送回去。
+        // ⚠️ 結果是「預覽卡」，不是寫入——寫入要教練在 iframe 按套用，走 set()→lantu:save→savePlanDataAction。
+        const q = msg as unknown as { reqId?: string; messages?: unknown; data?: unknown; context?: unknown };
+        const reqId = typeof q.reqId === "string" ? q.reqId : "";
+        if (!reqId) return;
+        const messages = Array.isArray(q.messages)
+          ? (q.messages as Array<{ role?: unknown; content?: unknown }>)
+              .filter((m) => (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string")
+              .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }))
+          : [];
+        void (async () => {
+          let result: unknown;
+          try {
+            result = await askAssistantAction({ planId, data: q.data, messages, context: typeof q.context === "string" ? q.context : null });
+          } catch (e) {
+            result = { ok: false, code: "model_error", error: reason(e) };
+          }
+          iframeRef.current?.contentWindow?.postMessage({ type: "lantu:aireply", reqId, result }, window.location.origin);
+        })();
       } else if (msg.type === "lantu:save") {
         if (readOnly) return; // 到期唯讀：不寫回（server action 也會擋，這裡只是不要一直跳「儲存失敗」）
         latest.current = msg.data;
@@ -420,7 +449,7 @@ export default function PlanEditor({
       window.removeEventListener("message", onMessage);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [planId, clientId, data, uiScale, readOnly, readOnlyReason, clientCode, birthDate, clientQuiz, noteAccess, router, doSave]);
+  }, [planId, clientId, data, uiScale, readOnly, readOnlyReason, clientCode, birthDate, clientQuiz, noteAccess, router, doSave, assistant]);
 
   /**
    * 存檔狀態回報給 iframe（v12 App 的頂列會顯示「儲存中… / 已儲存 HH:MM / 儲存失敗」）。
@@ -587,7 +616,7 @@ export default function PlanEditor({
           className="flex-1 w-full border-0"
           onLoad={() =>
             iframeRef.current?.contentWindow?.postMessage(
-              { type: "lantu:init", data, uiScale: normalizeScale(uiScale), theme: currentTheme(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz },
+              { type: "lantu:init", data, uiScale: normalizeScale(uiScale), theme: currentTheme(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz, assistant },
               window.location.origin,
             )
           }

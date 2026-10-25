@@ -1409,3 +1409,21 @@ export const payees = pgTable('payees', {
 }, (t) => [
   uniqueIndex('payees_coach_uq').on(t.coachId),
 ]);
+
+// AI 助理用量（2026/10/25）。每一次呼叫一列：誰、對哪位客戶、哪個模型、花了多少 token。
+// 月上限（AI_MONTHLY_TOKEN_CAP_PER_COACH）就是對這張表 sum 當月 input+output；
+// 費用是從 Ray 的 Anthropic 帳號扣的營運成本，這張表是唯一看得到「花在哪」的地方。
+// ⚠️ 不存對話內容——客戶財務資料不該因為「想看用量」而多留一份副本。
+export const aiUsage = pgTable('ai_usage', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
+  mode: text('mode').default('advisor').notNull(),      // advisor（顧問端）；客戶端開了再加
+  model: text('model').notNull(),
+  inputTokens: integer('input_tokens').default(0).notNull(),
+  outputTokens: integer('output_tokens').default(0).notNull(),
+  opsProposed: integer('ops_proposed').default(0).notNull(), // 這一次提了幾張預覽卡（看教練有沒有在用寫入）
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('ai_usage_coach_at_idx').on(t.coachId, t.createdAt.desc()),
+]);

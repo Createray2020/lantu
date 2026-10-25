@@ -19312,6 +19312,10 @@ LN.add=function(k){
  addNoteRaw(k, st.kind, txt, st.visible);
  st.text=''; st.visible=false;
 };
+// AI 助理套用後的留痕（2026/10/25）：走同一條註記通道，掛在落地那一頁的 page: 鍵底下，
+// 所以回頭看「這個數字誰填的」跟看教練自己寫的記事是同一個地方。
+LN.aiNote=function(block,txt){ try{ addNoteRaw(block,'basis',txt,false); }catch(e){ console.error('[LN.aiNote]',e); } };
+LN.flashMsg=function(m){ flash(m); };
 LN.del=function(id){
  var arr=allNotes(), i=-1;
  for(var j=0;j<arr.length;j++) if(arr[j].id===id) i=j;
@@ -19925,6 +19929,289 @@ else boot();
 })();
 
 </script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   AI 助理面板（2026/10/25 Ray 拍板啟動顧問端助理）
+   ═══════════════════════════════════════════════════════════════════════
+   右緣收合面板，跟記事本（lnPad）同一排、同一套樣式。做兩件事：
+     1. 問答：教練打一句話 → 父層 askAssistantAction → 回一句答案。
+     2. 填寫：助理回「預覽卡」（表 › 列 › 欄位：原值 → 新值），教練勾選後按套用，
+        才走規劃器既有的 set()／addRow()／setCat()／setPolicySub()／setMemberRole()，
+        所以千分位、數字守衛、保費投影、健保重算…全部沿用；套用後跳到那一頁、留一則註記。
+
+   ⚠️ iframe 不碰 API、不知道 planId：送 lantu:ai 給父層（PlanEditor.tsx），父層呼叫 action 後回 lantu:aireply。
+   ⚠️ 這裡只認父層回來的、已經對到實際列的 ops（lib/assistant.ts resolveOps）；模型從不碰畫面。
+   ⚠️ 模組開關（assistant／assistant_write）與金鑰有沒有，都由父層隨 lantu:init 送進來（m.assistant）；
+      關著＝面板不掛；開著但沒金鑰＝面板在、顯示「尚未啟用」。
+   ⚠️ 填入預設勾、覆蓋標紅預設不勾（Ray 2026/10/25：「空白格直接填、已有值的要教練點」）。
+   ═══════════════════════════════════════════════════════════════════════ */
+(function(){
+var EMBED=/[?&]embed=1/.test(location.search), CLIENT=/[?&]role=client/.test(location.search);
+if(!EMBED||CLIENT) return;
+var PARENT_ORIGIN=(function(){ try{ var ref=document.referrer; if(ref) return new URL(ref).origin; }catch(e){} return location.origin; })();
+function toParent(m){ try{ parent.postMessage(m,PARENT_ORIGIN); }catch(e){} }
+function esc2(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]}); }
+function flash2(m){ try{ if(window.LN&&LN.flashMsg){ LN.flashMsg(m); return; } }catch(e){} try{ console.log('[AI]',m); }catch(e){} }
+
+var AI = window.AI = {
+ cfg:null,            // {on, write, configured, notice, writeNotice}
+ open:false,
+ msgs:[],             // 給模型的對話：{role, content}
+ items:[],            // 畫面上的對話串：{role, text, ops?, rejected?, err?}
+ pending:null,        // 等回覆中的 reqId
+ text:'',
+ applied:{},          // cardId → true
+ picks:{},            // cardId → {field:bool}
+};
+var OPEN_KEY='ai_pad_open';
+try{ AI.open=localStorage.getItem(OPEN_KEY)==='1'; }catch(e){}
+
+var CAT_KIND={incomes:'income',expenses:'expense',assets:'asset',liabilities:'liability'};
+
+function C(){ try{ return activeCase(); }catch(e){ return null; } }
+function ctxTitle(){ try{ if(window.LN&&LN.padContext) return LN.padContext().title||''; }catch(e){} return ''; }
+
+// ── 掛載 ─────────────────────────────────────────────────────────────────
+function mountPad(){
+ var cfg=AI.cfg;
+ var pad=document.getElementById('aiPad');
+ if(!cfg||!cfg.on){ if(pad) pad.style.display='none'; return; }
+ if(!pad){
+  pad=document.createElement('div'); pad.id='aiPad'; document.body.appendChild(pad);
+  pad.innerHTML=
+   '<button type="button" class="lnpadtab aipadtab" onclick="AI.toggle()" title="AI 助理（⌘/Ctrl+Shift+J）"><span class="lnpadtabt">助理</span><span class="lnpadcnt" id="aiPadCnt"></span></button>'+
+   '<div class="lnpadbody aipadbody">'+
+    '<div class="lnpadhead"><div class="lnpadwhere"><span class="lnpadlbl">AI 助理 · 正在看</span><b id="aiPadTitle"></b></div>'+
+     '<button type="button" class="lnx" style="font-size:14px" onclick="AI.toggle()" title="收合">✕</button></div>'+
+    '<div class="aipadlist" id="aiPadList"></div>'+
+    '<div class="aipadfoot">'+
+     '<div class="lnhint" id="aiPadHint"></div>'+
+     '<textarea class="lnta lnpadta aipadta" id="aiPadTa" placeholder="問這位客戶的數字，或說要填什麼——Enter 送出、Shift+Enter 換行" oninput="AI.typing(this.value)" onkeydown="AI.key(event)"></textarea>'+
+     '<div class="lnrow" style="justify-content:space-between;margin-top:6px"><span class="lnhint" id="aiPadState"></span><button class="lnbtn pri" id="aiPadSend" onclick="AI.send()">送出</button></div>'+
+    '</div>'+
+   '</div>';
+  document.addEventListener('keydown',function(e){ if((e.metaKey||e.ctrlKey)&&e.shiftKey&&!e.altKey&&String(e.key).toLowerCase()==='j'){ e.preventDefault(); AI.toggle(); } });
+  var _st=null;
+  document.addEventListener('scroll',function(){ if(_st) return; _st=setTimeout(function(){ _st=null; syncTitle(); },150); },true);
+ }
+ pad.style.display=C()?'':'none';
+ pad.classList.toggle('on',!!AI.open);
+ // 記事本打開時把助理收起來（反向在 AI.toggle）；只包一次。
+ if(window.LN&&LN.padToggle&&!LN._aiWrapped){
+  var o=LN.padToggle;
+  LN.padToggle=function(){ var r=o.apply(this,arguments); try{ var ln=document.getElementById('lnPad'); if(ln&&ln.classList.contains('on')&&AI.open) AI.toggle(); }catch(e){} return r; };
+  LN._aiWrapped=true;
+ }
+ sync(true);
+}
+function syncTitle(){ var t=document.getElementById('aiPadTitle'); if(t) t.textContent=ctxTitle()||'—'; }
+function sync(full){
+ var pad=document.getElementById('aiPad'); if(!pad||pad.style.display==='none') return;
+ syncTitle();
+ var cfg=AI.cfg||{};
+ var hint=document.getElementById('aiPadHint'), ta=document.getElementById('aiPadTa'), btn=document.getElementById('aiPadSend'), st=document.getElementById('aiPadState');
+ var disabled=!cfg.configured;
+ if(hint) hint.innerHTML = !cfg.configured
+   ? '<span style="color:var(--warn)">尚未啟用</span>：'+esc2(cfg.notice||'伺服器還沒設定 AI 金鑰。')
+   : (cfg.write ? '可以問，也可以叫我填：「車貸每月一萬八、還三十六期」' : '目前只能問答'+(cfg.writeNotice?'：'+esc2(cfg.writeNotice):'（這份規劃對你是唯讀，或填寫功能還沒開）'));
+ if(ta){ ta.disabled=disabled; if(ta.value!==AI.text&&document.activeElement!==ta) ta.value=AI.text; }
+ if(btn) btn.disabled=disabled||!!AI.pending;
+ if(st) st.textContent = AI.pending?'思考中…':'';
+ var cnt=document.getElementById('aiPadCnt'); var k=AI.items.filter(function(x){return x.role==='assistant'&&x.ops&&x.ops.some(function(o){return !AI.applied[o.id]})}).length;
+ if(cnt){ cnt.textContent=k?String(k):''; cnt.style.display=k?'':'none'; }
+ if(!full) return;
+ var list=document.getElementById('aiPadList'); if(list){ list.innerHTML=listHTML(); list.scrollTop=list.scrollHeight; }
+}
+
+// ── 畫面 ─────────────────────────────────────────────────────────────────
+function cardHTML(op){
+ var done=!!AI.applied[op.id], picks=AI.picks[op.id]||{};
+ var head='<div class="aicardh"><span class="aitag '+(op.op==='add'?'add':'set')+'">'+(op.op==='add'?'新增一列':'修改')+'</span><b>'+esc2(op.arrLabel)+'</b><span class="aicardrow">› '+esc2(op.rowLabel)+'</span></div>';
+ var rows=op.fields.map(function(f){
+  var on = done ? !!picks[f.field] : (picks[f.field]!=null ? !!picks[f.field] : f.mode==='fill');
+  var cls='aifld'+(f.mode==='overwrite'?' ow':'')+(done&&!on?' skip':'');
+  return '<label class="'+cls+'"><input type="checkbox" '+(on?'checked':'')+(done?' disabled':'')+' onchange="AI.pick(\''+op.id+'\',\''+esc2(f.field)+'\',this.checked)">'+
+   '<span class="aifl">'+esc2(f.label)+'</span>'+
+   (f.old!=null?'<span class="aiold">'+esc2(f.old)+'</span><span class="aiarrow">→</span>':'')+
+   '<span class="ainew">'+esc2(f.shown)+'</span>'+
+   (f.mode==='overwrite'?'<span class="aiowmk" title="這一格原本有值，勾了才會覆蓋">覆蓋</span>':'')+
+   '</label>';
+ }).join('');
+ var foot = done
+   ? '<div class="aicardf"><span class="lnhint" style="color:var(--ok)">✓ 已套用</span></div>'
+   : '<div class="aicardf"><button class="lnbtn pri" onclick="AI.apply(\''+op.id+'\')">套用勾選</button><button class="lnbtn" onclick="AI.dismiss(\''+op.id+'\')">不要</button></div>';
+ return '<div class="aicard'+(done?' done':'')+'" id="aicard_'+op.id+'">'+head+rows+foot+'</div>';
+}
+function listHTML(){
+ if(!AI.items.length) return '<div class="lnpadempty">問我這位客戶的數字（「退休缺口多少？」「保障缺口在哪？」）'+(AI.cfg&&AI.cfg.write?'，或直接說要填的內容（「太太月薪五萬」「新增一筆房貸餘額 800 萬、月付 3 萬 2」）。<br>我會先給你預覽，你勾了才會寫進去。':'。')+'</div>';
+ return AI.items.map(function(it){
+  if(it.role==='user') return '<div class="aimsg me">'+esc2(it.text)+'</div>';
+  if(it.err) return '<div class="aimsg err">'+esc2(it.text)+'</div>';
+  var h='<div class="aimsg ai">'+esc2(it.text)+'</div>';
+  if(it.ops&&it.ops.length) h+=it.ops.map(cardHTML).join('');
+  if(it.rejected&&it.rejected.length) h+='<div class="airej">'+it.rejected.map(function(r){return '<div>· '+esc2(r.reason)+'</div>'}).join('')+'</div>';
+  return h;
+ }).join('')+(AI.pending?'<div class="aimsg ai pend">思考中…</div>':'');
+}
+
+// ── 互動 ─────────────────────────────────────────────────────────────────
+AI.toggle=function(){
+ AI.open=!AI.open;
+ try{ localStorage.setItem(OPEN_KEY,AI.open?'1':'0'); }catch(e){}
+ // 記事本開著就先收起來：兩個面板都 340px，疊在一起會蓋住彼此。
+ if(AI.open){ var ln=document.getElementById('lnPad'); if(ln&&ln.classList.contains('on')&&window.LN&&LN.padToggle) LN.padToggle(); }
+ var pad=document.getElementById('aiPad'); if(pad) pad.classList.toggle('on',AI.open);
+ if(AI.open){ sync(true); var ta=document.getElementById('aiPadTa'); if(ta&&!ta.disabled) setTimeout(function(){ ta.focus(); },50); }
+};
+AI.typing=function(v){ AI.text=v; };
+AI.key=function(e){ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); AI.send(); } };
+AI.send=function(){
+ var txt=(AI.text||'').trim(); if(!txt){ flash2('先寫點什麼'); return; }
+ if(!AI.cfg||!AI.cfg.configured){ flash2('助理尚未啟用'); return; }
+ if(AI.pending){ flash2('上一句還在想'); return; }
+ var c=C(); if(!c){ flash2('還沒有資料'); return; }
+ AI.items.push({role:'user',text:txt});
+ AI.msgs.push({role:'user',content:txt});
+ if(AI.msgs.length>24) AI.msgs=AI.msgs.slice(-24);
+ AI.text=''; var ta=document.getElementById('aiPadTa'); if(ta) ta.value='';
+ var reqId='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+ AI.pending=reqId;
+ toParent({type:'lantu:ai', reqId:reqId, messages:AI.msgs.slice(), data:c, context:ctxTitle()});
+ sync(true);
+ // 父層 25 秒沒回就解除等待（不然按鈕一直灰著）
+ setTimeout(function(){ if(AI.pending===reqId){ AI.pending=null; AI.items.push({role:'assistant',err:true,text:'助理沒有回應，請再試一次。'}); sync(true); } },25000);
+};
+function onReply(m){
+ if(!m||m.reqId!==AI.pending) return;
+ AI.pending=null;
+ var r=m.result||{};
+ if(!r.ok){
+  if(r.code==='not_configured'&&AI.cfg){ AI.cfg.configured=false; }
+  AI.items.push({role:'assistant',err:true,text:r.error||'助理暫時沒有回應。'});
+  // 失敗的那一句不留在對話脈絡裡，下一句才不會帶著沒答到的問題
+  AI.msgs.pop();
+ }else{
+  AI.items.push({role:'assistant',text:r.answer||'',ops:r.ops||[],rejected:r.rejected||[]});
+  AI.msgs.push({role:'assistant',content:r.answer||''});
+  (r.ops||[]).forEach(function(op){ var p={}; op.fields.forEach(function(f){ p[f.field]=(f.mode==='fill'); }); AI.picks[op.id]=p; });
+ }
+ sync(true);
+}
+AI.pick=function(id,field,on){ AI.picks[id]=AI.picks[id]||{}; AI.picks[id][field]=!!on; };
+AI.dismiss=function(id){ AI.applied[id]=true; AI.picks[id]={}; sync(true); };
+
+/** 找一張卡。 */
+function findOp(id){ for(var i=AI.items.length-1;i>=0;i--){ var it=AI.items[i]; if(it.ops) for(var j=0;j<it.ops.length;j++) if(it.ops[j].id===id) return it.ops[j]; } return null; }
+
+/**
+ * 套用一張卡：照規劃器原本的按鈕路徑寫，不自己動 c。
+ * 回傳實際寫入的欄位數；失敗丟例外由 AI.apply 接。
+ */
+function applyOp(op,picks){
+ var c=C(); if(!c) throw new Error('沒有資料');
+ if(window.LANTU_RO) throw new Error('這份規劃目前是唯讀的');
+ var arr=op.arr, i=op.index, n=0;
+ var fields=op.fields.filter(function(f){ return !!picks[f.field]; });
+ if(!fields.length) return 0;
+ if(op.op==='add'){
+  if(typeof addRow!=='function') throw new Error('這一版規劃器沒有 addRow');
+  addRow(arr);                                   // 走正式新增：範本、eid／aid、stampNeeds、save、render
+  var list=(typeof listOf==='function')?listOf(c,arr):(c[arr]||[]);
+  i=list.length-1;
+  if(i<0) throw new Error('新增列失敗');
+ }
+ var kind=CAT_KIND[arr], subKey=(kind&&typeof CAT_FIELDS!=='undefined'&&CAT_FIELDS[kind])?CAT_FIELDS[kind].sub:null;
+ fields.forEach(function(f){
+  var v=f.value;
+  if(f.via==='cat'&&subKey&&f.field===subKey&&typeof setCat==='function'){ setCat(arr,i,kind,String(v)); n++; return; }
+  if(f.via==='polsub'&&typeof setPolicySub==='function'&&i!=null){ setPolicySub(i,String(v)); n++; return; }
+  if(f.via==='memrole'&&typeof setMemberRole==='function'&&i!=null){ setMemberRole(i,String(v)); n++; return; }
+  var id = (i==null)? arr : (arr+':'+i);
+  set(id,f.field,v,f.type);
+  // 生日 → 年齡：跟表單上一樣，填了生日就把足歲帶回 age。
+  if(arr==='profile'&&f.field==='birth'&&typeof ageFromBirth==='function'){ var a=ageFromBirth(String(v)); if(a!=null) set('profile','age',a,'num'); }
+  n++;
+ });
+ return n;
+}
+AI.apply=function(id){
+ var op=findOp(id); if(!op||AI.applied[id]) return;
+ var picks=AI.picks[id]||{};
+ var picked=op.fields.filter(function(f){ return !!picks[f.field]; });
+ if(!picked.length){ flash2('沒有勾任何欄位'); return; }
+ try{
+  var n=applyOp(op,picks);
+  AI.applied[id]=true;
+  // 跳到落地的那一頁，教練眼睛看得到剛填進去的東西
+  try{ if(window.app){ app.activeTab='data'; app.dataTab=op.tab; } if(typeof render==='function') render(); }catch(e){}
+  // 留痕：掛在那一頁的 page: 鍵底下，跟記事本記的東西同一個家
+  try{
+   var body='由助理填入：'+op.arrLabel+(op.op==='add'?'（新增）':'')+' › '+op.rowLabel+'：'+picked.map(function(f){ return f.label+' '+(f.old!=null?f.old+'→':'')+f.shown; }).join('、');
+   if(window.LN&&LN.aiNote) LN.aiNote('page:'+op.tab+'|'+op.arrLabel, body);
+  }catch(e){}
+  flash2('已填入 '+n+' 個欄位');
+ }catch(e){
+  flash2('套用失敗：'+(e&&e.message?e.message:'未知錯誤'));
+ }
+ sync(true);
+};
+AI.applyOp=applyOp;   // 測試用
+
+// ── 父層訊息 ─────────────────────────────────────────────────────────────
+window.addEventListener('message',function(e){
+ if(e.source!==parent) return;
+ if(e.origin&&PARENT_ORIGIN&&e.origin!==PARENT_ORIGIN) return;
+ var m=e.data; if(!m||typeof m!=='object') return;
+ if(m.type==='lantu:init'){
+  if(m.assistant&&typeof m.assistant==='object') AI.cfg={on:!!m.assistant.on, write:!!m.assistant.write, configured:!!m.assistant.configured, notice:m.assistant.notice||'', writeNotice:m.assistant.writeNotice||''};
+  else if(!AI.cfg) AI.cfg={on:false};
+  setTimeout(mountPad,0);
+  return;
+ }
+ if(m.type==='lantu:aireply'){ onReply(m); return; }
+});
+// render() 之後補掛（面板是 body 的直接子元素，不會被 #app 重畫洗掉，但首次 init 可能早於 render）
+if(typeof window.render==='function'){
+ var _orig=window.render;
+ window.render=function(){ var r=_orig.apply(this,arguments); try{ if(AI.cfg) mountPad(); }catch(e){ console.error('[AI]',e); } return r; };
+}
+})();
+</script>
+<style>
+#aiPad{position:fixed;right:0;top:64px;bottom:calc(var(--lnbar-h,0px) + 8px);z-index:60;pointer-events:none}
+#aiPad .aipadtab{top:230px;color:var(--teal);border-color:var(--teal)}
+#aiPad.on .aipadbody{transform:none}
+#aiPad.on .aipadtab{right:340px;border-color:var(--line);color:var(--mut)}
+.aipadbody{width:360px}
+.aipadlist{flex:1;overflow:auto;padding-right:2px;display:flex;flex-direction:column;gap:6px}
+.aipadfoot{flex:none;border-top:1px solid var(--line);padding-top:8px}
+.aipadta{min-height:56px}
+.aimsg{font-size:12.5px;line-height:1.55;padding:7px 10px;border-radius:10px;white-space:pre-wrap;word-break:break-word;max-width:96%}
+.aimsg.me{align-self:flex-end;background:color-mix(in srgb, var(--amber) 18%, var(--card));border:1px solid color-mix(in srgb, var(--amber) 40%, transparent)}
+.aimsg.ai{align-self:flex-start;background:var(--card);border:1px solid var(--line)}
+.aimsg.ai.pend{color:var(--mut2)}
+.aimsg.err{align-self:flex-start;color:var(--warn);border:1px dashed var(--warn);background:transparent}
+.aicard{border:1px solid var(--teal);border-radius:10px;padding:8px 10px;background:color-mix(in srgb, var(--teal) 7%, var(--card));font-size:12.5px}
+.aicard.done{border-color:var(--line);opacity:.8}
+.aicardh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.aicardh b{color:var(--tx)}
+.aicardrow{color:var(--mut);font-size:11.5px;word-break:break-all}
+.aitag{font-size:10.5px;border-radius:4px;padding:1px 6px;border:1px solid var(--teal);color:var(--teal)}
+.aitag.add{border-color:var(--amber);color:var(--amber2)}
+.aifld{display:flex;align-items:center;gap:6px;padding:3px 0;border-top:1px dashed color-mix(in srgb, var(--line) 60%, transparent);cursor:pointer}
+.aifld input{margin:0;flex:none}
+.aifl{color:var(--mut);flex:none;min-width:56px}
+.aiold{color:var(--mut2);text-decoration:line-through}
+.aiarrow{color:var(--mut2)}
+.ainew{color:var(--tx);font-weight:700}
+.aifld.ow .ainew{color:var(--warn)}
+.aifld.skip{opacity:.45}
+.aiowmk{margin-left:auto;font-size:10.5px;color:var(--warn);border:1px solid var(--warn);border-radius:4px;padding:0 5px}
+.aicardf{display:flex;gap:6px;margin-top:6px}
+.airej{font-size:11.5px;color:var(--mut);line-height:1.6;padding:2px 6px}
+@media (max-width:640px){ #aiPad{top:52px} #aiPad .aipadtab{top:170px} #aiPad.on .aipadtab{right:min(360px,92vw)} .aipadbody{max-width:92vw} }
+</style>
+
 <!-- ⚠️⚠️ 訪談檢核浮層已於 2026-09-12 移除（原本在這裡，右下角常駐 + 側邊抽屜）。
      它的工作整組搬進分組列（dataPane 的下拉）：
        · 群標籤帶進度（4/12）

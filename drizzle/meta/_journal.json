@@ -365,6 +365,13 @@
       "when": 1792441285908,
       "tag": "0051_client_referral",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792863771058,
+      "tag": "0052_ai_usage",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
-import { ensureCoach, isAdmin } from "@/lib/coach";
+import { ensureCoach, isAdmin, listCoaches } from "@/lib/coach";
 import { MODULES, getModuleStates } from "@/lib/platformModules";
+import { monthTokensByCoach } from "@/lib/aiUsage";
+import { assistantConfigured, assistantModel, monthlyCap } from "@/lib/assistant";
 import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
 import ModuleBoard, { type ModuleRowView } from "./ModuleBoard";
@@ -14,7 +16,14 @@ export default async function ModulesPage() {
   if (!me) redirect("/dashboard");
   if (!(await isAdmin(me))) redirect("/dashboard");
 
-  const states = await getModuleStates();
+  const [states, usage, coachList] = await Promise.all([
+    getModuleStates(),
+    monthTokensByCoach().catch(() => []),
+    listCoaches().catch(() => []),
+  ]);
+  const coachName = new Map(coachList.map((c) => [c.id, c.name || c.clerkName || c.id]));
+  const cap = monthlyCap();
+  const totalTokens = usage.reduce((a, u) => a + u.tokens, 0);
   const rows: ModuleRowView[] = MODULES.map((m) => ({
     key: m.key,
     label: m.label,
@@ -43,6 +52,36 @@ export default async function ModulesPage() {
           </p>
         </div>
         <ModuleBoard rows={rows} />
+
+        {/* AI 助理用量（2026/10/25）：費用從 Ray 的 Anthropic 帳號扣，這裡是唯一看得到「花在哪」的地方。 */}
+        <div className="mt-8 rounded-xl border border-line bg-panel p-4">
+          <h2 className="text-base font-bold">AI 助理 · 本月用量</h2>
+          <p className="text-xs text-tx2 mt-1 leading-relaxed">
+            金鑰 {assistantConfigured() ? <b className="text-ok">已設定</b> : <b className="text-danger">未設定（面板會顯示「尚未啟用」）</b>}
+            ・模型 <code>{assistantModel()}</code>
+            ・每位教練月上限 {cap > 0 ? `${cap.toLocaleString()} tokens` : "不限"}
+            ・本月合計 {totalTokens.toLocaleString()} tokens（台北月份）
+          </p>
+          {usage.length === 0 ? (
+            <p className="text-sm text-tx3 mt-3">這個月還沒有人用過。</p>
+          ) : (
+            <table className="w-full text-sm mt-3">
+              <thead className="text-tx3 text-xs">
+                <tr><th className="text-left py-1">教練</th><th className="text-right">次數</th><th className="text-right">tokens</th><th className="text-right">提出預覽卡</th></tr>
+              </thead>
+              <tbody>
+                {usage.sort((a, b) => b.tokens - a.tokens).map((u) => (
+                  <tr key={u.coachId} className="border-t border-line">
+                    <td className="py-1">{coachName.get(u.coachId) ?? u.coachId}</td>
+                    <td className="text-right">{u.calls.toLocaleString()}</td>
+                    <td className={"text-right " + (cap > 0 && u.tokens >= cap ? "text-danger font-bold" : "")}>{u.tokens.toLocaleString()}</td>
+                    <td className="text-right">{u.ops.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </section>
     </main>
   );
