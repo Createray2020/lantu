@@ -421,6 +421,27 @@
       "when": 1793132238028,
       "tag": "0059_signed_html_uniques",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793134062281,
+      "tag": "0060_case_main_terms",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1793134440373,
+      "tag": "0061_roles_notifications_holidays",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793134937887,
+      "tag": "0062_report_labels_service_feedback",
+      "breakpoints": true
     }
   ]
 }

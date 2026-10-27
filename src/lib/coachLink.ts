@@ -304,6 +304,8 @@ async function redeemClientInvite(code: string, inv: InviteInfo & { clientId: st
   }
   await db.update(clients).set({ clientUserId: user.id, updatedAt: new Date() }).where(eq(clients.id, target.id));
   await db.update(coachInvites).set({ usedByClientUserId: user.id, usedAt: new Date() }).where(eq(coachInvites.code, code));
+  // 案件進度：客戶綁定帳號＝「已開通會員中心」，是階段 4 的完成訊號之一（失敗不擋綁定）
+  try { const { recheckCommission } = await import("./serviceStore"); await recheckCommission(target.id); } catch { /* 不擋 */ }
   return { ok: true, coachName: inv.coachName };
 }
 

@@ -23,6 +23,7 @@ export const ADMIN_GROUPS: { key: string; title: string; items: { href: string; 
       { href: "/admin/profiles", label: "對外檔案" },
       // 外部客戶（官網自己註冊的那群）與教練帳號是兩批人，排在同一類的最後：這一類回答的是「平台上有誰」。
       { href: "/admin/visitors", label: "訪客記錄" },
+      { href: "/admin/service", label: "客戶服務" },
     ],
   },
   {

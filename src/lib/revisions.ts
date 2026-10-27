@@ -38,7 +38,7 @@ async function pruneRevisions(planId: string): Promise<void> {
     await db.delete(planRevisions).where(sql`
       ${planRevisions.id} in (
         select id from plan_revisions
-        where plan_id = ${planId}
+        where plan_id = ${planId} and label is null
         order by created_at desc
         offset ${MAX_REVISIONS_PER_PLAN}
       )
@@ -99,6 +99,9 @@ export type TimelineRow = {
   editorType: string;      // coach / client
   editorName: string | null;
   createdAt: Date;
+  label: string | null;    // 報告書版本標籤：draft／revised／final
+  labelNote: string | null;
+  labeledAt: Date | null;
 };
 
 // 一位客戶名下「所有 plan（兩軌）」的版本，依時間新→舊合併。
@@ -115,6 +118,9 @@ export async function listClientTimeline(clientId: string, limit = 120): Promise
       editorType: planRevisions.editorType,
       editorName: planRevisions.editorName,
       createdAt: planRevisions.createdAt,
+      label: planRevisions.label,
+      labelNote: planRevisions.labelNote,
+      labeledAt: planRevisions.labeledAt,
     })
     .from(planRevisions)
     .innerJoin(plans, eq(planRevisions.planId, plans.id))
@@ -193,4 +199,27 @@ export async function isClientTrack(planId: string, clientId: string): Promise<b
     .where(and(eq(plans.id, planId), eq(plans.clientId, clientId), eq(plans.track, "client")))
     .limit(1);
   return !!rows[0];
+}
+
+// ---------- 報告書版本標籤（2026/10/28 案件進度 ⑦）----------
+export const REPORT_LABELS = ["draft", "revised", "final"] as const;
+export type ReportLabel = (typeof REPORT_LABELS)[number];
+export const REPORT_LABEL_TEXT: Record<ReportLabel, string> = { draft: "初稿", revised: "修改版", final: "最終版" };
+
+/** 對某一版快照打標（或清掉）。同一份 plan 的「最終版」只能有一個：再標一版最終版，舊的自動降成修改版。 */
+export async function labelRevision(revisionId: string, label: ReportLabel | null, note = ""): Promise<{ ok: true; planId: string; clientId: string } | { ok: false; error: string }> {
+  const [row] = await db.select({ id: planRevisions.id, planId: planRevisions.planId, clientId: plans.clientId }).from(planRevisions).innerJoin(plans, eq(planRevisions.planId, plans.id)).where(eq(planRevisions.id, revisionId)).limit(1);
+  if (!row) return { ok: false, error: "找不到這一版" };
+  if (label === "final") {
+    await db.update(planRevisions).set({ label: "revised" }).where(and(eq(planRevisions.planId, row.planId), eq(planRevisions.label, "final")));
+  }
+  await db.update(planRevisions).set({ label, labelNote: note.trim().slice(0, 200) || null, labeledAt: label ? new Date() : null }).where(eq(planRevisions.id, revisionId));
+  if (label) { try { const { onReportLabeled } = await import("./caseSignals"); await onReportLabeled(row.clientId, label); } catch { /* 不擋 */ } }
+  return { ok: true, planId: row.planId, clientId: row.clientId };
+}
+/** 客戶端用：這位客戶最新的最終版（交付日）。 */
+export async function latestFinalFor(clientId: string): Promise<{ revisionId: string; at: Date } | null> {
+  const [r] = await db.select({ id: planRevisions.id, at: planRevisions.labeledAt }).from(planRevisions).innerJoin(plans, eq(planRevisions.planId, plans.id))
+    .where(and(eq(plans.clientId, clientId), eq(planRevisions.label, "final"))).orderBy(desc(planRevisions.labeledAt)).limit(1);
+  return r?.at ? { revisionId: r.id, at: r.at } : null;
 }

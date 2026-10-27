@@ -21,6 +21,8 @@ export default async function ClientHistoryPage() {
     ...r,
     createdAt: r.createdAt.toISOString(),
     restorable: r.track === "client",
+    // 客戶只看「最終版」與交付日；初稿／修改版是教練的工作標記，不往外投
+    label: r.label === "final" ? "final" : null, labelNote: null, labeledAt: r.label === "final" && r.labeledAt ? r.labeledAt.toISOString() : null,
   }));
 
   return (

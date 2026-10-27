@@ -106,6 +106,7 @@ export async function submitClientQuiz(clientId: string, rawAnswers: unknown, wh
       set: { answers, score: r.score, tier, invitedAt: null, submittedAt: now, updatedAt: now },
     })
     .returning();
+  if (who === "self") { const { onQuizSubmitted } = await import("./caseSignals"); await onQuizSubmitted(clientId); }
   return { ok: true, row: toRow(row) };
 }
 

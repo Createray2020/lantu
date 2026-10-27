@@ -5,7 +5,7 @@ import { getPlanForTimeline } from "@/lib/plans";
 import { clientAccess } from "@/lib/clientScope";
 import { listClientTimeline } from "@/lib/revisions";
 import RevisionTimeline, { type TimelineItem } from "@/components/RevisionTimeline";
-import { restoreCoachRevisionAction } from "./actions";
+import { restoreCoachRevisionAction, labelRevisionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +31,8 @@ export default async function HistoryPage({ params }: { params: Promise<{ planId
     ...r,
     createdAt: r.createdAt.toISOString(),
     restorable: isOwner && r.track === "coach",
+    labelable: isOwner && r.track === "coach",
+    label: r.label, labelNote: r.labelNote, labeledAt: r.labeledAt ? r.labeledAt.toISOString() : null,
   }));
 
   return (
@@ -49,7 +51,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ planId
             ? "你可以回復年度版的任何一版；客戶的人生護照只有客戶本人能回復。"
             : "你是這位客戶的協作教練：看得到完整紀錄，但不能回復任何版本。"}
         </p>
-        <RevisionTimeline items={items} onRestore={restoreCoachRevisionAction} viewerType="coach" />
+        <RevisionTimeline items={items} onRestore={restoreCoachRevisionAction} onLabel={labelRevisionAction} viewerType="coach" />
       </div>
     </div>
   );

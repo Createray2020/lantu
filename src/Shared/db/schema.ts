@@ -48,6 +48,9 @@ export const coaches = pgTable('coaches', {
   // orgRank（member/manager/owner）是「系統可見範圍」，rankCode 是「制度職級」（C1…首席），
   // 兩者刻意分開：制度升到 S2 不代表就該看得到別人的客戶。
   rankCode: text('rank_code'),
+  // 服務角色（2026/10/28 案件進度定案）：客戶關係 client_relations／行政財法 admin_finance。可兼多個；與 role／orgRank／rankCode 都獨立。
+  // 客戶關係＝看全部案件的進度與回饋、接異常分流；行政財法＝看階段 4 與合約付款狀態。
+  serviceRoles: jsonb('service_roles').$type<string[]>().default([]).notNull(),
   entryType: text('entry_type'),              // training（培訓認證）/ recruit（同業招募）/ rejoin（回任）
   hireDate: date('hire_date'),                // 到職日：真除倒數與首年豁免的起點
   tenureRankCode: text('tenure_rank_code'),   // 真除中的核定職級（null＝非真除狀態）
@@ -444,6 +447,11 @@ export const planRevisions = pgTable('plan_revisions', {
   // ⚠️ 可為 null：這個欄位是後來才加的，既有 2,287 列都沒有 hash。
   //    比不到 hash 一律視為「不同」（寧可多寫一列，也不能漏掉真的有改的那一版）。
   dataHash: text('data_hash'),
+  // 報告書版本標籤（2026/10/28 案件進度 ⑦）：對某一版快照打標，不另存一份。draft（初稿）／revised（修改版）／final（最終版）。
+  // 有標籤的版本不會被 pruneRevisions 砍掉；客戶端顯示最終版與交付日。
+  label: text('label'),
+  labelNote: text('label_note'),
+  labeledAt: timestamp('labeled_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   // 全庫成長最快的表；版本紀錄頁與 plan 刪除的 cascade 都靠它。
@@ -1593,12 +1601,88 @@ export const trainingEnrollments = pgTable('training_enrollments', {
   uniqueIndex('training_enrollments_coach_live_uq').on(t.coachId).where(sql`review_stage not in ('cancelled','rejected')`),
 ]);
 
-// 顧問服務案件（第二個簽署消費者，2026/10/28）。收款、合約、發票的共同關聯單位。
-// 一位客戶可多案（首次委任／年度續約）；同年度加試算版本不等於新案；複製新年度不帶收款／簽名／合約／發票狀態（那些都不在 plans 上）。
-// case_no＝客戶編號-序（例：2610003-1）；方案＝營業項目（沒建的服務不能簽）。簽約人＝客戶帳號（clients.client_user_id，沒綁就先用專用登入連結）。
-// status：open／completed（合約完成）／terminated／refunded。
+// 服務案件（2026/10/28 案件進度定案）：一客戶一案件，是客戶服務面向的主軸——服務階段 4–8、狀態、標記都掛在這裡。
+// case_no＝客戶編號（沒有流水序：一客戶只有一案）。續約不是新案，是同一案件底下的下一個「服務年期」（service_terms）。
+// stage：commission（正式委託）／interview（深度會談）／planning（規劃與準備）／report（報告書會談）／tracking（執行追蹤與動態調整）。
+// status：active（進行中）／paused（暫停，待重新啟動）／closed（結案）。「結案」只能教練手動按並填 close_reason；合約簽完不會結案。
+// flags：overdue／waiting（等待客戶，暫停計時）／complaint（異常客訴）／lowscore（低分回饋）。overdue 由 cron 帶出，其餘人標。
 export const serviceCases = pgTable('service_cases', {
   id: uuid('id').defaultRandom().primaryKey(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'restrict' }),     // 專屬教練
+  s3CoachId: text('s3_coach_id').references(() => coaches.id, { onDelete: 'set null' }),        // 指定 S3（null＝用組織樹的推薦人）
+  caseNo: text('case_no').notNull(),
+  stage: text('stage').default('commission').notNull(),
+  status: text('status').default('active').notNull(),
+  flags: jsonb('flags').$type<string[]>().default([]).notNull(),
+  startedAt: date('started_at'),
+  pausedAt: date('paused_at'),
+  pauseReason: text('pause_reason').default('').notNull(),
+  waitingSince: date('waiting_since'),            // 等待客戶起算日（flags 含 waiting 時有值）
+  waitingNote: text('waiting_note').default('').notNull(),
+  waitingDays: integer('waiting_days').default(0).notNull(), // 累計等待客戶的天數（暫停計時用，解除時加總）
+  closedAt: date('closed_at'),
+  closeReason: text('close_reason').default('').notNull(),   // done／client_stop／no_response／coach_handover／not_established／other
+  closeNote: text('close_note').default('').notNull(),
+  escalation: integer('escalation').default(0).notNull(),    // 逾期升級到第幾步（0 無、1 教練+S3、2 S3 了解、3 待轉交）
+  escalatedAt: date('escalated_at'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('service_cases_client_uq').on(t.clientId),
+  index('service_cases_coach_idx').on(t.coachId),
+  uniqueIndex('service_cases_case_no_uq').on(t.caseNo),
+  index('service_cases_stage_idx').on(t.stage, t.status),
+]);
+
+// 服務階段列：一案五列（建案時只長 commission，之後每推進一階長一列）。三種日期：預計（系統依預設期限算）、承諾（教練與客戶確認）、實際（系統留存）。
+export const serviceCaseStages = pgTable('service_case_stages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  caseId: uuid('case_id').notNull().references(() => serviceCases.id, { onDelete: 'cascade' }),
+  stage: text('stage').notNull(),
+  startedOn: date('started_on'),                 // 這一階段開始（＝上一階段實際完成日）
+  expectedDate: date('expected_date'),
+  promisedDate: date('promised_date'),
+  actualDate: date('actual_date'),
+  checklist: jsonb('checklist').$type<{ k: string; label: string; done: boolean; at?: string | null }[]>().default([]).notNull(),
+  note: text('note').default('').notNull(),      // 客戶看得到的「預計時間說明／備註」
+  decision: text('decision').default('').notNull(), // 階段 7：客戶決定 accept／revise
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('service_case_stages_case_stage_uq').on(t.caseId, t.stage),
+]);
+
+// 案件異動紀錄：誰、何時、改了什麼、原因。系統自動寫，客戶端不顯示。
+export const serviceCaseLog = pgTable('service_case_log', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  caseId: uuid('case_id').notNull().references(() => serviceCases.id, { onDelete: 'cascade' }),
+  stage: text('stage'),
+  actorType: text('actor_type').default('system').notNull(),   // coach／client／admin／system
+  actorId: text('actor_id'),
+  actorName: text('actor_name').default('').notNull(),
+  action: text('action').notNull(),
+  detail: jsonb('detail').$type<Record<string, unknown>>().default({}).notNull(),
+  reason: text('reason').default('').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('service_case_log_case_idx').on(t.caseId, t.createdAt),
+]);
+
+// 各階段預設期限與檢查清單（後台可改；沒有列＝程式端預設值，見 lib/caseEngine）。全部是「預設值」，不是正式標準。
+export const serviceStageParams = pgTable('service_stage_params', {
+  stage: text('stage').primaryKey(),
+  days: integer('days').notNull(),
+  checklist: jsonb('checklist').$type<{ k: string; label: string }[]>().default([]).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 服務年期（原 2026/10/28 第二批的 service_cases，改名）：收款、合約、發票的共同關聯單位，掛在案件底下。
+// 一案可多期（首次委任／年度續約）；同年度加試算版本不等於新期；複製新年度不帶收款／簽名／合約／發票狀態。
+// case_no＝客戶編號-序（例：2610003-1）；方案＝營業項目（沒建的服務不能簽）。簽約人＝客戶帳號（clients.client_user_id，沒綁就先用專用登入連結）。
+// status：open／completed（合約完成）／terminated／refunded。⚠️ 收款／合約／發票的 case_type 仍叫 'client_service'、case_id 指到這一列（期）的 id。
+export const serviceTerms = pgTable('service_terms', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  caseId: uuid('case_id').references(() => serviceCases.id, { onDelete: 'cascade' }),
   clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
   coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'restrict' }),     // 主責／簽署教練
   promoCoachId: text('promo_coach_id').references(() => coaches.id, { onDelete: 'set null' }),   // 開發教練（null＝公司派案）
@@ -1617,11 +1701,12 @@ export const serviceCases = pgTable('service_cases', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index('service_cases_client_idx').on(t.clientId),
-  index('service_cases_coach_idx').on(t.coachId),
-  uniqueIndex('service_cases_case_no_uq').on(t.caseNo),
-  // 同客戶同年度只能有一個進行中／已完成的案（雙擊建案不會開兩案）
-  uniqueIndex('service_cases_client_year_live_uq').on(t.clientId, t.serviceYear).where(sql`status in ('open','completed')`),
+  index('service_terms_client_idx').on(t.clientId),
+  index('service_terms_case_idx').on(t.caseId),
+  index('service_terms_coach_idx').on(t.coachId),
+  uniqueIndex('service_terms_case_no_uq').on(t.caseNo),
+  // 同客戶同年度只能有一個進行中／已完成的期（雙擊建案不會開兩期）
+  uniqueIndex('service_terms_client_year_live_uq').on(t.clientId, t.serviceYear).where(sql`status in ('open','completed')`),
 ]);
 
 // 發票（公司獨立處理，第一期人工回填）。與合約共用案件與收款，但各自維護狀態、互不等待。
@@ -1664,4 +1749,50 @@ export const docTasks = pgTable('doc_tasks', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('doc_tasks_template_key_idx').on(t.templateKey),
+]);
+
+// 站內通知（2026/10/28 案件進度定案 ④）：三邊共用（教練／客戶），不推播不寄信。
+// dedupe_key 讓 cron 每天跑也只發一次同一件事（例：`case:<id>:overdue:1:2026-11-02`）。
+export const notifications = pgTable('notifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  recipientType: text('recipient_type').notNull(),     // coach / client
+  recipientId: text('recipient_id').notNull(),         // coaches.id 或 client_users.id
+  kind: text('kind').notNull(),                        // case_due / case_overdue / case_escalation / case_question / doc_sign / survey / todo / info
+  title: text('title').notNull(),
+  body: text('body').default('').notNull(),
+  href: text('href').default('').notNull(),
+  caseId: uuid('case_id').references(() => serviceCases.id, { onDelete: 'cascade' }),
+  dedupeKey: text('dedupe_key'),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('notifications_recipient_idx').on(t.recipientType, t.recipientId, t.createdAt),
+  uniqueIndex('notifications_dedupe_uq').on(t.dedupeKey),
+]);
+
+// 假日表：逾期升級以工作日計，週六日程式跳過，國定假日靠這張表（後台維護）。
+export const orgHolidays = pgTable('org_holidays', {
+  day: date('day').primaryKey(),
+  label: text('label').default('').notNull(),
+});
+
+// 服務回饋問卷（2026/10/28 案件進度 ⑧）：約定服務完成後 7 天內發、客戶評分；低分 → 案件標「低分回饋」→ 通知客戶關係。
+// 一案一份為主（一期一份：term_id 可區分續約期）。與業務制度的 comp_surveys（分潤結案要件、文字題）是兩回事。
+export const serviceFeedback = pgTable('service_feedback', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  caseId: uuid('case_id').notNull().references(() => serviceCases.id, { onDelete: 'cascade' }),
+  termId: uuid('term_id'),
+  clientUserId: text('client_user_id').references(() => clientUsers.id, { onDelete: 'set null' }),
+  sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  scores: jsonb('scores').$type<number[]>().default([]).notNull(),   // 每題 1–5
+  avg: doublePrecision('avg'),
+  comment: text('comment').default('').notNull(),
+  low: boolean('low').default(false).notNull(),
+  handledAt: timestamp('handled_at', { withTimezone: true }),
+  handledBy: text('handled_by'),
+  handleNote: text('handle_note').default('').notNull(),
+}, (t) => [
+  index('service_feedback_case_idx').on(t.caseId),
+  uniqueIndex('service_feedback_case_term_uq').on(t.caseId, sql`coalesce(${t.termId}::text, '')`),
 ]);

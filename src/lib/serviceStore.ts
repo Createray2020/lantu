@@ -1,4 +1,5 @@
-// 顧問服務案件（2026/10/28 電子簽署第二個消費者）：收款、合約、發票的共同關聯單位。
+// 服務年期（原「顧問服務案件」，2026/10/28 案件進度定案後改名）：收款、合約、發票的共同關聯單位，掛在服務案件（caseStore）底下。
+// 一客戶一案件；首次委任＝第一期、年度續約＝下一期。建第一期時順便 ensureCase（案件主軸）。
 //
 // 三個入口都落到這裡：建客戶時勾「建立付費顧問服務案件」／客戶頁「收款與合約」／新年度續約。
 // 三組狀態各自獨立、各自可追溯：
@@ -8,7 +9,8 @@
 // 「啟動簽約流程」的門檻在後端（startCaseSigning）：主責教練本人＋全額確認＋客戶已綁帳號。
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clients, clientUsers, coaches, coachDisplayName, invoices, serviceCases } from "@/Shared/db/schema";
+import { clients, clientUsers, coaches, coachDisplayName, invoices, serviceTerms } from "@/Shared/db/schema";
+import { ensureCase, autoCheck, completeStage, getCase, getCaseByClient, stagesOf } from "./caseStore";
 import { getAcctState, createCoachFeeReceipt, receiptsForCase, type CoachFeeInput } from "./acctStore";
 import { caseFunding, type Receipt } from "./acctEngine";
 import { startSigning, listInstancesForCase, withSigners, caseProgress, isUniqueViolation, type InstanceWithSigners } from "./docsStore";
@@ -17,7 +19,9 @@ import { E_SIGN_CLAUSE, type DocVars } from "./docs";
 import { todayISO } from "./license";
 import { fmtMoney0 } from "./money";
 
-export type ServiceCase = typeof serviceCases.$inferSelect;
+export type ServiceTerm = typeof serviceTerms.$inferSelect;
+/** @deprecated 舊名，等於 ServiceTerm（年期）。案件主軸請用 caseStore.ServiceCase。 */
+export type ServiceCase = ServiceTerm;
 export type Invoice = typeof invoices.$inferSelect;
 
 export type CaseInput = {
@@ -48,14 +52,16 @@ export async function createServiceCase(coachId: string, clientId: string, input
   const year = input.serviceYear ?? Number(todayISO().slice(0, 4));
   const existing = await db
     .select()
-    .from(serviceCases)
-    .where(and(eq(serviceCases.clientId, clientId), eq(serviceCases.serviceYear, year)))
-    .orderBy(desc(serviceCases.createdAt));
+    .from(serviceTerms)
+    .where(and(eq(serviceTerms.clientId, clientId), eq(serviceTerms.serviceYear, year)))
+    .orderBy(desc(serviceTerms.createdAt));
   const live = existing.find((c) => c.status === "open" || c.status === "completed");
   if (live) return { ok: true, case: live, existed: true };
 
-  const prior = await db.select({ id: serviceCases.id }).from(serviceCases).where(eq(serviceCases.clientId, clientId));
+  const prior = await db.select({ id: serviceTerms.id }).from(serviceTerms).where(eq(serviceTerms.clientId, clientId));
   const kind = input.kind ?? (prior.length ? "renewal" : "first");
+  // 案件主軸：一客戶一案件，第一期建立時一起長出來（冪等）
+  const mainCase = await ensureCase(clientId, client.coachId ?? coachId, { type: "coach", id: coachId });
   const base = client.code ?? clientId.slice(0, 8);
   let seq = prior.length + 1;
   // 編號唯一：萬一撞到（同客戶以前有終止的案）就往後找
@@ -64,9 +70,9 @@ export async function createServiceCase(coachId: string, clientId: string, input
     const amountDue = Math.max(0, Number(input.amountDue) || item.price || 0);
     try {
       const [row] = await db
-        .insert(serviceCases)
+        .insert(serviceTerms)
         .values({
-          clientId, coachId, promoCoachId: input.promoCoachId ?? null, caseNo, kind, itemId: item.id, itemName: item.name, serviceYear: year,
+          caseId: mainCase.id, clientId, coachId, promoCoachId: input.promoCoachId ?? null, caseNo, kind, itemId: item.id, itemName: item.name, serviceYear: year,
           fromDate: isDate(input.from) ? input.from : null, toDate: isDate(input.to) ? input.to : null, amountDue, taxIncl: input.taxIncl !== false,
           note: (input.note ?? "").trim().slice(0, 400),
         })
@@ -75,7 +81,7 @@ export async function createServiceCase(coachId: string, clientId: string, input
     } catch (e) {
       if (!isUniqueViolation(e)) throw e;
       // 撞到的是「同客戶同年度已有活案」的索引（雙擊）→ 回既有那一案；撞到案號就往後找
-      const again = (await db.select().from(serviceCases).where(and(eq(serviceCases.clientId, clientId), eq(serviceCases.serviceYear, year))).orderBy(desc(serviceCases.createdAt)))
+      const again = (await db.select().from(serviceTerms).where(and(eq(serviceTerms.clientId, clientId), eq(serviceTerms.serviceYear, year))).orderBy(desc(serviceTerms.createdAt)))
         .find((c) => c.status === "open" || c.status === "completed");
       if (again) return { ok: true, case: again, existed: true };
       seq++;
@@ -85,12 +91,12 @@ export async function createServiceCase(coachId: string, clientId: string, input
 }
 
 export async function getServiceCase(id: string): Promise<ServiceCase | null> {
-  const rows = await db.select().from(serviceCases).where(eq(serviceCases.id, id)).limit(1);
+  const rows = await db.select().from(serviceTerms).where(eq(serviceTerms.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
 export async function listCasesForClient(clientId: string): Promise<ServiceCase[]> {
-  return db.select().from(serviceCases).where(eq(serviceCases.clientId, clientId)).orderBy(desc(serviceCases.serviceYear), desc(serviceCases.createdAt));
+  return db.select().from(serviceTerms).where(eq(serviceTerms.clientId, clientId)).orderBy(desc(serviceTerms.serviceYear), desc(serviceTerms.createdAt));
 }
 
 // ── 檢視（三組狀態）──────────────────────────────────────────────────────────
@@ -148,7 +154,7 @@ export async function startCaseSigning(coachId: string, caseId: string): Promise
   if (!cl) return { ok: false, error: "找不到客戶" };
   const signerId = c.signerClientUserId ?? cl.cu ?? null;
   if (!signerId) return { ok: false, error: "客戶還沒有登入帳號：先用「專用登入連結」讓客戶登入綁定，再啟動簽約", needLogin: true };
-  if (!c.signerClientUserId) await db.update(serviceCases).set({ signerClientUserId: signerId, updatedAt: new Date() }).where(eq(serviceCases.id, c.id));
+  if (!c.signerClientUserId) await db.update(serviceTerms).set({ signerClientUserId: signerId, updatedAt: new Date() }).where(eq(serviceTerms.id, c.id));
 
   const [[cu], [co], ownerId, brand] = await Promise.all([
     db.select({ id: clientUsers.id, name: clientUsers.name, email: clientUsers.email }).from(clientUsers).where(eq(clientUsers.id, signerId)).limit(1),
@@ -190,15 +196,49 @@ export async function startCaseSigning(coachId: string, caseId: string): Promise
   return { ok: true, docs: r.instances.length, noTemplates: false };
 }
 
-/** 文件全部簽完（docsHooks）：案件標完成。冪等。 */
-export async function onCaseDocsCompleted(caseId: string): Promise<void> {
-  const c = await getServiceCase(caseId);
+/** 文件全部簽完（docsHooks）：這一期合約標完成（不是結案），並送出階段 4 的完成訊號。冪等。 */
+export async function onCaseDocsCompleted(termId: string): Promise<void> {
+  const c = await getServiceCase(termId);
   if (!c || c.status !== "open") return;
   const live = (await listInstancesForCase("client_service", c.id)).filter((i) => i.status !== "void");
   if (live.length && caseProgress(live).allDone) {
-    await db.update(serviceCases).set({ status: "completed", updatedAt: new Date() }).where(and(eq(serviceCases.id, c.id), eq(serviceCases.status, "open")));
+    await db.update(serviceTerms).set({ status: "completed", updatedAt: new Date() }).where(and(eq(serviceTerms.id, c.id), eq(serviceTerms.status, "open")));
+    await recheckCommission(c.clientId);
   }
 }
+
+/**
+ * 階段 4「正式委託」的完成訊號（三個既有零件）：合約完成＋全額收款確認＋客戶已綁登入帳號。
+ * 三個各自發生時都呼叫這裡；三個都到齊就自動推進到階段 5。只對第一期（kind=first）判定——
+ * 續約期的簽約／收款不會把案件退回第 4 階。冪等。
+ */
+export async function recheckCommission(clientId: string): Promise<void> {
+  const bundle = await getCaseByClient(clientId);
+  if (!bundle || bundle.case.status === "closed") return;
+  const terms = await listCasesForClient(clientId);
+  const first = terms.find((t) => t.kind === "first" && t.status !== "terminated" && t.status !== "refunded") ?? terms[terms.length - 1];
+  if (!first) return;
+  const [cl] = await db.select({ cu: clients.clientUserId }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  const bound = !!(first.signerClientUserId || cl?.cu);
+  const funding = caseFunding(await receiptsForCase("client_service", first.id), first.amountDue);
+  const live = (await listInstancesForCase("client_service", first.id)).filter((i) => i.status !== "void");
+  const signed = live.length > 0 && caseProgress(live).allDone;
+  const caseId = bundle.case.id;
+  if (signed) await autoCheck(caseId, "commission", "contract");
+  if (funding.met) await autoCheck(caseId, "commission", "paid");
+  if (bound) await autoCheck(caseId, "commission", "login");
+  if (bundle.case.stage === "commission" && signed && funding.met && bound) {
+    await completeStage(caseId, "commission", { type: "system", name: "系統" }, { auto: true, reason: "合約完成＋收款確認＋客戶已開通會員中心" });
+  }
+}
+
+/** 給客戶頁／會員中心：案件主軸＋年期一起拿。 */
+export async function caseWithTerms(clientId: string) {
+  const bundle = await getCaseByClient(clientId);
+  const terms = await listCasesForClient(clientId);
+  return { bundle, terms };
+}
+export { getCase as getMainCase, stagesOf as mainCaseStages };
 
 // ── 發票（公司端）────────────────────────────────────────────────────────────
 export type InvoiceQueueRow = {
@@ -216,7 +256,7 @@ export type InvoiceQueueRow = {
 /** 發票待辦：收款達門檻（或已有發票列）的案件，顧問服務＋培訓都列。 */
 export async function invoiceQueue(): Promise<InvoiceQueueRow[]> {
   const [cases, invs] = await Promise.all([
-    db.select({ c: serviceCases, clientName: clients.name, coachName: coachDisplayName }).from(serviceCases).innerJoin(clients, eq(clients.id, serviceCases.clientId)).leftJoin(coaches, eq(coaches.id, serviceCases.coachId)).orderBy(desc(serviceCases.createdAt)),
+    db.select({ c: serviceTerms, clientName: clients.name, coachName: coachDisplayName }).from(serviceTerms).innerJoin(clients, eq(clients.id, serviceTerms.clientId)).leftJoin(coaches, eq(coaches.id, serviceTerms.coachId)).orderBy(desc(serviceTerms.createdAt)),
     db.select().from(invoices).orderBy(desc(invoices.createdAt)),
   ]);
   const invOf = (t: string, id: string) => invs.find((i) => i.caseType === t && i.caseId === id) ?? null;

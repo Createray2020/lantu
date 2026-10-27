@@ -7,11 +7,12 @@ import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
 import { DEFAULT_THEME, normalizeTheme, type ThemeName } from "@/lib/theme";
 import { isModuleOn } from "@/lib/platformModules";
 import { countMyPending } from "@/lib/docsStore";
+import { unreadCount } from "@/lib/notify";
 
 // learnOn：學習區模組的開關（/admin/modules）。關閉時頂欄不出現學習區入口——
 // 入口與頁面各自判斷會漂（頁面擋住了、頂欄還亮著一個點進去是建置中的分頁），
 // 所以跟 isAdmin 一樣收在這裡算一次。
-export type HeaderProps = { isAdmin: boolean; uiScale: number; theme: ThemeName; license: LicenseState; learnOn: boolean; docsPending: number };
+export type HeaderProps = { isAdmin: boolean; uiScale: number; theme: ThemeName; license: LicenseState; learnOn: boolean; docsPending: number; unread: number };
 
 export async function headerProps(coach: Coach): Promise<HeaderProps> {
   return {
@@ -22,5 +23,7 @@ export async function headerProps(coach: Coach): Promise<HeaderProps> {
     learnOn: await isModuleOn("learn"),
     // 輪到我簽的電子文件（合約／培訓文件）；查不到就 0，不讓頂欄因為這個掛掉。
     docsPending: await countMyPending({ coachId: coach.id }).catch(() => 0),
+    // 站內通知未讀數（2026/10/28 案件進度）；查不到就 0。
+    unread: await unreadCount("coach", coach.id).catch(() => 0),
   };
 }

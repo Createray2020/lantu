@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ensureCoach, isAdmin, listCoaches, coachWorkloads } from "@/lib/coach";
 import OrgCell from "./OrgCell";
+import ServiceRoleCell from "./ServiceRoleCell";
 import StatusActions from "./StatusActions";
 import TestToggle from "./TestToggle";
 import RemoveCoach from "./RemoveCoach";
@@ -92,7 +93,7 @@ export default async function Admin() {
                 <th className="px-3 py-2 font-semibold">姓名 / Email</th>
                 <th className="px-3 py-2 font-semibold whitespace-nowrap">角色</th>
                 <th className="px-3 py-2 font-semibold whitespace-nowrap">狀態</th>
-                <th className="px-3 py-2 font-semibold">組織（職級 / 推薦人）</th>
+                <th className="px-3 py-2 font-semibold">組織（職級 / 推薦人 / 服務角色）</th>
                 <th className="px-3 py-2 font-semibold whitespace-nowrap">級別 · 使用期限</th>
                 <th className="px-3 py-2 font-semibold whitespace-nowrap">申請日</th>
                 <th className="px-3 py-2 font-semibold whitespace-nowrap">開通日</th>
@@ -171,6 +172,7 @@ export default async function Admin() {
                         uplineId={c.uplineId}
                         peers={peers}
                       />
+                      <ServiceRoleCell id={c.id} roles={Array.isArray(c.serviceRoles) ? c.serviceRoles : []} />
                     </td>
                     <td className="px-3 py-2 align-top">
                       <LicenseCell

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { ensureCoach } from "@/lib/coach";
 import { licenseState, LICENSE_LOCKED_MESSAGE } from "@/lib/license";
 import { getPlan } from "@/lib/plans";
-import { restoreRevision } from "@/lib/revisions";
+import { restoreRevision, labelRevision, REPORT_LABELS, type ReportLabel } from "@/lib/revisions";
+import { clientAccess } from "@/lib/clientScope";
 
 // 教練只能回復自己那一軌（track='coach'）。
 // 客戶的人生護照是客戶自己寫的東西，教練可以看、可以在年度版裡引用，但不能代為改寫歷史。
@@ -27,5 +28,25 @@ export async function restoreCoachRevisionAction(planId: string, revisionId: str
   } catch (e) {
     console.error("[restoreCoachRevisionAction]", e);
     return { ok: false as const, error: e instanceof Error ? e.message : "回復失敗" };
+  }
+}
+
+// 報告書版本標籤（2026/10/28）：只有主責教練能標；客戶看得到「最終版」與交付日。
+export async function labelRevisionAction(planId: string, revisionId: string, label: string | null, note = "") {
+  try {
+    const coach = await ensureCoach();
+    if (!coach || coach.status !== "active") return { ok: false as const, error: "沒有權限" };
+    const plan = await getPlan(coach.id, planId);
+    if (!plan) return { ok: false as const, error: "找不到這份規劃" };
+    if ((await clientAccess(coach.id, plan.clientId)) !== "owner") return { ok: false as const, error: "只有主責教練可以標版本" };
+    if (label !== null && !(REPORT_LABELS as readonly string[]).includes(label)) return { ok: false as const, error: "標籤不對" };
+    const r = await labelRevision(revisionId, label as ReportLabel | null, note);
+    if (!r.ok) return { ok: false as const, error: r.error };
+    revalidatePath(`/dashboard/plans/${planId}/history`);
+    revalidatePath(`/dashboard/clients/${plan.clientId}`);
+    revalidatePath("/portal");
+    return { ok: true as const };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "失敗" };
   }
 }

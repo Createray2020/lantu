@@ -5,7 +5,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { and, eq, count, inArray } from "drizzle-orm";
 import { recordAcctEvent } from "./acctStore";
 import { db } from "@/Shared/db";
-import { coaches, clients, compCases, serviceCases } from "@/Shared/db/schema";
+import { coaches, clients, compCases, serviceCases, serviceTerms } from "@/Shared/db/schema";
 import { allocCode } from "./codeAlloc";
 import { normalizeCode } from "./codes";
 // 顯示名稱的唯一真相（純函式＋SQL 版同住一處，語意不會走鐘）。
@@ -383,10 +383,15 @@ export async function transferClients(
   // 顧問服務案件（2026/10/28）跟著客戶走：主責教練換人，啟動簽約／登錄付款的權限才會跟著過去，
   // 也才拿得掉前一位教練列上的 RESTRICT。已完成合約的簽名不動（簽署人列是歷史）。
   if (moved.length) {
+    const ids = moved.map((m) => m.id);
     await db
       .update(serviceCases)
       .set({ coachId: toCoachId, updatedAt: new Date() })
-      .where(and(eq(serviceCases.coachId, fromCoachId), inArray(serviceCases.clientId, moved.map((m) => m.id))));
+      .where(and(eq(serviceCases.coachId, fromCoachId), inArray(serviceCases.clientId, ids)));
+    await db
+      .update(serviceTerms)
+      .set({ coachId: toCoachId, updatedAt: new Date() })
+      .where(and(eq(serviceTerms.coachId, fromCoachId), inArray(serviceTerms.clientId, ids)));
   }
   return { ok: true, moved: moved.length };
 }

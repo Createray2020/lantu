@@ -57,6 +57,8 @@ export async function createReview(coachId: string, clientId: string, input: Rev
       nextAppt: input.nextAppt ?? null,
     })
     .returning({ id: reviews.id });
+  const { onReviewSaved } = await import("./caseSignals");
+  await onReviewSaved(clientId, input.type, input.nextAppt);
   return row.id;
 }
 

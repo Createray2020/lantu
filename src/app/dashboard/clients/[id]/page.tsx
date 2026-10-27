@@ -13,6 +13,7 @@ import ReadOnlyBanner from "../../ReadOnlyBanner";
 import CollabBanner from "./CollabBanner";
 import ClientDetail from "./ClientDetail";
 import ClientFees from "./ClientFees";
+import CaseProgress from "./CaseProgress";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +120,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           createdAt: c.createdAt.toISOString().slice(0, 10),
         }))}
       />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-4">
+        <CaseProgress clientId={client.id} readOnly={readOnly} />
+      </div>
       {isOwner && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-8">
           <ClientFees clientId={client.id} meId={coach.id} readOnly={readOnly} planYears={[...new Set(plans.map((p) => p.year).filter((y): y is number => typeof y === "number"))]} />

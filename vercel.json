@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/close-sessions",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/case-reminders",
+      "schedule": "30 23 * * *"
     }
   ]
 }

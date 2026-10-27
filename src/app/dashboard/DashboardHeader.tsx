@@ -19,6 +19,7 @@ export default function DashboardHeader({
   license,
   learnOn = true,
   docsPending = 0,
+  unread = 0,
 }: {
   isAdmin?: boolean;
   uiScale?: number;
@@ -26,6 +27,8 @@ export default function DashboardHeader({
   license?: LicenseState;
   /** 輪到我簽的電子文件份數（2026/10/28）；0 不顯示角標。 */
   docsPending?: number;
+  /** 站內通知未讀數（2026/10/28）。 */
+  unread?: number;
   // 學習區模組關閉時整顆入口不出現（見 /admin/modules）。預設 true：
   // 沒傳的呼叫端（例如測試）維持改版前的行為。
   learnOn?: boolean;
@@ -99,6 +102,7 @@ export default function DashboardHeader({
         <Link href="/dashboard" className={tab(onHome)}>首頁</Link>
         <Link href="/dashboard/clients" className={tab(onClients)}>客戶</Link>
         <Link href="/dashboard/overview" className={tab(onOverview)}>儀表板</Link>
+        <Link href="/dashboard/cases" className={tab(pathname.startsWith("/dashboard/cases"))}>案件</Link>
         <Link href="/dashboard/requests" className={`${tab(onRequests)} relative`}>
           待確認
           {pendingErr ? (
@@ -133,6 +137,13 @@ export default function DashboardHeader({
         className="text-tx2 hover:text-tx text-xs font-bold px-2.5 py-1.5 rounded-md border border-line2"
       >
         我的分潤
+      </Link>
+      <Link
+        href="/dashboard/notifications"
+        className={`relative text-xs font-bold px-2.5 py-1.5 rounded-md border ${unread > 0 ? "border-brand2 text-brand2" : "border-line2 text-tx2 hover:text-tx"}`}
+        title="通知"
+      >
+        通知{unread > 0 ? `（${unread}）` : ""}
       </Link>
       <Link
         href="/dashboard/docs"

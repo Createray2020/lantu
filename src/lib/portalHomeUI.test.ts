@@ -36,7 +36,10 @@ vi.mock("@/lib/clientPlan", () => ({
   }),
 }));
 vi.mock("@/Shared/db", () => ({ db: { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) } }));
-vi.mock("@/Shared/db/schema", () => ({ coaches: { id: "id" } }));
+vi.mock("@/Shared/db/schema", () => ({ coaches: { id: "id" }, clients: { id: "id" } }));
+// 會員中心（2026/10/28 案件進度）與通知：首頁只問「有沒有案件／幾則未讀」，mock 在模組邊界。
+vi.mock("@/lib/portalCase", () => ({ portalCaseState: async () => ({ kind: "none" }) }));
+vi.mock("@/lib/notify", () => ({ unreadCount: async () => 0 }));
 // 風險屬性測驗的邀請狀態：mock 在模組邊界，不用讓假 schema 認識 client_risk_quiz。
 // 電子簽署：首頁只問「有沒有輪到我簽的」，mock 在模組邊界。
 vi.mock("@/lib/docsStore", () => ({ listMyInstances: async () => [], countMyPending: async () => 0 }));

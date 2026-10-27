@@ -22,6 +22,9 @@ import { db } from "@/Shared/db";
 import { coaches } from "@/Shared/db/schema";
 import BrandMark from "@/components/BrandMark";
 import { countMyPending, listMyInstances, hasReminderFor } from "@/lib/docsStore";
+import { portalCaseState } from "@/lib/portalCase";
+import { unreadCount } from "@/lib/notify";
+import MemberCenter from "./MemberCenter";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +59,9 @@ export default async function Portal() {
   const myDocs = await listMyInstances({ clientUserId: client.id });
   const docPending = await countMyPending({ clientUserId: client.id });
   const docReminded = docPending > 0 && (await hasReminderFor({ clientUserId: client.id }));
+  // 會員中心（2026/10/28 案件進度）：有案件就以「服務進度」為首屏；掛了教練但還沒委託顯示一張「尚未委託」卡；自助客戶什麼都不多畫。
+  const caseState = planCase ? await portalCaseState(planCase.clientId, name) : { kind: "none" as const };
+  const unread = await unreadCount("client", client.id).catch(() => 0);
   // 教練↔客戶是雙棲的：教練也會用客戶介面做自己的規劃。
   // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。
   // 教練端頁首早就有「我的規劃」指過來，這條是把單向補成雙向。
@@ -160,6 +166,12 @@ export default async function Portal() {
               申請成為教練
             </Link>
           )}
+          <Link
+            href="/portal/notifications"
+            className={`text-13 sm:text-sm border rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap ${unread > 0 ? "border-brand/40 text-brand2" : "border-line2 text-tx2 hover:text-tx"}`}
+          >
+            通知{unread > 0 ? `（${unread}）` : ""}
+          </Link>
           {myDocs.length > 0 && (
             <Link
               href="/portal/docs"
@@ -197,6 +209,13 @@ export default async function Portal() {
           </div>
         )}
         <RiskQuizGate invited={quizInvited} />
+        {caseState.kind === "case" && <MemberCenter d={caseState.data} />}
+        {caseState.kind === "no_case" && (
+          <div className="max-w-2xl mx-auto mb-8 rounded-xl border border-line bg-panel2 px-5 py-4 text-sm">
+            <div className="font-bold mb-1">服務進度</div>
+            <p className="text-tx2 text-xs">你的教練是 {caseState.coachName}。正式委託後，這裡會顯示五個階段的服務進度、下次會談與需要你配合的事。</p>
+          </div>
+        )}
         <Overview ov={ov} />
         <Todos items={todos} />
         <FlowActions items={flowActions} />

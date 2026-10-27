@@ -251,3 +251,21 @@ export async function setCoachTestAction(id: string, isTest: boolean): Promise<A
     return { ok: true };
   } catch (e) { return fail(e); }
 }
+
+// 服務角色（2026/10/28 案件進度 ③）：客戶關係／行政財法。
+export async function setServiceRoles(id: string, roles: string[]): Promise<ActionResult> {
+  try {
+    await guard();
+    const { SERVICE_ROLES } = await import("@/lib/caseScope");
+    const clean = SERVICE_ROLES.filter((r) => roles.includes(r));
+    const { db } = await import("@/Shared/db");
+    const { coaches } = await import("@/Shared/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.update(coaches).set({ serviceRoles: clean }).where(eq(coaches.id, id));
+    revalidatePath("/admin");
+    revalidatePath("/dashboard/cases");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "failed" };
+  }
+}

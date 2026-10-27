@@ -268,6 +268,10 @@ export async function verifyAcctReceipt(id: string, v: boolean): Promise<void> {
   }
   await db.update(acctReceipts).set({ verified: v, allocs: allocs as ReceiptRow[] | null, updatedAt: new Date() }).where(eq(acctReceipts.id, id));
   updateTag(ACCT_TAG);
+  // 案件進度：顧問服務的收款確認是階段 4 的完成訊號之一（失敗不擋查帳）
+  if (v && r.caseType === "client_service" && r.clientId) {
+    try { const { recheckCommission } = await import("./serviceStore"); await recheckCommission(r.clientId); } catch { /* 案件進度不擋帳務 */ }
+  }
 }
 // ---------- 收款案件（2026/10/28 電子簽署）：培訓費提報與案件門檻 ----------
 export type CaseFeeInput = { amount: number; gross?: number | null; fee?: number; on: string; method?: string; methodFields?: Record<string, string>; last5?: string; payer: string; note?: string };

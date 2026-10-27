@@ -23,6 +23,7 @@ const h = vi.hoisted(() => {
     clients: { _n: "clients" },
     compCases: { _n: "comp_cases" },
     serviceCases: { _n: "service_cases", coachId: { name: "coach_id" }, clientId: { name: "client_id" } },
+    serviceTerms: { _n: "service_terms", coachId: { name: "coach_id" }, clientId: { name: "client_id" } },
   };
   // rows＝coaches 查詢結果；counts＝clients/comp_cases 的 count() 結果；moved＝transferClients 影響列
   const state: any = {
@@ -284,13 +285,14 @@ describe("transferClients", () => {
     h.state.moved = [{ id: "cl_1" }, { id: "cl_2" }];
   });
 
-  it("整批改掛到接手教練：clients 與其顧問服務案件（2026/10/28）一起過去", async () => {
+  it("整批改掛到接手教練：clients、服務案件與服務年期（2026/10/28）一起過去", async () => {
     const r = await transferClients("coach_from", "coach_to");
     expect(r).toEqual({ ok: true, moved: 2 });
     const tables = h.state.updates.map((u: any) => u.table);
-    expect(tables).toEqual(["clients", "service_cases"]);
+    expect(tables).toEqual(["clients", "service_cases", "service_terms"]);
     expect(h.state.updates[0].coachId).toBe("coach_to");
     expect(h.state.updates[1].coachId).toBe("coach_to");
+    expect(h.state.updates[2].coachId).toBe("coach_to");
   });
 
   it("不動 comp_cases.executorId（改掉會竄改誰執行了案子）", async () => {

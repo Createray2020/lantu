@@ -14,18 +14,25 @@ export type TimelineItem = {
   editorName: string | null;
   createdAt: string;       // ISO（server component 傳過來要可序列化）
   restorable: boolean;
+  /** 報告書版本標籤（2026/10/28）：draft／revised／final；labelable＝主責教練可標 */
+  label?: string | null;
+  labelNote?: string | null;
+  labeledAt?: string | null;
+  labelable?: boolean;
 };
+const LABEL_TEXT: Record<string, string> = { draft: "初稿", revised: "修改版", final: "最終版" };
 
 type Props = {
   items: TimelineItem[];
   onRestore: (planId: string, revisionId: string) => Promise<{ ok: boolean; error?: string }>;
+  onLabel?: (planId: string, revisionId: string, label: string | null) => Promise<{ ok: boolean; error?: string }>;
   /** 看時間軸的人是誰，用來把「教練／客戶」講成「我」。 */
   viewerType: "coach" | "client";
 };
 
 const trackLabel = (t: string) => (t === "client" ? "人生護照" : "年度版");
 
-export default function RevisionTimeline({ items, onRestore, viewerType }: Props) {
+export default function RevisionTimeline({ items, onRestore, onLabel, viewerType }: Props) {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -84,6 +91,11 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                     {isLatest && (
                       <span className="text-10 px-2 py-0.5 rounded bg-brand text-onbrand font-bold">目前版本</span>
                     )}
+                    {it.label && (
+                      <span className={`text-10 px-2 py-0.5 rounded font-bold ${it.label === "final" ? "bg-ok text-onsolid" : "border border-brand2/60 text-brand2"}`} title={it.labelNote ?? undefined}>
+                        報告書{LABEL_TEXT[it.label] ?? it.label}{it.labeledAt ? `・${new Date(it.labeledAt).toLocaleDateString("zh-TW")}` : ""}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-tx2 mt-1">
                     {mine ? "我" : it.editorType === "client" ? "客戶" : "教練"}
@@ -92,6 +104,25 @@ export default function RevisionTimeline({ items, onRestore, viewerType }: Props
                   </div>
                 </div>
 
+                {it.labelable && onLabel && (
+                  <select
+                    className="shrink-0 text-xs bg-field border border-line2 rounded-md px-2 py-1 text-tx"
+                    value={it.label ?? ""}
+                    disabled={busy === it.id}
+                    onChange={async (e) => {
+                      const v = e.target.value || null;
+                      setBusy(it.id); setErr(null);
+                      const res = await onLabel(it.planId, it.id, v);
+                      if (res.ok) window.location.reload(); else { setErr(res.error || "標記失敗"); setBusy(null); }
+                    }}
+                    title="報告書版本標籤：客戶看得到最終版與交付日"
+                  >
+                    <option value="">（不標）</option>
+                    <option value="draft">初稿</option>
+                    <option value="revised">修改版</option>
+                    <option value="final">最終版</option>
+                  </select>
+                )}
                 {/* 目前版本沒有「回復到自己」的意義，所以只有非最新的才給按鈕 */}
                 {it.restorable && !isLatest && (
                   confirming === it.id ? (
