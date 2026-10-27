@@ -455,8 +455,6 @@ input::placeholder,textarea::placeholder{color:var(--mut2);font-weight:400;font-
 .report .rcover.light{background:#fdfbf6;color:#0d2b45}
 .report .rcover .rcframe{position:absolute;inset:18px;border:1px solid #c99a5b;pointer-events:none}
 .report .rcover .rcframe::after{content:"";position:absolute;inset:5px;border:1px solid rgba(201,154,91,.35)}
-.report .rcover .rcarc{position:absolute;right:-90px;bottom:-90px;width:300px;height:300px;border-radius:50%;border:7px solid rgba(201,154,91,.28);border-left-color:transparent;border-bottom-color:transparent;transform:rotate(25deg);pointer-events:none}
-.report .rcover.light .rcarc{border-color:rgba(13,43,69,.12);border-left-color:transparent;border-bottom-color:transparent}
 .report .rcover .rcbrand{position:relative;display:flex;align-items:center;gap:12px;min-height:46px}
 .report .rcover .rcbrand img{height:46px;max-width:220px;object-fit:contain;object-position:left}
 .report .rcover .rcbrand .rcname{font-size:22px;letter-spacing:.18em;font-weight:700}
@@ -17304,10 +17302,13 @@ var R_PRINT_CSS=[
  ' @bottom-right{content:counter(page);font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:9px;letter-spacing:.1em;color:#8a9aa2;vertical-align:top;padding-top:6px}}',
  '@page cover{margin:0;@top-left{content:none;border:0}@top-center{content:none;border:0}@top-right{content:none;border:0}@bottom-left{content:none}@bottom-right{content:none}}',
  '@page toc{@top-left{content:"目錄"}}',
- 'html,body{background:#fff!important;margin:0;color:#22333a}',
+ /* ⚠️ 規劃器 CSS 給 body 一截 padding-bottom（諮詢註記底列用）；Paged.js 的頁高是 body 的 100%，
+    留著會讓每一頁矮 52px、封面底下露一條白（2026/10/27 Ray 回報）。 */
+ 'html,body{background:#fff!important;margin:0!important;padding:0!important;color:#22333a}',
  '@media print{body *{visibility:visible}.report{position:static!important}}',
  '.report{box-shadow:none;border-radius:0;max-width:none;padding:0;margin:0;background:#fff}',
- '.report .rcover{page:cover;margin:0;border-radius:0;width:210mm;height:297mm;padding:26mm 20mm 22mm;break-after:page}',
+ '.report .rcover{page:cover;margin:0;border-radius:0;box-sizing:border-box;width:210mm;height:297mm;min-height:297mm;padding:26mm 20mm 22mm;break-after:page}',
+ '.pagedjs_named-page-cover .pagedjs_page_content,.pagedjs_named-page-cover .pagedjs_pagebox{background:inherit}',
  '.report .rcover .rctitle{font-size:46px}.report .rcover .rcwho b{font-size:30px}',
  '.report .rcover.light .rchead{margin-top:110px}',
  '.report .rtocpg{page:toc;break-after:page}',
@@ -17892,7 +17893,7 @@ function rReportDate(){var d=new Date();return d.getFullYear()+' 年 '+(d.getMon
 function rCover(docTitle,sub,who){
  var th=rThemeKey(),B=window.LANTU_BRAND||{},bn=B.brandName||'嵐途 LAN TU',slogan=B.slogan||'理解自己・做出選擇・走向未來';
  var logo=B.logoUrl?'<img src="'+esc(B.logoUrl)+'" alt="'+esc(bn)+'"/>':'<span class="rcname">'+esc(bn)+'</span>';
- return '<div class="rcover '+th+'" data-doc="'+esc(docTitle)+'">'+(th==='light'?'<div class="rcframe"></div>':'')+'<div class="rcarc"></div>'+
+ return '<div class="rcover '+th+'" data-doc="'+esc(docTitle)+'">'+(th==='light'?'<div class="rcframe"></div>':'')+
   '<div class="rcbrand">'+logo+'</div>'+
   '<div class="rchead" style="margin-top:'+(th==='light'?'70px':'54px')+'"><div class="rck">全方位財務規劃</div><div class="rctitle">'+esc(docTitle)+'</div><div class="rcsub">'+esc(sub)+'</div></div>'+
   '<div class="rcrule"></div>'+
