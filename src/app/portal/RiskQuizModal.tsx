@@ -15,10 +15,12 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Modal from "@/components/ui/Modal";
 import { RISK_QUESTIONS } from "@/lib/riskQuiz";
 import { submitMyRiskQuizAction } from "./actions";
+import type { QuizWho } from "@/lib/riskQuizTodo";
 
 type Answers = Record<string, number | number[]>;
 
-export default function RiskQuizModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function RiskQuizModal({ open, onClose, who = "self" }: { open: boolean; onClose: () => void; who?: QuizWho }) {
+  const isSp = who === "spouse";
   const [ans, setAns] = useState<Answers>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
     setBusy(true);
     setErr(null);
     try {
-      const r = await submitMyRiskQuizAction(ans);
+      const r = await submitMyRiskQuizAction(ans, who);
       if (r.ok) setDone({ score: r.score, tier: r.tier });
       else setErr(r.error);
     } catch {
@@ -70,7 +72,7 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
       <div>
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <div className="flex-1">
-            <div id="riskQuizTitle" className="text-15 font-bold text-brand2">投資風險屬性測驗</div>
+            <div id="riskQuizTitle" className="text-15 font-bold text-brand2">{isSp ? "投資風險屬性測驗 · 替配偶填" : "投資風險屬性測驗"}</div>
             <div className="text-11 text-tx2">
               {done ? "已完成" : `${all} 題 · 約 5 分鐘 · 已作答 ${answered}／${all}`}
             </div>
@@ -84,7 +86,7 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
 
         {done ? (
           <div className="px-6 py-8 text-center">
-            <div className="text-13 text-tx2">你的風險屬性是</div>
+            <div className="text-13 text-tx2">{isSp ? "配偶的風險屬性是" : "你的風險屬性是"}</div>
             <div className="my-2 font-serif text-3xl text-brand2">{done.tier}</div>
             <div className="text-xs text-tx2">{done.score} / 60 分</div>
             <p className="mx-auto mt-4 max-w-[440px] text-xs leading-relaxed text-tx3">
@@ -95,6 +97,11 @@ export default function RiskQuizModal({ open, onClose }: { open: boolean; onClos
         ) : (
           <>
             <div className="max-h-[62dvh] overflow-auto px-5 py-4">
+              {isSp && (
+                <p className="mb-3 rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-xs leading-relaxed text-brand2">
+                  這一份是<b>替配偶</b>作答：請用配偶自己的想法與習慣來選，不是你希望他／她怎麼選。最好兩個人一起看著填。
+                </p>
+              )}
               <p className="mb-4 rounded-lg bg-tx/5 px-3 py-2.5 text-xs leading-relaxed text-tx2">
                 題目裡的「這一筆資金」是<b className="text-brand2">假設情境</b>——
                 問的是「如果要做長期配置，你會怎麼選」，不代表你現在要投入任何一筆錢。

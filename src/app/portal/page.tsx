@@ -7,7 +7,7 @@ import { getClientOwnPlan, getClientPlanCase, getClientSetup } from "@/lib/clien
 import { flowActionsOf } from "@/lib/flowActions";
 import FlowActions from "./FlowActions";
 import { listClientTodos } from "@/lib/clientTodos";
-import { pendingInvite } from "@/lib/clientRiskQuiz";
+import { pendingInvites } from "@/lib/clientRiskQuiz";
 import Todos from "./Todos";
 import Overview from "./Overview";
 import { clientOverviewOf } from "@/lib/clientOverview";
@@ -49,7 +49,7 @@ export default async function Portal() {
   // 首頁第一眼：階段＋最早受影響的願景＋下一步（engine.overview，算不出來整塊不出現）。
   const ov = planCase ? clientOverviewOf(planCase.data) : null;
   // 教練按了「邀請客戶填寫」而客戶還沒送出 → 一進首頁就跳浮動框（關掉還能從橫幅再開）。
-  const quizInvited = planCase ? await pendingInvite(planCase.clientId) : false;
+  const quizInvited = planCase ? await pendingInvites(planCase.clientId) : { self: false, spouse: false };
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
   // 教練↔客戶是雙棲的：教練也會用客戶介面做自己的規劃。
   // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。

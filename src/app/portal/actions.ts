@@ -8,7 +8,7 @@ import { ensureClientUser } from "@/lib/clientUser";
 import { getClientPlanCase, setClientActionStatus } from "@/lib/clientPlan";
 import { setClientTodoDone } from "@/lib/clientTodos";
 import { submitClientQuiz } from "@/lib/clientRiskQuiz";
-import { RISK_QUIZ_TODO } from "@/lib/riskQuizTodo";
+import { quizTodoTitle, quizWho } from "@/lib/riskQuizTodo";
 import { db } from "@/Shared/db";
 import { actionItems } from "@/Shared/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -50,18 +50,21 @@ export async function setMyActionStatusAction(actionId: string, state: string): 
  */
 export async function submitMyRiskQuizAction(
   answers: unknown,
+  whoRaw?: unknown,
 ): Promise<{ ok: true; score: number; tier: string } | { ok: false; error: string }> {
   const user = await ensureClientUser();
   if (!user) return { ok: false, error: "請先登入" };
   const plan = await getClientPlanCase(user.id);
   if (!plan) return { ok: false, error: "找不到你的規劃" };
-  const r = await submitClientQuiz(plan.clientId, answers);
+  // 2026/10/27 B-2：who='spouse' 是客戶替配偶填的那一份，住同一張表的另一列。
+  const who = quizWho(whoRaw);
+  const r = await submitClientQuiz(plan.clientId, answers, who);
   if (!r.ok) return r;
   try {
     await db
       .update(actionItems)
       .set({ done: true })
-      .where(and(eq(actionItems.clientId, plan.clientId), eq(actionItems.title, RISK_QUIZ_TODO)));
+      .where(and(eq(actionItems.clientId, plan.clientId), eq(actionItems.title, quizTodoTitle(who))));
   } catch {
     /* 待辦勾不掉不該讓作答白填 */
   }

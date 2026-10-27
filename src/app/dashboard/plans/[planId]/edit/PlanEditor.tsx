@@ -67,6 +67,8 @@ const ASSISTANT_OFF: AssistantInit = { on: false, write: false, configured: fals
 type NoteAccess = "owner" | "viewer" | "none";
 
 /** iframe → 父層的註記／諮詢訊息。 */
+/** 一份客戶填的風險屬性測驗（2026/10/27 起本人／配偶各一份，隨 lantu:init 送進 iframe）。 */
+type ClientQuizInit = { score: number | null; tier: string | null; answers: Record<string, number | number[]>; submittedAt: string | null; invitedAt: string | null };
 type NoteMsg =
   | { type: "lantu:note"; op: "add"; input: NoteInput }
   | { type: "lantu:note"; op: "del"; noteId: string }
@@ -138,7 +140,7 @@ export default function PlanEditor({
    * 客戶自己填的投資風險屬性測驗（client_risk_quiz）。
    * ⚠️ 只是送進去給教練看與「套用」，不是規劃內容——客戶端永遠不直接寫 plans.data。
    */
-  clientQuiz?: { score: number | null; tier: string | null; answers: Record<string, number | number[]>; submittedAt: string | null; invitedAt: string | null } | null;
+  clientQuiz?: { self: ClientQuizInit | null; spouse: ClientQuizInit | null } | null;
   /** AI 助理（2026/10/25）。iframe 只顯示，不決定——開不開、能不能填都是這裡算好的。 */
   assistant?: AssistantInit;
 }) {
@@ -379,15 +381,16 @@ export default function PlanEditor({
         // 客戶填完的答案住他自己的表，教練回來按「套用」才會進 plans.data。
         if (readOnly) {
           iframeRef.current?.contentWindow?.postMessage(
-            { type: "lantu:riskinvited", error: "這份規劃目前是唯讀的，沒辦法發出邀請。" },
+            { type: "lantu:riskinvited", error: "這份規劃目前是唯讀的，沒辦法發出邀請。", who: (msg as unknown as { who?: unknown }).who === "spouse" ? "spouse" : "self" },
             window.location.origin,
           );
           return;
         }
+        const who = (msg as unknown as { who?: unknown }).who === "spouse" ? "spouse" : "self";
         void (async () => {
-          const r = await inviteRiskQuizAction(clientId);
+          const r = await inviteRiskQuizAction(clientId, who);
           iframeRef.current?.contentWindow?.postMessage(
-            r.ok ? { type: "lantu:riskinvited", invitedAt: r.invitedAt } : { type: "lantu:riskinvited", error: r.error },
+            r.ok ? { type: "lantu:riskinvited", invitedAt: r.invitedAt, who } : { type: "lantu:riskinvited", error: r.error, who },
             window.location.origin,
           );
           if (r.ok) router.refresh();

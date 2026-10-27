@@ -1866,6 +1866,8 @@ function migrateCase(c){
  c.marriage=_fill(d.marriage,c.marriage);
  if(!c.riskQuiz||typeof c.riskQuiz!=='object')c.riskQuiz={ans:{}};
  if(!c.riskQuiz.ans||typeof c.riskQuiz.ans!=='object')c.riskQuiz.ans={};
+ // 2026/10/27 B-2 配偶風險屬性：第二份只在有作答時存在（riskQuizSpouse），這裡只正規化、不自動建
+ if(c.riskQuizSpouse!=null&&(typeof c.riskQuizSpouse!=='object'||!c.riskQuizSpouse.ans||typeof c.riskQuizSpouse.ans!=='object'))c.riskQuizSpouse={ans:{}};
  if(!c.bizGate||typeof c.bizGate!=='object')c.bizGate={ans:{}};
  if(!c.bizGate.ans||typeof c.bizGate.ans!=='object')c.bizGate.ans={};
  CASE_ARRAYS.forEach(function(k){if(!Array.isArray(c[k]))c[k]=[]});
@@ -7139,12 +7141,12 @@ function retireLineHTML(c){
    KYC 算得出屬性時標「你的屬性」。純唯讀，絕不寫回；正本仍是 effReturn(c)。 */
 var RETIRE_SCEN=[['保守',0],['穩健',1],['積極',2]];
 function retireScenarios(c){
- var rp=riskProfile(c),mine=rp?rp.tier.name:null;
+ var rp=riskProfile(c),mine=rp?rp.tier.name:null,rpS=riskHasSpouse(c)?riskProfile(c,'spouse'):null,sp=rpS?rpS.tier.name:null;
  return RETIRE_SCEN.map(function(s){
   var tier=RISK_TIERS[s[1]],t=JSON.parse(JSON.stringify(c));
   t.params=t.params||{};t.params.invReturn=tier.rr;t.plan=t.plan||{};t.plan.useAllocReturn=false;
   var p=projection(t),ok=null;(p.events||[]).forEach(function(e){if(e.kind==='retire')ok=e.ok});
-  return {name:s[0],rr:tier.rr,mine:mine===tier.name,turnNeg:p.turnNeg,shortPV:n(p.shortPV),retireOk:ok};
+  return {name:s[0],rr:tier.rr,mine:mine===tier.name,spouse:sp===tier.name,turnNeg:p.turnNeg,shortPV:n(p.shortPV),retireOk:ok};
  });
 }
 function retireScenHTML(c){
@@ -7152,7 +7154,7 @@ function retireScenHTML(c){
  var cur=effReturn(c);
  return '<div class="sec" id="retireScen"><h4>三種報酬率，退休差多少 <span class="hint">目前規劃用 '+cur.toFixed(1)+'%；下面三欄只是對照，不會改任何存檔值</span></h4><div class="kpis">'+
   rows.map(function(r){
-   return '<div class="kpi"'+(r.mine?' style="outline:1px solid var(--amber2)"':'')+'><div class="lb">'+r.name+' '+r.rr.toFixed(1)+'%'+(r.mine?' <span style="color:var(--amber2)">· 你的屬性</span>':'')+'</div>'+
+   return '<div class="kpi"'+(r.mine?' style="outline:1px solid var(--amber2)"':'')+'><div class="lb">'+r.name+' '+r.rr.toFixed(1)+'%'+(r.mine?' <span style="color:var(--amber2)">· 你的屬性</span>':'')+(r.spouse?' <span style="color:var(--teal)">· 配偶的屬性</span>':'')+'</div>'+
     '<div class="vv">'+(r.turnNeg?'<span class="w">'+r.turnNeg+' 歲</span>':'<span class="o">期間內夠用</span>')+'</div>'+
     '<small>'+(r.turnNeg?'存量用完的年齡':'存量期間內未用完')+(r.shortPV>0.5?' · 現值缺口 '+cfAxis(r.shortPV):'')+' · 退休生活 '+(r.retireOk===false?'<b class="w">✕</b>':'<b class="o">✓</b>')+'</small></div>';
   }).join('')+'</div></div>';
@@ -12194,7 +12196,20 @@ var RISK_Q=[
  {q:'您目前的緊急預備金（可隨時動用的現金）大約可以支應幾個月的生活支出？',hint:'系統參數的「緊急預備金(月)」預設是 6 個月，可作為對照。',o:[['沒有準備',1],['不到 3 個月',2],['3–6 個月',3],['6–12 個月',4],['12 個月以上',5]]}
 ];
 // 這一份的第 12 題是不是改版前的舊作答（分數照算，只是提醒教練重問一次）。
-function q12IsLegacy(c){var q=c.riskQuiz||{};return !!q.q12Legacy&&riskAnsList(q.ans,11).length>0;}
+/* ── 配偶風險屬性（2026/10/27 Ray B-2）──
+   本人那份仍是 c.riskQuiz（舊資料、分數、報告書一位不變）；配偶那份住 c.riskQuizSpouse，只在有作答時存在。
+   所有計算函式多一個 who（'self'|'spouse'，預設 self），既有呼叫不用改。
+   ⚠️ 讀分數一律走 riskAnsOf（不建物件）；只有 setRiskAns／applyClientQuiz 走 riskQuizOf（會建）。
+   ⚠️ 「套用到報酬率參數」仍以本人為準（Ray 2026/10/27 拍板），配偶只是並列呈現。 */
+function riskWho(){return (typeof app!=='undefined'&&app&&app.riskWho==='spouse')?'spouse':'self'}
+function riskQuizOf(c,who){ // 會建
+ if(who==='spouse'){if(!c.riskQuizSpouse||typeof c.riskQuizSpouse!=='object')c.riskQuizSpouse={ans:{}};if(!c.riskQuizSpouse.ans||typeof c.riskQuizSpouse.ans!=='object')c.riskQuizSpouse.ans={};return c.riskQuizSpouse}
+ if(!c.riskQuiz||typeof c.riskQuiz!=='object')c.riskQuiz={ans:{}};if(!c.riskQuiz.ans||typeof c.riskQuiz.ans!=='object')c.riskQuiz.ans={};return c.riskQuiz}
+function riskQuizRead(c,who){var q=who==='spouse'?c.riskQuizSpouse:c.riskQuiz;return (q&&typeof q==='object')?q:{}}
+function riskAnsOf(c,who){var q=riskQuizRead(c,who);return (q.ans&&typeof q.ans==='object')?q.ans:{}}
+function riskHasSpouse(c){return !!spouseMember(c)}
+function riskWhoLabel(c,who){if(who!=='spouse')return '本人';var sp=spouseMember(c);return '配偶'+(sp&&sp.name?'（'+sp.name+'）':'')}
+function q12IsLegacy(c,who){var q=riskQuizRead(c,who);return !!q.q12Legacy&&riskAnsList(q.ans,11).length>0;}
 var RISK_TIERS=[
  {min:12,max:23,name:'保守型',en:'Conservative',rr:3,std:6,desc:'以保本與穩定為優先，可承受的波動很低。',color:'#6f8f74',alloc:'現金/定存與債券為主（約 70–85%），少量配置平衡型或高評級收益商品。'},
  {min:24,max:35,name:'穩健型',en:'Moderate',rr:5,std:10,desc:'願意承擔適度風險換取中等成長，重視風險與報酬的平衡。',color:'#7f97ac',alloc:'股債均衡（股 40–55%、債與現金 45–60%），核心配置搭配部分成長型標的。'},
@@ -12205,23 +12220,26 @@ var RISK_TIERS=[
 // 因此複選題不會膨脹總分，12 題滿分仍為 60，四個分級門檻不變。
 function riskAnsList(a,qi){var v=a?a[qi]:null;if(v==null)return [];return Array.isArray(v)?v.slice():[v];}
 function riskQScore(qi,list){var Q=RISK_Q[qi],mx=0;if(!Q)return 0;(list||[]).forEach(function(oi){if(Q.o[oi]&&Q.o[oi][1]>mx)mx=Q.o[oi][1];});return mx;}
-function riskScore(c){var a=(c.riskQuiz&&c.riskQuiz.ans)||{},s=0,answered=0,un=[];
+function riskScore(c,who){var a=riskAnsOf(c,who),s=0,answered=0,un=[];
  for(var i=0;i<RISK_Q.length;i++){var L=riskAnsList(a,i);if(L.length){s+=riskQScore(i,L);answered++;}else un.push(i);}
  return {score:s,answered:answered,total:RISK_Q.length,unanswered:un};}
-function riskProfile(c){var r=riskScore(c);if(r.answered<RISK_Q.length)return null;var t=RISK_TIERS[0];for(var i=0;i<RISK_TIERS.length;i++){if(r.score>=RISK_TIERS[i].min)t=RISK_TIERS[i];}return {tier:t,score:r.score,answered:r.answered,total:r.total};}
-function setRiskAns(qi,oi){var c=activeCase();if(!c.riskQuiz)c.riskQuiz={ans:{}};
+function riskProfile(c,who){var r=riskScore(c,who);if(r.answered<RISK_Q.length)return null;var t=RISK_TIERS[0];for(var i=0;i<RISK_TIERS.length;i++){if(r.score>=RISK_TIERS[i].min)t=RISK_TIERS[i];}return {tier:t,score:r.score,answered:r.answered,total:r.total};}
+function setRiskAns(qi,oi,who){var c=activeCase();who=who||riskWho();var q=riskQuizOf(c,who);
  // 教練重新作答第 12 題＝已經當面問過了，提醒可以收掉。
- if(qi===11&&c.riskQuiz.q12Legacy)delete c.riskQuiz.q12Legacy;
- if(RISK_Q[qi].multi){var L=riskAnsList(c.riskQuiz.ans,qi);var k=L.indexOf(oi);
+ if(qi===11&&q.q12Legacy)delete q.q12Legacy;
+ if(RISK_Q[qi].multi){var L=riskAnsList(q.ans,qi);var k=L.indexOf(oi);
   if(k<0)L.push(oi);else L.splice(k,1);
-  L.sort(function(x,y){return x-y});c.riskQuiz.ans[qi]=L;}
- else c.riskQuiz.ans[qi]=oi;
+  L.sort(function(x,y){return x-y});q.ans[qi]=L;}
+ else q.ans[qi]=oi;
  save();render();}
 var RISK_OPEN={};
-function riskToggled(el,qi){if(el.open)RISK_OPEN[qi]=1;else delete RISK_OPEN[qi];}
-function focusRiskQ(qi){var el=document.getElementById('riskq_'+qi);if(!el)return;if(el.tagName==='DETAILS'&&!el.open){el.open=true;RISK_OPEN[qi]=1;}if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});}
+function riskOpenKey(qi,who){return who==='spouse'?'sp'+qi:qi}
+function riskQId(qi,who){return who==='spouse'?'riskq_sp_'+qi:'riskq_'+qi}
+function riskToggled(el,qi,who){var k=riskOpenKey(qi,who||'self');if(el.open)RISK_OPEN[k]=1;else delete RISK_OPEN[k];}
+function focusRiskQ(qi,who){who=who||'self';var el=document.getElementById(riskQId(qi,who));if(!el)return;if(el.tagName==='DETAILS'&&!el.open){el.open=true;RISK_OPEN[riskOpenKey(qi,who)]=1;}if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});}
+function setRiskWho(w){app.riskWho=w==='spouse'?'spouse':'self';render();}
 // 防呆：金融機構 KYC 常見的自我矛盾組合。只提示、不偷改分數，由教練當面釐清。
-function riskConflicts(c){var a=(c.riskQuiz&&c.riskQuiz.ans)||{};var out=[];
+function riskConflicts(c,who){var a=riskAnsOf(c,who);var out=[];
  function one(qi){var L=riskAnsList(a,qi);return L.length&&!RISK_Q[qi].multi?L[0]:null;}
  function best(qi){var L=riskAnsList(a,qi);return L.length?Math.max.apply(null,L):null;}
  function worst(qi){var L=riskAnsList(a,qi);return L.length?Math.min.apply(null,L):null;}
@@ -12244,73 +12262,76 @@ function applyRiskToParams(){var c=activeCase();var rp=riskProfile(c);if(!rp)ret
    ⚠️ 分數與等級由伺服器重算，這裡收到的 score/tier 只拿來顯示。
    ⚠️ 單機預覽（沒有父層）時把話講清楚，不要按了沒反應。
    ══════════════════════════════════════════════════════════════════════ */
-function clientQuizState(){return window.LANTU_CLIENT_QUIZ||null;}
-function inviteRiskQuiz(){
- var el=document.getElementById('riskInviteMsg');
+function clientQuizState(who){var st=window.LANTU_CLIENT_QUIZ||null;if(!st)return null;who=who||'self';
+ // 新形狀 {self,spouse}（2026/10/27）；舊形狀（平的一份）＝本人
+ if(st.self!==undefined||st.spouse!==undefined)return st[who]||null;
+ return who==='self'?st:null;}
+function inviteRiskQuiz(who){who=who||'self';
+ var el=document.getElementById('riskInviteMsg_'+who);
  function say(t,col){if(el)el.innerHTML='<span style="color:'+(col||'var(--mut)')+'">'+t+'</span>';}
  if(typeof window.LANTU_INVITE_QUIZ!=='function'){
   say('這裡是單機預覽，沒有連到客戶帳號——請在教練工作台的規劃器裡操作。','var(--amber2)');return;}
  say('送出中…');
- window.LANTU_INVITE_QUIZ();
+ window.LANTU_INVITE_QUIZ(who);
 }
 /** 把客戶填的答案套進這一份規劃（覆蓋教練這邊的作答）。 */
-function applyClientQuiz(){
- var q=clientQuizState();if(!q||!q.answers)return;
- if(!confirm('把客戶自己填的 12 題答案套進這一份規劃？\n這會覆蓋你在這裡已經作答的部分。'))return;
- var c=activeCase();c.riskQuiz=c.riskQuiz||{ans:{}};
+function applyClientQuiz(who){who=who||'self';
+ var q=clientQuizState(who);if(!q||!q.answers)return;
+ if(!confirm('把客戶'+(who==='spouse'?'替配偶':'自己')+'填的 12 題答案套進這一份規劃？\n這會覆蓋你在這裡已經作答的部分。'))return;
+ var c=activeCase();var rq=riskQuizOf(c,who);
  var ans={};
  Object.keys(q.answers).forEach(function(k){ans[k]=q.answers[k];});
- c.riskQuiz.ans=ans;
- delete c.riskQuiz.q12Legacy;
+ rq.ans=ans;
+ delete rq.q12Legacy;
  save();render();
 }
-function clientQuizBox(c){
- var q=clientQuizState();
+function clientQuizBox(c,who){who=who||'self';
+ var q=clientQuizState(who),isSp=who==='spouse';
  var invited=q&&q.invitedAt&&!q.submittedAt;
  var done=q&&q.submittedAt;
- var head='<div class="sec"><h4>讓客戶自己填 <span class="hint">12 題約 5 分鐘，客戶登入後會跳出來；答案住客戶那邊，你按「套用」才會進這一份規劃</span></h4>';
+ var head='<div class="sec"><h4>'+(isSp?'讓客戶替配偶填':'讓客戶自己填')+' <span class="hint">12 題約 5 分鐘，客戶登入後會跳出來'+(isSp?'（標明是替配偶作答）':'')+'；答案住客戶那邊，你按「套用」才會進這一份規劃</span></h4>';
  var body;
  if(done){
   body='<div class="hint" style="display:block;margin-left:0">客戶已於 <b>'+esc(String(q.submittedAt).slice(0,10))+'</b> 填完：'+
    '<b style="color:var(--amber2)">'+esc(q.tier||'')+'</b>（'+n(q.score)+' / 60 分）。</div>'+
    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">'+
-   '<button class="tbtn amber" onclick="applyClientQuiz()">套用到這份規劃 →</button>'+
-   '<button class="tbtn" onclick="inviteRiskQuiz()">再請他重填一次</button>'+
-   '<span id="riskInviteMsg" class="hint"></span></div>'+
+   '<button class="tbtn amber" onclick="applyClientQuiz(\''+who+'\')">套用到這份規劃 →</button>'+
+   '<button class="tbtn" onclick="inviteRiskQuiz(\''+who+'\')">再請他重填一次</button>'+
+   '<span id="riskInviteMsg_'+who+'" class="hint"></span></div>'+
    '<div class="hint" style="margin-top:6px">套用會<b>覆蓋你在下面已經作答的部分</b>；不套用的話這份結果只是參考，計算仍以下面的作答為準。</div>';
  }else if(invited){
   body='<div class="hint" style="display:block;margin-left:0;color:var(--amber2)">已於 <b>'+esc(String(q.invitedAt).slice(0,10))+'</b> 發出邀請，客戶還沒送出。</div>'+
    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">'+
-   '<button class="tbtn" onclick="inviteRiskQuiz()">重新發出邀請</button>'+
-   '<span id="riskInviteMsg" class="hint"></span></div>'+
+   '<button class="tbtn" onclick="inviteRiskQuiz(\''+who+'\')">重新發出邀請</button>'+
+   '<span id="riskInviteMsg_'+who+'" class="hint"></span></div>'+
    '<div class="hint" style="margin-top:6px">客戶登入後首頁會跳出浮動框；他關掉了也還找得到——待辦清單上有一則「完成投資風險屬性測驗」。</div>';
  }else{
   body='<div class="hint" style="display:block;margin-left:0">當面一題一題問要花五分鐘，而且客戶會看著你選。'+
    '請他自己填，答案比較誠實，你也把時間留給後面的討論。</div>'+
    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">'+
-   '<button class="tbtn amber" onclick="inviteRiskQuiz()">邀請客戶填寫 →</button>'+
-   '<span id="riskInviteMsg" class="hint"></span></div>';
+   '<button class="tbtn amber" onclick="inviteRiskQuiz(\''+who+'\')">'+(isSp?'邀請客戶替配偶填寫 →':'邀請客戶填寫 →')+'</button>'+
+   '<span id="riskInviteMsg_'+who+'" class="hint"></span></div>';
  }
  return head+body+'</div>';
 }
-function riskSec(c){
- var a=(c.riskQuiz&&c.riskQuiz.ans)||{};var rp=riskProfile(c);var rs=riskScore(c);
- var conf=riskConflicts(c);
+function riskSecBody(c,who){
+ var a=riskAnsOf(c,who),rp=riskProfile(c,who),rs=riskScore(c,who),isSp=who==='spouse';
+ var conf=riskConflicts(c,who);
  var qs=RISK_Q.map(function(Q,qi){
   var sel=riskAnsList(a,qi);var blank=!sel.length;
   var opts=Q.o.map(function(op,oi){var on=sel.indexOf(oi)>=0;
-   return '<button onclick="setRiskAns('+qi+','+oi+')" style="text-align:left;background:'+(on?'var(--amber)':'var(--card)')+';color:'+(on?'var(--onbrand)':'var(--tx)')+';border:1px solid '+(on?'var(--amber)':'var(--line)')+';border-radius:9px;padding:8px 11px;font-size:13px;font-weight:'+(on?'700':'500')+';font-family:inherit;cursor:pointer;display:block;width:100%;margin-bottom:5px">'+(Q.multi?(on?'☑ ':'☐ '):(on?'● ':'○ '))+esc(op[0])+'</button>';
+   return '<button onclick="setRiskAns('+qi+','+oi+',\''+who+'\')" style="text-align:left;background:'+(on?'var(--amber)':'var(--card)')+';color:'+(on?'var(--onbrand)':'var(--tx)')+';border:1px solid '+(on?'var(--amber)':'var(--line)')+';border-radius:9px;padding:8px 11px;font-size:13px;font-weight:'+(on?'700':'500')+';font-family:inherit;cursor:pointer;display:block;width:100%;margin-bottom:5px">'+(Q.multi?(on?'☑ ':'☐ '):(on?'● ':'○ '))+esc(op[0])+'</button>';
   }).join('');
   // 2026/09/26 全站盤查：12 題全攤 4,300px。已作答的題收成一行「題目 · 所選答案」，
   //    只攤未答的；點標題可再打開改答案（RISK_OPEN 記住）。
-  var openQ=blank||!!RISK_OPEN[qi];
+  var openQ=blank||!!RISK_OPEN[riskOpenKey(qi,who)];
   var ansTxt=blank?'':sel.map(function(oi){return esc(String(Q.o[oi]||''))}).join('、');
-  return '<details class="sec riskq" id="riskq_'+qi+'"'+(openQ?' open':'')+' ontoggle="riskToggled(this,'+qi+')"'+(blank?' style="border-color:rgba(224,138,104,.55)"':'')+'>'+
+  return '<details class="sec riskq" id="'+riskQId(qi,who)+'"'+(openQ?' open':'')+' ontoggle="riskToggled(this,'+qi+',\''+who+'\')"'+(blank?' style="border-color:rgba(224,138,104,.55)"':'')+'>'+
    '<summary><h4 style="font-size:14px;margin:0">'+(qi+1)+'. '+esc(Q.q)+
    (Q.multi?'<span class="hint" style="color:var(--teal)">複選</span>':'')+
    (blank?'<span class="hint" style="color:var(--warn)">尚未作答</span>':'<span class="hint riskans">'+ansTxt+'</span>')+
-   (qi===11&&q12IsLegacy(c)?'<span class="hint" style="color:var(--warn)">此題已改版</span>':'')+'</h4></summary>'+
-   (qi===11&&q12IsLegacy(c)?'<div class="hint" style="margin:-6px 0 8px 0;color:var(--warn);border-left:3px solid var(--warn);padding-left:9px">這一份的第 12 題是改版前的舊題（原本問「臨時需要動用這筆資金的可能性」）作答。分數與分級照舊有效，但兩題問的不是同一件事——<b>下次見到客戶時順口問一次、重選一個選項</b>，這行提示就會消失。</div>':'')+
+   (qi===11&&q12IsLegacy(c,who)?'<span class="hint" style="color:var(--warn)">此題已改版</span>':'')+'</h4></summary>'+
+   (qi===11&&q12IsLegacy(c,who)?'<div class="hint" style="margin:-6px 0 8px 0;color:var(--warn);border-left:3px solid var(--warn);padding-left:9px">這一份的第 12 題是改版前的舊題（原本問「臨時需要動用這筆資金的可能性」）作答。分數與分級照舊有效，但兩題問的不是同一件事——<b>下次見到客戶時順口問一次、重選一個選項</b>，這行提示就會消失。</div>':'')+
    (Q.hint?'<div class="hint" style="margin:-6px 0 8px 0">'+esc(Q.hint)+'</div>':'')+
    '<div style="margin-top:8px">'+opts+'</div></details>';
  }).join('');
@@ -12321,7 +12342,7 @@ function riskSec(c){
   '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
    '<b style="font-size:13px">作答進度 '+rs.answered+' / '+rs.total+'</b>'+
    '<div style="flex:1;min-width:150px;height:8px;border-radius:99px;background:var(--card);overflow:hidden"><div style="width:'+pctDone+'%;height:100%;background:'+(pctDone===100?'var(--ok)':'var(--amber)')+'"></div></div>'+
-   (rs.unanswered.length?'<button class="tbtn amber" onclick="focusRiskQ('+rs.unanswered[0]+')">跳到第 '+(rs.unanswered[0]+1)+' 題（未答）</button>':'<span style="color:var(--ok);font-size:12.5px;font-weight:700">全部作答完成</span>')+
+   (rs.unanswered.length?'<button class="tbtn amber" onclick="focusRiskQ('+rs.unanswered[0]+',\''+who+'\')">跳到第 '+(rs.unanswered[0]+1)+' 題（未答）</button>':'<span style="color:var(--ok);font-size:12.5px;font-weight:700">全部作答完成</span>')+
   '</div></div>';
  var conflictBox=conf.length?'<div class="sec" style="border-left:4px solid var(--warn)">'+
   '<div style="font-weight:800;color:var(--warn)">⚠ 作答一致性檢核：發現 '+conf.length+' 處需要釐清</div>'+
@@ -12335,13 +12356,28 @@ function riskSec(c){
    '<p style="color:var(--mut);margin:8px 0">'+esc(t.desc)+'</p>'+
    '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px"><div>建議投資報酬率 <b style="color:var(--amber2)">'+t.rr+'%</b></div><div>建議報酬標準差 <b>'+t.std+'%</b></div></div>'+
    '<div style="color:var(--mut);font-size:12.5px;margin-top:6px">配置方向：'+esc(t.alloc)+'</div>'+
-   '<button class="tbtn amber" style="margin-top:12px" onclick="applyRiskToParams()">套用建議報酬率與波動到規劃參數 →</button>'+
-   '<span class="hint" style="margin-left:8px">目前參數：投報 '+n(c.params.invReturn)+'%、標準差 '+n(c.params.invReturnStd)+'%</span></div>';
+   (isSp?'<div class="hint" style="margin-top:10px;display:block;margin-left:0">規劃參數的報酬率以本人的屬性為準（Ray 2026/10/27）；配偶這份是家庭討論時的對照，兩人差一級以上值得當面談。</div>'
+    :'<button class="tbtn amber" style="margin-top:12px" onclick="applyRiskToParams()">套用建議報酬率與波動到規劃參數 →</button>'+
+     '<span class="hint" style="margin-left:8px">目前參數：投報 '+n(c.params.invReturn)+'%、標準差 '+n(c.params.invReturnStd)+'%</span>')+'</div>';
  } else {
   result='<div class="sec" style="border-left:4px solid var(--mut2)"><div style="font-weight:700">尚未完成測驗</div><p style="color:var(--mut);margin:6px 0 0">已作答 '+rs.answered+' / '+rs.total+' 題（尚缺第 '+rs.unanswered.map(function(i){return i+1}).join('、')+' 題），全部作答後即產生風險屬性與建議報酬率。</p></div>';
  }
- return clientQuizBox(c)+'<div class="sec"><h4>投資風險屬性測驗（KYC）</h4><div class="hint" style="display:block;margin-left:0">依 12 題結果評定風險承受度，作為建議投資報酬率與蒙地卡羅波動度的依據。可一鍵套用至規劃參數。複選題以所選項中風險最高者計分，滿分維持 60 分。<br><b style="color:var(--amber2)">這份測驗量的是「風險承受度」本身，不預設客戶現在就要投入一筆錢</b>——題目裡的「這一筆資金」是假設情境（如果要做長期配置的話），還沒有任何投資計畫的客戶一樣可以完整作答。</div></div>'+
+ return clientQuizBox(c,who)+'<div class="sec"><h4>投資風險屬性測驗（KYC）'+(isSp?' · '+esc(riskWhoLabel(c,who)):'')+'</h4><div class="hint" style="display:block;margin-left:0">依 12 題結果評定風險承受度，作為建議投資報酬率與蒙地卡羅波動度的依據。可一鍵套用至規劃參數。複選題以所選項中風險最高者計分，滿分維持 60 分。<br><b style="color:var(--amber2)">這份測驗量的是「風險承受度」本身，不預設客戶現在就要投入一筆錢</b>——題目裡的「這一筆資金」是假設情境（如果要做長期配置的話），還沒有任何投資計畫的客戶一樣可以完整作答。</div></div>'+
   progress+conflictBox+result+qs+conflictBox+result;
+}
+/* 2026/10/27 B-2：有配偶成員時分「本人｜配偶」兩份作答；沒配偶時畫面與改版前一模一樣。 */
+function riskPairSummary(c){
+ var items=[['self','本人'],['spouse',riskWhoLabel(c,'spouse')]].map(function(x){var rp=riskProfile(c,x[0]),rs=riskScore(c,x[0]);
+  return '<div class="kpi" style="cursor:pointer;'+(riskWho()===x[0]?'outline:1px solid var(--amber2)':'')+'" onclick="setRiskWho(\''+x[0]+'\')"><div class="lb">'+esc(x[1])+'</div><div class="vv" style="font-size:20px;color:'+(rp?rp.tier.color:'var(--mut)')+'">'+(rp?esc(rp.tier.name):'未完成')+'</div><small>'+(rp?rp.score+' / 60 分':'已答 '+rs.answered+' / '+rs.total+' 題')+'</small></div>'});
+ var a=riskProfile(c,'self'),b=riskProfile(c,'spouse'),gap='';
+ if(a&&b){var ia=RISK_TIERS.indexOf(a.tier),ib=RISK_TIERS.indexOf(b.tier);gap=ia===ib?'兩人同一級，家庭討論容易對齊。':'兩人差 '+Math.abs(ia-ib)+' 級：'+(ia<ib?'本人較保守':'配偶較保守')+'。規劃參數以本人為準；共同資金的配置建議以較保守的一側解讀。'}
+ return '<div class="sec" id="riskPair"><h4>家庭風險屬性 <span class="hint">本人與配偶各一份；點卡片切換作答對象</span></h4><div class="kpis" style="margin-bottom:'+(gap?'8px':'0')+'">'+items.join('')+'</div>'+(gap?'<div class="hint" style="display:block;margin-left:0">'+gap+'</div>':'')+'</div>';
+}
+function riskSec(c){
+ if(!riskHasSpouse(c)){if(app.riskWho==='spouse')app.riskWho='self';return riskSecBody(c,'self')}
+ var who=riskWho();
+ var tabs='<div class="sec" style="padding-bottom:8px"><div style="display:flex;gap:8px;flex-wrap:wrap">'+[['self','本人'],['spouse',riskWhoLabel(c,'spouse')]].map(function(x){return '<button class="tbtn'+(who===x[0]?' amber':'')+'" onclick="setRiskWho(\''+x[0]+'\')">'+esc(x[1])+'</button>'}).join('')+'</div></div>';
+ return riskPairSummary(c)+tabs+riskSecBody(c,who);
 }
 /* ===================== 第 ④ 群：企業 =====================
    E1 公司概況 / E2 公私勾稽。設計依據見專案記憶「企業主模組設計提案」。
@@ -18470,6 +18506,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<h2>§、傳承規劃</h2>'+rLegacy(c)+
 
   '<h2>§、投資風險屬性與建議配置</h2>'+(function(){var rp=riskProfile(c);if(!rp)return '<p style="color:#5a6b72">尚未完成風險屬性測驗；建議先於「風險屬性」分頁完成 12 題 KYC 評估。</p>';var t=rp.tier;return '<p style="color:#33474e">依 KYC 測驗（'+rp.score+' / 60 分）評定為 <b style="color:'+t.color+'">'+t.name+'（'+t.en+'）</b>。'+esc(t.desc)+' 對應建議投資報酬率約 <b>'+t.rr+'%</b>、報酬波動度約 '+t.std+'%。配置方向：'+esc(t.alloc)+'</p>';})()+
+  (function(){var rpS=riskHasSpouse(c)?riskProfile(c,'spouse'):null;if(!rpS)return '';var t=rpS.tier,sp=spouseMember(c);return '<p style="color:#33474e">配偶'+(sp&&sp.name?'（'+esc(sp.name)+'）':'')+'依 KYC 測驗（'+rpS.score+' / 60 分）評定為 <b style="color:'+t.color+'">'+t.name+'（'+t.en+'）</b>。規劃參數以本人屬性為準；兩人屬性不同時，共同資金的配置以較保守的一側解讀。</p>';})()+
    (al.list.filter(function(x){return n(x.pct)>0}).length?'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">實際規劃配置</div>'+rPie(al.list)+'<table style="margin-top:10px"><tr><th>標的</th><th>比例</th><th>預期報酬</th><th>效益</th></tr>'+allocRep+'</table><p style="color:#33474e;margin-top:6px">加權預期報酬約 <b>'+al.wRet.toFixed(1)+'%</b>。</p>':'<p style="color:#5a6b72">尚未設定實際配置方案。</p>')+
 
   '<h2>§、其他規劃面向</h2>'+(rOtherAspects(c)||'<p style="color:#5a6b72">職涯、婚姻、信用與海外資產這幾項本次沒有需要特別處理的內容。</p>')+
@@ -18628,7 +18665,7 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
   // 待補齊清單 → 客戶待辦：iframe 不查也不寫 DB，跟註記一樣交給父層（它才有 clientId 與租戶條件）。
   window.LANTU_SEND_TODOS=function(titles){try{toParent({type:'lantu:todos',titles:titles});}catch(e){}};
   // 邀請客戶填風險屬性測驗：同上，iframe 不查也不寫 DB。
-  window.LANTU_INVITE_QUIZ=function(){try{toParent({type:'lantu:riskinvite'});}catch(e){}};
+  window.LANTU_INVITE_QUIZ=function(who){try{toParent({type:'lantu:riskinvite',who:who||'self'});}catch(e){}};
   var inited=false;
   // 介面縮放（老花友善）。這份是 px 寫死的版面，rem 縮放對它無效，
   // 用 zoom 才會字與版面一起等比放大（Chrome/Safari/Edge/Firefox 126+ 都支援）。
@@ -18679,9 +18716,13 @@ document.querySelectorAll('#roleSw button').forEach(function(b){b.onclick=functi
       return;
     }
     if(m.type==='lantu:riskinvited'){
-      var _rm=document.getElementById('riskInviteMsg');
+      var _who=m.who==='spouse'?'spouse':'self';
+      var _rm=document.getElementById('riskInviteMsg_'+_who);
       if(m.error){ if(_rm)_rm.innerHTML='<span style="color:var(--warn)">'+esc(String(m.error))+'</span>'; return; }
-      window.LANTU_CLIENT_QUIZ={invitedAt:m.invitedAt||null,submittedAt:null,score:null,tier:null,answers:{}};
+      // 2026/10/27：狀態改成 {self,spouse} 兩份；舊的平形狀視為本人
+      var _st=window.LANTU_CLIENT_QUIZ||null;if(!_st||(_st.self===undefined&&_st.spouse===undefined))_st={self:_st||null,spouse:null};
+      _st[_who]={invitedAt:m.invitedAt||null,submittedAt:null,score:null,tier:null,answers:{}};
+      window.LANTU_CLIENT_QUIZ=_st;
       try{render();}catch(e){}
       return;
     }

@@ -3,7 +3,7 @@
 import { sql } from 'drizzle-orm';
 import {
   pgTable, text, integer, bigint, boolean, jsonb, timestamp, uuid, date,
-  doublePrecision, index, uniqueIndex,
+  doublePrecision, index, uniqueIndex, primaryKey,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 // 報聘申請的 jsonb 形狀住在純函式層（client component 也要 import，不能把 drizzle 拖進 bundle）。
@@ -456,11 +456,15 @@ export const coachInvites = pgTable('coach_invites', {
   coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
   code: text('code').notNull().unique(),
   note: text('note'),
+  // 2026/10/27 客戶專用登入連結：有 client_id ＝「把這條連結的帳號接到教練已建好的這一筆客戶」，
+  // 一人一碼、綁定後失效。null ＝ 原本的通用邀請（一碼多人、兌換時新建客戶列），語意不變。
+  clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }),
   usedByClientUserId: text('used_by_client_user_id').references(() => clientUsers.id, { onDelete: 'set null' }),
   usedAt: timestamp('used_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('coach_invites_coach_id_idx').on(t.coachId),
+  index('coach_invites_client_id_idx').on(t.clientId),
   // used_by_client_user_id 是 SET NULL：刪一位 client_user 會掃全表找他用過的邀請碼。
   index('coach_invites_used_by_idx').on(t.usedByClientUserId),
 ]);
@@ -1184,15 +1188,17 @@ export const clientDashDefaults = pgTable('client_dash_defaults', {
 //    前端送上來的只有選項索引；信任客戶端算的分數等於讓他自己決定風險等級。
 // ⚠️ 一位客戶只有一列（PK 就是 client_id）：重新邀請＝同一列把 submitted_at 清掉重來，
 //    不留歷史——教練要的是「他現在的屬性」，不是一份作答歷程。
+// 2026/10/27 B-2：一位客戶兩份（who = 'self' 本人／'spouse' 配偶），客戶可替配偶填；PK 改成 (client_id, who)。
 export const clientRiskQuiz = pgTable('client_risk_quiz', {
-  clientId: uuid('client_id').primaryKey().references(() => clients.id, { onDelete: 'cascade' }),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  who: text('who').default('self').notNull(),
   answers: jsonb('answers').$type<Record<string, number | number[]>>().default({}).notNull(),
   score: integer('score'),
   tier: text('tier'),
   invitedAt: timestamp('invited_at', { withTimezone: true }),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [primaryKey({ columns: [t.clientId, t.who] })]);
 
 
 // ────────────────────────────────────────────────────────────

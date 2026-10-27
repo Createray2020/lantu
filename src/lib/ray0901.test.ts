@@ -405,6 +405,6 @@ describe("⑨ 邀請客戶填風險屬性測驗", () => {
     delete w.LANTU_INVITE_QUIZ;
     w.render();
     w.inviteRiskQuiz();
-    expect(w.document.getElementById("riskInviteMsg").textContent).toContain("單機預覽");
+    expect(w.document.getElementById("riskInviteMsg_self").textContent).toContain("單機預覽");   // 2026/10/27 B-2：id 帶 who
   });
 });

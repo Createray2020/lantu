@@ -10,7 +10,7 @@ import { logRevision, restoreRevision } from "@/lib/revisions";
 import * as Notes from "@/lib/notes";
 import * as Session from "@/lib/consultSession";
 import * as ClientQuiz from "@/lib/clientRiskQuiz";
-import { RISK_QUIZ_TODO } from "@/lib/riskQuizTodo";
+import { quizTodoTitle, quizWho, type QuizWho } from "@/lib/riskQuizTodo";
 import { createCoachFeeReceipt, receiptsForClient } from "@/lib/acctStore";
 import { listActiveCoaches } from "@/lib/org";
 
@@ -310,16 +310,18 @@ export async function createActionItemsAction(
 //    「套用到這份規劃」。跟區塊註記同一條線（客戶端對 plans 的 save 永遠是 noop）。
 export async function inviteRiskQuizAction(
   clientId: string,
-): Promise<{ ok: true; invitedAt: string | null } | { ok: false; error: string }> {
+  whoRaw?: unknown,
+): Promise<{ ok: true; invitedAt: string | null; who: QuizWho } | { ok: false; error: string }> {
   try {
     const cid = await coachId();
+    const who = quizWho(whoRaw);
     // 借 createActionItems 的租戶檢查（assertClientOwned）＋順手把它變成一則客戶待辦，
-    // 客戶就算關掉浮動框，之後也還找得到入口。
-    await Reviews.createActionItems(cid, clientId, [RISK_QUIZ_TODO]);
-    const row = await ClientQuiz.inviteClientQuiz(clientId);
+    // 客戶就算關掉浮動框，之後也還找得到入口。配偶那份是另一則待辦（標題不同）。
+    await Reviews.createActionItems(cid, clientId, [quizTodoTitle(who)]);
+    const row = await ClientQuiz.inviteClientQuiz(clientId, who);
     revalidatePath(`/dashboard/clients/${clientId}`);
     revalidatePath("/portal");
-    return { ok: true, invitedAt: row.invitedAt };
+    return { ok: true, invitedAt: row.invitedAt, who };
   } catch (e) {
     const f = fail(e);
     return { ok: false, error: f.ok ? "操作失敗，請重試" : f.error };

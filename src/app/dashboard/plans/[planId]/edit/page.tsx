@@ -3,7 +3,7 @@ import { ensureCoach } from "@/lib/coach";
 import { getPlanForRead } from "@/lib/plans";
 import { getClientForRead } from "@/lib/clients";
 import { clientAccess } from "@/lib/clientScope";
-import { getClientQuiz } from "@/lib/clientRiskQuiz";
+import { getClientQuizzes } from "@/lib/clientRiskQuiz";
 import { licenseState } from "@/lib/license";
 import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
 import { getModuleStates } from "@/lib/platformModules";
@@ -29,7 +29,7 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
     getClientForRead(coach.id, plan.clientId),
     clientAccess(coach.id, plan.clientId),
     // 客戶自己填的風險屬性測驗：教練端要看得到結果，也要能一鍵套用進這份規劃。
-    getClientQuiz(plan.clientId),
+    getClientQuizzes(plan.clientId),
     getModuleStates(),
   ]);
   const isOwner = access === "owner";
@@ -57,7 +57,10 @@ export default async function EditPlanPage({ params }: { params: Promise<{ planI
       readOnlyReason={!isOwner ? "collab" : "license"}
       clientCode={client?.code ?? null}
       birthDate={client?.birthDate ?? null}
-      clientQuiz={quiz ? { score: quiz.score, tier: quiz.tier, answers: quiz.answers, submittedAt: quiz.submittedAt, invitedAt: quiz.invitedAt } : null}
+      clientQuiz={{
+        self: quiz.self ? { score: quiz.self.score, tier: quiz.self.tier, answers: quiz.self.answers, submittedAt: quiz.self.submittedAt, invitedAt: quiz.self.invitedAt } : null,
+        spouse: quiz.spouse ? { score: quiz.spouse.score, tier: quiz.spouse.tier, answers: quiz.spouse.answers, submittedAt: quiz.spouse.submittedAt, invitedAt: quiz.spouse.invitedAt } : null,
+      }}
     />
   );
 }
