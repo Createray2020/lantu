@@ -28,11 +28,14 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
       <Shell>
         <div className="text-5xl mb-3">🤝</div>
         <h1 className="font-serif text-2xl mb-3">
-          {inv?.coachName ? `${inv.coachName} 邀請你一起做財務規劃` : "教練邀請連結"}
+          {inv?.clientId
+            ? `${inv.coachName ?? "教練"} 已為你準備好財務規劃`
+            : inv?.coachName ? `${inv.coachName} 邀請你一起做財務規劃` : "教練邀請連結"}
         </h1>
         <p className="text-tx2 mb-6">
-          建立你的<strong className="text-tx">客戶</strong>帳號後就會自動連結
-          {inv?.coachName ? `教練 ${inv.coachName}` : "這位教練"}，可以一起規劃。
+          {inv?.clientId
+            ? <>建立或登入你的<strong className="text-tx">客戶</strong>帳號後，就會接上教練{inv.coachName ? ` ${inv.coachName}` : ""}為你做的規劃，隨時可以回來看。</>
+            : <>建立你的<strong className="text-tx">客戶</strong>帳號後就會自動連結{inv?.coachName ? `教練 ${inv.coachName}` : "這位教練"}，可以一起規劃。</>}
         </p>
         <Link
           href={`/client/sign-up?redirect_url=${back}`}
@@ -55,6 +58,8 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
   // 兌換可能被擋下（連結失效、教練停權、教練客戶數已滿…）。
   // ⚠️ 防呆兩層：回傳的 { ok:false, error } 要照原文顯示給客戶看；
   //    真的 throw 出來也不能讓整頁掉進錯誤頁——那會變成一個沒有任何說明的白畫面。
+  // 專用連結（教練已建好規劃）成功後直接進首頁看規劃，不是去填護照——護照在有教練軌時是投影。
+  const dedicated = !!(await getInviteByCode(code))?.clientId;
   const r = await redeemInvite(code, user).catch((e: unknown) => ({
     ok: false as const,
     error: e instanceof Error && e.message ? e.message : "連結時發生問題，請稍後再試一次。",
@@ -66,11 +71,21 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
         <>
           <div className="text-5xl mb-3">🤝</div>
           <h1 className="font-serif text-2xl mb-2">連結成功</h1>
-          <p className="text-tx2 mb-6">你已連結教練{r.coachName ? `：${r.coachName}` : ""}，可以一起規劃了。</p>
-          <Link href="/portal/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg">開始填人生護照</Link>
-          <div className="mt-4">
-            <Link href="/portal" className="text-sm text-tx2 hover:text-tx underline underline-offset-4">先回我的首頁</Link>
-          </div>
+          <p className="text-tx2 mb-6">
+            {dedicated
+              ? `你已接上教練${r.coachName ? ` ${r.coachName}` : ""}為你做的財務規劃。`
+              : `你已連結教練${r.coachName ? `：${r.coachName}` : ""}，可以一起規劃了。`}
+          </p>
+          {dedicated ? (
+            <Link href="/portal" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg">看我的規劃</Link>
+          ) : (
+            <>
+              <Link href="/portal/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg">開始填人生護照</Link>
+              <div className="mt-4">
+                <Link href="/portal" className="text-sm text-tx2 hover:text-tx underline underline-offset-4">先回我的首頁</Link>
+              </div>
+            </>
+          )}
         </>
       ) : (
         <>

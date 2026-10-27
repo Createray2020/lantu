@@ -4,6 +4,7 @@ import { getClientDetail } from "@/lib/clients";
 import { comparePlans } from "@/lib/plans";
 import { clientAccess } from "@/lib/clientScope";
 import { listCollaborators } from "@/lib/clientCollab";
+import { clientLoginInfo } from "@/lib/clientLogin";
 import { pendingDraft } from "@/lib/consultSession";
 import { wishesForCoach } from "@/lib/clientPlan";
 import DashboardHeader from "../../DashboardHeader";
@@ -86,6 +87,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   }));
 
   const wishes = await wishesForCoach(id);
+  // 客戶登入狀態（主責才看）：已接上哪個帳號、或目前待客戶開啟的專用連結。
+  const login = isOwner ? await clientLoginInfo(id) : null;
   const hp = await headerProps(coach);
   // 唯讀有兩種來源：期限到期（紅）與共同執案（藍）。兩條橫幅分開，
   // 協作教練不該看到「請聯繫管理員延長期限」那句與他無關的話。
@@ -107,6 +110,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         readOnly={readOnly}
         isOwner={isOwner}
         wishes={wishes}
+        login={login}
         collaborators={collaborators.map((c) => ({
           id: c.id,
           coachName: c.coachName,

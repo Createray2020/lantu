@@ -199,7 +199,7 @@ export default function ClientList({
                 className="absolute inset-0 rounded-lg"
               />
               <div className="col-span-2 md:col-span-1">
-                <div className="font-bold">{c.name}</div>
+                <div className="font-bold">{c.name}{c.clientUserId && <span title="客戶已開通登入" className="ml-1.5 text-11 font-normal text-ok">🔑</span>}</div>
                 {c.code && (
                   <div className="font-mono text-10 tracking-wider text-tx3">{c.code}</div>
                 )}

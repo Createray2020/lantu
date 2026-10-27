@@ -28,6 +28,7 @@ import {
 } from "../../actions";
 import { StageGuideModal } from "../../StageGuide";
 import Collaborators, { type CollaboratorLite } from "./Collaborators";
+import ClientLogin, { type ClientLoginInfo } from "./ClientLogin";
 import ConsultRecordForm, { type ConsultRecordValue } from "../../ConsultRecordForm";
 import {
   fmtMoney,
@@ -69,6 +70,7 @@ export default function ClientDetail({
   isOwner = true,
   collaborators = [],
   wishes,
+  login = null,
 }: {
   client: ClientLite;
   plans: PlanLite[];
@@ -84,6 +86,8 @@ export default function ClientDetail({
   collaborators?: CollaboratorLite[];
   /** 客戶在人生護照上存的願望快照（含與教練軌的差異）。 */
   wishes: WishesForCoach;
+  /** 客戶登入狀態／專用登入連結。主責才有；協作教練拿 null。 */
+  login?: ClientLoginInfo | null;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"overview" | "plans" | "reviews" | "wishes">("overview");
@@ -191,6 +195,7 @@ export default function ClientDetail({
       />
 
       {isOwner && <Collaborators clientId={client.id} collaborators={collaborators} readOnly={readOnly} />}
+      {isOwner && login && <ClientLogin clientId={client.id} info={login} readOnly={readOnly} />}
 
       {err && <div className="mt-3 text-danger text-sm">{err}</div>}
 

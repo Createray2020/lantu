@@ -16,6 +16,7 @@ const h = vi.hoisted(() => {
     coachLinkRequests: { _n: "clr" },
     coachInvites: { _n: "invites" },
     clientUsers: { _n: "client_users" },
+    plans: { _n: "plans" },
     // 顯示名稱的 SQL 片段也從 schema 匯出（見 coachName.ts 的說明）。
     // 假 db 只認欄位名，這裡給個佔位物件讓 select({ name: coachDisplayName }) 過得去。
     coachDisplayName: { _col: "name" },
@@ -66,7 +67,7 @@ const h = vi.hoisted(() => {
   return { T, store, log, db, quota };
 });
 
-vi.mock("drizzle-orm", () => ({ and: () => ({}), eq: () => ({}), desc: () => ({}), count: () => ({}) }));
+vi.mock("drizzle-orm", () => ({ and: () => ({}), eq: () => ({}), desc: () => ({}), count: () => ({}), isNull: () => ({}) }));
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 // 配號走 DB（code_counters）——這裡的假 schema 沒有那張表，且發號規則另有 codes.test.ts 守著。
