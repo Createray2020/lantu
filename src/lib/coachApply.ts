@@ -191,6 +191,12 @@ export type ApplySettings = {
   /** 申請表單的必填欄位（姓名與手機不在此列，那兩個永遠必填）。 */
   requiredFields: string[];
   checklist: ChecklistItem[];
+  /**
+   * 2026/10/28 電子簽署：報聘＝培訓報名時掛的營業項目（acct_params.items[].id）。
+   * 有值 → 送出申請時建培訓報名案件（應收＝該項目價格）、審核通過後要先簽完該方案的應簽文件才開通。
+   * null → 不收費、不簽文件：審核通過即開通（2026/10 以前的行為）。
+   */
+  trainingItemId?: string | null;
 };
 
 export const DEFAULT_APPLY_SETTINGS: ApplySettings = {

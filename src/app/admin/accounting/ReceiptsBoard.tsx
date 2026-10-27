@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
-import { calcReceipt, payoutsOf, prevYm, nextYm, isYm, netOf, referralChain, isFormalRank, splitKey, splitPayee, type AcctState, type AcctItem, type Receipt, type Sharer, type CoachLite } from "@/lib/acctEngine";
+import { calcReceipt, payoutsOf, prevYm, nextYm, isYm, netOf, referralChain, isFormalRank, splitKey, splitPayee, PAYMENT_METHODS, type AcctState, type AcctItem, type Receipt, type Sharer, type CoachLite } from "@/lib/acctEngine";
 import { saveAcctReceiptAction, deleteAcctReceiptAction, verifyAcctReceiptAction } from "./actions";
 import { useAcct, card, h2, hint, btn, xbtn, F, NUM, uid } from "./AcctParts";
 
@@ -13,7 +13,7 @@ import { useAcct, card, h2, hint, btn, xbtn, F, NUM, uid } from "./AcctParts";
 // 每一筆的拆分由 acctEngine.calcReceipt 算，規則掛在參數設定的項目上。
 
 const EMPTY_FORM = (it: AcctItem | undefined, ym: string): Receipt => ({
-  id: "", ym, itemId: it?.id ?? "", on: `${ym}-01`, amount: it?.price ?? 0, last5: "", payer: "", payerCoachId: null, sharers: [], payees: {}, note: "", void: false, refund: 0, source: "manual", verified: true,
+  id: "", ym, itemId: it?.id ?? "", on: `${ym}-01`, amount: it?.price ?? 0, last5: "", payer: "", payerCoachId: null, sharers: [], payees: {}, note: "", void: false, refund: 0, source: "manual", verified: true, caseType: "client_service", gross: null, fee: 0, method: "", methodFields: {},
 });
 /** 手填的分潤人（備援）：對得上名冊就帶 coachId 與目前職級。正規做法是用「推薦人」挑人讓系統展開輔導鏈。 */
 const parseSharers = (text: string, coachList: CoachLite[]): Sharer[] =>
@@ -182,6 +182,8 @@ export default function ReceiptsBoard({ initial, today }: { initial: AcctState; 
                       <td className="pl-3 text-tx2">{r.last5 || "—"}</td>
                       <td className="whitespace-nowrap">{r.payer}{r.payerCoachId && <span className="text-10 text-tx3 ml-1">教練</span>}
                         {r.execCoachId && <div className="text-10 text-tx3">執案 {coachName(r.execCoachId)}{r.promoCoachId ? `・開發 ${r.promoCoachId === r.execCoachId ? "本人" : coachName(r.promoCoachId)}` : "・公司派案"}</div>}
+                        {r.caseType === "training" && <span className="text-10 rounded-full border border-line text-tx2 px-2 py-0.5 mr-1">培訓費</span>}
+                        {r.method && <span className="text-10 text-tx3 mr-1">{PAYMENT_METHODS.find((m) => m.value === r.method)?.label}{r.fee > 0 ? `・手續費 ${F(r.fee)}` : ""}</span>}
                         {unverified && <span className="text-10 rounded-full border border-danger text-danger px-2 py-0.5">待查帳</span>}</td>
                       <td className="text-tx2">{isCase ? <span className="text-tx3">案件</span> : r.sharers.length ? r.sharers.map((s) => `${s.name}${s.rankCode ? ` ${s.rankCode}` : ""}`).join(" → ") : <span className="text-tx3">—</span>}</td>
                       <td className="no-underline">
@@ -262,6 +264,19 @@ function ReceiptForm({ init, S, coachList, pending, onCancel, onSave }: {
           <input className={`${FIELD_SM} w-28`} value={r.last5} placeholder="或「信用卡分期」" onChange={(e) => set({ last5: e.target.value })} /></label>
         <label className="flex flex-col gap-1"><span className="text-xs text-tx3">匯款人</span>
           <input className={`${FIELD_SM} w-32`} list="acct-coach-names" value={r.payer} onChange={(e) => setPayer(e.target.value)} /></label>
+        <label className="flex flex-col gap-1"><span className="text-xs text-tx3">付款方式</span>
+          <select className={SELECT_SM} value={r.method} onChange={(e) => set({ method: (e.target.value || "") as Receipt["method"], methodFields: {} })}>
+            <option value="">未填</option>
+            {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select></label>
+        {r.method && PAYMENT_METHODS.find((m) => m.value === r.method)?.fields.map((f) => (
+          <label key={f.key} className="flex flex-col gap-1"><span className="text-xs text-tx3">{f.label}</span>
+            <input className={`${FIELD_SM} w-32`} value={r.methodFields[f.key] ?? ""} onChange={(e) => set({ methodFields: { ...r.methodFields, [f.key]: e.target.value } })} /></label>
+        ))}
+        {r.method && r.method !== "bank" && (
+          <label className="flex flex-col gap-1"><span className="text-xs text-tx3">客戶實付總額（含手續費）</span>
+            <input className={`${FIELD_SM} w-28 text-right`} inputMode="numeric" value={r.gross ?? ""} placeholder={String(r.amount)} onChange={(e) => { const g = e.target.value === "" ? null : NUM(e.target.value); set({ gross: g, fee: g != null ? Math.max(0, g - r.amount) : 0 }); }} /></label>
+        )}
         <label className="flex flex-col gap-1"><span className="text-xs text-tx3">退款（部分退款填金額）</span>
           <input className={`${FIELD_SM} w-24 text-right`} inputMode="numeric" value={r.refund || ""} placeholder="0" onChange={(e) => set({ refund: NUM(e.target.value) })} /></label>
         {hasPool && !manualShare && (

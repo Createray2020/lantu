@@ -9,6 +9,8 @@ import AdminNav from "./AdminNav";
 import LicenseCell from "./LicenseCell";
 import CoachRoster, { type RosterRow } from "./CoachRoster";
 import ReviewPanel from "./ReviewPanel";
+import { enrollmentsFor, enrollmentView } from "@/lib/trainingStore";
+import type { TrainingBrief } from "./StatusActions";
 import { getApplySettings, listApplications } from "@/lib/coachApplyStore";
 import { rankCaps } from "@/lib/quota";
 import { clientCapOf, licenseState, RANK_ORDER } from "@/lib/license";
@@ -41,6 +43,20 @@ export default async function Admin() {
   const caps = await rankCaps();
   // 報聘申請表與全平台設定：檢核表要用，逐列查就是 N+1。
   const [applications, applySettings] = await Promise.all([listApplications(), getApplySettings()]);
+  // 培訓報名案件（2026/10/28）：只替待審帳號撈收款與文件進度（待審的人不多，逐案查可以接受）。
+  const pendingIds = coaches.filter((c) => c.status === "pending").map((c) => c.id);
+  const enrollments = await enrollmentsFor(pendingIds);
+  const training: Record<string, TrainingBrief> = {};
+  await Promise.all(
+    Object.values(enrollments).map(async (e) => {
+      const v = await enrollmentView(e);
+      training[e.coachId] = {
+        enrollmentId: e.id, stage: e.reviewStage, amountDue: e.amountDue,
+        confirmed: v.funding.confirmed, pending: v.funding.pending, met: v.funding.met,
+        docsDone: v.progress.done, docsRequired: v.progress.required, docsTotal: v.docs.length, anyDeclined: v.progress.anyDeclined,
+      };
+    }),
+  );
   // 四個級別一律選得到：生效中的制度版本是加入「實習教練」之前建的，職級表裡沒有那一列，
   // 而「載入 V4 辦法數值」只在職級表完全空白時才帶入 —— 只讀 DB 的話實習教練永遠選不到。
   const rankCodes = [...RANK_ORDER, ...Object.keys(caps).filter((c) => !RANK_ORDER.includes(c as never))];
@@ -176,7 +192,7 @@ export default async function Admin() {
                         <span className="text-tx3 text-xs block text-right">本人</span>
                       ) : (
                         <div className="flex flex-col items-end gap-1">
-                          <StatusActions id={c.id} status={c.status} />
+                          <StatusActions id={c.id} status={c.status} training={training[c.id] ?? null} />
                           <TestToggle id={c.id} isTest={c.isTest} />
                           <RemoveCoach
                             id={c.id}

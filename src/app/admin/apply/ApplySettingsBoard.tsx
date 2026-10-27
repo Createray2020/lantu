@@ -18,9 +18,12 @@ const field = SELECT_SM;
 export default function ApplySettingsBoard({
   settings,
   rankCodes,
+  items = [],
 }: {
   settings: ApplySettings;
   rankCodes: string[];
+  /** 帳務營業項目：報聘＝培訓報名時掛哪個方案（2026/10/28 電子簽署）。 */
+  items?: { id: string; name: string; price: number; cat: string }[];
 }) {
   const router = useRouter();
   const [s, setS] = useState<ApplySettings>(settings);
@@ -51,6 +54,25 @@ export default function ApplySettingsBoard({
 
   return (
     <div className="grid gap-6">
+      {/* ⓪ 培訓方案（2026/10/28 電子簽署）：有設 → 送出申請建案、審核通過要先簽完文件才開通 */}
+      <section className="border border-line rounded-lg p-4">
+        <h2 className="font-bold mb-1">培訓方案與應簽文件</h2>
+        <p className="text-11 text-tx3 mb-3">
+          報聘＝培訓報名。選了方案：送出申請時建「培訓報名案件」（應收＝方案價格），申請人可提報付款、公司在帳務「收款明細」確認；
+          審核通過後依「電子簽署 › 範本組合」產應簽文件，全部必簽完成才正式開通、期限從開通日起算。不選＝審核通過即開通（舊流程）。
+        </p>
+        <label className="flex items-center gap-3 text-sm">
+          <span className="w-28 text-tx2 text-xs">培訓方案</span>
+          <select className={field} value={s.trainingItemId ?? ""} onChange={(e) => patch({ trainingItemId: e.target.value || null })}>
+            <option value="">不收費、不簽文件（審核通過即開通）</option>
+            {items.map((it) => (
+              <option key={it.id} value={it.id}>{it.cat ? `${it.cat}・` : ""}{it.name}（{it.price.toLocaleString()}）</option>
+            ))}
+          </select>
+        </label>
+        {items.length === 0 && <p className="text-11 text-tx3 mt-2">帳務後台還沒有營業項目——先到「帳務 › 參數設定」建一個培訓方案。</p>}
+      </section>
+
       {/* ① 核准時自動帶什麼 */}
       <section className="border border-line rounded-lg p-4">
         <h2 className="font-bold mb-1">核准時自動帶入</h2>

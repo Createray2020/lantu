@@ -4,6 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import { applySteps, routeMeta } from "@/lib/coachApply";
 import ApplyStepList from "@/components/ApplyStepList";
 import BrandMark from "@/components/BrandMark";
+import TrainingCase, { type TrainingCaseView } from "./TrainingCase";
 
 export type ApplyProgress = {
   route: string;
@@ -21,10 +22,13 @@ export default function PendingNotice({
   email,
   status,
   progress = null,
+  training = null,
 }: {
   email: string | null;
   status: string;
   progress?: ApplyProgress | null;
+  /** 2026/10/28 培訓報名案件：費用、提報付款、應簽文件。沒有案件（後台沒設培訓方案）就是 null。 */
+  training?: TrainingCaseView | null;
 }) {
   const suspended = status === "suspended";
   // 三段：已送出 → 推薦人確認（只有推薦路線有）→ 嵐途審核。
@@ -56,8 +60,10 @@ export default function PendingNotice({
           </div>
         )}
 
+        {!suspended && training && <TrainingCase t={training} />}
+
         {!suspended && (
-          <p className="text-tx3 text-11 leading-relaxed mb-5">
+          <p className="text-tx3 text-11 leading-relaxed mb-5 mt-5">
             資料完整並完成推薦人確認後，原則上於 1～3 個工作日內完成審核。
           </p>
         )}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import { getApplySettings } from "@/lib/coachApplyStore";
 import { rankCaps } from "@/lib/quota";
+import { getAcctState } from "@/lib/acctStore";
 import { RANK_ORDER } from "@/lib/license";
 import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
@@ -16,7 +17,8 @@ export default async function ApplySettingsPage() {
   if (!me) redirect("/dashboard");
   if (!(await isAdmin(me))) redirect("/dashboard");
 
-  const [settings, caps] = await Promise.all([getApplySettings(), rankCaps()]);
+  const [settings, caps, acct] = await Promise.all([getApplySettings(), rankCaps(), getAcctState()]);
+  const items = acct.items.map((i) => ({ id: i.id, name: i.name, price: i.price, cat: i.cat ?? "" }));
   const rankCodes = [...RANK_ORDER, ...Object.keys(caps).filter((c) => !RANK_ORDER.includes(c as never))];
 
   return (
@@ -32,7 +34,7 @@ export default async function ApplySettingsPage() {
             以及審核者按下核准之前一定要打的勾。這裡改了不會回頭動已經開通的帳號。
           </p>
         </div>
-        <ApplySettingsBoard settings={settings} rankCodes={rankCodes} />
+        <ApplySettingsBoard settings={settings} rankCodes={rankCodes} items={items} />
       </section>
     </main>
   );

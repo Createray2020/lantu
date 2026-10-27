@@ -118,8 +118,10 @@ describe("申請表單收得到後台審核要用的資料", () => {
 
   it("⚠️ 核准報聘一律走閘門，不是直接 status='active'", () => {
     // 舊版 approveCoach 只做 setStatus(id,'active')，職級／推薦人／期限全靠人事後補。
+    // 2026/10/28 起核准走 trainingStore.passReview（裡面先過 checkApprovalGate 再開通／啟動簽署）。
     const actions = R("src/app/admin/actions.ts");
-    expect(actions).toContain("approveApplication");
+    expect(actions).toContain("passReview");
+    expect(R("src/lib/trainingStore.ts")).toContain("checkApprovalGate");
     expect(actions).not.toMatch(/export async function approveCoach[\s\S]{0,120}setStatus\(id, "active"\)/);
   });
 

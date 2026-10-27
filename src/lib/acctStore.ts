@@ -12,7 +12,7 @@ import { db } from "@/Shared/db";
 import { acctParams, acctMonths, acctTargets, acctEntries, acctReceipts, acctPayouts, acctCash, payees, coaches, compCases, compPayouts } from "@/Shared/db/schema";
 import {
   ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, ACCT_DEFAULT_CASH, annualFeeOf, isYm, normGoal, normItems, normMonth, normParams, normTarget, normReceipt, normPayoutMark, normPayee, normCashEntry, normCashOpening, prevYm, ymOf,
-  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark, type PayeeRec, type CoachLite, type ReceiptRow, type CashState,
+  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark, type PayeeRec, type CoachLite, type ReceiptRow, type CashState, type CaseType,
 } from "./acctEngine";
 
 export const ACCT_TAG = "acct-params";
@@ -76,7 +76,7 @@ async function loadState(): Promise<AcctState> {
         }));
         (receipts[ym] ??= []).push({
           id: `case:${c.id}`, ym, itemId: caseItem.id, on, amount: c.fee, last5: "", payer: c.clientName, payerCoachId: null, sharers: [], payees: {},
-          note: c.note ?? "", void: c.status === "void" || c.status === "cancelled", refund: c.refund ?? 0, source: "case", caseId: c.id, allocs, verified: true,
+          note: c.note ?? "", void: c.status === "void" || c.status === "cancelled", refund: c.refund ?? 0, source: "case", caseId: c.id, allocs, verified: true, caseType: "client_service", gross: null, fee: 0, method: "", methodFields: {},
         });
       }
     }
@@ -205,7 +205,7 @@ export async function saveAcctReceipt(id: string | null, value: unknown): Promis
   if (!r.on) throw new Error("invalid-date");
   if (!r.itemId) throw new Error("invalid-item");
   if (!(r.amount > 0)) throw new Error("invalid-amount");
-  const row = { ym: r.ym, itemId: r.itemId, receivedOn: r.on, amount: r.amount, last5: r.last5, payer: r.payer, payerCoachId: r.payerCoachId ?? null, sharers: r.sharers, payees: r.payees, note: r.note, void: r.void, refund: r.refund, updatedAt: new Date() };
+  const row = { ym: r.ym, itemId: r.itemId, receivedOn: r.on, amount: r.amount, last5: r.last5, payer: r.payer, payerCoachId: r.payerCoachId ?? null, sharers: r.sharers, payees: r.payees, note: r.note, void: r.void, refund: r.refund, caseType: r.caseType, caseId: r.caseId ?? null, gross: r.gross, fee: r.fee, method: r.method, methodFields: r.methodFields, updatedAt: new Date() };
   let out = id;
   if (id) await db.update(acctReceipts).set(row).where(eq(acctReceipts.id, id));
   else { const [x] = await db.insert(acctReceipts).values(row).returning({ id: acctReceipts.id }); out = x.id; }
@@ -266,6 +266,29 @@ export async function verifyAcctReceipt(id: string, v: boolean): Promise<void> {
   }
   await db.update(acctReceipts).set({ verified: v, allocs: allocs as ReceiptRow[] | null, updatedAt: new Date() }).where(eq(acctReceipts.id, id));
   updateTag(ACCT_TAG);
+}
+// ---------- 收款案件（2026/10/28 電子簽署）：培訓費提報與案件門檻 ----------
+export type CaseFeeInput = { amount: number; gross?: number | null; fee?: number; on: string; method?: string; methodFields?: Record<string, string>; last5?: string; payer: string; note?: string };
+/**
+ * 替某個案件記一筆收款（申請人／教練提報：verified=false 等後台確認；後台直接記：verified=true）。
+ * 培訓費掛培訓那個營業項目，走它自己的拆分（課程推薦率）；不碰顧問費的 execCoach／allocs，所以不算執案實績。
+ */
+export async function createCaseReceipt(caseType: CaseType, caseId: string, itemId: string, input: CaseFeeInput, opts: { verified: boolean; enteredBy: string | null; sharers?: Receipt["sharers"] }): Promise<string> {
+  const amount = Math.max(0, Number(input.amount) || 0);
+  if (!(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(input.on)) throw new Error("invalid-amount");
+  const n = normReceipt({ ...input, itemId, amount, on: input.on, verified: opts.verified, caseType, caseId }, "");
+  const [x] = await db.insert(acctReceipts).values({
+    ym: n.ym, itemId, receivedOn: n.on, amount, last5: n.last5, payer: n.payer, payerCoachId: null, sharers: opts.sharers ?? [], payees: {}, note: n.note, void: false, refund: 0,
+    caseType, caseId, gross: n.gross, fee: n.fee, method: n.method, methodFields: n.methodFields, verified: opts.verified, enteredBy: opts.enteredBy, updatedAt: new Date(),
+  }).returning({ id: acctReceipts.id });
+  await ensureAcctMonth(n.ym);
+  updateTag(ACCT_TAG);
+  return x.id;
+}
+/** 某案件的所有收款（含待查帳、作廢），新→舊。 */
+export async function receiptsForCase(caseType: CaseType, caseId: string): Promise<Receipt[]> {
+  const rs = await db.select().from(acctReceipts).where(and(eq(acctReceipts.caseType, caseType), eq(acctReceipts.caseId, caseId))).orderBy(desc(acctReceipts.receivedOn));
+  return rs.map((r) => normReceipt({ ...r, on: r.receivedOn }, r.id));
 }
 /** 某客戶的顧問費收款（教練端客戶詳情用）。 */
 export async function receiptsForClient(clientId: string): Promise<Receipt[]> {

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { applyAsCoach, ensureCoach } from "@/lib/coach";
 import { getApplySettings, lookupCoachByCode, submitApplication } from "@/lib/coachApplyStore";
 import { canSubmit, routeMeta, type ApplyDraft } from "@/lib/coachApply";
+import { ensureEnrollment, reportTrainingPayment } from "@/lib/trainingStore";
+import type { CaseFeeInput } from "@/lib/acctStore";
 
 // 明確申請成為教練。只有這支會建立 coaches 列（status=pending，待後台核准）。
 //
@@ -40,7 +42,24 @@ export async function applyAsCoachAction(draft: ApplyDraft) {
   if (!row) redirect("/login?redirect_url=/dashboard/apply");
 
   await submitApplication(row.id, draft, introducer?.id ?? null);
+  // 2026/10/28：報聘＝培訓報名。後台設了培訓方案就建案（應收＝方案價格）；沒設就跳過（舊流程）。
+  // 建案失敗不擋申請——申請已經送出了，案件後台補得回來。
+  try {
+    await ensureEnrollment(row.id);
+  } catch (e) {
+    console.error("[training] ensureEnrollment failed", e);
+  }
   redirect("/dashboard");
+}
+
+/** 申請人提報培訓費付款：寫一筆待查帳的收款，公司確認後才算。 */
+export async function reportTrainingPaymentAction(input: Omit<CaseFeeInput, "payer"> & { last5?: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const me = await ensureCoach();
+  if (!me) return { ok: false, error: "請先登入" };
+  if (me.status !== "pending") return { ok: false, error: "這個帳號不在報名階段" };
+  const r = await reportTrainingPayment(me.id, { ...input, payer: me.name });
+  if (!r.ok) return r;
+  return { ok: true };
 }
 
 /** 申請表單即時驗推薦人編號：填對了當場把名字顯示出來，不用送出才知道打錯。 */

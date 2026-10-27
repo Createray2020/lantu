@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 後台動作的契約測試：確保「存檔」真的把使用者選的職級／推薦人送進 DB 層，
 // 且任何失敗都以 { ok:false, error } 回傳（而不是丟例外讓 UI 靜默失敗）。
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), unstable_cache: (fn: unknown) => fn, updateTag: vi.fn() }));
 vi.mock("@/lib/brand", () => ({ saveBrand: vi.fn() }));
 vi.mock("@/lib/coach", () => ({
   ensureCoach: vi.fn(),
@@ -13,13 +13,18 @@ vi.mock("@/lib/coach", () => ({
 // 2026/08/31：核准不再是 setCoachStatus(id,'active')，而是走報聘閘門＋一次寫齊
 // （職級／推薦人／期限）。那一支的行為由 coachApplyStore.test.ts 守著，這裡只驗接線與錯誤轉譯。
 vi.mock("@/lib/coachApplyStore", () => ({
-  approveApplication: vi.fn(),
   saveApplySettings: vi.fn(),
   saveReviewChecks: vi.fn(),
 }));
+// 2026/10/28：核准改走培訓案件的 passReview（審核閘＋收款門檻＋啟動簽署；沒案件時退回 approveApplication 的舊行為）。
+// 那一支的行為由 trainingStore 守著，這裡仍只驗接線與錯誤轉譯。
+vi.mock("@/lib/trainingStore", () => ({
+  passReview: vi.fn(),
+  tryActivateEnrollment: vi.fn(),
+}));
 
 import { ensureCoach, isAdmin, setCoachOrg, setCoachStatus } from "@/lib/coach";
-import { approveApplication } from "@/lib/coachApplyStore";
+import { passReview as approveApplication } from "@/lib/trainingStore";
 import { updateOrg, approveCoach, suspendCoach } from "./actions";
 
 const asMock = (f: unknown) => f as unknown as ReturnType<typeof vi.fn>;
@@ -31,7 +36,7 @@ beforeEach(() => {
   // setCoachOrg 現在會回 { ok } —— 推薦人鏈的環狀檢查失敗時要讓 updateOrg 轉成畫面看得到的錯誤。
   asMock(setCoachOrg).mockResolvedValue({ ok: true });
   asMock(setCoachStatus).mockResolvedValue(undefined);
-  asMock(approveApplication).mockResolvedValue({ ok: true, applied: { rankCode: "C1", uplineId: null, licenseUntil: null } });
+  asMock(approveApplication).mockResolvedValue({ ok: true, activated: true, docs: 0, noTemplates: true });
 });
 
 describe("updateOrg", () => {
@@ -79,8 +84,8 @@ describe("updateOrg", () => {
 
 describe("帳號狀態動作", () => {
   it("核准開通走報聘核准（不是只寫 status）", async () => {
-    expect(await approveCoach("c1")).toEqual({ ok: true });
-    expect(approveApplication).toHaveBeenCalledWith("c1", "admin1");
+    expect(await approveCoach("c1")).toEqual({ ok: true, activated: true, docs: 0 });
+    expect(approveApplication).toHaveBeenCalledWith("c1", "admin1", "admin1");
     expect(setCoachStatus).not.toHaveBeenCalled();
   });
 

@@ -52,7 +52,41 @@ export type Receipt = {
   enteredBy?: string | null;
   /** 已算好的拆分（case／coach 用）：直接當拆分結果，不再套項目的 splits */
   allocs?: ReceiptRow[];
+  // ── 收款案件（2026/10/28 電子簽署）──
+  /** 這筆錢屬於哪種案件：顧問服務（算分潤與實績）／培訓費（只進營收）。舊資料全是 client_service。 */
+  caseType: CaseType;
+  /** 客戶實際付的總額（門檻比對用）；null＝跟 amount 一樣。amount 永遠是公司淨入帳。 */
+  gross: number | null;
+  /** 金流手續費（gross − amount）。分開記，才不會「扣費後淨入帳較少」被誤判沒付清。 */
+  fee: number;
+  /** 付款方式與依方式而異的欄位（後五碼、交易編號、期數…）。 */
+  method: PaymentMethod | "";
+  methodFields: Record<string, string>;
 };
+export type CaseType = "client_service" | "training";
+export const CASE_TYPE_LABEL: Record<CaseType, string> = { client_service: "顧問服務", training: "培訓費" };
+export type PaymentMethod = "bank" | "card" | "card_installment" | "zero_installment" | "other";
+/** 付款方式與各自要補的欄位（Ray 2026/10/28 需求表第四節）。 */
+export const PAYMENT_METHODS: { value: PaymentMethod; label: string; fields: { key: string; label: string }[] }[] = [
+  { value: "bank", label: "銀行轉帳", fields: [{ key: "account", label: "公司收款帳戶" }] },
+  { value: "card", label: "信用卡一次付清", fields: [{ key: "gateway", label: "金流商" }, { key: "txn", label: "訂單／交易編號" }, { key: "paidAt", label: "付款成功時間" }, { key: "settle", label: "撥款紀錄" }] },
+  { value: "card_installment", label: "信用卡分期", fields: [{ key: "gateway", label: "金流商" }, { key: "txn", label: "訂單／交易編號" }, { key: "paidAt", label: "付款成功時間" }, { key: "periods", label: "分期期數" }, { key: "settle", label: "公司撥款方式" }] },
+  { value: "zero_installment", label: "零卡分期", fields: [{ key: "vendor", label: "業者" }, { key: "txn", label: "申請／交易編號" }, { key: "approved", label: "核准狀態" }, { key: "periods", label: "期數" }, { key: "settle", label: "公司撥款紀錄" }] },
+  { value: "other", label: "其他", fields: [{ key: "detail", label: "說明" }] },
+];
+export const isPaymentMethod = (v: unknown): v is PaymentMethod => PAYMENT_METHODS.some((m) => m.value === v);
+/** 客戶實付（門檻用）：gross 沒填就等於 amount；扣掉退款。 */
+export const grossOf = (r: Pick<Receipt, "amount" | "gross" | "refund">) => Math.max(0, (r.gross ?? r.amount) - (r.refund ?? 0));
+/** 某案件「已確認」的客戶實付合計，與是否達到應收（一期門檻＝全額）。 */
+export function caseFunding(receipts: Pick<Receipt, "amount" | "gross" | "refund" | "void" | "verified">[], due: number): { confirmed: number; pending: number; met: boolean } {
+  let confirmed = 0, pending = 0;
+  for (const r of receipts) {
+    if (r.void) continue;
+    if (r.verified === false) pending += grossOf(r);
+    else confirmed += grossOf(r);
+  }
+  return { confirmed, pending, met: due > 0 ? confirmed + 0.5 >= due : confirmed > 0 };
+}
 /** 名冊精簡列：職級與直屬主管用來展開推薦端輔導鏈。 */
 export type CoachLite = { id: string; name: string; rankCode?: string | null; uplineId?: string | null };
 /**
@@ -521,7 +555,21 @@ export function normReceipt(v: unknown, id: string): Receipt {
     clientId: r.clientId ? String(r.clientId) : null, execCoachId: r.execCoachId ? String(r.execCoachId) : null, promoCoachId: r.promoCoachId ? String(r.promoCoachId) : null,
     verified: r.verified !== false, enteredBy: r.enteredBy ? String(r.enteredBy) : null,
     ...(Array.isArray(r.allocs) ? { allocs: r.allocs as ReceiptRow[] } : {}),
+    caseType: r.caseType === "training" ? "training" : "client_service",
+    gross: r.gross == null || r.gross === ("" as unknown) ? null : Math.max(0, num0(r.gross)),
+    fee: Math.max(0, num0(r.fee)),
+    method: isPaymentMethod(r.method) ? r.method : "",
+    methodFields: normMethodFields(r.methodFields),
   };
+}
+function normMethodFields(v: unknown): Record<string, string> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, string> = {};
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    const s = String(x ?? "").trim().slice(0, 120);
+    if (s && /^[a-zA-Z0-9_]{1,30}$/.test(k)) out[k] = s;
+  }
+  return out;
 }
 /**
  * 顧問費實績（V7.2 §27：同一客戶同一年度合計一案；§九：只算已確認的）。

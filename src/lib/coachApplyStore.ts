@@ -54,6 +54,7 @@ export async function getApplySettings(): Promise<ApplySettings> {
     licenseQty: Math.max(1, Math.min(120, r.licenseQty || 1)),
     requiredFields: (r.requiredFields ?? []) as string[],
     checklist: checklist.length ? checklist : DEFAULT_CHECKLIST,
+    trainingItemId: r.trainingItemId ?? null,
   };
 }
 
@@ -67,6 +68,7 @@ export async function saveApplySettings(input: ApplySettings): Promise<void> {
     licenseQty: Math.max(1, Math.min(120, Math.round(input.licenseQty || 1))),
     requiredFields: input.requiredFields ?? [],
     checklist: input.checklist ?? [],
+    trainingItemId: input.trainingItemId || null,
     updatedAt: new Date(),
   };
   // neon-http 沒有交易，設定寫入一律單語句 upsert（見 an_module_defaults 的作法）。
@@ -285,16 +287,23 @@ export type ApproveResult =
  * ⚠️ 實習教練（INTERN）的期限固定半年，與 licenseActions 同一條規則，這裡再夾一次。
  */
 export async function approveApplication(coachId: string, reviewerId: string): Promise<ApproveResult> {
-  const rows = await db.select().from(coaches).where(eq(coaches.id, coachId)).limit(1);
-  const coach = rows[0];
-  if (!coach) return { ok: false, error: "找不到這位教練" };
+  const gate = await checkApprovalGate(coachId);
+  if (!gate.ok) return gate;
+  return activateCoach(coachId, reviewerId);
+}
 
+/**
+ * 審核閘（不寫任何東西）：教練存在、推薦人已確認、檢核表打齊。
+ * 2026/10/28 起「審核通過」與「正式開通」分兩步（中間要簽完培訓文件），兩步都要過這道閘。
+ */
+export async function checkApprovalGate(coachId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const rows = await db.select().from(coaches).where(eq(coaches.id, coachId)).limit(1);
+  if (!rows[0]) return { ok: false, error: "找不到這位教練" };
   const [settings, appRows] = await Promise.all([
     getApplySettings(),
     db.select().from(coachApplications).where(eq(coachApplications.coachId, coachId)).limit(1),
   ]);
   const app = appRows[0] ?? null;
-
   const gate = approvalGate(
     {
       route: app?.route,
@@ -305,6 +314,26 @@ export async function approveApplication(coachId: string, reviewerId: string): P
     settings,
   );
   if (!gate.ok) return { ok: false, error: gate.reasons.join("、") };
+  return { ok: true };
+}
+
+/**
+ * 正式開通：status=active、職級／推薦人／期限（從**今天**起算）、發編號、帳務記一筆。
+ * 冪等：已 active 的人再呼叫只回現況，不重設期限、不重複記帳。
+ * ⚠️ 不檢查審核閘——呼叫端負責（approveApplication 或培訓案件的 tryActivateEnrollment）。
+ */
+export async function activateCoach(coachId: string, reviewerId: string): Promise<ApproveResult> {
+  const rows = await db.select().from(coaches).where(eq(coaches.id, coachId)).limit(1);
+  const coach = rows[0];
+  if (!coach) return { ok: false, error: "找不到這位教練" };
+  if (coach.status === "active") {
+    return { ok: true, applied: { rankCode: coach.rankCode ?? null, uplineId: coach.uplineId ?? null, licenseUntil: coach.licenseUntil ?? null } };
+  }
+  const [settings, appRows] = await Promise.all([
+    getApplySettings(),
+    db.select().from(coachApplications).where(eq(coachApplications.coachId, coachId)).limit(1),
+  ]);
+  const app = appRows[0] ?? null;
 
   // 三項都只在「原本是空的」時才寫進 set，不是寫回同一個值 ——
   // 寫回去看起來無害，但那是一次真的 UPDATE，會蓋掉別人在這幾秒內剛改好的值。
