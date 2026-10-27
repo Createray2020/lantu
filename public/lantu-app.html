@@ -17,6 +17,7 @@
  /* ⚠️ 改版前 --teal / --blue 都等於 --mut(#a9bccf)：三個名字同一個 hex，
     所以 KPI 上緣色條、進度條、rtable code 標成強調卻看起來是灰的。給它們真的顏色。 */
  --teal:#8fbfc8;--blue:#8fb8ff;--purple:#b7c6b0;
+ --ap1:#6f9fb8;--ap2:#c99a5b;--ap3:#d97b6b;--ap0:#8fa3b3;   /* 資產配置四池 */
  --ok:#8fc0a3;--warn:#e08a68;--danger:#ff9d9f;--info:#8fb8ff;--gap2:#ef6f6f;
  /* 圖表分類色盤：舊版每個繪圖函式各自複製一份，同一種資料在不同圖上是不同顏色 */
  --c1:#5b93d6;--c2:#5cc08a;--c3:#f0c34e;--c4:#ef6f6f;--c5:#b7c6b0;--c6:#e79ec4;
@@ -38,6 +39,7 @@
  --amber:#8a6220;--amber2:#7d5415;--onbrand:#ffffff;
   /* 同上：淺色版 --teal 也等於 --mut(#4a5c6e)。新值對白底約 5.7:1。 */
  --teal:#2a6f7a;--blue:#2c6fb5;--purple:#5f7a63;
+ --ap1:#3f7a9a;--ap2:#9a6f22;--ap3:#b8503f;--ap0:#6b7f90;
  --ok:#2a7050;--warn:#915a12;--danger:#c0362f;--info:#2c6fb5;--gap2:#c2453e;
  --c1:#2e6db4;--c2:#237a4f;--c3:#8c6208;--c4:#c2453e;--c5:#5f7a63;--c6:#a8497e;
  --sh:96,116,136;
@@ -1170,6 +1172,26 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .ckitems{font-size:12px}.cklegend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:8px}
 .cklegend span{padding-left:8px;border-left:3px solid transparent}.cklegend .ck-low{border-left-color:var(--danger)}.cklegend .ck-mid{border-left-color:var(--ok)}.cklegend .ck-high{border-left-color:var(--warn)}.cklegend .ck-info{border-left-color:var(--teal)}
 .ckfoldsec{padding:0;background:none;border:0}.ckfoldsec>details{margin:0}.ckbyy{margin-bottom:14px}.ckbyy tr.dim td{color:var(--mut)}
+/* ── C 批 資產配置台（2026/10/28）── */
+.ap-hero{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}@media(max-width:860px){.ap-hero{grid-template-columns:1fr}}
+.ap-pies{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ap-pie{text-align:center}.ap-pie .t{font-size:12px;color:var(--mut);margin-bottom:4px;letter-spacing:.06em}.ap-pie .v{font-family:var(--serif);font-size:15px;font-weight:700}
+.ap-legend{grid-column:1/3;display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin-top:8px}.ap-legend span{display:inline-flex;align-items:center;gap:5px}.ap-legend i{width:10px;height:10px;border-radius:4px;display:inline-block}
+.ap-kpis .kpi{border-top-color:var(--amber)}.ap-kpis .vv{font-family:var(--serif);font-size:22px;font-weight:700;line-height:1.2}.ap-kpis .was{font-size:13px;color:var(--mut2);font-weight:400}.ap-kpis small{display:block;font-size:11px;color:var(--mut2);margin-top:3px}
+.ap-line{display:block;margin-top:10px;margin-left:0}
+.ap-pool{display:grid;grid-template-columns:150px 1fr 110px 230px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.ap-pool:last-of-type{border-bottom:0}
+.ap-pool .nm{font-weight:700;display:flex;align-items:center;gap:7px}.ap-pool .nm i{width:12px;height:12px;border-radius:4px;display:inline-block}.ap-pool .nm small{display:block;font-weight:400;font-size:11px;color:var(--mut2)}
+.ap-pool input[type=range]{width:100%;accent-color:var(--amber)}
+.ap-pool .pct{font-family:var(--serif);font-size:20px;font-weight:700;text-align:right}.ap-pool .pct small{font-size:11px;color:var(--mut2);font-weight:400;display:block}
+.ap-pool .prm{display:flex;gap:6px;align-items:center;font-size:12px;white-space:nowrap}.ap-pool .prm input{width:52px;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:3px 5px;font-size:12px;text-align:right}
+@media(max-width:860px){.ap-pool{grid-template-columns:1fr 1fr}.ap-pool .nm{grid-column:1/3}}
+.ap-sidenote{background:var(--card);border-left:3px solid var(--teal);border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px}.ap-sidenote b{color:var(--teal)}
+.ap-inhead{display:grid;grid-template-columns:150px repeat(4,1fr) 110px;gap:8px;font-size:11px;color:var(--mut2);letter-spacing:.05em;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.ap-inrow{display:grid;grid-template-columns:150px repeat(4,1fr) 110px;gap:8px;align-items:center;padding:6px 0;font-size:13px}
+.ap-inrow input{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:5px 7px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.ap-inrow .lb{font-weight:700}.ap-inrow .lb small{display:block;font-weight:400;font-size:11px;color:var(--mut2)}.ap-inrow .tot{text-align:right;font-family:var(--serif);font-weight:700}
+@media(max-width:860px){.ap-inrow,.ap-inhead{grid-template-columns:1fr 1fr 1fr}.ap-inrow .lb{grid-column:1/4}}
+.ap-scen{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:860px){.ap-scen{grid-template-columns:1fr}}.ap-fan{width:100%;height:auto}.ap-band{font-size:12px;color:var(--mut2)}
+#allocSec tr.dim td{color:var(--mut2)}
 .tmrow{display:grid;grid-template-columns:1fr 150px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
 .tmrow .tmn{font-weight:700}.tmrow .tmn .hint{font-weight:400;margin-left:6px}
 .tmrow input[type=text]{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:6px 8px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums}
@@ -1664,6 +1686,8 @@ function applyBizTax(payload){
  try{applyPlanCaps(v)}catch(e){}
  // 保單健檢的適中帶與理財金三角比例同理（grp='保單健檢'）。
  try{applyCheckupParams(v)}catch(e){}
+ // 資產配置四池的報酬／風險值與各屬性建議比例（grp='資產配置'）。
+ try{applyAllocParams(v)}catch(e){}
 }
 
 // ===== 企業主體 =====
@@ -8774,14 +8798,14 @@ function adoptDraft(){var c=activeCase();c.plan=c.plan||{};
    只讀正式層（adoptedCase），工作區隨便試都不會動到客戶看到的東西。
    ⚠️ 沒有 adopted 的舊客戶：adoptedCase 回 c 本身，數字一位不動（trialsUI.test 守著）。
    願景歲數／金額與流程步驟刻意不進快照：願景是引擎不是方案內容、流程是過程不是結果。 */
-var TRIAL_MAX=5, TRIAL_PLAN_KEYS=['levers','draft','allocations','invest','protect','movableToOverseas','useAllocReturn'];
+var TRIAL_MAX=5, TRIAL_PLAN_KEYS=['levers','draft','allocations','invest','protect','movableToOverseas','useAllocReturn','alloc'];
 function trialSnap(c){
  var p=c.plan||{},pl={};TRIAL_PLAN_KEYS.forEach(function(k){if(p[k]!==undefined)pl[k]=JSON.parse(JSON.stringify(p[k]))});
  var tn=(c.flow&&c.flow.tune)?JSON.parse(JSON.stringify(c.flow.tune)):null;
  return {actions:JSON.parse(JSON.stringify(c.actions||[])),plan:pl,tune:tn};
 }
 function trialSnapEmpty(s){s=s||{};if((s.actions||[]).length)return false;if(s.tune)return false;
- var p=s.plan||{};return Object.keys(p).every(function(k){var v=p[k];return v==null||v===false||v===0||(Array.isArray(v)&&!v.length)||(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)});
+ var p=s.plan||{};return Object.keys(p).every(function(k){var v=p[k];if(k==='alloc')return !(v&&v.adoptedAt);return v==null||v===false||v===0||(Array.isArray(v)&&!v.length)||(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)});
 }
 function trialApplyTo(c,snap){ // 把快照套進 c（可以是複本）；不 save、不 render
  snap=snap||{};c.actions=JSON.parse(JSON.stringify(snap.actions||[]));
@@ -9183,6 +9207,192 @@ function protectMatchHTML(rec,theme){
  return rows+orphan;
 }
 
+/* ===== C 批（2026/10/28 Ray 定案，原型 docs/資產配置台_原型.html）資產配置台：四池 =====
+   把可投資資產放進四個風險池（低／中／高／投資池現金）：現況（資產逐筆歸池）→ 目標比例拉桿 →
+   新投入（定期定額／單筆分配到池）→ 情境（年化 P10／P50／P90、第一年理財收入、期末資產）→
+   風險屬性旁註（本人；有配偶以較保守者為尺）→ 對照回全生涯財務流 → 採用（寫規劃參數、投入變動作）。
+   ⚠️ 不帶商品、只講結構。各池視為完全相關（風險值加權相加＝保守）；最差／最好＝期間年化 P10／P90，不是單年最慘。
+   ⚠️ 讀取 allocView 不建物件；只有改拉桿／輸入／採用走 allocMut。舊客戶沒碰配置台，數字一位不動。
+   ⚠️ 採用＝加權報酬與風險值直接寫進 params.invReturn／invReturnStd，plan.useAllocReturn 關掉（開關退場，effReturn 只留舊資料相容）。 */
+var ALLOC_POOLS=[
+ {k:'low', name:'低風險',   desc:'定存、債券、貨幣型',      ret:2.5, std:4,  col:'var(--ap1)'},
+ {k:'mid', name:'中度風險', desc:'平衡型、指數型、績優股',   ret:5,   std:10, col:'var(--ap2)'},
+ {k:'high',name:'高度風險', desc:'個股、產業型、另類',       ret:8,   std:18, col:'var(--ap3)'},
+ {k:'cash',name:'投資池現金',desc:'等著進場的錢，併在現金裡', ret:1,   std:0,  col:'var(--ap0)'}
+];
+var ALLOC_TIER_MIX={'保守型':[70,20,0,10],'穩健型':[40,40,10,10],'積極型':[20,45,30,5],'進取型':[10,40,45,5]};
+var ALLOC_POOL_LABEL={'低風險':'low','中度風險':'mid','高度風險':'high','投資池現金':'cash','不投資':'none'};
+var ALLOC_POOL_OPTS=['','低風險','中度風險','高度風險','投資池現金','不投資'];
+// 後台 /admin/categories「資產配置」群組（bizTaxParams 同一張表）一存就覆蓋：POOL_<K>_RET／STD、MIX_T<1..4>_LOW／MID／HIGH（現金＝餘數）。
+function applyAllocParams(v){
+ if(!v||typeof v!=='object')return;
+ var ks={low:'LOW',mid:'MID',high:'HIGH',cash:'CASH'};
+ ALLOC_POOLS.forEach(function(p){var r=Number(v['POOL_'+ks[p.k]+'_RET']),s=Number(v['POOL_'+ks[p.k]+'_STD']);
+  if(v['POOL_'+ks[p.k]+'_RET']!=null&&v['POOL_'+ks[p.k]+'_RET']!==''&&isFinite(r))p.ret=r;
+  if(v['POOL_'+ks[p.k]+'_STD']!=null&&v['POOL_'+ks[p.k]+'_STD']!==''&&isFinite(s))p.std=s;});
+ ['保守型','穩健型','積極型','進取型'].forEach(function(t,i){var pre='MIX_T'+(i+1)+'_',l=Number(v[pre+'LOW']),m=Number(v[pre+'MID']),h=Number(v[pre+'HIGH']);
+  if([l,m,h].every(function(x){return isFinite(x)})&&v[pre+'LOW']!=null&&v[pre+'LOW']!==''){ALLOC_TIER_MIX[t]=[l,m,h,Math.max(0,100-l-m-h)];}});
+}
+function assetPoolOf(c,a){ // 資產表的「風險池」欄；留空＝依類別自動歸池（保守：只有明確投資類才進池）
+ if(!a)return 'none';var p=ALLOC_POOL_LABEL[a.pool];if(p)return p;
+ var t=a.type||'';if(t==='現金')return 'cash';   // 現金就是現金，不管標成自用還是可投資（預備金另外扣）
+ if(a.mainCat==='自用資產')return 'none';
+ if(t==='定存'||t==='債券')return 'low';if(t==='基金')return 'mid';if(t==='股票')return 'high';return 'none';
+}
+function allocReserve(c){var m=metrics(c);return Math.max(0,n(m.monthExp))*(n((c.params||{}).emergencyMonths)||6);}
+function allocNowPools(c){var out=[0,0,0,0],idx={low:0,mid:1,high:2,cash:3};
+ (c.assets||[]).forEach(function(a){var p=assetPoolOf(c,a);if(idx[p]==null)return;out[idx[p]]+=aVal(a);});
+ out[3]=Math.max(0,out[3]-allocReserve(c));   // 預備金先扣，救命錢不進池
+ return out;}
+function allocDefaultTarget(np){var tot=sum(np,function(x){return x});if(!(tot>0))return [25,25,25,25];var t=np.map(function(x){return Math.round(x/tot*100)});t[0]+=100-sum(t,function(x){return x});return t;}
+function allocYearsDefault(c){var A=n(c.profile.age)||40,R=n(c.profile.retireAge)||65;return Math.max(1,R-A);}
+function allocView(c){ // 唯讀：沒有 plan.alloc 就回預設（目標＝現況、沒投入）
+ var p=(c.plan||{}),A=p.alloc,np=allocNowPools(c);
+ var V={np:np,target:(A&&A.target&&A.target.length===4)?A.target.slice():allocDefaultTarget(np),
+  ret:ALLOC_POOLS.map(function(P,i){var o=A&&A.ret&&A.ret[i];return (o!=null&&o!=='')?n(o):P.ret}),
+  std:ALLOC_POOLS.map(function(P,i){var o=A&&A.std&&A.std[i];return (o!=null&&o!=='')?n(o):P.std}),
+  dca:(A&&A.dca)?A.dca.map(n):[0,0,0,0],lump:(A&&A.lump)?A.lump.map(n):[0,0,0,0],
+  years:(A&&n(A.years)>0)?n(A.years):allocYearsDefault(c),adoptedAt:(A&&A.adoptedAt)||null,touched:!!A};
+ return V;}
+function allocMut(c){c.plan=c.plan||{};if(!c.plan.alloc){var V=allocView(c);c.plan.alloc={target:V.target,ret:[null,null,null,null],std:[null,null,null,null],dca:[0,0,0,0],lump:[0,0,0,0],years:V.years,adoptedAt:null};}return c.plan.alloc;}
+function allocStats(V,w){var mu=0,sd=0;for(var i=0;i<4;i++){mu+=w[i]*V.ret[i]/100;sd+=w[i]*V.std[i]/100;}return {mu:mu,sd:sd};}
+function allocPctl(st,N,z){var ml=Math.log(1+st.mu)-st.sd*st.sd/2;return Math.exp(ml+z*st.sd/Math.sqrt(Math.max(1,N)))-1;}
+function allocFV(v0,m,lump,r,N){var g=Math.pow(1+r,N);var a=(v0+lump)*g;var d=Math.abs(r)>1e-9?m*12*(g-1)/r:m*12*N;return a+d;}
+function allocRiskRef(c){ // 風險屬性旁註：本人；有配偶時以較保守者為尺
+ var me=riskProfile(c),sp=riskHasSpouse(c)?riskProfile(c,'spouse'):null;
+ if(!me&&!sp)return null;
+ var ti=function(rp){return rp?RISK_TIERS.indexOf(rp.tier):99};
+ var useSp=sp&&(!me||ti(sp)<ti(me));
+ var tier=useSp?sp.tier.name:me.tier.name;
+ return {me:me?me.tier.name:null,sp:sp?sp.tier.name:null,useSp:!!useSp,tier:tier,mix:ALLOC_TIER_MIX[tier]||[40,40,10,10]};
+}
+function allocCalc(c){
+ var V=allocView(c),np=V.np,inv=sum(np,function(x){return x});
+ var wNow=np.map(function(x){return inv?x/inv:0}),wT=V.target.map(function(x){return x/100});
+ var sN=allocStats(V,wNow),sT=allocStats(V,wT),N=V.years;
+ var dcaM=sum(V.dca,function(x){return x}),lumpT=sum(V.lump,function(x){return x});
+ var zs=[-1.2816,0,1.2816];
+ var ser=zs.map(function(z){var r=allocPctl(sT,N,z),pts=[];for(var y=0;y<=N;y++)pts.push(allocFV(inv,dcaM,lumpT,r,y));return pts});
+ var base=[];for(var y=0;y<=N;y++)base.push(allocFV(inv,0,0,allocPctl(sN,N,0),y));
+ return {V:V,np:np,inv:inv,wNow:wNow,wT:wT,sN:sN,sT:sT,N:N,dcaM:dcaM,lumpT:lumpT,
+  p10:allocPctl(sT,N,-1.2816),p50:allocPctl(sT,N,0),p90:allocPctl(sT,N,1.2816),
+  incNow:inv*sN.mu,incT:inv*sT.mu,ser:ser,base:base,ref:allocRiskRef(c),
+  nonInv:sum((c.assets||[]),function(a){return assetPoolOf(c,a)==='none'?aVal(a):0}),reserve:allocReserve(c)};
+}
+/* 採用時要寫進個案的東西（也用在「對照」的複本上） */
+function allocApplyTo(c,V){
+ var K=allocCalc(c),sT=K.sT;
+ c.params=c.params||{};c.params.invReturn=Math.round(sT.mu*1000)/10;c.params.invReturnStd=Math.round(sT.sd*1000)/10;
+ c.plan=c.plan||{};c.plan.useAllocReturn=false;
+ var A=n(c.profile.age)||40,N=K.N;c.actions=c.actions||[];
+ ALLOC_POOLS.forEach(function(P,i){
+  var kd='alloc:dca:'+P.k,kl='alloc:lump:'+P.k;
+  if(V.dca[i]>0){var a=flowTuneEnsure(c,kd,function(){return {id:actId(),on:true,cat:'regular',lane:'income-invest',name:'定期定額・'+P.name,src:'月結餘',divMode:'reinvest',startY:A+1}});
+   a.payMonthly=V.dca[i];a.growth=V.ret[i];a.payFrom=A+1;a.payTo=A+N;a.on=true;}
+  else c.actions=c.actions.filter(function(x){return x.flowKey!==kd});
+  if(V.lump[i]>0){var b=flowTuneEnsure(c,kl,function(){return {id:actId(),on:true,cat:'lump',lane:'income-invest',name:'單筆投入・'+P.name,src:'投資池現金',divMode:'reinvest',startY:A+1}});
+   b.payLump=V.lump[i];b.growth=V.ret[i];b.payFrom=A+1;b.on=true;}
+  else c.actions=c.actions.filter(function(x){return x.flowKey!==kl});
+ });
+ return c;
+}
+function allocAfterCase(c){var t=JSON.parse(JSON.stringify(c));return allocApplyTo(t,allocView(c));}
+function allocAdopt(){var c=activeCase();if(!c)return;var K=allocCalc(c);
+ if(!confirm('採用這個配置？\n\n・規劃參數：投資報酬率 '+(Math.round(K.sT.mu*1000)/10)+'%、報酬標準差 '+(Math.round(K.sT.sd*1000)/10)+'%（原 '+n(c.params.invReturn)+'%／'+n(c.params.invReturnStd)+'%）\n・調整動作：定期定額 '+fmt(K.dcaM)+'／月、單筆 '+fmt(K.lumpT)+'（各用該池報酬滾）\n・配置結構存進 plan.alloc（存方案時一起帶）'))return;
+ var A=allocMut(c);allocApplyTo(c,allocView(c));A.adoptedAt=new Date().toISOString().slice(0,10);save();render();}
+function allocReset(){var c=activeCase();if(!c)return;
+ if(!confirm('回到現況：目標比例回到現況、新投入歸零、覆寫的報酬／風險清掉，並移除「採用」時寫進去的配置動作（規劃參數不動）。確定？'))return;
+ delete c.plan.alloc;c.actions=(c.actions||[]).filter(function(x){return !(x.flowKey&&String(x.flowKey).indexOf('alloc:')===0)});save();render();}
+function allocSetTarget(i,v,live){var c=activeCase();var A=allocMut(c);v=Math.max(0,Math.min(100,Math.round(n(v))));
+ var others=0;A.target.forEach(function(x,j){if(j!==i)others+=x});var rest=100-v;
+ for(var j=0;j<4;j++){if(j===i)continue;A.target[j]=others?Math.round(A.target[j]/others*rest):Math.round(rest/3);}
+ A.target[i]=v;A.target[i]=v+(100-sum(A.target,function(x){return x}));
+ if(live){allocPaintThrottled();}else{save();render();}}
+var __apTimer=null;
+function allocPaintThrottled(){if(__apTimer)return;__apTimer=setTimeout(function(){__apTimer=null;try{allocPaint(activeCase());}catch(e){}},80);}
+function allocSetIn(kind,i,v){var c=activeCase();var A=allocMut(c);A[kind][i]=Math.max(0,n(v));save();render();}
+function allocSetYears(v){var c=activeCase();var A=allocMut(c);A.years=Math.max(1,Math.round(n(v)));save();render();}
+function allocSetParam(kind,i,v){var c=activeCase();var A=allocMut(c);A[kind][i]=(v===''||v==null)?null:n(v);save();render();}
+
+/* ── 畫面 ── */
+function allocPieSVG(vals){var tot=sum(vals,function(x){return x})||1,R=56,cx=70,cy=70,a=-Math.PI/2,out='';
+ vals.forEach(function(v,i){if(v<=0)return;var ang=v/tot*Math.PI*2;var x1=cx+R*Math.cos(a),y1=cy+R*Math.sin(a);a+=ang;var x2=cx+R*Math.cos(a),y2=cy+R*Math.sin(a);var lg=ang>Math.PI?1:0;
+  if(ang>=Math.PI*2-1e-6){out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="'+ALLOC_POOLS[i].col+'"/>';return;}
+  out+='<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+R+','+R+' 0 '+lg+' 1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+ALLOC_POOLS[i].col+'" stroke="var(--panel)" stroke-width="2"/>';});
+ return '<svg viewBox="0 0 140 140" width="140" height="140">'+out+'<circle cx="70" cy="70" r="26" fill="var(--panel)"/></svg>';}
+function apPct(v){return (Math.round(v*10)/10).toFixed(1)+'%';}
+function allocParts(c){
+ var K=allocCalc(c),V=K.V,inv=K.inv,sN=K.sN,sT=K.sT,N=K.N;
+ var P={};
+ P.hero='<div class="ap-hero"><div class="ap-pies">'+
+  '<div class="ap-pie"><div class="t">現況（歸池）</div>'+allocPieSVG(K.np)+'<div class="v">'+cfAxis(inv)+' <span class="hint">預期 '+apPct(sN.mu*100)+'・風險 '+apPct(sN.sd*100)+'</span></div></div>'+
+  '<div class="ap-pie"><div class="t">目標配置</div>'+allocPieSVG(K.wT)+'<div class="v">'+cfAxis(inv)+' <span class="hint">預期 '+apPct(sT.mu*100)+'・風險 '+apPct(sT.sd*100)+'</span></div></div>'+
+  '<div class="ap-legend">'+ALLOC_POOLS.map(function(p,i){return '<span><i style="background:'+p.col+'"></i>'+p.name+' <span class="num">'+apPct(K.wNow[i]*100)+' → '+apPct(K.wT[i]*100)+'</span></span>'}).join('')+'<span class="hint">不投資（自用房、車等 '+cfAxis(K.nonInv)+'）不進圓餅；預備金 '+cfAxis(K.reserve)+' 已從現金扣除</span></div></div>'+
+  '<div><div class="kpis ap-kpis">'+
+   '<div class="kpi"><div class="lb">加權預期報酬</div><div class="vv"><span class="was">'+apPct(sN.mu*100)+' →</span> '+apPct(sT.mu*100)+'</div><small>風險值 '+apPct(sN.sd*100)+' → '+apPct(sT.sd*100)+'</small></div>'+
+   '<div class="kpi"><div class="lb">第一年理財收入</div><div class="vv"><span class="was">'+cfAxis(K.incNow)+' →</span> '+cfAxis(K.incT)+'</div><small>'+(K.incT-K.incNow>=0?'+':'−')+cfAxis(Math.abs(K.incT-K.incNow))+'／年（期初資產 × 報酬）</small></div>'+
+   '<div class="kpi"><div class="lb">'+N+' 年年化（最差～最好）</div><div class="vv">'+apPct(K.p10*100)+' <span class="was">～ '+apPct(K.p90*100)+'</span></div><small>P10 ～ P90；中位 '+apPct(K.p50*100)+'</small></div></div>'+
+   '<div class="hint ap-line">一句話：把 <b>'+cfAxis(inv)+'</b> 可投資資產從「'+ALLOC_POOLS.map(function(p,i){return p.name+' '+Math.round(K.wNow[i]*100)+'%'}).join('／')+'」調成「'+ALLOC_POOLS.map(function(p,i){return p.name+' '+V.target[i]+'%'}).join('／')+'」，每年理財收入約 <b>'+cfAxis(K.incT)+'</b>（'+(K.incT-K.incNow>=0?'多':'少')+' '+cfAxis(Math.abs(K.incT-K.incNow))+'）；'+N+' 年最差情境年化 <b'+(K.p10<0?' style="color:var(--danger)"':'')+'>'+apPct(K.p10*100)+'</b>，客戶要先接受這一行。</div></div></div>';
+ P.pcts=ALLOC_POOLS.map(function(p,i){var amt=inv*K.wT[i],mv=amt-K.np[i];return V.target[i]+'%<small>'+cfAxis(amt)+'　<span class="'+(mv>0.5?'ok':mv<-0.5?'warn':'')+'">'+(mv>0.5?'＋':mv<-0.5?'－':'')+(Math.abs(mv)>0.5?cfAxis(Math.abs(mv)):'不動')+'</span></small>'});
+ var R=K.ref;
+ if(!R)P.note='<b>風險屬性旁註</b>　尚未完成風險屬性測驗——到保障中心 KYC 分頁做完 12 題，這裡會貼出建議結構。';
+ else{var over=V.target[2]>R.mix[2]+5||(V.target[1]+V.target[2])>(R.mix[1]+R.mix[2])+10;
+  P.note='<b>風險屬性旁註</b>　本人 '+esc(R.me||'未測')+(R.sp?'・配偶 '+esc(R.sp):'')+'；'+(R.sp?'家庭共同資金以 <b>'+esc(R.tier)+(R.useSp?'（配偶，較保守）':'（本人）')+'</b> 為尺，':'')+'建議結構 '+ALLOC_POOLS.map(function(p,i){return p.name+' '+R.mix[i]+'%'}).join('／')+'。'+
+   (over?'<div class="warn" style="margin-top:4px">⚠ 目前目標的中高風險部位（'+(V.target[1]+V.target[2])+'%）超過屬性建議（'+(R.mix[1]+R.mix[2])+'%）——不擋，但要跟客戶講清楚最差情境那一行。</div>':'<div class="ok" style="margin-top:4px">✓ 目標結構在屬性承受範圍內。</div>');}
+ // 情境
+ var zs=[['最差 P10',-1.2816,0],['中位 P50',0,1],['最好 P90',1.2816,2]];
+ var rows=zs.map(function(z){var r=allocPctl(sT,N,z[1]),end=K.ser[z[2]][N],rN=allocPctl(sN,N,z[1]),endN=allocFV(inv,0,0,rN,N);
+  return '<tr><td>'+z[0]+'</td><td class="r">'+apPct(r*100)+'</td><td class="r">'+cfAxis(inv*(sT.mu+z[1]*sT.sd))+'</td><td class="r"><b>'+cfAxis(end)+'</b></td><td class="r dim">'+cfAxis(endN)+'</td></tr>'}).join('');
+ var tbl='<table class="rtable"><tr><th>情境</th><th class="r">'+N+' 年年化</th><th class="r">第一年理財收入</th><th class="r">期末資產（目標＋新投入）</th><th class="r">期末（現況不動）</th></tr>'+rows+'<tr><td class="hint" colspan="5">現況不動＝不改配置、不新增投入；差額就是這次配置＋投入的價值。</td></tr></table>';
+ var W=460,H=200,pad=48,mx=Math.max.apply(null,K.ser[2].concat(K.base))||1,A0=n(c.profile.age)||40;
+ var sx=function(y){return pad+(W-pad-8)*y/N},sy=function(v){return H-pad+(pad-8-(H-pad))*v/mx};
+ var band='M'+K.ser[2].map(function(v,y){return sx(y).toFixed(1)+','+sy(v).toFixed(1)}).join(' L')+' L'+K.ser[0].slice().reverse().map(function(v,i){return sx(N-i).toFixed(1)+','+sy(v).toFixed(1)}).join(' L')+' Z';
+ var line=function(a,col,dash){return '<polyline fill="none" stroke="'+col+'" stroke-width="2"'+(dash?' stroke-dasharray="5,4"':'')+' points="'+a.map(function(v,y){return sx(y).toFixed(1)+','+sy(v).toFixed(1)}).join(' ')+'"/>'};
+ var ticks='';for(var t=0;t<=4;t++){var v=mx*t/4;ticks+='<text x="'+(pad-4)+'" y="'+(sy(v)+4).toFixed(1)+'" text-anchor="end" font-size="10" fill="var(--mut2)">'+cfAxis(v)+'</text><line x1="'+pad+'" x2="'+(W-8)+'" y1="'+sy(v).toFixed(1)+'" y2="'+sy(v).toFixed(1)+'" stroke="var(--line)"/>'}
+ var xt='';[0,Math.round(N/2),N].forEach(function(y){xt+='<text x="'+sx(y).toFixed(1)+'" y="'+(H-pad+14)+'" text-anchor="middle" font-size="10" fill="var(--mut2)">'+(A0+y)+' 歲</text>'});
+ var fan='<svg class="ap-fan" viewBox="0 0 '+W+' '+H+'">'+ticks+xt+'<path d="'+band+'" fill="var(--amber)" opacity=".18"/>'+line(K.ser[1],'var(--amber2)')+line(K.base,'var(--mut2)',true)+'</svg>'+
+  '<div class="ap-band"><span style="color:var(--amber2)">— 目標配置（中位）</span>　<span style="color:var(--mut2)">╌ 現況不動（中位）</span>　<span style="background:var(--amber);opacity:.5;padding:0 6px"> </span> P10–P90 區間</div>';
+ var yr='<tr><th>年齡</th><th class="r">期初</th><th class="r">當年投入</th><th class="r">最差 P10</th><th class="r">中位 P50</th><th class="r">最好 P90</th></tr>';
+ for(var y=0;y<=N;y+=5){yr+='<tr'+(y>0&&y%10?' class="dim"':'')+'><td>'+(A0+y)+'</td><td class="r">'+cfAxis(K.ser[1][Math.max(0,y-1)])+'</td><td class="r">'+(y?cfAxis(K.dcaM*12):cfAxis(K.lumpT))+'</td><td class="r">'+cfAxis(K.ser[0][y])+'</td><td class="r"><b>'+cfAxis(K.ser[1][y])+'</b></td><td class="r">'+cfAxis(K.ser[2][y])+'</td></tr>'}
+ P.scen='<div class="ap-scen"><div>'+fan+'</div><div>'+tbl+'<div class="hint" style="margin-top:8px">每年理財收入＝期初可投資資產 × 當年報酬；表裡列的是「第一年」，之後隨資產長大。</div></div></div>'+
+  foldKeep('alloc:yearly','逐年期間表現（每 5 年）','',  '<div class="tw"><table class="rtable">'+yr+'</table></div>',false);
+ // 對照回全生涯財務流（真的跑投影：原本 vs 套用配置後）
+ var pb=projection(c),pa=projection(allocAfterCase(c));
+ P.cmp=flowTuneKpi(pb,pa).replace('id="tuneKpis"','id="allocKpis"')+'<div class="hint">投資報酬率 '+n(c.params.invReturn)+'% → '+apPct(sT.mu*100)+'、定期定額 '+fmt(K.dcaM)+'／月、單筆 '+cfAxis(K.lumpT)+'；'+(V.adoptedAt?'<span class="ok">已於 '+esc(V.adoptedAt)+' 採用（寫進規劃參數與調整動作）</span>':'尚未採用——目前的投影還是用原本的參數。')+'</div>';
+ P.K=K;return P;
+}
+function allocPaint(c){ // 拖曳中只換數字與圖，拉桿不動
+ var P=allocParts(c);var set=function(id,h){var el=document.getElementById(id);if(el)el.innerHTML=h};
+ set('allocHero',P.hero);P.pcts.forEach(function(h,i){set('allocPct_'+i,h)});set('allocRiskNote',P.note);set('allocScen',P.scen);set('allocCmp',P.cmp);
+}
+function allocPoolSec(c){
+ var P=allocParts(c),K=P.K,V=K.V;
+ var pools=ALLOC_POOLS.map(function(p,i){var A=(c.plan||{}).alloc,ro=A&&A.ret&&A.ret[i]!=null&&A.ret[i]!=='',so=A&&A.std&&A.std[i]!=null&&A.std[i]!=='';
+  return '<div class="ap-pool"><div class="nm"><i style="background:'+p.col+'"></i><span>'+p.name+'<small>'+esc(p.desc)+'</small></span></div>'+
+   '<input type="range" min="0" max="100" value="'+V.target[i]+'" oninput="allocSetTarget('+i+',this.value,true)" onchange="allocSetTarget('+i+',this.value)">'+
+   '<div class="pct" id="allocPct_'+i+'">'+P.pcts[i]+'</div>'+
+   '<div class="prm">報酬 <input value="'+V.ret[i]+'" title="'+(ro?'已覆寫（後台預設 '+p.ret+'%）':'後台預設')+'" onchange="allocSetParam(\'ret\','+i+',this.value)">% 風險 <input value="'+V.std[i]+'" title="'+(so?'已覆寫（後台預設 '+p.std+'%）':'後台預設')+'" onchange="allocSetParam(\'std\','+i+',this.value)">%</div></div>'}).join('');
+ var IG=null;try{IG=investGate(c)}catch(e){}
+ var inrow=function(kind,label,sub){return '<div class="ap-inrow"><div class="lb">'+label+'<small>'+sub+'</small></div>'+ALLOC_POOLS.map(function(p,i){return '<input type="text" inputmode="numeric" class="amtin" value="'+esc(amtFmt(V[kind][i]))+'" onchange="allocSetIn(\''+kind+'\','+i+',this.value)">'}).join('')+'<div class="tot">'+(kind==='dca'?fmt(K.dcaM)+'／月':fmt(K.lumpT))+'</div></div>'};
+ var mSave=Math.max(0,n(metrics(c).save)/12);
+ var room='月結餘約 '+fmt(mSave)+'／月'+(IG?'；可投資水位 '+cfAxis(Math.max(0,n(IG.investable)))+'（預備金已扣）':'')+'。';
+ return '<div id="allocSec">'+
+  '<div class="sec"><h4>資產配置 <span class="hint">把可投資資產放進四個風險池：現況是怎麼放的、目標要怎麼放、放完之後每年多多少、最差會多慘。不帶商品，只講結構。</span></h4><div id="allocHero">'+P.hero+'</div></div>'+
+  '<div class="sec"><h4>目標配置 <span class="hint">四根拉桿合計鎖 100%；每池的預期報酬與風險值是後台參數（可在這裡覆寫，覆寫的只影響這位客戶）。拉的時候圓餅、數字、情境即時變。</span></h4>'+pools+'<div class="ap-sidenote" id="allocRiskNote">'+P.note+'</div></div>'+
+  '<div class="sec"><h4>新投入 <span class="hint">定期定額（每月）與單筆分開算：定期定額是年金終值、單筆是複利終值。分配到哪個池就用那個池的報酬與風險。</span></h4>'+
+   '<div class="ap-inhead"><span></span>'+ALLOC_POOLS.map(function(p){return '<span>'+p.name+'</span>'}).join('')+'<span class="r">合計／月或次</span></div>'+
+   inrow('dca','定期定額','每月，元')+inrow('lump','單筆投入','一次，元')+
+   '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:13px"><span>投入年數 <input type="number" inputmode="decimal" value="'+V.years+'" onchange="allocSetYears(this.value)" style="width:60px"> 年 <span class="hint">預設到退休</span></span><span class="hint">'+room+'</span></div></div>'+
+  '<div class="sec"><h4>放完之後會怎樣 <span class="hint">三條線＝年化報酬的 P10／P50／P90（各池報酬與風險值加權，對數常態近似，各池視為完全相關＝保守）。不是蒙地卡羅，是結構算出來的區間。</span></h4><div id="allocScen">'+P.scen+'</div></div>'+
+  '<div class="sec"><h4>對照回全生涯財務流 <span class="hint">採用後：加權報酬與風險值寫進規劃參數（取代「投資報酬率」那一格），定期定額與單筆變成調整動作，整份進「存方案」。這三個數字就是方案頁頁首那三個。</span></h4><div id="allocCmp">'+P.cmp+'</div>'+
+   '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center"><button class="tbtn amber" onclick="allocAdopt()">採用這個配置 →</button><button class="tbtn ghost" onclick="allocReset()">回到現況</button><span class="hint">採用＝寫入，之後再按「存成方案」才會留下一組可比較的方案。</span></div></div>'+
+  '<div class="sec"><h4>資產歸池 <span class="hint">資產表每一筆多一欄「風險池」，留空＝依類別自動歸池（現金→投資池現金、可投資的定存／債券→低、基金→中、股票→高、自用與其他→不投資）；現金先扣預備金 '+cfAxis(K.reserve)+'。改這裡，上面的「現況」跟著變。</span></h4>'+
+   '<div class="tw"><table class="rtable"><tr><th>資產</th><th>類別</th><th class="r">帳面（台幣）</th><th>風險池</th><th class="r">進池金額</th></tr>'+
+   (c.assets||[]).map(function(a,i){var pk=assetPoolOf(c,a),v=pk==='none'?0:aVal(a);
+    return '<tr'+(pk==='none'?' class="dim"':'')+'><td>'+esc(a.name||'（未命名）')+'</td><td>'+esc(a.mainCat||'')+'・'+esc(a.type||'')+'</td><td class="r">'+fmt(aVal(a))+'</td><td><select onchange="set(\'assets:'+i+'\',\'pool\',this.value);render()">'+ALLOC_POOL_OPTS.map(function(o){return '<option value="'+o+'"'+((a.pool||'')===o?' selected':'')+'>'+(o||'（自動：'+({low:'低風險',mid:'中度風險',high:'高度風險',cash:'投資池現金',none:'不投資'}[pk])+'）')+'</option>'}).join('')+'</select></td><td class="r">'+(v?fmt(v):'—')+'</td></tr>'}).join('')+
+   (c.assets&&c.assets.length?'':'<tr><td colspan="5" class="muted">資產表還是空的——先到「收支資債」登錄資產。</td></tr>')+'</table></div></div>'+
+  '</div>';
+}
 function allocSecHTML(c){
  var d=planDraft(c);
  var rec=allocReconcile(c,d);
@@ -10809,7 +11019,7 @@ function planSec(c){
   foldSec('拉桿與處方（v1 診斷）','六根槓桿的反解、該解什麼、三個處方 — 保留作為量體參考',
     soloHTML(c,solo)+rxCardsHTML(c,rxs)+gapHeroHTML(c,led,gate))+
   foldSec('缺口組成與即時缺口','缺口是哪些支出造成的，另有保障與預備金要補',gapDetailHTML(c,led))+
-  foldSec('建議資產配置','投資型與保障型的配置與對帳',allocSecHTML(c))+
+  foldSec('資產配置','四池：現況→目標、新投入、情境、對照回財務流（2026/10/28 取代投資型／保障型手填表）',allocPoolSec(c))+
   foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>')+
   foldSec('真實追蹤','逐年實際淨資產疊到規劃線（有流程時在 S8 回訪對帳裡對帳）',trackingSec(c));
  // 2026/09/28 Ray：方案最上面用「全生涯財務流」開頭（同分析頁那張圖），缺口從這裡抓；願景歷程收進折疊第一格。
@@ -13284,7 +13494,7 @@ function inflowTimelineSVG(c,ev,theme){
 }
 function fmtShort(v){v=Math.round(v);if(Math.abs(v)>=1e8)return (v/1e8).toFixed(1).replace(/\.0$/,'')+' 億';if(Math.abs(v)>=1e4)return Math.round(v/1e4)+' 萬';return fmt(v)}
 function assetsSec(c){
- var tbl=groupedTable(c,'資產','assets',c.assets,[['name','名稱','text'],['owner','持有人','memsel'],['mainCat','主分類','sel:自用資產,可投資資產'],['type','次分類','sel:現金,定存,股票,基金,債券,不動產,其他'],['cls','流動性','sel:流動,固定'],['region','地區','sel:台灣,美國,韓國,其他海外'],['currency','幣別','sel:台幣,美金,人民幣,日圓,港幣,其他'],['fxRate','匯率','num'],['cost','購入價(原幣)','money'],['value','現值(原幣)','money'],['ret','報酬率%','num'],['income','被動現金流(原幣/年)','money'],['movable','可變動','bool']],'owner',aVal,'依持有人分組、小計為台幣現值；現值/購入價/被動現金流以原幣輸入，依匯率換算統計。');
+ var tbl=groupedTable(c,'資產','assets',c.assets,[['name','名稱','text'],['owner','持有人','memsel'],['mainCat','主分類','sel:自用資產,可投資資產'],['type','次分類','sel:現金,定存,股票,基金,債券,不動產,其他'],['cls','流動性','sel:流動,固定'],['region','地區','sel:台灣,美國,韓國,其他海外'],['currency','幣別','sel:台幣,美金,人民幣,日圓,港幣,其他'],['fxRate','匯率','num'],['cost','購入價(原幣)','money'],['value','現值(原幣)','money'],['ret','報酬率%','num'],['income','被動現金流(原幣/年)','money'],['movable','可變動','bool'],['pool','風險池','sel:,低風險,中度風險,高度風險,投資池現金,不投資']],'owner',aVal,'依持有人分組、小計為台幣現值；現值/購入價/被動現金流以原幣輸入，依匯率換算統計。');
  var tot=sum(c.assets,function(a){return aVal(a)}),liq=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0});
  var pnl=sum(c.assets,function(a){return (n(a.value)-n(a.cost))*(n(a.fxRate)||1)});
  var pas=assetPassive(c);
@@ -18006,6 +18216,15 @@ function rGauge(t,v){v=Math.max(0,Math.min(100,v));var col=v>=70?'#6f8f74':v>=40
   '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="4" fill="#0d2b45"/></svg>'+
   '<div style="font-size:22px;font-weight:800;color:'+col+'">'+Math.round(v)+'<span style="font-size:12px;color:#5a6b72"> 分</span></div></div>';}
 function rBars(items){return items.map(function(it){var v=Math.max(0,Math.min(100,it.val));return '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#33474e"><span>'+it.label+'</span><span>'+Math.round(v)+'%</span></div><div style="height:8px;background:#e2e8ea;border-radius:5px;overflow:hidden"><div style="height:100%;width:'+v+'%;background:'+(it.color||'#6f8f74')+'"></div></div></div>'}).join('')}
+/* 2026/10/28 C 批：報告書配置章改讀四池（採用過才印）；沒有就退回舊的 allocations 表 */
+function rAllocHTML(c,al,allocRep){
+ var V=allocView(c);
+ if(V.adoptedAt){var K=allocCalc(c),pie=function(w,t){return '<div style="text-align:center"><div style="font-size:12px;color:#5a6b72">'+t+'</div>'+rPie(ALLOC_POOLS.map(function(p,i){return {name:p.name,pct:+(w[i]*100).toFixed(1)}}))+'</div>'};
+  return '<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">資產配置（四池）</div><div style="display:flex;gap:18px;justify-content:center;flex-wrap:wrap">'+pie(K.wNow,'現況')+pie(K.wT,'目標')+'</div>'+
+   '<table style="margin-top:10px"><tr><th>池</th><th>現況</th><th>目標</th><th>預期報酬</th><th>風險值</th></tr>'+ALLOC_POOLS.map(function(p,i){return '<tr><td>'+p.name+'</td><td>'+(K.wNow[i]*100).toFixed(1)+'%</td><td>'+V.target[i]+'%</td><td>'+V.ret[i]+'%</td><td>'+V.std[i]+'%</td></tr>'}).join('')+'</table>'+
+   '<p style="color:#33474e;margin-top:6px">加權預期報酬 <b>'+apPct(K.sT.mu*100)+'</b>、風險值 '+apPct(K.sT.sd*100)+'；'+K.N+' 年年化最差～最好 <b>'+apPct(K.p10*100)+' ～ '+apPct(K.p90*100)+'</b>（P10～P90）。第一年理財收入約 <b>'+fmt(K.incT)+'</b> 元'+(K.dcaM||K.lumpT?'；新投入 定期定額 '+fmt(K.dcaM)+' 元／月、單筆 '+fmt(K.lumpT)+' 元':'')+'。採用日 '+esc(V.adoptedAt)+'。</p>';}
+ return (al.list.filter(function(x){return n(x.pct)>0}).length?'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">實際規劃配置</div>'+rPie(al.list)+'<table style="margin-top:10px"><tr><th>標的</th><th>比例</th><th>預期報酬</th><th>效益</th></tr>'+allocRep+'</table><p style="color:#33474e;margin-top:6px">加權預期報酬約 <b>'+al.wRet.toFixed(1)+'%</b>。</p>':'<p style="color:#5a6b72">尚未設定實際配置方案。</p>');
+}
 function rPie(list){list=(list||[]).filter(function(x){return n(x.pct)>0});if(!list.length)return '<p style="color:#5a6b72">—</p>';
  var tot=sum(list,function(x){return n(x.pct)})||1,cx=80,cy=80,rr=72,acc=0;
  var segs=list.map(function(x,i){var frac=n(x.pct)/tot,a0=acc*2*Math.PI-Math.PI/2;acc+=frac;var a1=acc*2*Math.PI-Math.PI/2;var large=frac>0.5?1:0;
@@ -18690,7 +18909,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
 
   '<h2>§、投資風險屬性與建議配置</h2>'+(function(){var rp=riskProfile(c);if(!rp)return '<p style="color:#5a6b72">尚未完成風險屬性測驗；建議先於「風險屬性」分頁完成 12 題 KYC 評估。</p>';var t=rp.tier;return '<p style="color:#33474e">依 KYC 測驗（'+rp.score+' / 60 分）評定為 <b style="color:'+t.color+'">'+t.name+'（'+t.en+'）</b>。'+esc(t.desc)+' 對應建議投資報酬率約 <b>'+t.rr+'%</b>、報酬波動度約 '+t.std+'%。配置方向：'+esc(t.alloc)+'</p>';})()+
   (function(){var rpS=riskHasSpouse(c)?riskProfile(c,'spouse'):null;if(!rpS)return '';var t=rpS.tier,sp=spouseMember(c);return '<p style="color:#33474e">配偶'+(sp&&sp.name?'（'+esc(sp.name)+'）':'')+'依 KYC 測驗（'+rpS.score+' / 60 分）評定為 <b style="color:'+t.color+'">'+t.name+'（'+t.en+'）</b>。規劃參數以本人屬性為準；兩人屬性不同時，共同資金的配置以較保守的一側解讀。</p>';})()+
-   (al.list.filter(function(x){return n(x.pct)>0}).length?'<div style="color:#0d2b45;font-weight:700;font-size:13px;margin:12px 0 4px">實際規劃配置</div>'+rPie(al.list)+'<table style="margin-top:10px"><tr><th>標的</th><th>比例</th><th>預期報酬</th><th>效益</th></tr>'+allocRep+'</table><p style="color:#33474e;margin-top:6px">加權預期報酬約 <b>'+al.wRet.toFixed(1)+'%</b>。</p>':'<p style="color:#5a6b72">尚未設定實際配置方案。</p>')+
+   rAllocHTML(c,al,allocRep)+
 
   '<h2>§、其他規劃面向</h2>'+(rOtherAspects(c)||'<p style="color:#5a6b72">職涯、婚姻、信用與海外資產這幾項本次沒有需要特別處理的內容。</p>')+
 

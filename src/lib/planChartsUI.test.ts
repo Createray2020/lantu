@@ -163,7 +163,8 @@ describe("版面（v2）：首屏必須是圖，不是報表", () => {
     const h = pane();
     const firstFold = h.indexOf("<details");
     // 方案比較 2026/10/27 升到頁首（trialsHTML），不在折疊裡——見下一支測試
-    ["一生願景需要的資金", "缺口改善", "開開看", "該解什麼", "三個處方", "曲線掉到零線以下", "配置與對帳"].forEach((t) => {
+    // 「配置與對帳」2026/10/28 由四池資產配置台取代（allocUI.test）
+    ["一生願景需要的資金", "缺口改善", "開開看", "該解什麼", "三個處方", "曲線掉到零線以下", "四池：現況→目標"].forEach((t) => {
       const i = h.indexOf(t);
       expect(i, t + " 不該消失").toBeGreaterThan(0);
       expect(i, t + " 應該在收合區裡").toBeGreaterThan(firstFold);
@@ -237,51 +238,9 @@ describe("版面（v2）：首屏必須是圖，不是報表", () => {
 });
 
 describe("配置表的按鈕真的接得上（不是繞過按鈕直接呼叫函式）", () => {
-  const secOf = (title: string) => {
-    const h = [...w.document.querySelectorAll("h4")].find((e: Element) => (e.textContent || "").includes(title));
-    return h ? h.closest(".sec") : null;
-  };
 
-  it("兩張表的「＋ 新增」按鈕，按下去真的會多一列", () => {
-    w.app.dataTab = "plan"; w.render();
-    const c = cur();
-    ([["投資型配置", "invest"], ["保障型配置", "protect"]] as [string, string][]).forEach(([title, key]) => {
-      const sec = secOf(title);
-      expect(sec, title + " 這一區塊要存在").toBeTruthy();
-      const btn = sec!.querySelector("button.add") as HTMLElement;
-      expect(btn, title + " 要有新增鈕").toBeTruthy();
-      const before = (c.plan[key] || []).length;
-      // 直接執行按鈕上掛的那段字串——鍵名對不上的話這裡就會爆或沒有效果
-      w.eval(btn.getAttribute("onclick") as string);
-      expect((cur().plan[key] || []).length, title + " 應該多一列").toBe(before + 1);
-    });
-  });
-
-  it("表格欄位的 onchange 寫得進 c.plan 底下的陣列", () => {
-    w.app.dataTab = "plan"; w.render();
-    const sec = secOf("投資型配置")!;
-    const inputs = sec.querySelectorAll("input, select");
-    expect(inputs.length).toBeGreaterThan(0);
-    // 找「每年投入」那一欄（money 欄位帶 data-money）
-    const row0 = sec.querySelectorAll("table tr")[1];
-    const cells = row0.querySelectorAll("input");
-    expect(cells.length).toBeGreaterThan(2);
-    const oc = (cells[2] as HTMLElement).getAttribute("onchange") as string;
-    expect(oc).toContain("planInvest:");        // ⚠️ 鍵名必須是 PLAN_ARRS 認得的那一個
-    expect(() => w.eval(oc.replace(/this\.value/g, "'12345'"))).not.toThrow();
-  });
-
-  it("刪除鈕刪的是 c.plan 底下那一列，不是頂層陣列", () => {
-    w.app.dataTab = "plan"; w.render();
-    const c = cur();
-    const before = (c.plan.invest || []).length;
-    expect(before).toBeGreaterThan(0);
-    const sec = secOf("投資型配置")!;
-    const del = sec.querySelector("button.del") as HTMLElement;
-    w.eval(del.getAttribute("onclick") as string);
-    expect((cur().plan.invest || []).length).toBe(before - 1);
-  });
-
+  // 2026/10/28 C 批：方案頁的「投資型配置／保障型配置」兩張手填表由四池資產配置台取代（allocUI.test），
+  // 舊的 PLAN_ARRS 範本仍在（舊資料相容），只守 addRow。
   it("PLAN_ARRS 的每一個鍵都要有 addRow 範本，否則按鈕會靜靜地沒反應", () => {
     Object.keys(w.PLAN_ARRS).forEach((k) => {
       w.app.dataTab = "plan"; w.render();
@@ -393,11 +352,12 @@ describe("拉桿要能當場改變上面的數字（用真的拉桿，不呼叫�
 
   it("六根拉桿都能透過真實事件寫進 draft", () => {
     w.clearDraft(); w.app.dataTab = "plan"; w.render();
-    const ranges = w.document.querySelectorAll('input[type=range]');
+    const notAlloc = (el: Element) => !el.closest("#allocSec");   // 資產配置台的四根池拉桿不算
+    const ranges = [...w.document.querySelectorAll('input[type=range]')].filter(notAlloc);
     expect(ranges.length).toBe(w.LEVERS.length);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     w.LEVERS.forEach((L: any, i: number) => {
-      const r = w.document.querySelectorAll('input[type=range]')[i] as HTMLInputElement;
+      const r = [...w.document.querySelectorAll('input[type=range]')].filter(notAlloc)[i] as HTMLInputElement;
       if (r.disabled) return;                  // 階段閘門鎖住的那根跳過
       const mid = (Number(r.min) + Number(r.max)) / 2;
       r.value = String(mid);

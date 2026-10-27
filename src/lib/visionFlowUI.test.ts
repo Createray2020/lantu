@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 const cur = () => w.app.cases[0];
 const pane = () => w.document.querySelector("#app").innerHTML as string;
-const v2Folds = ["缺口配額對帳", "調整動作清單", "資金勾稽", "動作流程", "拉桿與處方", "缺口組成與即時缺口", "建議資產配置", "其他方案參數", "真實追蹤", "願景歷程"];
+const v2Folds = ["缺口配額對帳", "調整動作清單", "資金勾稽", "動作流程", "拉桿與處方", "缺口組成與即時缺口", "資產配置", "其他方案參數", "真實追蹤", "願景歷程"];
 
 describe("TS 鏡射與 HTML 一致", () => {
   it("步驟常數兩邊一樣", () => {

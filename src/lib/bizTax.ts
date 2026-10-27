@@ -158,6 +158,17 @@ export const CAP_VISION_CUT = 100;
 /** 啟程期(C) 的報酬率上限，比一般更保守。 */
 export const CAP_RATE_STARTER = 6;
 
+// ── 資產配置四池（2026/10/28 C 批）──
+// 預期報酬與風險值（年化標準差）％；各風險屬性的建議比例（低／中／高，投資池現金＝餘數）。
+export const POOL_LOW_RET = 2.5;  export const POOL_LOW_STD = 4;
+export const POOL_MID_RET = 5;    export const POOL_MID_STD = 10;
+export const POOL_HIGH_RET = 8;   export const POOL_HIGH_STD = 18;
+export const POOL_CASH_RET = 1;   export const POOL_CASH_STD = 0;
+export const MIX_T1 = [70, 20, 0] as const;   // 保守型
+export const MIX_T2 = [40, 40, 10] as const;  // 穩健型
+export const MIX_T3 = [20, 45, 30] as const;  // 積極型
+export const MIX_T4 = [10, 40, 45] as const;  // 進取型
+
 // ── 保單健檢參數 ──
 // insure80 的健檢只有「偏低／偏高／適中」三值，但沒有公布寬容帶。
 // 實測它 11.1 萬 vs 12 萬（差 7.5%）判「適中」，所以它是有帶的；我們把它明寫成可治理的參數。

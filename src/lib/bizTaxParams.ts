@@ -19,6 +19,7 @@ import {
   QUAKE_BASIC_SUM, QUAKE_LODGING, PROP_PING_COST, PROP_BUILDING_RATIO,
   CAR_LIAB_BODILY, CAR_LIAB_PROPERTY, CALI_DEATH, CALI_MEDICAL,
   EMPLOYER_COMP_MONTHS,
+  POOL_LOW_RET, POOL_LOW_STD, POOL_MID_RET, POOL_MID_STD, POOL_HIGH_RET, POOL_HIGH_STD, POOL_CASH_RET, POOL_CASH_STD, MIX_T1, MIX_T2, MIX_T3, MIX_T4
 } from "./bizTax";
 
 export const BIZ_TAX_TAG = "biz-tax";
@@ -62,6 +63,27 @@ const seed: Omit<BizTaxRow, "sortOrder">[] = [
   { key: "CAP_RETIRE_DELAY", label: "延後退休上限（年）", grp: "規劃求解", unit: "num", value: CAP_RETIRE_DELAY, basis: BIZ_TAX_BASIS, note: "" },
   { key: "CAP_RETIRE_CUT", label: "退休生活水準可調降上限（%）", grp: "規劃求解", unit: "num", value: CAP_RETIRE_CUT, basis: BIZ_TAX_BASIS, note: "" },
   { key: "CAP_VISION_CUT", label: "願景下修上限（%）", grp: "規劃求解", unit: "num", value: CAP_VISION_CUT, basis: BIZ_TAX_BASIS, note: "100 ＝ 一路走到每一項的「金額(最低)」" },
+  // 資產配置四池（2026/10/28）：各池預期報酬與風險值、各風險屬性建議比例（現金＝餘數）。
+  { key: "POOL_LOW_RET", label: "資產配置 低風險 預期報酬（%）", grp: "資產配置", unit: "num", value: POOL_LOW_RET, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "POOL_LOW_STD", label: "資產配置 低風險 風險值（年化標準差 %）", grp: "資產配置", unit: "num", value: POOL_LOW_STD, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "POOL_MID_RET", label: "資產配置 中度風險 預期報酬（%）", grp: "資產配置", unit: "num", value: POOL_MID_RET, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "POOL_MID_STD", label: "資產配置 中度風險 風險值（年化標準差 %）", grp: "資產配置", unit: "num", value: POOL_MID_STD, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "POOL_HIGH_RET", label: "資產配置 高度風險 預期報酬（%）", grp: "資產配置", unit: "num", value: POOL_HIGH_RET, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "POOL_HIGH_STD", label: "資產配置 高度風險 風險值（年化標準差 %）", grp: "資產配置", unit: "num", value: POOL_HIGH_STD, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "POOL_CASH_RET", label: "資產配置 投資池現金 預期報酬（%）", grp: "資產配置", unit: "num", value: POOL_CASH_RET, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "POOL_CASH_STD", label: "資產配置 投資池現金 風險值（年化標準差 %）", grp: "資產配置", unit: "num", value: POOL_CASH_STD, basis: BIZ_TAX_BASIS, note: "" },
+  { key: "MIX_T1_LOW", label: "保守型 建議 低風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T1[0], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T1_MID", label: "保守型 建議 中風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T1[1], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T1_HIGH", label: "保守型 建議 高風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T1[2], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T2_LOW", label: "穩健型 建議 低風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T2[0], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T2_MID", label: "穩健型 建議 中風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T2[1], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T2_HIGH", label: "穩健型 建議 高風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T2[2], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T3_LOW", label: "積極型 建議 低風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T3[0], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T3_MID", label: "積極型 建議 中風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T3[1], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T3_HIGH", label: "積極型 建議 高風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T3[2], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T4_LOW", label: "進取型 建議 低風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T4[0], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T4_MID", label: "進取型 建議 中風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T4[1], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
+  { key: "MIX_T4_HIGH", label: "進取型 建議 高風險比例（%）", grp: "資產配置", unit: "num", value: MIX_T4[2], basis: BIZ_TAX_BASIS, note: "投資池現金＝100 減三者" },
   // 保單健檢：HAVE vs NEED 的判定門檻與理財金三角比例。同樣用 "num"（純數值百分比）。
   { key: "CHECKUP_BAND", label: "健檢「適中」寬容帶（%）", grp: "保單健檢", unit: "num", value: CHECKUP_BAND, basis: BIZ_TAX_BASIS, note: "|HAVE−NEED|÷NEED 在此帶內判「適中」；設 0 ＝ 只要不相等就判偏高/偏低" },
   { key: "TRIANGLE_RISK", label: "理財金三角：保障型佔年收入（%）", grp: "保單健檢", unit: "num", value: TRIANGLE_RISK, basis: BIZ_TAX_BASIS, note: "保費需求的分母，6:3:1 的 1" },

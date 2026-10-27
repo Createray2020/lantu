@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>資產配置台 · 四池 原型</title>
+<style>
+:root{
+ --bg:#081a2b;--panel:#0d2b45;--card:#12334f;--card2:#17406a;
+ --field:#0a1a2b;--line:#1c3a58;--line2:#2a4d73;
+ --tx:#eef2f7;--mut:#a9bccf;--mut2:#8296ab;
+ --amber:#c99a5b;--amber2:#e0bd8b;--onbrand:#08202a;
+ --teal:#8fbfc8;--blue:#8fb8ff;
+ --ok:#8fc0a3;--warn:#e08a68;--danger:#ff9d9f;
+ --p1:#6f9fb8;--p2:#c99a5b;--p3:#d97b6b;--p0:#8fa3b3;--pn:#2a4d73;
+ --serif:"Noto Serif TC","Songti TC","PingFang TC",serif;--r:12px;--sh:0,0,0;
+}
+:root[data-theme="light"]{
+ --bg:#f4f6f8;--panel:#ffffff;--card:#eaeef3;--card2:#dfe6ee;
+ --field:#fbfcfd;--line:#e3e8ee;--line2:#c9d2dc;
+ --tx:#14212e;--mut:#4a5c6e;--mut2:#5c6c7a;
+ --amber:#8a6220;--amber2:#7d5415;--onbrand:#ffffff;
+ --teal:#2a6f7a;--blue:#2c6fb5;
+ --ok:#2a7050;--warn:#915a12;--danger:#c0362f;
+ --p1:#3f7a9a;--p2:#9a6f22;--p3:#b8503f;--p0:#6b7f90;--pn:#c9d2dc;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6;font-size:14px}
+.wrap{max-width:1080px;margin:0 auto;padding:18px 16px 90px}
+.tbtn{background:var(--card);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.tbtn:hover{background:var(--card2)}.tbtn.amber{background:var(--amber);color:var(--onbrand);border-color:var(--amber)}.tbtn.ghost{background:transparent}.tbtn.sm{padding:4px 10px;font-size:12px}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(var(--sh),.22)}
+.sec h4{font-size:15px;font-weight:700;margin:0 0 10px;color:var(--amber);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sec h4 .hint{flex:1 0 100%;margin-top:2px}
+.hint{font-size:12px;font-weight:400;color:var(--mut2);line-height:1.6}
+.muted{color:var(--mut2)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--danger)}
+.num{font-family:var(--serif);font-variant-numeric:tabular-nums}
+.proto{position:sticky;top:0;z-index:9;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.proto b{font-size:12px;color:var(--mut);letter-spacing:.07em}.proto .sp{flex:1}
+.hero{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}
+@media(max-width:860px){.hero{grid-template-columns:1fr}}
+.pies{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pie{text-align:center}.pie .t{font-size:12px;color:var(--mut);margin-bottom:4px;letter-spacing:.06em}
+.pie .v{font-family:var(--serif);font-size:15px;font-weight:700}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin-top:8px}.legend span{display:inline-flex;align-items:center;gap:5px}.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;border-top:3px solid var(--amber)}
+.kpi .lb{font-size:11px;color:var(--mut);letter-spacing:.06em}.kpi .vv{font-family:var(--serif);font-size:22px;font-weight:700;line-height:1.2;margin-top:2px}
+.kpi .was{font-size:13px;color:var(--mut2);font-weight:400}.kpi small{display:block;font-size:11px;color:var(--mut2);margin-top:3px}
+.pool{display:grid;grid-template-columns:150px 1fr 110px 230px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.pool:last-child{border-bottom:0}
+.pool .nm{font-weight:700;display:flex;align-items:center;gap:7px}.pool .nm i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.pool .nm small{display:block;font-weight:400;font-size:11px;color:var(--mut2)}
+.pool input[type=range]{width:100%;accent-color:var(--amber)}
+.pool .pct{font-family:var(--serif);font-size:20px;font-weight:700;text-align:right}.pool .pct small{font-size:11px;color:var(--mut2);font-weight:400;display:block}
+.pool .prm{display:flex;gap:6px;align-items:center;font-size:12px;white-space:nowrap}.pool .prm input{width:52px;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:3px 5px;font-size:12px;text-align:right}
+@media(max-width:860px){.pool{grid-template-columns:1fr 1fr}.pool .nm{grid-column:1/3}}
+.sidenote{background:var(--card);border-left:3px solid var(--teal);border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px}
+.sidenote b{color:var(--teal)}
+.inrow{display:grid;grid-template-columns:150px repeat(4,1fr) 90px;gap:8px;align-items:center;padding:6px 0;font-size:13px}
+.inrow input{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:5px 7px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.inrow .lb{font-weight:700}.inrow .lb small{display:block;font-weight:400;font-size:11px;color:var(--mut2)}
+.inrow .tot{text-align:right;font-family:var(--serif);font-weight:700}
+.inhead{display:grid;grid-template-columns:150px repeat(4,1fr) 90px;gap:8px;font-size:11px;color:var(--mut2);letter-spacing:.05em;padding-bottom:4px;border-bottom:1px solid var(--line)}
+@media(max-width:860px){.inrow,.inhead{grid-template-columns:1fr 1fr 1fr}.inrow .lb{grid-column:1/4}}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}th{font-size:11px;color:var(--mut2);letter-spacing:.05em;font-weight:600}td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+tr.dim td{color:var(--mut2)}
+.scen{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:860px){.scen{grid-template-columns:1fr}}
+.band{font-size:12px;color:var(--mut2)}
+.fan{width:100%;height:auto}
+.cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}@media(max-width:860px){.cmp{grid-template-columns:1fr}}
+details.fold{border:1px solid var(--line);border-radius:10px;padding:0 14px;margin-top:10px;background:var(--card)}
+details.fold>summary{cursor:pointer;padding:10px 0;font-weight:700;color:var(--amber2);list-style:none}
+details.fold>summary::before{content:"▸ ";color:var(--mut2)}details.fold[open]>summary::before{content:"▾ "}
+details.fold .body{padding:4px 0 12px}
+select{background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:4px 6px;font-size:12px}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--line2);color:var(--mut)}
+.chip.on{border-color:var(--amber);color:var(--amber2)}
+.modal{position:fixed;inset:0;background:rgba(4,14,24,.62);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
+.modal.on{display:flex}.modal .box{max-width:520px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+.modal h3{margin:0 0 8px;font-family:var(--serif);font-size:18px}
+.modal li{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="proto"><b>原型 · 資產配置台（四池）</b><span class="hint">方案頁「建議資產配置」折疊的替代品。數字是示範客戶，拉桿與輸入都能動。</span><span class="sp"></span>
+ <button class="tbtn sm" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">深／淺</button></div>
+<div class="wrap">
+
+<!-- ① 頁首：一句話結論 ＋ 三個數字 -->
+<div class="sec" id="hero">
+ <h4>資產配置 <span class="hint">把可投資資產放進四個風險池：現況是怎麼放的、目標要怎麼放、放完之後每年多多少、最差會多慘。不帶商品，只講結構。</span></h4>
+ <div class="hero">
+  <div class="pies">
+   <div class="pie"><div class="t">現況（歸池）</div><div id="pieNow"></div><div class="v" id="pieNowV"></div></div>
+   <div class="pie"><div class="t">目標配置</div><div id="pieTgt"></div><div class="v" id="pieTgtV"></div></div>
+   <div class="legend" style="grid-column:1/3" id="legend"></div>
+  </div>
+  <div>
+   <div class="kpis" id="kpis"></div>
+   <div class="hint" style="margin-top:10px" id="heroLine"></div>
+  </div>
+ </div>
+</div>
+
+<!-- ② 目標比例拉桿 -->
+<div class="sec">
+ <h4>目標配置 <span class="hint">四根拉桿合計鎖 100%；每池的預期報酬與風險值是後台參數（可在這裡覆寫，覆寫的只影響這位客戶）。拉的時候上面的圓餅、數字、下面的情境即時變。</span></h4>
+ <div id="pools"></div>
+ <div class="sidenote" id="riskNote"></div>
+</div>
+
+<!-- ③ 新投入 -->
+<div class="sec">
+ <h4>新投入 <span class="hint">定期定額（每月）與單筆分開算：定期定額是年金終值、單筆是複利終值。分配到哪個池就用那個池的報酬與風險。</span></h4>
+ <div class="inhead"><span></span><span>低風險</span><span>中度風險</span><span>高度風險</span><span>投資池現金</span><span class="r">合計／月或次</span></div>
+ <div class="inrow"><div class="lb">定期定額<small>每月，元</small></div>
+  <input data-dca="0" value="5,000"><input data-dca="1" value="8,000"><input data-dca="2" value="2,000"><input data-dca="3" value="0"><div class="tot" id="dcaTot"></div></div>
+ <div class="inrow"><div class="lb">單筆投入<small>一次，元</small></div>
+  <input data-lump="0" value="0"><input data-lump="1" value="500,000"><input data-lump="2" value="0"><input data-lump="3" value="0"><div class="tot" id="lumpTot"></div></div>
+ <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:13px">
+  <span>投入年數 <input id="years" value="25" style="width:50px;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:3px 5px;text-align:right"> 年 <span class="hint">預設到退休（65 歲）</span></span>
+  <span class="hint" id="roomNote"></span>
+ </div>
+</div>
+
+<!-- ④ 情境 -->
+<div class="sec">
+ <h4>放完之後會怎樣 <span class="hint">三條線＝年化報酬的 P10／P50／P90（各池報酬與風險值加權，對數常態近似，各池視為完全相關＝保守）。不是蒙地卡羅，是結構算出來的區間。</span></h4>
+ <div class="scen">
+  <div>
+   <div id="fan"></div>
+   <div class="band" id="fanNote"></div>
+  </div>
+  <div>
+   <table id="scenTbl"></table>
+   <div class="hint" style="margin-top:8px">每年理財收入＝期初可投資資產 × 當年報酬；表裡列的是「第一年」，之後隨資產長大。</div>
+  </div>
+ </div>
+ <details class="fold"><summary>逐年期間表現（每 5 年）</summary><div class="body"><table id="yearTbl"></table></div></details>
+</div>
+
+<!-- ⑤ 對照回全生涯財務流 -->
+<div class="sec">
+ <h4>對照回全生涯財務流 <span class="hint">採用後：加權報酬與風險值寫進規劃參數（取代「投資報酬率 5%」那一格），定期定額與單筆變成調整動作，整份進「存方案」。這三個數字就是方案頁頁首那三個。</span></h4>
+ <div class="cmp" id="cmp"></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center">
+  <button class="tbtn amber" onclick="document.getElementById('m').classList.add('on')">採用這個配置 →</button>
+  <button class="tbtn ghost">回到現況</button>
+  <span class="hint">採用＝寫入，之後再按「存成方案」才會留下一組可比較的方案。</span>
+ </div>
+</div>
+
+<!-- ⑥ 歸池表 -->
+<div class="sec">
+ <h4>資產歸池 <span class="hint">資產表每一筆多一欄「風險池」。現金類預設「投資池現金」但先扣掉預備金（6 個月支出＝48 萬）；自用房、車是「不投資」，不進圓餅。改這裡，上面的「現況」跟著變。</span></h4>
+ <table id="assetTbl"></table>
+</div>
+
+</div>
+
+<div class="modal" id="m" onclick="if(event.target===this)this.classList.remove('on')"><div class="box">
+ <h3>採用這個配置</h3>
+ <div class="hint" style="margin-bottom:10px">會寫入這一份規劃：</div>
+ <ul id="mList" style="margin:0 0 12px 18px;font-size:13px"></ul>
+ <div class="hint">報告書「投資風險屬性與建議配置」章會印現況／目標兩張圓餅、情境表與這一句理財收入。</div>
+ <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="tbtn ghost" onclick="document.getElementById('m').classList.remove('on')">取消</button><button class="tbtn amber" onclick="document.getElementById('m').classList.remove('on')">寫入</button></div>
+</div></div>
+
+<script>
+/* ====== 後台參數（草案）====== */
+var POOLS=[
+ {k:'low', name:'低風險',   desc:'定存、債券、貨幣型',      ret:2.5, std:4,  col:'var(--p1)'},
+ {k:'mid', name:'中度風險', desc:'平衡型、指數型、績優股',   ret:5,   std:10, col:'var(--p2)'},
+ {k:'high',name:'高度風險', desc:'個股、產業型、另類',       ret:8,   std:18, col:'var(--p3)'},
+ {k:'cash',name:'投資池現金',desc:'等著進場的錢，併在現金裡', ret:1,   std:0,  col:'var(--p0)'}
+];
+var TIER_MIX={ '保守型':[70,20,0,10], '穩健型':[40,40,10,10], '積極型':[20,45,30,5], '進取型':[10,40,45,5] };
+var RISK={self:'穩健型',spouse:'保守型'};
+var RESERVE=480000;   // 預備金 6 個月 × 8 萬
+
+/* ====== 示範客戶資產（歸池）====== */
+var ASSETS=[
+ {name:'活存（含薪轉）',cat:'現金',val:1800000,pool:'cash',reserve:true},
+ {name:'定存',cat:'定存',val:1000000,pool:'low'},
+ {name:'債券基金',cat:'基金',val:1500000,pool:'low'},
+ {name:'股票型基金',cat:'基金',val:2000000,pool:'mid'},
+ {name:'台股 ETF',cat:'ETF',val:800000,pool:'mid'},
+ {name:'個股',cat:'股票',val:1200000,pool:'high'},
+ {name:'自用住宅',cat:'不動產',val:15000000,pool:'none'},
+ {name:'自用車',cat:'車輛',val:600000,pool:'none'}
+];
+var S={target:[35,40,15,10],ret:POOLS.map(function(p){return p.ret}),std:POOLS.map(function(p){return p.std}),dca:[5000,8000,2000,0],lump:[0,500000,0,0],years:25};
+
+function n(v){v=parseFloat(String(v).replace(/,/g,''));return isFinite(v)?v:0}
+function fmt(v){return Math.round(v).toLocaleString('en-US')}
+function wan(v){var a=Math.abs(v);if(a>=1e8)return (v/1e8).toFixed(1)+'億';if(a>=1e4)return Math.round(v/1e4)+'萬';return fmt(v)}
+function pct(v){return (Math.round(v*10)/10).toFixed(1)+'%'}
+
+function nowPools(){var out=[0,0,0,0];ASSETS.forEach(function(a){var i={low:0,mid:1,high:2,cash:3}[a.pool];if(i==null)return;var v=a.val;if(a.reserve)v=Math.max(0,v-RESERVE);out[i]+=v});return out}
+function stats(w){ // w 比例陣列（和為 1）
+ var mu=0,sd=0;for(var i=0;i<4;i++){mu+=w[i]*S.ret[i]/100;sd+=w[i]*S.std[i]/100}
+ return {mu:mu,sd:sd};
+}
+function pctl(st,N,z){var ml=Math.log(1+st.mu)-st.sd*st.sd/2;return Math.exp(ml+z*st.sd/Math.sqrt(N))-1}
+function fv(v0,m,lumpAdd,r,N){var g=Math.pow(1+r,N);var a=(v0+lumpAdd)*g;var d=r>1e-9?m*12*(g-1)/r:m*12*N;return a+d}
+
+function pieSVG(vals){var tot=vals.reduce(function(s,x){return s+x},0)||1;var R=56,cx=70,cy=70,a=-Math.PI/2,out='';
+ vals.forEach(function(v,i){if(v<=0)return;var ang=v/tot*Math.PI*2;var x1=cx+R*Math.cos(a),y1=cy+R*Math.sin(a);a+=ang;var x2=cx+R*Math.cos(a),y2=cy+R*Math.sin(a);var lg=ang>Math.PI?1:0;
+  out+='<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+R+','+R+' 0 '+lg+' 1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+POOLS[i].col+'" stroke="var(--panel)" stroke-width="2"/>';});
+ return '<svg viewBox="0 0 140 140" width="140" height="140">'+out+'<circle cx="70" cy="70" r="26" fill="var(--panel)"/></svg>';}
+
+function render(){
+ var np=nowPools(),inv=np.reduce(function(s,x){return s+x},0);
+ var wNow=np.map(function(x){return inv?x/inv:0}),wT=S.target.map(function(x){return x/100});
+ var sN=stats(wNow),sT=stats(wT),N=S.years;
+ var dcaM=S.dca.reduce(function(s,x){return s+x},0),lumpT=S.lump.reduce(function(s,x){return s+x},0);
+ // 新投入的加權（投入本身的結構）
+ var wIn=[0,0,0,0];var inTot=dcaM*12*N+lumpT;for(var i=0;i<4;i++)wIn[i]=inTot?(S.dca[i]*12*N+S.lump[i])/inTot:wT[i];
+ document.getElementById('pieNow').innerHTML=pieSVG(np);document.getElementById('pieTgt').innerHTML=pieSVG(wT);
+ document.getElementById('pieNowV').innerHTML='<span class="num">'+wan(inv)+'</span> <span class="hint">預期 '+pct(sN.mu*100)+'・風險 '+pct(sN.sd*100)+'</span>';
+ document.getElementById('pieTgtV').innerHTML='<span class="num">'+wan(inv)+'</span> <span class="hint">預期 '+pct(sT.mu*100)+'・風險 '+pct(sT.sd*100)+'</span>';
+ document.getElementById('legend').innerHTML=POOLS.map(function(p,i){return '<span><i style="background:'+p.col+'"></i>'+p.name+' <span class="num">'+pct(wNow[i]*100)+' → '+pct(wT[i]*100)+'</span></span>'}).join('')+'<span class="hint">不投資（自用房、車 '+wan(ASSETS.filter(function(a){return a.pool==='none'}).reduce(function(s,a){return s+a.val},0))+'）不進圓餅</span>';
+ var incNow=inv*sN.mu,incT=inv*sT.mu;
+ var p10=pctl(sT,N,-1.2816),p90=pctl(sT,N,1.2816);
+ document.getElementById('kpis').innerHTML=
+  '<div class="kpi"><div class="lb">加權預期報酬</div><div class="vv"><span class="was">'+pct(sN.mu*100)+' →</span> '+pct(sT.mu*100)+'</div><small>風險值 '+pct(sN.sd*100)+' → '+pct(sT.sd*100)+'</small></div>'+
+  '<div class="kpi"><div class="lb">第一年理財收入</div><div class="vv"><span class="was">'+wan(incNow)+' →</span> '+wan(incT)+'</div><small>'+(incT-incNow>=0?'+':'')+wan(incT-incNow)+'／年（期初資產 × 報酬）</small></div>'+
+  '<div class="kpi"><div class="lb">'+N+' 年年化（最差～最好）</div><div class="vv">'+pct(p10*100)+' <span class="was">～ '+pct(p90*100)+'</span></div><small>P10 ～ P90；中位 '+pct(pctl(sT,N,0)*100)+'</small></div>';
+ document.getElementById('heroLine').innerHTML='一句話：把 <b>'+wan(inv)+'</b> 可投資資產從「'+POOLS.map(function(p,i){return p.name+' '+Math.round(wNow[i]*100)+'%'}).join('／')+'」調成「'+POOLS.map(function(p,i){return p.name+' '+S.target[i]+'%'}).join('／')+'」，每年理財收入約 <b>'+wan(incT)+'</b>（多 '+wan(incT-incNow)+'）；'+N+' 年最差情境年化 <b class="'+(p10<0?'bad':'')+'">'+pct(p10*100)+'</b>，客戶要先接受這一行。';
+ // 拉桿
+ document.getElementById('pools').innerHTML=POOLS.map(function(p,i){var amt=inv*wT[i],mv=amt-np[i];
+  return '<div class="pool"><div class="nm"><i style="background:'+p.col+'"></i><span>'+p.name+'<small>'+p.desc+'</small></span></div>'+
+   '<input type="range" min="0" max="100" value="'+S.target[i]+'" oninput="setTarget('+i+',this.value)">'+
+   '<div class="pct">'+S.target[i]+'%<small>'+wan(amt)+'　<span class="'+(mv>0?'ok':mv<0?'warn':'')+'">'+(mv>0?'＋':mv<0?'－':'')+(mv?wan(Math.abs(mv)):'不動')+'</span></small></div>'+
+   '<div class="prm">報酬 <input value="'+S.ret[i]+'" onchange="S.ret['+i+']=n(this.value);render()">% 風險 <input value="'+S.std[i]+'" onchange="S.std['+i+']=n(this.value);render()">%</div></div>'}).join('');
+ // 風險屬性旁註
+ var tier=RISK.self,mix=TIER_MIX[tier],sp=RISK.spouse,useSp=sp&&Object.keys(TIER_MIX).indexOf(sp)<Object.keys(TIER_MIX).indexOf(tier);
+ var ref=useSp?TIER_MIX[sp]:mix,refName=useSp?sp+'（配偶，較保守）':tier+'（本人）';
+ var over=S.target[2]>ref[2]+5||S.target[1]+S.target[2]>ref[1]+ref[2]+10;
+ document.getElementById('riskNote').innerHTML='<b>風險屬性旁註</b>　本人 '+tier+(sp?'・配偶 '+sp:'')+'；家庭共同資金以 <b>'+refName+'</b> 為尺，建議結構 '+POOLS.map(function(p,i){return p.name+' '+ref[i]+'%'}).join('／')+'。'+
+  (over?'<div class="warn" style="margin-top:4px">⚠ 目前目標的中高風險部位（'+(S.target[1]+S.target[2])+'%）超過屬性建議（'+(ref[1]+ref[2])+'%）——不擋，但要跟客戶講清楚最差情境那一行。</div>':'<div class="ok" style="margin-top:4px">✓ 目標結構在屬性承受範圍內。</div>');
+ // 新投入
+ document.getElementById('dcaTot').textContent=fmt(dcaM)+'／月';document.getElementById('lumpTot').textContent=fmt(lumpT);
+ document.getElementById('roomNote').textContent='月結餘可投入 18,000（已扣既有定期定額）；可投資水位 '+wan(np[3])+'（投資池現金，預備金已扣）。單筆超過水位會標紅。';
+ // 情境表
+ var zs=[['最差 P10',-1.2816],['中位 P50',0],['最好 P90',1.2816]];
+ var rows=zs.map(function(z){var r=pctl(sT,N,z[1]);var end=fv(inv,dcaM,lumpT,r,N);var rN=pctl(sN,N,z[1]);var endN=fv(inv,0,0,rN,N);
+  return '<tr><td>'+z[0]+'</td><td class="r">'+pct(r*100)+'</td><td class="r">'+wan(inv*(sT.mu+z[1]*sT.sd))+'</td><td class="r"><b>'+wan(end)+'</b></td><td class="r dim">'+wan(endN)+'</td></tr>'}).join('');
+ document.getElementById('scenTbl').innerHTML='<tr><th>情境</th><th class="r">'+N+' 年年化</th><th class="r">第一年理財收入</th><th class="r">期末資產（目標＋新投入）</th><th class="r">期末（現況不動）</th></tr>'+rows+
+  '<tr><td class="hint" colspan="5">現況不動＝不改配置、不新增投入；差額就是這次配置＋投入的價值。</td></tr>';
+ // 扇形圖
+ var W=460,H=200,pad=48;var ser=zs.map(function(z){var r=pctl(sT,N,z[1]);var pts=[];for(var y=0;y<=N;y++)pts.push(fv(inv,dcaM,lumpT,r,y));return pts});
+ var base=[];for(var y=0;y<=N;y++)base.push(fv(inv,0,0,pctl(sN,N,0),y));
+ var mx=Math.max.apply(null,ser[2].concat(base)),sx=function(y){return pad+(W-pad-8)*y/N},sy=function(v){return H-pad+ (pad-8-(H-pad))*v/mx};
+ var band='M'+ser[2].map(function(v,y){return sx(y).toFixed(1)+','+sy(v).toFixed(1)}).join(' L')+' L'+ser[0].slice().reverse().map(function(v,i){return sx(N-i).toFixed(1)+','+sy(v).toFixed(1)}).join(' L')+' Z';
+ var line=function(a,col,dash){return '<polyline fill="none" stroke="'+col+'" stroke-width="2"'+(dash?' stroke-dasharray="5,4"':'')+' points="'+a.map(function(v,y){return sx(y).toFixed(1)+','+sy(v).toFixed(1)}).join(' ')+'"/>'};
+ var ticks='';for(var t=0;t<=4;t++){var v=mx*t/4;ticks+='<text x="'+(pad-4)+'" y="'+(sy(v)+4).toFixed(1)+'" text-anchor="end" font-size="10" fill="var(--mut2)">'+wan(v)+'</text><line x1="'+pad+'" x2="'+(W-8)+'" y1="'+sy(v).toFixed(1)+'" y2="'+sy(v).toFixed(1)+'" stroke="var(--line)"/>'}
+ var xt='';[0,Math.round(N/2),N].forEach(function(y){xt+='<text x="'+sx(y).toFixed(1)+'" y="'+(H-pad+14)+'" text-anchor="middle" font-size="10" fill="var(--mut2)">'+(40+y)+' 歲</text>'});
+ document.getElementById('fan').innerHTML='<svg class="fan" viewBox="0 0 '+W+' '+H+'">'+ticks+xt+'<path d="'+band+'" fill="var(--amber)" opacity=".18"/>'+line(ser[1],'var(--amber2)')+line(base,'var(--mut2)',true)+'</svg>';
+ document.getElementById('fanNote').innerHTML='<span style="color:var(--amber2)">— 目標配置（中位）</span>　<span style="color:var(--mut2)">╌ 現況不動（中位）</span>　<span style="background:var(--amber);opacity:.5;padding:0 6px"> </span> P10–P90 區間';
+ // 逐年
+ var yr='<tr><th>年齡</th><th class="r">期初</th><th class="r">當年投入</th><th class="r">最差 P10</th><th class="r">中位 P50</th><th class="r">最好 P90</th></tr>';
+ for(var y=0;y<=N;y+=5){yr+='<tr'+(y>0&&y%10?' class="dim"':'')+'><td>'+(40+y)+'</td><td class="r">'+wan(ser[1][Math.max(0,y-1)])+'</td><td class="r">'+(y?wan(dcaM*12):wan(lumpT))+'</td><td class="r">'+wan(ser[0][y])+'</td><td class="r"><b>'+wan(ser[1][y])+'</b></td><td class="r">'+wan(ser[2][y])+'</td></tr>'}
+ document.getElementById('yearTbl').innerHTML=yr;
+ // 對照
+ var dPct=(sT.mu-sN.mu)*100;
+ document.getElementById('cmp').innerHTML=[['首次入不敷出','62 歲','64 歲'],['存量用完','78 歲',dPct>0?'84 歲':'76 歲'],['現值缺口','412 萬',dPct>0?'186 萬':'470 萬']].map(function(x){return '<div class="kpi"><div class="lb">'+x[0]+'</div><div class="vv"><span class="was">'+x[1]+' →</span> '+x[2]+'</div><small>投資報酬率 '+pct(sN.mu*100)+' → '+pct(sT.mu*100)+'、定期定額 '+fmt(dcaM)+'／月、單筆 '+wan(lumpT)+'</small></div>'}).join('');
+ document.getElementById('mList').innerHTML='<li>規劃參數：投資報酬率 <b>'+pct(sT.mu*100)+'</b>、報酬標準差 <b>'+pct(sT.sd*100)+'</b>（原 '+pct(sN.mu*100)+'／'+pct(sN.sd*100)+'）</li>'+
+  '<li>調整動作：定期定額 '+POOLS.map(function(p,i){return S.dca[i]?p.name+' '+fmt(S.dca[i])+'／月':''}).filter(Boolean).join('、')+(lumpT?'；單筆 '+POOLS.map(function(p,i){return S.lump[i]?p.name+' '+wan(S.lump[i]):''}).filter(Boolean).join('、'):'')+'（各用該池報酬滾，進分離池）</li>'+
+  '<li>配置結構 plan.alloc：現況四池、目標比例、覆寫的報酬／風險、投入年數（存方案時一起帶）</li>';
+ // 歸池表
+ document.getElementById('assetTbl').innerHTML='<tr><th>資產</th><th>類別</th><th class="r">帳面</th><th>風險池</th><th class="r">進池金額</th></tr>'+ASSETS.map(function(a,i){var v=a.pool==='none'?0:(a.reserve?Math.max(0,a.val-RESERVE):a.val);
+  return '<tr'+(a.pool==='none'?' class="dim"':'')+'><td>'+a.name+(a.reserve?' <span class="chip">扣預備金 48 萬</span>':'')+'</td><td>'+a.cat+'</td><td class="r">'+fmt(a.val)+'</td><td><select onchange="ASSETS['+i+'].pool=this.value;render()">'+[['low','低風險'],['mid','中度風險'],['high','高度風險'],['cash','投資池現金'],['none','不投資']].map(function(o){return '<option value="'+o[0]+'"'+(a.pool===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select></td><td class="r">'+(v?fmt(v):'—')+'</td></tr>'}).join('');
+}
+function setTarget(i,v){v=Math.max(0,Math.min(100,n(v)));var others=S.target.reduce(function(s,x,j){return j===i?s:s+x},0);var rest=100-v;
+ for(var j=0;j<4;j++){if(j===i)continue;S.target[j]=others?Math.round(S.target[j]/others*rest):Math.round(rest/3)}
+ var fix=100-S.target.reduce(function(s,x){return s+x},0);S.target[i]=v+fix;render()}
+document.querySelectorAll('[data-dca]').forEach(function(el){el.addEventListener('change',function(){S.dca[+el.dataset.dca]=n(el.value);el.value=fmt(S.dca[+el.dataset.dca]);render()})});
+document.querySelectorAll('[data-lump]').forEach(function(el){el.addEventListener('change',function(){S.lump[+el.dataset.lump]=n(el.value);el.value=fmt(S.lump[+el.dataset.lump]);render()})});
+document.getElementById('years').addEventListener('change',function(){S.years=Math.max(1,Math.round(n(this.value)));render()});
+render();
+</script>
+</body>
+</html>
