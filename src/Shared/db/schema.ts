@@ -8,6 +8,7 @@ import {
 } from 'drizzle-orm/pg-core';
 // 報聘申請的 jsonb 形狀住在純函式層（client component 也要 import，不能把 drizzle 拖進 bundle）。
 import type { ApplyLicense, ChecklistItem } from '@/lib/coachApply';
+import type { DocSignerSlot } from '@/lib/docs';
 
 // ⚠️ 索引一律宣告在這裡再跑 db:generate。
 //    直接用 psql 手建的索引不在 schema 快照裡，之後任何人跑 `npm run db:push`
@@ -1138,6 +1139,10 @@ export const coachApplySettings = pgTable('coach_apply_settings', {
   licenseQty: integer('license_qty').default(1).notNull(),
   requiredFields: jsonb('required_fields').$type<string[]>().default([]).notNull(),
   checklist: jsonb('checklist').$type<ChecklistItem[]>().default([]).notNull(),
+  // 2026/10/28 電子簽署：報聘＝培訓報名。這裡指到帳務「營業項目」(acct_params.items[].id)，
+  // 送出申請時用它建 training_enrollments（應收＝該項目價格）；應簽文件組合走 doc_sets(kind='training_item', ref=它)。
+  // null＝不收費、不簽文件 → 審核通過即開通（舊行為）。
+  trainingItemId: text('training_item_id'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -1365,6 +1370,17 @@ export const acctReceipts = pgTable('acct_receipts', {
   promoCoachId: text('promo_coach_id').references(() => coaches.id, { onDelete: 'set null' }),
   verified: boolean('verified').default(true).notNull(),
   enteredBy: text('entered_by'),
+  // 2026/10/28 電子簽署／收款案件：這筆錢屬於哪一種案件。
+  //   client_service＝顧問服務（算分潤與執案實績，舊資料全是這個）／training＝培訓費（只進營收，不算分潤與實績）。
+  //   case_id 指向 service_cases.id 或 training_enrollments.id（text，兩邊都收）。
+  //   gross＝客戶實際付的總額（門檻用它比應收）；amount 仍是公司淨入帳；fee＝金流手續費（gross − amount）。
+  //   method：bank／card／card_installment／zero_installment／other；method_fields 依方式放後五碼、交易編號、期數…
+  caseType: text('case_type').default('client_service').notNull(),
+  caseId: text('case_id'),
+  gross: doublePrecision('gross'),
+  fee: doublePrecision('fee').default(0).notNull(),
+  method: text('method').default('').notNull(),
+  methodFields: jsonb('method_fields').$type<Record<string, string>>().default({}).notNull(),
   allocs: jsonb('allocs').$type<{ to: string; v: number; mode: string; label: string; coachId?: string | null }[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -1372,6 +1388,7 @@ export const acctReceipts = pgTable('acct_receipts', {
   index('acct_receipts_ym_idx').on(t.ym),
   index('acct_receipts_client_idx').on(t.clientId),
   index('acct_receipts_exec_idx').on(t.execCoachId),
+  index('acct_receipts_case_idx').on(t.caseType, t.caseId),
 ]);
 // 匯款對帳的「已匯」紀錄：某月某受款人匯了多少、哪一天。應匯金額不存，每次從收款算。
 export const acctPayouts = pgTable('acct_payouts', {
@@ -1435,4 +1452,137 @@ export const aiUsage = pgTable('ai_usage', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('ai_usage_coach_at_idx').on(t.coachId, t.createdAt.desc()),
+]);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 電子簽署（2026/10/28 Ray 定案：自建「內部點點簽」，不串第三方、不寄信、不需檔案儲存）
+//
+// 地基語意：
+//   · 簽署的對象不是 PDF 檔，是一份**凍結的 HTML 快照＋它的 SHA-256**。簽完把簽名圖貼進簽名位、
+//     再算一次 final_hash 鎖起來。「文件改變後原確認失效」靠雜湊不同天然成立。
+//   · 簽名圖是小 PNG（data URL）直接存 DB；教練／客戶帳號／申請人各自一份預存簽名（signatures）。
+//   · 範本更新＝新版本列，已發出的文件實例不動；要補簽另開新實例。
+//   · 兩個業務消費者（培訓報名 training／顧問服務 client_service）都只是往這個引擎丟「一組範本＋簽署人」。
+// 規則與型別在 lib/docs.ts（純函式，client component 也用）；讀寫在 lib/docsStore.ts。
+// ═════════════════════════════════════════════════════════════════════════════
+
+// 文件範本。同一份文件的所有版本共用 key；(key, version) 唯一。改內容＝插新版本，舊版 enabled 不動。
+// signers：這份文件有哪些簽名位——role（company／member／client／coach）＋seq（簽署順序，同 seq 可並行）。
+// html 裡用 {{sign:coach:1}} 放簽名位、{{seal}} 放公司大小章（use_seal=true 時渲染）、{{client.name}} 等帶欄位。
+export const docTemplates = pgTable('doc_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  key: text('key').notNull(),
+  version: integer('version').default(1).notNull(),
+  category: text('category').default('training').notNull(),   // training / client_service
+  name: text('name').notNull(),
+  html: text('html').default('').notNull(),
+  useSeal: boolean('use_seal').default(true).notNull(),
+  required: boolean('required').default(true).notNull(),
+  signDays: integer('sign_days'),                               // null＝不設期限
+  signers: jsonb('signers').$type<DocSignerSlot[]>().default([]).notNull(),
+  enabled: boolean('enabled').default(true).notNull(),
+  note: text('note').default('').notNull(),
+  createdBy: text('created_by').references(() => coaches.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('doc_templates_key_version_uq').on(t.key, t.version),
+  index('doc_templates_category_idx').on(t.category),
+]);
+
+// 範本組合：某個對象（kind＋ref）啟動簽署時要產哪幾份文件（有序的範本 key 清單，啟動時解析成最新啟用版本）。
+// kind：training_item（培訓方案＝營業項目 id）／service_item（顧問服務方案＝營業項目 id）。
+export const docSets = pgTable('doc_sets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  kind: text('kind').notNull(),
+  ref: text('ref').notNull(),
+  templateKeys: jsonb('template_keys').$type<string[]>().default([]).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('doc_sets_kind_ref_uq').on(t.kind, t.ref),
+]);
+
+// 文件實例：某個案件的某一份文件。status：pending（待簽）／completed／declined／expired／void。
+// case_type＋case_id：training→training_enrollments.id／client_service→service_cases.id（text，兩邊都收）。
+// 同案同 key 在非 void 狀態下只能有一份（部分唯一索引）——重複點「啟動」回既有進度，不重產。
+export const docInstances = pgTable('doc_instances', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  caseType: text('case_type').notNull(),
+  caseId: text('case_id').notNull(),
+  templateId: uuid('template_id').notNull().references(() => docTemplates.id, { onDelete: 'restrict' }),
+  templateKey: text('template_key').notNull(),
+  version: integer('version').notNull(),
+  title: text('title').notNull(),
+  required: boolean('required').default(true).notNull(),
+  htmlSnapshot: text('html_snapshot').notNull(),
+  hash: text('hash').notNull(),
+  status: text('status').default('pending').notNull(),
+  expiresAt: date('expires_at'),
+  finalHash: text('final_hash'),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  voidedAt: timestamp('voided_at', { withTimezone: true }),
+  voidReason: text('void_reason'),
+  createdBy: text('created_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('doc_instances_case_idx').on(t.caseType, t.caseId),
+  index('doc_instances_status_idx').on(t.status),
+  uniqueIndex('doc_instances_case_key_live_uq').on(t.caseType, t.caseId, t.templateKey).where(sql`status <> 'void'`),
+]);
+
+// 簽署人：一個簽名位一列。身分二選一（coach_id 或 client_user_id）；簽署動作必須驗「登入者＝這一列」。
+// status：pending／signed／declined。hash_at_sign＝按下確認那一刻看到的快照雜湊（跟 instance.hash 對得上才算）。
+export const docSigners = pgTable('doc_signers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  instanceId: uuid('instance_id').notNull().references(() => docInstances.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(),
+  seq: integer('seq').default(1).notNull(),
+  label: text('label').default('').notNull(),
+  coachId: text('coach_id').references(() => coaches.id, { onDelete: 'set null' }),
+  clientUserId: text('client_user_id').references(() => clientUsers.id, { onDelete: 'set null' }),
+  displayName: text('display_name').default('').notNull(),
+  status: text('status').default('pending').notNull(),
+  consentAt: timestamp('consent_at', { withTimezone: true }),
+  signatureImg: text('signature_img'),
+  signedAt: timestamp('signed_at', { withTimezone: true }),
+  ip: text('ip'),
+  ua: text('ua'),
+  hashAtSign: text('hash_at_sign'),
+  declineReason: text('decline_reason'),
+}, (t) => [
+  index('doc_signers_instance_idx').on(t.instanceId),
+  index('doc_signers_coach_idx').on(t.coachId),
+  index('doc_signers_client_user_idx').on(t.clientUserId),
+]);
+
+// 預存簽名檔：owner_kind（coach／client_user）＋owner_id。簽署時可「用我存的」或重畫；存了不等於同意任何文件。
+export const signatures = pgTable('signatures', {
+  ownerKind: text('owner_kind').notNull(),
+  ownerId: text('owner_id').notNull(),
+  img: text('img').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.ownerKind, t.ownerId] }),
+]);
+
+// 培訓報名案件（第一個消費者）。一位申請人一案（coach_id）；收款掛 acct_receipts(case_type='training', case_id=這裡的 id)。
+// review_stage：pending（待審）／passed（審核通過、待簽文件）／activated（正式開通）／rejected／cancelled。
+// expires_at＝實習使用期限，**從正式開通日起算**（不是註冊、收款或審核通過日）。
+export const trainingEnrollments = pgTable('training_enrollments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'cascade' }),
+  itemId: text('item_id').notNull(),
+  itemName: text('item_name').default('').notNull(),
+  amountDue: doublePrecision('amount_due').default(0).notNull(),
+  reviewStage: text('review_stage').default('pending').notNull(),
+  passedAt: timestamp('passed_at', { withTimezone: true }),
+  passedBy: text('passed_by'),
+  activatedAt: timestamp('activated_at', { withTimezone: true }),
+  expiresAt: date('expires_at'),
+  note: text('note').default('').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('training_enrollments_coach_idx').on(t.coachId),
+  index('training_enrollments_stage_idx').on(t.reviewStage),
 ]);

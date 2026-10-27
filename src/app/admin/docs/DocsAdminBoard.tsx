@@ -1,0 +1,405 @@
+"use client";
+
+import { useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import Modal from "@/components/ui/Modal";
+import SubmitButton from "@/components/ui/SubmitButton";
+import { FIELD, SELECT_SM } from "@/components/ui/Field";
+import {
+  CATEGORY_LABEL,
+  DOC_CATEGORIES,
+  DOC_ROLES,
+  DOC_SET_KINDS,
+  DOC_CSS,
+  ROLE_LABEL,
+  slotKey,
+  type DocCategory,
+  type DocSetKind,
+  type DocSignerSlot,
+} from "@/lib/docs";
+import { STARTER_HTML, varsFor } from "@/lib/docsVars";
+import { previewTemplateAction, saveSealAction, saveSetAction, saveTemplateAction, setTemplateEnabledAction } from "./actions";
+
+export type TemplateLite = {
+  id: string;
+  key: string;
+  version: number;
+  versions: number;
+  category: DocCategory;
+  name: string;
+  html: string;
+  useSeal: boolean;
+  required: boolean;
+  signDays: number | null;
+  signers: DocSignerSlot[];
+  enabled: boolean;
+  note: string;
+  createdAt: string;
+};
+export type ItemLite = { id: string; name: string; price: number; cat: string };
+
+type Draft = {
+  key: string | null;
+  category: DocCategory;
+  name: string;
+  html: string;
+  useSeal: boolean;
+  required: boolean;
+  signDays: string;
+  signers: DocSignerSlot[];
+  note: string;
+};
+
+const emptyDraft = (category: DocCategory = "training"): Draft => ({
+  key: null,
+  category,
+  name: "",
+  html: STARTER_HTML,
+  useSeal: true,
+  required: true,
+  signDays: "14",
+  signers: category === "training" ? [{ role: "member", seq: 1, label: "申請人" }] : [{ role: "client", seq: 1, label: "簽約人" }, { role: "coach", seq: 2 }],
+  note: "",
+});
+const toDraft = (t: TemplateLite): Draft => ({
+  key: t.key,
+  category: t.category,
+  name: t.name,
+  html: t.html,
+  useSeal: t.useSeal,
+  required: t.required,
+  signDays: t.signDays == null ? "" : String(t.signDays),
+  signers: t.signers,
+  note: t.note,
+});
+
+export default function DocsAdminBoard({ templates, items, sets, seal }: { templates: TemplateLite[]; items: ItemLite[]; sets: Record<string, string[]>; seal: string | null }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState<Draft | null>(null);
+
+  return (
+    <div className="grid gap-6">
+      <SealSection seal={seal} onSaved={() => router.refresh()} />
+
+      {/* ② 範本 */}
+      <section className="border border-line rounded-lg p-4">
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h2 className="font-bold">文件範本</h2>
+          <div className="flex gap-2">
+            {DOC_CATEGORIES.map((c) => (
+              <button key={c.value} type="button" className="text-xs rounded-md border border-line px-2.5 py-1.5 hover:bg-panel2" onClick={() => setEditing(emptyDraft(c.value))}>
+                ＋ 新增{c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-11 text-tx3 mb-3">每一列是這份文件的最新版本。編輯後存檔會變成下一個版本；停用最新版＝這份文件暫時不能被啟動。</p>
+        {templates.length === 0 && <p className="text-sm text-tx3">還沒有範本。先新增一份，內容可以之後再修。</p>}
+        <ul className="grid gap-2">
+          {templates.map((t) => (
+            <TemplateRow key={t.key} t={t} onEdit={() => setEditing(toDraft(t))} onChanged={() => router.refresh()} />
+          ))}
+        </ul>
+      </section>
+
+      <SetsSection templates={templates} items={items} sets={sets} onSaved={() => router.refresh()} />
+
+      {editing && (
+        <TemplateEditor
+          draft={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            router.refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── ① 印鑑 ───────────────────────────────────────────────────────────────────
+function SealSection({ seal, onSaved }: { seal: string | null; onSaved: () => void }) {
+  const [img, setImg] = useState<string | null>(seal);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  const file = useRef<HTMLInputElement>(null);
+
+  function pick(f: File | undefined) {
+    setErr(null);
+    if (!f) return;
+    if (f.type !== "image/png") return setErr("請用透明底 PNG");
+    if (f.size > 2_500_000) return setErr("圖片太大（上限約 2.5MB）");
+    const r = new FileReader();
+    r.onload = () => setImg(String(r.result));
+    r.readAsDataURL(f);
+  }
+  function save(next: string | null) {
+    setMsg(null);
+    setErr(null);
+    start(async () => {
+      const r = await saveSealAction(next);
+      if (r.ok) {
+        setImg(next);
+        setMsg(next ? "已儲存印鑑" : "已移除印鑑");
+        onSaved();
+      } else setErr(r.error);
+    });
+  }
+  return (
+    <section className="border border-line rounded-lg p-4">
+      <h2 className="font-bold mb-1">公司大小章</h2>
+      <p className="text-11 text-tx3 mb-3">
+        一張透明底 PNG（大章＋小章合成一張）。範本裡寫 <code className="text-brand2">{"{{seal}}"}</code> 的位置、且該範本有勾「套用公司印鑑」，產文件時就直接印上去——合約視為公司已用印，不另設公司簽章步驟。
+      </p>
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="w-40 h-28 rounded-md border border-dashed border-line2 bg-white grid place-items-center overflow-hidden">
+          {img ? <img src={img} alt="公司印鑑" className="max-h-24 max-w-36 object-contain" /> : <span className="text-xs text-tx3">尚未上傳</span>}
+        </div>
+        <div className="grid gap-2">
+          <input ref={file} type="file" accept="image/png" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+          <div className="flex gap-2">
+            <button type="button" className="text-sm rounded-md border border-line px-3 py-1.5 hover:bg-panel2" onClick={() => file.current?.click()}>選擇 PNG</button>
+            <SubmitButton state={busy ? "pending" : "idle"} disabled={!img || img === seal} onClick={() => save(img)}>儲存印鑑</SubmitButton>
+            {seal && <button type="button" className="text-sm text-danger px-2" disabled={busy} onClick={() => save(null)}>移除</button>}
+          </div>
+          {msg && <p className="text-xs text-ok">{msg}</p>}
+          {err && <p className="text-xs text-danger">{err}</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── ② 範本列 ─────────────────────────────────────────────────────────────────
+function TemplateRow({ t, onEdit, onChanged }: { t: TemplateLite; onEdit: () => void; onChanged: () => void }) {
+  const [busy, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <li className={`rounded-md border ${t.enabled ? "border-line" : "border-line2 opacity-60"} bg-panel2 px-3 py-2`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-11 rounded px-1.5 py-0.5 bg-panel text-tx2">{CATEGORY_LABEL[t.category]}</span>
+        <span className="font-bold">{t.name}</span>
+        <span className="text-11 text-tx3">v{t.version}{t.versions > 1 ? `（共 ${t.versions} 版）` : ""}</span>
+        <span className="text-11 text-tx3">{t.required ? "必簽" : "選簽"}・{t.useSeal ? "用印" : "不用印"}・{t.signDays ? `${t.signDays} 天內簽` : "不限期"}</span>
+        <span className="text-11 text-tx2">
+          簽署：{t.signers.map((s) => `${s.seq}.${s.label || ROLE_LABEL[s.role]}`).join(" → ")}
+        </span>
+        <span className="ml-auto flex items-center gap-2">
+          <button type="button" className="text-xs rounded-md border border-line px-2 py-1 hover:bg-panel" onClick={onEdit}>編輯（存成新版本）</button>
+          <button
+            type="button"
+            className="text-xs text-tx2 px-1"
+            disabled={busy}
+            onClick={() =>
+              start(async () => {
+                const r = await setTemplateEnabledAction(t.id, !t.enabled);
+                if (!r.ok) setErr(r.error);
+                else onChanged();
+              })
+            }
+          >
+            {t.enabled ? "停用" : "啟用"}
+          </button>
+        </span>
+      </div>
+      {err && <p className="text-xs text-danger mt-1">{err}</p>}
+    </li>
+  );
+}
+
+// ── ② 範本編輯器 ─────────────────────────────────────────────────────────────
+function TemplateEditor({ draft, onClose, onSaved }: { draft: Draft; onClose: () => void; onSaved: () => void }) {
+  const [d, setD] = useState<Draft>(draft);
+  const [err, setErr] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ html: string; warnings: string[] } | null>(null);
+  const [busy, start] = useTransition();
+  const ta = useRef<HTMLTextAreaElement>(null);
+  const patch = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
+  const vars = useMemo(() => varsFor(d.category), [d.category]);
+
+  function insert(token: string) {
+    const el = ta.current;
+    if (!el) return patch({ html: d.html + token });
+    const a = el.selectionStart ?? d.html.length;
+    const b = el.selectionEnd ?? a;
+    const next = d.html.slice(0, a) + token + d.html.slice(b);
+    patch({ html: next });
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(a + token.length, a + token.length);
+    });
+  }
+  function setSigner(i: number, p: Partial<DocSignerSlot>) {
+    patch({ signers: d.signers.map((s, j) => (j === i ? { ...s, ...p } : s)) });
+  }
+  const payload = () => ({ ...d, signDays: d.signDays.trim() === "" ? null : Number(d.signDays) });
+
+  function doPreview() {
+    setErr(null);
+    start(async () => {
+      const r = await previewTemplateAction(payload());
+      if (r.ok) setPreview({ html: r.html, warnings: r.warnings });
+      else setErr(r.error);
+    });
+  }
+  function save() {
+    setErr(null);
+    start(async () => {
+      const r = await saveTemplateAction(payload());
+      if (r.ok) onSaved();
+      else setErr(r.error);
+    });
+  }
+
+  return (
+    <Modal onClose={onClose} labelledBy="doc-editor-title" width="max-w-5xl">
+      <div className="p-5 grid gap-4 max-h-[88vh] overflow-auto">
+        <div className="flex items-center justify-between">
+          <h2 id="doc-editor-title" className="font-bold text-lg">{d.key ? "編輯範本（存檔＝新版本）" : "新增範本"}</h2>
+          <button type="button" className="text-sm text-tx2" onClick={onClose}>關閉</button>
+        </div>
+
+        <div className="grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
+          <label className="grid gap-1 text-xs text-tx2">文件名稱
+            <input className={FIELD} value={d.name} onChange={(e) => patch({ name: e.target.value })} placeholder="例：實習教練合作約定書" />
+          </label>
+          <label className="grid gap-1 text-xs text-tx2">類別
+            <select className={SELECT_SM} value={d.category} disabled={!!d.key} onChange={(e) => patch({ category: e.target.value as DocCategory })}>
+              {DOC_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs text-tx2">簽署期限（天）
+            <input className={`${FIELD} w-24`} inputMode="numeric" value={d.signDays} onChange={(e) => patch({ signDays: e.target.value })} placeholder="不限" />
+          </label>
+          <div className="flex gap-4 text-sm pb-2">
+            <label className="flex items-center gap-1.5"><input type="checkbox" checked={d.required} onChange={(e) => patch({ required: e.target.checked })} />必簽</label>
+            <label className="flex items-center gap-1.5"><input type="checkbox" checked={d.useSeal} onChange={(e) => patch({ useSeal: e.target.checked })} />套用公司印鑑</label>
+          </div>
+        </div>
+
+        {/* 簽署人 */}
+        <div className="rounded-md border border-line p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold">簽署人與順序</h3>
+            <button type="button" className="text-xs rounded-md border border-line px-2 py-1" onClick={() => patch({ signers: [...d.signers, { role: "coach", seq: (d.signers.at(-1)?.seq ?? 0) + 1 }] })}>＋ 加一位</button>
+          </div>
+          <p className="text-11 text-tx3 mb-2">順序數字小的先簽；同一個數字可以同時簽。內容裡用 <code className="text-brand2">{"{{sign:角色:順序}}"}</code> 放簽名位，沒放的會自動補在文末。</p>
+          <div className="grid gap-2">
+            {d.signers.map((s, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
+                <input className={`${FIELD} w-16 text-center`} inputMode="numeric" value={s.seq} onChange={(e) => setSigner(i, { seq: Math.max(1, Number(e.target.value) || 1) })} />
+                <select className={SELECT_SM} value={s.role} onChange={(e) => setSigner(i, { role: e.target.value as DocSignerSlot["role"] })}>
+                  {DOC_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}——{r.hint}</option>)}
+                </select>
+                <input className={`${FIELD} w-40`} value={s.label ?? ""} onChange={(e) => setSigner(i, { label: e.target.value })} placeholder={`顯示名（預設「${ROLE_LABEL[s.role]}簽名」）`} />
+                <button type="button" className="text-xs text-brand2" onClick={() => insert(`{{sign:${slotKey(s)}}}`)}>插入簽名位</button>
+                <button type="button" className="text-xs text-danger" onClick={() => patch({ signers: d.signers.filter((_, j) => j !== i) })}>移除</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 內容 */}
+        <div className="grid lg:grid-cols-[1fr_260px] gap-3">
+          <label className="grid gap-1 text-xs text-tx2">內容（HTML）
+            <textarea ref={ta} className={`${FIELD} font-mono text-xs leading-relaxed min-h-[360px]`} value={d.html} onChange={(e) => patch({ html: e.target.value })} spellCheck={false} />
+          </label>
+          <div className="rounded-md border border-line p-3 text-xs">
+            <p className="font-bold mb-2">可用欄位（點一下插入）</p>
+            <div className="flex flex-wrap gap-1.5">
+              {vars.map((v) => (
+                <button key={v.key} type="button" title={v.label} className="rounded border border-line px-1.5 py-0.5 hover:bg-panel2" onClick={() => insert(`{{${v.key}}}`)}>
+                  {v.label}
+                </button>
+              ))}
+              <button type="button" className="rounded border border-brand2 text-brand2 px-1.5 py-0.5" onClick={() => insert("{{seal}}")}>公司印鑑位置</button>
+            </div>
+            <p className="text-tx3 mt-3 leading-relaxed">電子簽署條款那一句用「電子簽署條款」欄位帶入，簽署頁的同意勾選旁也會再出現一次。</p>
+          </div>
+        </div>
+
+        <label className="grid gap-1 text-xs text-tx2">備註（只有後台看得到）
+          <input className={FIELD} value={d.note} onChange={(e) => patch({ note: e.target.value })} />
+        </label>
+
+        {err && <p className="text-sm text-danger">{err}</p>}
+        <div className="flex items-center gap-2">
+          <button type="button" className="text-sm rounded-md border border-line px-3 py-2" disabled={busy} onClick={doPreview}>預覽</button>
+          <SubmitButton state={busy ? "pending" : "idle"} onClick={save}>{d.key ? "存成新版本" : "建立範本"}</SubmitButton>
+        </div>
+
+        {preview && (
+          <div className="rounded-md border border-line overflow-hidden">
+            {preview.warnings.length > 0 && <p className="text-xs text-danger px-3 py-2 bg-panel2">{preview.warnings.join("；")}</p>}
+            <iframe title="預覽" sandbox="" className="w-full h-[70vh] bg-white" srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>${DOC_CSS}</style></head><body><div class="doc-body">${preview.html}</div></body></html>`} />
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// ── ③ 範本組合 ───────────────────────────────────────────────────────────────
+function SetsSection({ templates, items, sets, onSaved }: { templates: TemplateLite[]; items: ItemLite[]; sets: Record<string, string[]>; onSaved: () => void }) {
+  return (
+    <section className="border border-line rounded-lg p-4">
+      <h2 className="font-bold mb-1">範本組合（哪個方案要簽哪幾份）</h2>
+      <p className="text-11 text-tx3 mb-3">方案＝帳務「營業項目」。沒在帳務後台建的方案不會出現在這裡，也就不能拿來簽——這是刻意的。</p>
+      {items.length === 0 && <p className="text-sm text-tx3">帳務後台還沒有營業項目。</p>}
+      <div className="grid gap-4">
+        {DOC_SET_KINDS.map((k) => (
+          <div key={k.value}>
+            <h3 className="text-sm font-bold mb-2">{k.label} <span className="text-11 text-tx3 font-normal">→ 使用「{CATEGORY_LABEL[k.category]}」類別的範本</span></h3>
+            <div className="grid gap-2">
+              {items.map((it) => (
+                <SetRow key={`${k.value}:${it.id}`} kind={k.value} item={it} options={templates.filter((t) => t.category === k.category)} value={sets[`${k.value}:${it.id}`] ?? []} onSaved={onSaved} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SetRow({ kind, item, options, value, onSaved }: { kind: DocSetKind; item: ItemLite; options: TemplateLite[]; value: string[]; onSaved: () => void }) {
+  const [sel, setSel] = useState<string[]>(value);
+  const [busy, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  const dirty = sel.join("|") !== value.join("|");
+  const toggle = (key: string) => setSel((s) => (s.includes(key) ? s.filter((k) => k !== key) : [...s, key]));
+  return (
+    <div className="rounded-md border border-line bg-panel2 px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+      <span className="font-bold text-sm min-w-40">{item.name}{item.cat ? <span className="text-11 text-tx3 font-normal ml-1">{item.cat}</span> : null}</span>
+      <div className="flex flex-wrap gap-2 text-sm">
+        {options.length === 0 && <span className="text-xs text-tx3">（這個類別還沒有範本）</span>}
+        {options.map((t) => (
+          <label key={t.key} className={`flex items-center gap-1.5 rounded px-2 py-0.5 border ${sel.includes(t.key) ? "border-brand2" : "border-line"} ${t.enabled ? "" : "opacity-50"}`}>
+            <input type="checkbox" checked={sel.includes(t.key)} onChange={() => toggle(t.key)} />
+            {sel.includes(t.key) && <span className="text-11 text-brand2">{sel.indexOf(t.key) + 1}.</span>}
+            {t.name}{!t.enabled && <span className="text-11 text-tx3">（已停用）</span>}
+          </label>
+        ))}
+      </div>
+      <span className="ml-auto flex items-center gap-2">
+        {msg && <span className="text-xs text-ok">{msg}</span>}
+        <button
+          type="button"
+          className="text-xs rounded-md border border-line px-2 py-1 disabled:opacity-40"
+          disabled={!dirty || busy}
+          onClick={() =>
+            start(async () => {
+              const r = await saveSetAction(kind, item.id, sel);
+              setMsg(r.ok ? "已儲存" : r.error);
+              if (r.ok) onSaved();
+            })
+          }
+        >
+          儲存
+        </button>
+      </span>
+    </div>
+  );
+}
