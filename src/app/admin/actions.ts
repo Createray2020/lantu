@@ -7,7 +7,7 @@ import { coaches } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg, transferClients, removeCoach } from "@/lib/coach";
 import { saveBrand } from "@/lib/brand";
 import { saveApplySettings, saveReviewChecks } from "@/lib/coachApplyStore";
-import { passReview, tryActivateEnrollment } from "@/lib/trainingStore";
+import { passReview, tryActivateEnrollment, rejectEnrollment } from "@/lib/trainingStore";
 import type { ApplySettings } from "@/lib/coachApply";
 
 // 後台動作的統一回傳型別：讓 client 端能顯示「已儲存 / 失敗原因」，
@@ -93,16 +93,29 @@ async function setStatus(
  * 通過才開通，而且開通當下一次帶齊職級（預設 C1）、推薦人（推薦人）、使用期限（預設一年）。
  * 沒有申請表的舊帳號一律直接放行 —— 見 approvalGate 的 hasApplication。
  */
-export async function approveCoach(id: string): Promise<ActionResult & { activated?: boolean; docs?: number }> {
+export async function approveCoach(id: string, companySignerId?: string | null): Promise<ActionResult & { activated?: boolean; docs?: number }> {
   try {
     const me = await guard();
     // 2026/10/28：有培訓案件 → 審核閘＋收款門檻 → 啟動簽署（簽完才開通）；沒有案件 → 審核閘 → 直接開通（舊流程）。
-    // 公司代表簽名位預設由按下這顆鈕的管理員擔任。
-    const r = await passReview(id, me.id, me.id);
+    // 公司代表簽名位：後台選了誰就是誰；沒選＝按下這顆鈕的管理員。
+    const r = await passReview(id, me.id, companySignerId || me.id);
     if (!r.ok) return { ok: false, error: r.error };
     revalidatePath("/admin");
     revalidatePath("/dashboard");
     return { ok: true, activated: r.activated, docs: r.docs };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 退回培訓報名（資格不符）：案件標 rejected，收款與文件歷程保留；帳號維持待審，之後可重新處理。 */
+export async function rejectTrainingAction(coachId: string, note: string): Promise<ActionResult> {
+  try {
+    const me = await guard();
+    await rejectEnrollment(coachId, me.id, note ?? "");
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+    return { ok: true };
   } catch (e) {
     return fail(e);
   }

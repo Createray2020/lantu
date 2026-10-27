@@ -121,7 +121,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       />
       {isOwner && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-8">
-          <ClientFees clientId={client.id} meId={coach.id} readOnly={readOnly} />
+          <ClientFees clientId={client.id} meId={coach.id} readOnly={readOnly} planYears={[...new Set(plans.map((p) => p.year).filter((y): y is number => typeof y === "number"))]} />
         </div>
       )}
     </div>

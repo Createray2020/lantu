@@ -12,7 +12,7 @@ import { db } from "@/Shared/db";
 import { acctParams, acctMonths, acctTargets, acctEntries, acctReceipts, acctPayouts, acctCash, payees, coaches, compCases, compPayouts } from "@/Shared/db/schema";
 import {
   ACCT_DEFAULT_GOAL, ACCT_DEFAULT_PARAMS, ACCT_DEFAULT_CASH, annualFeeOf, isYm, normGoal, normItems, normMonth, normParams, normTarget, normReceipt, normPayoutMark, normPayee, normCashEntry, normCashOpening, prevYm, ymOf,
-  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark, type PayeeRec, type CoachLite, type ReceiptRow, type CashState, type CaseType,
+  type AcctGoal, type AcctItem, type AcctMonth, type AcctParams, type AcctState, type AcctTarget, type AcctSource, type SysRow, type Receipt, type PayoutMark, type PayeeRec, type CoachLite, type ReceiptRow, type CashState, type CaseType, isPaymentMethod,
 } from "./acctEngine";
 
 export const ACCT_TAG = "acct-params";
@@ -214,11 +214,6 @@ export async function saveAcctReceipt(id: string | null, value: unknown): Promis
   return out!;
 }
 // ---------- 顧問費：教練端入口（2026/10/09 Ray：建客戶時勾付費才記，後台查帳確認） ----------
-/** 顧問費項目（參數設定裡自動來源＝顧問費案件的那一個）。 */
-async function consultItem(): Promise<AcctItem | null> {
-  const S = await loadState();
-  return S.items.find((it) => it.source === "case") ?? null;
-}
 /**
  * 用業務制度引擎算一筆顧問費的拆分快照（30／60／10、差階、平階、代管、公司派案）。
  * 動態載入 comp 層：它會碰 comp_* 表，帳務的既有測試只 mock 了帳務的表。
@@ -234,12 +229,17 @@ async function consultAllocs(fee: number, execCoachId: string, promoCoachId: str
     label: l.kind === "advisor" ? `${l.role}${l.rankCode ? `（${l.rankCode}）` : ""} ${Math.round(l.totalPct * 10) / 10}%` : l.kind === "company_lead" ? "公司派案推廣端" : l.kind === "company_remainder" ? "鏈不完整歸公司" : "公司營運",
   }));
 }
-export type CoachFeeInput = { clientId: string; clientName: string; amount: number; on: string; last5?: string; promoCoachId?: string | null; note?: string };
+export type CoachFeeInput = {
+  clientId: string; clientName: string; amount: number; on: string; last5?: string; promoCoachId?: string | null; note?: string;
+  // 2026/10/28 收款案件：掛到哪個顧問服務案件、付款方式與實付總額／手續費、方案（營業項目；不給＝顧問費項目）
+  caseId?: string | null; itemId?: string | null; method?: string; methodFields?: Record<string, string>; gross?: number | null; fee?: number;
+};
 /**
  * 教練建客戶（或之後補）時記一筆顧問費：verified=false 等後台確認。回 receipt id；沒有顧問費項目時回 null（帳務不擋客戶建立）。
  */
 export async function createCoachFeeReceipt(execCoachId: string, input: CoachFeeInput): Promise<string | null> {
-  const it = await consultItem();
+  const S = await loadState();
+  const it = (input.itemId ? S.items.find((i) => i.id === input.itemId) : null) ?? S.items.find((i) => i.source === "case") ?? null;
   if (!it) return null;
   const amount = Math.max(0, Number(input.amount) || 0);
   if (!(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(input.on)) throw new Error("invalid-amount");
@@ -250,7 +250,9 @@ export async function createCoachFeeReceipt(execCoachId: string, input: CoachFee
   const [x] = await db.insert(acctReceipts).values({
     ym: input.on.slice(0, 7), itemId: it.id, receivedOn: input.on, amount, last5: (input.last5 ?? "").trim().slice(0, 20), payer: input.clientName.trim(),
     payerCoachId: null, sharers: [], payees: {}, note: (input.note ?? "").trim(), void: false, refund: 0,
-    clientId: input.clientId, execCoachId, promoCoachId: promo, verified: false, enteredBy: execCoachId, allocs, updatedAt: new Date(),
+    clientId: input.clientId, execCoachId, promoCoachId: promo, verified: false, enteredBy: execCoachId, allocs,
+    caseType: "client_service", caseId: input.caseId ?? null, gross: input.gross == null ? null : Math.max(0, Number(input.gross) || 0), fee: Math.max(0, Number(input.fee) || 0),
+    method: isPaymentMethod(input.method) ? input.method : "", methodFields: normReceipt({ methodFields: input.methodFields }, "").methodFields, updatedAt: new Date(),
   }).returning({ id: acctReceipts.id });
   await ensureAcctMonth(input.on.slice(0, 7));
   updateTag(ACCT_TAG);

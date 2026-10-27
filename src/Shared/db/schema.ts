@@ -1586,3 +1586,57 @@ export const trainingEnrollments = pgTable('training_enrollments', {
   index('training_enrollments_coach_idx').on(t.coachId),
   index('training_enrollments_stage_idx').on(t.reviewStage),
 ]);
+
+// 顧問服務案件（第二個簽署消費者，2026/10/28）。收款、合約、發票的共同關聯單位。
+// 一位客戶可多案（首次委任／年度續約）；同年度加試算版本不等於新案；複製新年度不帶收款／簽名／合約／發票狀態（那些都不在 plans 上）。
+// case_no＝客戶編號-序（例：2610003-1）；方案＝營業項目（沒建的服務不能簽）。簽約人＝客戶帳號（clients.client_user_id，沒綁就先用專用登入連結）。
+// status：open／completed（合約完成）／terminated／refunded。
+export const serviceCases = pgTable('service_cases', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  coachId: text('coach_id').notNull().references(() => coaches.id, { onDelete: 'restrict' }),     // 主責／簽署教練
+  promoCoachId: text('promo_coach_id').references(() => coaches.id, { onDelete: 'set null' }),   // 開發教練（null＝公司派案）
+  caseNo: text('case_no').notNull(),
+  kind: text('kind').default('first').notNull(),        // first / renewal
+  itemId: text('item_id').notNull(),
+  itemName: text('item_name').default('').notNull(),
+  serviceYear: integer('service_year').notNull(),
+  fromDate: date('from_date'),
+  toDate: date('to_date'),
+  amountDue: doublePrecision('amount_due').default(0).notNull(),
+  taxIncl: boolean('tax_incl').default(true).notNull(),
+  signerClientUserId: text('signer_client_user_id').references(() => clientUsers.id, { onDelete: 'set null' }),
+  status: text('status').default('open').notNull(),
+  note: text('note').default('').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('service_cases_client_idx').on(t.clientId),
+  index('service_cases_coach_idx').on(t.coachId),
+  uniqueIndex('service_cases_case_no_uq').on(t.caseNo),
+]);
+
+// 發票（公司獨立處理，第一期人工回填）。與合約共用案件與收款，但各自維護狀態、互不等待。
+// status：pending（待處理）／issued／failed／voided／allowance（折讓）。
+export const invoices = pgTable('invoices', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  caseType: text('case_type').notNull(),                 // client_service / training
+  caseId: text('case_id').notNull(),
+  buyerKind: text('buyer_kind').default('person').notNull(), // person / company
+  title: text('title').default('').notNull(),
+  taxId: text('tax_id').default('').notNull(),
+  email: text('email').default('').notNull(),
+  carrier: text('carrier').default('').notNull(),
+  invoiceNo: text('invoice_no').default('').notNull(),
+  issuedOn: date('issued_on'),
+  amount: doublePrecision('amount').default(0).notNull(),
+  status: text('status').default('pending').notNull(),
+  failReason: text('fail_reason').default('').notNull(),
+  handlerId: text('handler_id').references(() => coaches.id, { onDelete: 'set null' }),
+  note: text('note').default('').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('invoices_case_idx').on(t.caseType, t.caseId),
+  index('invoices_status_idx').on(t.status),
+]);

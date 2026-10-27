@@ -6,12 +6,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { approveCoach, resetCoach, suspendCoach, retryActivateAction } from "./actions";
+import { approveCoach, resetCoach, suspendCoach, retryActivateAction, rejectTrainingAction } from "./actions";
+import { SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
 
-export type TrainingBrief = { enrollmentId: string; stage: string; amountDue: number; confirmed: number; pending: number; met: boolean; docsDone: number; docsRequired: number; docsTotal: number; anyDeclined: boolean };
+export type TrainingBrief = { enrollmentId: string; stage: string; amountDue: number; confirmed: number; pending: number; met: boolean; docsDone: number; docsRequired: number; docsTotal: number; anyDeclined: boolean; needsCompany: boolean };
+export type CompanyOption = { id: string; name: string };
 
-export default function StatusActions({ id, status, training = null }: { id: string; status: string; training?: TrainingBrief | null }) {
+export default function StatusActions({ id, status, training = null, companyOptions = [], meId = "" }: { id: string; status: string; training?: TrainingBrief | null; companyOptions?: CompanyOption[]; meId?: string }) {
+  const [company, setCompany] = useState<string>(meId);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -37,11 +42,16 @@ export default function StatusActions({ id, status, training = null }: { id: str
         </div>
       )}
       <div className="flex gap-2 justify-end">
+        {status !== "active" && !signing && t?.needsCompany && t.stage === "pending" && (
+          <select className={SELECT_SM} value={company} onChange={(e) => setCompany(e.target.value)} title="公司代表簽名位由誰簽">
+            {companyOptions.map((c) => <option key={c.id} value={c.id}>公司代表：{c.name}</option>)}
+          </select>
+        )}
         {status !== "active" && !signing && (
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(approveCoach)}
+            onClick={() => run((cid) => approveCoach(cid, t?.needsCompany ? company : null))}
             className="rounded-md bg-ok-solid text-onbrand font-bold px-3 py-1.5 text-xs disabled:opacity-50"
           >
             {pending ? "處理中…" : t ? "審核通過並啟動簽署" : "核准開通"}
@@ -60,6 +70,9 @@ export default function StatusActions({ id, status, training = null }: { id: str
               {pending ? "處理中…" : "開通"}
             </button>
           </>
+        )}
+        {status === "pending" && t && t.stage !== "rejected" && t.stage !== "activated" && !rejecting && (
+          <button type="button" className="rounded-md border border-line2 text-tx2 px-2.5 py-1.5 text-xs" disabled={pending} onClick={() => setRejecting(true)}>退回</button>
         )}
         {status === "active" && (
           <button
@@ -82,6 +95,14 @@ export default function StatusActions({ id, status, training = null }: { id: str
           </button>
         )}
       </div>
+      {rejecting && (
+        <div className="flex items-center gap-1 text-xs">
+          <input className="rounded border border-line bg-field px-2 py-1 w-40" placeholder="退回原因（必填）" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <button type="button" className="rounded border border-danger text-danger px-2 py-1 disabled:opacity-40" disabled={pending || !reason.trim()} onClick={() => run(() => rejectTrainingAction(id, reason).then((r) => { if (r.ok) setRejecting(false); return r; }))}>確認退回</button>
+          <button type="button" className="text-tx3" onClick={() => setRejecting(false)}>取消</button>
+        </div>
+      )}
+      {t?.stage === "rejected" && <span className="text-10 text-danger">培訓報名已退回</span>}
       {error && <span className="text-10 text-danger">失敗：{error}</span>}
     </div>
   );

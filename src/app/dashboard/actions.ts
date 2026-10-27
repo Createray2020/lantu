@@ -11,7 +11,10 @@ import * as Notes from "@/lib/notes";
 import * as Session from "@/lib/consultSession";
 import * as ClientQuiz from "@/lib/clientRiskQuiz";
 import { quizTodoTitle, quizWho, type QuizWho } from "@/lib/riskQuizTodo";
-import { createCoachFeeReceipt, receiptsForClient } from "@/lib/acctStore";
+import { createCoachFeeReceipt, getAcctState } from "@/lib/acctStore";
+import { createServiceCase, listCasesForClient, caseView, addCasePayment, startCaseSigning, getServiceCase } from "@/lib/serviceStore";
+import { canSignNow, isSigner } from "@/lib/docs";
+import type { PaymentMethod } from "@/lib/acctEngine";
 import { listActiveCoaches } from "@/lib/org";
 
 // 這裡是教練端「所有寫入」的唯一身分入口 —— 期限到期的唯讀鎖定就掛在 requireWritableCoach()，
@@ -53,8 +56,32 @@ function fail(e: unknown): { ok: false; error: string } {
   return { ok: false, error: FALLBACK_ERROR };
 }
 
-/** 建客戶時勾「付費顧問案」帶的收款資料（2026/10/09 Ray：勾了才記進後台顧問費、等後台查帳確認）。 */
-export type ClientFeeInput = { amount: number; on: string; last5?: string; promoCoachId?: string | null };
+/** 建客戶時勾「建立付費顧問服務案件」帶的資料（2026/10/09 收款、2026/10/28 加案件：方案／年度／期間／付款方式）。 */
+export type ClientFeeInput = {
+  amount: number; on: string; last5?: string; promoCoachId?: string | null;
+  itemId?: string; serviceYear?: number; from?: string | null; to?: string | null; method?: PaymentMethod; gross?: number | null; fee?: number;
+};
+export type ServiceItemOption = { id: string; name: string; price: number; cat: string; default: boolean };
+/** 服務方案下拉：帳務營業項目（沒建的服務不能拿來建案）；顧問費那個項目當預設。 */
+export async function serviceItemOptionsAction(): Promise<ServiceItemOption[]> {
+  await requireWritableCoach();
+  const S = await getAcctState();
+  return S.items.map((i) => ({ id: i.id, name: i.name, price: i.price, cat: i.cat ?? "", default: i.source === "case" }));
+}
+/** 建案＋記第一筆付款（建客戶與客戶頁補建共用）。案件建不起來就回錯；付款記不進去只警告（案件已經在了）。 */
+async function createCaseWithFee(coachId: string, clientId: string, clientName: string, fee: ClientFeeInput): Promise<{ ok: true; warn?: string } | { ok: false; error: string }> {
+  if (!fee.itemId) return { ok: false, error: "請選服務方案" };
+  const r = await createServiceCase(coachId, clientId, { itemId: fee.itemId, serviceYear: fee.serviceYear, from: fee.from, to: fee.to, amountDue: fee.amount, promoCoachId: fee.promoCoachId ?? null });
+  if (!r.ok) return r;
+  if (fee.amount > 0) {
+    try {
+      await createCoachFeeReceipt(coachId, { clientId, clientName, amount: fee.amount, on: fee.on, last5: fee.last5, promoCoachId: fee.promoCoachId ?? null, caseId: r.case.id, itemId: r.case.itemId, method: fee.method, gross: fee.gross, fee: fee.fee });
+    } catch {
+      return { ok: true, warn: "案件已建立，但付款沒記成功，請到客戶頁「收款與合約」補登" };
+    }
+  }
+  return { ok: true };
+}
 
 export async function createClientAction(input: Clients.ClientInput & { fee?: ClientFeeInput | null }): Promise<CreateClientResult> {
   try {
@@ -63,10 +90,12 @@ export async function createClientAction(input: Clients.ClientInput & { fee?: Cl
     await requireClientQuota(me);
     const { fee, ...clientInput } = input;
     const id = await Clients.createClient(me.id, clientInput);
-    // 顧問費：客戶建好之後才記；帳務失敗不能讓客戶建立失敗（客戶已經在了），把錯誤帶回畫面就好
-    if (fee && fee.amount > 0) {
-      try { await createCoachFeeReceipt(me.id, { clientId: id, clientName: clientInput.name, ...fee }); }
-      catch { revalidatePath("/dashboard/clients"); return { ok: true, id, warn: "客戶已建立，但顧問費沒記成功，請到客戶頁補記" }; }
+    // 服務案件＋顧問費：客戶建好之後才做；失敗不能讓客戶建立失敗（客戶已經在了），把訊息帶回畫面就好
+    if (fee && (fee.amount > 0 || fee.itemId)) {
+      const r = await createCaseWithFee(me.id, id, clientInput.name, fee).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }));
+      revalidatePath("/dashboard/clients");
+      if (!r.ok) return { ok: true, id, warn: `客戶已建立，但服務案件沒建成功（${r.error}），請到客戶頁「收款與合約」補建` };
+      if (r.warn) return { ok: true, id, warn: r.warn };
     }
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/clients");
@@ -527,24 +556,72 @@ export async function restoreToSessionAction(clientId: string, sessionId: string
   return { ok: true, planId: s.planId };
 }
 
-/** 既有客戶之後收費：補記一筆顧問費（待後台查帳）。 */
-export async function addClientFeeAction(clientId: string, fee: ClientFeeInput): Promise<ActionResult> {
+/** 既有客戶後來才付款（入口 B／C）：建立付費服務案件＋第一筆付款。同年度已有案就掛到既有案。 */
+export async function addClientFeeAction(clientId: string, fee: ClientFeeInput): Promise<ActionResult & { warn?: string }> {
   try {
     const me = await requireWritableCoach();
     const c = await Clients.getClient(me.id, clientId);
     if (!c) throw new Error("forbidden");
-    await createCoachFeeReceipt(me.id, { clientId, clientName: c.name, ...fee });
+    const r = await createCaseWithFee(me.id, clientId, c.name, fee);
     revalidatePath(`/dashboard/clients/${clientId}`);
+    return r;
+  } catch (e) { return fail(e); }
+}
+export type CaseDocRow = { id: string; title: string; status: string; myTurn: boolean; signers: string };
+export type ClientCaseRow = {
+  id: string; caseNo: string; kind: string; itemName: string; serviceYear: number; from: string | null; to: string | null; amountDue: number; status: string;
+  confirmed: number; pending: number; met: boolean; clientBound: boolean;
+  receipts: { id: string; on: string; amount: number; gross: number | null; refund: number; method: string; verified: boolean }[];
+  docs: CaseDocRow[]; docsDone: number; docsRequired: number; anyDeclined: boolean;
+  invoice: { status: string; invoiceNo: string; issuedOn: string | null } | null;
+};
+/** 客戶頁「收款與合約」：這位客戶的所有服務案件，三組狀態一次帶齊。 */
+export async function clientCasesAction(clientId: string): Promise<ClientCaseRow[]> {
+  const me = await requireWritableCoach().catch(() => null);
+  if (!me) return [];
+  const cases = await listCasesForClient(clientId);
+  const out: ClientCaseRow[] = [];
+  for (const c of cases) {
+    const v = await caseView(c);
+    out.push({
+      id: c.id, caseNo: c.caseNo, kind: c.kind, itemName: c.itemName, serviceYear: c.serviceYear, from: c.fromDate, to: c.toDate, amountDue: c.amountDue, status: c.status,
+      confirmed: v.funding.confirmed, pending: v.funding.pending, met: v.funding.met, clientBound: v.clientBound,
+      receipts: v.receipts.filter((r) => !r.void).map((r) => ({ id: r.id, on: r.on, amount: r.amount, gross: r.gross, refund: r.refund, method: r.method, verified: r.verified })),
+      docs: v.docs.map((d) => {
+        const mine = d.signers.find((s) => isSigner(s, { coachId: me.id }));
+        return { id: d.id, title: d.title, status: d.status, myTurn: !!mine && d.status === "pending" && canSignNow(mine, d.signers), signers: d.signers.map((s) => `${s.displayName || s.label}${s.status === "signed" ? "✓" : ""}`).join("→") };
+      }),
+      docsDone: v.progress.done, docsRequired: v.progress.required, anyDeclined: v.progress.anyDeclined,
+      invoice: v.invoice ? { status: v.invoice.status, invoiceNo: v.invoice.invoiceNo, issuedOn: v.invoice.issuedOn } : null,
+    });
+  }
+  return out;
+}
+export type CasePaymentInput = { amount: number; on: string; method?: PaymentMethod; last5?: string; gross?: number | null; fee?: number };
+/** 登錄付款：掛到既有案件（教練提報、待後台查帳）。 */
+export async function addCasePaymentAction(caseId: string, input: CasePaymentInput): Promise<ActionResult> {
+  try {
+    const me = await requireWritableCoach();
+    const c = await getServiceCase(caseId);
+    if (!c || c.coachId !== me.id) throw new Error("forbidden");
+    const cl = await Clients.getClient(me.id, c.clientId);
+    if (!cl) throw new Error("forbidden");
+    await addCasePayment(me.id, c, cl.name, input);
+    revalidatePath(`/dashboard/clients/${c.clientId}`);
     return { ok: true };
   } catch (e) { return fail(e); }
 }
-export type ClientFeeRow = { id: string; on: string; amount: number; refund: number; verified: boolean; void: boolean; promo: string };
-/** 這位客戶的顧問費收款（教練端只看自己客戶的）。 */
-export async function clientFeesAction(clientId: string): Promise<ClientFeeRow[]> {
-  const me = await requireWritableCoach().catch(() => null);
-  if (!me) return [];
-  const rows = await receiptsForClient(clientId);
-  return rows.filter((r) => r.execCoachId === me.id || r.enteredBy === me.id).map((r) => ({ id: r.id, on: r.on, amount: r.amount, refund: r.refund, verified: r.verified, void: r.void, promo: r.promoCoachId ? (r.promoCoachId === me.id ? "本人" : r.promoCoachId) : "公司派案" }));
+/** 啟動簽約流程（後端驗門檻）。 */
+export async function startCaseSigningAction(caseId: string): Promise<{ ok: true; docs: number } | { ok: false; error: string; needLogin?: boolean }> {
+  try {
+    const me = await requireWritableCoach();
+    const r = await startCaseSigning(me.id, caseId);
+    if (!r.ok) return r;
+    const c = await getServiceCase(caseId);
+    if (c) revalidatePath(`/dashboard/clients/${c.clientId}`);
+    revalidatePath("/dashboard/docs");
+    return { ok: true, docs: r.docs };
+  } catch (e) { const f = fail(e); return f.ok ? { ok: false, error: "失敗" } : f; }
 }
 /** 開發教練下拉用：全組織在職教練。 */
 export async function coachOptionsAction(): Promise<{ id: string; name: string; rankCode: string | null }[]> {

@@ -14,7 +14,8 @@ import { coaches, coachApplications, coachDisplayName, trainingEnrollments } fro
 import { getApplySettings, checkApprovalGate, activateCoach } from "./coachApplyStore";
 import { getAcctState, createCaseReceipt, receiptsForCase, type CaseFeeInput } from "./acctStore";
 import { caseFunding, referralChain, type Receipt } from "./acctEngine";
-import { startSigning, listInstancesForCase, withSigners, caseProgress, type InstanceWithSigners } from "./docsStore";
+import { startSigning, listInstancesForCase, withSigners, caseProgress, getSet, latestEnabledTemplate, type InstanceWithSigners } from "./docsStore";
+import type { DocSignerSlot } from "./docs";
 import { getBrand } from "./brand";
 import { E_SIGN_CLAUSE, type DocVars } from "./docs";
 import { todayISO } from "./license";
@@ -105,6 +106,16 @@ export async function reportTrainingPayment(coachId: string, input: CaseFeeInput
   } catch (e) {
     return { ok: false, error: e instanceof Error && e.message === "invalid-amount" ? "請填正確的金額與日期" : "提報失敗" };
   }
+}
+
+/** 這個培訓方案的範本組合裡有沒有「公司」簽名位（有＝後台核准時要選公司代表）。 */
+export async function setNeedsCompanySigner(itemId: string): Promise<boolean> {
+  const keys = await getSet("training_item", itemId);
+  for (const k of keys) {
+    const t = await latestEnabledTemplate(k);
+    if ((t?.signers as DocSignerSlot[] | undefined)?.some((x) => x.role === "company")) return true;
+  }
+  return false;
 }
 
 // ── 審核通過 → 啟動簽署 ─────────────────────────────────────────────────────

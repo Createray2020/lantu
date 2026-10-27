@@ -18,11 +18,14 @@ export default function DashboardHeader({
   theme = DEFAULT_THEME,
   license,
   learnOn = true,
+  docsPending = 0,
 }: {
   isAdmin?: boolean;
   uiScale?: number;
   theme?: ThemeName;
   license?: LicenseState;
+  /** 輪到我簽的電子文件份數（2026/10/28）；0 不顯示角標。 */
+  docsPending?: number;
   // 學習區模組關閉時整顆入口不出現（見 /admin/modules）。預設 true：
   // 沒傳的呼叫端（例如測試）維持改版前的行為。
   learnOn?: boolean;
@@ -133,9 +136,9 @@ export default function DashboardHeader({
       </Link>
       <Link
         href="/dashboard/docs"
-        className="text-tx2 hover:text-tx text-xs font-bold px-2.5 py-1.5 rounded-md border border-line2"
+        className={`text-xs font-bold px-2.5 py-1.5 rounded-md border ${docsPending > 0 ? "border-brand2 text-brand2" : "border-line2 text-tx2 hover:text-tx"}`}
       >
-        我的文件
+        我的文件{docsPending > 0 ? `（${docsPending}）` : ""}
       </Link>
       <Link
         href="/portal"

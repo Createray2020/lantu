@@ -9,7 +9,7 @@ import AdminNav from "./AdminNav";
 import LicenseCell from "./LicenseCell";
 import CoachRoster, { type RosterRow } from "./CoachRoster";
 import ReviewPanel from "./ReviewPanel";
-import { enrollmentsFor, enrollmentView } from "@/lib/trainingStore";
+import { enrollmentsFor, enrollmentView, setNeedsCompanySigner } from "@/lib/trainingStore";
 import type { TrainingBrief } from "./StatusActions";
 import { getApplySettings, listApplications } from "@/lib/coachApplyStore";
 import { rankCaps } from "@/lib/quota";
@@ -49,11 +49,11 @@ export default async function Admin() {
   const training: Record<string, TrainingBrief> = {};
   await Promise.all(
     Object.values(enrollments).map(async (e) => {
-      const v = await enrollmentView(e);
+      const [v, needsCompany] = await Promise.all([enrollmentView(e), setNeedsCompanySigner(e.itemId)]);
       training[e.coachId] = {
         enrollmentId: e.id, stage: e.reviewStage, amountDue: e.amountDue,
         confirmed: v.funding.confirmed, pending: v.funding.pending, met: v.funding.met,
-        docsDone: v.progress.done, docsRequired: v.progress.required, docsTotal: v.docs.length, anyDeclined: v.progress.anyDeclined,
+        docsDone: v.progress.done, docsRequired: v.progress.required, docsTotal: v.docs.length, anyDeclined: v.progress.anyDeclined, needsCompany,
       };
     }),
   );
@@ -64,6 +64,10 @@ export default async function Admin() {
   const activePeers = coaches
     .filter((c) => c.status === "active")
     .map((c) => ({ id: c.id, label: c.name || c.email || c.id }));
+  // 公司代表簽名位的人選：核心成員與管理員（培訓文件範本有「公司」簽名位時才會出現下拉）。
+  const companyOptions = coaches
+    .filter((c) => c.status === "active" && (c.orgRank === "owner" || c.role === "admin"))
+    .map((c) => ({ id: c.id, name: c.name || c.email || c.id }));
 
   return (
     <main className="flex-1 bg-canvas text-tx min-h-screen">
@@ -192,7 +196,7 @@ export default async function Admin() {
                         <span className="text-tx3 text-xs block text-right">本人</span>
                       ) : (
                         <div className="flex flex-col items-end gap-1">
-                          <StatusActions id={c.id} status={c.status} training={training[c.id] ?? null} />
+                          <StatusActions id={c.id} status={c.status} training={training[c.id] ?? null} companyOptions={companyOptions} meId={me.id} />
                           <TestToggle id={c.id} isTest={c.isTest} />
                           <RemoveCoach
                             id={c.id}

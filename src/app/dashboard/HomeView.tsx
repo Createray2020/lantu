@@ -175,7 +175,7 @@ function MemberView({ d, today, pl, multi }: { d: MemberHome; today: string; pl:
               <>
                 <div className="text-13 mb-2">{promoLine}</div>
                 <Bar pct={p.pct} kind={p.met ? "green" : "amber"} />
-                <div className="text-11 text-tx3 mt-2">件數＝同一客戶同年度合計一案；顧問費＝公司已確認入帳的實收。只勾了「付費顧問案」的才算。</div>
+                <div className="text-11 text-tx3 mt-2">件數＝同一客戶同年度合計一案；顧問費＝公司已確認入帳的實收。只有建了「付費顧問服務案件」的才算。</div>
               </>
             )}
           </Section>

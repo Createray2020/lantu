@@ -8,5 +8,8 @@ export async function onDocCompleted(caseType: DocCategory, caseId: string): Pro
     const { tryActivateEnrollment } = await import("./trainingStore");
     await tryActivateEnrollment(caseId, "docs");
   }
-  // client_service：第二批（顧問服務案件）接上「通知雙方＋發票待辦」。
+  if (caseType === "client_service") {
+    const { onCaseDocsCompleted } = await import("./serviceStore");
+    await onCaseDocsCompleted(caseId);
+  }
 }
