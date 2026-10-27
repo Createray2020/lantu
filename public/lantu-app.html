@@ -1152,6 +1152,24 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .trialcard .tnums{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
 .trialcard .tnums .lb{font-size:11px;color:var(--mut)}.trialcard .tnums .vv{font-family:var(--serif);font-size:16px;font-weight:700}.trialcard .tnums small{font-size:11px;color:var(--mut);font-weight:400}
 .trialcard .tbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pgrid{min-width:1180px;table-layout:fixed}.pgrid th:nth-child(1){width:110px}.pgrid th:nth-child(2){width:110px}.pgrid th:nth-child(3){width:190px}.pgrid th:nth-child(4){width:130px}.pgrid th:nth-child(5){width:100px}.pgrid th:nth-child(6){width:58px}.pgrid th:nth-child(7){width:84px}.pgrid th:nth-child(8){width:104px}.pgrid th:nth-child(9){width:104px}.pgrid th:nth-child(10){width:90px}.pgrid th:nth-child(11){width:150px}
+.pgrid td{padding:3px 4px;vertical-align:middle}.pgrid input,.pgrid select{width:100%;min-width:0;background:var(--field);border:1px solid var(--line);color:var(--tx);border-radius:4px;padding:4px 6px;font-size:12px}
+.pgrid input.amtin{text-align:right}.pgrid td.r{text-align:right}.pgrid .pgind{display:inline-block;color:var(--amber2);font-weight:700;margin-right:4px}
+.pgrid tr.rider td:first-child{padding-left:16px}.pgrid tr.off input,.pgrid tr.off select{opacity:.55}
+.pgrid tr.pggrp td{background:var(--card2);font-size:13px;padding:6px 8px}.pgrid tr.pggrp .hint{margin-left:8px}
+.pgrid tr.pgsum td{font-size:12px;color:var(--mut);border-bottom:2px solid var(--line2)}
+.pgrid .pgops{white-space:nowrap}.pgrid .pgops .tbtn{padding:2px 7px;font-size:11px;margin-right:4px}
+.pgtot{margin-top:8px;font-size:13px}.pgtot .hint{margin-left:10px}
+.ckov th{font-size:11px;white-space:nowrap}.ckov td.ckcell{cursor:pointer;line-height:1.3;border-left:3px solid transparent}
+.ckov td.ckcell .h{font-weight:700;font-size:13px}.ckov td.ckcell .nd{font-size:11px;color:var(--mut)}
+.ckov td.ck-low{border-left-color:var(--danger)}.ckov td.ck-low .h{color:var(--danger)}
+.ckov td.ck-mid{border-left-color:var(--ok)}.ckov td.ck-high{border-left-color:var(--warn)}.ckov td.ck-high .h{color:var(--warn)}
+.ckov td.ck-info{border-left-color:var(--teal)}.ckov td.ck-none .h{color:var(--mut2)}
+.ckov td.ckcell.on{background:var(--card2)}.ckov tr.ckdetail td{background:var(--card2);padding:10px 12px}
+.ckdhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;margin-bottom:8px}.ckdhead .warn{color:var(--danger)}
+.ckitems{font-size:12px}.cklegend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:8px}
+.cklegend span{padding-left:8px;border-left:3px solid transparent}.cklegend .ck-low{border-left-color:var(--danger)}.cklegend .ck-mid{border-left-color:var(--ok)}.cklegend .ck-high{border-left-color:var(--warn)}.cklegend .ck-info{border-left-color:var(--teal)}
+.ckfoldsec{padding:0;background:none;border:0}.ckfoldsec>details{margin:0}.ckbyy{margin-bottom:14px}.ckbyy tr.dim td{color:var(--mut)}
 .tmrow{display:grid;grid-template-columns:1fr 150px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
 .tmrow .tmn{font-weight:700}.tmrow .tmn .hint{font-weight:400;margin-left:6px}
 .tmrow input[type=text]{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:6px 8px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums}
@@ -5431,6 +5449,7 @@ function setAmtByPeriodLive(arr,idx,val){var c=activeCase();if(!c)return;var it=
 // 新增任何衍生數字時只要掛 data-calc，不必再記得補同步邏輯 —— 這是「數字不會更新」bug 的根治。
 var CALC={
  eduTotal:function(c){return eduDerivedHTML(c);},
+ polGridTot:function(c){return polGridTotHTML(c);},   // B-3 保單明細表合計
  // 手冊第 3 章的兩題：改變的準備度、財務決策分工。兩者都不進引擎，
  // 但都必須產生一句可行動的判讀，否則就是「填得進去卻不影響任何結果」的死欄位。
  readiness:function(c){return readinessHint(c);},
@@ -14145,6 +14164,75 @@ function jumpPolicy(j){
  revealEl(el);   // 附約住在折疊群組裡：先展開（並記住）再捲
  if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
 }
+/* ===== B-3（2026/10/27 Ray）保單明細表：可直接 key 入的一覽表 =====
+   跟 Ray 自己的 xlsx 同構：按被保人分組、附約接在主約下、每人一列保費合計；
+   表與卡片是同一份 c.policies（表負責快速登錄，卡片負責深欄位），卡片收進下面「逐張保單詳細」折疊。
+   ⚠️ 格子走 setLive/set（不 render），合計列用 data-calc="polGridTot" 當場重算；險種細分與被保人換了要 render。 */
+function polAmtField(p){if(!p)return '';if(p.bigCat==='產物')return 'pAmount';return SUB_TO_FIELD[p.subtype]||'';}
+function polMemberName(c,p){return ((p&&p.insured)||'').trim()||'（未指定被保人）';}
+function policyGridGroups(c){ // [{member, rows:[{p,i,rider,orphan,main}]}]，附約一律跟著主約的那一組
+ var pols=c.policies||[],byM={},order=[];
+ function grp(nm){if(!byM[nm]){byM[nm]={member:nm,rows:[]};order.push(nm);}return byM[nm];}
+ (c.members||[]).map(function(m){return (m.name||'').trim();}).filter(Boolean).forEach(function(nm){
+  if(pols.some(function(p){return p.policyKind!=='附約'&&polMemberName(c,p)===nm}))grp(nm);});
+ var used={};
+ pols.forEach(function(p,i){if(p.policyKind==='附約')return;used[i]=1;var g=grp(polMemberName(c,p));g.rows.push({p:p,i:i,rider:false});
+  pols.forEach(function(r,j){if(r.policyKind==='附約'&&r.riderOf&&r.riderOf===p.pid){used[j]=1;g.rows.push({p:r,i:j,rider:true,main:p});}});});
+ pols.forEach(function(p,i){if(!used[i])grp(polMemberName(c,p)).rows.push({p:p,i:i,rider:true,orphan:true});});
+ return order.map(function(k){return byM[k];});
+}
+function polGridGroupTotal(c,g){return sum(g.rows,function(r){return policyActive(r.p)?n(r.p.premium):0;});}
+function polGridTotHTML(c){
+ var groups=policyGridGroups(c),tot=0;
+ var parts=groups.map(function(g){var t=polGridGroupTotal(c,g);tot+=t;return '<span>'+esc(g.member)+' <b>'+fmt(t)+'</b></span>';});
+ return '<div class="pgtot">年繳保費合計 <b style="color:var(--amber2)">'+fmt(tot)+'</b>'+(parts.length>1?'<span class="hint">'+parts.join('　')+'</span>':'')+'</div>';
+}
+function pgAddRider(i){addRider(i);}   // 明細表的「＋附約」（跟卡片那顆分開命名，financeInputUI.test 數 addRider(0) 只有一顆）
+function addPolicyFor(member){var c=activeCase();if(!c)return;addRow('policies');var p=c.policies[c.policies.length-1];if(p&&member&&member!=='（未指定被保人）'){p.insured=member;if(!p.owner)p.owner=member;}save();render();
+ var el=document.querySelector('.pgrow[data-pgidx="'+(c.policies.length-1)+'"] input');if(el&&el.focus)el.focus();}
+function policyGridSec(c){
+ c.policies=c.policies||[];ensurePolicies(c);
+ var groups=policyGridGroups(c);
+ var memOpts=(c.members||[]).map(function(m){return (m.name||'').trim();}).filter(Boolean);
+ var head='<tr><th>保險公司</th><th>保單號碼</th><th>險種名稱</th><th>險種細分</th><th class="r">保額</th><th>年期</th><th>繳別</th><th class="r">年繳保費</th><th>生效日</th><th>被保人</th><th></th></tr>';
+ var ncol=11;
+ var body=groups.map(function(g){
+  var rows=g.rows.map(function(r){var p=r.p,i=r.i,id='policies:'+i;
+   var sb=function(k,ty){var t=ty==='num'?',\'num\'':'';return 'oninput="setLive(\''+id+'\',\''+k+'\',this.value'+t+')" onchange="set(\''+id+'\',\''+k+'\',this.value'+t+')"';};
+   var af=polAmtField(p);
+   var amt=af?moneyCell('oninput="setLive(\''+id+'\',\''+af+'\',this.value,\'num\')" onchange="set(\''+id+'\',\''+af+'\',this.value,\'num\')"',p[af])
+     :'<span class="hint" title="此險種不對到單一保額欄，到詳細卡的「保障明細」填">—</span>';
+   var subSel='<select onchange="setPolicySub('+i+',this.value)">'+(POLICY_SUB[p.bigCat]||[]).map(function(o){return '<option '+(p.subtype===o?'selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select>';
+   var insSel='<select onchange="set(\''+id+'\',\'insured\',this.value);render()">'+['' ].concat(memOpts).map(function(o){return '<option value="'+esc(o)+'" '+((p.insured||'')===o?'selected':'')+'>'+(o||'—')+'</option>';}).join('')+'</select>';
+   var payModeSel='<select '+sb('payMode')+'>'+PAY_MODES.map(function(o){return '<option '+((p.payMode||'年繳')===o?'selected':'')+'>'+o+'</option>';}).join('')+'</select>';
+   var tag=r.rider?'<span class="pgind" title="'+(r.orphan?'附約（未指定主約）':'附約・'+esc((r.main&&r.main.name)||''))+'">'+(r.orphan?'└?':'└')+'</span>':'';
+   var stOff=!policyActive(p);
+   return '<tr class="pgrow'+(r.rider?' rider':'')+(r.orphan?' orphan':'')+(stOff?' off':'')+'" data-pgidx="'+i+'">'+
+    '<td>'+tag+'<input list="dl-insurers" value="'+esc(p.insurer||'')+'" '+sb('insurer')+' placeholder="公司"></td>'+
+    '<td><input value="'+esc(p.policyNo||'')+'" '+sb('policyNo')+' placeholder="號碼"></td>'+
+    '<td><input value="'+esc(p.name||'')+'" '+sb('name')+' placeholder="險種名稱"></td>'+
+    '<td>'+subSel+'</td>'+
+    '<td class="r">'+amt+'</td>'+
+    '<td><input type="number" inputmode="decimal" value="'+esc(p.payYears==null?'':p.payYears)+'" '+sb('payYears','num')+' style="width:52px"></td>'+
+    '<td>'+payModeSel+'</td>'+
+    '<td class="r">'+moneyCell('oninput="setLive(\''+id+'\',\'premium\',this.value,\'num\')" onchange="set(\''+id+'\',\'premium\',this.value,\'num\')"',p.premium)+'</td>'+
+    '<td><input value="'+esc(p.effDate||'')+'" '+sb('effDate')+' placeholder="YYYY/MM/DD"></td>'+
+    '<td>'+insSel+'</td>'+
+    '<td class="pgops"><button type="button" class="tbtn sm" onclick="jumpPolicy('+i+')" title="到下面的詳細卡：關係人、期間、保障明細、理賠">詳細</button>'+
+     (r.rider?'':'<button type="button" class="tbtn sm ghost" onclick="pgAddRider('+i+')" title="在這張主約底下加附約">＋附約</button>')+
+     '<button class="del" onclick="delRow(\'policies\','+i+')">✕</button></td></tr>';
+  }).join('');
+  return '<tr class="pggrp"><td colspan="'+ncol+'"><b>'+esc(g.member)+'</b><span class="hint">'+g.rows.length+' 列</span></td></tr>'+rows+
+   '<tr class="pgsum"><td colspan="'+(ncol-4)+'" class="r">'+esc(g.member)+' 年繳保費合計</td><td class="r"><b>'+fmt(polGridGroupTotal(c,g))+'</b></td><td colspan="3"></td></tr>'+
+   addTr('policies',ncol,'給 '+esc(g.member)+' 的主約','addPolicyFor(\''+esc(g.member)+'\')');
+ }).join('');
+ var newGrp='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">'+
+  '<span class="hint">沒有保單的成員：</span>'+memOpts.filter(function(nm){return !groups.some(function(g){return g.member===nm});}).map(function(nm){return '<button type="button" class="tbtn sm" onclick="addPolicyFor(\''+esc(nm)+'\')">＋ '+esc(nm)+' 的第一張保單</button>';}).join('')+
+  (groups.length||memOpts.length?'':'<button type="button" class="tbtn sm" onclick="addRow(\'policies\')">＋ 新增保單</button>')+'</div>';
+ return '<div class="sec" id="polGrid"><h4>保單明細 <span class="hint">直接在格子裡打；附約接在主約底下（└）；關係人、保障明細等深欄位按「詳細」到下面的卡片填</span></h4>'+
+  '<div class="tw"><table class="rtable pgrid">'+head+(body||'<tr><td colspan="'+ncol+'" class="muted">尚無保單。</td></tr>')+'</table></div>'+
+  '<div data-calc="polGridTot">'+polGridTotHTML(c)+'</div>'+newGrp+'</div>';
+}
 function policiesSec(c){
  c.policies=c.policies||[];
  ensurePolicies(c);
@@ -14169,7 +14257,10 @@ function policiesSec(c){
  var totPrem=sum(c.policies,function(p){return n(p.premium)});
  var propPrem=sum(c.policies,function(p){return p.bigCat==='產物'?n(p.premium):0});
  var statTbl=mems.length?'<div class="sec"><h4>人身保障統計 <span class="hint">年繳保費合計 '+fmt(totPrem)+'（其中產險 '+fmt(propPrem)+'）</span></h4><div class="tw"><table class="rtable"><tr><th>被保人</th>'+KINDS.map(function(k){return '<th>'+k+'<div class="muted" style="font-weight:400;font-size:10.5px">'+kindUnit(k)+'</div></th>'}).join('')+'</tr>'+stat+'</table></div></div>':'';
- return '<div class="ppband">現有保單 <span class="hint">逐張加厚登錄：人身／產物 · 主附約 · 關係人 · 期間狀態 · 理賠條件</span></div>'+cards+addBtn+statTbl;
+ // 2026/10/27 B-3：上面是可直接 key 入的明細表（policyGridSec），卡片收進「逐張保單詳細」折疊當深欄位。
+ var nPol=(c.policies||[]).length;
+ return '<div class="ppband">現有保單 <span class="hint">明細表快速登錄 · 詳細卡填關係人／期間／保障明細／理賠條件</span></div>'+policyGridSec(c)+
+  foldKeep('polcards','逐張保單詳細（'+nPol+' 張）','關係人、期間狀態、保障明細、子表、理賠條件；明細表的「詳細」會跳到這裡',cards+addBtn,false)+statTbl;
 }
 
 // ===== 保單檢查報告 UI（2026/08/24）=====
@@ -14441,16 +14532,108 @@ function policyCheckupSec(c){
   '</div>';
  var chart='<div class="sec ckhero"><h4>保單檢查報告 <span class="hint">現在的保單狀況，是否符合現在的需求</span></h4>'+
   checkupDatesHTML(c)+'<div data-calc="checkupChart">'+checkupChartSVG(c)+'</div>'+kpi+'</div>';
- var t1='<div class="sec"><h4>1 保費 <span class="hint">依理財金三角：保障型佔年收入 '+TRIANGLE_RISK+'%、理財型 '+TRIANGLE_INVEST+'%</span></h4>'+
-  checkupTable(pm.rows)+checkupAdviceHTML(c,pm.rows,'1 保費')+'</div>';
- var t2='<div class="sec"><h4>2 保障 <span class="hint">需求來自「保障需求」三大塊；已備來自逐張保單與已備補充</span></h4>'+
+ // 2026/10/27 B-3：主圖＋KPI 之後先給「保障總覽」（被保人 × 九類，點格看來源）；三張五欄表收進折疊，點開才看細節。
+ var t1=foldKeep('ck1','1 保費','依理財金三角：保障型佔年收入 '+TRIANGLE_RISK+'%、理財型 '+TRIANGLE_INVEST+'%',
+  checkupTable(pm.rows)+checkupAdviceHTML(c,pm.rows,'1 保費'),false);
+ var t2=foldKeep('ck2','2 保障','需求來自「保障需求」三大塊；已備來自逐張保單與已備補充',
   checkupTable(cov,{empty:'尚未建立保障需求。到下方「保障需求」為每位需要保障的成員建一張。'})+
   '<div class="hint">「住院醫療」之金額為定額給付＋實支實付之每日病房費。</div>'+
-  checkupAdviceHTML(c,cov,'2 保障')+'</div>';
- var t3='<div class="sec"><h4>3 $領回 <span class="hint">理財目標所需 vs 已備＋保單可領回（$生存/$滿期/$祝壽/$年金/$投資）</span></h4>'+
+  checkupAdviceHTML(c,cov,'2 保障'),false);
+ var t3=foldKeep('ck3','3 $領回','理財目標所需 vs 已備＋保單可領回（$生存/$滿期/$祝壽/$年金/$投資）',
   checkupTable(pay,{empty:'尚未建立退休或理財目標。'})+
-  checkupAdviceHTML(c,pay,'3 $領回')+'</div>';
- return chart+t1+t2+t3;
+  checkupAdviceHTML(c,pay,'3 $領回'),false);
+ // 折疊外包一層 .sec：註記掛點（mount）只認 .sec 裡的 h4/summary，「2 保障」那一條掛在五欄表上（notesUI.test）。
+ var wrap=function(h){return '<div class="sec ckfoldsec">'+h+'</div>';};
+ return chart+checkupOverviewSec(c)+wrap(t1)+wrap(t2)+wrap(t3)+wrap(coverageByYearSec(c));
+}
+/* ===== B-3（2026/10/27 Ray）健檢報告總覽：被保人 × 九類保障，點一格看「這個數字是哪幾張保單湊的」 =====
+   需求／已備／狀況三值沿用 coverageGaps（同一條分子，coverageGap.test 釘住）；沒有需求卡的被保人只列已備。
+   三張五欄表、壓力測試、地圖、主約效益全部收進折疊（policyCheckupUI.test 守預設不 open）。 */
+var CK_OPEN={};
+function ckCellToggle(k){if(CK_OPEN[k])delete CK_OPEN[k];else CK_OPEN[k]=1;render();}
+function coverContributors(c,member,kind){ // 這一格的已備是誰湊出來的
+ var f=POLICY_MAP[kindNorm(kind)],out=[];
+ (c.policies||[]).forEach(function(p,i){if(!policyActive(p)||p.insured!==member||!f)return;var a=coverAmt(p,f);if(a>0)out.push({src:'policy',i:i,name:(p.name||p.subtype||'（未命名保單）'),sub:(p.insurer||'')+(p.policyKind==='附約'?'・附約':''),amount:a});});
+ (c.coverages||[]).forEach(function(cv){if(cv.member!==member||kindNorm(cv.kind)!==kindNorm(kind))return;if(n(cv.comm)>0)out.push({src:'cov',name:'已備補充（商業）',sub:cv.note||'',amount:n(cv.comm)});if(n(cv.social)>0)out.push({src:'cov',name:'已備補充（社會保險）',sub:cv.note||'',amount:n(cv.social)});});
+ if(kindNorm(kind)==='壽險'&&member===(primaryMember(c)||{}).name){var lm=liquidMovable(c);if(lm>0)out.push({src:'asset',name:'家庭可變現流動資產',sub:'壽險一次性需求可由它支應',amount:lm});}
+ planActionsOn(c).forEach(function(a){if(a.cat!=='insure')return;if((a.coverKind||'壽險')!==kindNorm(kind))return;var pm=(primaryMember(c)||{}).name;if((((a.member||'').trim())||pm)!==member)return;if(n(a.cover)>0)out.push({src:'action',name:'調整動作：'+(a.name||'保障'),sub:'方案裡排的，尚未成交',amount:n(a.cover)});});
+ return out;
+}
+function ckStateOf(need,have){ // 跟五欄表同一把尺：適中帶 ±CHECKUP_BAND%
+ if(!(need>0))return have>0?'high':'none';
+ var r=have/need;if(r<1-CHECKUP_BAND/100)return 'low';if(r>1+CHECKUP_BAND/100)return 'high';return 'mid';
+}
+function checkupOverviewRows(c){
+ var gaps=coverageGaps(c),byMK={};gaps.forEach(function(g){byMK[g.member+'|'+g.kind]=g;});
+ var mems=[],seen={};
+ (c.needs||[]).forEach(function(nd){if(nd.member&&!seen[nd.member]){seen[nd.member]=1;mems.push(nd.member);}});
+ (c.policies||[]).forEach(function(p){if(policyActive(p)&&p.bigCat!=='產物'&&p.insured&&!seen[p.insured]){seen[p.insured]=1;mems.push(p.insured);}});
+ return mems.map(function(m){
+  var hasNeed=(c.needs||[]).some(function(nd){return nd.member===m;});
+  var cells=KINDS.map(function(k){var g=byMK[m+'|'+k];var have=g?g.have:existingCover(c,m,k)+actionCover(c,m,k);var need=g?g.need:0;
+   return {kind:k,need:need,have:have,state:hasNeed?ckStateOf(need,have):(have>0?'info':'none'),unit:COVER_UNIT?COVER_UNIT[k]||'':''};});
+  return {member:m,hasNeed:hasNeed,cells:cells};
+ });
+}
+var COVER_UNIT={'壽險':'元','意外傷殘':'元','住院醫療':'元/日','醫療雜費':'元/日','薪資補償（日）':'元/日','薪資補償（月）':'元/月','初次罹癌':'元','癌症住院':'元/日','重病給付':'元','每月照護':'元/月'};
+function checkupOverviewSec(c){
+ var rows=checkupOverviewRows(c);
+ if(!rows.length)return '<div class="sec"><h4>保障總覽</h4><div class="muted">還沒有保單也沒有需求卡——先到「保單」分頁登錄，或到「需求」分頁建需求卡。</div></div>';
+ var head='<tr><th>被保人</th>'+KINDS.map(function(k){return '<th class="r">'+esc(k)+'</th>';}).join('')+'</tr>';
+ var body=rows.map(function(r){
+  var tds=r.cells.map(function(cl){var key=r.member+'|'+cl.kind,open=!!CK_OPEN[key];
+   var cls=cl.state==='low'?'ck-low':cl.state==='high'?'ck-high':cl.state==='mid'?'ck-mid':cl.state==='info'?'ck-info':'ck-none';
+   return '<td class="r ckcell '+cls+(open?' on':'')+'" onclick="ckCellToggle(\''+esc(key)+'\')" title="點開看這個數字是哪幾張保單湊的"><div class="h">'+(cl.have>0?cfAxis(cl.have):'—')+'</div>'+(r.hasNeed?'<div class="nd">需 '+(cl.need>0?cfAxis(cl.need):'—')+'</div>':'')+'</td>';}).join('');
+  var tr='<tr><td class="k">'+esc(r.member)+(r.hasNeed?'':'<div class="hint">沒有需求卡，只列已備</div>')+'</td>'+tds+'</tr>';
+  r.cells.forEach(function(cl){var key=r.member+'|'+cl.kind;if(!CK_OPEN[key])return;
+   var items=coverContributors(c,r.member,cl.kind);
+   var g=cl;var verdict=r.hasNeed?(cl.state==='low'?'偏低，還差 '+fmt(Math.max(0,cl.need-cl.have))+' '+cl.unit:cl.state==='high'?'偏高，多出 '+fmt(Math.max(0,cl.have-cl.need))+' '+cl.unit:cl.state==='mid'?'適中':'沒有需求'):'沒有需求卡，無法判定';
+   tr+='<tr class="ckdetail"><td colspan="'+(KINDS.length+1)+'"><div class="ckdhead"><b>'+esc(r.member)+' · '+esc(cl.kind)+'</b>　已備 '+fmt(cl.have)+' '+cl.unit+(r.hasNeed?'／需求 '+fmt(cl.need)+' '+cl.unit:'')+'　<span class="'+(cl.state==='low'?'warn':'')+'">'+esc(verdict)+'</span><button type="button" class="tbtn sm ghost" style="margin-left:auto" onclick="ckCellToggle(\''+esc(key)+'\')">收起</button></div>'+
+    (items.length?'<table class="rtable ckitems"><tr><th>來源</th><th>說明</th><th class="r">金額</th><th></th></tr>'+items.map(function(it){return '<tr><td>'+esc(it.name)+'</td><td class="hint">'+esc(it.sub||'')+'</td><td class="r">'+fmt(it.amount)+'</td><td>'+(it.src==='policy'?'<button type="button" class="tbtn sm" onclick="covTabPick(\'policies\');jumpPolicy('+it.i+')">看保單</button>':'')+'</td></tr>';}).join('')+'</table>':'<div class="muted">這一格沒有任何保單或已備補充。</div>')+
+    '</td></tr>';});
+  return tr;
+ }).join('');
+ return '<div class="sec" id="ckOverview"><h4>保障總覽 <span class="hint">每位被保人 × 九類保障：上面是已備、下面是需求；點一格看是哪幾張保單湊出來的</span></h4>'+
+  '<div class="tw"><table class="rtable ckov">'+head+body+'</table></div>'+
+  '<div class="cklegend"><span class="ck-low">偏低</span><span class="ck-mid">適中</span><span class="ck-high">偏高</span><span class="ck-info">只有已備</span><span class="hint">適中帶 ±'+CHECKUP_BAND+'%，與五欄表同一把尺</span></div></div>';
+}
+
+/* ===== B-3 逐年綜合保障明細（對照 CloudWinner 健診報告第 4 頁）=====
+   每位被保人：年度 × 年齡 × 年度保費／累計保費／一般身故／意外身故或完全失能／重疾給付／初次罹癌／生存領回。
+   在保＝有效且（沒填到期）或（到期是年齡→年齡以內；到期是年份→年份以內）；年度保費走 payingInYear（繳費年期留空＝仍在繳）。
+   ⚠️ 這張表只讀保單欄位，不進任何缺口／健康度計算，粗算先有再調（Ray 2026/10/27）。 */
+function polEffYearOf(c,p){var y=effYear(p);if(y||!p||p.policyKind!=='附約'||!p.riderOf)return y;var m=(c.policies||[]).filter(function(x){return x.pid===p.riderOf;})[0];return m?effYear(m):0;}
+function policyInForceAt(p,age,year,c){
+ if(!policyActive(p))return false;
+ var y0=c?polEffYearOf(c,p):effYear(p);if(y0&&year<y0)return false;
+ var te=String(p.termEnd||'').trim();if(!te)return true;
+ var m=te.match(/(\d{1,4})/);if(!m)return true;var v=+m[1];
+ if(v<=130)return age<=v;              // 最高續保年齡
+ var yy=v<1911?v+1911:v;return year<=yy; // 到期年份
+}
+function memberAgeOf(c,name){var m=(c.members||[]).filter(function(x){return (x.name||'').trim()===name;})[0];if(m&&n(m.age)>0)return n(m.age);var pm=primaryMember(c);if(pm&&pm.name===name)return n(c.profile.age);return n(c.profile.age)||40;}
+function coverageByYear(c,member){
+ var pols=(c.policies||[]).filter(function(p){return p.bigCat!=='產物'&&p.insured===member;});
+ var age0=memberAgeOf(c,member),Y0=new Date().getFullYear(),out=[],cum=0,pb=policyPaybacks(c).filter(function(b){return pols.indexOf(c.policies[b.pi])>=0;});
+ for(var a=age0;a<=110;a++){var y=Y0+(a-age0),row={year:y,age:a,premium:0,cum:0,life:0,accident:0,critical:0,cancer:0,payback:0};
+  pols.forEach(function(p){var inF=policyInForceAt(p,a,y,c),y0=polEffYearOf(c,p),yrs=n(p.payYears);
+   var paying=inF&&(!y0||y>=y0)&&(yrs>0?(y0?y<y0+yrs:(a-age0)<yrs):true);   // 附約沒生效日就跟主約；到期了就不再繳
+   if(paying)row.premium+=n(p.premium);if(!inF)return;row.life+=coverAmt(p,'life');row.accident+=coverAmt(p,'accident');row.critical+=coverAmt(p,'critical');row.cancer+=coverAmt(p,'firstCancer');});
+  row.accident+=row.life;   // 意外身故＝一般身故＋意外傷殘保額（CloudWinner 口徑）
+  pb.forEach(function(b){row.payback+=paybackInSpan(b,a,a);});
+  cum+=row.premium;row.cum=cum;out.push(row);}
+ return out;
+}
+function coverageByYearSec(c){
+ var mems=[],seen={};(c.policies||[]).forEach(function(p){if(policyActive(p)&&p.bigCat!=='產物'&&p.insured&&!seen[p.insured]){seen[p.insured]=1;mems.push(p.insured);}});
+ if(!mems.length)return '<div class="muted">還沒有人身保單，逐年綜合保障明細沒有東西可列。</div>';
+ var inner=mems.map(function(m){var rows=coverageByYear(c,m),a0=rows[0]?rows[0].age:0;
+  var show=rows.filter(function(r,i){return i<20||r.age%5===0||i===rows.length-1;});
+  return '<div class="ckbyy"><div class="subhd">'+esc(m)+' <span class="hint">前 20 年逐年、之後每 5 年；年度保費依繳費年期、保障依到期年齡／年份</span></div>'+
+   '<div class="tw"><table class="rtable"><tr><th>年度</th><th>年齡</th><th class="r">年度保費</th><th class="r">累計保費</th><th class="r">一般身故</th><th class="r">意外身故／完全失能</th><th class="r">重疾給付</th><th class="r">初次罹癌</th><th class="r">生存領回</th></tr>'+
+   show.map(function(r){return '<tr'+(r.age-a0>=20&&r.age%5===0?' class="dim"':'')+'><td>'+r.year+'</td><td>'+r.age+'</td><td class="r">'+(r.premium>0?fmt(r.premium):'')+'</td><td class="r">'+fmt(r.cum)+'</td><td class="r">'+(r.life>0?fmt(r.life):'')+'</td><td class="r">'+(r.accident>0?fmt(r.accident):'')+'</td><td class="r">'+(r.critical>0?fmt(r.critical):'')+'</td><td class="r">'+(r.cancer>0?fmt(r.cancer):'')+'</td><td class="r">'+(r.payback>0?fmt(r.payback):'')+'</td></tr>';}).join('')+
+   '</table></div></div>';}).join('');
+ return foldKeep('ckByYear','逐年綜合保障明細','每位被保人每一年的保費與保障額，到期的保單會在那一年掉下去',inner,false);
 }
 function checkupDerivedHTML(c){return checkupChartSVG(c);}
 
