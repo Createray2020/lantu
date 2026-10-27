@@ -227,13 +227,53 @@ describe("保單：生效日與附約", () => {
     expect(rider.insurer).toBe("國泰");
   });
 
-  it("主約卡片會列出掛在它底下的附約", () => {
+  // 2026/10/26 Ray：附約改成主約底下的折疊群組（記狀態），「＋ 新增附約」在群組最後，
+  //   主約卡底的附約摘要表拿掉。附約多的時候不用一直往上找新增鈕。
+  it("附約包在主約底下的折疊群組裡：標題帶張數與保費合計，群組預設收合、記狀態", () => {
     const c = w.activeCase();
     c.policies[1].name = "住院醫療附約";
     c.policies[1].premium = 12000;
-    const h = w.policyCard(c, c.policies[0], 0) as string;
-    expect(h).toContain("住院醫療附約");
-    expect(h).toContain("12,000");
+    w.FOLD_OPEN = {};
+    const h = w.policiesSec(c) as string;
+    const grp = h.indexOf('data-fk="riders:' + c.policies[0].pid + '"');
+    expect(grp).toBeGreaterThan(0);
+    expect(h.slice(grp, grp + 400)).toContain("附約 1 張");
+    expect(h.slice(grp, grp + 400)).toContain("12,000");
+    expect(h.slice(grp, grp + 200)).not.toContain(" open");
+    // 附約的完整卡在群組裡、在主約卡後面
+    const mainCard = h.indexOf('data-polidx="0"');
+    const riderCard = h.indexOf('data-polidx="1"');
+    expect(mainCard).toBeGreaterThan(0);
+    expect(riderCard).toBeGreaterThan(grp);
+    // 主約卡底不再有附約摘要表
+    expect(w.policyCard(c, c.policies[0], 0)).not.toContain("前往編輯");
+    // 記狀態：標成展開後重建仍然展開
+    w.FOLD_OPEN["riders:" + c.policies[0].pid] = 1;
+    const h2 = w.policiesSec(c) as string;
+    const grp2 = h2.indexOf('data-fk="riders:' + c.policies[0].pid + '"');
+    expect(h2.slice(grp2, grp2 + 200)).toContain(" open");
+  });
+
+  it("「＋ 新增附約」在群組最後一張附約之後；沒有附約時留在主約卡底", () => {
+    const c = w.activeCase();
+    const h = w.policiesSec(c) as string;
+    const riderCard = h.indexOf('data-polidx="1"');
+    const addBtn = h.indexOf("addRider(0)");
+    expect(addBtn).toBeGreaterThan(riderCard);
+    expect((h.match(/addRider\(0\)/g) || []).length).toBe(1);
+    // 沒有附約的主約：卡底有新增鈕
+    w.addRow("policies");
+    const j = c.policies.length - 1;
+    expect(w.policyCard(c, c.policies[j], j)).toContain("addRider(" + j + ")");
+    c.policies.pop();
+  });
+
+  it("addRider 之後該主約的群組會被標成展開", () => {
+    const c = w.activeCase();
+    w.FOLD_OPEN = {};
+    w.addRider(0);
+    expect(w.FOLD_OPEN["riders:" + c.policies[0].pid]).toBe(1);
+    c.policies.pop();
   });
 
   it("切回主約會清掉所屬主約（不留指向別人的孤兒欄位）", () => {

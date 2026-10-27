@@ -630,6 +630,9 @@ tr.actnote td{padding-top:0;border-top:0}
 .pcard.isrider{margin-left:24px;border-left:3px solid var(--amber2)}
 .pcard.isrider .phd .who::before{content:'↳ ';color:var(--amber2)}
 .ridernone{margin-top:8px;text-align:center}
+.ridergrp{margin:-6px 0 14px 24px}
+.ridergrp>.ckfold>summary{color:var(--amber2)}
+.ridergrp .pcard.isrider{margin-left:0}
 .bgbox{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
 .bgbox>summary{cursor:pointer;font-size:12px;color:var(--amber2);list-style:none}
 .bgbox>summary::-webkit-details-marker{display:none}
@@ -8711,8 +8714,12 @@ function useAllocRate(){var c=activeCase();var al=allocInfo(c);if(!(al.totalPct>
 // ===== 調整方案：畫面 =====
 // 排版原則（2026/08/23 第二輪重排）：首屏只有「一張圖 ＋ 三個數字 ＋ 拉桿」，
 // 其餘一律收合。教練打開這一頁的第一眼要是一張圖，不是一張報表。
+// 2026/10/26 Ray：方案頁每改一個參數、所有折疊就全部縮回去——因為這裡的 <details> 沒有 key，
+// render() 重建後一律回到預設。現在跟 foldKeep 一樣記在 FOLD_OPEN；key 用標題去掉「（N 個）」這類會變的尾綴。
 function foldSec(title,hint,inner,open){
- return '<div class="sec"><details'+(open?' open':'')+'><summary style="cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:8px">'+
+ var key='plan:'+String(title).replace(/（[^）]*）\s*$/,'').replace(/<[^>]*>/g,'').trim();
+ if(FOLD_OPEN.hasOwnProperty(key))open=!!FOLD_OPEN[key];
+ return '<div class="sec"><details'+(open?' open':'')+' data-fk="'+key+'" ontoggle="foldToggled(this,\''+key+'\')"><summary style="cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:8px">'+
   '<span style="color:var(--amber2);font-weight:700;font-size:14px">'+title+'</span>'+
   (hint?'<span class="hint">'+hint+'</span>':'')+
   '<span style="flex:1"></span><span class="hint">展開 ▾</span></summary>'+
@@ -13918,21 +13925,21 @@ function riderParentSel(c,p,i){
  }).join('');
  return '<div class="f"><label>所屬主約</label><select onchange="set(\'policies:'+i+'\',\'riderOf\',this.value)">'+opts+'</select></div>';
 }
-// 主約卡片底部，把掛在它底下的附約摘要列出來（保費／保額一目了然）。
+// 2026/10/26 Ray：附約改成整組折疊群組（riderGroupHTML，在 policiesSec 包），「＋ 新增附約」移到群組最後。
+// 主約卡底只在「還沒有任何附約」時留一顆新增鈕（第一張附約得有地方長）；原本的附約摘要表拿掉，由群組標題取代。
 function riderCardsHTML(c,p,i){
  if(p.policyKind==='附約')return '';
- var rs=(c.policies||[]).map(function(x,j){return [x,j];}).filter(function(q){return q[0].policyKind==='附約'&&q[0].riderOf===p.pid;});
- if(!rs.length)return '<div class="ridernone"><button class="add" onclick="addRider('+i+')">＋ 新增附約</button></div>';
- var rows=rs.map(function(q){var x=q[0],j=q[1];
-  var amt=HUMAN_AMT.concat(HUMAN_AMT_OPT).filter(function(a){return n(x[a[0]])>0;})
-    .map(function(a){return a[1]+' '+fmt(n(x[a[0]]));}).join('・')||'—';
-  return '<tr><td class="k">'+esc(x.name||x.subtype||'（未命名附約）')+'</td><td>'+esc(x.subtype||'')+'</td><td class="calc">'+fmt(n(x.premium))+'</td><td class="muted" style="font-size:11.5px">'+amt+'</td>'+
-   '<td><button class="tbtn" onclick="jumpPolicy('+j+')">前往編輯</button></td></tr>';
- }).join('');
+ var has=(c.policies||[]).some(function(x){return x&&x.policyKind==='附約'&&x.riderOf===p.pid;});
+ if(has)return '';
+ return '<div class="ridernone"><button class="add" onclick="addRider('+i+')">＋ 新增附約</button></div>';
+}
+// 主約底下的附約群組：foldKeep 記狀態（key riders:<主約 pid>）、預設收合，標題帶張數與年繳合計，新增鈕在群組最後。
+function riderGroupHTML(c,main,i,rs){
+ if(!rs.length)return '';
  var prem=sum(rs.map(function(q){return q[0];}),function(x){return n(x.premium);});
- return '<div class="subhd">附約 <span class="hint" style="font-weight:400">'+rs.length+' 張・年繳保費合計 '+fmt(prem)+'（保額已計入被保人的保障彙總）</span></div>'+
-  '<table class="rtable"><tr><th>附約名稱</th><th>險種</th><th>年繳保費</th><th>給付</th><th></th></tr>'+rows+'</table>'+
-  '<div class="ridernone"><button class="add" onclick="addRider('+i+')">＋ 新增附約</button></div>';
+ var cards=rs.map(function(q){return policyCard(c,q[0],q[1]);}).join('');
+ return '<div class="ridergrp">'+foldKeep('riders:'+main.pid,'附約 '+rs.length+' 張','年繳保費合計 '+fmt(prem)+'（保額已計入被保人的保障彙總）',
+  cards+'<div class="ridernone"><button class="add" onclick="addRider('+i+')">＋ 新增附約</button></div>',false)+'</div>';
 }
 // 從主約卡片直接長一張附約：被保人／要保人／保險公司都跟著主約走，省得重打。
 function addRider(i){
@@ -13946,26 +13953,32 @@ function addRider(i){
  p.bigCat=main.bigCat;
  p.subtype=(POLICY_SUB[main.bigCat]||[])[0]||'';
  p.name='';
+ FOLD_OPEN['riders:'+main.pid]=1;   // 新卡在群組裡，先把群組打開再捲過去
  save();render();
  setTimeout(function(){jumpPolicy(c.policies.length-1);},0);
 }
 function jumpPolicy(j){
  var el=document.querySelector('.pcard[data-polidx="'+j+'"]');
- if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
+ if(!el)return;
+ revealEl(el);   // 附約住在折疊群組裡：先展開（並記住）再捲
+ if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
 }
 function policiesSec(c){
  c.policies=c.policies||[];
  ensurePolicies(c);
  // 顯示順序：主約 → 掛在它底下的附約 → …… → 孤兒附約（沒指定主約的）排最後。
+ // 2026/10/26：附約不再散成一張張卡接在主約後面，而是包進主約的折疊群組（riderGroupHTML）。
  var idx=c.policies.map(function(p,i){return [p,i];});
- var seq=[],used={};
+ var out=[],used={};
  idx.forEach(function(q){
   if(q[0].policyKind==='附約')return;
-  seq.push(q);used[q[1]]=1;
-  idx.forEach(function(r){if(r[0].policyKind==='附約'&&r[0].riderOf===q[0].pid){seq.push(r);used[r[1]]=1;}});
+  used[q[1]]=1;
+  var rs=idx.filter(function(r){return r[0].policyKind==='附約'&&r[0].riderOf===q[0].pid;});
+  rs.forEach(function(r){used[r[1]]=1;});
+  out.push(policyCard(c,q[0],q[1])+riderGroupHTML(c,q[0],q[1],rs));
  });
- idx.forEach(function(q){if(!used[q[1]])seq.push(q);});
- var cards=seq.map(function(q){return policyCard(c,q[0],q[1]);}).join('')||'<div class="sec"><div class="muted" style="padding:6px">尚無保單，點下方「＋ 新增保單」逐張登錄。</div></div>';
+ idx.forEach(function(q){if(!used[q[1]])out.push(policyCard(c,q[0],q[1]));});
+ var cards=out.join('')||'<div class="sec"><div class="muted" style="padding:6px">尚無保單，點下方「＋ 新增保單」逐張登錄。</div></div>';
  var addBtn='<div style="text-align:center;margin:2px 0 18px"><button class="add" onclick="addRow(\'policies\')">＋ 新增保單</button></div>';
  // 保障統計 by member（人身彙總，沿用既有引擎欄位）
  var mems=[...new Set((c.policies||[]).map(function(p){return p.insured}).filter(Boolean))];

@@ -189,6 +189,26 @@ describe("版面（v2）：首屏必須是圖，不是報表", () => {
     });
   });
 
+  // 2026/10/26 Ray：改一個參數所有折疊就全縮回去——foldSec 現在跟 foldKeep 一樣記在 FOLD_OPEN。
+  it("折疊展開後 render() 不會縮回去（foldSec 記狀態；動作清單的「（N 個）」不進 key）", () => {
+    w.FOLD_OPEN = {};
+    w.render();
+    let h = pane();
+    expect(h).toContain('data-fk="plan:調整動作清單"');
+    expect(h).toContain('data-fk="plan:資金勾稽"');
+    const d = w.document.querySelector('details[data-fk="plan:資金勾稽"]');
+    expect(d.open).toBe(false);
+    d.open = true;   // jsdom 會觸發 toggle → foldToggled 記下來
+    w.foldToggled(d, "plan:資金勾稽");
+    w.render();
+    h = pane();
+    const i = h.indexOf('data-fk="plan:資金勾稽"');
+    expect(h.slice(i - 20, i)).toContain(" open");
+    expect(w.document.querySelector('details[data-fk="plan:資金勾稽"]').open).toBe(true);
+    expect(w.document.querySelector('details[data-fk="plan:調整動作清單"]').open).toBe(false);
+    w.FOLD_OPEN = {};
+  });
+
   it("主圖的旗子一定同時有符號與顏色（綠紅在色盲下 ΔE 僅 7.8）", () => {
     const h = pane();
     expect(/[✓✕]/.test(h)).toBe(true);
