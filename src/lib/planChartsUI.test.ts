@@ -332,6 +332,27 @@ describe("拉桿要能當場改變上面的數字（用真的拉桿，不呼叫�
     expect(after[2], "願景達成度要跟著變").not.toBe(before[2]);
   });
 
+  it("拉桿放開後捲軸不會跳走（Ray 2026/10/27：裸 render() 讓文件捲回頂端，桿子看起來跑掉了）", () => {
+    // jsdom 的 scrollTo 預設不實作；用 spy 釘住「render 後有把 scrollY 還原」這件事。
+    const calls: number[][] = [];
+    const origTo = w.scrollTo, origSY = Object.getOwnPropertyDescriptor(w, "scrollY");
+    w.scrollTo = (x: number, y: number) => { calls.push([x, y]); };
+    Object.defineProperty(w, "scrollY", { configurable: true, get: () => 1234 });
+    try {
+      pull(1, "5");
+      expect(w.n(cur().plan.draft.expense)).toBe(5);
+      expect(calls, "setLever 要走 renderKeepFocus：render 後把捲軸還原到原位").toContainEqual([0, 1234]);
+      calls.length = 0;
+      w.clearDraft();
+      expect(calls).toContainEqual([0, 1234]);
+    } finally {
+      w.scrollTo = origTo;
+      if (origSY) Object.defineProperty(w, "scrollY", origSY); else delete w.scrollY;
+    }
+    // 讓後面的測試接著原本的狀態
+    pull(1, "15");
+  });
+
   it("有拉桿時會標示「調整後」，並把調整前的數字用刪除線留著當參照", () => {
     const h = pane();
     expect(h).toContain("調整後");

@@ -121,20 +121,23 @@
   --line: #e3e8ee;
   --line2: #c9d2dc;
 
+  /* ⚠️ 2026/10/27 Ray：淺色版字糊。tx3 舊值 #75838f 白底 3.9:1、brand2 舊值 #c08f3c 只有 2.9:1，
+     而 brand2 在規劃器裡是用最多的強調色。深色版 brand2 比 brand 亮才是強調，淺色版要反過來比 brand 深。
+     現值：tx3 5.4:1、brand 5.5:1、brand2 6.7:1（白底）。與 public/lantu-app.html 的淺色 token 同值。 */
   --tx: #14212e;
   --tx2: #4a5c6e;
-  --tx3: #75838f;
+  --tx3: #5c6c7a;
 
   /* ⚠️ 金色是唯一兩套主題不能共用亮度的地方：#c99a5b 在白底上只有 2.4:1，
-     必須壓深到 #9a6f22 才有 4.5:1。 */
-  --brand: #9a6f22;
-  --brand2: #c08f3c;
+     必須壓深才有 4.5:1。 */
+  --brand: #8a6220;
+  --brand2: #7d5415;
   --onbrand: #ffffff;
 
-  --ok: #2f7d57;
-  --ok-solid: #2f7d57;
-  --warn: #a8681a;
-  --warn-solid: #a8681a;
+  --ok: #2a7050;
+  --ok-solid: #2a7050;
+  --warn: #915a12;
+  --warn-solid: #915a12;
   --danger: #c0362f;
   --danger-solid: #c0362f;
   --info: #2c6fb5;
@@ -150,8 +153,8 @@
   --sh-3: 0 18px 50px rgba(24, 45, 70, .22);
 
   --c1: #2e6db4;
-  --c2: #2c8c5f;
-  --c3: #a8760c;
+  --c2: #237a4f;
+  --c3: #8c6208;
   --c4: #c2453e;
   --c5: #5f7a63;
   --c6: #a8497e;

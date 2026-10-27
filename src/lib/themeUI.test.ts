@@ -91,6 +91,47 @@ describe("② 兩套主題都完整", () => {
   });
 });
 
+/* 2026/10/27 Ray：「淺色版色塊跟文字對比不夠，看得很糊」。真因是 --amber2（規劃器用最多的強調色）
+   白底只有 2.9:1、--mut2 3.9:1。這裡把兩份淺色 token 的文字色釘在 WCAG AA（白面板 ≥4.5:1），
+   而且規劃器與 globals.css 同一個語意要同一個值，不然外框與規劃器兩種金。 */
+describe("②b 淺色文字 token 讀得到（白底 ≥4.5:1）", () => {
+  const lum = (hex: string) => {
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(1 + i, 3 + i), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const tokensOf = (block: string) => Object.fromEntries([...block.matchAll(/(--[a-z0-9-]+):\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1], m[2].toLowerCase()]));
+
+  const cssLight = tokensOf(css.slice(css.indexOf('\n:root[data-theme="light"] {'), css.indexOf("\n@theme inline {")));
+  const style = planner.slice(0, planner.indexOf("</style>"));
+  const pl0 = style.indexOf(':root[data-theme="light"]{');
+  const plLight = tokensOf(style.slice(pl0, style.indexOf("}", pl0)));
+
+  it("globals.css 淺色：tx/tx2/tx3/brand/brand2/ok/warn/danger/info/teal 在白面板上 ≥4.5:1", () => {
+    const bad = ["--tx", "--tx2", "--tx3", "--brand", "--brand2", "--ok", "--warn", "--danger", "--info", "--teal"]
+      .map((k) => [k, ratio(cssLight[k], cssLight["--panel"])] as const)
+      .filter(([, r]) => r < 4.5).map(([k, r]) => `${k} ${r.toFixed(2)}`);
+    expect(bad, bad.join(", ")).toEqual([]);
+  });
+
+  it("規劃器淺色：tx/mut/mut2/amber/amber2/ok/warn/danger/gap2/teal/blue 在白面板上 ≥4.5:1", () => {
+    const bad = ["--tx", "--mut", "--mut2", "--amber", "--amber2", "--ok", "--warn", "--danger", "--gap2", "--teal", "--blue"]
+      .map((k) => [k, ratio(plLight[k], plLight["--panel"])] as const)
+      .filter(([, r]) => r < 4.5).map(([k, r]) => `${k} ${r.toFixed(2)}`);
+    expect(bad, bad.join(", ")).toEqual([]);
+  });
+
+  it("兩份淺色 token 同一個語意同一個值（外框與規劃器不能兩種金）", () => {
+    const pairs: [string, string][] = [["--tx", "--tx"], ["--tx2", "--mut"], ["--tx3", "--mut2"], ["--brand", "--amber"], ["--brand2", "--amber2"], ["--ok", "--ok"], ["--warn", "--warn"], ["--danger", "--danger"], ["--panel", "--panel"]];
+    for (const [a, b] of pairs) expect(plLight[b], `${a} ↔ ${b}`).toBe(cssLight[a]);
+  });
+
+  it("拉桿旁的數字框不再寫死深底（淺色版會變成深底深字）", () => {
+    expect(planner).not.toContain("background:#0b2136");
+  });
+});
+
 describe("③ 規劃器（獨立文件）也跟得上", () => {
   let w: never & { [k: string]: never };
 

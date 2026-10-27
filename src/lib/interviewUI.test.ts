@@ -412,6 +412,20 @@ describe("訪談檢核清單", () => {
     expect(w.app.dataTab).toBe("intent");
   });
 
+  it("「這個家」四項（scope／basic／bg／decide）ivGoto 後會捲到宿主並閃一下（Ray 2026/10/27：沒 a 錨點也要捲）", async () => {
+    fresh();
+    for (const k of ["scope", "basic", "bg", "decide", "params"]) {
+      go("intent");
+      w.ivGoto(k);
+      expect(w.app.dataTab).toBe("family");
+      await new Promise((r) => setTimeout(r, 80));
+      const st = w.navStep(k);
+      const el = w.document.querySelector(`#app ${w.ivSecSel(st)}`);
+      expect(el, `${k} 的宿主不在`).toBeTruthy();
+      expect(el!.classList.contains("goalflash"), `${k} 沒有捲到定位（沒閃）`).toBe(true);
+    }
+  });
+
   it("每一段都指得到一個真的分頁", () => {
     const known = new Set([
       ...w.BASE_TABS.map((b: string[]) => b[0]),

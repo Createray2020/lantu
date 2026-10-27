@@ -29,13 +29,17 @@
 :root[data-theme="light"]{
  --bg:#f4f6f8;--panel:#ffffff;--card:#eaeef3;--card2:#dfe6ee;
  --field:#fbfcfd;--line:#e3e8ee;--line2:#c9d2dc;
- --tx:#14212e;--mut:#4a5c6e;--mut2:#75838f;
+ /* ⚠️ 2026/10/27 Ray：淺色版字糊——--mut2 舊值 #75838f 白底只有 3.9:1；
+    --amber2 舊值 #c08f3c 更只有 2.9:1，而它是全站用最多的強調色（228 處文字）。
+    深色版 amber2 比 amber「亮」才是強調，淺色版要反過來比 amber「深」。
+    現值：mut2 5.4:1、amber 5.5:1、amber2 6.7:1（白底），卡片底仍 ≥4.5。themeUI.test 守著。 */
+ --tx:#14212e;--mut:#4a5c6e;--mut2:#5c6c7a;
  /* ⚠️ 金色是唯一兩套主題不能共用亮度的地方：#c99a5b 在白底上只有 2.4:1 */
- --amber:#9a6f22;--amber2:#c08f3c;--onbrand:#ffffff;
+ --amber:#8a6220;--amber2:#7d5415;--onbrand:#ffffff;
   /* 同上：淺色版 --teal 也等於 --mut(#4a5c6e)。新值對白底約 5.7:1。 */
  --teal:#2a6f7a;--blue:#2c6fb5;--purple:#5f7a63;
- --ok:#2f7d57;--warn:#a8681a;--danger:#c0362f;--info:#2c6fb5;--gap2:#c2453e;
- --c1:#2e6db4;--c2:#2c8c5f;--c3:#a8760c;--c4:#c2453e;--c5:#5f7a63;--c6:#a8497e;
+ --ok:#2a7050;--warn:#915a12;--danger:#c0362f;--info:#2c6fb5;--gap2:#c2453e;
+ --c1:#2e6db4;--c2:#237a4f;--c3:#8c6208;--c4:#c2453e;--c5:#5f7a63;--c6:#a8497e;
  --sh:96,116,136;
  color-scheme:light;
 }
@@ -8686,18 +8690,20 @@ function deltaCardsHTML(c,set,theme){
 // 拉桿的當前值存在 c.plan.draft（跟著存檔走，教練切分頁不會掉）。
 // c.plan.levers 才是「已採用」的方案——scenario()／報告書／追蹤線吃的是它。
 function planDraft(c){var p=c.plan||{};return p.draft||{}}
+// ⚠️ 2026/10/27 Ray：拉桿一拉就「跳到別的位置」——裸 render() 整棵重建後文件捲軸回頂端，
+//    拉桿住在「更多診斷」深處，看起來就是桿子跑掉了。這幾支一律 renderKeepFocus()（記 scrollY 並還原）。
 function setLever(id,v){var c=activeCase();c.plan=c.plan||{};c.plan.draft=c.plan.draft||{};
- var x=n(v);if(id==='rate'&&(v===''||v===null))x='';c.plan.draft[id]=x;save();render();}
-function clearDraft(){var c=activeCase();c.plan=c.plan||{};c.plan.draft={};save();render();}
+ var x=n(v);if(id==='rate'&&(v===''||v===null))x='';c.plan.draft[id]=x;save();renderKeepFocus();}
+function clearDraft(){var c=activeCase();c.plan=c.plan||{};c.plan.draft={};save();renderKeepFocus();}
 function adoptRx(key){var c=activeCase();var rx=prescriptions(c);
- for(var i=0;i<rx.length;i++)if(rx[i].key===key){c.plan=c.plan||{};c.plan.draft=JSON.parse(JSON.stringify(rx[i].levers));save();render();return;}}
+ for(var i=0;i<rx.length;i++)if(rx[i].key===key){c.plan=c.plan||{};c.plan.draft=JSON.parse(JSON.stringify(rx[i].levers));save();renderKeepFocus();return;}}
 function adoptSolo(id){var c=activeCase();var r=solveLever(c,id,{});
- c.plan=c.plan||{};c.plan.draft={};c.plan.draft[id]=r.x;save();render();}
+ c.plan=c.plan||{};c.plan.draft={};c.plan.draft[id]=r.x;save();renderKeepFocus();}
 function adoptDraft(){var c=activeCase();c.plan=c.plan||{};
  c.plan.levers=JSON.parse(JSON.stringify(c.plan.draft||{}));
  // 舊欄位同步，避免報告書與 scenario() 各讀各的
  c.plan.retireDelay=n((c.plan.levers||{}).retire);
- save();render();}
+ save();renderKeepFocus();}
 function saveTrial(){var c=activeCase();c.plan=c.plan||{};c.plan.trials=c.plan.trials||[];
  if(c.plan.trials.length>=5){alert('最多存 5 個方案，請先刪掉一個。');return;}
  var d=JSON.parse(JSON.stringify(c.plan.draft||{}));
@@ -8907,7 +8913,7 @@ function leverSliderHTML(c,id,gate){
   '<div style="display:flex;align-items:center;gap:8px">'+
    '<span style="font-weight:700;font-size:13px;min-width:92px;color:'+(on?'var(--amber2)':'var(--tx)')+'">'+esc(L.name)+'</span>'+
    '<input type="range" min="'+r.lo+'" max="'+r.hi+'" step="'+step+'" value="'+cur+'" onchange="setLever(\''+id+'\',this.value)" style="flex:1;min-width:90px;accent-color:var(--amber)"'+dis+'>'+
-   '<input type="number" inputmode="decimal" step="'+step+'" min="'+r.lo+'" max="'+r.hi+'" value="'+(+cur.toFixed(1))+'" onchange="setLever(\''+id+'\',this.value)" style="width:72px;background:#0b2136;border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:3px 6px;text-align:right"'+dis+'>'+
+   '<input type="number" inputmode="decimal" step="'+step+'" min="'+r.lo+'" max="'+r.hi+'" value="'+(+cur.toFixed(1))+'" onchange="setLever(\''+id+'\',this.value)" style="width:72px;background:var(--field);border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:3px 6px;text-align:right"'+dis+'>'+
    '<span class="hint" style="width:20px">'+esc(L.unit)+'</span>'+
   '</div>'+
   (gate.block[id]?'<div class="hint" style="display:block;margin-left:100px;color:var(--mut2)">'+esc(gate.reason[id]||'已鎖住')+'</div>':'')+
@@ -8984,7 +8990,7 @@ function trialsHTML(c){
  var head='<tr><th>方案</th>'+LEVERS.map(function(L){return '<th>'+esc(L.name)+'</th>'}).join('')+'<th>剩餘缺口</th><th></th></tr>';
  var rows=ts.map(function(t,i){
   var cells=LEVERS.map(function(L){var v=(t.levers||{})[L.id];return '<td>'+(n(v)?leverLabel(L.id,v):'—')+'</td>'}).join('');
-  return '<tr><td class="k"><input value="'+esc(t.label)+'" onchange="renameTrial('+i+',this.value)" style="width:82px;background:#0b2136;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:3px 6px"><div class="hint">'+esc(t.at||'')+'</div></td>'+cells+
+  return '<tr><td class="k"><input value="'+esc(t.label)+'" onchange="renameTrial('+i+',this.value)" style="width:82px;background:var(--field);border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:3px 6px"><div class="hint">'+esc(t.at||'')+'</div></td>'+cells+
    '<td style="color:'+(t.gap>0.5?'var(--warn)':'var(--ok)')+'">'+(t.gap>0.5?fmt(t.gap):'✅ 0')+'</td>'+
    '<td style="white-space:nowrap"><button class="tbtn" style="padding:3px 8px;font-size:12px" onclick="useTrial('+i+')">帶回</button> <button class="tbtn" style="padding:3px 8px;font-size:12px" onclick="delTrial('+i+')">刪</button></td></tr>';
  }).join('');
@@ -9702,6 +9708,21 @@ function flowVisionList(c,proj){
  items.forEach(function(x,i){x.pos=i+1});
  return items;
 }
+// 2026/10/27 Ray：S2 取消勾選後那一列直接消失、沒地方勾回來——資料其實沒刪（on:false 留著，visionOn 閘擋掉），
+//   只是 flowVisionList 只列「要做的」。S2 清單用這支：要做的在前（原樣），取消的接在後面（off:true、不給序號），
+//   勾回去就回到前面。⚠️ flowVisionList 本身不動——鎖定、時間軸、後果旗都靠它只算「要做的」。
+function flowVisionListAll(c){
+ var items=flowVisionList(c),off=[];
+ (c.goals||[]).forEach(function(g,i){if(visionOn(g))return;
+  off.push({key:'goals:'+i,kind:'goal',off:true,name:(g.name||g.type||'目標'),age:n(g.start),amount:n(g.present),rank:99,target:flowTargetOfGoalType(g.type),ok:null,ref:{arr:'goals',i:i}})});
+ [['travel','旅遊規劃','旅遊'],['hobby','休閒興趣規劃','休閒'],['luxury','奢侈品購買規劃','奢侈品']].forEach(function(pr){
+  (c[pr[0]]||[]).forEach(function(w,i){if(visionOn(w))return;
+   off.push({key:pr[0]+':'+i,kind:'wish',off:true,name:(w.sub||w.cat||pr[2]),age:n(w.start),span:n(w.end),amount:n(w.amount),rank:99,target:pr[1],ok:null,ref:{arr:pr[0],i:i}})});
+ });
+ var lg=c.legacy||{};
+ if(lg.on===false&&n(lg.heirs)*n(lg.perHeirCash)>0)off.push({key:'legacy',kind:'legacy',off:true,name:'傳承',age:effHorizon(c),amount:n(lg.heirs)*n(lg.perHeirCash),rank:99,target:null,ok:null});
+ return items.concat(off);
+}
 
 /* Step 1 缺口呈現：三個數字＋受影響的願景（純讀既有欄位） */
 function gapView(c){
@@ -9970,11 +9991,15 @@ function flowBodyHTML(c){
     '<button class="tbtn amber" onclick="flowDecide(\'S1\',\'d1\',{ok:true},\'客戶看見缺口 '+cfAxis(G.shortPV)+'，進願景鎖定\',\'S2\')">下一步 → 鎖定願景</button>'+
     '<span class="hint">要不要改願景，到下一步同一頁「微調」；不改就直接鎖定。</span>','客戶');
  }
- if(s==='S2'){var items=flowVisionList(c),must=((c.intent||{}).mustHave)||[];
+ if(s==='S2'){var items=flowVisionListAll(c),must=((c.intent||{}).mustHave)||[];
   var seen={};
   return flowAsk('這份願景要不要改？要改就按該項「微調」（時間／金額，同一頁改完）；不改就直接鎖定。排序是為了後面知道先保哪個，不是為了砍。')+
    '<div class="hint" style="margin-bottom:8px">順序＝意圖分頁的必達優先序（同一份資料，▲▼ 直接調）；勾選＝要做（＝願景選定閘）。</div>'+
    items.map(function(x){var t=x.target,mi=t?must.indexOf(t):-1,arrows='';
+    if(x.off){   // 取消勾選的：灰顯、勾選框空的、不給序號／微調／排序，勾回去就恢復
+     var chkOff=x.ref?'<input type="checkbox" onchange="set(\''+x.ref.arr+':'+x.ref.i+'\',\'on\',this.checked,\'bool\');render()">':'<input type="checkbox" onchange="setObj(\'legacy\',\'on\',this.checked);render()">';
+     return '<div class="vitem off"><span class="pr">–</span>'+chkOff+'<div class="vt"><div class="vn">'+esc(x.name)+'</div><div class="vm">'+x.age+(x.span?'–'+x.span:'')+' 歲　'+fmt(x.amount)+'　<span class="hint">這次不做（資料保留，勾回去即恢復）</span></div></div></div>';
+    }
     if(t&&mi>=0&&!seen[t]){seen[t]=1;arrows='<span class="flowarr"><button class="tbtn sm" onclick="flowMoveTarget(\''+esc(t)+'\',-1)" '+(mi<=0?'disabled':'')+'>▲</button><button class="tbtn sm" onclick="flowMoveTarget(\''+esc(t)+'\',1)" '+(mi>=must.length-1?'disabled':'')+'>▼</button></span>'}
     var chk=x.ref?'<input type="checkbox" checked onchange="set(\''+x.ref.arr+':'+x.ref.i+'\',\'on\',this.checked,\'bool\');render()">':(x.kind==='legacy'?'<input type="checkbox" checked onchange="setObj(\'legacy\',\'on\',this.checked);render()">':'<span style="width:17px;display:inline-block"></span>');
     return '<div class="vitem"><span class="pr">'+x.pos+'</span>'+chk+'<div class="vt"><div class="vn">'+esc(x.name)+'</div><div class="vm">'+x.age+(x.span?'–'+x.span:'')+' 歲　'+(x.kind==='retire'?'每年 '+fmt(x.amount):fmt(x.amount))+(x.rank>=99?'　<span class="hint">未列必達</span>':'')+'</div></div>'+
@@ -11950,8 +11975,10 @@ function ivGoto(k){
  // 「未來的需求」（第 2 群）一律進需求中樞，該項目直接展開
  if(st.g===2){NEED_SEL=k;NEED_SEL_ID=c?c.id:'';app.activeTab='data';app.dataTab='needhub';app.ivFacet=k;render();}
  else{app.activeTab='data';app.dataTab=st.tab;app.ivFacet=k;render();}
- if(!st.a)return;
- setTimeout(function(){var el=document.querySelector(st.a);if(!el)return;revealEl(el);
+ // 2026/10/27 Ray：「這個家」四項（scope／basic／bg／decide）點了只切分頁不捲動——它們沒有 a 錨點，
+ //   但宿主 data-ivsec 早就在，ivSecSel() 也早會推出 selector。一律走 ivSecSel，沒錨點才真的不捲。
+ var sel=ivSecSel(st);if(!sel)return;
+ setTimeout(function(){var el=document.querySelector(sel);if(!el)return;revealEl(el);
   if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
   el.classList.add('goalflash');setTimeout(function(){el.classList.remove('goalflash')},1700);},40);
 }
@@ -14823,17 +14850,19 @@ var COV_WHEEL=[
  {ring:'醫療',tone:'med',
   note:'住院期間，每天在燒的錢。病房費＋自付差額＋看護費三項<b>合成</b>一條「住院醫療日額」缺口；薪資補償與雜費各自獨立。',
   cells:[
-   {key:'room',lb:'病房費',part:'住院醫療',
-    fields:[['room','病房費（日額）','money']],
-    adv:[['selfPay','自付差額（日額）','money']],
-    advWhy:'<b>自付差額</b>在引擎裡與病房費、看護費併成同一條「住院醫療日額需求」（medicalDailyNeed），所以掛在這一格底下，不另開一格。'},
-   {key:'nursing',lb:'看護費',part:'住院醫療',
-    fields:[['nursing','看護費（日額）','money']]},
+  // 2026/10/27 Ray：環是順時針畫、醫療區在左上角，陣列前面的格子落在下面。
+  //   要「從上到下＝病房→看護→薪資補償→醫療雜費」就得把陣列反過來排（引擎與測試都用 key 找格子，順序無關）。
+   {key:'misc',lb:'醫療雜費',kind:'醫療雜費',
+    fields:[['miscDaily','住院雜費（每次住院）','money','醫療雜費']]},
    {key:'income',lb:'薪資補償',multiKind:true,
     fields:[['incomeCompMonth','薪資補償（月額）','money','薪資補償（月）'],
             ['incomeCompDay','薪資補償（日額）','money','薪資補償（日）']]},
-   {key:'misc',lb:'醫療雜費',kind:'醫療雜費',
-    fields:[['miscDaily','住院雜費（每次住院）','money','醫療雜費']]}
+   {key:'nursing',lb:'看護費',part:'住院醫療',
+    fields:[['nursing','看護費（日額）','money']]},
+   {key:'room',lb:'病房費',part:'住院醫療',
+    fields:[['room','病房費（日額）','money']],
+    adv:[['selfPay','自付差額（日額）','money']],
+    advWhy:'<b>自付差額</b>在引擎裡與病房費、看護費併成同一條「住院醫療日額需求」（medicalDailyNeed），所以掛在這一格底下，不另開一格。'}
   ]}
 ];
 var COV_TONE={resp:['var(--wresp)','var(--wresp2)'],crit:['var(--wcrit)','var(--wcrit2)'],med:['var(--wmed)','var(--wmed2)']};

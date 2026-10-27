@@ -52,6 +52,11 @@ describe("賓士圖的形狀", () => {
     expect(ring.cells.map((c: { key: string }) => c.key)).toEqual(["care", "disability", "critical"]);
   });
 
+  it("醫療的陣列順序＝雜費 → 薪資補償 → 看護 → 病房（Ray 2026/10/27：環順時針畫、醫療在左上，畫面由上到下才是 病房→看護→薪資→雜費）", () => {
+    const ring = w.COV_WHEEL.find((r: { ring: string }) => r.ring === "醫療");
+    expect(ring.cells.map((c: { key: string }) => c.key)).toEqual(["misc", "income", "nursing", "room"]);
+  });
+
   it("圖畫在保障中心最上面，且整塊掛 data-calc 才會即時重算", () => {
     const h = pane();
     // 圖與總額永遠在；cwNums／cwDeriv 是紀錄框的衍生區，選了格子才會出現。

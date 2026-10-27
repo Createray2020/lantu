@@ -311,6 +311,37 @@ describe("流程推進與閘門", () => {
     expect(pane()).toContain(">微調</button>");
     c.flow.step = st; w.render();
   });
+  it("S2 取消勾選的願景不會從清單消失：灰顯、勾選框空的、不給序號，勾回去就恢復（Ray 2026/10/27）", () => {
+    const c = cur();
+    const st = c.flow.step; c.flow.step = "S2"; w.render();
+    const g = w.flowVisionList(c).find((x: any) => x.kind === "goal" && x.ref);
+    expect(g, "示範案要有一個目標可以取消").toBeTruthy();
+    const nBefore = w.flowVisionList(c).length;
+    // 用畫面上那顆勾選框取消（走 set(...,'bool') → render）
+    const box = [...w.document.querySelectorAll(".vitem input[type=checkbox]")]
+      .find((i: any) => (i.getAttribute("onchange") || "").includes(`'${g.ref.arr}:${g.ref.i}'`)) as HTMLInputElement;
+    expect(box).toBeTruthy();
+    box.checked = false; box.dispatchEvent(new w.Event("change", { bubbles: true }));
+    expect(c.goals[g.ref.i].on).toBe(false);
+    expect(w.flowVisionList(c).length, "鎖定／時間軸吃的清單要少一項").toBe(nBefore - 1);
+    const all = w.flowVisionListAll(c);
+    expect(all.length, "S2 清單總數不變").toBe(nBefore);
+    const off = all.find((x: any) => x.key === g.key);
+    expect(off.off).toBe(true);
+    expect(all.indexOf(off), "取消的排最後").toBe(all.length - 1);
+    const h = pane();
+    expect(h).toContain('class="vitem off"');
+    expect(h).toContain("這次不做（資料保留，勾回去即恢復）");
+    // 勾回去
+    const box2 = [...w.document.querySelectorAll(".vitem.off input[type=checkbox]")]
+      .find((i: any) => (i.getAttribute("onchange") || "").includes(`'${g.ref.arr}:${g.ref.i}'`)) as HTMLInputElement;
+    expect(box2.checked).toBe(false);
+    box2.checked = true; box2.dispatchEvent(new w.Event("change", { bubbles: true }));
+    expect(c.goals[g.ref.i].on).toBe(true);
+    expect(w.flowVisionList(c).length).toBe(nBefore);
+    expect(pane()).not.toContain('class="vitem off"');
+    c.flow.step = st; w.render();
+  });
   it("閘門那一刻：只有按過確定的收入／支出算數；有延後的願景已在確定時打過印記", () => {
     const c = cur();
     w.flowTuneInc(2000);
