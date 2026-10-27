@@ -162,12 +162,21 @@ describe("版面（v2）：首屏必須是圖，不是報表", () => {
   it("v1 的診斷區塊沒有被刪掉，只是收進收合區", () => {
     const h = pane();
     const firstFold = h.indexOf("<details");
-    ["一生願景需要的資金", "缺口改善", "開開看", "該解什麼", "三個處方", "曲線掉到零線以下", "配置與對帳", "方案比較"].forEach((t) => {
+    // 方案比較 2026/10/27 升到頁首（trialsHTML），不在折疊裡——見下一支測試
+    ["一生願景需要的資金", "缺口改善", "開開看", "該解什麼", "三個處方", "曲線掉到零線以下", "配置與對帳"].forEach((t) => {
       const i = h.indexOf(t);
       expect(i, t + " 不該消失").toBeGreaterThan(0);
       expect(i, t + " 應該在收合區裡").toBeGreaterThan(firstFold);
     });
     expect(h.indexOf('type="range"')).toBeGreaterThan(firstFold);
+  });
+
+  it("方案比較在頁首（第一個 <details> 之前），不在折疊裡", () => {
+    const h = pane();
+    const i = h.indexOf('id="trialsSec"');
+    expect(i).toBeGreaterThan(0);
+    expect(i).toBeLessThan(h.indexOf("<details"));
+    expect(h).not.toContain("教練多次模擬的收納處");
   });
 
   it("收合區塊的順序照定案企劃：配額 → 動作清單 → 勾稽 → 流程 → v1 診斷（願景選定 2026/09/27 拿掉，S2 是唯一鎖定點）", () => {

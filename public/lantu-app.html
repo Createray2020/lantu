@@ -446,8 +446,40 @@ input::placeholder,textarea::placeholder{color:var(--mut2);font-weight:400;font-
 .report th,.report td{border-bottom:1px solid #e6e0d4;color:#33414a}.report th{color:#0d2b45;background:#f2ede2}
 .report .rc{background:linear-gradient(135deg,#0d2b45,#0a2138);color:#fff;padding:24px 26px;margin:-34px -38px 22px;border-radius:12px 14px 0 0;border-bottom:3px solid #c99a5b}
 .report .rc .k{color:#c99a5b;letter-spacing:.28em;font-size:11px;font-weight:700}.report .rc h1{font-size:26px;margin-top:6px;letter-spacing:.06em}
+/* ── 報告書封面（2026/10/27 Ray 定案：最簡內容＝品牌 logo／書名／謹致客戶／日期／標語；深＝深藍整頁金字、淺＝米白雙線框）──
+   螢幕預覽是一張直式卡；列印時 printReport() 走 Paged.js，.rcover 成為整頁第 1 頁（見 R_PRINT_CSS）。
+   ⚠️ logo 一律用後台壓上去的 LANTU_BRAND.logoUrl，沒有才退回品牌名文字——不要再畫簡化版 SVG（Ray 2026/10/27）。 */
+.report .rcover{position:relative;margin:-34px -38px 26px;padding:44px 42px 36px;min-height:520px;display:flex;flex-direction:column;border-radius:12px 12px 0 0;overflow:hidden;font-family:var(--serif)}
+.report .rcover.dark{background:linear-gradient(160deg,#0d2b45 0%,#0a2138 55%,#071a2c 100%);color:#fff}
+.report .rcover.dark::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(420px 420px at 108% -8%,rgba(201,154,91,.18),transparent 60%)}
+.report .rcover.light{background:#fdfbf6;color:#0d2b45}
+.report .rcover .rcframe{position:absolute;inset:18px;border:1px solid #c99a5b;pointer-events:none}
+.report .rcover .rcframe::after{content:"";position:absolute;inset:5px;border:1px solid rgba(201,154,91,.35)}
+.report .rcover .rcarc{position:absolute;right:-90px;bottom:-90px;width:300px;height:300px;border-radius:50%;border:7px solid rgba(201,154,91,.28);border-left-color:transparent;border-bottom-color:transparent;transform:rotate(25deg);pointer-events:none}
+.report .rcover.light .rcarc{border-color:rgba(13,43,69,.12);border-left-color:transparent;border-bottom-color:transparent}
+.report .rcover .rcbrand{position:relative;display:flex;align-items:center;gap:12px;min-height:46px}
+.report .rcover .rcbrand img{height:46px;max-width:220px;object-fit:contain;object-position:left}
+.report .rcover .rcbrand .rcname{font-size:22px;letter-spacing:.18em;font-weight:700}
+.report .rcover .rck{position:relative;color:#c99a5b;letter-spacing:.3em;font-size:11px;font-weight:700;font-family:var(--sans,sans-serif)}
+.report .rcover .rctitle{position:relative;font-size:40px;font-weight:900;letter-spacing:.08em;line-height:1.25;margin-top:6px}
+.report .rcover .rcsub{position:relative;font-size:12px;letter-spacing:.14em;color:#e0bd8b;margin-top:7px;font-family:var(--sans,sans-serif)}
+.report .rcover.light .rcsub{color:#8a6f3c}
+.report .rcover .rcrule{position:relative;height:2px;background:linear-gradient(90deg,#c99a5b,transparent);margin:26px 0}
+.report .rcover.light .rcrule{width:120px;margin:34px auto;background:#c99a5b}
+.report .rcover .rcwho{position:relative;font-size:16px;line-height:1.7}
+.report .rcover .rcwho b{font-size:27px;font-weight:700;letter-spacing:.06em;display:block}
+.report .rcover .rcwho small{display:block;font-family:var(--sans,sans-serif);font-size:11px;letter-spacing:.12em;opacity:.75;margin-top:4px}
+.report .rcover .rcmeta{position:relative;margin-top:auto;padding-top:28px;font-family:var(--sans,sans-serif);font-size:12px}
+.report .rcover .rcmeta .l{opacity:.68;letter-spacing:.1em;font-size:10px;display:block}
+.report .rcover .rcmeta .v{font-weight:600;font-size:13px}
+.report .rcover .rcslogan{position:relative;margin-top:18px;font-family:var(--sans,sans-serif);font-size:11px;letter-spacing:.3em;color:#c99a5b;text-align:right}
+.report .rcover.light{text-align:center}.report .rcover.light .rcbrand{justify-content:flex-start}
+.report .rcover.light .rchead{margin-top:70px}.report .rcover.light .rcslogan{text-align:center;color:#0d2b45;opacity:.6}
+.report .rcover.light .rcmeta{text-align:center}
+.report .rtocpg .rtoc a{color:inherit;text-decoration:none}
+.report section.rch{display:block}
 .pill{display:inline-block;padding:2px 9px;border-radius:8px;font-size:12px;font-weight:700}
-@media print{body *{visibility:hidden}.report,.report *{visibility:visible}.report{position:absolute;left:0;top:0;box-shadow:none;max-width:100%}.report h2{break-after:avoid;page-break-after:avoid}.report table{break-inside:auto}.report tr{break-inside:avoid;page-break-inside:avoid}.report details{break-inside:avoid-page}.report details>summary{list-style:none;color:var(--panel)}}
+@media print{body *{visibility:hidden}.report,.report *{visibility:visible}.report{position:absolute;left:0;top:0;box-shadow:none;max-width:100%}.report h2{break-after:avoid;page-break-after:avoid}.report section.rch{break-before:page}.report .rcover,.report .rtocpg{break-after:page}.report table{break-inside:auto}.report tr{break-inside:avoid;page-break-inside:avoid}.report details{break-inside:avoid-page}.report details>summary{list-style:none;color:var(--panel)}}
 .hero2{background:linear-gradient(120deg,var(--panel),var(--bg));border:1px solid var(--line);border-radius:12px;padding:22px 26px;margin-bottom:18px}
 .hero2 .k{color:var(--amber);letter-spacing:.18em;font-size:12px;font-weight:700}.hero2 h1{font-size:26px;margin:6px 0}
 /* 1200–1440px（一般螢幕開 115–130% 字級會落到這一段）：側欄先收窄，不要等到 820px 才收 */
@@ -476,6 +508,7 @@ input::placeholder,textarea::placeholder{color:var(--mut2);font-weight:400;font-
   .main{--mainpad:12px;padding:12px}
   .sec{padding:14px 12px}
   .report{padding:20px 16px;overflow-x:auto}
+  .report .rcover{margin:-20px -16px 20px;padding:28px 22px 26px;min-height:420px}.report .rcover .rctitle{font-size:30px}
 
   /* ⚠️ 報告書的表格：中文可以**逐字**換行 → 表格的 min-content 極小 → 它只會一路縮到
      容器寬，欄位被壓成一字一行（實測：家庭成員表 5 欄擠在 266px，「王太太」斷兩行）。
@@ -1112,6 +1145,15 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .tunelev .val button{margin-top:6px}.tunelev .done{display:block;font-size:12px;color:var(--ok);margin-top:4px}.tunelev .done a{color:var(--amber2);cursor:pointer;margin-left:6px;text-decoration:underline}
 .tunemodal{max-width:560px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;color:var(--tx);max-height:86vh;overflow:auto}
 .tunemodal h3{margin:0 0 6px;font-family:var(--serif);font-size:18px}
+.trialstat{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-bottom:10px}
+.trialgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.trialcard{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px}
+.trialcard.adopted{border-color:var(--amber)}
+.trialcard .th{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.trialcard .tname{width:110px;background:var(--card);border:1px solid var(--line);color:var(--tx);border-radius:4px;padding:3px 6px;font-weight:700;font-size:13px}
+.trialcard .tnums{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.trialcard .tnums .lb{font-size:11px;color:var(--mut)}.trialcard .tnums .vv{font-family:var(--serif);font-size:16px;font-weight:700}.trialcard .tnums small{font-size:11px;color:var(--mut);font-weight:400}
+.trialcard .tbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .tmrow{display:grid;grid-template-columns:1fr 150px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
 .tmrow .tmn{font-weight:700}.tmrow .tmn .hint{font-weight:400;margin-left:6px}
 .tmrow input[type=text]{width:100%;background:var(--field);border:1px solid var(--line2);color:var(--tx);border-radius:4px;padding:6px 8px;font-size:14px;text-align:right;font-variant-numeric:tabular-nums}
@@ -1812,6 +1854,8 @@ function migrateCase(c){
  if(!Array.isArray(c.plan.invest))c.plan.invest=[];
  if(!Array.isArray(c.plan.protect))c.plan.protect=[];
  if(!Array.isArray(c.plan.trials))c.plan.trials=[];
+ // 2026/10/27 方案比較 v2：舊的 levers-only 方案包成快照（snap.plan.draft），補 id
+ c.plan.trials.forEach(function(t){if(!t)return;if(!t.id)t.id=uid();if(!t.snap){t.snap={actions:[],plan:{draft:JSON.parse(JSON.stringify(t.levers||{}))},tune:null};t.legacy=true}});
  migrateAlloc(c);   // 舊的 allocations（比例%）搬進新的 invest（本金/年投入），只跑一次
  c.taxParams=_fill(d.taxParams,c.taxParams);
  c.credit=_fill(d.credit,c.credit);
@@ -5638,7 +5682,7 @@ function bindVT(){
 }
 function render(){document.querySelectorAll('#roleSw button').forEach(function(b){b.classList.toggle('on',b.dataset.r===app.role)});
  var ac=activeCase();if(ac)normalizeIntent(ac);
- document.getElementById('app').innerHTML=app.role==='coach'?coachView():clientView();bindTabs();bindPrioDrag();bindAnalysis();bindVT();try{if(typeof mountVisionDrawer==='function'){mountVisionDrawer();mountTuneModal();mountVisionModal()}}catch(e){}}
+ document.getElementById('app').innerHTML=app.role==='coach'?coachView():clientView();bindTabs();bindPrioDrag();bindAnalysis();bindVT();try{if(typeof mountVisionDrawer==='function'){mountVisionDrawer();mountTuneModal();mountVisionModal();mountTrialModal()}}catch(e){}}
 function bindTabs(){document.querySelectorAll('[data-tab]').forEach(function(b){b.onclick=function(){app.activeTab=b.dataset.tab;render()}});
  document.querySelectorAll('[data-dtab]').forEach(function(b){b.onclick=function(){app.dataTab=b.dataset.dtab;app.ivFacet='';render()}});
  // 下拉裡的面向：走 ivGoto（切分頁 → 捲到錨點 → 閃一下），與訪談清單同一條路。
@@ -8704,15 +8748,85 @@ function adoptDraft(){var c=activeCase();c.plan=c.plan||{};
  // 舊欄位同步，避免報告書與 scenario() 各讀各的
  c.plan.retireDelay=n((c.plan.levers||{}).retire);
  save();renderKeepFocus();}
-function saveTrial(){var c=activeCase();c.plan=c.plan||{};c.plan.trials=c.plan.trials||[];
- if(c.plan.trials.length>=5){alert('最多存 5 個方案，請先刪掉一個。');return;}
- var d=JSON.parse(JSON.stringify(c.plan.draft||{}));
- c.plan.trials.push({label:'方案 '+String.fromCharCode(65+c.plan.trials.length),levers:d,gap:gapWith(c,d),at:new Date().toISOString().slice(0,10)});
- save();render();}
+/* ===== 方案比較 v2（2026/10/27 Ray 定案）=====
+   存方案＝整份調整方案快照（動作清單＋plan 層＋調整台拉桿狀態），不再只存六根槓桿。
+   名稱預設帶第一個沒用掉的字母（方案 A／B／C…），不用流水號；重名擋存；上限 TRIAL_MAX 組。
+   「採用」把那一筆複製成正式層 c.plan.adopted——報告書／客戶端（/portal 的 iframe）／真實追蹤
+   只讀正式層（adoptedCase），工作區隨便試都不會動到客戶看到的東西。
+   ⚠️ 沒有 adopted 的舊客戶：adoptedCase 回 c 本身，數字一位不動（trialsUI.test 守著）。
+   願景歲數／金額與流程步驟刻意不進快照：願景是引擎不是方案內容、流程是過程不是結果。 */
+var TRIAL_MAX=5, TRIAL_PLAN_KEYS=['levers','draft','allocations','invest','protect','movableToOverseas','useAllocReturn'];
+function trialSnap(c){
+ var p=c.plan||{},pl={};TRIAL_PLAN_KEYS.forEach(function(k){if(p[k]!==undefined)pl[k]=JSON.parse(JSON.stringify(p[k]))});
+ var tn=(c.flow&&c.flow.tune)?JSON.parse(JSON.stringify(c.flow.tune)):null;
+ return {actions:JSON.parse(JSON.stringify(c.actions||[])),plan:pl,tune:tn};
+}
+function trialSnapEmpty(s){s=s||{};if((s.actions||[]).length)return false;if(s.tune)return false;
+ var p=s.plan||{};return Object.keys(p).every(function(k){var v=p[k];return v==null||v===false||v===0||(Array.isArray(v)&&!v.length)||(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)});
+}
+function trialApplyTo(c,snap){ // 把快照套進 c（可以是複本）；不 save、不 render
+ snap=snap||{};c.actions=JSON.parse(JSON.stringify(snap.actions||[]));
+ c.plan=c.plan||{};TRIAL_PLAN_KEYS.forEach(function(k){if(snap.plan&&snap.plan[k]!==undefined)c.plan[k]=JSON.parse(JSON.stringify(snap.plan[k]));else delete c.plan[k]});
+ c.plan.retireDelay=n((c.plan.levers||{}).retire);   // 舊欄位同步，報告書與 scenario() 才不會各讀各的
+ if(c.flow){if(snap.tune)c.flow.tune=JSON.parse(JSON.stringify(snap.tune));else delete c.flow.tune}
+ return c;
+}
+function trialScore(c){var pr=projection(c),ev=pr.events||[],acts=planActionsOn(c);
+ return {gap:Math.max(0,n(pr.shortPV)),annual:sum(acts,function(a){return n(a.payMonthly)*12}),lump:sum(acts,function(a){return n(a.payLump)}),acts:acts.length,visOk:ev.filter(function(e){return e.ok}).length,visAll:ev.length};
+}
+function adoptedCase(c){var ad=c&&c.plan&&c.plan.adopted;if(!(ad&&ad.snap))return c;
+ return trialApplyTo(JSON.parse(JSON.stringify(c)),ad.snap);}
+function trialDefaultName(c){var used={};((c.plan||{}).trials||[]).forEach(function(t){used[(t.label||'').trim()]=1});
+ for(var i=0;i<26;i++){var nm='方案 '+String.fromCharCode(65+i);if(!used[nm])return nm}return '方案 '+(Date.now()%1000);}
+function trialById(c,id){if(!id)return null;return ((c.plan||{}).trials||[]).filter(function(t){return t&&t.id===id})[0]||null}
+function trialAskSave(){var c=activeCase();if(!c)return;var ts=(c.plan||{}).trials||[];
+ if(ts.length>=TRIAL_MAX){alert('最多存 '+TRIAL_MAX+' 組方案——方案是有限的，請先刪掉一組再存。');return}
+ app.trialNaming={name:trialDefaultName(c),err:''};mountTrialModal();}
+function trialNamingClose(){app.trialNaming=null;var m=document.getElementById('trialMask');if(m)m.remove()}
+function trialNamingSet(v){if(app.trialNaming){app.trialNaming.name=v;app.trialNaming.err=''}}
+function saveTrial(name){var c=activeCase();if(!c)return false;c.plan=c.plan||{};c.plan.trials=c.plan.trials||[];
+ name=(name==null?(app.trialNaming||{}).name:name);name=(name||'').trim();
+ var err='';if(!name)err='方案名稱不能空白。';
+ else if(c.plan.trials.length>=TRIAL_MAX)err='最多存 '+TRIAL_MAX+' 組方案，請先刪掉一組。';
+ else if(c.plan.trials.some(function(t){return (t.label||'').trim()===name}))err='「'+name+'」已經存在——請改一個名字（例如 '+trialDefaultName(c)+'）。';
+ if(err){if(app.trialNaming){app.trialNaming.err=err;mountTrialModal()}else alert(err);return false}
+ var t={id:uid(),label:name,at:new Date().toISOString().slice(0,10),snap:trialSnap(c),score:trialScore(c),from:((c.plan.base||{}).trialId)||null};
+ c.plan.trials.push(t);c.plan.base={trialId:t.id};app.trialNaming=null;trialNamingClose();save();render();return true;}
 function useTrial(i){var c=activeCase();var t=(c.plan.trials||[])[i];if(!t)return;
- c.plan.draft=JSON.parse(JSON.stringify(t.levers||{}));save();render();}
-function delTrial(i){var c=activeCase();(c.plan.trials||[]).splice(i,1);save();render();}
-function renameTrial(i,v){var c=activeCase();var t=(c.plan.trials||[])[i];if(t){t.label=v;save();}}
+ trialApplyTo(c,t.snap||{});c.plan.base={trialId:t.id};save();render();}
+function trialReset(){var c=activeCase();if(!c)return;
+ if(!confirm('回到原始：清空工作區的動作清單、槓桿、配置與拉桿狀態（已存的方案與正式方案都不動）。確定？'))return;
+ trialApplyTo(c,{});c.plan.base={trialId:null};save();render();}
+function adoptTrial(i){var c=activeCase();var t=(c.plan.trials||[])[i];if(!t)return;
+ c.plan.adopted={trialId:t.id,label:t.label,at:new Date().toISOString().slice(0,10),snap:JSON.parse(JSON.stringify(t.snap||{}))};
+ save();render();}
+function unadoptTrial(){var c=activeCase();if(!c||!c.plan||!c.plan.adopted)return;
+ if(!confirm('取消正式方案？報告書與客戶端會回到「未調整」。'))return;delete c.plan.adopted;save();render();}
+function delTrial(i){var c=activeCase();var t=(c.plan.trials||[])[i];if(!t)return;
+ if(c.plan.adopted&&c.plan.adopted.trialId===t.id){alert('這是正式方案，先取消採用才能刪。');return}
+ if(!confirm('刪除「'+(t.label||'')+'」？'))return;
+ c.plan.trials.splice(i,1);if((c.plan.base||{}).trialId===t.id)c.plan.base={trialId:null};save();render();}
+function renameTrial(i,v){var c=activeCase();var t=(c.plan.trials||[])[i];if(!t)return;v=(v||'').trim();
+ if(!v||c.plan.trials.some(function(x,j){return j!==i&&(x.label||'').trim()===v})){alert(v?'「'+v+'」已經存在。':'名稱不能空白。');render();return}
+ t.label=v;if(c.plan.adopted&&c.plan.adopted.trialId===t.id)c.plan.adopted.label=v;save();render();}
+function trialWorkState(c){ // 工作區現在是什麼：原始／＝方案 X（未改）／自 X 修改中
+ var base=trialById(c,((c.plan||{}).base||{}).trialId),snap=trialSnap(c);
+ if(base){var same=JSON.stringify(base.snap||{})===JSON.stringify(snap);return {base:base,same:same,text:same?'＝ '+base.label+'（未改）':'自 '+base.label+' 修改中'}}
+ var empty=trialSnapEmpty(snap);return {base:null,same:empty,text:empty?'原始（空白）':'自原始修改中'};
+}
+function mountTrialModal(){
+ var m=document.getElementById('trialMask');var c=activeCase();var st=app.trialNaming;
+ if(!(c&&st&&app.activeTab==='plan')){if(m)m.remove();return}
+ if(!m){m=document.createElement('div');m.id='trialMask';m.style.cssText='position:fixed;inset:0;background:rgba(4,14,24,.62);display:flex;align-items:center;justify-content:center;z-index:80;padding:20px';
+  m.onclick=function(e){if(e.target===m)trialNamingClose()};document.body.appendChild(m)}
+ var sc=trialScore(c);
+ m.innerHTML='<div class="tunemodal" style="max-width:460px"><h3>存成方案</h3><div class="hint" style="margin-bottom:12px">整份調整方案一起存：動作清單、槓桿、資產配置、調整台拉桿。名稱重複不能存，請自己改。</div>'+
+  '<div class="f"><label>方案名稱</label><input id="trialNameIn" value="'+esc(st.name)+'" oninput="trialNamingSet(this.value)" onkeydown="if(event.key===\'Enter\')saveTrial()"></div>'+
+  (st.err?'<div style="color:var(--danger);font-size:13px;margin-top:6px">'+esc(st.err)+'</div>':'')+
+  '<div class="hint" style="margin-top:10px">這一版的成績：剩餘缺口 '+cfAxis(sc.gap)+'・年投入 '+cfAxis(sc.annual)+'・'+sc.acts+' 個動作・願景達成 '+sc.visOk+'/'+sc.visAll+'</div>'+
+  '<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end"><button class="tbtn ghost" onclick="trialNamingClose()">取消</button><button class="tbtn amber" onclick="saveTrial()">存檔</button></div></div>';
+ var inp=document.getElementById('trialNameIn');if(inp&&!st.err){inp.focus();inp.select()}
+}
 function setUseAlloc(v){var c=activeCase();c.plan=c.plan||{};c.plan.useAllocReturn=!!v;save();render();}
 function useAllocRate(){var c=activeCase();var al=allocInfo(c);if(!(al.totalPct>0))return;
  c.params.invReturn=+al.wRet.toFixed(1);save();render();}
@@ -8882,7 +8996,7 @@ function gapHeroHTML(c,ledBase,gate){
  var sliders=LEVERS.map(function(L){return leverSliderHTML(c,L.id,gate)}).join('');
  var btns='<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">'+
   '<button class="tbtn amber" onclick="adoptDraft()">採用為正式方案</button>'+
-  '<button class="tbtn" onclick="saveTrial()">存成方案</button>'+
+  '<button class="tbtn" onclick="trialAskSave()">存成方案</button>'+
   '<button class="tbtn" onclick="clearDraft()">歸零</button></div>';
  var adopted=(c.plan||{}).levers&&Object.keys((c.plan||{}).levers).length;
  var adoptNote=adopted
@@ -8985,16 +9099,23 @@ function gapDetailHTML(c,led){
 }
 
 function trialsHTML(c){
- var ts=(c.plan||{}).trials||[];
- if(!ts.length)return '<div class="muted">還沒有存過方案。在上面拉出一組組合後按「存成方案」，最多可以並排比較 5 組。</div>';
- var head='<tr><th>方案</th>'+LEVERS.map(function(L){return '<th>'+esc(L.name)+'</th>'}).join('')+'<th>剩餘缺口</th><th></th></tr>';
- var rows=ts.map(function(t,i){
-  var cells=LEVERS.map(function(L){var v=(t.levers||{})[L.id];return '<td>'+(n(v)?leverLabel(L.id,v):'—')+'</td>'}).join('');
-  return '<tr><td class="k"><input value="'+esc(t.label)+'" onchange="renameTrial('+i+',this.value)" style="width:82px;background:var(--field);border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:3px 6px"><div class="hint">'+esc(t.at||'')+'</div></td>'+cells+
-   '<td style="color:'+(t.gap>0.5?'var(--warn)':'var(--ok)')+'">'+(t.gap>0.5?fmt(t.gap):'✅ 0')+'</td>'+
-   '<td style="white-space:nowrap"><button class="tbtn" style="padding:3px 8px;font-size:12px" onclick="useTrial('+i+')">帶回</button> <button class="tbtn" style="padding:3px 8px;font-size:12px" onclick="delTrial('+i+')">刪</button></td></tr>';
+ // 方案頁最上面（全生涯財務流之後）：結論出來之後看到的結果，不再收進「更多診斷」。
+ var p=c.plan||{},ts=p.trials||[],ad=p.adopted||null,ws=trialWorkState(c);
+ var status='<div class="trialstat">'+
+  '<span>正式方案：'+(ad?'<b style="color:var(--amber2)">★ '+esc(ad.label)+'</b> <span class="hint">'+esc(ad.at||'')+' 採用 · 報告書／客戶端／真實追蹤讀這一份</span>':'<b style="color:var(--mut)">尚未採用</b> <span class="hint">報告書與客戶端仍以「未調整」呈現</span>')+'</span>'+
+  '<span>工作區：<b>'+esc(ws.text)+'</b> <span class="hint">分析頁、方案頁、拉桿與動作清單改的都是這一份</span></span></div>';
+ var cards=ts.map(function(t,i){var sc=t.score||{},isAd=!!(ad&&ad.trialId===t.id),isBase=!!(ws.base&&ws.base.id===t.id),fr=trialById(c,t.from);
+  return '<div class="trialcard'+(isAd?' adopted':'')+'">'+
+   '<div class="th"><input class="tname" value="'+esc(t.label)+'" onchange="renameTrial('+i+',this.value)">'+(isAd?'<span class="flpill w">★ 正式</span>':'')+(isBase?'<span class="flpill i">工作區基底</span>':'')+'<span class="hint">'+esc(t.at||'')+(fr?' · 自 '+esc(fr.label):'')+(t.legacy?' · 舊格式（只有槓桿）':'')+'</span></div>'+
+   '<div class="tnums"><div><div class="lb">剩餘缺口</div><div class="vv" style="color:'+(n(sc.gap)>0.5?'var(--warn)':'var(--ok)')+'">'+(n(sc.gap)>0.5?cfAxis(sc.gap):'✅ 0')+'</div></div>'+
+    '<div><div class="lb">年投入</div><div class="vv">'+cfAxis(n(sc.annual))+(n(sc.lump)>0?'<small> +單筆 '+cfAxis(sc.lump)+'</small>':'')+'</div></div>'+
+    '<div><div class="lb">動作</div><div class="vv">'+n(sc.acts)+'</div></div>'+
+    '<div><div class="lb">願景達成</div><div class="vv">'+(sc.visAll!=null?n(sc.visOk)+'/'+n(sc.visAll):'—')+'</div></div></div>'+
+   '<div class="tbtns"><button class="tbtn sm" onclick="useTrial('+i+')">載入來改</button>'+(isAd?'<button class="tbtn sm ghost" onclick="unadoptTrial()">取消採用</button>':'<button class="tbtn sm amber" onclick="adoptTrial('+i+')">採用為正式</button>')+'<button class="tbtn sm ghost" onclick="delTrial('+i+')">刪</button></div></div>';
  }).join('');
- return '<div style="overflow-x:auto"><table class="rtable" style="min-width:640px">'+head+rows+'</table></div>';
+ return '<div class="sec" id="trialsSec"><h4>方案比較 <span class="hint">把調整完的整份方案存下來並排看，最多 '+TRIAL_MAX+' 組；按「採用為正式」才會進報告書與客戶端</span></h4>'+status+
+  (ts.length?'<div class="trialgrid">'+cards+'</div>':'<div class="muted" style="margin:8px 0">還沒有存過方案。在下面的流程或動作清單調整完，按「存成方案」。</div>')+
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="tbtn amber" onclick="trialAskSave()">存成方案</button><button class="tbtn ghost" onclick="trialReset()">回到原始</button></div></div>';
 }
 
 // ===== 配置與對帳：畫面 =====
@@ -10236,6 +10357,7 @@ function flowBodyHTML2(c){
  var f=flowOf(c),s=f.step,A=n(c.profile.age)||40;
  if(s==='S6x'||s==='P3x'){
   return flowActionListHTML(c,flowGate('輸出與執行',
+   '<button class="tbtn" onclick="trialAskSave()">存成方案</button>'+
    '<button class="tbtn amber" onclick="flowStartExec()">進入執行期 →</button>'+
    '<button class="tbtn ghost" onclick="app.activeTab=\'report\';app.reportDoc=\'plan\';render()">產出調整方案書</button>'+
    '<button class="tbtn ghost" onclick="app.activeTab=\'analysis\';render()">回到分析頁</button>','教練'));
@@ -10650,7 +10772,7 @@ function planSec(c){
   '<div class="f"><label>下次檢視日期</label><input type="date" value="'+esc(c.nextReview)+'" onchange="setCase(\'nextReview\',this.value)"></div>';
  // ── 版面（v2，2026/08/24）──
  // 首屏只有「一張圖＋三個數字＋判語＋動作開關」，其餘一律收合。
- // ⚠️ v1 的拉桿／三個處方／該解什麼／方案比較全部保留，只是收進 <details>——
+ // ⚠️ v1 的拉桿／三個處方／該解什麼全部保留，只是收進 <details>——（方案比較 2026/10/27 升到頁首 trialsHTML，不在折疊裡）
  //    它們仍然是有用的診斷，但不該再佔首屏；首屏要回答的是「做得到嗎、改善多少」。
  // planact 的宿主包住方案本體；review 的宿主是「其他方案參數」那一折（下次檢視日在裡面）。
  // 2026/09/27 願景處理流程：有 c.flow 的客戶在首屏下方接步進器，v2 九個折疊原樣收進「更多診斷」；
@@ -10669,12 +10791,11 @@ function planSec(c){
     soloHTML(c,solo)+rxCardsHTML(c,rxs)+gapHeroHTML(c,led,gate))+
   foldSec('缺口組成與即時缺口','缺口是哪些支出造成的，另有保障與預備金要補',gapDetailHTML(c,led))+
   foldSec('建議資產配置','投資型與保障型的配置與對帳',allocSecHTML(c))+
-  foldSec('方案比較','教練多次模擬的收納處，最多 5 組',trialsHTML(c))+
   foldSec('其他方案參數','資產移轉、下次檢視日','<div class="fgrid">'+f+'</div>')+
   foldSec('真實追蹤','逐年實際淨資產疊到規劃線（有流程時在 S8 回訪對帳裡對帳）',trackingSec(c));
  // 2026/09/28 Ray：方案最上面用「全生涯財務流」開頭（同分析頁那張圖），缺口從這裡抓；願景歷程收進折疊第一格。
  var vf=foldSec('願景歷程','灰線＝現況、金線＝套用動作後；旗子 ✓ 做得到、✕ 做不到',planHeroV2(c),false);
- return '<div data-ivsec="flow" data-ivname="願景處理流程">'+flowTuneHeroHTML(c)+planTop3HTML(c)+
+ return '<div data-ivsec="flow" data-ivname="願景處理流程">'+flowTuneHeroHTML(c)+trialsHTML(c)+planTop3HTML(c)+
   (fl?flowSec(c)+foldSec('更多診斷（v2 既有折疊，原樣保留）','願景歷程、配額對帳、動作清單、資金勾稽、拉桿與處方…都在這裡',vf+folds,false):flowEntryHTML(c)+vf+folds)+
   '</div>';
 }
@@ -15419,7 +15540,7 @@ function trackingSec(c){
  var tbl=tableSec('真實資產追蹤 (Beta) — 逐年實際淨資產','tracking',c.tracking,[['year','西元年','num'],['age','年齡','num'],['net','實際淨資產','money']]);
  return '<div class="sec"><h4>實際 vs 模擬 <span class="hint">輸入過去年度實際淨資產，疊到模擬淨資產走勢對照</span></h4><div data-calc="trackingChart">'+trackingChartSVG(c)+'</div></div>'+tbl;
 }
-function trackingChartSVG(c){var proj=projection(c),rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
+function trackingChartSVG(c){c=adoptedCase(c);var proj=projection(c),rows=proj.rows;if(!rows.length)return '<div class="muted">無資料</div>';
  // 採用了正式方案就多疊一條「方案後」的線——教練要看的是實際落在「沒調整」還是「調整後」哪一條上。
  // ⚠️ 2026/08/24：c 本身已經含調整動作，所以「沒調整」那條要畫 baseCase(c)，
  //    「調整後」才是 c＋levers。有動作或有 levers 任一個，就值得畫兩條。
@@ -17164,10 +17285,62 @@ function bizToolHTML(){var T=app.tools.biz,net=n(T.monthRev)-n(T.monthCost);
    而且獨立輸出反而更有價值——這是一份可以獨立交付、甚至獨立收費的東西。
    ⚠️ 合規閘燈號只出現在這一份與教練端，家庭版客戶報告書不顯示（Ray 2026/08/22 拍板）。 */
 function setReportDoc(v){app.reportDoc=v;render()}
-// 列印：先把報告書裡所有 <details> 打開再叫 window.print()，印完還原。
-// 收合是螢幕上的首屏紀律，不是「這段不用給客戶看」——交到客戶手上的 PDF 少一半內容是另一回事。
-// 純 CSS 打不開 details（Chrome 128 起內容藏在 ::details-content 裡），只能用 JS。
+/* ── 列印（2026/10/27 改版）──
+   Ray：匯出的 PDF 不要瀏覽器自己印上去的日期／網頁標題／網址；要設計封面、目錄頁；每一章從頁首開始；
+   每頁頁首章名＋客戶、頁尾日期＋頁碼，要像排好的不是貼上去的。
+   瀏覽器原生列印給不了頁碼與「每頁章名」，所以改成：另開一個乾淨的列印視窗，用 Paged.js（public/vendor，MIT）
+   真的分頁——它自己接管 @page，瀏覽器那三個註記也就不會出現。彈窗被擋時退回原地 window.print()（舊做法）。 */
+/* who／date 直接烤進 @page 的 content（string-set 跨頁帶值不穩，而且宿主元素放在 .report 前面會多出一張空白頁）。 */
+function rPrintCSS(who,date){
+ var q=function(t){return '"'+String(t).replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"'};
+ return R_PRINT_CSS.replace('__WHO__',q(who)).replace('__DATE__',q(date));
+}
+var R_PRINT_CSS=[
+ '@page{size:A4;margin:20mm 18mm 18mm 18mm;',
+ ' @top-left{content:string(rch);white-space:nowrap;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:9px;letter-spacing:.14em;color:#8a9aa2;vertical-align:bottom;padding-bottom:5px;border-bottom:1px solid #e6e0d4}',
+ ' @top-center{content:" ";border-bottom:1px solid #e6e0d4;vertical-align:bottom;padding-bottom:5px;font-size:9px}',
+ ' @top-right{content:__WHO__;white-space:nowrap;text-align:right;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:9px;letter-spacing:.14em;color:#8a9aa2;vertical-align:bottom;padding-bottom:5px;border-bottom:1px solid #e6e0d4}',
+ ' @bottom-left{content:__DATE__;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:9px;letter-spacing:.1em;color:#8a9aa2;vertical-align:top;padding-top:6px}',
+ ' @bottom-right{content:counter(page);font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:9px;letter-spacing:.1em;color:#8a9aa2;vertical-align:top;padding-top:6px}}',
+ '@page cover{margin:0;@top-left{content:none;border:0}@top-center{content:none;border:0}@top-right{content:none;border:0}@bottom-left{content:none}@bottom-right{content:none}}',
+ '@page toc{@top-left{content:"目錄"}}',
+ 'html,body{background:#fff!important;margin:0;color:#22333a}',
+ '@media print{body *{visibility:visible}.report{position:static!important}}',
+ '.report{box-shadow:none;border-radius:0;max-width:none;padding:0;margin:0;background:#fff}',
+ '.report .rcover{page:cover;margin:0;border-radius:0;width:210mm;height:297mm;padding:26mm 20mm 22mm;break-after:page}',
+ '.report .rcover .rctitle{font-size:46px}.report .rcover .rcwho b{font-size:30px}',
+ '.report .rcover.light .rchead{margin-top:110px}',
+ '.report .rtocpg{page:toc;break-after:page}',
+ '.report .rtocpg>div{background:none!important;border:0!important;padding:0!important;margin:0!important}',
+ '.report .rtocpg b{display:block;font-size:24px;color:#0d2b45;letter-spacing:.1em;margin-bottom:14px}',
+ '.report .rtoc{column-count:1!important;list-style:none;padding-left:0!important;font-size:14px!important;line-height:2.3!important}',
+ '.report .rtoc li{display:flex;gap:10px;align-items:baseline}',
+ '.report .rtoc li::before{content:attr(data-n);color:#c99a5b;font-weight:700;min-width:34px;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:12px}',
+ '.report .rtoc li a{color:#22333a;text-decoration:none;flex:1;display:flex;align-items:baseline;border-bottom:1px dotted #cfc6b5;line-height:1.6;margin-bottom:9px}',
+ '.report .rtoc li a::after{content:target-counter(attr(href url),page);margin-left:auto;padding-left:10px;color:#5a6b72;font-family:"Noto Sans TC","PingFang TC",sans-serif;font-size:12px}',
+ '.report section.rch{break-before:page}',
+ '.report section.rch h2{string-set:rch content(text);margin-top:0}',
+ '.report details{break-inside:auto}.report details>summary{list-style:none;color:#0d2b45;font-weight:700}',
+ '.report table{break-inside:auto}.report tr{break-inside:avoid}',
+ '.report svg{max-width:100%;height:auto}'
+].join('\n');
 function printReport(){
+ var rep=document.querySelector('.report');
+ var win=null;
+ try{win=window.open('','_blank');}catch(e){win=null;}
+ if(!rep||!win){printReportInPlace();return;}
+ var css=[].slice.call(document.querySelectorAll('style')).map(function(x){return x.textContent}).join('\n');
+ var cover=rep.querySelector('.rcover');var docTitle=cover?cover.getAttribute('data-doc')||'報告書':'報告書';
+ var who=rep.querySelector('.rcover .rcwho b');var whoTxt=who?who.textContent:'';
+ var html='<!doctype html><html lang="zh-Hant" data-theme="light"><head><meta charset="utf-8"><title>'+esc(docTitle)+(whoTxt?' · '+esc(whoTxt):'')+'</title>'+
+  '<style>'+css+'</style><style>'+rPrintCSS(whoTxt,rReportDate())+'</style>'+
+  '<script>window.PagedConfig={auto:true,after:function(){setTimeout(function(){window.print();},400);}};<\/script>'+
+  '<script src="/vendor/paged.polyfill.min.js"><\/script></head><body>'+
+  rep.outerHTML.replace(/<details(?![^>]*\bopen\b)/g,'<details open')+'</body></html>';
+ win.document.open();win.document.write(html);win.document.close();
+}
+// 舊做法（原地列印）：先把報告書裡所有 <details> 打開再叫 window.print()，印完還原。
+function printReportInPlace(){
  var ds=[].slice.call(document.querySelectorAll('.report details'));
  var was=ds.map(function(d){return d.open;});
  ds.forEach(function(d){d.open=true;});
@@ -17192,9 +17365,7 @@ function bizReportHTML(c){
   ['第二階段 · 優化','6～12 個月','報酬結構重設計、稅務效率、資產配置分散'],
   ['第三階段 · 傳承','1～3 年','退場路徑選定、股權與傳承架構、家族治理']
  ].map(function(x){return '<tr><td><b>'+x[0]+'</b></td><td style="white-space:nowrap">'+x[1]+'</td><td>'+x[2]+'</td></tr>'}).join('');
- return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 企業主財務規劃</div><h1>企業主財務診斷書</h1></div>'+
-  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+esc(window.LANTU_BRAND.logoUrl)+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
-  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+(co.name?' · '+esc(co.name):'')+docCodeHTML()+'</div></div>'+
+ return rDocShell('企業主財務診斷書','BUSINESS OWNER FINANCIAL REVIEW',esc(p.name)+(co.name?' · '+esc(co.name):''),
 
   '<h2>一、核心命題</h2>'+
   '<p style="font-size:14px;line-height:1.9">企業主的財務規劃，本質是<b>「把一個高度集中、不流動、與人身高度綁定的資產，逐步轉換成分散、流動、與人身脫鉤的資產」</b>的過程。'+
@@ -17242,7 +17413,7 @@ function bizReportHTML(c){
   '財務規劃師可以做的是：解讀財報、指出結構性缺口、整合式資產負債表與現金流分析、報酬結構的試算框架、保障缺口分析、退休與傳承的議題盤點。'+
   '應轉介專業人士的是：記帳與稅務申報、財稅簽證、認定特定稅務處理的合法性、法律文件撰擬、公司架構的設立與變更。</p>'+
   (c.bizReportNote?'<h2>九、教練總結</h2><p style="font-size:13.5px;line-height:1.9;white-space:pre-wrap">'+esc(c.bizReportNote)+'</p>':'')+
-  '</div>';
+  '');
 }
 /* ── 企業現金流三件工具 ──
    刻意放工具箱而不是規劃案裡：13 週表是「每週滾動更新」的營運工具，
@@ -17488,9 +17659,7 @@ function planReportHTML(c){
      ? '基本的人生目標都做得到了，<b style="color:'+RP.bad+'">卡在「傳承」</b>——期末資產 '+cfAxis((pa.rows[pa.rows.length-1]||{}).total)+'，目標 '+cfAxis(ff.amount)+'。'
      : '照這一組動作走，做得到 <b>'+ff.age+' 歲以前</b>的所有事；第一個做不到的是 <b style="color:'+RP.bad+'">'+ff.age+' 歲的「'+esc(ff.name)+'」</b>。');
 
- return '<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>調整方案書</h1></div>'+
-  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+esc(window.LANTU_BRAND.logoUrl)+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'')+'</div>'+
-  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+'　現年 '+n(p.age)+' 歲　目前階段：'+stageName(hb.grade)+docCodeHTML()+'</div></div>'+
+ return rDocShell('調整方案書','FINANCIAL ADJUSTMENT PLAN',esc(p.name),
 
   flowReportChapterHTML(c)+
   '<h2>一、你和你想要的未來，差多少</h2>'+
@@ -17559,7 +17728,7 @@ function planReportHTML(c){
   '每一筆調整動作登錄的是<b>工具與效果</b>，不是特定商品；商品的選擇與適配請由您與各該領域的專業人士確認。'+
   '嵐途為一般顧問公司，不從事投資顧問或保險招攬業務，本文件不構成任何金融商品的推介或投資建議。'+
   '個人稅務與法律事項請與您的會計師、律師確認。</p>'+
-  '</div>';
+  '');
 }
 
 /* 三份文件表頭共用：有編號才印，沒有就整段不出現（教練本機開的示範案例沒有編號）。 */
@@ -17587,28 +17756,24 @@ function reportPane(c){
   rTheme(bizReportHTML(c));
  if(isPlan)return '<div style="margin-bottom:10px" class="muted">調整方案書預覽，右上「列印報告」輸出 PDF。內容全部取自「調整方案」分頁採用的方案。</div>'+sw+
   '<div class="sec"><h4>教練總結（方案書用）</h4><textarea onchange="setCase(\'planNote\',this.value)" placeholder="例：這一輪先把支出結構調下來，投資報酬率的部分等預備金補滿再談…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.planNote||'')+'</textarea></div>'+
-  rTheme(planReportHTML(c));
+  rTheme(planReportHTML(adoptedCase(c)));   // 2026/10/27 方案書只讀正式方案
  return '<div style="margin-bottom:10px" class="muted">客戶交付報告預覽（圖表化），右上「列印報告」輸出 PDF。</div>'+sw+
  '<div class="sec"><h4>教練總結 <span class="hint">教練可編輯；填寫後會出現在報告書結尾（客戶版）</span></h4><textarea onchange="setCase(\'reportNote\',this.value)" placeholder="例：整體財務結構穩健，建議優先補強壽險缺口與提高緊急預備金…" style="width:100%;min-height:90px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit;font-size:14px;line-height:1.6;box-sizing:border-box">'+esc(c.reportNote||'')+'</textarea></div>'+
- rTheme(reportHTML(c))}
+ rTheme(reportHTML(adoptedCase(c)))}   // 2026/10/27 報告書只讀正式方案
 /* ===== 報告書配色（2026/10/20）=====
    報告書的顏色全是行內 hex（列印用淺色稿，不走全站 token），CSS 蓋不到，所以配色是對
    輸出的 HTML 做色碼對照替換。三套：經典（原樣）／墨金／高對比。選擇存 localStorage，
    三份報告書（客戶版／方案書／診斷書）都吃同一個選擇。 */
-var R_THEMES={
- classic:{name:'經典',map:{}},
- ink:{name:'墨金',map:{'#0d2b45':'#10233a','#c99a5b':'#b8893f','#faf7f1':'#f4efe4','#fffdf8':'#faf6ec','#e4dccf':'#d8ccb8','#33474e':'#2b3a40','#5a6b72':'#55636b','#a9bccf':'#8fa3b8','#8a6f3c':'#7a5f2c'}},
- hc:{name:'高對比',map:{'#0d2b45':'#000000','#c99a5b':'#8a5a12','#faf7f1':'#ffffff','#fffdf8':'#ffffff','#e4dccf':'#8c8c8c','#33474e':'#111111','#5a6b72':'#333333','#a9bccf':'#555555','#8a6f3c':'#5a3a00','#3f7d54':'#146b2a','#b5852f':'#8a5500','#b05a4a':'#b00020','#6f8f74':'#146b2a','#e2e8ea':'#bfbfbf','#b8c4c8':'#777777','#7f97ac':'#2f4f6f'}}
-};
-function rThemeKey(){try{var k=localStorage.getItem('lantu.reportTheme');return R_THEMES[k]?k:'classic';}catch(e){return 'classic';}}
-function rThemePick(k){try{localStorage.setItem('lantu.reportTheme',R_THEMES[k]?k:'classic');}catch(e){}render();}
-function rTheme(html){
- var m=R_THEMES[rThemeKey()].map,ks=Object.keys(m);if(!ks.length)return html;
- return String(html).replace(/#[0-9a-fA-F]{6}\b/g,function(h){var l=h.toLowerCase();return m.hasOwnProperty(l)?m[l]:h;});
-}
+/* 2026/10/27 Ray 定案：配色只剩「深／淺」兩種，而且只決定封面（深＝深藍整頁、淺＝米白雙線框）；
+   內頁一律是印刷淺色稿，不再對色碼做替換（舊的墨金／高對比連同色碼對照一起拿掉）。
+   舊的 localStorage 值（classic／ink／hc）一律視為「深」。 */
+var R_THEMES={dark:{name:'深'},light:{name:'淺'}};
+function rThemeKey(){try{var k=localStorage.getItem('lantu.reportTheme');return R_THEMES[k]?k:'dark';}catch(e){return 'dark';}}
+function rThemePick(k){try{localStorage.setItem('lantu.reportTheme',R_THEMES[k]?k:'dark');}catch(e){}render();}
+function rTheme(html){return html;}   // 保留介面：三份報告書都經過它；配色現在由封面 class 決定
 function rThemePickHTML(){
  var cur=rThemeKey();
- return '<div class="sec"><h4>報告配色 <span class="hint">三份報告書共用；只改顏色，內容與版面不變</span></h4><div style="display:flex;gap:8px;flex-wrap:wrap">'+
+ return '<div class="sec"><h4>報告配色 <span class="hint">三份報告書共用；只決定封面——深＝深藍整頁、淺＝米白留白，內頁一律印刷淺色稿</span></h4><div style="display:flex;gap:8px;flex-wrap:wrap">'+
   Object.keys(R_THEMES).map(function(k){return '<button class="tbtn'+(cur===k?' amber':'')+'" onclick="rThemePick(\''+k+'\')">'+R_THEMES[k].name+'</button>'}).join('')+'</div></div>';
 }
 /* ===== 報告用淺色圖表元件 ===== */
@@ -17695,19 +17860,50 @@ function rGapBars(gaps){var pos=gaps.filter(function(g){return g.gap>0});if(!pos
 // 為什麼不寫死：有些章是「有資料才出現」的（真實追蹤、人生護照…），
 // 寫死編號的話，目錄會列出一個翻不到的章，而且往中間插一章要手改十幾個地方。
 var CN_NUM=['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','二十一','二十二','二十三','二十四'];
+/* 章節：把 body 裡的 <h2>§、章名</h2>（自動編號）或 <h2>一、章名</h2>（方案書／診斷書寫死的編號）
+   切成一章一個 <section class="rch" id="rch-N">。列印時每章從頁首開始（break-before:page），
+   每頁頁首的章名靠 h2 的 string-set 帶出來（見 R_PRINT_CSS）。
+   ⚠️ 「§」才會重新編號；已經寫死的「零、一、…」照原樣（方案書的「零」章是條件章，測試釘住字面）。 */
+var RCH_RE=/<h2>(§|[零一二三四五六七八九十]+)、([^<]*)<\/h2>/g;
 function rNumberSections(body){
- var titles=[],k=0;
- var html=String(body).replace(/<h2>\u00a7\u3001([^<]*)<\/h2>/g,function(m,t){
-  titles.push(t);
-  return '<h2>'+(CN_NUM[k++]||(k))+'\u3001'+t+'</h2>';
+ var titles=[],nums=[],k=0,html=String(body);
+ var parts=[],last=0,m;RCH_RE.lastIndex=0;
+ while((m=RCH_RE.exec(html))){parts.push({at:m.index,len:m[0].length,num:m[1]==='§'?(CN_NUM[k++]||String(k)):m[1],title:m[2]});}
+ if(!parts.length)return {html:html,titles:titles,nums:nums};
+ var out=html.slice(0,parts[0].at);
+ parts.forEach(function(x,i){
+  var end=(i+1<parts.length)?parts[i+1].at:html.length;
+  titles.push(x.title);nums.push(x.num);
+  out+='<section class="rch" id="rch-'+(i+1)+'"><h2>'+x.num+'、'+x.title+'</h2>'+html.slice(x.at+x.len,end)+'</section>';
  });
- return {html:html,titles:titles};
+ return {html:out,titles:titles,nums:nums};
 }
-function rTOC(titles){
+function rTOC(titles,nums){
  if(!titles.length)return '';
- return '<div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px">'+
+ nums=nums||[];
+ return '<div class="rtocpg"><div style="margin:14px 0 6px;padding:14px 16px;background:#faf7f1;border:1px solid #e4dccf;border-radius:10px">'+
   '<b style="color:#0d2b45">目錄</b><ol class="rtoc" style="color:#33474e;font-size:13px;margin:8px 0 0;padding-left:20px;line-height:1.9;column-count:2;column-gap:28px">'+
-  titles.map(function(t){return '<li>'+esc(t)+'</li>';}).join('')+'</ol></div>';
+  titles.map(function(t,i){return '<li'+(nums[i]?' data-n="'+esc(nums[i])+'"':'')+'><a href="#rch-'+(i+1)+'">'+esc(t)+'</a></li>';}).join('')+'</ol></div></div>';
+}
+/* 封面。docTitle＝書名；sub＝英文副標；who＝謹致對象（已 esc）。
+   2026/10/27 Ray：最簡內容（品牌 logo／書名／謹致客戶／日期／標語），深淺由 rThemeKey() 決定。
+   logo 一律用後台壓的 LANTU_BRAND.logoUrl；沒有就印品牌名文字，不畫簡化版圖形。 */
+function rReportDate(){var d=new Date();return d.getFullYear()+' 年 '+(d.getMonth()+1)+' 月 '+d.getDate()+' 日';}
+function rCover(docTitle,sub,who){
+ var th=rThemeKey(),B=window.LANTU_BRAND||{},bn=B.brandName||'嵐途 LAN TU',slogan=B.slogan||'理解自己・做出選擇・走向未來';
+ var logo=B.logoUrl?'<img src="'+esc(B.logoUrl)+'" alt="'+esc(bn)+'"/>':'<span class="rcname">'+esc(bn)+'</span>';
+ return '<div class="rcover '+th+'" data-doc="'+esc(docTitle)+'">'+(th==='light'?'<div class="rcframe"></div>':'')+'<div class="rcarc"></div>'+
+  '<div class="rcbrand">'+logo+'</div>'+
+  '<div class="rchead" style="margin-top:'+(th==='light'?'70px':'54px')+'"><div class="rck">全方位財務規劃</div><div class="rctitle">'+esc(docTitle)+'</div><div class="rcsub">'+esc(sub)+'</div></div>'+
+  '<div class="rcrule"></div>'+
+  '<div class="rcwho">謹致<b>'+who+'</b>'+docCodeHTML().replace(/<span style="[^"]*">/,'<small>').replace(/<\/span>/,'</small>')+'</div>'+
+  '<div class="rcmeta"><span class="l">報告日期</span><span class="v">'+rReportDate()+'</span></div>'+
+  '<div class="rcslogan">'+esc(slogan)+'</div></div>';
+}
+/* 三份報告書共用的外殼：封面 → 目錄頁 → 章節。 */
+function rDocShell(docTitle,sub,who,body){
+ var R=rNumberSections(body);
+ return '<div class="report">'+rCover(docTitle,sub,who)+rTOC(R.titles,R.nums)+R.html+'</div>';
 }
 // 報告書的三個數字：一排 KPI，不要更多。超過三個就是還沒想清楚哪個最重要。
 function rBig(items){
@@ -18215,9 +18411,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
  var aLiq=sum(c.assets,function(a){return aLiquid(c,a)?aVal(a):0}),aFix=sum(c.assets,function(a){return aLiquid(c,a)?0:aVal(a)});
  var assetPie=[{name:'流動資產',pct:aLiq},{name:'固定資產',pct:aFix}];
  var hp=h.parts;
- var head='<div class="report"><div class="rc"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><div class="k">嵐途 LAN TU · 全方位財務規劃</div><h1>財務規劃報告書</h1></div>'+
-  (window.LANTU_BRAND&&window.LANTU_BRAND.logoUrl?'<img src="'+esc(window.LANTU_BRAND.logoUrl)+'" alt="logo" style="flex:none;height:46px;max-width:210px;object-fit:contain"/>':'<svg width="40" height="40" viewBox="0 0 48 48" style="flex:none"><rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="none" stroke="#c99a5b" stroke-width="1.2"/><path d="M15 12 L15 33 L34 33" stroke="#a9bccf" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M13 24 A13 13 0 0 1 36 16" stroke="#c99a5b" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg>')+'</div>'+
-  '<div style="margin-top:8px;font-size:13px">謹致 '+esc(p.name)+' · 財務階段 <b style="color:var(--amber2)">'+stageName(h.grade)+'</b>'+docCodeHTML()+'<span style="color:#a9bccf;margin-left:10px;letter-spacing:.14em;font-size:11px">理解自己・做出選擇・走向未來</span></div></div>';
+ var who=esc(p.name);   // 封面：謹致客戶（財務階段不上封面，留到第一章總覽——Ray 2026/10/27）
 
  // 章節先組起來，編號與目錄最後才由 rNumberSections() 依「實際印出來的章」自動產生。
  // 舊版是把「一、二、三…」寫死在字串裡、目錄再手抄一份 —— 只要有一章因為沒資料被略過
@@ -18296,8 +18490,7 @@ function reportHTML(c){var m=metrics(c),h=health(c),r=ratios(c),gaps=coverageGap
   '<h2>§、動態調整（PDCA）</h2><p style="color:#33474e">計畫(Plan)→行動(Do)→確認(Check)→調整(Act)，建議每半年檢視一次。下次檢視日期：<b>'+(esc(c.nextReview)||'尚未設定')+'</b></p>'+
   (c.reportNote?'<div style="margin:14px 0;padding:14px 16px;background:#f4f7f5;border:1px solid #cfe0d5;border-radius:10px"><b style="color:#0d2b45">教練總結</b><div style="color:#33474e;margin-top:6px;white-space:pre-wrap">'+esc(c.reportNote)+'</div></div>':'')+
   '<h2>§、注意事項</h2><p style="color:#5a6b72;font-size:12.5px">本報告依所提供資料與假設參數試算，僅供參考；稅額為簡化估算，實際以主管機關與會計師核定為準。財務規劃為動態調整過程，建議每半年檢視。</p>';
- var R=rNumberSections(body);
- return head+rTOC(R.titles)+R.html+'</div>';
+ return rDocShell('財務規劃報告書','FINANCIAL PLANNING REPORT',who,body);
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -18351,6 +18544,7 @@ function clientModCards(c,title,mods,prefix){
 }
 function cdToggled(el){if(el.open)anFill(el.getAttribute('data-k'));}
 function clientView(){var c=activeCase();if(!c)return '<div style="padding:60px;text-align:center;color:var(--mut)">尚無資料</div>';
+ c=adoptedCase(c);   // 2026/10/27 客戶端只看正式方案，教練試方案不會讓客戶看到半成品
  var m=metrics(c),h=health(c),r=ratios(c),proj=m.proj,rn=retireNeed(c);
  // 報告書分頁被後台關掉時，連分頁鈕都不出現（也不能靠改網址進去）。
  var showReport=dashOn('report');
