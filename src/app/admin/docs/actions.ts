@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { getDocSeal, saveDocSeal, saveSet, saveTemplate, setTemplateEnabled, voidInstance, sanitizeTemplateInput } from "@/lib/docsStore";
+import { getDocSeal, saveDocSeal, saveSet, saveTemplate, setTemplateEnabled, voidInstance, sanitizeTemplateInput, saveDocSettings, createDocTask } from "@/lib/docsStore";
 import { renderTemplate, validateTemplate } from "@/lib/docs";
 import { SAMPLE_VARS } from "@/lib/docsVars";
 
@@ -96,5 +96,32 @@ export async function previewTemplateAction(input: unknown): Promise<{ ok: true;
   } catch (e) {
     const r = fail(e);
     return { ok: false, error: r.ok ? "" : r.error };
+  }
+}
+
+/** 催簽天數等設定。 */
+export async function saveDocSettingsAction(input: { nudgeDays: number }): Promise<ActionResult> {
+  try {
+    const me = await guard();
+    await saveDocSettings(input, me.id);
+    bump();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 建立補簽任務：一份範本 × 一批既有教練 × 期限。 */
+export async function createDocTaskAction(input: { templateKey: string; coachIds: string[]; deadline: string | null; note?: string }): Promise<ActionResult & { created?: number; skipped?: string[] }> {
+  try {
+    const me = await guard();
+    const r = await createDocTask(input, me.id);
+    if (!r.ok) return r;
+    revalidatePath("/admin/docs/tasks");
+    revalidatePath("/dashboard/docs");
+    revalidatePath("/dashboard");
+    return { ok: true, created: r.created, skipped: r.skipped };
+  } catch (e) {
+    return fail(e);
   }
 }

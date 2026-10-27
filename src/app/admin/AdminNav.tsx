@@ -81,6 +81,7 @@ export const ADMIN_GROUPS: { key: string; title: string; items: { href: string; 
       { href: "/admin/brand", label: "品牌設定" },
       { href: "/admin/docs", label: "電子簽署" },
       { href: "/admin/docs/instances", label: "簽署總覽" },
+      { href: "/admin/docs/tasks", label: "補簽任務" },
       { href: "/admin/site-nav", label: "官網頂欄" },
       { href: "/admin/modules", label: "模組開關" },
     ],

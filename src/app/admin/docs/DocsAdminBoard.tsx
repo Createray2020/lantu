@@ -18,7 +18,7 @@ import {
   type DocSignerSlot,
 } from "@/lib/docs";
 import { STARTER_HTML, varsFor } from "@/lib/docsVars";
-import { previewTemplateAction, saveSealAction, saveSetAction, saveTemplateAction, setTemplateEnabledAction } from "./actions";
+import { previewTemplateAction, saveSealAction, saveSetAction, saveTemplateAction, setTemplateEnabledAction, saveDocSettingsAction } from "./actions";
 
 export type TemplateLite = {
   id: string;
@@ -73,7 +73,7 @@ const toDraft = (t: TemplateLite): Draft => ({
   note: t.note,
 });
 
-export default function DocsAdminBoard({ templates, items, sets, seal }: { templates: TemplateLite[]; items: ItemLite[]; sets: Record<string, string[]>; seal: string | null }) {
+export default function DocsAdminBoard({ templates, items, sets, seal, nudgeDays = 7 }: { templates: TemplateLite[]; items: ItemLite[]; sets: Record<string, string[]>; seal: string | null; nudgeDays?: number }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Draft | null>(null);
 
@@ -103,6 +103,8 @@ export default function DocsAdminBoard({ templates, items, sets, seal }: { templ
       </section>
 
       <SetsSection templates={templates} items={items} sets={sets} onSaved={() => router.refresh()} />
+
+      <NudgeSection nudgeDays={nudgeDays} />
 
       {editing && (
         <TemplateEditor
@@ -401,5 +403,25 @@ function SetRow({ kind, item, options, value, onSaved }: { kind: DocSetKind; ite
         </button>
       </span>
     </div>
+  );
+}
+
+// ── ④ 催簽設定 ───────────────────────────────────────────────────────────────
+function NudgeSection({ nudgeDays }: { nudgeDays: number }) {
+  const [v, setV] = useState(String(nudgeDays));
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  return (
+    <section className="border border-line rounded-lg p-4">
+      <h2 className="font-bold mb-1">催簽與待辦</h2>
+      <p className="text-11 text-tx3 mb-3">待簽超過這個天數（從發出或最後一次催算）就進「待我處理」與教練的「我的文件」；同一份一天最多催一次。逾期與拒簽一律進待辦。</p>
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-tx2 text-xs">待簽超過</span>
+        <input className={`${FIELD} w-20 text-center`} inputMode="numeric" value={v} onChange={(e) => setV(e.target.value)} />
+        <span className="text-tx2 text-xs">天進待辦</span>
+        <SubmitButton state={busy ? "pending" : "idle"} onClick={() => start(async () => { const r = await saveDocSettingsAction({ nudgeDays: Number(v) }); setMsg(r.ok ? "已儲存" : r.error); })}>儲存</SubmitButton>
+        {msg && <span className="text-xs text-tx2">{msg}</span>}
+      </div>
+    </section>
   );
 }

@@ -14,9 +14,12 @@ const h = vi.hoisted(() => {
     docSigners: col("doc_signers"),
     signatures: col("signatures"),
     siteSettings: col("site_settings"),
+    docTasks: col("doc_tasks"),
+    coaches: col("coaches"),
+    coachDisplayName: { name: "name" },
   };
   const state: Record<string, any[]> = {};
-  const reset = () => { for (const k of ["doc_templates", "doc_sets", "doc_instances", "doc_signers", "signatures", "site_settings"]) state[k] = []; };
+  const reset = () => { for (const k of ["doc_templates", "doc_sets", "doc_instances", "doc_signers", "signatures", "site_settings", "doc_tasks", "coaches"]) state[k] = []; };
   reset();
   const test = (p: any, row: any): boolean => {
     if (!p) return true;
@@ -26,6 +29,7 @@ const h = vi.hoisted(() => {
       case "in": return p.vals.includes(row[p.col]);
       case "and": return p.xs.every((x: any) => test(x, row));
       case "or": return p.xs.some((x: any) => test(x, row));
+      case "false": return false;
       default: return true;
     }
   };
@@ -39,7 +43,8 @@ const h = vi.hoisted(() => {
     id: crypto.randomUUID(),
     ...(table === "doc_templates" ? { enabled: true, version: 1, required: true, useSeal: true, signDays: null, note: "" } : {}),
     ...(table === "doc_instances" ? { status: "pending", required: true, finalHash: null, completedAt: null, expiresAt: null } : {}),
-    ...(table === "doc_signers" ? { status: "pending", consentAt: null, signatureImg: null, signedAt: null, hashAtSign: null, label: "", displayName: "" } : {}),
+    ...(table === "doc_signers" ? { status: "pending", consentAt: null, signatureImg: null, signedAt: null, hashAtSign: null, label: "", displayName: "", remindCount: 0, lastRemindedAt: null } : {}),
+    ...(table === "doc_tasks" ? { deadline: null, note: "" } : {}),
     createdAt: new Date(),
     updatedAt: new Date(),
     ...v,
@@ -96,7 +101,11 @@ const h = vi.hoisted(() => {
     update: (t: any) => ({
       set: (v: any) => {
         let pred: any = null;
-        const run = () => { const hit = state[t._n].filter((r) => test(pred, r)); hit.forEach((r) => Object.assign(r, v)); return hit.map((r) => ({ ...r })); };
+        const run = () => {
+          const hit = state[t._n].filter((r) => test(pred, r));
+          hit.forEach((r) => { for (const [k, x] of Object.entries(v)) r[k] = x && typeof x === "object" && (x as any).op === "inc" ? (r[k] ?? 0) + 1 : x; });
+          return hit.map((r) => ({ ...r }));
+        };
         const c: any = { where: (p: any) => { pred = p; return c; }, returning: () => Promise.resolve(run()), then: (res: any, rej: any) => Promise.resolve().then(run).then(res, rej) };
         return c;
       },
@@ -115,13 +124,14 @@ vi.mock("drizzle-orm", () => ({
   or: (...xs: any[]) => ({ op: "or", xs }),
   asc: (x: any) => ({ name: x.name, dir: "asc" }),
   desc: (x: any) => ({ name: x.name, dir: "desc" }),
-  sql: () => ({ op: "true" }),
+  // sweepExpired 的日期比較在記憶體 db 裡一律不成立（不讓測試裡的待簽被掃成逾期）；remind_count + 1 走 inc。
+  sql: (strs: TemplateStringsArray) => { const t = String(strs.join("")); return t.includes("+") ? { op: "inc" } : t.includes("<") || t.includes("is not null") ? { op: "false" } : { op: "true" }; },
 }));
 vi.mock("next/cache", () => ({ unstable_cache: (fn: any) => fn, updateTag: () => {} }));
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 
-import { startSigning, consentAndSign, declineSign, voidInstance, saveTemplate, saveSet, listMyInstances, countMyPending, caseProgress, getInstance, saveSignature, getSignature, latestEnabledTemplate, setTemplateEnabled } from "./docsStore";
+import { startSigning, consentAndSign, declineSign, voidInstance, saveTemplate, saveSet, listMyInstances, countMyPending, caseProgress, getInstance, saveSignature, getSignature, latestEnabledTemplate, setTemplateEnabled, remindInstance, reopenInstance, listDocTodos, createDocTask, listDocTasks, hasReminderFor } from "./docsStore";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const S = h.state;
@@ -258,5 +268,74 @@ describe("簽名檔", () => {
     await saveSignature({ kind: "client_user", id: "cu1" }, PNG);
     expect(S.signatures).toHaveLength(1);
     await expect(saveSignature({ kind: "coach", id: "c" }, "data:image/jpeg;base64,xx")).rejects.toThrow();
+  });
+});
+
+describe("催簽、延長、待辦", () => {
+  it("教練催客戶：記一次、一天內不重複；被催的那一位 hasReminderFor＝true", async () => {
+    await seedTraining();
+    await start();
+    const main = S.doc_instances.find((i) => i.title === "實習教練合作約定書")!;
+    // 現在輪到 u1（成員）；公司代表 boss 來催
+    const r1 = await remindInstance(main.id, { coachId: "boss" });
+    expect(r1.ok).toBe(true);
+    expect(r1.reminded).toEqual(["小美"]);
+    const r2 = await remindInstance(main.id, { coachId: "boss" });
+    expect(!r2.ok && r2.error).toContain("今天已經");
+    expect(await hasReminderFor({ coachId: "u1" })).toBe(true);
+    expect(await hasReminderFor({ coachId: "boss" })).toBe(false);
+    // 輪到自己的人不能催別人
+    const r3 = await remindInstance(main.id, { coachId: "u1" });
+    expect(r3.ok).toBe(false);
+    // 外人不能催
+    expect((await remindInstance(main.id, { coachId: "stranger" })).ok).toBe(false);
+  });
+
+  it("逾期→延長回待簽；待簽太久進待辦（依 nudgeDays）；拒簽進待辦", async () => {
+    await seedTraining();
+    await start();
+    const main = S.doc_instances.find((i) => i.title === "實習教練合作約定書")!;
+    main.status = "expired";
+    const re = await reopenInstance(main.id, 10, { coachId: "boss" });
+    expect(re.ok && re.expiresAt).toBeTruthy();
+    expect(S.doc_instances.find((i) => i.id === main.id)!.status).toBe("pending");
+    // 剛建立：不算卡住
+    expect((await listDocTodos()).length).toBe(0);
+    // 建立時間倒退 8 天 → stale（預設 7 天）
+    main.createdAt = new Date(Date.now() - 8 * 86_400_000);
+    const todos = await listDocTodos();
+    expect(todos.map((t) => t.kind)).toEqual(["stale"]);
+    expect(todos[0].waitingOn).toBe("小美");
+    // 只看某位教練身上的
+    expect((await listDocTodos({ coachId: "stranger" })).length).toBe(0);
+    expect((await listDocTodos({ coachId: "u1" })).length).toBe(1);
+    // 拒簽
+    await declineSign(main.id, { coachId: "u1" }, "x");
+    expect((await listDocTodos()).map((t) => t.kind)).toEqual(["declined"]);
+  });
+});
+
+describe("補簽任務", () => {
+  it("一份範本×一批教練：各產一份 coach_doc 實例、簽署人＝本人；進度表算得出完成數；不碰任何權限", async () => {
+    S.coaches.push({ id: "a1", name: "阿一", email: "a@x", code: "FC1", status: "active" }, { id: "a2", name: "阿二", email: null, code: null, status: "active" }, { id: "boss", name: "Ray", email: null, code: null, status: "active" });
+    const t = await saveTemplate({ category: "training", name: "保密同意書 v2", html: "<p>{{member.name}} 保密</p>{{sign:member:1}}", signers: [{ role: "member", seq: 1 }] }, "boss");
+    const r = await createDocTask({ templateKey: t.key, coachIds: ["a1", "a2"], deadline: "2026-12-31" }, "boss");
+    expect(r.ok && r.created).toBe(2);
+    const insts = S.doc_instances.filter((i) => i.caseType === "coach_doc");
+    expect(insts).toHaveLength(2);
+    expect(insts[0].htmlSnapshot).toContain("阿一 保密");
+    expect(insts.every((i) => i.expiresAt === "2026-12-31")).toBe(true);
+    expect(await countMyPending({ coachId: "a1" })).toBe(1);
+    // 阿一簽完
+    const mine = insts.find((i) => i.htmlSnapshot.includes("阿一"))!;
+    const s1 = await consentAndSign({ instanceId: mine.id, me: { coachId: "a1" }, consent: true, signatureImg: PNG, hashSeen: mine.hash, saveAsDefault: false, ip: null, ua: null });
+    expect(s1.ok && s1.completed).toBe(true);
+    const tasks = await listDocTasks();
+    expect(tasks[0]).toMatchObject({ total: 2, done: 1 });
+    expect(tasks[0].rows.map((x) => [x.name, x.status])).toEqual([["阿一", "completed"], ["阿二", "pending"]]);
+    // 同一位再被另一個任務指定同一份文件：case_id 帶任務 id，不會撞唯一索引
+    const r2 = await createDocTask({ templateKey: t.key, coachIds: ["a1"], deadline: null }, "boss");
+    expect(r2.ok && r2.created).toBe(1);
+    expect(S.coaches.find((c) => c.id === "a1").status).toBe("active");
   });
 });

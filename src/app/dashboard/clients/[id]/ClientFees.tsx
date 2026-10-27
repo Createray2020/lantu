@@ -7,6 +7,7 @@ import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/acctEngine";
 import FeeFields, { EMPTY_FEE, feeError, feeToInput, type FeeDraft } from "../../FeeFields";
 import { addClientFeeAction, clientCasesAction, addCasePaymentAction, startCaseSigningAction, type ClientCaseRow } from "../../actions";
+import { remindAction } from "@/app/sign/[id]/actions";
 
 // 客戶詳情「收款與合約」（2026/10/28；2026/10/09 原為「顧問費」）。
 // 一案一卡：收款／合約／發票三組獨立狀態；動作依狀態給——建立付費服務案件、登錄付款、啟動簽約流程、合約進度與下載。
@@ -138,6 +139,9 @@ function CaseCard({ c, readOnly, onChanged }: { c: ClientCaseRow; readOnly: bool
             <li key={d.id} className="flex items-center gap-2 text-xs">
               <span className={`w-2 h-2 rounded-full ${d.status === "completed" ? "bg-ok" : d.status === "declined" ? "bg-danger" : d.myTurn ? "bg-brand" : "bg-line2"}`} />
               <span className="flex-1 truncate">{d.title} <span className="text-tx3">{d.signers}</span></span>
+              {!readOnly && d.status === "pending" && !d.myTurn && (
+                <button type="button" className="rounded-md border border-brand2 text-brand2 px-2.5 py-1 disabled:opacity-40" disabled={pending} onClick={() => start(async () => { const x = await remindAction(d.id); setErr(x.ok ? `已提醒 ${x.reminded?.join("、")}` : x.error ?? "失敗"); })}>催簽</button>
+              )}
               <Link href={`/sign/${d.id}`} className={`rounded-md px-2.5 py-1 ${d.myTurn ? "bg-brand text-onbrand font-bold" : "border border-line"}`}>{d.myTurn ? "預覽並確認簽署" : d.status === "completed" ? "下載合約" : "查看進度"}</Link>
             </li>
           ))}

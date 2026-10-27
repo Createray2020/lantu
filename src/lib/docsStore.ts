@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { unstable_cache, updateTag } from "next/cache";
 import { db } from "@/Shared/db";
-import { docInstances, docSets, docSigners, docTemplates, signatures, siteSettings } from "@/Shared/db/schema";
+import { docInstances, docSets, docSigners, docTasks, docTemplates, signatures, siteSettings, coaches, coachDisplayName } from "@/Shared/db/schema";
 import {
   applySignatures,
   canSignNow,
@@ -23,7 +23,13 @@ import {
   validSignaturePng,
   validateTemplate,
   type DocCategory,
+  type DocCaseType,
   type DocSetKind,
+  type DocSettings,
+  DEFAULT_DOC_SETTINGS,
+  sanitizeDocSettings,
+  isStale,
+  E_SIGN_CLAUSE,
   type DocSignerSlot,
   type DocVars,
   type SlotContext,
@@ -199,7 +205,7 @@ export async function deleteSignature(o: SignatureOwner): Promise<void> {
 
 // ── 啟動簽署 ─────────────────────────────────────────────────────────────────
 export type StartSigningInput = {
-  caseType: DocCategory;
+  caseType: DocCaseType;
   caseId: string;
   setKind: DocSetKind;
   setRef: string;
@@ -400,4 +406,136 @@ export async function sweepExpired(): Promise<number> {
     .where(and(eq(docInstances.status, "pending"), sql`${docInstances.expiresAt} < ${today}`, sql`${docInstances.expiresAt} is not null`))
     .returning({ id: docInstances.id });
   return rows.length;
+}
+
+// ── 設定（催簽天數）────────────────────────────────────────────────────────
+export const DOC_SETTINGS_KEY = "doc_settings";
+export const getDocSettings = unstable_cache(
+  async (): Promise<DocSettings> => {
+    try {
+      const rows = await db.select().from(siteSettings).where(eq(siteSettings.key, DOC_SETTINGS_KEY)).limit(1);
+      return rows[0] ? sanitizeDocSettings(rows[0].value) : DEFAULT_DOC_SETTINGS;
+    } catch {
+      return DEFAULT_DOC_SETTINGS;
+    }
+  },
+  ["lantu-doc-settings"],
+  { tags: [DOC_SEAL_TAG] },
+);
+export async function saveDocSettings(v: unknown, updatedBy: string | null): Promise<void> {
+  const value = sanitizeDocSettings(v);
+  await db.insert(siteSettings).values({ key: DOC_SETTINGS_KEY, value, updatedAt: new Date(), updatedBy }).onConflictDoUpdate({ target: siteSettings.key, set: { value, updatedAt: new Date(), updatedBy } });
+  updateTag(DOC_SEAL_TAG);
+}
+
+// ── 催簽與重新開放 ─────────────────────────────────────────────────────────
+/**
+ * 催簽（站內）：把「現在輪到、還沒簽」的簽署人記一次提醒。同一份一天最多一次。
+ * 誰能催：這份文件的其他簽署人（例如教練催客戶）或後台管理員。
+ */
+export async function remindInstance(instanceId: string, by: Identity & { admin?: boolean }): Promise<{ ok: boolean; error?: string; reminded?: string[] }> {
+  const inst = await getInstance(instanceId);
+  if (!inst) return { ok: false, error: "找不到這份文件" };
+  if (inst.status !== "pending") return { ok: false, error: "這份文件已經不在待簽狀態" };
+  if (!by.admin && !inst.signers.some((s) => isSigner(s, by))) return { ok: false, error: "你不是這份文件的簽署人" };
+  const targets = inst.signers.filter((s) => canSignNow(s, inst.signers) && !isSigner(s, by));
+  if (!targets.length) return { ok: false, error: "現在輪到的是你自己，沒有人可以催" };
+  const dayAgo = Date.now() - 86_400_000;
+  const fresh = targets.filter((s) => !s.lastRemindedAt || s.lastRemindedAt.getTime() < dayAgo);
+  if (!fresh.length) return { ok: false, error: "今天已經提醒過了，明天再催" };
+  await db.update(docSigners).set({ remindCount: sql`${docSigners.remindCount} + 1`, lastRemindedAt: new Date() }).where(inArray(docSigners.id, fresh.map((s) => s.id)));
+  return { ok: true, reminded: fresh.map((s) => s.displayName || s.label) };
+}
+
+/** 重新開放：逾期（或快逾期）的文件延長期限、回到待簽；不重建、不要求已簽的人重簽。 */
+export async function reopenInstance(instanceId: string, days: number, by: Identity & { admin?: boolean }): Promise<{ ok: boolean; error?: string; expiresAt?: string }> {
+  const inst = await getInstance(instanceId);
+  if (!inst) return { ok: false, error: "找不到這份文件" };
+  if (inst.status !== "pending" && inst.status !== "expired") return { ok: false, error: "只有待簽或逾期的文件可以延長" };
+  if (!by.admin && !inst.signers.some((s) => isSigner(s, by))) return { ok: false, error: "你不是這份文件的簽署人" };
+  const d = Math.max(1, Math.min(365, Math.floor(days) || 14));
+  const expiresAt = addDaysISO(todayISO(), d);
+  await db.update(docInstances).set({ status: "pending", expiresAt, updatedAt: new Date() }).where(eq(docInstances.id, inst.id));
+  return { ok: true, expiresAt };
+}
+
+/** 這個人身上有沒有「被催」的待簽文件（客戶 portal 橫幅用）。 */
+export async function hasReminderFor(me: Identity): Promise<boolean> {
+  const list = await listMyInstances(me);
+  return list.some((i) => i.status === "pending" && i.signers.some((s) => isSigner(s, me) && s.status === "pending" && !!s.lastRemindedAt));
+}
+
+// ── 待辦（後台／教練）──────────────────────────────────────────────────────
+export type DocTodo = { instance: InstanceWithSigners; kind: "stale" | "expired" | "declined"; waitingOn: string; days: number };
+
+/** 卡住的文件：待簽超過 nudgeDays（從建立或最後一次催算）、逾期、拒簽。opts.coachId 只看那位教練是簽署人的。 */
+export async function listDocTodos(opts: { coachId?: string } = {}): Promise<DocTodo[]> {
+  const { nudgeDays } = await getDocSettings();
+  await sweepExpired();
+  const list = opts.coachId ? await listMyInstances({ coachId: opts.coachId }) : await listAllInstances({ limit: 500 });
+  const now = new Date();
+  const out: DocTodo[] = [];
+  for (const i of list) {
+    const pendingNow = i.signers.filter((s) => canSignNow(s, i.signers));
+    const waitingOn = pendingNow.map((s) => s.displayName || s.label).join("、");
+    const lastRemind = pendingNow.map((s) => s.lastRemindedAt?.getTime() ?? 0).reduce((a, b) => Math.max(a, b), 0);
+    const base = Math.max(new Date(i.createdAt).getTime(), lastRemind || 0);
+    const days = Math.floor((now.getTime() - base) / 86_400_000);
+    if (i.status === "declined") out.push({ instance: i, kind: "declined", waitingOn: i.signers.find((s) => s.status === "declined")?.displayName ?? "", days });
+    else if (i.status === "expired") out.push({ instance: i, kind: "expired", waitingOn, days });
+    else if (isStale(i, lastRemind ? new Date(lastRemind) : null, nudgeDays, now)) out.push({ instance: i, kind: "stale", waitingOn, days });
+  }
+  return out;
+}
+
+// ── 補簽任務 ─────────────────────────────────────────────────────────────────
+export type DocTask = typeof docTasks.$inferSelect;
+export type DocTaskView = DocTask & { total: number; done: number; rows: { coachId: string; name: string; instanceId: string | null; status: string }[] };
+
+/**
+ * 建立補簽任務：用範本「最新啟用版」替每位對象產一份實例（case_type='coach_doc'，case_id=`${taskId}:${coachId}`）。
+ * 簽署人＝那位教練本人（member）；範本若有 company 簽名位，由建立任務的管理員擔任。
+ */
+export async function createDocTask(input: { templateKey: string; coachIds: string[]; deadline: string | null; note?: string }, createdBy: string): Promise<{ ok: true; task: DocTask; created: number; skipped: string[] } | { ok: false; error: string }> {
+  const t = await latestEnabledTemplate(input.templateKey);
+  if (!t) return { ok: false, error: "找不到啟用中的範本" };
+  const ids = [...new Set(input.coachIds.filter(Boolean))];
+  if (!ids.length) return { ok: false, error: "請選至少一位對象" };
+  const people = await db.select({ id: coaches.id, name: coachDisplayName, email: coaches.email, code: coaches.code }).from(coaches).where(inArray(coaches.id, ids));
+  const admin = (await db.select({ id: coaches.id, name: coachDisplayName }).from(coaches).where(eq(coaches.id, createdBy)).limit(1))[0];
+  const deadline = input.deadline && /^\d{4}-\d{2}-\d{2}$/.test(input.deadline) ? input.deadline : null;
+  const [task] = await db.insert(docTasks).values({ templateKey: t.key, templateVersion: t.version, title: t.name, deadline, targetCoachIds: ids, note: (input.note ?? "").trim().slice(0, 400), createdBy }).returning();
+  const seal = (await getDocSeal()).img;
+  let created = 0;
+  const skipped: string[] = [];
+  for (const p of people) {
+    const resolved = resolveSlots(t.signers as DocSignerSlot[], { member: { coachId: p.id, name: p.name ?? "" }, coach: { coachId: p.id, name: p.name ?? "" }, company: admin ? { coachId: admin.id, name: admin.name ?? "" } : null });
+    if (!resolved.ok) { skipped.push(p.name ?? p.id); continue; }
+    const vars: DocVars = { title: t.name, today: todayISO(), esign_clause: E_SIGN_CLAUSE, "member.name": p.name ?? "", "member.email": p.email ?? "", "member.code": p.code ?? "" };
+    const html = renderTemplate({ html: t.html, signers: t.signers as DocSignerSlot[], useSeal: t.useSeal }, vars, { seal });
+    const [inst] = await db.insert(docInstances).values({
+      caseType: "coach_doc", caseId: `${task.id}:${p.id}`, templateId: t.id, templateKey: t.key, version: t.version, title: t.name, required: t.required,
+      htmlSnapshot: html, hash: sha256(html), status: "pending", expiresAt: deadline, createdBy,
+    }).onConflictDoNothing().returning();
+    if (!inst) continue;
+    if (resolved.signers.length) await db.insert(docSigners).values(resolved.signers.map((s) => ({ ...s, status: "pending", instanceId: inst.id })));
+    created++;
+  }
+  return { ok: true, task, created, skipped };
+}
+
+export async function listDocTasks(): Promise<DocTaskView[]> {
+  const tasks = await db.select().from(docTasks).orderBy(desc(docTasks.createdAt));
+  if (!tasks.length) return [];
+  const insts = await db.select().from(docInstances).where(and(eq(docInstances.caseType, "coach_doc"), ne(docInstances.status, "void")));
+  const ids = [...new Set(tasks.flatMap((t) => t.targetCoachIds))];
+  const names = ids.length ? await db.select({ id: coaches.id, name: coachDisplayName }).from(coaches).where(inArray(coaches.id, ids)) : [];
+  const nameOf = (id: string) => names.find((n) => n.id === id)?.name ?? id.slice(0, 8);
+  return tasks.map((t) => {
+    const rows = t.targetCoachIds.map((cid) => {
+      const inst = insts.find((i) => i.caseId === `${t.id}:${cid}`) ?? null;
+      return { coachId: cid, name: nameOf(cid), instanceId: inst?.id ?? null, status: inst?.status ?? "none" };
+    });
+    return { ...t, total: rows.length, done: rows.filter((r) => r.status === "completed").length, rows };
+  });
 }

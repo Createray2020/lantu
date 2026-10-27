@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { ensureCoach, isAdmin } from "@/lib/coach";
 import { getAcctState } from "@/lib/acctStore";
-import { getDocSeal, listSets, listTemplates, latestByKey } from "@/lib/docsStore";
+import { getDocSeal, listSets, listTemplates, latestByKey, getDocSettings } from "@/lib/docsStore";
 import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
 import DocsAdminBoard, { type TemplateLite, type ItemLite } from "./DocsAdminBoard";
@@ -15,7 +15,7 @@ export default async function DocsAdminPage() {
   if (!me) redirect("/dashboard");
   if (!(await isAdmin(me))) redirect("/dashboard");
 
-  const [all, sets, seal, acct] = await Promise.all([listTemplates(), listSets(), getDocSeal(), getAcctState()]);
+  const [all, sets, seal, acct, settings] = await Promise.all([listTemplates(), listSets(), getDocSeal(), getAcctState(), getDocSettings()]);
   const latest = latestByKey(all);
   const versions: Record<string, number> = {};
   for (const t of all) versions[t.key] = Math.max(versions[t.key] ?? 0, t.version);
@@ -52,7 +52,7 @@ export default async function DocsAdminPage() {
             「組合」決定某個方案啟動簽署時要產哪幾份。簽署人分類（公司／成員／客戶／教練）與順序在每份範本裡設。
           </p>
         </div>
-        <DocsAdminBoard templates={templates} items={items} sets={setMap} seal={seal.img} />
+        <DocsAdminBoard templates={templates} items={items} sets={setMap} seal={seal.img} nudgeDays={settings.nudgeDays} />
       </section>
     </main>
   );

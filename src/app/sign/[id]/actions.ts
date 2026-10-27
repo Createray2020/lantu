@@ -2,10 +2,10 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { consentAndSign, declineSign, getInstance, saveSignature, deleteSignature } from "@/lib/docsStore";
+import { consentAndSign, declineSign, getInstance, saveSignature, deleteSignature, remindInstance, reopenInstance } from "@/lib/docsStore";
 import { currentSignIdentity } from "@/lib/docsIdentity";
 import { onDocCompleted } from "@/lib/docsHooks";
-import type { DocCategory } from "@/lib/docs";
+import type { DocCaseType } from "@/lib/docs";
 
 export type SignActionResult = { ok: true; completed: boolean } | { ok: false; error: string };
 
@@ -28,7 +28,7 @@ export async function signAction(instanceId: string, input: { consent: boolean; 
   if (r.completed) {
     // 後續失敗不該讓「已簽完」變成「沒簽」：簽署已入庫，這裡吞錯、留給後台重跑（冪等）。
     try {
-      await onDocCompleted(r.instance.caseType as DocCategory, r.instance.caseId);
+      await onDocCompleted(r.instance.caseType as DocCaseType, r.instance.caseId);
     } catch (e) {
       console.error("[docs] onDocCompleted failed", e);
     }
@@ -70,4 +70,25 @@ export async function instanceStatusAction(instanceId: string): Promise<{ status
   const inst = await getInstance(instanceId);
   if (!inst) return null;
   return { status: inst.status, signed: inst.signers.filter((s) => s.status === "signed").length, total: inst.signers.length };
+}
+
+/** 催簽（站內提醒輪到的那一位）。 */
+export async function remindAction(instanceId: string): Promise<{ ok: boolean; error?: string; reminded?: string[] }> {
+  const me = await currentSignIdentity();
+  if (!me) return { ok: false, error: "請先登入" };
+  const r = await remindInstance(instanceId, me);
+  if (r.ok) PATHS.forEach((p) => revalidatePath(p));
+  return r;
+}
+
+/** 重新開放（延長期限）。 */
+export async function reopenAction(instanceId: string, days: number): Promise<{ ok: boolean; error?: string; expiresAt?: string }> {
+  const me = await currentSignIdentity();
+  if (!me) return { ok: false, error: "請先登入" };
+  const r = await reopenInstance(instanceId, days, me);
+  if (r.ok) {
+    PATHS.forEach((p) => revalidatePath(p));
+    revalidatePath(`/sign/${instanceId}`);
+  }
+  return r;
 }

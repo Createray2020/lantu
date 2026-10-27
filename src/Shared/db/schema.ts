@@ -1549,6 +1549,9 @@ export const docSigners = pgTable('doc_signers', {
   ua: text('ua'),
   hashAtSign: text('hash_at_sign'),
   declineReason: text('decline_reason'),
+  // 催簽（2026/10/28）：站內提醒——次數與最後一次時間；客戶端橫幅與後台待辦都看這兩欄。
+  remindCount: integer('remind_count').default(0).notNull(),
+  lastRemindedAt: timestamp('last_reminded_at', { withTimezone: true }),
 }, (t) => [
   index('doc_signers_instance_idx').on(t.instanceId),
   index('doc_signers_coach_idx').on(t.coachId),
@@ -1639,4 +1642,21 @@ export const invoices = pgTable('invoices', {
 }, (t) => [
   index('invoices_case_idx').on(t.caseType, t.caseId),
   index('invoices_status_idx').on(t.status),
+]);
+
+// 補簽任務（2026/10/28）：新增或修訂文件時，指定既有教練補簽。一個任務＝一份範本版本×一批對象×期限。
+// 實例掛 case_type='coach_doc'、case_id=`${task_id}:${coach_id}`（同一位教練之後可再被另一個任務指定同一份文件）。
+// ⚠️ 補簽不改任何權限：是否影響既有權限、何時影響，由公司另訂規則，系統不推定（需求書第九節）。
+export const docTasks = pgTable('doc_tasks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  templateKey: text('template_key').notNull(),
+  templateVersion: integer('template_version').notNull(),
+  title: text('title').notNull(),
+  deadline: date('deadline'),
+  targetCoachIds: jsonb('target_coach_ids').$type<string[]>().default([]).notNull(),
+  note: text('note').default('').notNull(),
+  createdBy: text('created_by').references(() => coaches.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('doc_tasks_template_key_idx').on(t.templateKey),
 ]);

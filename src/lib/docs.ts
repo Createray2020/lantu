@@ -10,6 +10,9 @@
 export type DocRole = "company" | "member" | "client" | "coach";
 export type DocSignerSlot = { role: DocRole; seq: number; label?: string };
 export type DocCategory = "training" | "client_service";
+/** 實例的案件類型：兩個業務消費者＋補簽任務（coach_doc，不觸發任何業務後續）。 */
+export type DocCaseType = DocCategory | "coach_doc";
+export const CASE_TYPE_LABEL: Record<DocCaseType, string> = { training: "培訓", client_service: "顧問服務", coach_doc: "補簽" };
 export type DocSetKind = "training_item" | "service_item";
 export type DocInstanceStatus = "pending" | "completed" | "declined" | "expired" | "void";
 export type DocSignerStatus = "pending" | "signed" | "declined";
@@ -48,7 +51,22 @@ export const CONSENT_LABEL = "我已確認本份文件內容，並同意使用�
 
 export const TEMPLATE_NAME_MAX = 80;
 export const TEMPLATE_HTML_MAX = 400_000;
-export const SIGNATURE_MAX_CHARS = 400_000; // base64 PNG 約 300KB，手寫簽名通常 10–30KB
+export const SIGNATURE_MAX_CHARS = 400_000;
+/** 催簽：待簽超過幾天進待辦（後台可改，存 site_settings doc_settings）；同一位一天最多催一次。 */
+export const DEFAULT_NUDGE_DAYS = 7;
+export type DocSettings = { nudgeDays: number };
+export const DEFAULT_DOC_SETTINGS: DocSettings = { nudgeDays: DEFAULT_NUDGE_DAYS };
+export function sanitizeDocSettings(v: unknown): DocSettings {
+  const x = (v ?? {}) as { nudgeDays?: unknown };
+  const n = Number(x.nudgeDays);
+  return { nudgeDays: Number.isFinite(n) && n >= 1 && n <= 90 ? Math.floor(n) : DEFAULT_NUDGE_DAYS };
+}
+/** 這一份是不是「卡太久」：還在待簽、而且從建立（或最後一次催）起超過 nudgeDays。 */
+export function isStale(inst: { status: string; createdAt: Date | string }, lastActivity: Date | string | null, nudgeDays: number, now: Date = new Date()): boolean {
+  if (inst.status !== "pending") return false;
+  const base = new Date(lastActivity ?? inst.createdAt).getTime();
+  return now.getTime() - base >= nudgeDays * 86_400_000;
+} // base64 PNG 約 300KB，手寫簽名通常 10–30KB
 
 // ── 簽名圖（PNG data URL）────────────────────────────────────────────────────
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];

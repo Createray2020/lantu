@@ -4,6 +4,9 @@ import { getApplySettings, listApplications } from "@/lib/coachApplyStore";
 import AdminHeader from "../AdminHeader";
 import AdminNav from "../AdminNav";
 import InboxBoard, { type InboxItem } from "./InboxBoard";
+import DocTodoList from "@/components/DocTodoList";
+import { listDocTodos } from "@/lib/docsStore";
+import { toTodoRows } from "@/lib/docTodoRows";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +28,11 @@ export default async function InboxPage() {
   if (!me) redirect("/dashboard");
   if (!(await isAdmin(me))) redirect("/dashboard");
 
-  const [coaches, applications, settings] = await Promise.all([
+  const [coaches, applications, settings, docTodos] = await Promise.all([
     listCoaches(),
     listApplications(),
     getApplySettings(),
+    listDocTodos(),
   ]);
 
   const unitLabel = settings.licenseUnit === "year" ? "年" : "個月";
@@ -93,6 +97,8 @@ export default async function InboxPage() {
           </p>
         </div>
         <InboxBoard items={items} settings={settings} />
+        {/* 電子簽署（2026/10/28）：待簽太久、逾期、拒簽的文件——催簽、延長、看原因都在這裡做 */}
+        <div className="mt-6"><DocTodoList rows={toTodoRows(docTodos)} /></div>
       </section>
     </main>
   );
