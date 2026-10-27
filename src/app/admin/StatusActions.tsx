@@ -6,7 +6,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { approveCoach, resetCoach, suspendCoach, retryActivateAction, rejectTrainingAction } from "./actions";
+import { approveCoach, resetCoach, suspendCoach, retryActivateAction, rejectTrainingAction, reopenTrainingAction } from "./actions";
 import { SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
 
@@ -32,6 +32,7 @@ export default function StatusActions({ id, status, training = null, companyOpti
 
   const t = training;
   const signing = !!t && t.stage === "passed";
+  const rejected = !!t && t.stage === "rejected";
   return (
     <div className="flex flex-col items-end gap-1">
       {/* 三組獨立狀態（2026/10/28）：收款／文件；資格審核在左邊的檢核表 */}
@@ -47,7 +48,10 @@ export default function StatusActions({ id, status, training = null, companyOpti
             {companyOptions.map((c) => <option key={c.id} value={c.id}>公司代表：{c.name}</option>)}
           </select>
         )}
-        {status !== "active" && !signing && (
+        {status !== "active" && rejected && (
+          <button type="button" className="rounded-md border border-line2 text-tx2 px-3 py-1.5 text-xs disabled:opacity-50" disabled={pending} onClick={() => run(reopenTrainingAction)}>重新受理</button>
+        )}
+        {status !== "active" && !signing && !rejected && (
           <button
             type="button"
             disabled={pending}
@@ -63,9 +67,9 @@ export default function StatusActions({ id, status, training = null, companyOpti
             <button
               type="button"
               disabled={pending}
-              onClick={() => run(() => retryActivateAction(t.enrollmentId))}
+              onClick={() => run(retryActivateAction)}
               className="rounded-md bg-ok-solid text-onbrand font-bold px-3 py-1.5 text-xs disabled:opacity-50"
-              title="文件都簽完就會自動開通；這顆是沒跟上時再推一次"
+              title="文件都簽完就會自動開通；這顆是沒跟上、或文件沒產出來時再推一次"
             >
               {pending ? "處理中…" : "開通"}
             </button>

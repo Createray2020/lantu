@@ -4,6 +4,7 @@ import BrandMark from "@/components/BrandMark";
 import { currentSignIdentity } from "@/lib/docsIdentity";
 import { getInstance, getSignature } from "@/lib/docsStore";
 import { canSignNow, isSigner, DOC_CSS } from "@/lib/docs";
+import { todayISO } from "@/lib/license";
 import SignView, { type SignerLite } from "./SignView";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +31,12 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
     );
   }
 
-  const owner = me.coachId ? { kind: "coach" as const, id: me.coachId } : me.clientUserId ? { kind: "client_user" as const, id: me.clientUserId } : null;
+  // 預存簽名檔跟著「這一列簽署人是哪種身分」走（同一個人可能既是教練列又是客戶列）
+  const owner = mine?.coachId ? { kind: "coach" as const, id: mine.coachId } : mine?.clientUserId ? { kind: "client_user" as const, id: mine.clientUserId } : null;
   const saved = owner ? await getSignature(owner) : null;
-  const myTurn = !!mine && inst.status === "pending" && canSignNow(mine, inst.signers);
+  // 還沒被 sweepExpired 掃到的過期文件也不能簽（送出端 consentAndSign 會再擋一次）
+  const expired = !!inst.expiresAt && inst.expiresAt < todayISO() && inst.status === "pending";
+  const myTurn = !!mine && inst.status === "pending" && !expired && canSignNow(mine, inst.signers);
 
   const signers: SignerLite[] = inst.signers.map((s) => ({
     id: s.id,
@@ -60,11 +64,11 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
       <div className="max-w-5xl mx-auto px-4 py-5 grid lg:grid-cols-[1fr_340px] gap-5 items-start">
         <article className="rounded-lg border border-line bg-white text-black overflow-hidden">
           <style dangerouslySetInnerHTML={{ __html: DOC_CSS }} />
-          <div className="doc-body" dangerouslySetInnerHTML={{ __html: inst.htmlSnapshot }} />
+          <div className="doc-body" dangerouslySetInnerHTML={{ __html: inst.signedHtml ?? inst.htmlSnapshot }} />
         </article>
         <SignView
           instanceId={inst.id}
-          status={inst.status}
+          status={expired ? "expired" : inst.status}
           hash={inst.hash}
           expiresAt={inst.expiresAt}
           signers={signers}

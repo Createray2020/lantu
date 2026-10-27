@@ -36,6 +36,20 @@ import {
   type TemplateInput,
 } from "./docs";
 import { addDaysISO, todayISO } from "./license";
+import { sanitizeTemplateHtml } from "./docsSanitize";
+
+/** Postgres 23505＝unique_violation。neon-http／drizzle 把原始錯誤包了一層，沿 cause 往下看。 */
+export function isUniqueViolation(e: unknown): boolean {
+  const seen = new Set<unknown>();
+  let cur: unknown = e;
+  while (cur && typeof cur === "object" && !seen.has(cur)) {
+    seen.add(cur);
+    const o = cur as { code?: unknown; cause?: unknown };
+    if (o.code === "23505") return true;
+    cur = o.cause;
+  }
+  return /duplicate key value/.test(e instanceof Error ? e.message : String(e));
+}
 
 export type DocTemplate = typeof docTemplates.$inferSelect;
 export type DocInstance = typeof docInstances.$inferSelect;
@@ -128,32 +142,30 @@ export function sanitizeTemplateInput(raw: unknown): TemplateInput {
  * 回傳新列。錯誤用 Error(訊息) 丟出讓 action 直接給人看。
  */
 export async function saveTemplate(raw: unknown, createdBy: string | null): Promise<DocTemplate> {
-  const t = sanitizeTemplateInput(raw);
+  const t0 = sanitizeTemplateInput(raw);
+  // 白名單消毒在驗證之前：{{…}} 是純文字會原樣留下，驗證看的就是真正會存進去的內容。
+  const t = { ...t0, html: sanitizeTemplateHtml(t0.html) };
   const errs = validateTemplate(t);
   if (errs.length) throw new Error(errs.join("；"));
   const key = t.key ?? crypto.randomUUID();
-  let version = 1;
-  if (t.key) {
-    const prev = await db.select({ v: docTemplates.version }).from(docTemplates).where(eq(docTemplates.key, key)).orderBy(desc(docTemplates.version)).limit(1);
-    version = (prev[0]?.v ?? 0) + 1;
+  // 版本號先讀後寫：兩位管理員同時存同一份會撞 (key, version) 唯一索引 → 重讀一次再試，最多三次。
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let version = 1;
+    if (t.key) {
+      const prev = await db.select({ v: docTemplates.version }).from(docTemplates).where(eq(docTemplates.key, key)).orderBy(desc(docTemplates.version)).limit(1);
+      version = (prev[0]?.v ?? 0) + 1;
+    }
+    try {
+      const rows = await db
+        .insert(docTemplates)
+        .values({ key, version, category: t.category, name: t.name, html: t.html, useSeal: t.useSeal, required: t.required, signDays: t.signDays, signers: t.signers, note: t.note ?? "", createdBy })
+        .returning();
+      return rows[0];
+    } catch (e) {
+      if (!isUniqueViolation(e) || attempt === 2) throw new Error(isUniqueViolation(e) ? "有人同時在存這份範本，請重新整理再試" : (e instanceof Error ? e.message : String(e)));
+    }
   }
-  const rows = await db
-    .insert(docTemplates)
-    .values({
-      key,
-      version,
-      category: t.category,
-      name: t.name,
-      html: t.html,
-      useSeal: t.useSeal,
-      required: t.required,
-      signDays: t.signDays,
-      signers: t.signers,
-      note: t.note ?? "",
-      createdBy,
-    })
-    .returning();
-  return rows[0];
+  throw new Error("存檔失敗");
 }
 
 /** 啟用／停用某一個版本列（不產新版本）。停用最新版＝這個 key 暫時不能被啟動。 */
@@ -229,14 +241,16 @@ export async function startSigning(input: StartSigningInput): Promise<StartSigni
 
   const seal = (await getDocSeal()).img;
   const today = todayISO();
-  const toCreate: { inst: typeof docInstances.$inferInsert; signers: Omit<typeof docSigners.$inferInsert, "instanceId">[] }[] = [];
+  const toCreate: { inst: typeof docInstances.$inferInsert & { id: string }; signers: Omit<typeof docSigners.$inferInsert, "instanceId">[] }[] = [];
   for (const t of templates) {
     if (live.some((i) => i.templateKey === t.key && i.status !== "void")) continue;
     const resolved = resolveSlots(t.signers as DocSignerSlot[], input.ctx);
     if (!resolved.ok) return { ok: false, error: `「${t.name}」缺少簽署人：${resolved.missing.map((r) => ({ company: "公司代表", member: "成員", client: "客戶", coach: "教練" })[r]).join("、")}` };
-    const html = renderTemplate({ html: t.html, signers: t.signers as DocSignerSlot[], useSeal: t.useSeal }, input.vars, { seal });
+    // title 永遠有值（範本名）；呼叫端給了就用呼叫端的。範本 HTML 再過一次白名單（舊資料或直接寫 DB 的也擋）。
+    const html = renderTemplate({ html: sanitizeTemplateHtml(t.html), signers: t.signers as DocSignerSlot[], useSeal: t.useSeal }, { title: t.name, ...input.vars }, { seal });
     toCreate.push({
       inst: {
+        id: crypto.randomUUID(),
         caseType: input.caseType,
         caseId: input.caseId,
         templateId: t.id,
@@ -254,14 +268,34 @@ export async function startSigning(input: StartSigningInput): Promise<StartSigni
     });
   }
 
-  for (const c of toCreate) {
-    // 一份實例＋它的簽署人一起寫；實例先拿 id，再 batch 寫簽署人。
-    const [inst] = await db.insert(docInstances).values(c.inst).onConflictDoNothing().returning();
-    if (!inst) continue; // 同時有人按了啟動：部分唯一索引擋下，沿用對方那一份
-    if (c.signers.length) await db.insert(docSigners).values(c.signers.map((s) => ({ ...s, instanceId: inst.id })));
-  }
+  let created = 0;
+  for (const c of toCreate) created += (await insertInstanceWithSigners(c.inst, c.signers)) ? 1 : 0;
   const all = await listInstancesForCase(input.caseType, input.caseId);
-  return { ok: true, instances: all.filter((i) => i.status !== "void"), created: toCreate.length, existing: live.length, noTemplates: false };
+  return { ok: true, instances: all.filter((i) => i.status !== "void"), created, existing: live.length, noTemplates: false };
+}
+
+/**
+ * 實例＋簽署人一起寫（db.batch＝單一交易）。id 由程式先產，所以不需要 returning 再寫第二句——
+ * 分兩句寫的話第二句失敗會留下「永遠待簽、沒有簽署人」的孤兒實例（而且占著部分唯一索引）。
+ * 同案同 key 已有一份（別人同時按了啟動）：實例 DO NOTHING、簽署人 FK 找不到 → 整個 batch 回滾 → 回 false，沿用對方那一份。
+ */
+async function insertInstanceWithSigners(inst: typeof docInstances.$inferInsert & { id: string }, signers: Omit<typeof docSigners.$inferInsert, "instanceId">[]): Promise<boolean> {
+  try {
+    if (signers.length) {
+      await db.batch([
+        db.insert(docInstances).values(inst).onConflictDoNothing(),
+        db.insert(docSigners).values(signers.map((s) => ({ ...s, instanceId: inst.id }))),
+      ]);
+    } else {
+      await db.insert(docInstances).values(inst).onConflictDoNothing();
+    }
+  } catch (e) {
+    // FK 失敗＝實例沒插成（撞到既有的那一份）；其他錯誤往上丟
+    if (/foreign key|violates|23503/i.test(e instanceof Error ? e.message : String(e)) || isUniqueViolation(e)) return false;
+    throw e;
+  }
+  const rows = await db.select({ id: docInstances.id }).from(docInstances).where(eq(docInstances.id, inst.id)).limit(1);
+  return rows.length > 0;
 }
 
 export async function listInstancesForCase(caseType: string, caseId: string): Promise<DocInstance[]> {
@@ -356,10 +390,11 @@ export async function consentAndSign(input: SignInput): Promise<SignResult> {
   if (!after) return { ok: false, error: "寫入後讀不到文件" };
   const status = instanceStatusFrom(after.signers);
   if (status === "completed") {
+    // 原始快照（hash／hash_at_sign 對應的內容）不動；貼了簽名的版本另存 signed_html，才能事後重算每位簽署人確認過的雜湊。
     const finalHtml = applySignatures(after.htmlSnapshot, after.signers);
     await db
       .update(docInstances)
-      .set({ status: "completed", htmlSnapshot: finalHtml, finalHash: sha256(finalHtml), completedAt: now, updatedAt: now })
+      .set({ status: "completed", signedHtml: finalHtml, finalHash: sha256(finalHtml), completedAt: now, updatedAt: now })
       .where(and(eq(docInstances.id, inst.id), eq(docInstances.status, "pending")));
     const done = await getInstance(inst.id);
     return { ok: true, completed: true, instance: done ?? after };
@@ -375,18 +410,21 @@ export async function declineSign(instanceId: string, me: Identity, reason: stri
   if (!mine || mine.status !== "pending") return { ok: false, error: "你不是這份文件的待簽人" };
   const now = new Date();
   await db.batch([
-    db.update(docSigners).set({ status: "declined", declineReason: reason.trim().slice(0, 400) || null, signedAt: now }).where(eq(docSigners.id, mine.id)),
+    db.update(docSigners).set({ status: "declined", declineReason: reason.trim().slice(0, 400) || null, signedAt: now }).where(and(eq(docSigners.id, mine.id), eq(docSigners.status, "pending"))),
     db.update(docInstances).set({ status: "declined", updatedAt: now }).where(eq(docInstances.id, inst.id)),
   ]);
   return { ok: true };
 }
 
 /** 作廢（後台）：留痕不刪。作廢後同案同 key 可以重新啟動產新版本。 */
-export async function voidInstance(instanceId: string, reason: string): Promise<void> {
-  await db
+export async function voidInstance(instanceId: string, reason: string): Promise<{ ok: boolean; error?: string }> {
+  // 已完成的合約不可作廢覆寫（需求書第十一節）：後續修訂另開新文件。
+  const rows = await db
     .update(docInstances)
     .set({ status: "void", voidedAt: new Date(), voidReason: reason.trim().slice(0, 400) || null, updatedAt: new Date() })
-    .where(and(eq(docInstances.id, instanceId), ne(docInstances.status, "void")));
+    .where(and(eq(docInstances.id, instanceId), ne(docInstances.status, "void"), ne(docInstances.status, "completed")))
+    .returning({ id: docInstances.id });
+  return rows.length ? { ok: true } : { ok: false, error: "已完成的文件不能作廢；要修訂請另發新文件" };
 }
 
 /** 後台總覽：全部非 void 實例（可選狀態），新→舊。 */
@@ -452,9 +490,13 @@ export async function reopenInstance(instanceId: string, days: number, by: Ident
   const inst = await getInstance(instanceId);
   if (!inst) return { ok: false, error: "找不到這份文件" };
   if (inst.status !== "pending" && inst.status !== "expired") return { ok: false, error: "只有待簽或逾期的文件可以延長" };
-  if (!by.admin && !inst.signers.some((s) => isSigner(s, by))) return { ok: false, error: "你不是這份文件的簽署人" };
+  // 只有後台或「教練端」簽署人（教練／成員／公司代表）能延長；客戶不能自己把過期合約重開。
+  const coachSide = !!by.coachId && inst.signers.some((s) => s.coachId === by.coachId);
+  if (!by.admin && !coachSide) return { ok: false, error: "只有負責教練或後台可以延長期限" };
   const d = Math.max(1, Math.min(365, Math.floor(days) || 14));
-  const expiresAt = addDaysISO(todayISO(), d);
+  const proposed = addDaysISO(todayISO(), d);
+  // 只往後延、不縮短：原本期限更晚就維持原本的
+  const expiresAt = inst.expiresAt && inst.expiresAt > proposed ? inst.expiresAt : proposed;
   await db.update(docInstances).set({ status: "pending", expiresAt, updatedAt: new Date() }).where(eq(docInstances.id, inst.id));
   return { ok: true, expiresAt };
 }
@@ -512,14 +554,12 @@ export async function createDocTask(input: { templateKey: string; coachIds: stri
     const resolved = resolveSlots(t.signers as DocSignerSlot[], { member: { coachId: p.id, name: p.name ?? "" }, coach: { coachId: p.id, name: p.name ?? "" }, company: admin ? { coachId: admin.id, name: admin.name ?? "" } : null });
     if (!resolved.ok) { skipped.push(p.name ?? p.id); continue; }
     const vars: DocVars = { title: t.name, today: todayISO(), esign_clause: E_SIGN_CLAUSE, "member.name": p.name ?? "", "member.email": p.email ?? "", "member.code": p.code ?? "" };
-    const html = renderTemplate({ html: t.html, signers: t.signers as DocSignerSlot[], useSeal: t.useSeal }, vars, { seal });
-    const [inst] = await db.insert(docInstances).values({
-      caseType: "coach_doc", caseId: `${task.id}:${p.id}`, templateId: t.id, templateKey: t.key, version: t.version, title: t.name, required: t.required,
-      htmlSnapshot: html, hash: sha256(html), status: "pending", expiresAt: deadline, createdBy,
-    }).onConflictDoNothing().returning();
-    if (!inst) continue;
-    if (resolved.signers.length) await db.insert(docSigners).values(resolved.signers.map((s) => ({ ...s, status: "pending", instanceId: inst.id })));
-    created++;
+    const html = renderTemplate({ html: sanitizeTemplateHtml(t.html), signers: t.signers as DocSignerSlot[], useSeal: t.useSeal }, vars, { seal });
+    const ok = await insertInstanceWithSigners(
+      { id: crypto.randomUUID(), caseType: "coach_doc", caseId: `${task.id}:${p.id}`, templateId: t.id, templateKey: t.key, version: t.version, title: t.name, required: t.required, htmlSnapshot: html, hash: sha256(html), status: "pending", expiresAt: deadline, createdBy },
+      resolved.signers.map((s) => ({ ...s, status: "pending" })),
+    );
+    if (ok) created++;
   }
   return { ok: true, task, created, skipped };
 }

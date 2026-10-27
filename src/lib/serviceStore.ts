@@ -11,7 +11,7 @@ import { db } from "@/Shared/db";
 import { clients, clientUsers, coaches, coachDisplayName, invoices, serviceCases } from "@/Shared/db/schema";
 import { getAcctState, createCoachFeeReceipt, receiptsForCase, type CoachFeeInput } from "./acctStore";
 import { caseFunding, type Receipt } from "./acctEngine";
-import { startSigning, listInstancesForCase, withSigners, caseProgress, type InstanceWithSigners } from "./docsStore";
+import { startSigning, listInstancesForCase, withSigners, caseProgress, isUniqueViolation, type InstanceWithSigners } from "./docsStore";
 import { getBrand, getOrgOwnerId } from "./brand";
 import { E_SIGN_CLAUSE, type DocVars } from "./docs";
 import { todayISO } from "./license";
@@ -73,7 +73,11 @@ export async function createServiceCase(coachId: string, clientId: string, input
         .returning();
       return { ok: true, case: row, existed: false };
     } catch (e) {
-      if (!/service_cases_case_no_uq|duplicate key/.test(String((e as Error).message))) throw e;
+      if (!isUniqueViolation(e)) throw e;
+      // 撞到的是「同客戶同年度已有活案」的索引（雙擊）→ 回既有那一案；撞到案號就往後找
+      const again = (await db.select().from(serviceCases).where(and(eq(serviceCases.clientId, clientId), eq(serviceCases.serviceYear, year))).orderBy(desc(serviceCases.createdAt)))
+        .find((c) => c.status === "open" || c.status === "completed");
+      if (again) return { ok: true, case: again, existed: true };
       seq++;
     }
   }
@@ -249,12 +253,11 @@ export async function upsertInvoice(caseType: "client_service" | "training", cas
     status: INV_STATUS.has(String(input.status)) ? String(input.status) : "pending", failReason: clip(input.failReason, 400), note: clip(input.note, 400),
     handlerId, updatedAt: new Date(),
   };
-  const existing = await db.select().from(invoices).where(and(eq(invoices.caseType, caseType), eq(invoices.caseId, caseId))).limit(1);
-  if (existing[0]) {
-    const [row] = await db.update(invoices).set(set).where(eq(invoices.id, existing[0].id)).returning();
-    return row;
-  }
-  const [row] = await db.insert(invoices).values({ caseType, caseId, ...set }).returning();
+  const [row] = await db
+    .insert(invoices)
+    .values({ caseType, caseId, ...set })
+    .onConflictDoUpdate({ target: [invoices.caseType, invoices.caseId], set })
+    .returning();
   return row;
 }
 

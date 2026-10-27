@@ -23,6 +23,7 @@ describe("收款案件門檻", () => {
     const old = normReceipt({ on: "2026-01-01", itemId: "c", amount: 60000 }, "id2");
     expect(old).toMatchObject({ caseType: "client_service", gross: null, fee: 0, method: "", methodFields: {} });
     expect(normReceipt({ on: "2026-01-01", itemId: "c", amount: 1, method: "paypal" }, "x").method).toBe("");
+    expect(normReceipt({ on: "2026-01-01", itemId: "c", amount: 30000, gross: 29000 }, "x").gross).toBeNull(); // 填反了＝沒填
   });
   it("付款方式表：每種都有欄位，分期有期數", () => {
     expect(PAYMENT_METHODS.map((m) => m.value)).toEqual(["bank", "card", "card_installment", "zero_installment", "other"]);

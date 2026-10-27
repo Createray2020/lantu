@@ -15,6 +15,7 @@ export type DocTodoRow = {
   days: number;
   expiresAt: string | null;
   remindCount: number;
+  canRemind: boolean;
 };
 
 const KIND: Record<DocTodoRow["kind"], { label: string; cls: string }> = {
@@ -53,10 +54,10 @@ function Row({ r, days }: { r: DocTodoRow; days: number }) {
       </span>
       <span className="ml-auto flex items-center gap-2">
         {msg && <span className="text-11 text-tx2">{msg}</span>}
-        {r.kind === "stale" && (
+        {r.kind === "stale" && r.canRemind && (
           <button type="button" className="text-xs rounded-md border border-brand2 text-brand2 px-2.5 py-1 disabled:opacity-40" disabled={busy} onClick={() => start(async () => { const x = await remindAction(r.id); setMsg(x.ok ? `已提醒 ${x.reminded?.join("、")}` : x.error ?? "失敗"); if (x.ok) router.refresh(); })}>催簽</button>
         )}
-        {(r.kind === "expired" || r.kind === "stale") && (
+        {r.kind === "expired" && (
           <button type="button" className="text-xs rounded-md border border-line px-2.5 py-1 disabled:opacity-40" disabled={busy} onClick={() => start(async () => { const x = await reopenAction(r.id, days); setMsg(x.ok ? `延到 ${x.expiresAt}` : x.error ?? "失敗"); if (x.ok) router.refresh(); })}>延長 {days} 天</button>
         )}
         <Link href={`/sign/${r.id}`} className="text-xs rounded-md border border-line px-2.5 py-1">{r.kind === "declined" ? "看原因" : "查看"}</Link>

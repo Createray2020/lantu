@@ -76,7 +76,8 @@ export async function saveSealAction(img: string | null): Promise<ActionResult> 
 export async function voidInstanceAction(id: string, reason: string): Promise<ActionResult> {
   try {
     await guard();
-    await voidInstance(id, reason);
+    const r = await voidInstance(id, reason);
+    if (!r.ok) return { ok: false, error: r.error ?? "作廢失敗" };
     revalidatePath("/admin/docs/instances");
     return { ok: true };
   } catch (e) {

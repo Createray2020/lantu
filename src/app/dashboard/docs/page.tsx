@@ -26,7 +26,7 @@ export default async function CoachDocsPage() {
           <h1 className="text-xl font-bold">我的文件</h1>
           <p className="text-sm text-tx2 mt-1">你是簽署人的合約與文件都在這裡；客戶那一邊看到的是同一份。</p>
         </div>
-        <DocTodoList rows={toTodoRows(todos)} />
+        <DocTodoList rows={toTodoRows(todos, { coachId: me.id })} />
         <DocList list={list} me={{ coachId: me.id }} />
         <MySignature saved={saved} />
       </section>

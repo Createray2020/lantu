@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { canSignNow, isSigner, ROLE_LABEL, STATUS_LABEL, type DocInstanceStatus, type DocRole } from "@/lib/docs";
+import { canSignNow, isSigner, ROLE_LABEL, STATUS_LABEL, CASE_TYPE_LABEL, type DocCaseType, type DocInstanceStatus, type DocRole } from "@/lib/docs";
 import type { Identity, InstanceWithSigners } from "@/lib/docsStore";
 
 // 「我的文件」清單：教練端、客戶 portal、申請人進度頁、後台總覽共用。
@@ -18,7 +18,7 @@ export default function DocList({ list, me, empty = "目前沒有需要你處理
             <div className="min-w-0">
               <p className="font-bold truncate">{i.title} <span className="text-11 text-tx3 font-normal">v{i.version}</span></p>
               <p className="text-11 text-tx3">
-                {showCase && <span className="mr-2">{i.caseType === "training" ? "培訓" : "顧問服務"}</span>}
+                {showCase && <span className="mr-2">{CASE_TYPE_LABEL[i.caseType as DocCaseType] ?? i.caseType}</span>}
                 {i.signers.map((s) => `${ROLE_LABEL[s.role as DocRole] ?? s.role}${s.displayName ? `・${s.displayName}` : ""}${s.status === "signed" ? " ✓" : ""}`).join("　")}
                 {i.expiresAt && st === "pending" ? `　期限 ${i.expiresAt}` : ""}
               </p>

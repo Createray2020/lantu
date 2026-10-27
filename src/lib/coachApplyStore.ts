@@ -360,6 +360,15 @@ export async function activateCoach(coachId: string, reviewerId: string): Promis
     license = { licenseFrom: from, licenseUntil: addPeriod(base, unit, qty), licenseUnit: unit, licenseQty: qty };
   }
 
+  // 審核人先寫（reviewer_id 是 coaches 的 FK：給了不存在的 id 會在這裡就失敗，而不是把帳號開到一半才炸）。
+  if (app) {
+    const reviewerOk = (await db.select({ id: coaches.id }).from(coaches).where(eq(coaches.id, reviewerId)).limit(1)).length > 0;
+    await db
+      .update(coachApplications)
+      .set({ ...(reviewerOk ? { reviewerId } : {}), updatedAt: new Date() })
+      .where(eq(coachApplications.coachId, coachId));
+  }
+
   await db
     .update(coaches)
     .set({
@@ -370,13 +379,6 @@ export async function activateCoach(coachId: string, reviewerId: string): Promis
       ...(license ?? {}),
     })
     .where(eq(coaches.id, coachId));
-
-  if (app) {
-    await db
-      .update(coachApplications)
-      .set({ reviewerId, updatedAt: new Date() })
-      .where(eq(coachApplications.coachId, coachId));
-  }
 
   // 編號在「核准報聘」那一刻發，且只發一次（停權後再核准拿回同一個號）。
   await ensureCoachCode(coachId);

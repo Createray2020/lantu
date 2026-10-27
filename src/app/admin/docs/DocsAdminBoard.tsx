@@ -132,7 +132,8 @@ function SealSection({ seal, onSaved }: { seal: string | null; onSaved: () => vo
     setErr(null);
     if (!f) return;
     if (f.type !== "image/png") return setErr("請用透明底 PNG");
-    if (f.size > 2_500_000) return setErr("圖片太大（上限約 2.5MB）");
+    // 伺服器端只收 data URL ≤ SIGNATURE_MAX_CHARS（約 300KB 的 PNG）；這裡用同一把尺，不要讓人上傳完才被退。
+    if (f.size > 280_000) return setErr("圖片太大（請壓到 280KB 以內——印章圖縮到 600px 寬就夠）");
     const r = new FileReader();
     r.onload = () => setImg(String(r.result));
     r.readAsDataURL(f);
@@ -160,7 +161,7 @@ function SealSection({ seal, onSaved }: { seal: string | null; onSaved: () => vo
           {img ? <img src={img} alt="公司印鑑" className="max-h-24 max-w-36 object-contain" /> : <span className="text-xs text-tx3">尚未上傳</span>}
         </div>
         <div className="grid gap-2">
-          <input ref={file} type="file" accept="image/png" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+          <input ref={file} type="file" accept="image/png" className="hidden" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
           <div className="flex gap-2">
             <button type="button" className="text-sm rounded-md border border-line px-3 py-1.5 hover:bg-panel2" onClick={() => file.current?.click()}>選擇 PNG</button>
             <SubmitButton state={busy ? "pending" : "idle"} disabled={!img || img === seal} onClick={() => save(img)}>儲存印鑑</SubmitButton>

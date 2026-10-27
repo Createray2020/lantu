@@ -86,7 +86,7 @@ export default function SignView({
         <ol className="grid gap-1.5 text-sm">
           {signers.map((s) => (
             <li key={s.id} className={`flex items-center gap-2 ${s.isMe ? "font-bold" : ""}`}>
-              <span className={`w-5 h-5 rounded-full grid place-items-center text-11 ${s.status === "signed" ? "bg-ok text-onsolid" : s.status === "declined" ? "bg-danger text-onsolid" : "bg-panel2 text-tx3 border border-line"}`}>{s.status === "signed" ? "✓" : s.seq}</span>
+              <span className={`w-5 h-5 rounded-full grid place-items-center text-11 ${s.status === "signed" ? "bg-ok-solid text-onsolid" : s.status === "declined" ? "bg-danger-solid text-onsolid" : "bg-panel2 text-tx3 border border-line"}`}>{s.status === "signed" ? "✓" : s.seq}</span>
               <span className="text-tx2 text-xs w-10">{ROLE_LABEL[s.role as DocRole] ?? s.role}</span>
               <span className="truncate">{s.displayName || s.label}{s.isMe ? "（你）" : ""}</span>
               {s.signedAt && <span className="ml-auto text-11 text-tx3">{s.signedAt.slice(0, 10)}</span>}
@@ -99,10 +99,10 @@ export default function SignView({
       {/* 本人簽署 */}
       {st === "pending" && isMine && (
         <section className="rounded-lg border border-line bg-panel p-4 grid gap-3">
-          {!myTurn ? (
+          {done || signers.some((s) => s.isMe && s.status === "signed") ? (
+            <p className="text-sm text-ok font-bold">已完成你的簽署，等其他簽署人完成。</p>
+          ) : !myTurn ? (
             <p className="text-sm text-tx2">還沒輪到你——前一順位的簽署人完成後，這裡就會開放。</p>
-          ) : done ? (
-            <p className="text-sm text-ok font-bold">已完成你的簽署。</p>
           ) : (
             <>
               <h2 className="font-bold">本人確認簽署</h2>
@@ -145,9 +145,9 @@ export default function SignView({
           <p className="text-tx2 text-xs">雙方看到的是同一份：右上角「列印／PDF」可以存成 PDF。</p>
         </section>
       )}
-      {(st === "declined" || st === "expired") && (
+      {(st === "declined" || st === "expired" || st === "void") && (
         <section className="rounded-lg border border-line bg-panel p-4 text-sm text-tx2">
-          {st === "declined" ? "這份文件已被拒簽，負責人會重新確認內容後再發一份。" : "簽署期限已過，請聯絡負責人重新啟動。"}
+          {st === "declined" ? "這份文件已被拒簽，負責人會重新確認內容後再發一份。" : st === "expired" ? "簽署期限已過，請聯絡負責人重新開放。" : "這份文件已作廢，不需要再簽；若有新版本會另外通知你。"}
         </section>
       )}
       {admin && !isMine && <p className="text-11 text-tx3">你以後台身分唯讀檢視這份文件。</p>}

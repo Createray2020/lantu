@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FIELD } from "@/components/ui/Field";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/acctEngine";
 import { coachOptionsAction, serviceItemOptionsAction, type ServiceItemOption } from "./actions";
@@ -17,6 +17,8 @@ export type FeeDraft = {
   from: string;
   to: string;
   amount: string;
+  /** 這一次付了多少（預設跟總額一樣；分期／訂金時填少一點；0＝先建案不記付款） */
+  paid: string;
   date: string;
   method: PaymentMethod;
   last5: string;
@@ -31,14 +33,16 @@ const plusYear = (iso: string) => {
   d.setDate(d.getDate() - 1);
   return d.toISOString().slice(0, 10);
 };
-export const EMPTY_FEE: FeeDraft = { on: false, itemId: "", year: thisYear(), from: todayStr(), to: plusYear(todayStr()), amount: "", date: "", method: "bank", last5: "", gross: "", promo: "me" };
+export const EMPTY_FEE: FeeDraft = { on: false, itemId: "", year: thisYear(), from: todayStr(), to: plusYear(todayStr()), amount: "", paid: "", date: "", method: "bank", last5: "", gross: "", promo: "me" };
 
 export function feeToInput(f: FeeDraft, meId: string): ClientFeeInput | null {
   if (!f.on) return null;
   const amount = Number(String(f.amount).replace(/,/g, ""));
+  const paid = f.paid.trim() === "" ? amount : Number(f.paid.replace(/,/g, ""));
   const gross = f.gross.trim() ? Number(f.gross.replace(/,/g, "")) : null;
   return {
     amount: Number.isFinite(amount) ? amount : 0,
+    paid: Number.isFinite(paid) ? Math.max(0, paid) : 0,
     on: f.date,
     last5: f.last5.trim() || undefined,
     promoCoachId: f.promo === "me" ? meId : f.promo === "none" ? null : f.promo,
@@ -48,7 +52,7 @@ export function feeToInput(f: FeeDraft, meId: string): ClientFeeInput | null {
     to: f.to || null,
     method: f.method,
     gross,
-    fee: gross != null && Number.isFinite(amount) ? Math.max(0, gross - amount) : 0,
+    fee: gross != null && Number.isFinite(paid) ? Math.max(0, gross - paid) : 0,
   };
 }
 export function feeError(f: FeeDraft): string | null {
@@ -56,13 +60,19 @@ export function feeError(f: FeeDraft): string | null {
   if (!f.itemId) return "請選服務方案";
   const amount = Number(String(f.amount).replace(/,/g, ""));
   if (!(amount > 0)) return "請填顧問費金額";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.date)) return "請填客戶付款日";
+  const paid = f.paid.trim() === "" ? amount : Number(f.paid.replace(/,/g, ""));
+  if (!Number.isFinite(paid) || paid < 0) return "本次付款金額不正確";
+  if (paid > amount) return "本次付款不能超過顧問費總額";
+  if (paid > 0 && !/^\d{4}-\d{2}-\d{2}$/.test(f.date)) return "請填客戶付款日";
   return null;
 }
 
 export default function FeeFields({ value, onChange, meId, compact = false, lockOn = false }: { value: FeeDraft; onChange: (f: FeeDraft) => void; meId: string; compact?: boolean; lockOn?: boolean }) {
   const [coaches, setCoaches] = useState<{ id: string; name: string; rankCode: string | null }[]>([]);
   const [items, setItems] = useState<ServiceItemOption[] | null>(null);
+  // 方案清單是非同步回來的；回來時要用「那一刻」的草稿往上送，不能用 effect 啟動時抓到的舊值（會把使用者打到一半的字洗掉）
+  const latest = useRef(value);
+  useEffect(() => { latest.current = value; }, [value]);
   useEffect(() => {
     if (!value.on) return;
     if (!coaches.length) coachOptionsAction().then(setCoaches).catch(() => {});
@@ -70,7 +80,8 @@ export default function FeeFields({ value, onChange, meId, compact = false, lock
       setItems(list);
       // 預設選顧問費那個項目，金額帶定價
       const def = list.find((i) => i.default) ?? list[0];
-      if (def && !value.itemId) onChange({ ...value, itemId: def.id, amount: value.amount || (def.price ? String(def.price) : "") });
+      const cur = latest.current;
+      if (def && !cur.itemId) onChange({ ...cur, itemId: def.id, amount: cur.amount || (def.price ? String(def.price) : "") });
     }).catch(() => setItems([]));
   }, [value.on]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<FeeDraft>) => onChange({ ...value, ...patch });
@@ -91,14 +102,15 @@ export default function FeeFields({ value, onChange, meId, compact = false, lock
               {items?.map((i) => <option key={i.id} value={i.id}>{i.cat ? `${i.cat}・` : ""}{i.name}{i.price ? `（${i.price.toLocaleString()}）` : ""}</option>)}
             </select></div>
           <div><label className="text-xs text-tx2">服務年度</label><input className={FIELD} inputMode="numeric" value={value.year} onChange={(e) => set({ year: e.target.value })} /></div>
-          <div><label className="text-xs text-tx2">顧問費金額 *</label><input className={FIELD} inputMode="numeric" value={value.amount} onChange={(e) => set({ amount: e.target.value })} placeholder="60,000" /></div>
+          <div><label className="text-xs text-tx2">顧問費總額 *</label><input className={FIELD} inputMode="numeric" value={value.amount} onChange={(e) => set({ amount: e.target.value })} placeholder="60,000" /></div>
+          <div><label className="text-xs text-tx2">本次付款金額</label><input className={FIELD} inputMode="numeric" value={value.paid} onChange={(e) => set({ paid: e.target.value })} placeholder={value.amount ? `同總額 ${value.amount}` : "同總額"} /></div>
           <div><label className="text-xs text-tx2">服務起日</label><input type="date" className={FIELD} value={value.from} onChange={(e) => set({ from: e.target.value, to: value.to || plusYear(e.target.value) })} /></div>
           <div><label className="text-xs text-tx2">服務迄日</label><input type="date" className={FIELD} value={value.to} onChange={(e) => set({ to: e.target.value })} /></div>
           <div><label className="text-xs text-tx2">付款方式</label>
             <select className={FIELD} value={value.method} onChange={(e) => set({ method: e.target.value as PaymentMethod })}>
               {PAYMENT_METHODS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
             </select></div>
-          <div><label className="text-xs text-tx2">客戶付款日 *</label><input type="date" className={FIELD} value={value.date} onChange={(e) => set({ date: e.target.value })} /></div>
+          <div><label className="text-xs text-tx2">客戶付款日</label><input type="date" className={FIELD} value={value.date} onChange={(e) => set({ date: e.target.value })} /></div>
           {value.method === "bank" ? (
             <div><label className="text-xs text-tx2">匯款後五碼</label><input className={FIELD} value={value.last5} onChange={(e) => set({ last5: e.target.value })} placeholder="選填" /></div>
           ) : (
@@ -110,7 +122,7 @@ export default function FeeFields({ value, onChange, meId, compact = false, lock
               <option value="none">無／公司派案</option>
               {coaches.filter((c) => c.id !== meId).map((c) => <option key={c.id} value={c.id}>{c.name}{c.rankCode ? `（${c.rankCode}）` : ""}</option>)}
             </select></div>
-          <p className="col-span-full text-xs text-tx3">送出後：建立服務案件、付款進公司「收款明細」等查帳。<b className="text-tx2">公司確認全額收款後</b>，客戶頁才會出現「啟動簽約流程」；確認後才算分潤與晉升實績。</p>
+          <p className="col-span-full text-xs text-tx3">送出後：建立服務案件（應收＝顧問費總額）、本次付款進公司「收款明細」等查帳；分期或訂金就把「本次付款金額」填少一點，之後在客戶頁補登。<b className="text-tx2">公司確認全額收款後</b>，客戶頁才會出現「啟動簽約流程」；確認後才算分潤與晉升實績。</p>
         </div>
       )}
     </div>

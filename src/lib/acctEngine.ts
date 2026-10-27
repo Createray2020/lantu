@@ -556,7 +556,8 @@ export function normReceipt(v: unknown, id: string): Receipt {
     verified: r.verified !== false, enteredBy: r.enteredBy ? String(r.enteredBy) : null,
     ...(Array.isArray(r.allocs) ? { allocs: r.allocs as ReceiptRow[] } : {}),
     caseType: r.caseType === "training" ? "training" : "client_service",
-    gross: r.gross == null || r.gross === ("" as unknown) ? null : Math.max(0, num0(r.gross)),
+    // gross（客戶實付）小於 amount（公司淨入帳）是填反了：當成沒填，不讓門檻被少算
+    gross: r.gross == null || r.gross === ("" as unknown) || num0(r.gross) < Math.max(0, num0(r.amount)) ? null : Math.max(0, num0(r.gross)),
     fee: Math.max(0, num0(r.fee)),
     method: isPaymentMethod(r.method) ? r.method : "",
     methodFields: normMethodFields(r.methodFields),

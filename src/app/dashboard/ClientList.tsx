@@ -302,6 +302,7 @@ export default function ClientList({
     const [birthDate, setBirthDate] = useState("");
     const [fee, setFee] = useState<FeeDraft>(EMPTY_FEE);
     const [err, setErr] = useState("");
+    const [warn, setWarn] = useState<{ id: string; text: string } | null>(null);
     const [pending, start] = useTransition();
 
     const field = FIELD;
@@ -332,6 +333,7 @@ export default function ClientList({
           });
           // 額度已滿／期限到期是「使用者要看到理由」的情況，原樣顯示伺服器的訊息。
           if (!r.ok) setErr(r.error);
+          else if (r.warn) setWarn({ id: r.id, text: r.warn }); // 客戶建好了、但案件或付款沒成——先讓人看到，再進客戶頁
           else onCreated(r.id);
         } catch {
           setErr("建立失敗，請重試。");
@@ -343,6 +345,12 @@ export default function ClientList({
       <Modal onClose={onClose} labelledBy="newClientTitle" width="max-w-lg">
         <div className="p-5">
           <h2 id="newClientTitle" className="font-serif text-lg mb-4">新增客戶</h2>
+          {warn && (
+            <div className="mb-3 rounded-lg border border-danger/40 bg-panel2 p-3 text-sm grid gap-2">
+              <p className="text-tx">客戶已建立。{warn.text}</p>
+              <button type="button" className="justify-self-end rounded-md bg-brand text-onbrand text-sm px-3 py-1.5" onClick={() => onCreated(warn.id)}>前往客戶頁</button>
+            </div>
+          )}
           <div className="grid gap-3">
             {/* 2026/10/09 Ray：最上面先問有沒有付費——勾了才記進公司顧問費 */}
             <FeeFields value={fee} onChange={setFee} meId={meId} compact />

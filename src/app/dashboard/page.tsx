@@ -33,7 +33,8 @@ export default async function Dashboard({
     // 待審者看得到自己的報聘進度（卡在推薦人還是卡在審核）。舊帳號沒有申請表就只有原本那句話。
     const app = await getApplication(coach.id);
     // 培訓報名案件（2026/10/28）：費用進度、提報付款、應簽文件——待簽階段申請人只開這一塊。
-    const enr = coach.status === "pending" ? await getEnrollmentForCoach(coach.id) : null;
+    // 含已退回：申請人要看得到處理結果
+    const enr = coach.status === "pending" ? await getEnrollmentForCoach(coach.id, { includeRejected: true }) : null;
     const tv = enr ? await enrollmentView(enr) : null;
     const training = tv
       ? {

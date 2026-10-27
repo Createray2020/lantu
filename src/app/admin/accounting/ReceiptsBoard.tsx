@@ -259,7 +259,7 @@ function ReceiptForm({ init, S, coachList, pending, onCancel, onSave }: {
         <label className="flex flex-col gap-1"><span className="text-xs text-tx3">匯款日期</span>
           <input type="date" className={`${FIELD_SM} w-40`} value={r.on} onChange={(e) => set({ on: e.target.value })} /></label>
         <label className="flex flex-col gap-1"><span className="text-xs text-tx3">匯款金額</span>
-          <input className={`${FIELD_SM} w-28 text-right`} inputMode="numeric" value={r.amount} onChange={(e) => set({ amount: NUM(e.target.value) })} /></label>
+          <input className={`${FIELD_SM} w-28 text-right`} inputMode="numeric" value={r.amount} onChange={(e) => { const a = NUM(e.target.value); set({ amount: a, fee: r.gross != null ? Math.max(0, r.gross - a) : r.fee }); }} /></label>
         <label className="flex flex-col gap-1"><span className="text-xs text-tx3">後五碼</span>
           <input className={`${FIELD_SM} w-28`} value={r.last5} placeholder="或「信用卡分期」" onChange={(e) => set({ last5: e.target.value })} /></label>
         <label className="flex flex-col gap-1"><span className="text-xs text-tx3">匯款人</span>

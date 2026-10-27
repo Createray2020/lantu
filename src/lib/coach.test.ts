@@ -22,6 +22,7 @@ const h = vi.hoisted(() => {
     },
     clients: { _n: "clients" },
     compCases: { _n: "comp_cases" },
+    serviceCases: { _n: "service_cases", coachId: { name: "coach_id" }, clientId: { name: "client_id" } },
   };
   // rows＝coaches 查詢結果；counts＝clients/comp_cases 的 count() 結果；moved＝transferClients 影響列
   const state: any = {
@@ -64,6 +65,7 @@ const h = vi.hoisted(() => {
         const c: any = {
           where: () => c,
           returning: () => Promise.resolve(table === "clients" ? state.moved : [{ ...state.rows[0], ...v }]),
+          then: (res: any, rej: any) => Promise.resolve([]).then(res, rej),
         };
         return c;
       },
@@ -83,7 +85,7 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("react", async (orig) => ({ ...(await orig<any>()), cache: (f: any) => f }));
-vi.mock("drizzle-orm", () => ({ eq: (col: any, val: any) => ({ col: col?.name, val }), count: () => ({}) }));
+vi.mock("drizzle-orm", () => ({ eq: (col: any, val: any) => ({ col: col?.name, val }), count: () => ({}), and: (...xs: any[]) => ({ and: xs }), inArray: (col: any, vals: any[]) => ({ col: col?.name, vals }) }));
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 vi.mock("@clerk/nextjs/server", () => ({ currentUser: h.currentUser }));
@@ -282,12 +284,13 @@ describe("transferClients", () => {
     h.state.moved = [{ id: "cl_1" }, { id: "cl_2" }];
   });
 
-  it("整批改掛到接手教練，且只動 clients", async () => {
+  it("整批改掛到接手教練：clients 與其顧問服務案件（2026/10/28）一起過去", async () => {
     const r = await transferClients("coach_from", "coach_to");
     expect(r).toEqual({ ok: true, moved: 2 });
     const tables = h.state.updates.map((u: any) => u.table);
-    expect(tables).toEqual(["clients"]);
+    expect(tables).toEqual(["clients", "service_cases"]);
     expect(h.state.updates[0].coachId).toBe("coach_to");
+    expect(h.state.updates[1].coachId).toBe("coach_to");
   });
 
   it("不動 comp_cases.executorId（改掉會竄改誰執行了案子）", async () => {

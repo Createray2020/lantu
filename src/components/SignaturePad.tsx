@@ -57,7 +57,7 @@ export default function SignaturePad({
 }
 
 // ── 畫布 ─────────────────────────────────────────────────────────────────────
-function Canvas({ onDone, disabled, compact, big }: { onDone: (png: string | null) => void; disabled?: boolean; compact?: boolean; big?: boolean }) {
+function Canvas({ onDone, disabled, big }: { onDone: (png: string | null) => void; disabled?: boolean; compact?: boolean; big?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -137,11 +137,13 @@ function Canvas({ onDone, disabled, compact, big }: { onDone: (png: string | nul
   };
 
   return (
-    <div className="grid gap-2">
+    // 全螢幕模式：畫布吃掉所有剩餘高度（父層是 1fr 列、這裡 absolute 撐滿），按鈕列固定在底部——
+    // 百分比高度對 canvas 不可靠（會退回 300×150 的固有比例），所以用絕對定位，不用 h-full。
+    <div className={big ? "grid grid-rows-[1fr_auto] gap-2 min-h-0 h-full" : "grid gap-2"}>
+      <div className={big ? "relative min-h-0" : "contents"}>
       <canvas
         ref={ref}
-        className={`w-full ${compact ? "h-40" : "h-full"} rounded-md border border-dashed border-line2 bg-white touch-none select-none ${disabled ? "opacity-50" : "cursor-crosshair"}`}
-        style={big ? { height: "100%" } : undefined}
+        className={`${big ? "absolute inset-0 w-full h-full" : "w-full h-40"} rounded-md border border-dashed border-line2 bg-white touch-none select-none ${disabled ? "opacity-50" : "cursor-crosshair"}`}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
@@ -149,6 +151,7 @@ function Canvas({ onDone, disabled, compact, big }: { onDone: (png: string | nul
         onPointerLeave={up}
         aria-label="簽名區，請在此手寫簽名"
       />
+      </div>
       <div className="flex items-center gap-2 text-sm">
         <button type="button" className="rounded-md border border-line px-3 py-1.5" disabled={disabled || !dirty} onClick={clear}>清除</button>
         <button type="button" className="rounded-md bg-brand text-onbrand font-bold px-3 py-1.5 disabled:opacity-40" disabled={disabled || !dirty} onClick={done}>完成簽名</button>
@@ -181,7 +184,7 @@ function FullScreen({ onClose, onDone }: { onClose: () => void; onDone: (png: st
         <span className="text-sm text-tx2">在框內手寫簽名<span className="portrait:inline hidden">（把手機轉橫會更好寫）</span></span>
         <button type="button" className="text-sm rounded-md border border-line px-3 py-1.5" onClick={onClose}>取消</button>
       </div>
-      <div className="min-h-0 grid grid-rows-[1fr_auto]">
+      <div className="min-h-0">
         <Canvas big onDone={(png) => png && onDone(png)} />
       </div>
     </div>

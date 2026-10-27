@@ -6,7 +6,8 @@ import type { DocCaseType } from "./docs";
 export async function onDocCompleted(caseType: DocCaseType, caseId: string): Promise<void> {
   if (caseType === "training") {
     const { tryActivateEnrollment } = await import("./trainingStore");
-    await tryActivateEnrollment(caseId, "docs");
+    // 審核人給空字串：不是教練 id，trainingStore 會退回「審核通過那位」
+    await tryActivateEnrollment(caseId, "");
   }
   if (caseType === "client_service") {
     const { onCaseDocsCompleted } = await import("./serviceStore");

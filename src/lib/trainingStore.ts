@@ -8,13 +8,13 @@
 //   · 收款：acct_receipts(case_type='training', case_id=案件 id)，verified 由帳務後台改
 //   · 文件：doc_instances(case_type='training')
 // 開通條件在 tryActivateEnrollment 一處檢查，而且冪等：重送、重複回報、按兩次都不會再開通或重設期限。
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, notInArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches, coachApplications, coachDisplayName, trainingEnrollments } from "@/Shared/db/schema";
 import { getApplySettings, checkApprovalGate, activateCoach } from "./coachApplyStore";
 import { getAcctState, createCaseReceipt, receiptsForCase, type CaseFeeInput } from "./acctStore";
 import { caseFunding, referralChain, type Receipt } from "./acctEngine";
-import { startSigning, listInstancesForCase, withSigners, caseProgress, getSet, latestEnabledTemplate, type InstanceWithSigners } from "./docsStore";
+import { startSigning, listInstancesForCase, withSigners, caseProgress, getSet, latestEnabledTemplate, isUniqueViolation, type InstanceWithSigners } from "./docsStore";
 import type { DocSignerSlot } from "./docs";
 import { getBrand } from "./brand";
 import { E_SIGN_CLAUSE, type DocVars } from "./docs";
@@ -37,21 +37,42 @@ export async function ensureEnrollment(coachId: string): Promise<Enrollment | nu
   const S = await getAcctState();
   const item = S.items.find((i) => i.id === settings.trainingItemId);
   if (!item) return null; // 設定指到已刪掉的項目：不擋申請
-  const [row] = await db
-    .insert(trainingEnrollments)
-    .values({ coachId, itemId: item.id, itemName: item.name, amountDue: item.price || 0, reviewStage: "pending" })
-    .returning();
-  return row;
+  try {
+    const [row] = await db
+      .insert(trainingEnrollments)
+      .values({ coachId, itemId: item.id, itemName: item.name, amountDue: item.price || 0, reviewStage: "pending" })
+      .returning();
+    return row;
+  } catch (e) {
+    // 同時送了兩次：部分唯一索引擋下第二筆，沿用第一筆
+    if (isUniqueViolation(e)) return getEnrollmentForCoach(coachId);
+    throw e;
+  }
 }
 
-export async function getEnrollmentForCoach(coachId: string): Promise<Enrollment | null> {
+export async function getEnrollmentForCoach(coachId: string, opts: { includeRejected?: boolean } = {}): Promise<Enrollment | null> {
   const rows = await db
     .select()
     .from(trainingEnrollments)
-    .where(and(eq(trainingEnrollments.coachId, coachId), ne(trainingEnrollments.reviewStage, "cancelled")))
+    .where(and(eq(trainingEnrollments.coachId, coachId), notInArray(trainingEnrollments.reviewStage, opts.includeRejected ? ["cancelled"] : ["cancelled", "rejected"])))
     .orderBy(desc(trainingEnrollments.createdAt))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/** 退回之後公司要重新受理：把最近一案從 rejected 拉回 pending（歷程保留），後台按鈕用。 */
+export async function reopenEnrollment(coachId: string): Promise<{ ok: boolean; error?: string }> {
+  const live = await getEnrollmentForCoach(coachId);
+  if (live) return { ok: true };
+  const rows = await db
+    .select()
+    .from(trainingEnrollments)
+    .where(and(eq(trainingEnrollments.coachId, coachId), eq(trainingEnrollments.reviewStage, "rejected")))
+    .orderBy(desc(trainingEnrollments.createdAt))
+    .limit(1);
+  if (!rows[0]) return { ok: false, error: "沒有退回的案件" };
+  await db.update(trainingEnrollments).set({ reviewStage: "pending", updatedAt: new Date() }).where(eq(trainingEnrollments.id, rows[0].id));
+  return { ok: true };
 }
 
 export async function getEnrollment(id: string): Promise<Enrollment | null> {
@@ -106,6 +127,13 @@ export async function reportTrainingPayment(coachId: string, input: CaseFeeInput
   } catch (e) {
     return { ok: false, error: e instanceof Error && e.message === "invalid-amount" ? "請填正確的金額與日期" : "提報失敗" };
   }
+}
+
+/** 這個培訓方案的範本組合裡有沒有啟用中的範本。 */
+export async function setHasTemplates(itemId: string): Promise<boolean> {
+  const keys = await getSet("training_item", itemId);
+  for (const k of keys) if (await latestEnabledTemplate(k)) return true;
+  return false;
 }
 
 /** 這個培訓方案的範本組合裡有沒有「公司」簽名位（有＝後台核准時要選公司代表）。 */
@@ -201,8 +229,12 @@ export async function tryActivateEnrollment(enrollmentId: string, by: string): P
   const live = instances.filter((i) => i.status !== "void");
   const prog = caseProgress(live);
   if (live.some((i) => i.required) && !prog.allDone) return { ok: false, activated: false, error: `必簽文件 ${prog.done}/${prog.required}` };
+  // 範本組合有文件、但這一案一份活的實例都沒有（啟動失敗過、或被作廢等重發）：不能就這樣開通——先回去按「審核通過並啟動簽署」。
+  if (!live.length && (await setHasTemplates(enr.itemId))) return { ok: false, activated: false, error: "應簽文件尚未產生，請先重新啟動簽署" };
 
-  const r = await activateCoach(enr.coachId, by);
+  // 審核人：呼叫端給的若不是教練 id（例如簽完文件的自動開通路徑），退回審核通過那位、再退回本人。
+  const actor = (await db.select({ id: coaches.id }).from(coaches).where(eq(coaches.id, by)).limit(1)).length ? by : (enr.passedBy ?? enr.coachId);
+  const r = await activateCoach(enr.coachId, actor);
   if (!r.ok) return { ok: false, activated: false, error: r.error };
   // 只有「原本不是 activated」的那一次更新會成功——兩條路同時進來也只有一條寫得到。
   const rows = await db

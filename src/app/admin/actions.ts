@@ -7,7 +7,7 @@ import { coaches } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg, transferClients, removeCoach } from "@/lib/coach";
 import { saveBrand } from "@/lib/brand";
 import { saveApplySettings, saveReviewChecks } from "@/lib/coachApplyStore";
-import { passReview, tryActivateEnrollment, rejectEnrollment } from "@/lib/trainingStore";
+import { passReview, rejectEnrollment, reopenEnrollment } from "@/lib/trainingStore";
 import type { ApplySettings } from "@/lib/coachApply";
 
 // 後台動作的統一回傳型別：讓 client 端能顯示「已儲存 / 失敗原因」，
@@ -121,12 +121,30 @@ export async function rejectTrainingAction(coachId: string, note: string): Promi
   }
 }
 
-/** 文件都簽完了但開通沒跟上（例如簽完那一刻的後續失敗）：後台再推一次。冪等。 */
-export async function retryActivateAction(enrollmentId: string): Promise<ActionResult> {
+/**
+ * 文件都簽完了但開通沒跟上、或啟動簽署失敗過（審核通過了卻沒有文件）：後台再推一次。
+ * 走 passReview（冪等）：缺文件會重新產、文件齊了就開通。
+ */
+export async function retryActivateAction(coachId: string): Promise<ActionResult> {
   try {
     const me = await guard();
-    const r = await tryActivateEnrollment(enrollmentId, me.id);
-    if (!r.ok) return { ok: false, error: r.error ?? "尚未符合開通條件" };
+    const r = await passReview(coachId, me.id, me.id);
+    if (!r.ok) return { ok: false, error: r.error };
+    if (!r.activated && !r.noTemplates) return { ok: false, error: r.docs ? "文件還沒簽完，簽完會自動開通" : "尚未符合開通條件" };
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 退回之後重新受理：案件回待審，再走正常流程。 */
+export async function reopenTrainingAction(coachId: string): Promise<ActionResult> {
+  try {
+    await guard();
+    const r = await reopenEnrollment(coachId);
+    if (!r.ok) return { ok: false, error: r.error ?? "失敗" };
     revalidatePath("/admin");
     revalidatePath("/dashboard");
     return { ok: true };

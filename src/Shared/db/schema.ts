@@ -1513,10 +1513,11 @@ export const docInstances = pgTable('doc_instances', {
   version: integer('version').notNull(),
   title: text('title').notNull(),
   required: boolean('required').default(true).notNull(),
-  htmlSnapshot: text('html_snapshot').notNull(),
+  htmlSnapshot: text('html_snapshot').notNull(),     // 發出當下的快照，簽完也不動（hash／hash_at_sign 對應它）
   hash: text('hash').notNull(),
   status: text('status').default('pending').notNull(),
   expiresAt: date('expires_at'),
+  signedHtml: text('signed_html'),                    // 全員簽完後貼了簽名的版本（final_hash 對應它）；顯示與列印優先用這份
   finalHash: text('final_hash'),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   voidedAt: timestamp('voided_at', { withTimezone: true }),
@@ -1588,6 +1589,8 @@ export const trainingEnrollments = pgTable('training_enrollments', {
 }, (t) => [
   index('training_enrollments_coach_idx').on(t.coachId),
   index('training_enrollments_stage_idx').on(t.reviewStage),
+  // 一位申請人同時只能有一個進行中的案（重送申請、雙擊都不會開第二案）
+  uniqueIndex('training_enrollments_coach_live_uq').on(t.coachId).where(sql`review_stage not in ('cancelled','rejected')`),
 ]);
 
 // 顧問服務案件（第二個簽署消費者，2026/10/28）。收款、合約、發票的共同關聯單位。
@@ -1617,6 +1620,8 @@ export const serviceCases = pgTable('service_cases', {
   index('service_cases_client_idx').on(t.clientId),
   index('service_cases_coach_idx').on(t.coachId),
   uniqueIndex('service_cases_case_no_uq').on(t.caseNo),
+  // 同客戶同年度只能有一個進行中／已完成的案（雙擊建案不會開兩案）
+  uniqueIndex('service_cases_client_year_live_uq').on(t.clientId, t.serviceYear).where(sql`status in ('open','completed')`),
 ]);
 
 // 發票（公司獨立處理，第一期人工回填）。與合約共用案件與收款，但各自維護狀態、互不等待。
@@ -1640,7 +1645,7 @@ export const invoices = pgTable('invoices', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index('invoices_case_idx').on(t.caseType, t.caseId),
+  uniqueIndex('invoices_case_uq').on(t.caseType, t.caseId),   // 一案一張發票列（再存＝更新）
   index('invoices_status_idx').on(t.status),
 ]);
 

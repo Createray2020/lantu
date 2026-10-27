@@ -42,7 +42,7 @@ const h = vi.hoisted(() => {
   const defaults = (table: string, v: any) => ({
     id: crypto.randomUUID(),
     ...(table === "doc_templates" ? { enabled: true, version: 1, required: true, useSeal: true, signDays: null, note: "" } : {}),
-    ...(table === "doc_instances" ? { status: "pending", required: true, finalHash: null, completedAt: null, expiresAt: null } : {}),
+    ...(table === "doc_instances" ? { status: "pending", required: true, finalHash: null, completedAt: null, expiresAt: null, signedHtml: null } : {}),
     ...(table === "doc_signers" ? { status: "pending", consentAt: null, signatureImg: null, signedAt: null, hashAtSign: null, label: "", displayName: "", remindCount: 0, lastRemindedAt: null } : {}),
     ...(table === "doc_tasks" ? { deadline: null, note: "" } : {}),
     createdAt: new Date(),
@@ -220,8 +220,11 @@ describe("簽署流程", () => {
     expect(done.status).toBe("completed");
     expect(done.finalHash).toBeTruthy();
     expect(done.finalHash).not.toBe(done.hash);
-    expect(done.htmlSnapshot).toContain('data-slot="member:1"><img class="sign-img"');
-    expect(done.htmlSnapshot).toContain("Ray　");
+    // 原始快照不動（hash／hash_at_sign 對得回來）；簽名貼在 signedHtml
+    expect(done.htmlSnapshot).not.toContain("sign-img");
+    expect(done.signedHtml).toContain('data-slot="member:1"><img class="sign-img"');
+    expect(done.signedHtml).toContain("Ray　");
+    expect(await voidInstance(main.id, "x")).toMatchObject({ ok: false }); // 已完成不能作廢
     expect(done.signers.every((s) => s.status === "signed" && s.hashAtSign === main.hash)).toBe(true);
   });
 
@@ -253,11 +256,10 @@ describe("簽署流程", () => {
     await start();
     const main = S.doc_instances.find((i) => i.title === "實習教練合作約定書")!;
     const opt = S.doc_instances.find((i) => i.title === "保密同意書")!;
-    opt.status = "completed";
+    await voidInstance(opt.id, "x"); // 選簽的那份作廢（待簽狀態可以作廢）
     expect(caseProgress(S.doc_instances)).toMatchObject({ required: 1, done: 0, allDone: false });
     main.status = "completed";
     expect(caseProgress(S.doc_instances).allDone).toBe(true);
-    await voidInstance(opt.id, "x");
     expect((await listMyInstances({ coachId: "u1" })).map((i) => i.title)).toEqual(["實習教練合作約定書"]);
   });
 });

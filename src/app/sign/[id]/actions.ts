@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { consentAndSign, declineSign, getInstance, saveSignature, deleteSignature, remindInstance, reopenInstance } from "@/lib/docsStore";
+import { consentAndSign, declineSign, saveSignature, deleteSignature, remindInstance, reopenInstance } from "@/lib/docsStore";
 import { currentSignIdentity } from "@/lib/docsIdentity";
 import { onDocCompleted } from "@/lib/docsHooks";
 import type { DocCaseType } from "@/lib/docs";
@@ -63,13 +63,6 @@ export async function saveMySignatureAction(img: string | null): Promise<{ ok: b
   } catch {
     return { ok: false, error: "簽名圖不正確（只接受 PNG）" };
   }
-}
-
-/** 簽署頁輪詢用：拿最新狀態（別人簽了沒）。 */
-export async function instanceStatusAction(instanceId: string): Promise<{ status: string; signed: number; total: number } | null> {
-  const inst = await getInstance(instanceId);
-  if (!inst) return null;
-  return { status: inst.status, signed: inst.signers.filter((s) => s.status === "signed").length, total: inst.signers.length };
 }
 
 /** 催簽（站內提醒輪到的那一位）。 */
