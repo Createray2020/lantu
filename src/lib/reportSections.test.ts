@@ -128,7 +128,78 @@ describe("目錄與章節永遠對得起來", () => {
 
   it("章名只在一個地方寫（編號是產生的，不是手抄的）", () => {
     expect(HTML).toContain("function rNumberSections(body)");
-    expect(HTML).toContain("function rTOC(titles)");
+    expect(HTML).toContain("function rTOC(titles,nums)");
+  });
+});
+
+/* 2026/10/27 Ray：匯出要有設計封面、目錄頁、每章從頁首開始；頁首章名／客戶、頁尾日期／頁碼要像排好的；三份都套。
+   封面 logo 一律用後台壓的 LANTU_BRAND.logoUrl，不畫簡化版 SVG。 */
+describe("封面／目錄頁／章節 section：三份報告書都套", () => {
+  const docs: [string, (c: unknown) => string][] = [
+    ["財務規劃報告書", (c) => w.reportHTML(c)],
+    ["調整方案書", (c) => w.planReportHTML(c)],
+    ["企業主財務診斷書", (c) => w.bizReportHTML(c)],
+  ];
+  it("每一份：第一個元素是封面、接著目錄頁、每一章包成 section.rch 且 id 與目錄連結對得上", () => {
+    for (const [title, fn] of docs) {
+      const d = dom(fn(rich()));
+      const rep = d.querySelector(".report")!;
+      expect(rep.children[0].classList.contains("rcover"), title + " 第一個不是封面").toBe(true);
+      expect(rep.children[0].getAttribute("data-doc")).toBe(title);
+      expect(rep.children[1].classList.contains("rtocpg"), title + " 第二個不是目錄頁").toBe(true);
+      const secs = [...rep.querySelectorAll("section.rch")];
+      expect(secs.length, title + " 沒有章節 section").toBeGreaterThan(3);
+      const links = [...rep.querySelectorAll(".rtoc a")].map((a) => a.getAttribute("href"));
+      expect(links).toEqual(secs.map((x) => "#" + x.id));
+      // 每個 section 第一個子元素就是 h2（列印時 string-set 從這裡帶章名）
+      secs.forEach((x) => expect(x.children[0].tagName).toBe("H2"));
+      // 舊的深藍頁首帶拿掉了
+      expect(rep.querySelector(".rc")).toBeNull();
+      expect(rep.querySelector(".rcover .rcwho")!.textContent).toContain("謹致");
+      expect(rep.querySelector(".rcover .rcmeta")!.textContent).toContain("報告日期");
+    }
+  });
+  it("封面：有後台 logo 就用 logo（不畫簡化版 SVG）、沒有就印品牌名文字", () => {
+    w.LANTU_BRAND = { logoUrl: "https://cdn.test/brand-logo.png", brandName: "嵐途 LAN TU", slogan: "理解自己・做出選擇・走向未來" };
+    let d = dom(w.reportHTML(rich()));
+    expect(d.querySelector(".rcover .rcbrand img")!.getAttribute("src")).toBe("https://cdn.test/brand-logo.png");
+    expect(d.querySelector(".rcover svg")).toBeNull();
+    w.LANTU_BRAND = null;
+    d = dom(w.reportHTML(rich()));
+    expect(d.querySelector(".rcover .rcbrand img")).toBeNull();
+    expect(d.querySelector(".rcover .rcbrand")!.textContent).toContain("嵐途");
+    expect(d.querySelector(".rcover svg")).toBeNull();
+  });
+  it("配色只剩深／淺，只決定封面 class；舊的 localStorage 值一律當「深」", () => {
+    expect(Object.keys(w.R_THEMES)).toEqual(["dark", "light"]);
+    w.localStorage.setItem("lantu.reportTheme", "hc");
+    expect(w.rThemeKey()).toBe("dark");
+    expect(dom(w.reportHTML(rich())).querySelector(".rcover")!.classList.contains("dark")).toBe(true);
+    w.localStorage.setItem("lantu.reportTheme", "light");
+    const d = dom(w.reportHTML(rich()));
+    expect(d.querySelector(".rcover")!.classList.contains("light")).toBe(true);
+    expect(d.querySelector(".rcover .rcframe"), "淺色版有雙線框").toBeTruthy();
+    w.localStorage.removeItem("lantu.reportTheme");
+  });
+  it("printReport：另開列印視窗，帶 Paged.js、@page 自己接管（瀏覽器的日期／標題／網址不會出現）、details 全開", () => {
+    w.app.role = "coach"; w.app.activeTab = "report"; w.app.reportDoc = "family"; w.render();
+    let written = "";
+    const fake = { document: { open() {}, write(h: string) { written += h; }, close() {} } };
+    const orig = w.open; w.open = () => fake;
+    try { w.printReport(); } finally { w.open = orig; }
+    expect(written).toContain('src="/vendor/paged.polyfill.min.js"');
+    expect(written).toContain("@page{size:A4");
+    expect(written).toContain("@page cover{margin:0");
+    expect(written).toContain("string-set:rch content(text)");
+    expect(written).toContain("counter(page)");
+    expect(written).toContain("target-counter(attr(href url),page)");
+    expect(written).toContain('class="rcover');
+    expect(written).not.toMatch(/<details(?![^>]*\bopen\b)/);
+    expect(written).toContain("window.PagedConfig");
+  });
+  it("vendor 的 Paged.js 真的在 repo 裡（不吃外部 CDN）", () => {
+    const js = readFileSync(new URL("../../public/vendor/paged.polyfill.min.js", import.meta.url), "utf8");
+    expect(js).toContain("Paged.js v0.4.3");
   });
 });
 

@@ -169,19 +169,18 @@ describe("第二批落點（jsdom）", () => {
     expect(h).toContain("不構成投資、稅務或法律建議");
     expect(w.stageReportNote(w.health(c))).toContain("不構成投資、稅務或法律建議");
   });
-  it("⑥ 報告書配色：經典原樣、高對比把 navy 換成黑；選擇記在 localStorage", async () => {
+  it("⑥ 報告書配色（2026/10/27 改成深／淺）：只決定封面、不再換內頁色碼；選擇記在 localStorage", async () => {
     await boot("report");
     const c = w.app.cases[0];
     const raw = w.reportHTML(c) as string;
     expect(raw).toContain("#0d2b45");
-    expect(w.rTheme(raw)).toBe(raw);                      // classic
-    w.localStorage.setItem("lantu.reportTheme", "hc");
-    const hc = w.rTheme(raw) as string;
-    expect(hc).not.toContain("#0d2b45");
-    expect(hc).toContain("#000000");
-    expect(hc.length).toBe(raw.length);                   // 只換色碼，長度不變＝沒碰到內容
+    expect(w.rTheme(raw)).toBe(raw);                      // 不再對色碼做替換
+    expect(raw).toContain('class="rcover dark');
+    w.localStorage.setItem("lantu.reportTheme", "light");
+    expect(w.reportHTML(c)).toContain('class="rcover light');
     w.render();
     expect(w.document.querySelector("#app").innerHTML).toContain("報告配色");
+    expect(w.document.querySelector("#app").innerHTML).toContain(">淺<");
     w.localStorage.removeItem("lantu.reportTheme");
   });
 });

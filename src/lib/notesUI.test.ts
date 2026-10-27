@@ -237,10 +237,13 @@ describe("客戶報告書：註記貼在對應章節，不集中成一章", () =
     const root = w.document.querySelector("#app");
     const note = root.querySelector(".lnrpn");
     expect(note).toBeTruthy();
-    // 往後找到的第一個 h2，就是「下一章」——代表這則註記確實落在某一章的內部
-    let el = note.parentElement.nextElementSibling as Element | null;
-    while (el && el.tagName !== "H2") el = el.nextElementSibling;
-    expect(el, "註記後面應該還有下一章，表示它貼在章節之間而不是文末").toBeTruthy();
+    // 2026/10/27 起每一章是一個 section.rch（列印每章從頁首開始）：註記必須落在某一章的 section 裡，
+    // 而且那一章後面還有下一章——代表它貼在章節之間而不是文末
+    const sec = note.closest("section.rch") as Element | null;
+    expect(sec, "註記要在某一章的 section 裡").toBeTruthy();
+    expect(sec!.lastElementChild!.contains(note), "註記貼在這一章的結尾").toBe(true);
+    const next = sec!.nextElementSibling as Element | null;
+    expect(next && next.tagName === "SECTION", "註記後面應該還有下一章，表示它貼在章節之間而不是文末").toBe(true);
   });
 
   it("重畫兩次不會把註記貼成兩份", () => {
