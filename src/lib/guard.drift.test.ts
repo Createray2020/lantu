@@ -32,6 +32,7 @@ const IS_ACTIONS = (name: string) => /[Aa]ctions\.ts$/.test(name) && !/\.test\.t
 const EXEMPT: Record<string, string> = {
   "src/app/dashboard/apply/actions.ts": "申請成為教練：當下還不是教練，沒有期限可檢查",
   "src/app/dashboard/learn/actions.ts": "學習區進度：到期的人正是最需要把課補完的人，擋住等於斷了續約的路",
+  "src/app/sign/[id]/actions.ts": "電子簽署：簽署人可能是客戶、待審的申請人或已到期的教練（簽的正是續約），身分由 isSigner 逐列驗，不走教練端寫入閘",
 };
 
 /**

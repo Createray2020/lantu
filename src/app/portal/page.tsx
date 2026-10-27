@@ -21,6 +21,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches } from "@/Shared/db/schema";
 import BrandMark from "@/components/BrandMark";
+import { countMyPending, listMyInstances } from "@/lib/docsStore";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,9 @@ export default async function Portal() {
   // 教練按了「邀請客戶填寫」而客戶還沒送出 → 一進首頁就跳浮動框（關掉還能從橫幅再開）。
   const quizInvited = planCase ? await pendingInvites(planCase.clientId) : { self: false, spouse: false };
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
+  // 電子簽署（2026/10/28）：輪到客戶簽的合約份數；有任何文件才在頁首放「我的合約」。
+  const myDocs = await listMyInstances({ clientUserId: client.id });
+  const docPending = await countMyPending({ clientUserId: client.id });
   // 教練↔客戶是雙棲的：教練也會用客戶介面做自己的規劃。
   // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。
   // 教練端頁首早就有「我的規劃」指過來，這條是把單向補成雙向。
@@ -155,6 +159,14 @@ export default async function Portal() {
               申請成為教練
             </Link>
           )}
+          {myDocs.length > 0 && (
+            <Link
+              href="/portal/docs"
+              className="text-13 sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              我的合約{docPending > 0 ? `（${docPending}）` : ""}
+            </Link>
+          )}
           <SignOutButton redirectUrl="/">
             <button className="text-13 sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5">登出</button>
           </SignOutButton>
@@ -162,6 +174,16 @@ export default async function Portal() {
       </header>
 
       <main className="flex-1 px-6 py-12">
+        {docPending > 0 && (
+          <div className="max-w-2xl mx-auto mb-6 rounded-xl border border-brand/40 bg-brand/10 px-5 py-4 flex flex-wrap items-center gap-3">
+            <span className="text-sm text-brand2 flex-1">
+              有 <b>{docPending}</b> 份合約等你簽署。
+            </span>
+            <Link href="/portal/docs" className="font-bold text-onbrand bg-brand hover:bg-brand2 px-4 py-2 rounded-lg text-sm">
+              前往簽署
+            </Link>
+          </div>
+        )}
         {pendingSurveys > 0 && (
           <div className="max-w-2xl mx-auto mb-6 rounded-xl border border-brand/40 bg-brand/10 px-5 py-4 flex flex-wrap items-center gap-3">
             <span className="text-sm text-brand2 flex-1">
