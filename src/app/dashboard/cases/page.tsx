@@ -4,6 +4,7 @@ import { headerProps } from "../headerProps";
 import { ensureCoach } from "@/lib/coach";
 import { listCasesAction } from "../caseActions";
 import CaseTable from "./CaseTable";
+import { STAGE_LABEL, STAGE_NO, STAGES } from "@/lib/caseEngine";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,24 @@ export default async function CasesPage() {
             <span className={`rounded-full px-2.5 py-1 ${soon ? "bg-brand2/15 text-brand2" : "bg-panel2 text-tx3"}`}>3 天內到期 {soon}</span>
           </div>
         </div>
+        {data.rows.length > 0 && (
+          <div className="grid sm:grid-cols-[auto_1fr] gap-3 text-xs">
+            <div className="rounded-xl border border-line bg-panel p-3 min-w-44">
+              <div className="text-tx3">準時完成率</div>
+              <div className="text-2xl font-bold mt-0.5">{data.kpi.onTime + data.kpi.late ? `${Math.round((data.kpi.onTime / (data.kpi.onTime + data.kpi.late)) * 100)}%` : "—"}</div>
+              <div className="text-10 text-tx3">已完成階段 {data.kpi.onTime + data.kpi.late} 個，其中準時 {data.kpi.onTime}</div>
+            </div>
+            <div className="rounded-xl border border-line bg-panel p-3 grid grid-cols-5 gap-2">
+              {STAGES.map((s) => (
+                <div key={s}>
+                  <div className="text-tx3 truncate">{STAGE_NO[s]}・{STAGE_LABEL[s]}</div>
+                  <div className="text-lg font-bold">{data.kpi.byStage[s] ?? 0} <span className="text-10 font-normal text-tx3">案</span></div>
+                  <div className="text-10 text-tx3">平均 {data.kpi.avgDays[s] == null ? "—" : `${data.kpi.avgDays[s]} 天`}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <CaseTable rows={data.rows} />
       </section>
     </main>

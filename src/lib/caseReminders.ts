@@ -6,7 +6,7 @@
 //   · 逾期標記（flags.overdue）與 escalation 由這裡寫，人不能改
 import { and, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { actionItems, clients, orgHolidays, reviews } from "@/Shared/db/schema";
+import { actionItems, clients, orgHolidays, reviews, serviceTerms } from "@/Shared/db/schema";
 import { listAllCases, stagesForCases, lastHumanTouch, markOverdue } from "./caseStore";
 import { overdueDays, daysToDue, escalationStep, diffDays, STAGE_LABEL, type Stage } from "./caseEngine";
 import { notify, notifyMany } from "./notify";
@@ -14,10 +14,10 @@ import { listActiveCoaches } from "./org";
 import { s3For, clientRelationsIds } from "./caseScope";
 import { todayISO } from "./license";
 
-export type ReminderStats = { cases: number; due: number; overdue: number; escalated: number; noNext: number; waiting: number; paused: number };
+export type ReminderStats = { cases: number; due: number; overdue: number; escalated: number; noNext: number; waiting: number; paused: number; renew: number };
 
 export async function runCaseReminders(today = todayISO()): Promise<ReminderStats> {
-  const stats: ReminderStats = { cases: 0, due: 0, overdue: 0, escalated: 0, noNext: 0, waiting: 0, paused: 0 };
+  const stats: ReminderStats = { cases: 0, due: 0, overdue: 0, escalated: 0, noNext: 0, waiting: 0, paused: 0, renew: 0 };
   const cases = await listAllCases();
   if (!cases.length) return stats;
   const [stages, all, hol] = await Promise.all([stagesForCases(cases.map((c) => c.id)), listActiveCoaches(), db.select({ d: orgHolidays.day }).from(orgHolidays)]);
@@ -29,6 +29,10 @@ export async function runCaseReminders(today = todayISO()): Promise<ReminderStat
     db.select({ clientId: reviews.clientId, n: sql<number>`count(*)::int` }).from(reviews).where(and(inArray(reviews.clientId, clientIds), isNotNull(reviews.nextAppt), gte(reviews.nextAppt, today))).groupBy(reviews.clientId),
   ]);
   const nameOf = new Map(names.map((n) => [n.id, n.name]));
+  // 續約提醒（第三批）：進行中案件最新一期的服務期間 30 天內到期 → 提醒教練
+  const terms = await db.select({ clientId: serviceTerms.clientId, to: serviceTerms.toDate, year: serviceTerms.serviceYear, id: serviceTerms.id }).from(serviceTerms).where(inArray(serviceTerms.clientId, clientIds));
+  const latestTerm = new Map<string, { id: string; to: string | null; year: number }>();
+  for (const t of terms) { const cur = latestTerm.get(t.clientId); if (!cur || t.year > cur.year) latestTerm.set(t.clientId, { id: t.id, to: t.to, year: t.year }); }
   const todoOf = new Map(openTodos.map((t) => [t.clientId, t.n]));
   const meetOf = new Map(nextMeets.map((t) => [t.clientId, t.n]));
   const admins = all.filter((x) => x.role === "admin" || x.orgRank === "owner").map((x) => x.id);
@@ -51,6 +55,15 @@ export async function runCaseReminders(today = todayISO()): Promise<ReminderStat
       continue;
     }
     if (c.status !== "active") continue;
+
+    // 續約
+    const lt = latestTerm.get(c.clientId);
+    if (lt?.to) {
+      const left = diffDays(today, lt.to);
+      if (left >= 0 && left <= 30) {
+        if (await notify({ to: "coach", id: c.coachId, kind: "info", title: `${name} 的服務期間 ${left === 0 ? "今天" : `${left} 天後`}到期`, body: `${lt.year} 年度服務到 ${lt.to}。請確認後續安排：定期追蹤／續約（建立下一年度）／結案。`, href, caseId: c.id, dedupeKey: `term:${lt.id}:renew30` })) stats.renew++;
+      }
+    }
 
     // 等待客戶滿 14 天
     if (c.flags.includes("waiting") && c.waitingSince && diffDays(c.waitingSince, today) >= 14) {

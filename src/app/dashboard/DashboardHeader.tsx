@@ -143,7 +143,10 @@ export default function DashboardHeader({
         className={`relative text-xs font-bold px-2.5 py-1.5 rounded-md border ${unread > 0 ? "border-brand2 text-brand2" : "border-line2 text-tx2 hover:text-tx"}`}
         title="通知"
       >
-        通知{unread > 0 ? `（${unread}）` : ""}
+        通知
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-brand text-onbrand text-10 font-bold grid place-items-center">{unread > 99 ? "99+" : unread}</span>
+        )}
       </Link>
       <Link
         href="/dashboard/docs"

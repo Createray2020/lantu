@@ -14,7 +14,7 @@ export default function Overview({ ov }: { ov: ClientOverview | null }) {
       </div>
       <div className="px-4 pb-4 border-t border-line pt-3">
         <div className="flex items-baseline gap-3 flex-wrap">
-          <span className="text-11 text-tx2">目前階段</span>
+          <span className="text-11 text-tx2">財務階段</span>
           <span className="font-serif text-2xl text-brand">{ov.stage}</span>
         </div>
         {ov.desc && <p className="text-13 text-tx2 mt-1 leading-relaxed">{ov.desc}</p>}

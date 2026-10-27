@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Modal from "@/components/ui/Modal";
 import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
@@ -26,7 +26,8 @@ export default function CaseProgress({ clientId, readOnly }: { clientId: string;
   const [open, setOpen] = useState<Stage | null>(null);
   const [err, setErr] = useState("");
   const [pending, start] = useTransition();
-  const load = () => caseForClientAction(clientId).then((r) => { setRow(r); if (r && open === null) setOpen(r.stage); if (r) feedbackForCaseAction(r.id).then(setFb).catch(() => setFb([])); }).catch(() => setRow(null));
+  const lastStage = useRef<string | null>(null);
+  const load = () => caseForClientAction(clientId).then((r) => { setRow(r); if (r && lastStage.current !== r.stage) { lastStage.current = r.stage; setOpen(r.stage); } if (r) feedbackForCaseAction(r.id).then(setFb).catch(() => setFb([])); }).catch(() => setRow(null));
   useEffect(() => { load(); }, [clientId]); // eslint-disable-line react-hooks/exhaustive-deps
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => { setErr(""); start(async () => { const r = await fn(); if (!r.ok) { setErr(r.error ?? "失敗"); return; } load(); }); };
 

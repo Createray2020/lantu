@@ -197,7 +197,8 @@ export async function setS3Action(caseId: string, s3CoachId: string | null): Pro
 
 /** 案件總表（/dashboard/cases）：依身分給範圍。 */
 export type CaseListRow = Omit<CaseViewRow, "stages" | "log" | "terms"> & { curDue: string | null };
-export async function listCasesAction(): Promise<{ scope: string; rows: CaseListRow[] }> {
+export type CaseKpi = { onTime: number; late: number; byStage: Record<string, number>; avgDays: Record<string, number | null> };
+export async function listCasesAction(): Promise<{ scope: string; rows: CaseListRow[]; kpi: CaseKpi }> {
   const me = await requireCoach();
   const all = await listActiveCoaches();
   const scope = caseScopeFor(me, all);
@@ -210,7 +211,20 @@ export async function listCasesAction(): Promise<{ scope: string; rows: CaseList
     return { ...rest, curDue: cur?.actualDate ?? cur?.promisedDate ?? cur?.expectedDate ?? null };
   });
   rows.sort((a, b) => (b.overdue - a.overdue) || ((a.daysToDue ?? 9999) - (b.daysToDue ?? 9999)));
-  return { scope: scope.kind === "all" ? scope.reason : scope.reason, rows };
+  // KPI：準時率（已完成的階段，實際日 ≤ 承諾／預計日）、各階段分布、各階段平均天數
+  const kpi: CaseKpi = { onTime: 0, late: 0, byStage: {}, avgDays: {} };
+  const dur: Record<string, number[]> = {};
+  for (const s of sums) {
+    if (s.case.status !== "closed") kpi.byStage[s.case.stage] = (kpi.byStage[s.case.stage] ?? 0) + 1;
+    for (const st of s.stages) {
+      if (!st.actualDate) continue;
+      const due = st.promisedDate ?? st.expectedDate;
+      if (due) { if (st.actualDate <= due) kpi.onTime++; else kpi.late++; }
+      if (st.startedOn) (dur[st.stage] ??= []).push(Math.max(0, (Date.parse(st.actualDate) - Date.parse(st.startedOn)) / 86400000));
+    }
+  }
+  for (const [k, v] of Object.entries(dur)) kpi.avgDays[k] = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+  return { scope: scope.kind === "all" ? scope.reason : scope.reason, rows, kpi };
 }
 
 // ── 通知 ─────────────────────────────────────────────────────────────────────
