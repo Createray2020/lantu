@@ -2,8 +2,8 @@
 import { and, desc, eq, gte, isNotNull } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { clients, coaches, reviews } from "@/Shared/db/schema";
-import { getCaseByClient } from "./caseStore";
-import { stageProgress, dueForClient, completion, STAGES, type Stage } from "./caseEngine";
+import { getCaseByClient, loadStageParams } from "./caseStore";
+import { stageProgress, dueForClient, completion, paramsFor, STAGES, type Stage } from "./caseEngine";
 import { listClientTodos } from "./clientTodos";
 import { getSupportContact } from "./supportContact";
 import { displayNameOf } from "./coachName";
@@ -25,7 +25,7 @@ export async function portalCaseState(clientId: string, clientName: string): Pro
     .where(and(eq(reviews.clientId, clientId), isNotNull(reviews.nextAppt), gte(reviews.nextAppt, today))).orderBy(desc(reviews.date)).limit(1);
   const row = { stage: c.stage as Stage, status: c.status as "active" | "paused" | "closed" };
   const comp = completion(row);
-  const [todos, support] = await Promise.all([listClientTodos(clientId), getSupportContact()]);
+  const [todos, support, overrides] = await Promise.all([listClientTodos(clientId), getSupportContact(), loadStageParams()]);
   return {
     kind: "case",
     data: {
@@ -39,7 +39,8 @@ export async function portalCaseState(clientId: string, clientName: string): Pro
           due: dueForClient({ promisedDate: r?.promisedDate ?? null, actualDate: r?.actualDate ?? null }),
           // 客戶端只給承諾／實際；預計完成日留教練端（Ray 2026/10/28 定案），這裡刻意不送出去
           promisedDate: r?.promisedDate ?? null, actualDate: r?.actualDate ?? null,
-          checklist: (r?.checklist ?? []).map((x) => ({ label: x.label, done: x.done })),
+          // 待開始的階段還沒有列：先用預設清單（全未勾）讓客戶看得到後面的流程（Ray 2026/10/28）
+          checklist: r ? r.checklist.map((x) => ({ label: x.label, done: x.done })) : paramsFor(st, overrides).checklist.map((x) => ({ label: x.label, done: false })),
           note: r?.note ?? "", decision: r?.decision ?? "",
         };
       }),

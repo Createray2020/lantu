@@ -141,12 +141,12 @@ function StagePanel({ row, s, isCurrent, edit, pending, run }: { row: CaseViewRo
       <ul className="grid sm:grid-cols-2 gap-1">
         {s.checklist.map((c) => (
           <li key={c.k} className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={c.done} disabled={!edit || row.status !== "active"} onChange={(e) => run(() => toggleCheckAction(row.id, s.stage, c.k, e.target.checked))} />
+            <input type="checkbox" checked={c.done} disabled={!edit || row.status !== "active" || s.progress === "pending"} onChange={(e) => run(() => toggleCheckAction(row.id, s.stage, c.k, e.target.checked))} />
             <span className={c.done ? "text-tx3 line-through" : ""}>{c.label}</span>
             {c.at && <span className="text-10 text-tx3">{fmt(c.at)}</span>}
           </li>
         ))}
-        {!s.checklist.length && <li className="text-xs text-tx3">這一階段還沒開始，清單在開始時長出來。</li>}
+        {s.progress === "pending" && <li className="text-10 text-tx3 sm:col-span-2">這一階段還沒開始：先預覽預設清單，開始後才能勾。</li>}
       </ul>
       {s.stage === "report" && (
         <div className="flex items-center gap-2 text-xs">

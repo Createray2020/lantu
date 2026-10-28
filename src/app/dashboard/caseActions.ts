@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireCoach, requireWritableCoach } from "@/lib/guard";
 import { clientAccess } from "@/lib/clientScope";
 import * as Case from "@/lib/caseStore";
-import { isStage, type Stage, type CaseFlag, overdueDays, daysToDue, stageProgress, completion } from "@/lib/caseEngine";
+import { isStage, type Stage, type CaseFlag, type StageParam, overdueDays, daysToDue, stageProgress, completion, paramsFor } from "@/lib/caseEngine";
 import { caseScopeFor, canEditCase, canHandleFlags, s3For } from "@/lib/caseScope";
 import { getCasePerms } from "@/lib/casePerms";
 import { listActiveCoaches } from "@/lib/org";
@@ -36,7 +36,7 @@ export type CaseViewRow = {
   log: { at: string; who: string; action: string; reason: string; detail: Record<string, unknown> }[];
 };
 
-function shape(b: Case.CaseBundle, extra: { clientName: string; coachName: string; s3Name: string | null; canEdit: boolean; canFlags: boolean; terms: CaseViewRow["terms"]; log: CaseViewRow["log"] }): CaseViewRow {
+function shape(b: Case.CaseBundle, extra: { clientName: string; coachName: string; s3Name: string | null; canEdit: boolean; canFlags: boolean; terms: CaseViewRow["terms"]; log: CaseViewRow["log"]; overrides?: Partial<Record<Stage, Partial<StageParam>>> }): CaseViewRow {
   const c = b.case;
   const today = todayISO();
   const cur = b.stages.find((s) => s.stage === c.stage) ?? null;
@@ -50,7 +50,9 @@ function shape(b: Case.CaseBundle, extra: { clientName: string; coachName: strin
     overdue: overdueDays(row, curDates, today), daysToDue: daysToDue(row, curDates, today), done: comp.done, total: comp.total,
     stages: (["commission", "interview", "planning", "report", "tracking"] as Stage[]).map((st) => {
       const r = b.stages.find((s) => s.stage === st);
-      return { stage: st, progress: stageProgress(row, st), startedOn: r?.startedOn ?? null, expectedDate: r?.expectedDate ?? null, promisedDate: r?.promisedDate ?? null, actualDate: r?.actualDate ?? null, checklist: r?.checklist ?? [], note: r?.note ?? "", decision: r?.decision ?? "" };
+      // 待開始的階段先用預設清單預覽（全未勾、不能勾），教練與客戶都看得到整條路
+      const checklist = r ? r.checklist : paramsFor(st, extra.overrides).checklist.map((x) => ({ k: x.k, label: x.label, done: false, at: null }));
+      return { stage: st, progress: stageProgress(row, st), startedOn: r?.startedOn ?? null, expectedDate: r?.expectedDate ?? null, promisedDate: r?.promisedDate ?? null, actualDate: r?.actualDate ?? null, checklist, note: r?.note ?? "", decision: r?.decision ?? "" };
     }),
     canEdit: extra.canEdit, canFlags: extra.canFlags, terms: extra.terms, log: extra.log,
   };
@@ -68,10 +70,9 @@ export async function caseForClientAction(clientId: string): Promise<CaseViewRow
   const viaCollab = access === "viewer" && perms.collabView;
   const inScope = access === "owner" || viaCollab || scope.kind === "all" || (scope.kind === "coaches" && scope.coachIds.includes(b.case.coachId));
   if (!inScope) return null;
-  const [sum] = await Case.summarize([b.case]);
-  const terms = await listCasesForClient(clientId);
-  const log = await Case.listLog(b.case.id, 40);
+  const [[sum], terms, log, overrides] = await Promise.all([Case.summarize([b.case]), listCasesForClient(clientId), Case.listLog(b.case.id, 40), Case.loadStageParams()]);
   return shape(b, {
+    overrides,
     clientName: sum?.clientName ?? "", coachName: sum?.coachName ?? "", s3Name: sum?.s3Name ?? (s3For(b.case, all) ? displayNameOf(s3For(b.case, all)!) : null),
     canEdit: canEditCase(me, b.case, perms, all), canFlags: canHandleFlags(me),
     terms: terms.map((t) => ({ id: t.id, caseNo: t.caseNo, year: t.serviceYear, kind: t.kind, itemName: t.itemName, status: t.status })),
