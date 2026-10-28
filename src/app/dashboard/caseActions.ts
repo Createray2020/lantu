@@ -6,6 +6,7 @@ import { clientAccess } from "@/lib/clientScope";
 import * as Case from "@/lib/caseStore";
 import { isStage, type Stage, type CaseFlag, overdueDays, daysToDue, stageProgress, completion } from "@/lib/caseEngine";
 import { caseScopeFor, canEditCase, canHandleFlags, s3For } from "@/lib/caseScope";
+import { getCasePerms } from "@/lib/casePerms";
 import { listActiveCoaches } from "@/lib/org";
 import { listCasesForClient, recheckCommission } from "@/lib/serviceStore";
 import { displayNameOf } from "@/lib/coachName";
@@ -60,18 +61,19 @@ export async function caseForClientAction(clientId: string): Promise<CaseViewRow
   const me = await requireCoach().catch(() => null);
   if (!me) return null;
   const access = await clientAccess(me.id, clientId);
-  const all = await listActiveCoaches();
+  const [all, perms] = await Promise.all([listActiveCoaches(), getCasePerms()]);
   const b = await Case.getCaseByClient(clientId);
   if (!b) return null;
-  const scope = caseScopeFor(me, all);
-  const inScope = access !== null || scope.kind === "all" || (scope.kind === "coaches" && scope.coachIds.includes(b.case.coachId));
+  const scope = caseScopeFor(me, all, perms);
+  const viaCollab = access === "viewer" && perms.collabView;
+  const inScope = access === "owner" || viaCollab || scope.kind === "all" || (scope.kind === "coaches" && scope.coachIds.includes(b.case.coachId));
   if (!inScope) return null;
   const [sum] = await Case.summarize([b.case]);
   const terms = await listCasesForClient(clientId);
   const log = await Case.listLog(b.case.id, 40);
   return shape(b, {
     clientName: sum?.clientName ?? "", coachName: sum?.coachName ?? "", s3Name: sum?.s3Name ?? (s3For(b.case, all) ? displayNameOf(s3For(b.case, all)!) : null),
-    canEdit: canEditCase(me, b.case), canFlags: canHandleFlags(me),
+    canEdit: canEditCase(me, b.case, perms, all), canFlags: canHandleFlags(me),
     terms: terms.map((t) => ({ id: t.id, caseNo: t.caseNo, year: t.serviceYear, kind: t.kind, itemName: t.itemName, status: t.status })),
     log: log.map((l) => ({ at: l.createdAt.toISOString().slice(0, 16).replace("T", " "), who: l.actorName || (l.actorType === "system" ? "系統" : ""), action: l.action, reason: l.reason, detail: l.detail })),
   });
@@ -93,7 +95,8 @@ async function editable(caseId: string) {
   const me = await requireWritableCoach();
   const c = await Case.getCase(caseId);
   if (!c) throw new Error("找不到案件");
-  if (!canEditCase(me, c)) throw new Error("只有主責教練可以更改案件進度");
+  const [perms, all] = await Promise.all([getCasePerms(), listActiveCoaches()]);
+  if (!canEditCase(me, c, perms, all)) throw new Error("只有主責教練可以更改案件進度");
   return { me, c, actor: await actorOf(me) };
 }
 const bump = (clientId: string) => { revalidatePath(`/dashboard/clients/${clientId}`); revalidatePath("/dashboard/cases"); revalidatePath("/portal"); };
@@ -157,8 +160,8 @@ export async function feedbackForCaseAction(caseId: string): Promise<FeedbackRow
   if (!me) return [];
   const c = await Case.getCase(caseId);
   if (!c) return [];
-  const all = await listActiveCoaches();
-  const scope = caseScopeFor(me, all);
+  const [all, perms] = await Promise.all([listActiveCoaches(), getCasePerms()]);
+  const scope = caseScopeFor(me, all, perms);
   if (!(scope.kind === "all" || scope.coachIds.includes(c.coachId))) return [];
   return (await listFeedbackForCase(caseId)).map((f) => ({ id: f.id, sentAt: f.sentAt.toISOString().slice(0, 10), submittedAt: f.submittedAt ? f.submittedAt.toISOString().slice(0, 10) : null, avg: f.avg, scores: f.scores, comment: f.comment, low: f.low, handledAt: f.handledAt ? f.handledAt.toISOString().slice(0, 10) : null, handleNote: f.handleNote }));
 }
@@ -167,7 +170,8 @@ export async function handleFeedbackAction(feedbackId: string, caseId: string, n
     const me = await requireWritableCoach();
     const c = await Case.getCase(caseId);
     if (!c) return { ok: false, error: "找不到案件" };
-    if (!(canEditCase(me, c) || canHandleFlags(me))) return { ok: false, error: "沒有權限" };
+    const [perms, all] = await Promise.all([getCasePerms(), listActiveCoaches()]);
+    if (!(canEditCase(me, c, perms, all) || canHandleFlags(me))) return { ok: false, error: "沒有權限" };
     await handleFeedback(feedbackId, me.id, note);
     await Case.setFlag(caseId, "lowscore", false, await actorOf(me), note);
     bump(c.clientId); return { ok: true };
@@ -184,7 +188,8 @@ export async function setFlagAction(caseId: string, flag: string, on: boolean, n
     if (!c) return { ok: false, error: "找不到案件" };
     if (flag === "overdue") return { ok: false, error: "逾期標記由系統判定" };
     if (!["waiting", "complaint", "lowscore"].includes(flag)) return { ok: false, error: "標記不對" };
-    const allowed = canEditCase(me, c) || (flag !== "waiting" && canHandleFlags(me));
+    const [perms, all] = await Promise.all([getCasePerms(), listActiveCoaches()]);
+    const allowed = canEditCase(me, c, perms, all) || (flag !== "waiting" && canHandleFlags(me));
     if (!allowed) return { ok: false, error: "沒有權限" };
     const r = await Case.setFlag(caseId, flag as CaseFlag, on, await actorOf(me), note); if (!r.ok) return r;
     bump(c.clientId);
@@ -200,12 +205,13 @@ export type CaseListRow = Omit<CaseViewRow, "stages" | "log" | "terms"> & { curD
 export type CaseKpi = { onTime: number; late: number; byStage: Record<string, number>; avgDays: Record<string, number | null> };
 export async function listCasesAction(): Promise<{ scope: string; rows: CaseListRow[]; kpi: CaseKpi }> {
   const me = await requireCoach();
-  const all = await listActiveCoaches();
-  const scope = caseScopeFor(me, all);
-  const cases = scope.kind === "all" ? await Case.listAllCases() : await Case.listCasesForCoaches(scope.coachIds);
+  const [all, perms] = await Promise.all([listActiveCoaches(), getCasePerms()]);
+  const scope = caseScopeFor(me, all, perms);
+  let cases = scope.kind === "all" ? await Case.listAllCases() : await Case.listCasesForCoaches(scope.coachIds);
+  if (scope.kind === "all" && scope.stageOnly) cases = cases.filter((c) => c.stage === scope.stageOnly);
   const sums = await Case.summarize(cases);
   const rows: CaseListRow[] = sums.map((s) => {
-    const v = shape({ case: s.case, stages: s.stages }, { clientName: s.clientName, coachName: s.coachName, s3Name: s.s3Name ?? (s3For(s.case, all) ? displayNameOf(s3For(s.case, all)!) : null), canEdit: canEditCase(me, s.case), canFlags: canHandleFlags(me), terms: [], log: [] });
+    const v = shape({ case: s.case, stages: s.stages }, { clientName: s.clientName, coachName: s.coachName, s3Name: s.s3Name ?? (s3For(s.case, all) ? displayNameOf(s3For(s.case, all)!) : null), canEdit: canEditCase(me, s.case, perms, all), canFlags: canHandleFlags(me), terms: [], log: [] });
     const cur = v.stages.find((x) => x.stage === v.stage);
     const { stages: _s, log: _l, terms: _t, ...rest } = v; void _s; void _l; void _t;
     return { ...rest, curDue: cur?.actualDate ?? cur?.promisedDate ?? cur?.expectedDate ?? null };

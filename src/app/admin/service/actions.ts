@@ -6,6 +6,7 @@ import { isStage } from "@/lib/caseEngine";
 import { saveStageParam } from "@/lib/caseStore";
 import { saveSupportContact } from "@/lib/supportContact";
 import { saveFeedbackSettings } from "@/lib/serviceFeedback";
+import { saveCasePerms } from "@/lib/casePerms";
 import { db } from "@/Shared/db";
 import { orgHolidays } from "@/Shared/db/schema";
 import { eq } from "drizzle-orm";
@@ -34,4 +35,8 @@ export async function addHolidayAction(day: string, label: string): Promise<R> {
 }
 export async function removeHolidayAction(day: string): Promise<R> {
   try { await guard(); await db.delete(orgHolidays).where(eq(orgHolidays.day, day)); bump(); return { ok: true }; } catch (e) { return fail(e); }
+}
+
+export async function saveCasePermsAction(input: unknown): Promise<R> {
+  try { const me = await guard(); await saveCasePerms(input, me.id); revalidatePath("/admin/service/permissions"); revalidatePath("/dashboard/cases"); return { ok: true }; } catch (e) { return fail(e); }
 }
