@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { SupportContact } from "@/lib/supportContact";
-import { STAGE_LABEL, STAGE_NO, STAGE_CLIENT_HINT, STAGE_OWNER_HINT, STAGE_TIME_HINT, DECISION_LABEL, type Stage } from "@/lib/caseEngine";
+import { STAGE_LABEL, STAGE_SEQ, STAGE_CLIENT_HINT, STAGE_OWNER_HINT, STAGE_TIME_HINT, DECISION_LABEL, type Stage } from "@/lib/caseEngine";
 import { askCoachAction } from "./caseActions";
 
 // 客戶端會員中心（2026/10/28 案件進度 ⑥，照提案書圖 1–6）：
@@ -78,7 +78,7 @@ export default function MemberCenter({ d }: { d: MemberCenterData }) {
               return (
                 <li key={s.stage} className="flex gap-4">
                   <div className="flex flex-col items-center">
-                    <span className={`grid place-items-center w-10 h-10 rounded-full text-sm font-bold shrink-0 ${s.progress === "done" ? "bg-ok text-onsolid" : s.progress === "active" ? "bg-brand text-onbrand" : "border border-line text-tx3"}`}>{s.progress === "done" ? "✓" : String(STAGE_NO[s.stage] - 3).padStart(2, "0")}</span>
+                    <span className={`grid place-items-center w-10 h-10 rounded-full text-sm font-bold shrink-0 ${s.progress === "done" ? "bg-ok text-onsolid" : s.progress === "active" ? "bg-brand text-onbrand" : "border border-line text-tx3"}`}>{s.progress === "done" ? "✓" : String(STAGE_SEQ[s.stage]).padStart(2, "0")}</span>
                     {!last && <span className="w-px flex-1 bg-line my-1" />}
                   </div>
                   <div className={`flex-1 mb-3 rounded-xl border bg-panel2 ${s.progress === "active" ? "border-brand/50" : "border-line"}`}>

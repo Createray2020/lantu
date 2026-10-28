@@ -4,7 +4,7 @@ import { headerProps } from "../headerProps";
 import { ensureCoach } from "@/lib/coach";
 import { listCasesAction } from "../caseActions";
 import CaseTable from "./CaseTable";
-import { STAGE_LABEL, STAGE_NO, STAGES } from "@/lib/caseEngine";
+import { STAGE_LABEL, STAGE_SEQ, STAGES } from "@/lib/caseEngine";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export default async function CasesPage() {
             <div className="rounded-xl border border-line bg-panel p-3 grid grid-cols-5 gap-2">
               {STAGES.map((s) => (
                 <div key={s}>
-                  <div className="text-tx3 truncate">{STAGE_NO[s]}・{STAGE_LABEL[s]}</div>
+                  <div className="text-tx3 truncate">{STAGE_SEQ[s]}・{STAGE_LABEL[s]}</div>
                   <div className="text-lg font-bold">{data.kpi.byStage[s] ?? 0} <span className="text-10 font-normal text-tx3">案</span></div>
                   <div className="text-10 text-tx3">平均 {data.kpi.avgDays[s] == null ? "—" : `${data.kpi.avgDays[s]} 天`}</div>
                 </div>

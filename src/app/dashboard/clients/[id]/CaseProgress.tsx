@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Modal from "@/components/ui/Modal";
 import { confirmDialog } from "@/components/ui/confirm";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
-import { STAGE_LABEL, STAGE_NO, STATUS_LABEL, FLAG_LABEL, CLOSE_REASONS, DECISION_LABEL, STAGE_OWNER_HINT, type Stage } from "@/lib/caseEngine";
+import { STAGE_LABEL, STAGE_SEQ, STATUS_LABEL, FLAG_LABEL, CLOSE_REASONS, DECISION_LABEL, STAGE_OWNER_HINT, type Stage } from "@/lib/caseEngine";
 import {
   caseForClientAction, ensureCaseAction, completeStageAction, revertStageAction, setPromisedAction, setStageNoteAction, toggleCheckAction, setDecisionAction,
   pauseCaseAction, resumeCaseAction, closeCaseAction, reopenCaseAction, setFlagAction, sendFeedbackAction, feedbackForCaseAction, handleFeedbackAction,
@@ -64,7 +64,7 @@ export default function CaseProgress({ clientId, readOnly }: { clientId: string;
           <li key={s.stage}>
             <button type="button" onClick={() => setOpen(open === s.stage ? null : s.stage)} className={`w-full text-left rounded-md border px-2 py-1.5 ${s.progress === "active" ? "border-brand bg-brand/10" : s.progress === "done" ? "border-ok/40" : "border-line"} ${open === s.stage ? "ring-1 ring-brand" : ""}`}>
               <div className="flex items-center gap-1.5">
-                <span className={`grid place-items-center w-5 h-5 rounded-full text-10 font-bold ${s.progress === "done" ? "bg-ok text-onsolid" : s.progress === "active" ? "bg-brand text-onbrand" : "bg-panel3 text-tx3"}`}>{s.progress === "done" ? "✓" : STAGE_NO[s.stage]}</span>
+                <span className={`grid place-items-center w-5 h-5 rounded-full text-10 font-bold ${s.progress === "done" ? "bg-ok text-onsolid" : s.progress === "active" ? "bg-brand text-onbrand" : "bg-panel3 text-tx3"}`}>{s.progress === "done" ? "✓" : STAGE_SEQ[s.stage]}</span>
                 <span className="text-xs font-bold truncate">{STAGE_LABEL[s.stage]}</span>
               </div>
               <div className="text-10 text-tx3 mt-0.5 truncate">{s.actualDate ? `實際 ${fmt(s.actualDate)}` : s.promisedDate ? `承諾 ${fmt(s.promisedDate)}` : s.expectedDate ? `預計 ${fmt(s.expectedDate)}` : s.progress === "pending" ? "待開始" : ""}</div>
@@ -87,7 +87,7 @@ export default function CaseProgress({ clientId, readOnly }: { clientId: string;
           {row.log.map((l, i) => <div key={i} className="text-tx3">{l.at}・{l.who}・{logLabel(l.action, l.detail)}{l.reason ? `・${l.reason}` : ""}</div>)}
         </div>
       </details>
-      <p className="text-10 text-tx3">目前階段「{STAGE_LABEL[cur.stage]}」負責：{STAGE_OWNER_HINT[cur.stage]}。客戶端只看承諾／實際完成日，預計日留教練端。</p>
+      <p className="text-10 text-tx3">目前階段「{STAGE_LABEL[cur.stage]}」負責：{STAGE_OWNER_HINT[cur.stage]}。五個階段＝服務流程第 4–8 階段（1–3 初次接觸在系統外）；編號與客戶端一致。</p>
     </div>
   );
 }
@@ -134,7 +134,7 @@ function StagePanel({ row, s, isCurrent, edit, pending, run }: { row: CaseViewRo
   return (
     <div className="rounded-lg border border-line bg-panel2 p-3 grid gap-2 text-sm">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <b>{STAGE_NO[s.stage]}・{STAGE_LABEL[s.stage]}</b>
+        <b>{STAGE_SEQ[s.stage]}・{STAGE_LABEL[s.stage]}</b>
         <span className="text-11 text-tx3">{s.progress === "done" ? "已完成" : s.progress === "active" ? "進行中" : "待開始"}</span>
         <span className="ml-auto text-11 text-tx3">預計 {fmt(s.expectedDate)}・承諾 {fmt(s.promisedDate)}・實際 {fmt(s.actualDate)}</span>
       </div>

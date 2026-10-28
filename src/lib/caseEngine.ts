@@ -11,7 +11,10 @@
 export const STAGES = ["commission", "interview", "planning", "report", "tracking"] as const;
 export type Stage = (typeof STAGES)[number];
 
+/** 服務流程的階段編號（提案書：系統追蹤第 4–8 階段，1–3 在系統外）——只用在說明文字 */
 export const STAGE_NO: Record<Stage, number> = { commission: 4, interview: 5, planning: 6, report: 7, tracking: 8 };
+/** 畫面上的序號 1–5：教練端與客戶端一致（客戶端照提案書圖 01–05） */
+export const STAGE_SEQ: Record<Stage, number> = { commission: 1, interview: 2, planning: 3, report: 4, tracking: 5 };
 export const STAGE_LABEL: Record<Stage, string> = {
   commission: "正式委託",
   interview: "深度會談",

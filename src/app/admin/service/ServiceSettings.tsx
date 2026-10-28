@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FIELD_SM } from "@/components/ui/Field";
-import { STAGE_LABEL, STAGE_NO, type Stage } from "@/lib/caseEngine";
+import { STAGE_LABEL, STAGE_SEQ, type Stage } from "@/lib/caseEngine";
 import type { SupportContact } from "@/lib/supportContact";
 import type { FeedbackSettings } from "@/lib/serviceFeedback";
 import { saveStageParamAction, saveSupportAction, saveFeedbackSettingsAction, addHolidayAction, removeHolidayAction } from "./actions";
@@ -37,7 +37,7 @@ function StageEditor({ s }: { s: StageRow }) {
   return (
     <div className="rounded-lg border border-line bg-panel2 p-3 grid gap-2 text-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <b>{STAGE_NO[s.stage]}・{STAGE_LABEL[s.stage]}</b>
+        <b>{STAGE_SEQ[s.stage]}・{STAGE_LABEL[s.stage]}</b>
         <label className="flex items-center gap-1 text-xs">預設 <input className={`${FIELD_SM} w-16 text-right`} value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} /> 天</label>
         {!s.configured && <span className="text-10 text-tx3">（程式預設，尚未自訂）</span>}
         <span className="ml-auto flex items-center gap-2 text-xs">{msg && <span className="text-tx3">{msg}</span>}<button className={BTN_PRI} disabled={pending} onClick={save}>儲存</button></span>

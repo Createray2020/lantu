@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { STAGE_LABEL, STAGE_NO, STATUS_LABEL, FLAG_LABEL, type Stage } from "@/lib/caseEngine";
+import { STAGE_LABEL, STAGE_SEQ, STATUS_LABEL, FLAG_LABEL, type Stage } from "@/lib/caseEngine";
 import type { CaseListRow } from "../caseActions";
 
 const fmt = (d: string | null) => (d ? d.slice(5).replace("-", "/") : "—");
@@ -27,7 +27,7 @@ export default function CaseTable({ rows }: { rows: CaseListRow[] }) {
         {chip("all", "進行中")}{chip("overdue", "逾期")}{chip("soon", "即將到期")}{chip("waiting", "等待客戶")}{chip("paused", "暫停")}{chip("closed", "已結案")}
         <select className="ml-auto bg-field border border-line2 rounded-md text-xs px-2 py-1" value={stage} onChange={(e) => setStage(e.target.value as "" | Stage)}>
           <option value="">全部階段</option>
-          {(Object.keys(STAGE_LABEL) as Stage[]).map((s) => <option key={s} value={s}>{STAGE_NO[s]}・{STAGE_LABEL[s]}</option>)}
+          {(Object.keys(STAGE_LABEL) as Stage[]).map((s) => <option key={s} value={s}>{STAGE_SEQ[s]}・{STAGE_LABEL[s]}</option>)}
         </select>
       </div>
       <div className="overflow-x-auto">
@@ -43,7 +43,7 @@ export default function CaseTable({ rows }: { rows: CaseListRow[] }) {
               <tr key={r.id} className="border-t border-line hover:bg-panel2">
                 <td className="px-3 py-2"><Link href={`/dashboard/clients/${r.clientId}`} className="font-bold hover:underline">{r.clientName}</Link><div className="text-10 text-tx3">{r.caseNo}</div></td>
                 <td className="px-3 py-2 text-tx2">{r.coachName}{r.s3Name ? <div className="text-10 text-tx3">S3 {r.s3Name}</div> : null}</td>
-                <td className="px-3 py-2">{STAGE_NO[r.stage]}・{STAGE_LABEL[r.stage]}</td>
+                <td className="px-3 py-2">{STAGE_SEQ[r.stage]}・{STAGE_LABEL[r.stage]}</td>
                 <td className="px-3 py-2">
                   <span className={r.overdue > 0 ? "text-danger font-bold" : r.daysToDue !== null && r.daysToDue <= 3 ? "text-brand2 font-bold" : "text-tx2"}>{fmt(r.curDue)}</span>
                   {r.overdue > 0 && <span className="text-10 text-danger ml-1">逾期 {r.overdue} 天{r.escalation ? `・第 ${r.escalation} 步` : ""}</span>}
