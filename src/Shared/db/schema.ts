@@ -1490,6 +1490,8 @@ export const docTemplates = pgTable('doc_templates', {
   signers: jsonb('signers').$type<DocSignerSlot[]>().default([]).notNull(),
   enabled: boolean('enabled').default(true).notNull(),
   note: text('note').default('').notNull(),
+  // 封存（2026/10/28 Ray 要刪除鈕）：有文件引用過的範本不能真刪（實例要對得回範本版本），改封存——清單不顯示、不能啟動、歷史文件照看。
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
   createdBy: text('created_by').references(() => coaches.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [

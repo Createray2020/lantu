@@ -5,7 +5,7 @@
 // ⚠️ startSigning 必須冪等：同案同範本 key 在非 void 狀態下只能有一份（部分唯一索引守著），
 //    重複按「啟動」回既有進度，不重產、不重寄。
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { unstable_cache, updateTag } from "next/cache";
 import { db } from "@/Shared/db";
 import { docInstances, docSets, docSigners, docTasks, docTemplates, signatures, siteSettings, coaches, coachDisplayName } from "@/Shared/db/schema";
@@ -91,8 +91,32 @@ export async function saveDocSeal(img: unknown, updatedBy: string | null): Promi
 
 // ── 範本 ─────────────────────────────────────────────────────────────────────
 /** 全部版本（後台用）。 */
-export async function listTemplates(): Promise<DocTemplate[]> {
-  return db.select().from(docTemplates).orderBy(asc(docTemplates.category), asc(docTemplates.key), desc(docTemplates.version));
+export async function listTemplates(opts: { includeArchived?: boolean } = {}): Promise<DocTemplate[]> {
+  const order = [asc(docTemplates.category), asc(docTemplates.key), desc(docTemplates.version)];
+  return opts.includeArchived
+    ? db.select().from(docTemplates).orderBy(...order)
+    : db.select().from(docTemplates).where(isNull(docTemplates.archivedAt)).orderBy(...order);
+}
+
+/**
+ * 刪除範本（所有版本一起）。沒有任何文件引用過 → 真刪；有 → 封存（archived_at、enabled=false）。
+ * 兩種都會把這個 key 從所有範本組合拿掉，之後啟動簽署不會再產這一份。
+ */
+export async function deleteTemplate(key: string): Promise<{ ok: true; mode: "deleted" | "archived" } | { ok: false; error: string }> {
+  const versions = await db.select({ id: docTemplates.id }).from(docTemplates).where(eq(docTemplates.key, key));
+  if (!versions.length) return { ok: false, error: "找不到這份範本" };
+  const used = await db.select({ id: docInstances.id }).from(docInstances).where(eq(docInstances.templateKey, key)).limit(1);
+  const sets = await db.select().from(docSets);
+  const touched = sets.filter((s) => s.templateKeys.includes(key));
+  for (const s of touched) {
+    await db.update(docSets).set({ templateKeys: s.templateKeys.filter((k) => k !== key), updatedAt: new Date() }).where(eq(docSets.id, s.id));
+  }
+  if (used.length) {
+    await db.update(docTemplates).set({ archivedAt: new Date(), enabled: false }).where(eq(docTemplates.key, key));
+    return { ok: true, mode: "archived" };
+  }
+  await db.delete(docTemplates).where(eq(docTemplates.key, key));
+  return { ok: true, mode: "deleted" };
 }
 
 /** 每個 key 的最新版本（不管 enabled）。 */
@@ -115,7 +139,7 @@ export async function latestEnabledTemplate(key: string): Promise<DocTemplate | 
   const rows = await db
     .select()
     .from(docTemplates)
-    .where(and(eq(docTemplates.key, key), eq(docTemplates.enabled, true)))
+    .where(and(eq(docTemplates.key, key), eq(docTemplates.enabled, true), isNull(docTemplates.archivedAt)))
     .orderBy(desc(docTemplates.version))
     .limit(1);
   return rows[0] ?? null;

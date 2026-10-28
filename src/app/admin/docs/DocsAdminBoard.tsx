@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -12,13 +12,14 @@ import {
   DOC_SET_KINDS,
   DOC_CSS,
   ROLE_LABEL,
-  slotKey,
   type DocCategory,
   type DocSetKind,
   type DocSignerSlot,
 } from "@/lib/docs";
-import { STARTER_HTML, varsFor } from "@/lib/docsVars";
-import { previewTemplateAction, saveSealAction, saveSetAction, saveTemplateAction, setTemplateEnabledAction, saveDocSettingsAction } from "./actions";
+import { STARTER_HTML } from "@/lib/docsVars";
+import { previewTemplateAction, saveSealAction, saveSetAction, saveTemplateAction, setTemplateEnabledAction, saveDocSettingsAction, deleteTemplateAction } from "./actions";
+import RichTemplateEditor from "@/components/RichTemplateEditor";
+import { confirmDialog } from "@/components/ui/confirm";
 
 export type TemplateLite = {
   id: string;
@@ -205,6 +206,22 @@ function TemplateRow({ t, onEdit, onChanged }: { t: TemplateLite; onEdit: () => 
           >
             {t.enabled ? "停用" : "啟用"}
           </button>
+          <button
+            type="button"
+            className="text-xs text-danger px-1"
+            disabled={busy}
+            onClick={async () => {
+              const ok = await confirmDialog(`刪除「${t.name}」？所有版本一起刪，並從範本組合移除。已經有文件用過的話會改成封存（歷史文件照常看得到）。`, { danger: true, okLabel: "刪除" });
+              if (!ok) return;
+              start(async () => {
+                const r = await deleteTemplateAction(t.key);
+                if (!r.ok) setErr(r.error);
+                else onChanged();
+              });
+            }}
+          >
+            刪除
+          </button>
         </span>
       </div>
       {err && <p className="text-xs text-danger mt-1">{err}</p>}
@@ -218,22 +235,7 @@ function TemplateEditor({ draft, onClose, onSaved }: { draft: Draft; onClose: ()
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ html: string; warnings: string[] } | null>(null);
   const [busy, start] = useTransition();
-  const ta = useRef<HTMLTextAreaElement>(null);
   const patch = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
-  const vars = useMemo(() => varsFor(d.category), [d.category]);
-
-  function insert(token: string) {
-    const el = ta.current;
-    if (!el) return patch({ html: d.html + token });
-    const a = el.selectionStart ?? d.html.length;
-    const b = el.selectionEnd ?? a;
-    const next = d.html.slice(0, a) + token + d.html.slice(b);
-    patch({ html: next });
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(a + token.length, a + token.length);
-    });
-  }
   function setSigner(i: number, p: Partial<DocSignerSlot>) {
     patch({ signers: d.signers.map((s, j) => (j === i ? { ...s, ...p } : s)) });
   }
@@ -288,7 +290,7 @@ function TemplateEditor({ draft, onClose, onSaved }: { draft: Draft; onClose: ()
             <h3 className="text-sm font-bold">簽署人與順序</h3>
             <button type="button" className="text-xs rounded-md border border-line px-2 py-1" onClick={() => patch({ signers: [...d.signers, { role: "coach", seq: (d.signers.at(-1)?.seq ?? 0) + 1 }] })}>＋ 加一位</button>
           </div>
-          <p className="text-11 text-tx3 mb-2">順序數字小的先簽；同一個數字可以同時簽。內容裡用 <code className="text-brand2">{"{{sign:角色:順序}}"}</code> 放簽名位，沒放的會自動補在文末。</p>
+          <p className="text-11 text-tx3 mb-2">順序數字小的先簽；同一個數字可以同時簽。簽名出現的位置用下面工具列「插入簽名位」放進內容；沒放的會自動補在文末。</p>
           <div className="grid gap-2">
             {d.signers.map((s, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
@@ -297,30 +299,16 @@ function TemplateEditor({ draft, onClose, onSaved }: { draft: Draft; onClose: ()
                   {DOC_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}——{r.hint}</option>)}
                 </select>
                 <input className={`${FIELD} w-40`} value={s.label ?? ""} onChange={(e) => setSigner(i, { label: e.target.value })} placeholder={`顯示名（預設「${ROLE_LABEL[s.role]}簽名」）`} />
-                <button type="button" className="text-xs text-brand2" onClick={() => insert(`{{sign:${slotKey(s)}}}`)}>插入簽名位</button>
                 <button type="button" className="text-xs text-danger" onClick={() => patch({ signers: d.signers.filter((_, j) => j !== i) })}>移除</button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* 內容 */}
-        <div className="grid lg:grid-cols-[1fr_260px] gap-3">
-          <label className="grid gap-1 text-xs text-tx2">內容（HTML）
-            <textarea ref={ta} className={`${FIELD} font-mono text-xs leading-relaxed min-h-[360px]`} value={d.html} onChange={(e) => patch({ html: e.target.value })} spellCheck={false} />
-          </label>
-          <div className="rounded-md border border-line p-3 text-xs">
-            <p className="font-bold mb-2">可用欄位（點一下插入）</p>
-            <div className="flex flex-wrap gap-1.5">
-              {vars.map((v) => (
-                <button key={v.key} type="button" title={v.label} className="rounded border border-line px-1.5 py-0.5 hover:bg-panel2" onClick={() => insert(`{{${v.key}}}`)}>
-                  {v.label}
-                </button>
-              ))}
-              <button type="button" className="rounded border border-brand2 text-brand2 px-1.5 py-0.5" onClick={() => insert("{{seal}}")}>公司印鑑位置</button>
-            </div>
-            <p className="text-tx3 mt-3 leading-relaxed">電子簽署條款那一句用「電子簽署條款」欄位帶入，簽署頁的同意勾選旁也會再出現一次。</p>
-          </div>
+        {/* 內容：所見即所得（2026/10/28 Ray：不要看到 HTML 碼） */}
+        <div className="grid gap-1">
+          <span className="text-xs text-tx2">內容</span>
+          <RichTemplateEditor value={d.html} onChange={(html) => patch({ html })} signers={d.signers} category={d.category} useSeal={d.useSeal} />
         </div>
 
         <label className="grid gap-1 text-xs text-tx2">備註（只有後台看得到）

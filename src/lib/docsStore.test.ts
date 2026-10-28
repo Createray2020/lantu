@@ -30,6 +30,7 @@ const h = vi.hoisted(() => {
       case "and": return p.xs.every((x: any) => test(x, row));
       case "or": return p.xs.some((x: any) => test(x, row));
       case "false": return false;
+      case "isnull": return row[p.col] == null;
       default: return true;
     }
   };
@@ -41,7 +42,7 @@ const h = vi.hoisted(() => {
   };
   const defaults = (table: string, v: any) => ({
     id: crypto.randomUUID(),
-    ...(table === "doc_templates" ? { enabled: true, version: 1, required: true, useSeal: true, signDays: null, note: "" } : {}),
+    ...(table === "doc_templates" ? { enabled: true, version: 1, required: true, useSeal: true, signDays: null, note: "", archivedAt: null } : {}),
     ...(table === "doc_instances" ? { status: "pending", required: true, finalHash: null, completedAt: null, expiresAt: null, signedHtml: null } : {}),
     ...(table === "doc_signers" ? { status: "pending", consentAt: null, signatureImg: null, signedAt: null, hashAtSign: null, label: "", displayName: "", remindCount: 0, lastRemindedAt: null } : {}),
     ...(table === "doc_tasks" ? { deadline: null, note: "" } : {}),
@@ -120,6 +121,7 @@ vi.mock("drizzle-orm", () => ({
   eq: (c: any, val: any) => ({ op: "eq", col: c.name, val }),
   ne: (c: any, val: any) => ({ op: "ne", col: c.name, val }),
   inArray: (c: any, vals: any[]) => ({ op: "in", col: c.name, vals }),
+  isNull: (c: any) => ({ op: "isnull", col: c.name }),
   and: (...xs: any[]) => ({ op: "and", xs }),
   or: (...xs: any[]) => ({ op: "or", xs }),
   asc: (x: any) => ({ name: x.name, dir: "asc" }),
@@ -131,7 +133,7 @@ vi.mock("next/cache", () => ({ unstable_cache: (fn: any) => fn, updateTag: () =>
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 
-import { startSigning, consentAndSign, declineSign, voidInstance, saveTemplate, saveSet, listMyInstances, countMyPending, caseProgress, getInstance, saveSignature, getSignature, latestEnabledTemplate, setTemplateEnabled, remindInstance, reopenInstance, listDocTodos, createDocTask, listDocTasks, hasReminderFor } from "./docsStore";
+import { deleteTemplate, listTemplates, getSet, startSigning, consentAndSign, declineSign, voidInstance, saveTemplate, saveSet, listMyInstances, countMyPending, caseProgress, getInstance, saveSignature, getSignature, latestEnabledTemplate, setTemplateEnabled, remindInstance, reopenInstance, listDocTodos, createDocTask, listDocTasks, hasReminderFor } from "./docsStore";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const S = h.state;
@@ -339,5 +341,27 @@ describe("補簽任務", () => {
     const r2 = await createDocTask({ templateKey: t.key, coachIds: ["a1"], deadline: null }, "boss");
     expect(r2.ok && r2.created).toBe(1);
     expect(S.coaches.find((c) => c.id === "a1").status).toBe("active");
+  });
+});
+
+describe("刪除範本", () => {
+  it("沒被用過 → 真刪所有版本並從組合拿掉；用過 → 封存、不再被啟動、歷史文件照看", async () => {
+    const { t, t2 } = await seedTraining();
+    // t2（保密同意書）還沒被用：真刪
+    const r1 = await deleteTemplate(t2.key);
+    expect(r1).toEqual({ ok: true, mode: "deleted" });
+    expect(S.doc_templates.some((x) => x.key === t2.key)).toBe(false);
+    expect(await getSet("training_item", "item-train")).toEqual([t.key]);
+    // t 用過（啟動產了實例）：封存
+    await start();
+    const r2 = await deleteTemplate(t.key);
+    expect(r2).toEqual({ ok: true, mode: "archived" });
+    expect(S.doc_templates.find((x) => x.key === t.key)!.archivedAt).toBeTruthy();
+    expect((await listTemplates()).some((x) => x.key === t.key)).toBe(false);
+    expect((await listTemplates({ includeArchived: true })).some((x) => x.key === t.key)).toBe(true);
+    expect(await latestEnabledTemplate(t.key)).toBeNull();
+    expect(S.doc_instances.filter((i) => i.templateKey === t.key)).toHaveLength(1); // 歷史文件還在
+    expect(await getSet("training_item", "item-train")).toEqual([]);
+    expect((await deleteTemplate("nope")).ok).toBe(false);
   });
 });

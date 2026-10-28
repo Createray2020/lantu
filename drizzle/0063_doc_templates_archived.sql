@@ -1,0 +1,1 @@
+ALTER TABLE "doc_templates" ADD COLUMN "archived_at" timestamp with time zone;

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureCoach, isAdmin } from "@/lib/coach";
-import { getDocSeal, saveDocSeal, saveSet, saveTemplate, setTemplateEnabled, voidInstance, sanitizeTemplateInput, saveDocSettings, createDocTask } from "@/lib/docsStore";
+import { getDocSeal, saveDocSeal, saveSet, saveTemplate, setTemplateEnabled, voidInstance, sanitizeTemplateInput, saveDocSettings, createDocTask, deleteTemplate } from "@/lib/docsStore";
 import { renderTemplate, validateTemplate } from "@/lib/docs";
 import { SAMPLE_VARS } from "@/lib/docsVars";
 
@@ -122,6 +122,20 @@ export async function createDocTaskAction(input: { templateKey: string; coachIds
     revalidatePath("/dashboard/docs");
     revalidatePath("/dashboard");
     return { ok: true, created: r.created, skipped: r.skipped };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 刪除範本：沒用過真刪、用過封存（docsStore.deleteTemplate）。 */
+export async function deleteTemplateAction(key: string): Promise<ActionResult & { mode?: "deleted" | "archived" }> {
+  try {
+    await guard();
+    const r = await deleteTemplate(key);
+    if (!r.ok) return r;
+    bump();
+    revalidatePath("/admin/docs/tasks");
+    return { ok: true, mode: r.mode };
   } catch (e) {
     return fail(e);
   }
