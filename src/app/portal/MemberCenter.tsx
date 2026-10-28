@@ -12,7 +12,7 @@ import { askCoachAction } from "./caseActions";
 export type MemberStage = {
   stage: Stage; progress: "done" | "active" | "pending";
   due: { kind: "actual" | "promised" | null; date: string | null };
-  expectedDate: string | null; promisedDate: string | null; actualDate: string | null;
+  promisedDate: string | null; actualDate: string | null;
   checklist: { label: string; done: boolean }[];
   note: string; decision: string;
 };
@@ -61,8 +61,8 @@ export default function MemberCenter({ d }: { d: MemberCenterData }) {
             <div className="text-sm text-tx2">已完成 <b className="text-brand2">{d.done}</b> / {d.total} 個階段</div>
           </div>
           <div className="h-1.5 rounded-full bg-tx/10 overflow-hidden mb-3"><div className="h-full bg-brand rounded-full" style={{ width: `${pct}%` }} /></div>
-          <div className="grid sm:grid-cols-3 gap-2 mb-4 text-11">
-            <div className="rounded-lg border border-line bg-panel2 px-3 py-2 flex gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-tx3 shrink-0" /><div><b>預計完成日</b><div className="text-tx3">依預設流程的基準日期</div></div></div>
+          {/* 客戶端只看承諾／實際完成日；預計完成日留教練端（Ray 2026/10/28 定案） */}
+          <div className="grid sm:grid-cols-2 gap-2 mb-4 text-11">
             <div className="rounded-lg border border-line bg-panel2 px-3 py-2 flex gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-brand2 shrink-0" /><div><b>承諾完成日</b><div className="text-tx3">與客戶確認後的日期</div></div></div>
             <div className="rounded-lg border border-line bg-panel2 px-3 py-2 flex gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-ok shrink-0" /><div><b>實際完成日</b><div className="text-tx3">系統留下的完成紀錄</div></div></div>
           </div>
@@ -105,8 +105,7 @@ export default function MemberCenter({ d }: { d: MemberCenterData }) {
                           </div>
                         )}
                         {s.stage === "report" && s.decision && <div className="text-xs text-tx2">你的決定：<b>{DECISION_LABEL[s.decision] ?? s.decision}</b></div>}
-                        <div className="grid sm:grid-cols-3 gap-2">
-                          <DateBox tone="plain" label="預計完成日" date={s.expectedDate} sub="依預設流程產生的基準日期" />
+                        <div className="grid sm:grid-cols-2 gap-2">
                           <DateBox tone="brand" label="承諾完成日" date={s.promisedDate} sub="教練與客戶確認後的日期" />
                           <DateBox tone="ok" label="實際完成日" date={s.actualDate} sub="實際完成時由系統留下的紀錄" empty="尚未紀錄" />
                         </div>
@@ -192,7 +191,7 @@ function DateBox({ tone, label, date, sub, empty = "—" }: { tone: "plain" | "b
   const border = tone === "brand" && date ? "border-brand2/60" : tone === "ok" && date ? "border-ok/50" : "border-line";
   return (
     <div className={`rounded-lg border ${border} bg-panel px-3 py-2`}>
-      <div className="text-11 text-tx3">{tone === "plain" ? "▦" : tone === "brand" ? "▦" : "◷"} {label}</div>
+      <div className="text-11 text-tx3">{tone === "ok" ? "◷" : "▦"} {label}</div>
       <div className="text-sm font-bold mt-0.5">{date ? date.replace(/-/g, "/") : empty}</div>
       <div className="text-10 text-tx3">{sub}</div>
     </div>
