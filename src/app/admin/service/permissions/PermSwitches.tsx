@@ -21,7 +21,7 @@ export default function PermSwitches({ perms }: { perms: CasePerms }) {
       <h2 className="text-base font-bold mb-1">可調的開關</h2>
       <p className="text-xs text-tx2 mb-2">只開放這幾個判斷；其餘（客戶只看自己、主責才能改、行政財法改合約付款）寫死不開。</p>
       {row("adminEdit", "系統管理可直接改任何案件的進度", "關掉＝管理員只看不改（仍看得到全部）。預設開。")}
-      {row("s3Edit", "S3 可改所屬教練的案件", "開＝S3 可以替下線按本階段完成、改承諾日、暫停／結案。預設關：S3 只看、只了解原因。")}
+      {row("s3Edit", "S3 可改所屬教練的案件", "開＝S3 可以替所屬教練按本階段完成、改承諾日、暫停／結案。預設關：S3 只看、只了解原因。")}
       {row("relationsEdit", "客戶關係可改案件狀態與進度", "開＝客戶關係接到轉交後可直接暫停／結案／改進度。預設關：只處理標記（客訴／低分／待轉交）。")}
       <label className="flex items-start gap-3 py-2 border-t border-line">
         <input type="checkbox" className="mt-1" checked={v.financeScope === "commission"} onChange={(e) => setV({ ...v, financeScope: e.target.checked ? "commission" : "all" })} />
