@@ -23,3 +23,14 @@ describe("範本編輯器：佔位 ↔ 標籤", () => {
     expect(chipsToTokens(`<span class="x">保留</span>`)).toBe(`<span class="x">保留</span>`);
   });
 });
+
+describe("勾選欄與確認項的標籤", () => {
+  it("ask 與 xxx.is_yyy 往返不變；ask 標籤帶 ☐ 與清單文字", () => {
+    const asks = [{ key: "adult", label: "年滿 18 歲", kind: "must" as const, role: "member" as const }];
+    const src = "<p>{{pay.is_bank}} 匯款 {{ask:adult}} {{member.id_no}}</p>";
+    const chips = tokensToChips(src, [], asks);
+    expect(chips).toContain('chip-check" contenteditable="false" data-var="pay.is_bank">☐ 付款：匯款一次付清');
+    expect(chips).toContain('data-ask="adult">☐ 年滿 18 歲');
+    expect(chipsToTokens(chips)).toBe(src);
+  });
+});

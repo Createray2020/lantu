@@ -8,7 +8,7 @@ import {
 } from 'drizzle-orm/pg-core';
 // 報聘申請的 jsonb 形狀住在純函式層（client component 也要 import，不能把 drizzle 拖進 bundle）。
 import type { ApplyLicense, ChecklistItem } from '@/lib/coachApply';
-import type { DocSignerSlot } from '@/lib/docs';
+import type { DocAsk, DocSignerSlot } from '@/lib/docs';
 
 // ⚠️ 索引一律宣告在這裡再跑 db:generate。
 //    直接用 psql 手建的索引不在 schema 快照裡，之後任何人跑 `npm run db:push`
@@ -1488,6 +1488,11 @@ export const docTemplates = pgTable('doc_templates', {
   required: boolean('required').default(true).notNull(),
   signDays: integer('sign_days'),                               // null＝不設期限
   signers: jsonb('signers').$type<DocSignerSlot[]>().default([]).notNull(),
+  // 本人確認項（2026/10/28 Ray：「簽約人只需要簽名」但行銷同意、立即開通等選擇仍須本人作答）：
+  // {key,label,kind:'must'|'opt',role}。must＝沒勾不能簽；opt＝自由勾。內容裡用 {{ask:key}} 放 ☐，簽完才變 ☑；答案存 doc_signers.answers。
+  asks: jsonb('asks').$type<DocAsk[]>().default([]).notNull(),
+  // 適用方案（營業項目 id 多選；空＝通用）。組合選單依此過濾——範本一多，每個方案只看得到自己的。
+  itemIds: jsonb('item_ids').$type<string[]>().default([]).notNull(),
   enabled: boolean('enabled').default(true).notNull(),
   note: text('note').default('').notNull(),
   // 封存（2026/10/28 Ray 要刪除鈕）：有文件引用過的範本不能真刪（實例要對得回範本版本），改封存——清單不顯示、不能啟動、歷史文件照看。
@@ -1522,6 +1527,8 @@ export const docInstances = pgTable('doc_instances', {
   templateKey: text('template_key').notNull(),
   version: integer('version').notNull(),
   title: text('title').notNull(),
+  // 合約編號（2026/10/28）：T／S／D＋YYMM＋三碼（培訓／服務／補簽），code_counters 配號；印在文件上、對帳用。舊實例 null。
+  docNo: text('doc_no'),
   required: boolean('required').default(true).notNull(),
   htmlSnapshot: text('html_snapshot').notNull(),     // 發出當下的快照，簽完也不動（hash／hash_at_sign 對應它）
   hash: text('hash').notNull(),
@@ -1539,6 +1546,7 @@ export const docInstances = pgTable('doc_instances', {
   index('doc_instances_case_idx').on(t.caseType, t.caseId),
   index('doc_instances_status_idx').on(t.status),
   uniqueIndex('doc_instances_case_key_live_uq').on(t.caseType, t.caseId, t.templateKey).where(sql`status <> 'void'`),
+  uniqueIndex('doc_instances_doc_no_uq').on(t.docNo),
 ]);
 
 // 簽署人：一個簽名位一列。身分二選一（coach_id 或 client_user_id）；簽署動作必須驗「登入者＝這一列」。
@@ -1563,6 +1571,8 @@ export const docSigners = pgTable('doc_signers', {
   // 催簽（2026/10/28）：站內提醒——次數與最後一次時間；客戶端橫幅與後台待辦都看這兩欄。
   remindCount: integer('remind_count').default(0).notNull(),
   lastRemindedAt: timestamp('last_reminded_at', { withTimezone: true }),
+  // 本人確認紀錄：ask key → true/false，簽署那一刻與簽名一起寫入（consent_at 就是作答時間）。
+  answers: jsonb('answers').$type<Record<string, boolean>>().default({}).notNull(),
 }, (t) => [
   index('doc_signers_instance_idx').on(t.instanceId),
   index('doc_signers_coach_idx').on(t.coachId),
@@ -1574,6 +1584,25 @@ export const signatures = pgTable('signatures', {
   ownerKind: text('owner_kind').notNull(),
   ownerId: text('owner_id').notNull(),
   img: text('img').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.ownerKind, t.ownerId] }),
+]);
+
+// 簽約資料（2026/10/28 Ray：「申請人填一次，三份文件共用」）：合約上要印的個人資料——身分證／護照、生日、電話、地址、發票。
+// owner_kind：coach／client_user。只有本人與後台看得到；渲染進快照後，日後改檔案不影響已發出的文件。
+export const signerProfiles = pgTable('signer_profiles', {
+  ownerKind: text('owner_kind').notNull(),
+  ownerId: text('owner_id').notNull(),
+  idNo: text('id_no').default('').notNull(),
+  birthDate: date('birth_date'),
+  phone: text('phone').default('').notNull(),
+  email: text('email').default('').notNull(),
+  address: text('address').default('').notNull(),
+  invoiceKind: text('invoice_kind').default('personal').notNull(),   // personal／company
+  invoiceCarrier: text('invoice_carrier').default('').notNull(),     // 雲端發票載具（個人）
+  invoiceTaxId: text('invoice_tax_id').default('').notNull(),        // 統一編號（公司）
+  invoiceTitle: text('invoice_title').default('').notNull(),         // 抬頭（公司）
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   primaryKey({ columns: [t.ownerKind, t.ownerId] }),
@@ -1594,6 +1623,12 @@ export const trainingEnrollments = pgTable('training_enrollments', {
   activatedAt: timestamp('activated_at', { withTimezone: true }),
   expiresAt: date('expires_at'),
   note: text('note').default('').notNull(),
+  // 行政確認欄（2026/10/28）：合約要印、申請人不該自己填的——身分、報名前說明方式、補簽原報名日。付款方式不存，從已確認收款帶。
+  memberKind: text('member_kind').default('intern').notNull(),   // intern／partner／hired
+  briefKind: text('brief_kind'),                                  // meeting（說明會）／public（公版介紹）／null 未確認
+  briefDate: date('brief_date'),
+  briefVersion: text('brief_version').default('').notNull(),
+  resignDate: date('resign_date'),                                // 補簽：原報名日（null＝不是補簽）
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [

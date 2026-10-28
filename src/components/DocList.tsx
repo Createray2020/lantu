@@ -16,7 +16,7 @@ export default function DocList({ list, me, empty = "目前沒有需要你處理
         return (
           <li key={i.id} className={`rounded-lg border ${myTurn ? "border-brand2" : "border-line"} bg-panel px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1`}>
             <div className="min-w-0">
-              <p className="font-bold truncate">{i.title} <span className="text-11 text-tx3 font-normal">v{i.version}</span></p>
+              <p className="font-bold truncate">{i.title} <span className="text-11 text-tx3 font-normal">v{i.version}{i.docNo ? `・${i.docNo}` : ""}</span></p>
               <p className="text-11 text-tx3">
                 {showCase && <span className="mr-2">{CASE_TYPE_LABEL[i.caseType as DocCaseType] ?? i.caseType}</span>}
                 {i.signers.map((s) => `${ROLE_LABEL[s.role as DocRole] ?? s.role}${s.displayName ? `・${s.displayName}` : ""}${s.status === "signed" ? " ✓" : ""}`).join("　")}

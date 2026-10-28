@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DOC_CSS, ROLE_LABEL, slotKey, slotLabel, type DocCategory, type DocSignerSlot } from "@/lib/docs";
-import { varsFor } from "@/lib/docsVars";
+import { DOC_CSS, ROLE_LABEL, slotKey, slotLabel, type DocAsk, type DocCategory, type DocSignerSlot } from "@/lib/docs";
+import { VAR_GROUP_LABEL, varsFor, type VarGroup } from "@/lib/docsVars";
 import { CHIP_CLASS, EDITOR_CSS, PASTE_KEEP, chipHtml, chipsToTokens, tokensToChips } from "@/lib/docsEditor";
 
 /**
@@ -19,12 +19,14 @@ export default function RichTemplateEditor({
   value,
   onChange,
   signers,
+  asks = [],
   category,
   useSeal,
 }: {
   value: string;
   onChange: (html: string) => void;
   signers: DocSignerSlot[];
+  asks?: DocAsk[];
   category: DocCategory;
   useSeal: boolean;
 }) {
@@ -33,12 +35,12 @@ export default function RichTemplateEditor({
   const lastEmitted = useRef<string>("");
   const lastSigners = useRef<string>("");
 
-  // 外部 value 變了（開啟不同範本、改了簽署人名稱、原始碼模式改過）才重灌；自己打字造成的 onChange 不回灌，避免游標跳走。
-  const signersKey = JSON.stringify(signers);
+  // 外部 value 變了（開啟不同範本、改了簽署人／確認項名稱、原始碼模式改過）才重灌；自己打字造成的 onChange 不回灌，避免游標跳走。
+  const signersKey = JSON.stringify(signers) + "|" + JSON.stringify(asks);
   useEffect(() => {
     if (!ref.current || raw) return;
     if (value === lastEmitted.current && lastSigners.current === signersKey) return;
-    ref.current.innerHTML = tokensToChips(value, signers);
+    ref.current.innerHTML = tokensToChips(value, signers, asks);
     lastEmitted.current = value;
     lastSigners.current = signersKey;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,6 +75,7 @@ export default function RichTemplateEditor({
   };
 
   const vars = varsFor(category);
+  const groups: VarGroup[] = ["base", "person", "admin", "check"];
 
   return (
     <div className="grid gap-2">
@@ -92,8 +95,21 @@ export default function RichTemplateEditor({
         <span className="w-px h-5 bg-line mx-1" />
         <select className="rounded border border-line bg-field px-1.5 py-1 text-xs" value="" onChange={(e) => { if (e.target.value) insertHtml(chipHtml("var", e.target.value)); e.target.value = ""; }} title="插入會自動帶入的欄位">
           <option value="">＋ 插入欄位…</option>
-          {vars.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
+          {groups.map((g) => {
+            const list = vars.filter((v) => v.group === g);
+            return list.length ? (
+              <optgroup key={g} label={VAR_GROUP_LABEL[g]}>
+                {list.map((v) => <option key={v.key} value={v.key}>{g === "check" ? "☐ " : ""}{v.label}</option>)}
+              </optgroup>
+            ) : null;
+          })}
         </select>
+        {asks.length > 0 && (
+          <select className="rounded border border-line bg-field px-1.5 py-1 text-xs" value="" onChange={(e) => { const a = asks.find((x) => x.key === e.target.value); if (a) insertHtml(chipHtml("ask", a.key, a.label || a.key)); e.target.value = ""; }} title="簽署人作答的確認項（☐→☑）">
+            <option value="">＋ 插入確認項…</option>
+            {asks.map((a) => <option key={a.key} value={a.key}>☐ {a.label || a.key}</option>)}
+          </select>
+        )}
         <select className="rounded border border-line bg-field px-1.5 py-1 text-xs" value="" onChange={(e) => { const s = signers.find((x) => slotKey(x) === e.target.value); if (s) insertHtml(chipHtml("slot", slotKey(s), slotLabel(s))); e.target.value = ""; }} title="簽名要出現的位置">
           <option value="">＋ 插入簽名位…</option>
           {signers.map((s) => <option key={slotKey(s)} value={slotKey(s)}>{s.seq}. {slotLabel(s)}（{ROLE_LABEL[s.role]}）</option>)}
@@ -121,7 +137,7 @@ export default function RichTemplateEditor({
           />
         </div>
       )}
-      <p className="text-11 text-tx3">沒放進內容裡的簽名位，產文件時會自動補在文末「簽署欄」。藍色＝自動帶入的欄位、橘色＝簽名位、紅色＝公司印鑑；要刪掉就像刪一個字一樣按退格。</p>
+      <p className="text-11 text-tx3">沒放進內容裡的簽名位與確認項，產文件時會自動補在文末「簽署欄」。藍色＝自動帶入的欄位、綠色＝系統依資料打勾的格子、紫色＝簽署人自己勾的確認項、橘色＝簽名位、紅色＝公司印鑑；要刪掉就像刪一個字一樣按退格。</p>
 
       <details open={raw} onToggle={(e) => setRaw((e.target as HTMLDetailsElement).open)}>
         <summary className="text-11 text-tx3 cursor-pointer select-none">進階：原始碼（一般不用碰）</summary>

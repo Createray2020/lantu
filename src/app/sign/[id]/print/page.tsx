@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const inst = await getInstance(id);
-  return { title: inst ? inst.title : "文件" };
+  return { title: inst ? `${inst.docNo ? `${inst.docNo}_` : ""}${inst.title}` : "文件" };
 }
 
 // 列印版：只有文件本體＋列印鈕。瀏覽器「列印 → 儲存為 PDF」就是正式 PDF；

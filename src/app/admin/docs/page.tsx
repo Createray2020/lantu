@@ -32,6 +32,8 @@ export default async function DocsAdminPage() {
     required: t.required,
     signDays: t.signDays,
     signers: t.signers,
+    asks: t.asks ?? [],
+    itemIds: t.itemIds ?? [],
     enabled: t.enabled,
     note: t.note,
     createdAt: t.createdAt.toISOString(),

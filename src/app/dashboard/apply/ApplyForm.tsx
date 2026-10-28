@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { FIELD } from "@/components/ui/Field";
 import Link from "next/link";
+import SignerProfileForm, { emptyProfile } from "@/components/SignerProfileForm";
 import { applyAsCoachAction, lookupIntroducerAction } from "./actions";
 import {
   APPLY_CONSENTS,
@@ -225,8 +226,17 @@ export default function ApplyForm({
         </button>
       )}
 
-      {/* ④ 聲明 —— 全部勾了才送得出去。嵐途是一般顧問公司、純顧問費，界線在入口就要講清楚。 */}
-      <h2 className="text-13 text-brand font-bold mb-2 mt-4">④ 聲明</h2>
+      {/* ③½ 簽約資料（2026/10/28）：培訓契約、個資同意書、保密同意書都從這裡帶欄位，填一次就好。
+          不是送出門檻——沒填也送得出去，但審核通過要啟動簽署時會卡住，儀表板補得回來。 */}
+      <h2 className="text-13 text-brand font-bold mb-1 mt-4">④ 簽約資料</h2>
+      <p className="text-11 text-tx3 mb-2">培訓契約與同意書會直接帶入這些資料，簽署時只需要簽名。現在沒空填也可以之後在報名進度頁補。</p>
+      <SignerProfileForm
+        value={d.profile ?? emptyProfile({ phone: d.phone, email: email ?? "" })}
+        onChange={(profile) => patch({ profile })}
+      />
+
+      {/* ⑤ 聲明 —— 全部勾了才送得出去。嵐途是一般顧問公司、純顧問費，界線在入口就要講清楚。 */}
+      <h2 className="text-13 text-brand font-bold mb-2 mt-4">⑤ 聲明</h2>
       <div className="grid gap-2 mb-6">
         {APPLY_CONSENTS.map((c) => {
           const on = d.consents.includes(c.key);

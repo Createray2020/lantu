@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
 import { currentSignIdentity } from "@/lib/docsIdentity";
-import { getInstance, getSignature } from "@/lib/docsStore";
-import { canSignNow, isSigner, DOC_CSS } from "@/lib/docs";
+import { getInstance, getSignature, getTemplate } from "@/lib/docsStore";
+import { canSignNow, isSigner, asksForRole, DOC_CSS, type DocAsk } from "@/lib/docs";
 import { todayISO } from "@/lib/license";
 import SignView, { type SignerLite } from "./SignView";
 
@@ -37,6 +37,9 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
   // 還沒被 sweepExpired 掃到的過期文件也不能簽（送出端 consentAndSign 會再擋一次）
   const expired = !!inst.expiresAt && inst.expiresAt < todayISO() && inst.status === "pending";
   const myTurn = !!mine && inst.status === "pending" && !expired && canSignNow(mine, inst.signers);
+  // 本人確認項：依我這一列的 role 從範本取；簽名前逐項作答（server 端 consentAndSign 再驗一次）
+  const tpl = mine && myTurn ? await getTemplate(inst.templateId) : null;
+  const asks = mine && tpl ? asksForRole((tpl.asks as DocAsk[]) ?? [], mine.role) : [];
 
   const signers: SignerLite[] = inst.signers.map((s) => ({
     id: s.id,
@@ -56,7 +59,7 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
           <Link href="/" aria-label="回首頁"><BrandMark size={32} /></Link>
           <div className="min-w-0">
             <h1 className="font-bold truncate">{inst.title}</h1>
-            <p className="text-11 text-tx3">版本 v{inst.version}・文件編號 {inst.id.slice(0, 8)}</p>
+            <p className="text-11 text-tx3">版本 v{inst.version}・{inst.docNo ? `合約編號 ${inst.docNo}` : `文件編號 ${inst.id.slice(0, 8)}`}</p>
           </div>
           <Link href={`/sign/${inst.id}/print`} className="ml-auto text-sm rounded-md border border-line px-3 py-1.5 hover:bg-panel2">列印／PDF</Link>
         </div>
@@ -73,6 +76,7 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
           expiresAt={inst.expiresAt}
           signers={signers}
           myTurn={myTurn}
+          asks={asks}
           isMine={!!mine}
           saved={saved}
           admin={me.admin}

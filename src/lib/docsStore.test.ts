@@ -16,10 +16,12 @@ const h = vi.hoisted(() => {
     siteSettings: col("site_settings"),
     docTasks: col("doc_tasks"),
     coaches: col("coaches"),
+    signerProfiles: col("signer_profiles"),
+    codeCounters: col("code_counters"),
     coachDisplayName: { name: "name" },
   };
   const state: Record<string, any[]> = {};
-  const reset = () => { for (const k of ["doc_templates", "doc_sets", "doc_instances", "doc_signers", "signatures", "site_settings", "doc_tasks", "coaches"]) state[k] = []; };
+  const reset = () => { for (const k of ["doc_templates", "doc_sets", "doc_instances", "doc_signers", "signatures", "site_settings", "doc_tasks", "coaches", "signer_profiles", "code_counters"]) state[k] = []; };
   reset();
   const test = (p: any, row: any): boolean => {
     if (!p) return true;
@@ -34,7 +36,7 @@ const h = vi.hoisted(() => {
       default: return true;
     }
   };
-  const UNIQUE: Record<string, string[]> = { doc_instances: ["caseType", "caseId", "templateKey"], signatures: ["ownerKind", "ownerId"], site_settings: ["key"], doc_sets: ["kind", "ref"] };
+  const UNIQUE: Record<string, string[]> = { doc_instances: ["caseType", "caseId", "templateKey"], signatures: ["ownerKind", "ownerId"], signer_profiles: ["ownerKind", "ownerId"], code_counters: ["kind", "ym"], site_settings: ["key"], doc_sets: ["kind", "ref"] };
   const conflictOf = (table: string, v: any) => {
     const u = UNIQUE[table];
     if (!u) return null;
@@ -42,9 +44,9 @@ const h = vi.hoisted(() => {
   };
   const defaults = (table: string, v: any) => ({
     id: crypto.randomUUID(),
-    ...(table === "doc_templates" ? { enabled: true, version: 1, required: true, useSeal: true, signDays: null, note: "", archivedAt: null } : {}),
+    ...(table === "doc_templates" ? { enabled: true, version: 1, required: true, useSeal: true, signDays: null, note: "", archivedAt: null, asks: [], itemIds: [] } : {}),
     ...(table === "doc_instances" ? { status: "pending", required: true, finalHash: null, completedAt: null, expiresAt: null, signedHtml: null } : {}),
-    ...(table === "doc_signers" ? { status: "pending", consentAt: null, signatureImg: null, signedAt: null, hashAtSign: null, label: "", displayName: "", remindCount: 0, lastRemindedAt: null } : {}),
+    ...(table === "doc_signers" ? { status: "pending", consentAt: null, signatureImg: null, signedAt: null, hashAtSign: null, label: "", displayName: "", remindCount: 0, lastRemindedAt: null, answers: {} } : {}),
     ...(table === "doc_tasks" ? { deadline: null, note: "" } : {}),
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -80,8 +82,8 @@ const h = vi.hoisted(() => {
             if (hit) {
               if (mode === "throw") throw new Error("unique violation " + t._n);
               if (mode === "nothing") continue;
-              Object.assign(hit, mode.set);
-              out.push(hit);
+              for (const [k, x] of Object.entries(mode.set)) hit[k] = x && typeof x === "object" && (x as any).op === "inc" ? (hit[k] ?? 0) + 1 : x;
+              out.push({ ...hit });
               continue;
             }
             const row = defaults(t._n, x);
@@ -133,7 +135,7 @@ vi.mock("next/cache", () => ({ unstable_cache: (fn: any) => fn, updateTag: () =>
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 
-import { deleteTemplate, listTemplates, getSet, startSigning, consentAndSign, declineSign, voidInstance, saveTemplate, saveSet, listMyInstances, countMyPending, caseProgress, getInstance, saveSignature, getSignature, latestEnabledTemplate, setTemplateEnabled, remindInstance, reopenInstance, listDocTodos, createDocTask, listDocTasks, hasReminderFor } from "./docsStore";
+import { saveSignerProfile, getSignerProfile, profileMissing, profileVars, deleteTemplate, listTemplates, getSet, startSigning, consentAndSign, declineSign, voidInstance, saveTemplate, saveSet, listMyInstances, countMyPending, caseProgress, getInstance, saveSignature, getSignature, latestEnabledTemplate, setTemplateEnabled, remindInstance, reopenInstance, listDocTodos, createDocTask, listDocTasks, hasReminderFor } from "./docsStore";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const S = h.state;
@@ -363,5 +365,46 @@ describe("刪除範本", () => {
     expect(S.doc_instances.filter((i) => i.templateKey === t.key)).toHaveLength(1); // 歷史文件還在
     expect(await getSet("training_item", "item-train")).toEqual([]);
     expect((await deleteTemplate("nope")).ok).toBe(false);
+  });
+});
+
+describe("合約編號、本人確認項、簽約資料（2026/10/28）", () => {
+  it("啟動時每份配一個 T+YYMM+三碼的合約編號並印進快照；必勾沒勾不能簽、答案存進簽署人列、簽完 ☐ 變 ☑", async () => {
+    const t = await saveTemplate({
+      category: "training", name: "報名契約", html: "<p>合約編號 {{doc.no}}</p><p>{{ask:adult}} 年滿18 {{ask:mkt}} 行銷</p>{{sign:member:1}}",
+      signers: [{ role: "member", seq: 1 }], asks: [{ key: "adult", label: "年滿 18", kind: "must", role: "member" }, { key: "mkt", label: "行銷", kind: "opt", role: "member" }],
+    }, "admin");
+    await saveSet("training_item", "item-train", [t.key]);
+    const r = await start();
+    expect(r.ok && r.instances[0].docNo).toMatch(/^T\d{4}001$/);
+    expect(r.ok && r.instances[0].htmlSnapshot).toContain(`合約編號 ${r.ok ? r.instances[0].docNo : ""}`);
+    const id = r.ok ? r.instances[0].id : "";
+    const inst = await getInstance(id);
+    const base = { instanceId: id, me: { coachId: "u1" }, consent: true, signatureImg: PNG, hashSeen: inst!.hash, saveAsDefault: false, ip: null, ua: null };
+    const bad = await consentAndSign({ ...base, answers: { mkt: true } });
+    expect(bad.ok).toBe(false);
+    expect(!bad.ok && bad.error).toContain("年滿 18");
+    const ok = await consentAndSign({ ...base, answers: { adult: true } });
+    expect(ok.ok && ok.completed).toBe(true);
+    const done = await getInstance(id);
+    expect(done!.signers[0].answers).toEqual({ adult: true, mkt: false });
+    expect(done!.signedHtml).toContain('data-ask="adult" title="年滿 18">☑<');
+    expect(done!.signedHtml).toContain('data-ask="mkt" title="行銷">☐<');
+  });
+
+  it("簽約資料：upsert、缺什麼、變數（發票一句話與勾選）", async () => {
+    expect(profileMissing(null)).toHaveLength(6);
+    await saveSignerProfile({ kind: "coach", id: "u1" }, { idNo: "a123456789", birthDate: "1990-05-20", phone: "0912", email: "a@b.c", address: "桃園", invoiceKind: "company", invoiceTaxId: "12345678", invoiceTitle: "" });
+    let p = await getSignerProfile({ kind: "coach", id: "u1" });
+    expect(p!.idNo).toBe("A123456789");
+    expect(profileMissing(p)).toEqual(["公司發票的統一編號與抬頭"]);
+    await saveSignerProfile({ kind: "coach", id: "u1" }, { idNo: "A123456789", birthDate: "1990-05-20", phone: "0912", email: "a@b.c", address: "桃園", invoiceKind: "personal", invoiceCarrier: "/AB+12" });
+    p = await getSignerProfile({ kind: "coach", id: "u1" });
+    expect(S.signer_profiles).toHaveLength(1);
+    expect(profileMissing(p)).toEqual([]);
+    const v = profileVars("member", p);
+    expect(v["member.invoice"]).toBe("個人（雲端發票載具 /AB+12）");
+    expect(v["member.invoice_is_personal"]).toBe(true);
+    expect(v["member.invoice_tax_id"]).toBe("");
   });
 });

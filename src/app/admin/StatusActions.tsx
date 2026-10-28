@@ -6,11 +6,18 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { approveCoach, resetCoach, suspendCoach, retryActivateAction, rejectTrainingAction, reopenTrainingAction } from "./actions";
-import { SELECT_SM } from "@/components/ui/Field";
+import { approveCoach, resetCoach, suspendCoach, retryActivateAction, rejectTrainingAction, reopenTrainingAction, saveEnrollmentAdminAction } from "./actions";
+import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
 
-export type TrainingBrief = { enrollmentId: string; stage: string; amountDue: number; confirmed: number; pending: number; met: boolean; docsDone: number; docsRequired: number; docsTotal: number; anyDeclined: boolean; needsCompany: boolean };
+export type TrainingAdminFields = { memberKind: string; briefKind: string | null; briefDate: string | null; briefVersion: string; resignDate: string | null };
+export type TrainingBrief = {
+  enrollmentId: string; stage: string; amountDue: number; confirmed: number; pending: number; met: boolean;
+  docsDone: number; docsRequired: number; docsTotal: number; anyDeclined: boolean; needsCompany: boolean;
+  // 2026/10/28 合約自動帶入：行政確認欄＋啟動前還缺什麼（誰填）
+  admin: TrainingAdminFields;
+  missing: { label: string; by: "person" | "admin" }[];
+};
 export type CompanyOption = { id: string; name: string };
 
 export default function StatusActions({ id, status, training = null, companyOptions = [], meId = "" }: { id: string; status: string; training?: TrainingBrief | null; companyOptions?: CompanyOption[]; meId?: string }) {
@@ -33,8 +40,52 @@ export default function StatusActions({ id, status, training = null, companyOpti
   const t = training;
   const signing = !!t && t.stage === "passed";
   const rejected = !!t && t.stage === "rejected";
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [af, setAf] = useState<TrainingAdminFields>(t?.admin ?? { memberKind: "intern", briefKind: null, briefDate: null, briefVersion: "", resignDate: null });
+  const [adminMsg, setAdminMsg] = useState<string | null>(null);
+  function saveAdmin() {
+    setAdminMsg(null);
+    startTransition(async () => {
+      const r = await saveEnrollmentAdminAction(id, af);
+      if (r.ok) { setAdminMsg("已儲存"); setAdminOpen(false); router.refresh(); } else setAdminMsg(r.error);
+    });
+  }
   return (
     <div className="flex flex-col items-end gap-1">
+      {/* 行政確認（2026/10/28）：合約要印、申請人不該自己填的三樣；缺的項目啟動簽署會被擋 */}
+      {t && status === "pending" && t.stage !== "activated" && t.stage !== "rejected" && (
+        <div className="text-10 text-right text-tx2 leading-relaxed max-w-[320px]">
+          {t.missing.length > 0 ? (
+            <div className="text-warn">啟動前還缺：{t.missing.map((m) => `${m.label}（${m.by === "person" ? "申請人" : "行政"}）`).join("、")}</div>
+          ) : (
+            <div className="text-ok">合約資料已齊</div>
+          )}
+          {!adminOpen ? (
+            <button type="button" className="underline text-tx3" onClick={() => setAdminOpen(true)}>
+              行政確認：{af.memberKind === "partner" ? "合作教練" : af.memberKind === "hired" ? "報聘教練" : "實習教練"}・{af.briefKind === "meeting" ? `說明會 ${af.briefDate ?? "（日期未填）"}` : af.briefKind === "public" ? `公版 ${af.briefVersion || "（版本未填）"}` : "說明方式未確認"}{af.resignDate ? `・補簽（原報名 ${af.resignDate}）` : ""}
+            </button>
+          ) : (
+            <div className="grid gap-1.5 text-left rounded-md border border-line p-2 bg-panel mt-1 text-xs">
+              <label className="grid gap-0.5 text-tx3">身分
+                <select className={SELECT_SM} value={af.memberKind} onChange={(e) => setAf({ ...af, memberKind: e.target.value })}>
+                  <option value="intern">實習教練</option><option value="partner">合作教練</option><option value="hired">報聘教練</option>
+                </select></label>
+              <label className="grid gap-0.5 text-tx3">報名前說明方式
+                <select className={SELECT_SM} value={af.briefKind ?? ""} onChange={(e) => setAf({ ...af, briefKind: e.target.value || null })}>
+                  <option value="">（未確認）</option><option value="meeting">嵐途說明會</option><option value="public">公版介紹內容</option>
+                </select></label>
+              {af.briefKind === "meeting" && <label className="grid gap-0.5 text-tx3">說明會日期<input type="date" className={FIELD_SM} value={af.briefDate ?? ""} onChange={(e) => setAf({ ...af, briefDate: e.target.value || null })} /></label>}
+              {af.briefKind === "public" && <label className="grid gap-0.5 text-tx3">公版介紹版本<input className={FIELD_SM} value={af.briefVersion} onChange={(e) => setAf({ ...af, briefVersion: e.target.value })} placeholder="例 2026/10 版" /></label>}
+              <label className="grid gap-0.5 text-tx3">補簽：原報名日（不是補簽留空）<input type="date" className={FIELD_SM} value={af.resignDate ?? ""} onChange={(e) => setAf({ ...af, resignDate: e.target.value || null })} /></label>
+              <div className="flex gap-2">
+                <button type="button" className="rounded-md bg-brand text-onbrand font-bold px-2.5 py-1 disabled:opacity-40" disabled={pending} onClick={saveAdmin}>儲存</button>
+                <button type="button" className="text-tx3" onClick={() => setAdminOpen(false)}>取消</button>
+              </div>
+            </div>
+          )}
+          {adminMsg && <div>{adminMsg}</div>}
+        </div>
+      )}
       {/* 三組獨立狀態（2026/10/28）：收款／文件；資格審核在左邊的檢核表 */}
       {t && status !== "active" && (
         <div className="text-10 text-right text-tx2 leading-relaxed">

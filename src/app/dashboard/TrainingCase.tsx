@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/acctEngine";
 import { fmtMoney0 } from "@/lib/money";
-import { reportTrainingPaymentAction } from "./apply/actions";
+import { reportTrainingPaymentAction, saveMyProfileAction } from "./apply/actions";
+import SignerProfileForm, { emptyProfile, profileComplete, type ProfileDraft } from "@/components/SignerProfileForm";
 
 export type TrainingCaseView = {
   itemName: string;
@@ -20,6 +21,10 @@ export type TrainingCaseView = {
   docsDone: number;
   docsRequired: number;
   expiresAt: string | null;
+  // 簽約資料（2026/10/28）：範本有用到才要求；missing 是啟動簽署前還缺的（含行政端的）
+  profile: ProfileDraft | null;
+  profileNeeded: boolean;
+  missing: { label: string; by: "person" | "admin" }[];
 };
 
 // 申請人進度頁（PendingNotice）裡的培訓報名案件：費用與提報付款、應簽文件。
@@ -36,6 +41,19 @@ export default function TrainingCase({ t }: { t: TrainingCaseView }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, start] = useTransition();
   const m = PAYMENT_METHODS.find((x) => x.value === method)!;
+
+  // 簽約資料：文件產出前都能改；已產出（passed 且有文件）就唯讀——內容已凍結進文件。
+  const [prof, setProf] = useState<ProfileDraft>(t.profile ?? emptyProfile());
+  const [profOpen, setProfOpen] = useState(!t.profile || !profileComplete(t.profile));
+  const [profMsg, setProfMsg] = useState<string | null>(null);
+  const profLocked = t.stage === "activated" || (t.stage === "passed" && t.docs.length > 0);
+  function saveProf() {
+    setProfMsg(null);
+    start(async () => {
+      const r = await saveMyProfileAction(prof);
+      if (r.ok) { setProfMsg("已儲存"); setProfOpen(false); router.refresh(); } else setProfMsg(r.error);
+    });
+  }
 
   function submit() {
     setMsg(null);
@@ -117,6 +135,37 @@ export default function TrainingCase({ t }: { t: TrainingCaseView }) {
         )}
         {msg && <p className="text-xs text-tx2">{msg}</p>}
       </section>
+
+      {/* 簽約資料（2026/10/28）：合約欄位從這裡帶，簽署時只需要簽名 */}
+      {t.profileNeeded && t.stage !== "rejected" && (
+        <section className="grid gap-2 border-t border-line pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-bold">簽約資料 {t.profile && profileComplete(t.profile) ? <span className="text-ok font-normal text-xs">已填齊</span> : <span className="text-brand2 font-normal text-xs">待填</span>}</div>
+            {!profLocked && !profOpen && <button type="button" className="text-xs rounded-md border border-line px-2.5 py-1" onClick={() => setProfOpen(true)}>修改</button>}
+          </div>
+          <p className="text-11 text-tx3">培訓契約與同意書會直接帶入這些資料（身分證／護照、地址、發票…），簽署時只需要簽名。{profLocked ? "文件已產生，資料已帶入、不再更動。" : ""}</p>
+          {profOpen && !profLocked ? (
+            <div className="grid gap-2 rounded-md border border-line p-3 bg-panel">
+              <SignerProfileForm value={prof} onChange={setProf} disabled={busy} />
+              <div className="flex gap-2 text-sm">
+                <button type="button" className="rounded-md bg-brand text-onbrand font-bold px-3 py-1.5 disabled:opacity-40" disabled={busy || !profileComplete(prof)} onClick={saveProf}>儲存簽約資料</button>
+                {t.profile && <button type="button" className="text-tx2 px-2" onClick={() => { setProf(t.profile ?? emptyProfile()); setProfOpen(false); }}>取消</button>}
+              </div>
+              {!profileComplete(prof) && <p className="text-11 text-tx3">身分證／護照、出生日期、電話、Email、地址都要填；公司發票要統編與抬頭。</p>}
+            </div>
+          ) : t.profile ? (
+            <dl className="text-xs text-tx2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+              <dt>身分證／護照</dt><dd>{t.profile.idNo || "—"}</dd>
+              <dt>出生日期</dt><dd>{t.profile.birthDate || "—"}</dd>
+              <dt>電話／Email</dt><dd>{t.profile.phone || "—"}　{t.profile.email || "—"}</dd>
+              <dt>通訊地址</dt><dd>{t.profile.address || "—"}</dd>
+              <dt>發票</dt><dd>{t.profile.invoiceKind === "company" ? `公司（統編 ${t.profile.invoiceTaxId}　抬頭 ${t.profile.invoiceTitle}）` : `個人${t.profile.invoiceCarrier ? `（載具 ${t.profile.invoiceCarrier}）` : ""}`}</dd>
+            </dl>
+          ) : null}
+          {profMsg && <p className="text-xs text-tx2">{profMsg}</p>}
+          {t.stage === "pending" && t.missing.some((x) => x.by === "admin") && <p className="text-11 text-tx3">另有行政端要確認的項目（{t.missing.filter((x) => x.by === "admin").map((x) => x.label).join("、")}），不用你處理。</p>}
+        </section>
+      )}
 
       {/* 文件 */}
       {t.docs.length > 0 && (

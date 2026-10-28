@@ -7,7 +7,7 @@ import { coaches } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg, transferClients, removeCoach } from "@/lib/coach";
 import { saveBrand } from "@/lib/brand";
 import { saveApplySettings, saveReviewChecks } from "@/lib/coachApplyStore";
-import { passReview, rejectEnrollment, reopenEnrollment } from "@/lib/trainingStore";
+import { passReview, rejectEnrollment, reopenEnrollment, saveEnrollmentAdmin } from "@/lib/trainingStore";
 import type { ApplySettings } from "@/lib/coachApply";
 
 // 後台動作的統一回傳型別：讓 client 端能顯示「已儲存 / 失敗原因」，
@@ -131,6 +131,20 @@ export async function retryActivateAction(coachId: string): Promise<ActionResult
     const r = await passReview(coachId, me.id, me.id);
     if (!r.ok) return { ok: false, error: r.error };
     if (!r.activated && !r.noTemplates) return { ok: false, error: r.docs ? "文件還沒簽完，簽完會自動開通" : "尚未符合開通條件" };
+    revalidatePath("/admin");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 行政確認欄（2026/10/28）：身分、報名前說明方式、補簽原報名日——合約要印、申請人不該自己填的。 */
+export async function saveEnrollmentAdminAction(coachId: string, input: unknown): Promise<ActionResult> {
+  try {
+    await guard();
+    const r = await saveEnrollmentAdmin(coachId, input);
+    if (!r.ok) return { ok: false, error: r.error ?? "儲存失敗" };
     revalidatePath("/admin");
     revalidatePath("/dashboard");
     return { ok: true };

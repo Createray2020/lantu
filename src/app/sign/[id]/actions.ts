@@ -19,11 +19,11 @@ async function clientMeta() {
 const PATHS = ["/dashboard", "/dashboard/docs", "/portal", "/portal/docs", "/admin", "/admin/docs/instances"];
 
 /** 本人確認簽署：勾同意＋簽名圖＋當時看到的雜湊。全員簽完 → 觸發業務後續（例如培訓開通）。 */
-export async function signAction(instanceId: string, input: { consent: boolean; signatureImg: string; hashSeen: string; saveAsDefault: boolean }): Promise<SignActionResult> {
+export async function signAction(instanceId: string, input: { consent: boolean; answers?: Record<string, boolean>; signatureImg: string; hashSeen: string; saveAsDefault: boolean }): Promise<SignActionResult> {
   const me = await currentSignIdentity();
   if (!me) return { ok: false, error: "請先登入" };
   const { ip, ua } = await clientMeta();
-  const r = await consentAndSign({ instanceId, me, consent: !!input.consent, signatureImg: input.signatureImg, hashSeen: String(input.hashSeen ?? ""), saveAsDefault: !!input.saveAsDefault, ip, ua });
+  const r = await consentAndSign({ instanceId, me, consent: !!input.consent, answers: input.answers ?? {}, signatureImg: input.signatureImg, hashSeen: String(input.hashSeen ?? ""), saveAsDefault: !!input.saveAsDefault, ip, ua });
   if (!r.ok) return r;
   if (r.completed) {
     // 後續失敗不該讓「已簽完」變成「沒簽」：簽署已入庫，這裡吞錯、留給後台重跑（冪等）。

@@ -13,6 +13,8 @@ import {
   slotsInHtml,
   validSignaturePng,
   validateTemplate,
+  sanitizeAsks,
+  checkAnswers,
   E_SIGN_CLAUSE,
 } from "./docs";
 
@@ -142,5 +144,39 @@ describe("簽名位對到人", () => {
     expect(isSigner({ coachId: "c1", clientUserId: null }, { coachId: "c2" })).toBe(false);
     expect(isSigner({ coachId: null, clientUserId: "u" }, { clientUserId: "u" })).toBe(true);
     expect(isSigner({ coachId: null, clientUserId: null }, { coachId: null, clientUserId: null })).toBe(false);
+  });
+});
+
+describe("自動帶入與本人確認項（2026/10/28）", () => {
+  it("布林變數印 ☑／☐；sign.date 在快照是佔位、簽完才填；ask 在快照是 ☐", () => {
+    const t = { html: "<p>{{pay.is_bank}} 匯款 {{pay.is_card}} 刷卡</p><p>{{ask:adult}} 年滿18</p><p>簽署日期 {{sign.date}}</p>{{sign:member:1}}", signers: [{ role: "member" as const, seq: 1 }], useSeal: false, asks: [{ key: "adult", label: "年滿 18 歲", kind: "must" as const, role: "member" as const }] };
+    const html = renderTemplate(t, { "pay.is_bank": true, "pay.is_card": false });
+    expect(html).toContain("☑ 匯款 ☐ 刷卡");
+    expect(html).toContain('<span class="doc-ask" data-ask="adult">☐</span>');
+    expect(html).toContain('<span class="doc-sign-date">（簽署時帶入）</span>');
+    const signed = applySignatures(html, [{ role: "member", seq: 1, displayName: "小美", signatureImg: PNG, signedAt: "2026-10-30T02:00:00Z", answers: { adult: true } }], t.asks);
+    expect(signed).toContain('data-ask="adult" title="年滿 18 歲">☑<');
+    expect(signed).toContain('<span class="doc-sign-date">2026-10-30</span>');
+  });
+
+  it("沒放進內容的確認項列在文末簽署欄", () => {
+    const t = { html: "<p>條款</p>", signers: [{ role: "member" as const, seq: 1 }], useSeal: false, asks: [{ key: "mkt", label: "同意寄送活動資訊", kind: "opt" as const, role: "member" as const }] };
+    const html = renderTemplate(t, {});
+    expect(html).toContain("簽署欄");
+    expect(html).toContain('data-ask="mkt">☐</span> 同意寄送活動資訊');
+  });
+
+  it("sanitizeAsks 清 key、去重、kind 預設必勾、公司不能作答；checkAnswers 必勾沒勾就擋", () => {
+    const asks = sanitizeAsks([{ key: "Adult!", label: "年滿18", kind: "must", role: "member" }, { key: "adult", label: "重複" }, { key: "mkt", label: "行銷", kind: "opt", role: "company" }, { key: "", label: "沒 key" }]);
+    expect(asks).toEqual([{ key: "adult", label: "年滿18", kind: "must", role: "member" }, { key: "mkt", label: "行銷", kind: "opt", role: "member" }]);
+    expect(checkAnswers(asks, { mkt: true })).toEqual({ ok: false, missing: [asks[0]] });
+    expect(checkAnswers(asks, { adult: true, other: true })).toEqual({ ok: true, answers: { adult: true, mkt: false } });
+  });
+
+  it("validateTemplate：內容裡的 ask 要在清單裡；ask 指定的角色要有簽署人", () => {
+    const base = { category: "training" as const, name: "x", html: "<p>{{ask:adult}}</p>", useSeal: false, required: true, signDays: null, signers: [{ role: "member" as const, seq: 1 }] };
+    expect(validateTemplate({ ...base, asks: [] }).join()).toContain("ask:adult");
+    expect(validateTemplate({ ...base, asks: [{ key: "adult", label: "年滿", kind: "must", role: "client" }] }).join()).toContain("客戶");
+    expect(validateTemplate({ ...base, asks: [{ key: "adult", label: "年滿", kind: "must", role: "member" }] })).toEqual([]);
   });
 });

@@ -5,7 +5,9 @@ import { applyAsCoach, ensureCoach } from "@/lib/coach";
 import { getApplySettings, lookupCoachByCode, submitApplication } from "@/lib/coachApplyStore";
 import { canSubmit, routeMeta, type ApplyDraft } from "@/lib/coachApply";
 import { ensureEnrollment, reportTrainingPayment } from "@/lib/trainingStore";
+import { saveSignerProfile } from "@/lib/docsStore";
 import type { CaseFeeInput } from "@/lib/acctStore";
+import { revalidatePath } from "next/cache";
 
 // 明確申請成為教練。只有這支會建立 coaches 列（status=pending，待後台核准）。
 //
@@ -42,6 +44,14 @@ export async function applyAsCoachAction(draft: ApplyDraft) {
   if (!row) redirect("/login?redirect_url=/dashboard/apply");
 
   await submitApplication(row.id, draft, introducer?.id ?? null);
+  // 簽約資料（有填才存；失敗不擋申請，儀表板補得回來）
+  if (draft.profile && Object.values(draft.profile).some((v) => typeof v === "string" && v.trim())) {
+    try {
+      await saveSignerProfile({ kind: "coach", id: row.id }, { ...draft.profile, email: draft.profile.email || row.email || "", phone: draft.profile.phone || draft.phone });
+    } catch (e) {
+      console.error("[docs] saveSignerProfile at apply failed", e);
+    }
+  }
   // 2026/10/28：報聘＝培訓報名。後台設了培訓方案就建案（應收＝方案價格）；沒設就跳過（舊流程）。
   // 建案失敗不擋申請——申請已經送出了，案件後台補得回來。
   try {
@@ -67,4 +77,18 @@ export async function lookupIntroducerAction(code: string) {
   const found = await lookupCoachByCode(code);
   if (!found || found.status !== "active") return { ok: false as const };
   return { ok: true as const, name: found.name ?? "（未命名）" };
+}
+
+/** 簽約資料（本人）：任何已登入的教練／申請人都能改；已發出的文件不受影響（快照已凍結）。 */
+export async function saveMyProfileAction(input: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const me = await ensureCoach();
+  if (!me) return { ok: false, error: "請先登入" };
+  try {
+    await saveSignerProfile({ kind: "coach", id: me.id }, input);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/docs");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "儲存失敗，請再試一次" };
+  }
 }

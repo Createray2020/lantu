@@ -12,6 +12,9 @@ import {
   DOC_SET_KINDS,
   DOC_CSS,
   ROLE_LABEL,
+  ASK_KIND_LABEL,
+  ASK_MAX,
+  type DocAsk,
   type DocCategory,
   type DocSetKind,
   type DocSignerSlot,
@@ -33,6 +36,8 @@ export type TemplateLite = {
   required: boolean;
   signDays: number | null;
   signers: DocSignerSlot[];
+  asks: DocAsk[];
+  itemIds: string[];
   enabled: boolean;
   note: string;
   createdAt: string;
@@ -48,6 +53,8 @@ type Draft = {
   required: boolean;
   signDays: string;
   signers: DocSignerSlot[];
+  asks: DocAsk[];
+  itemIds: string[];
   note: string;
 };
 
@@ -60,6 +67,8 @@ const emptyDraft = (category: DocCategory = "training"): Draft => ({
   required: true,
   signDays: "14",
   signers: category === "training" ? [{ role: "member", seq: 1, label: "申請人" }] : [{ role: "client", seq: 1, label: "簽約人" }, { role: "coach", seq: 2 }],
+  asks: [],
+  itemIds: [],
   note: "",
 });
 const toDraft = (t: TemplateLite): Draft => ({
@@ -71,6 +80,8 @@ const toDraft = (t: TemplateLite): Draft => ({
   required: t.required,
   signDays: t.signDays == null ? "" : String(t.signDays),
   signers: t.signers,
+  asks: t.asks ?? [],
+  itemIds: t.itemIds ?? [],
   note: t.note,
 });
 
@@ -110,6 +121,7 @@ export default function DocsAdminBoard({ templates, items, sets, seal, nudgeDays
       {editing && (
         <TemplateEditor
           draft={editing}
+          items={items}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -230,8 +242,12 @@ function TemplateRow({ t, onEdit, onChanged }: { t: TemplateLite; onEdit: () => 
 }
 
 // ── ② 範本編輯器 ─────────────────────────────────────────────────────────────
-function TemplateEditor({ draft, onClose, onSaved }: { draft: Draft; onClose: () => void; onSaved: () => void }) {
+function TemplateEditor({ draft, items, onClose, onSaved }: { draft: Draft; items: ItemLite[]; onClose: () => void; onSaved: () => void }) {
   const [d, setD] = useState<Draft>(draft);
+  // 確認項的 key：自動從 1 編（ask1、ask2…），避免跟內容裡已放的標籤撞名
+  const nextAskKey = () => { let i = d.asks.length + 1; while (d.asks.some((a) => a.key === `ask${i}`)) i++; return `ask${i}`; };
+  const setAsk = (i: number, p: Partial<DocAsk>) => patch({ asks: d.asks.map((a, j) => (j === i ? { ...a, ...p } : a)) });
+  const askRoles = d.signers.map((s) => s.role).filter((r, i, arr) => r !== "company" && arr.indexOf(r) === i);
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ html: string; warnings: string[] } | null>(null);
   const [busy, start] = useTransition();
@@ -305,10 +321,51 @@ function TemplateEditor({ draft, onClose, onSaved }: { draft: Draft; onClose: ()
           </div>
         </div>
 
+        {/* 適用方案（2026/10/28 Ray：範本多了之後，組合只看自己方案的） */}
+        <div className="rounded-md border border-line p-3">
+          <h3 className="text-sm font-bold mb-1">適用方案</h3>
+          <p className="text-11 text-tx3 mb-2">勾了哪些方案，下面「範本組合」就只在那些方案列出這份；都不勾＝通用（每個方案都看得到，排在後面）。</p>
+          <div className="flex flex-wrap gap-2 text-sm">
+            {items.length === 0 && <span className="text-xs text-tx3">帳務後台還沒有營業項目。</span>}
+            {items.map((it) => (
+              <label key={it.id} className={`flex items-center gap-1.5 rounded px-2 py-0.5 border ${d.itemIds.includes(it.id) ? "border-brand2" : "border-line"}`}>
+                <input type="checkbox" checked={d.itemIds.includes(it.id)} onChange={() => patch({ itemIds: d.itemIds.includes(it.id) ? d.itemIds.filter((x) => x !== it.id) : [...d.itemIds, it.id] })} />
+                {it.name}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 本人確認項（2026/10/28）：簽署人簽名前逐項作答；必勾沒勾不能簽 */}
+        <div className="rounded-md border border-line p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold">簽署人要勾的確認項</h3>
+            <button type="button" className="text-xs rounded-md border border-line px-2 py-1 disabled:opacity-40" disabled={d.asks.length >= ASK_MAX} onClick={() => patch({ asks: [...d.asks, { key: nextAskKey(), label: "", kind: "must", role: askRoles[0] ?? "member" }] })}>＋ 加一項</button>
+          </div>
+          <p className="text-11 text-tx3 mb-2">例：「本人確認已年滿 18 歲」（必勾）、「同意寄送課程與活動資訊」（可選）。簽署頁會列出來讓本人作答，文件上用工具列「插入確認項」放 ☐，簽完依作答變 ☑；沒放進內容的會列在文末簽署欄。</p>
+          <div className="grid gap-2">
+            {d.asks.map((a, i) => (
+              <div key={a.key} className="flex flex-wrap items-center gap-2 text-sm">
+                <input className={`${FIELD} flex-1 min-w-60`} value={a.label} onChange={(e) => setAsk(i, { label: e.target.value })} placeholder="確認項文字（會原樣印在簽署頁）" />
+                <select className={SELECT_SM} value={a.kind} onChange={(e) => setAsk(i, { kind: e.target.value as DocAsk["kind"] })}>
+                  <option value="must">{ASK_KIND_LABEL.must}（沒勾不能簽）</option><option value="opt">{ASK_KIND_LABEL.opt}（自由勾）</option>
+                </select>
+                {askRoles.length > 1 && (
+                  <select className={SELECT_SM} value={a.role} onChange={(e) => setAsk(i, { role: e.target.value as DocAsk["role"] })}>
+                    {askRoles.map((r) => <option key={r} value={r}>由{ROLE_LABEL[r]}作答</option>)}
+                  </select>
+                )}
+                <button type="button" className="text-xs text-danger" onClick={() => patch({ asks: d.asks.filter((_, j) => j !== i) })}>移除</button>
+              </div>
+            ))}
+            {d.asks.length === 0 && <p className="text-xs text-tx3">沒有確認項：簽署人只要勾「同意電子簽署」再簽名。</p>}
+          </div>
+        </div>
+
         {/* 內容：所見即所得（2026/10/28 Ray：不要看到 HTML 碼） */}
         <div className="grid gap-1">
           <span className="text-xs text-tx2">內容</span>
-          <RichTemplateEditor value={d.html} onChange={(html) => patch({ html })} signers={d.signers} category={d.category} useSeal={d.useSeal} />
+          <RichTemplateEditor value={d.html} onChange={(html) => patch({ html })} signers={d.signers} asks={d.asks} category={d.category} useSeal={d.useSeal} />
         </div>
 
         <label className="grid gap-1 text-xs text-tx2">備註（只有後台看得到）
@@ -345,7 +402,18 @@ function SetsSection({ templates, items, sets, onSaved }: { templates: TemplateL
             <h3 className="text-sm font-bold mb-2">{k.label} <span className="text-11 text-tx3 font-normal">→ 使用「{CATEGORY_LABEL[k.category]}」類別的範本</span></h3>
             <div className="grid gap-2">
               {items.map((it) => (
-                <SetRow key={`${k.value}:${it.id}`} kind={k.value} item={it} options={templates.filter((t) => t.category === k.category)} value={sets[`${k.value}:${it.id}`] ?? []} onSaved={onSaved} />
+                <SetRow
+                  key={`${k.value}:${it.id}`}
+                  kind={k.value}
+                  item={it}
+                  // 這個方案專屬的排前面、通用（沒勾方案）排後面；勾了別的方案的不出現
+                  options={[
+                    ...templates.filter((t) => t.category === k.category && t.itemIds.includes(it.id)),
+                    ...templates.filter((t) => t.category === k.category && t.itemIds.length === 0),
+                  ]}
+                  value={sets[`${k.value}:${it.id}`] ?? []}
+                  onSaved={onSaved}
+                />
               ))}
             </div>
           </div>

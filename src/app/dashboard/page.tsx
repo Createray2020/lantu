@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { ensureCoach } from "@/lib/coach";
 import { getHome } from "@/lib/home";
 import { getApplication } from "@/lib/coachApplyStore";
-import { getEnrollmentForCoach, enrollmentView } from "@/lib/trainingStore";
+import { getEnrollmentForCoach, enrollmentView, enrollmentReadiness } from "@/lib/trainingStore";
 import { canSignNow, isSigner } from "@/lib/docs";
 import DashboardHeader from "./DashboardHeader";
 import { headerProps } from "./headerProps";
@@ -36,8 +36,14 @@ export default async function Dashboard({
     // 含已退回：申請人要看得到處理結果
     const enr = coach.status === "pending" ? await getEnrollmentForCoach(coach.id, { includeRejected: true }) : null;
     const tv = enr ? await enrollmentView(enr) : null;
+    const ready = enr ? await enrollmentReadiness(enr) : null;
     const training = tv
       ? {
+          profile: ready?.profile
+            ? { idNo: ready.profile.idNo, birthDate: ready.profile.birthDate ?? "", phone: ready.profile.phone, email: ready.profile.email, address: ready.profile.address, invoiceKind: (ready.profile.invoiceKind === "company" ? "company" : "personal") as "company" | "personal", invoiceCarrier: ready.profile.invoiceCarrier, invoiceTaxId: ready.profile.invoiceTaxId, invoiceTitle: ready.profile.invoiceTitle }
+            : null,
+          profileNeeded: !!ready?.usesProfile,
+          missing: ready?.missing ?? [],
           itemName: tv.enrollment.itemName,
           amountDue: tv.enrollment.amountDue,
           stage: tv.enrollment.reviewStage,

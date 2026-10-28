@@ -9,6 +9,15 @@
 
 export type DocRole = "company" | "member" | "client" | "coach";
 export type DocSignerSlot = { role: DocRole; seq: number; label?: string };
+/**
+ * 本人確認項（2026/10/28）：簽署人在簽名前逐項作答的勾選。
+ *   kind must＝沒勾不能簽（年滿 18、已審閱、個資同意）；opt＝自由選（行銷資訊、立即開通回放）。
+ *   role＝由哪一類簽署人作答（預設成員／客戶那一位）。內容裡 {{ask:key}} 印 ☐，該簽署人簽完依答案換成 ☑／☐。
+ */
+export type DocAskKind = "must" | "opt";
+export type DocAsk = { key: string; label: string; kind: DocAskKind; role: DocRole };
+export const ASK_KIND_LABEL: Record<DocAskKind, string> = { must: "必勾", opt: "可選" };
+export const ASK_MAX = 20;
 export type DocCategory = "training" | "client_service";
 /** 實例的案件類型：兩個業務消費者＋補簽任務（coach_doc，不觸發任何業務後續）。 */
 export type DocCaseType = DocCategory | "coach_doc";
@@ -120,6 +129,47 @@ export function sanitizeSlots(input: unknown): DocSignerSlot[] {
   }).sort((a, b) => a.seq - b.seq || a.role.localeCompare(b.role));
 }
 
+export function sanitizeAsks(input: unknown): DocAsk[] {
+  if (!Array.isArray(input)) return [];
+  const out: DocAsk[] = [];
+  const seen = new Set<string>();
+  for (const x of input) {
+    if (!x || typeof x !== "object") continue;
+    const o = x as { key?: unknown; label?: unknown; kind?: unknown; role?: unknown };
+    const key = String(o.key ?? "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 24);
+    const label = String(o.label ?? "").trim().slice(0, 200);
+    if (!key || !label || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, label, kind: o.kind === "opt" ? "opt" : "must", role: isDocRole(o.role) && o.role !== "company" ? o.role : "member" });
+    if (out.length >= ASK_MAX) break;
+  }
+  return out;
+}
+
+/** html 裡出現的 {{ask:key}}。 */
+export function asksInHtml(html: string): string[] {
+  const out: string[] = [];
+  const re = /\{\{\s*ask:([a-z0-9_]+)\s*\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) if (!out.includes(m[1])) out.push(m[1]);
+  return out;
+}
+
+/** 這一位簽署人（role）要作答的項目。 */
+export const asksForRole = (asks: DocAsk[], role: string) => asks.filter((a) => a.role === role);
+
+/** 檢查作答：必勾全勾才過；回傳整理過的答案（只留範本定義過的 key）。 */
+export function checkAnswers(asks: DocAsk[], raw: unknown): { ok: true; answers: Record<string, boolean> } | { ok: false; missing: DocAsk[] } {
+  const given = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const answers: Record<string, boolean> = {};
+  for (const a of asks) answers[a.key] = given[a.key] === true;
+  const missing = asks.filter((a) => a.kind === "must" && !answers[a.key]);
+  return missing.length ? { ok: false, missing } : { ok: true, answers };
+}
+
+export const CHECK_ON = "☑";
+export const CHECK_OFF = "☐";
+
 export const slotKey = (s: { role: string; seq: number }) => `${s.role}:${s.seq}`;
 export const slotLabel = (s: DocSignerSlot) => s.label || `${ROLE_LABEL[s.role]}簽名`;
 
@@ -144,6 +194,8 @@ export type TemplateInput = {
   required: boolean;
   signDays: number | null;
   signers: DocSignerSlot[];
+  asks?: DocAsk[];
+  itemIds?: string[];
   note?: string;
 };
 
@@ -158,6 +210,10 @@ export function validateTemplate(t: TemplateInput): string[] {
   const inHtml = new Set(slotsInHtml(t.html));
   const declared = new Set(t.signers.map(slotKey));
   for (const k of inHtml) if (!declared.has(k)) errs.push(`內容裡有 {{sign:${k}}} 但簽署人清單沒有這一位`);
+  const asks = t.asks ?? [];
+  const askKeys = new Set(asks.map((a) => a.key));
+  for (const k of asksInHtml(t.html)) if (!askKeys.has(k)) errs.push(`內容裡有勾選項 {{ask:${k}}} 但確認項清單沒有這一項`);
+  for (const a of asks) if (!t.signers.some((s) => s.role === a.role)) errs.push(`確認項「${a.label}」指定由${ROLE_LABEL[a.role]}作答，但簽署人沒有這一類`);
   if (t.signDays != null && (!Number.isFinite(t.signDays) || t.signDays < 1 || t.signDays > 365)) errs.push("簽署期限要在 1–365 天");
   return errs;
 }
@@ -173,17 +229,27 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
-export type DocVars = Record<string, string | number | null | undefined>;
+export type DocVars = Record<string, string | number | boolean | null | undefined>;
+
+/** 簽署完成日期的佔位 key：快照裡印「（簽署時帶入）」，全員簽完才換成日期——「產生日期」與「簽署時間」要分開。 */
+export const SIGN_DATE_KEY = "sign.date";
+const SIGN_DATE_PENDING = "（簽署時帶入）";
+
+/** 布林變數印成 ☑／☐（付款方式三選一、身分三選一這類「系統幫你勾」的格子）。 */
+export const isCheckVar = (key: string) => /\.is_[a-z0-9_]+$/.test(key);
 
 /**
  * 把範本變成「這一案的文件」：帶欄位、放簽名位、放大小章。
  *   {{client.name}}     → 變數（HTML 轉義；沒有的變數印空字串）
+ *   {{pay.is_bank}}     → 布林變數：☑／☐
+ *   {{ask:replay}}      → 本人確認項：<span class="doc-ask" data-ask="replay">☐</span>（簽完依答案換 ☑／☐）
+ *   {{sign.date}}       → 簽署完成日期佔位（完成時填）
  *   {{sign:coach:1}}    → <span class="sign-slot" data-slot="coach:1">…</span>
  *   {{seal}}            → 公司大小章（opts.seal 是 PNG data URL；沒有或 useSeal=false 就印空）
- * 沒寫在內容裡的簽名位補在文末一個「簽署欄」區塊。
+ * 沒寫在內容裡的簽名位補在文末一個「簽署欄」區塊；沒寫在內容裡的確認項也列在那裡（作答一定留在文件上）。
  */
 export function renderTemplate(
-  t: { html: string; signers: DocSignerSlot[]; useSeal: boolean },
+  t: { html: string; signers: DocSignerSlot[]; useSeal: boolean; asks?: DocAsk[] },
   vars: DocVars,
   opts: { seal?: string | null } = {},
 ): string {
@@ -192,20 +258,30 @@ export function renderTemplate(
     const s = t.signers.find((x) => slotKey(x) === k);
     return s ? slotLabel(s) : k;
   };
+  const asks = t.asks ?? [];
+  const askSpan = (key: string) => `<span class="doc-ask" data-ask="${escapeHtml(key)}">${CHECK_OFF}</span>`;
   let html = t.html
     .replace(/\{\{\s*seal\s*\}\}/g, () => seal)
     .replace(/\{\{\s*sign:([a-z_]+):(\d+)\s*\}\}/g, (_m, role: string, seq: string) => {
       const k = `${role}:${Number(seq)}`;
       return `<span class="sign-slot" data-slot="${k}"><span class="sign-slot-label">${escapeHtml(labelOf(k))}</span></span>`;
     })
+    .replace(/\{\{\s*ask:([a-z0-9_]+)\s*\}\}/g, (_m, key: string) => askSpan(key))
     .replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g, (_m, path: string) => {
+      if (path === SIGN_DATE_KEY) return `<span class="doc-sign-date">${SIGN_DATE_PENDING}</span>`;
       const v = vars[path];
+      if (isCheckVar(path)) return v === true || v === "1" || v === 1 ? CHECK_ON : CHECK_OFF;
+      if (typeof v === "boolean") return v ? CHECK_ON : CHECK_OFF;
       return v == null ? "" : escapeHtml(String(v));
     });
   html = stripActiveHtml(html);
   const extra = missingSlots(t);
-  if (extra.length) {
-    html += `\n<section class="doc-sign-block"><h3>簽署欄</h3>${extra
+  const inHtml = new Set(asksInHtml(t.html));
+  const extraAsks = asks.filter((a) => !inHtml.has(a.key));
+  if (extra.length || extraAsks.length) {
+    html += `\n<section class="doc-sign-block"><h3>簽署欄</h3>${extraAsks
+      .map((a) => `<div class="doc-ask-row">${askSpan(a.key)} ${escapeHtml(a.label)}</div>`)
+      .join("")}${extra
       .map((s) => `<div class="doc-sign-row"><span class="sign-slot" data-slot="${slotKey(s)}"><span class="sign-slot-label">${escapeHtml(slotLabel(s))}</span></span></div>`)
       .join("")}</section>`;
   }
@@ -232,10 +308,25 @@ export type SignedSigner = {
   displayName: string;
   signatureImg: string | null;
   signedAt: Date | string | null;
+  answers?: Record<string, boolean> | null;
 };
 
-/** 全員簽完：把簽名圖貼進簽名位（取代佔位 span 的內容），日期用台北日期。 */
-export function applySignatures(html: string, signers: SignedSigner[]): string {
+/**
+ * 全員簽完：把簽名圖貼進簽名位（取代佔位 span 的內容），日期用台北日期；
+ * 確認項依作答換成 ☑／☐；簽署日期佔位換成最後一位簽完的日期。
+ */
+export function applySignatures(html: string, signers: SignedSigner[], asks: DocAsk[] = []): string {
+  const answered: Record<string, boolean> = {};
+  for (const s of signers) for (const [k, v] of Object.entries(s.answers ?? {})) answered[k] = v;
+  const last = signers.map((s) => (s.signedAt ? new Date(s.signedAt).getTime() : 0)).reduce((a, b) => Math.max(a, b), 0);
+  const signDate = last ? fmtDateTaipei(new Date(last)) : "";
+  html = html
+    .replace(/<span class="doc-ask" data-ask="([a-z0-9_]+)">[^<]*<\/span>/g, (_m, key: string) => {
+      const def = asks.find((a) => a.key === key);
+      const on = answered[key] === true;
+      return `<span class="doc-ask${on ? " on" : ""}" data-ask="${key}"${def ? ` title="${escapeHtml(def.label)}"` : ""}>${on ? CHECK_ON : CHECK_OFF}</span>`;
+    })
+    .replace(/<span class="doc-sign-date">[^<]*<\/span>/g, () => `<span class="doc-sign-date">${signDate}</span>`);
   return html.replace(
     /<span class="sign-slot" data-slot="([a-z_]+:\d+)">[\s\S]*?<\/span><\/span>/g,
     (whole, k: string) => {
@@ -343,5 +434,9 @@ export const DOC_CSS = `
 .sign-slot.signed{border-bottom-color:#333}
 .sign-img{height:60px;display:block}
 .sign-meta{font-size:11px;color:#444}
+.doc-ask{display:inline-block;font-size:1.15em;line-height:1;vertical-align:-2px;margin-right:2px}
+.doc-ask.on{color:#1a4fa3}
+.doc-ask-row{margin:4px 0}
+.doc-sign-date{border-bottom:1px solid #333;padding:0 10px;min-width:90px;display:inline-block;text-align:center}
 @media print{.doc-body{padding:0;max-width:none}}
 `;

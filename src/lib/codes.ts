@@ -13,11 +13,15 @@
 // 用 UTC 會讓當月第一位客戶拿到上個月的號，而那個號很可能已經被用掉了（→ unique 撞號）。
 
 /** 純函式層可測試的最小輸入。 */
-export type CodeKind = "coach" | "client";
+export type CodeKind = "coach" | "client" | "doc_training" | "doc_service" | "doc_coach";
 
 export const CODE_PREFIX: Record<CodeKind, string> = {
   coach: "FC",
   client: "",
+  // 合約編號（2026/10/28 電子簽署）：T 培訓文件／S 顧問服務合約／D 補簽，同樣按月起算。
+  doc_training: "T",
+  doc_service: "S",
+  doc_coach: "D",
 };
 
 /** 發號當下的 YYMM（台北時區）。 */

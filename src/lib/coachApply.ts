@@ -1,3 +1,4 @@
+import type { ProfileDraft } from "@/components/SignerProfileForm";
 // 報聘（教練申請）的純函式層：路線、欄位、聲明、審核檢核表。
 // 不碰 DB、不 import drizzle —— client component（申請表單、後台面板）要直接 import 這一支。
 //
@@ -219,6 +220,8 @@ export function checklistFor(settings: ApplySettings, route: string | null | und
 // ── 送出前的檢核（表單與 server action 共用同一份規則）────────
 export type ApplyDraft = {
   route: string;
+  /** 簽約資料（2026/10/28）：填了就存進 signer_profiles；不是送出門檻，啟動簽署前再補也行。 */
+  profile?: ProfileDraft;
   name: string;
   phone: string;
   introducerCode: string;

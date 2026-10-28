@@ -14,12 +14,20 @@ import { coaches, coachApplications, coachDisplayName, trainingEnrollments } fro
 import { getApplySettings, checkApprovalGate, activateCoach } from "./coachApplyStore";
 import { getAcctState, createCaseReceipt, receiptsForCase, type CaseFeeInput } from "./acctStore";
 import { caseFunding, referralChain, type Receipt } from "./acctEngine";
-import { startSigning, listInstancesForCase, withSigners, caseProgress, getSet, latestEnabledTemplate, isUniqueViolation, type InstanceWithSigners } from "./docsStore";
+import { startSigning, listInstancesForCase, withSigners, caseProgress, getSet, latestEnabledTemplate, isUniqueViolation, getSignerProfile, profileVars, profileMissing, type InstanceWithSigners, type SignerProfile, type DocTemplate } from "./docsStore";
 import type { DocSignerSlot } from "./docs";
 import { getBrand } from "./brand";
 import { E_SIGN_CLAUSE, type DocVars } from "./docs";
+import { varDef, varsInHtml } from "./docsVars";
+import { PAYMENT_METHODS } from "./acctEngine";
 import { todayISO } from "./license";
 import { fmtMoney0 as fmtInt } from "./money";
+
+/** 行政確認欄（後台填）：身分、報名前說明方式、補簽原報名日。 */
+export type MemberKind = "intern" | "partner" | "hired";
+export const MEMBER_KIND_LABEL: Record<MemberKind, string> = { intern: "實習教練", partner: "合作教練", hired: "報聘教練" };
+export type BriefKind = "meeting" | "public";
+export type EnrollmentAdminInput = { memberKind: MemberKind; briefKind: BriefKind | null; briefDate: string | null; briefVersion: string; resignDate: string | null };
 
 export type Enrollment = typeof trainingEnrollments.$inferSelect;
 export type ReviewStage = "pending" | "passed" | "activated" | "rejected" | "cancelled";
@@ -175,6 +183,9 @@ export async function passReview(coachId: string, reviewerId: string, companySig
 
   const funding = caseFunding(await receiptsForCase("training", enr.id), enr.amountDue);
   if (!funding.met) return { ok: false, error: `收款未達門檻：應收 ${fmtInt(enr.amountDue)}，已確認 ${fmtInt(funding.confirmed)}${funding.pending ? `（另有 ${fmtInt(funding.pending)} 待查帳）` : ""}` };
+  // 資料閘（2026/10/28）：範本用到的欄位沒填齊不啟動——文件一產出就凍結，缺的欄位會變成永遠的空白。
+  const ready = await enrollmentReadiness(enr);
+  if (ready.missing.length) return { ok: false, error: `資料未填齊，還不能產文件：${ready.missing.map((m) => `${m.label}（${m.by === "person" ? "申請人填" : "行政確認"}）`).join("、")}` };
 
   if (enr.reviewStage === "pending") {
     await db
@@ -252,20 +263,91 @@ async function partyOf(coachId: string) {
 }
 
 async function buildVars(enr: Enrollment, coachId: string): Promise<DocVars> {
-  const [rows, brand] = await Promise.all([
+  const [rows, brand, prof, appRows, receipts] = await Promise.all([
     db.select({ name: coachDisplayName, email: coaches.email, code: coaches.code }).from(coaches).where(eq(coaches.id, coachId)).limit(1),
     getBrand(),
+    getSignerProfile({ kind: "coach", id: coachId }),
+    db.select({ phone: coachApplications.phone, introducerId: coachApplications.introducerId, introducerCode: coachApplications.introducerCode, submittedAt: coachApplications.submittedAt }).from(coachApplications).where(eq(coachApplications.coachId, coachId)).limit(1),
+    receiptsForCase("training", enr.id),
   ]);
   const c = rows[0];
+  const app = appRows[0];
+  const ref = app?.introducerId ? (await db.select({ name: coachDisplayName, code: coaches.code }).from(coaches).where(eq(coaches.id, app.introducerId)).limit(1))[0] : null;
+  // 付款方式：最早一筆已確認的收款（一期全額，通常只有一筆）
+  const paid = receipts.filter((r) => !r.void && r.verified !== false).sort((a, b) => (a.on < b.on ? -1 : 1))[0];
+  const method = paid?.method ?? null;
+  const kind = (enr.memberKind as MemberKind) ?? "intern";
   return {
     today: todayISO(),
     esign_clause: E_SIGN_CLAUSE,
     "company.name": brand.brandName,
     "member.name": c?.name ?? "",
-    "member.email": c?.email ?? "",
     "member.code": c?.code ?? "",
+    ...profileVars("member", prof, { email: c?.email ?? "", phone: app?.phone ?? "" }),
+    "member.kind": MEMBER_KIND_LABEL[kind] ?? "",
+    "member.is_intern": kind === "intern",
+    "member.is_partner": kind === "partner",
+    "member.is_hired": kind === "hired",
+    "ref.name": ref?.name ?? "",
+    "ref.code": ref?.code ?? app?.introducerCode ?? "",
+    "pay.method": method ? (PAYMENT_METHODS.find((m) => m.value === method)?.label ?? method) : "",
+    "pay.date": paid?.on ?? "",
+    "pay.is_bank": method === "bank",
+    "pay.is_card": method === "card",
+    "pay.is_zero": method === "zero_installment",
+    "brief.date": enr.briefDate ?? "",
+    "brief.version": enr.briefVersion ?? "",
+    "brief.is_meeting": enr.briefKind === "meeting",
+    "brief.is_public": enr.briefKind === "public",
+    "enroll.date": (app?.submittedAt ? todayISO(app.submittedAt) : todayISO(enr.createdAt)),
+    "enroll.resign_date": enr.resignDate ?? "",
+    "enroll.is_resign": !!enr.resignDate,
     "item.name": enr.itemName,
     "item.price": fmtInt(enr.amountDue),
     "case.amount": fmtInt(enr.amountDue),
   };
+}
+
+// ── 啟動前的資料檢查 ─────────────────────────────────────────────────────────
+export type MissingItem = { label: string; by: "person" | "admin" };
+export type Readiness = { missing: MissingItem[]; profile: SignerProfile | null; usesProfile: boolean };
+
+/**
+ * 這一案的範本組合用到哪些欄位、哪些還沒填。
+ *   · 簽約人資料（member.id_no／address／…）：看 signer_profiles；範本沒用到就不要求。
+ *   · 行政確認（說明會日期／公版版本）：範本有 brief.* 就要 briefKind，且對應的日期／版本要有。
+ */
+export async function enrollmentReadiness(enr: Enrollment): Promise<Readiness> {
+  const keys = await getSet("training_item", enr.itemId);
+  const templates = (await Promise.all(keys.map((k) => latestEnabledTemplate(k)))).filter((t): t is DocTemplate => !!t);
+  const used = new Set(templates.flatMap((t) => varsInHtml(t.html)));
+  const prof = await getSignerProfile({ kind: "coach", id: enr.coachId });
+  const missing: MissingItem[] = [];
+  const usesProfile = [...used].some((k) => varDef(k)?.need === "person");
+  if (usesProfile) for (const l of profileMissing(prof)) missing.push({ label: l, by: "person" });
+  const usesBrief = [...used].some((k) => k.startsWith("brief."));
+  if (usesBrief) {
+    if (!enr.briefKind) missing.push({ label: "報名前說明方式（說明會／公版介紹）", by: "admin" });
+    else if (enr.briefKind === "meeting" && !enr.briefDate) missing.push({ label: "說明會日期", by: "admin" });
+    else if (enr.briefKind === "public" && !enr.briefVersion) missing.push({ label: "公版介紹版本", by: "admin" });
+  }
+  return { missing, profile: prof, usesProfile };
+}
+
+/** 後台填行政確認欄。開通後不再改（合約已凍結，改了也不會進文件）。 */
+export async function saveEnrollmentAdmin(coachId: string, raw: unknown): Promise<{ ok: boolean; error?: string }> {
+  const enr = await getEnrollmentForCoach(coachId);
+  if (!enr) return { ok: false, error: "沒有培訓報名案件" };
+  if (enr.reviewStage === "activated") return { ok: false, error: "已開通的案件不能再改" };
+  const x = (raw ?? {}) as Record<string, unknown>;
+  const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const v: EnrollmentAdminInput = {
+    memberKind: x.memberKind === "partner" || x.memberKind === "hired" ? x.memberKind : "intern",
+    briefKind: x.briefKind === "meeting" || x.briefKind === "public" ? x.briefKind : null,
+    briefDate: date(x.briefDate),
+    briefVersion: String(x.briefVersion ?? "").trim().slice(0, 60),
+    resignDate: date(x.resignDate),
+  };
+  await db.update(trainingEnrollments).set({ ...v, updatedAt: new Date() }).where(eq(trainingEnrollments.id, enr.id));
+  return { ok: true };
 }

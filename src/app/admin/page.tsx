@@ -10,7 +10,7 @@ import AdminNav from "./AdminNav";
 import LicenseCell from "./LicenseCell";
 import CoachRoster, { type RosterRow } from "./CoachRoster";
 import ReviewPanel from "./ReviewPanel";
-import { enrollmentsFor, enrollmentView, setNeedsCompanySigner } from "@/lib/trainingStore";
+import { enrollmentsFor, enrollmentView, setNeedsCompanySigner, enrollmentReadiness } from "@/lib/trainingStore";
 import type { TrainingBrief } from "./StatusActions";
 import { getApplySettings, listApplications } from "@/lib/coachApplyStore";
 import { rankCaps } from "@/lib/quota";
@@ -50,11 +50,13 @@ export default async function Admin() {
   const training: Record<string, TrainingBrief> = {};
   await Promise.all(
     Object.values(enrollments).map(async (e) => {
-      const [v, needsCompany] = await Promise.all([enrollmentView(e), setNeedsCompanySigner(e.itemId)]);
+      const [v, needsCompany, ready] = await Promise.all([enrollmentView(e), setNeedsCompanySigner(e.itemId), enrollmentReadiness(e)]);
       training[e.coachId] = {
         enrollmentId: e.id, stage: e.reviewStage, amountDue: e.amountDue,
         confirmed: v.funding.confirmed, pending: v.funding.pending, met: v.funding.met,
         docsDone: v.progress.done, docsRequired: v.progress.required, docsTotal: v.docs.length, anyDeclined: v.progress.anyDeclined, needsCompany,
+        admin: { memberKind: e.memberKind, briefKind: e.briefKind, briefDate: e.briefDate, briefVersion: e.briefVersion, resignDate: e.resignDate },
+        missing: ready.missing,
       };
     }),
   );

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import SignaturePad from "@/components/SignaturePad";
 import SubmitButton from "@/components/ui/SubmitButton";
-import { CONSENT_LABEL, E_SIGN_CLAUSE, ROLE_LABEL, STATUS_LABEL, type DocInstanceStatus, type DocRole } from "@/lib/docs";
+import { CONSENT_LABEL, E_SIGN_CLAUSE, ROLE_LABEL, STATUS_LABEL, type DocAsk, type DocInstanceStatus, type DocRole } from "@/lib/docs";
 import { declineAction, signAction } from "./actions";
 
 export type SignerLite = {
@@ -27,6 +27,7 @@ export default function SignView({
   expiresAt,
   signers,
   myTurn,
+  asks = [],
   isMine,
   saved,
   admin,
@@ -37,12 +38,15 @@ export default function SignView({
   expiresAt: string | null;
   signers: SignerLite[];
   myTurn: boolean;
+  asks?: DocAsk[];
   isMine: boolean;
   saved: string | null;
   admin: boolean;
 }) {
   const router = useRouter();
   const [consent, setConsent] = useState(false);
+  // 本人確認項：預設全部不勾（不能預設同意）；必勾項沒勾不開放送出
+  const [answers, setAnswers] = useState<Record<string, boolean>>({});
   const [img, setImg] = useState<string | null>(null);
   const [keep, setKeep] = useState(!saved);
   const [err, setErr] = useState<string | null>(null);
@@ -51,13 +55,14 @@ export default function SignView({
   const [reason, setReason] = useState("");
   const [busy, start] = useTransition();
 
-  const canSubmit = myTurn && consent && !!img && !busy && !done;
+  const mustOk = asks.every((a) => a.kind !== "must" || answers[a.key] === true);
+  const canSubmit = myTurn && consent && mustOk && !!img && !busy && !done;
 
   function submit() {
     if (!img) return;
     setErr(null);
     start(async () => {
-      const r = await signAction(instanceId, { consent, signatureImg: img, hashSeen: hash, saveAsDefault: keep });
+      const r = await signAction(instanceId, { consent, answers, signatureImg: img, hashSeen: hash, saveAsDefault: keep });
       if (!r.ok) return setErr(r.error);
       setDone({ completed: r.completed });
       router.refresh();
@@ -106,6 +111,20 @@ export default function SignView({
           ) : (
             <>
               <h2 className="font-bold">本人確認簽署</h2>
+              {asks.length > 0 && (
+                <div className="grid gap-1.5 rounded-md border border-line p-2.5">
+                  <p className="text-xs text-tx2">請逐項確認（文件上對應的格子會依你的選擇打勾）</p>
+                  {asks.map((a) => (
+                    <label key={a.key} className="flex items-start gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" className="mt-1" checked={answers[a.key] === true} onChange={(e) => setAnswers({ ...answers, [a.key]: e.target.checked })} />
+                      <span>
+                        {a.label}
+                        <span className={`ml-1.5 text-10 rounded px-1 ${a.kind === "must" ? "bg-danger/15 text-danger" : "bg-panel2 text-tx3"}`}>{a.kind === "must" ? "必勾" : "可選"}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
               <p className="text-xs text-tx2 leading-relaxed rounded-md bg-panel2 p-2">{E_SIGN_CLAUSE}</p>
               <label className="flex items-start gap-2 text-sm cursor-pointer">
                 <input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)} />

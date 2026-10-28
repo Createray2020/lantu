@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { unstable_cache, updateTag } from "next/cache";
 import { db } from "@/Shared/db";
-import { docInstances, docSets, docSigners, docTasks, docTemplates, signatures, siteSettings, coaches, coachDisplayName } from "@/Shared/db/schema";
+import { docInstances, docSets, docSigners, docTasks, docTemplates, signatures, signerProfiles, siteSettings, coaches, coachDisplayName } from "@/Shared/db/schema";
 import {
   applySignatures,
   canSignNow,
@@ -20,6 +20,10 @@ import {
   renderTemplate,
   resolveSlots,
   sanitizeSlots,
+  sanitizeAsks,
+  asksForRole,
+  checkAnswers,
+  type DocAsk,
   validSignaturePng,
   validateTemplate,
   type DocCategory,
@@ -37,6 +41,11 @@ import {
 } from "./docs";
 import { addDaysISO, todayISO } from "./license";
 import { sanitizeTemplateHtml } from "./docsSanitize";
+import { allocCode } from "./codeAlloc";
+import type { CodeKind } from "./codes";
+
+/** 合約編號的號段：案件類型 → code_counters 的 kind。 */
+const DOC_NO_KIND: Record<DocCaseType, CodeKind> = { training: "doc_training", client_service: "doc_service", coach_doc: "doc_coach" };
 
 /** Postgres 23505＝unique_violation。neon-http／drizzle 把原始錯誤包了一層，沿 cause 往下看。 */
 export function isUniqueViolation(e: unknown): boolean {
@@ -157,6 +166,8 @@ export function sanitizeTemplateInput(raw: unknown): TemplateInput {
     required: x.required !== false,
     signDays: signDaysRaw == null || !Number.isFinite(signDaysRaw) ? null : Math.floor(signDaysRaw),
     signers: sanitizeSlots(x.signers),
+    asks: sanitizeAsks(x.asks),
+    itemIds: Array.isArray(x.itemIds) ? [...new Set(x.itemIds.filter((v): v is string => typeof v === "string" && !!v.trim()).map((v) => v.trim()))].slice(0, 50) : [],
     note: String(x.note ?? "").trim().slice(0, 400),
   };
 }
@@ -182,7 +193,7 @@ export async function saveTemplate(raw: unknown, createdBy: string | null): Prom
     try {
       const rows = await db
         .insert(docTemplates)
-        .values({ key, version, category: t.category, name: t.name, html: t.html, useSeal: t.useSeal, required: t.required, signDays: t.signDays, signers: t.signers, note: t.note ?? "", createdBy })
+        .values({ key, version, category: t.category, name: t.name, html: t.html, useSeal: t.useSeal, required: t.required, signDays: t.signDays, signers: t.signers, asks: t.asks, itemIds: t.itemIds, note: t.note ?? "", createdBy })
         .returning();
       return rows[0];
     } catch (e) {
@@ -235,6 +246,81 @@ export async function saveSignature(o: SignatureOwner, img: unknown): Promise<vo
     .onConflictDoUpdate({ target: [signatures.ownerKind, signatures.ownerId], set: { img: v, updatedAt: new Date() } });
 }
 
+// ── 簽約資料（signer_profiles）──────────────────────────────────────────────
+export type SignerProfile = typeof signerProfiles.$inferSelect;
+export type SignerProfileInput = {
+  idNo: string; birthDate: string | null; phone: string; email: string; address: string;
+  invoiceKind: "personal" | "company"; invoiceCarrier: string; invoiceTaxId: string; invoiceTitle: string;
+};
+export const PROFILE_FIELD_LABEL: Record<keyof SignerProfileInput, string> = {
+  idNo: "身分證字號／護照號碼", birthDate: "出生日期", phone: "電話", email: "Email", address: "通訊地址",
+  invoiceKind: "發票開立方式", invoiceCarrier: "雲端發票載具", invoiceTaxId: "統一編號", invoiceTitle: "發票抬頭",
+};
+
+export function sanitizeProfileInput(raw: unknown): SignerProfileInput {
+  const x = (raw ?? {}) as Record<string, unknown>;
+  const str = (k: string, max = 120) => String(x[k] ?? "").trim().slice(0, max);
+  const bd = str("birthDate", 10);
+  return {
+    idNo: str("idNo", 30).toUpperCase(),
+    birthDate: /^\d{4}-\d{2}-\d{2}$/.test(bd) ? bd : null,
+    phone: str("phone", 30),
+    email: str("email", 120),
+    address: str("address", 200),
+    invoiceKind: x.invoiceKind === "company" ? "company" : "personal",
+    invoiceCarrier: str("invoiceCarrier", 30),
+    invoiceTaxId: str("invoiceTaxId", 10),
+    invoiceTitle: str("invoiceTitle", 80),
+  };
+}
+
+export async function getSignerProfile(o: SignatureOwner): Promise<SignerProfile | null> {
+  const rows = await db.select().from(signerProfiles).where(and(eq(signerProfiles.ownerKind, o.kind), eq(signerProfiles.ownerId, o.id))).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function saveSignerProfile(o: SignatureOwner, raw: unknown): Promise<SignerProfile> {
+  const v = sanitizeProfileInput(raw);
+  const rows = await db
+    .insert(signerProfiles)
+    .values({ ownerKind: o.kind, ownerId: o.id, ...v, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: [signerProfiles.ownerKind, signerProfiles.ownerId], set: { ...v, updatedAt: new Date() } })
+    .returning();
+  return rows[0];
+}
+
+/** 發票方式一句話＋各欄；給範本變數用。prefix 是變數前綴（member／client）。 */
+export function profileVars(prefix: "member" | "client", p: SignerProfile | null, fallback: { email?: string; phone?: string } = {}): DocVars {
+  const company = p?.invoiceKind === "company";
+  const invoice = !p ? "" : company ? `公司（統一編號 ${p.invoiceTaxId}　抬頭 ${p.invoiceTitle}）` : `個人${p.invoiceCarrier ? `（雲端發票載具 ${p.invoiceCarrier}）` : ""}`;
+  return {
+    [`${prefix}.email`]: p?.email || fallback.email || "",
+    [`${prefix}.phone`]: p?.phone || fallback.phone || "",
+    [`${prefix}.id_no`]: p?.idNo ?? "",
+    [`${prefix}.birth`]: p?.birthDate ?? "",
+    [`${prefix}.address`]: p?.address ?? "",
+    [`${prefix}.invoice`]: invoice,
+    [`${prefix}.invoice_carrier`]: company ? "" : (p?.invoiceCarrier ?? ""),
+    [`${prefix}.invoice_tax_id`]: company ? p!.invoiceTaxId : "",
+    [`${prefix}.invoice_title`]: company ? p!.invoiceTitle : "",
+    [`${prefix}.invoice_is_personal`]: !!p && !company,
+    [`${prefix}.invoice_is_company`]: company,
+  };
+}
+
+/** 簽約資料缺哪些（合約必印的）：身分證／護照、電話、Email、地址；發票依方式看載具或統編＋抬頭（載具可空：可印紙本）。 */
+export function profileMissing(p: SignerProfile | null): string[] {
+  if (!p) return [PROFILE_FIELD_LABEL.idNo, PROFILE_FIELD_LABEL.birthDate, PROFILE_FIELD_LABEL.phone, PROFILE_FIELD_LABEL.email, PROFILE_FIELD_LABEL.address, PROFILE_FIELD_LABEL.invoiceKind];
+  const out: string[] = [];
+  if (!p.idNo) out.push(PROFILE_FIELD_LABEL.idNo);
+  if (!p.birthDate) out.push(PROFILE_FIELD_LABEL.birthDate);
+  if (!p.phone) out.push(PROFILE_FIELD_LABEL.phone);
+  if (!p.email) out.push(PROFILE_FIELD_LABEL.email);
+  if (!p.address) out.push(PROFILE_FIELD_LABEL.address);
+  if (p.invoiceKind === "company" && (!p.invoiceTaxId || !p.invoiceTitle)) out.push("公司發票的統一編號與抬頭");
+  return out;
+}
+
 export async function deleteSignature(o: SignatureOwner): Promise<void> {
   await db.delete(signatures).where(and(eq(signatures.ownerKind, o.kind), eq(signatures.ownerId, o.id)));
 }
@@ -271,7 +357,10 @@ export async function startSigning(input: StartSigningInput): Promise<StartSigni
     const resolved = resolveSlots(t.signers as DocSignerSlot[], input.ctx);
     if (!resolved.ok) return { ok: false, error: `「${t.name}」缺少簽署人：${resolved.missing.map((r) => ({ company: "公司代表", member: "成員", client: "客戶", coach: "教練" })[r]).join("、")}` };
     // title 永遠有值（範本名）；呼叫端給了就用呼叫端的。範本 HTML 再過一次白名單（舊資料或直接寫 DB 的也擋）。
-    const html = renderTemplate({ html: sanitizeTemplateHtml(t.html), signers: t.signers as DocSignerSlot[], useSeal: t.useSeal }, { title: t.name, ...input.vars }, { seal });
+    // 合約編號先配再渲染（文件上要印）；配了號但後面沒插成（撞到別人同時啟動的那一份）就讓這個號空掉——寧可跳號也不重號。
+    const docNo = await allocCode(DOC_NO_KIND[input.caseType]);
+    const expiresAt = t.signDays ? addDaysISO(today, t.signDays) : null;
+    const html = renderTemplate({ html: sanitizeTemplateHtml(t.html), signers: t.signers as DocSignerSlot[], useSeal: t.useSeal, asks: t.asks as DocAsk[] }, { title: t.name, "doc.no": docNo, "doc.expires": expiresAt ?? "", ...input.vars }, { seal });
     toCreate.push({
       inst: {
         id: crypto.randomUUID(),
@@ -281,11 +370,12 @@ export async function startSigning(input: StartSigningInput): Promise<StartSigni
         templateKey: t.key,
         version: t.version,
         title: t.name,
+        docNo,
         required: t.required,
         htmlSnapshot: html,
         hash: sha256(html),
         status: "pending",
-        expiresAt: t.signDays ? addDaysISO(today, t.signDays) : null,
+        expiresAt,
         createdBy: input.createdBy,
       },
       signers: resolved.signers.map((s) => ({ ...s, status: "pending" })),
@@ -376,6 +466,7 @@ export type SignInput = {
   instanceId: string;
   me: Identity;
   consent: boolean;
+  answers?: unknown;     // 本人確認項的作答 {key: true/false}；必勾沒勾在這裡擋
   signatureImg: unknown;
   hashSeen: string;      // 簽署頁拿到的 instance.hash，確認按下時看到的就是現在這份
   saveAsDefault: boolean;
@@ -399,11 +490,16 @@ export async function consentAndSign(input: SignInput): Promise<SignResult> {
   if (input.hashSeen !== inst.hash) return { ok: false, error: "文件內容已更新，請重新載入後再確認" };
   const img = validSignaturePng(input.signatureImg);
   if (!img) return { ok: false, error: "簽名圖不正確，請重新簽一次" };
+  // 本人確認項：依這一列的 role 取範本定義；必勾沒勾不給簽。範本列不在了（不該發生）就當沒有確認項。
+  const tpl = await getTemplate(inst.templateId);
+  const myAsks = asksForRole((tpl?.asks as DocAsk[] | undefined) ?? [], mine.role);
+  const ans = checkAnswers(myAsks, input.answers);
+  if (!ans.ok) return { ok: false, error: `請先確認：${ans.missing.map((a) => a.label).join("、")}` };
 
   const now = new Date();
   await db
     .update(docSigners)
-    .set({ status: "signed", consentAt: now, signatureImg: img, signedAt: now, ip: input.ip, ua: input.ua?.slice(0, 300) ?? null, hashAtSign: inst.hash })
+    .set({ status: "signed", consentAt: now, answers: ans.answers, signatureImg: img, signedAt: now, ip: input.ip, ua: input.ua?.slice(0, 300) ?? null, hashAtSign: inst.hash })
     .where(and(eq(docSigners.id, mine.id), eq(docSigners.status, "pending")));
   if (input.saveAsDefault) {
     const owner: SignatureOwner | null = mine.coachId ? { kind: "coach", id: mine.coachId } : mine.clientUserId ? { kind: "client_user", id: mine.clientUserId } : null;
@@ -415,7 +511,7 @@ export async function consentAndSign(input: SignInput): Promise<SignResult> {
   const status = instanceStatusFrom(after.signers);
   if (status === "completed") {
     // 原始快照（hash／hash_at_sign 對應的內容）不動；貼了簽名的版本另存 signed_html，才能事後重算每位簽署人確認過的雜湊。
-    const finalHtml = applySignatures(after.htmlSnapshot, after.signers);
+    const finalHtml = applySignatures(after.htmlSnapshot, after.signers, (tpl?.asks as DocAsk[] | undefined) ?? []);
     await db
       .update(docInstances)
       .set({ status: "completed", signedHtml: finalHtml, finalHash: sha256(finalHtml), completedAt: now, updatedAt: now })
@@ -577,10 +673,12 @@ export async function createDocTask(input: { templateKey: string; coachIds: stri
   for (const p of people) {
     const resolved = resolveSlots(t.signers as DocSignerSlot[], { member: { coachId: p.id, name: p.name ?? "" }, coach: { coachId: p.id, name: p.name ?? "" }, company: admin ? { coachId: admin.id, name: admin.name ?? "" } : null });
     if (!resolved.ok) { skipped.push(p.name ?? p.id); continue; }
-    const vars: DocVars = { title: t.name, today: todayISO(), esign_clause: E_SIGN_CLAUSE, "member.name": p.name ?? "", "member.email": p.email ?? "", "member.code": p.code ?? "" };
-    const html = renderTemplate({ html: sanitizeTemplateHtml(t.html), signers: t.signers as DocSignerSlot[], useSeal: t.useSeal }, vars, { seal });
+    const docNo = await allocCode(DOC_NO_KIND.coach_doc);
+    const prof = await getSignerProfile({ kind: "coach", id: p.id });
+    const vars: DocVars = { title: t.name, today: todayISO(), "doc.no": docNo, "doc.expires": deadline ?? "", esign_clause: E_SIGN_CLAUSE, "member.name": p.name ?? "", "member.email": p.email ?? "", "member.code": p.code ?? "", ...profileVars("member", prof, { email: p.email ?? "" }) };
+    const html = renderTemplate({ html: sanitizeTemplateHtml(t.html), signers: t.signers as DocSignerSlot[], useSeal: t.useSeal, asks: t.asks as DocAsk[] }, vars, { seal });
     const ok = await insertInstanceWithSigners(
-      { id: crypto.randomUUID(), caseType: "coach_doc", caseId: `${task.id}:${p.id}`, templateId: t.id, templateKey: t.key, version: t.version, title: t.name, required: t.required, htmlSnapshot: html, hash: sha256(html), status: "pending", expiresAt: deadline, createdBy },
+      { id: crypto.randomUUID(), caseType: "coach_doc", caseId: `${task.id}:${p.id}`, templateId: t.id, templateKey: t.key, version: t.version, title: t.name, docNo, required: t.required, htmlSnapshot: html, hash: sha256(html), status: "pending", expiresAt: deadline, createdBy },
       resolved.signers.map((s) => ({ ...s, status: "pending" })),
     );
     if (ok) created++;
