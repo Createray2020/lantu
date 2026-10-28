@@ -139,9 +139,21 @@ export default async function Portal() {
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 sm:px-8 py-4 border-b border-line">
         <Link href="/home" className="flex items-center gap-3 min-w-0" title="回官網首頁">
           <BrandMark />
-          <span className="font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
+          <span className="leading-tight">
+            <span className="block font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
+            {caseState.kind === "case" && <span className="block text-10 tracking-[0.3em] text-brand">MEMBER CENTER</span>}
+          </span>
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {caseState.kind === "case" && (
+            <span className="hidden sm:flex items-center gap-2 mr-1">
+              <span className="w-8 h-8 rounded-full bg-panel2 border border-line grid place-items-center text-xs font-bold">{name.slice(0, 1)}</span>
+              <span className="leading-tight">
+                <span className="block text-sm font-bold">{name}</span>
+                {setup.code && <span className="block text-10 text-tx3">規劃編號 {setup.code}</span>}
+              </span>
+            </span>
+          )}
           {coachState === "active" && (
             <Link
               href="/dashboard"

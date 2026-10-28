@@ -52,7 +52,7 @@ function StageEditor({ s }: { s: StageRow }) {
         ))}
       </ul>
       <button className={`${BTN} justify-self-start`} onClick={() => setList((l) => [...l, { k: "", label: "" }])}>＋ 項目</button>
-      <p className="text-10 text-tx3">鍵（contract／paid／login／next／meet／kyc／docs／draft／decision／final／actions／review／survey）是系統自動勾選用的對照；自訂項目用別的鍵即可。</p>
+      <p className="text-10 text-tx3">鍵（contract／paid／setup／goals／kyc／draft／meet／explain／decision／review）是系統自動勾選用的對照；自訂項目用別的鍵即可。</p>
     </div>
   );
 }

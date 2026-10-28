@@ -19,13 +19,21 @@ export const STAGE_LABEL: Record<Stage, string> = {
   report: "報告書會談",
   tracking: "執行追蹤與動態調整",
 };
-/** 客戶端每階段的一句話（提案書第二節「客戶該知道什麼」） */
+/** 客戶端每階段的一句話（照提案書圖 2–5 的文字） */
 export const STAGE_CLIENT_HINT: Record<Stage, string> = {
-  commission: "確認服務範圍、期間與付款；完成後會開通你的專屬教練與規劃編號。",
-  interview: "教練會和你深談，請依清單提供資料；補齊後不會再重複詢問。",
-  planning: "教練正在整理你的規劃與報告書初稿，沒消息也代表進度在走。",
-  report: "一起看規劃結果；你的修改意見會被記下，會談後交付修改與行動計畫。",
-  tracking: "依約定的行動項目陪你走，至少每季定期追蹤一次。",
+  commission: "完成付費、合約與正式進案，系統開立你的專屬規劃編號，正式啟動這份規劃。",
+  interview: "進行完整需求與現況了解，約 60 分鐘，一次盤點收入、支出、資產、負債與人生目標。",
+  planning: "整理資料、進行分析並建立規劃，試算各大目標的缺口與可行方案，編寫你的專屬規劃書。",
+  report: "與客戶討論規劃結果，約 60 分鐘，逐頁說明規劃書內容，你可以隨時提問並調整優先順序。",
+  tracking: "定期檢視階段性成果與生活變化，依現況動態調整規劃，確保每一步都跟得上你的目標。",
+};
+/** 客戶端「預計時間」那一列（照圖） */
+export const STAGE_TIME_HINT: Record<Stage, string> = {
+  commission: "7 天內",
+  interview: "7 天",
+  planning: "資料齊全後 14 天內完成規劃與報告書初稿",
+  report: "初稿完成日起 7 天內完成會談；修改於會談後 7 天內交付",
+  tracking: "完成服務節點後 7 天內發送問卷；轉入定期追蹤後至少每季 1 次",
 };
 export const STAGE_OWNER_HINT: Record<Stage, string> = {
   commission: "財務教練；行政財法協助合約與收付款",
@@ -36,31 +44,36 @@ export const STAGE_OWNER_HINT: Record<Stage, string> = {
 };
 
 export type StageParam = { days: number; checklist: { k: string; label: string }[] };
+// 清單文字照提案書圖 2–5；鍵（k）是系統自動勾選的對照：
+//   contract 合約完成、paid 收款確認、setup 客戶開通會員中心、goals 諮詢紀錄（初次／深度）、kyc 風險問卷、
+//   draft 報告書標初稿、explain 諮詢紀錄（提案／報告書）、decision 客戶決定、review 定期檢視紀錄
 export const DEFAULT_STAGE_PARAMS: Record<Stage, StageParam> = {
   commission: { days: 7, checklist: [
-    { k: "contract", label: "合約已簽署" },
-    { k: "paid", label: "款項已確認" },
-    { k: "login", label: "客戶已開通會員中心" },
-    { k: "next", label: "已排定首次會談日期" },
+    { k: "scope", label: "確認方案範圍與服務期間" },
+    { k: "contract", label: "簽署服務合約" },
+    { k: "paid", label: "確認付款完成" },
+    { k: "setup", label: "於系統建立案件與規劃編號" },
   ] },
   interview: { days: 14, checklist: [
-    { k: "meet", label: "首次深度會談已完成" },
-    { k: "kyc", label: "風險屬性問卷已完成" },
-    { k: "docs", label: "必要資料已齊全並經客戶確認" },
+    { k: "goals", label: "深入了解客戶目標、家庭與財務狀況" },
+    { k: "kyc", label: "進行 KYC 與資料收集" },
+    { k: "docs", label: "列出缺漏資料與補件期限" },
   ] },
   planning: { days: 14, checklist: [
-    { k: "draft", label: "規劃與報告書初稿已完成" },
-    { k: "meet", label: "已排定報告書會談" },
+    { k: "analysis", label: "進行財務分析與規劃" },
+    { k: "draft", label: "準備報告書與行動方案" },
+    { k: "meet", label: "排定報告書會談日期" },
   ] },
   report: { days: 14, checklist: [
-    { k: "meet", label: "報告書會談已完成" },
-    { k: "decision", label: "已記錄客戶決定（接受／修改後再提案）" },
-    { k: "final", label: "報告書最終版已交付" },
-    { k: "actions", label: "行動計畫已建立並排定下次追蹤日" },
+    { k: "explain", label: "向客戶說明分析、規劃與行動方案" },
+    { k: "qa", label: "回答客戶疑問" },
+    { k: "decision", label: "確認客戶接受與需修改的項目" },
   ] },
   tracking: { days: 90, checklist: [
-    { k: "review", label: "本季定期追蹤已完成" },
-    { k: "survey", label: "服務回饋問卷已發送" },
+    { k: "review", label: "定期檢視階段性成果與生活變化並調整規劃" },
+    { k: "needs", label: "確認後續需求" },
+    { k: "referral", label: "詢問轉介紹" },
+    { k: "renew", label: "決定續約／再服務" },
   ] },
 };
 

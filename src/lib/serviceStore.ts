@@ -226,7 +226,7 @@ export async function recheckCommission(clientId: string): Promise<void> {
   const caseId = bundle.case.id;
   if (signed) await autoCheck(caseId, "commission", "contract");
   if (funding.met) await autoCheck(caseId, "commission", "paid");
-  if (bound) await autoCheck(caseId, "commission", "login");
+  if (bound) await autoCheck(caseId, "commission", "setup");
   if (bundle.case.stage === "commission" && signed && funding.met && bound) {
     await completeStage(caseId, "commission", { type: "system", name: "系統" }, { auto: true, reason: "合約完成＋收款確認＋客戶已開通會員中心" });
   }

@@ -37,6 +37,8 @@ export async function portalCaseState(clientId: string, clientName: string): Pro
         return {
           stage: st, progress: stageProgress(row, st),
           due: dueForClient({ promisedDate: r?.promisedDate ?? null, actualDate: r?.actualDate ?? null }),
+          // 照提案書圖 2–5：三個日期方塊都給（預計日也顯示）
+          expectedDate: r?.expectedDate ?? null, promisedDate: r?.promisedDate ?? null, actualDate: r?.actualDate ?? null,
           checklist: (r?.checklist ?? []).map((x) => ({ label: x.label, done: x.done })),
           note: r?.note ?? "", decision: r?.decision ?? "",
         };

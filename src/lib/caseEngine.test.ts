@@ -17,13 +17,13 @@ describe("caseEngine 階段順序與預設值", () => {
     expect(STAGES.map((s) => DEFAULT_STAGE_PARAMS[s].days)).toEqual([7, 14, 14, 14, 90]);
     expect(paramsFor("planning", { planning: { days: 21 } }).days).toBe(21);
     expect(paramsFor("planning", { planning: { days: 0 } }).days).toBe(14);
-    expect(paramsFor("planning", { planning: { checklist: [] } }).checklist.length).toBe(2);
+    expect(paramsFor("planning", { planning: { checklist: [] } }).checklist.length).toBe(3);
   });
   it("新階段列：預計日＝起算＋天數、清單全未勾", () => {
     const r = newStageRow("commission", "2026-09-05", paramsFor("commission"));
     expect(r.expectedDate).toBe("2026-09-12");
     expect(r.checklist.every((c) => !c.done)).toBe(true);
-    expect(r.checklist.map((c) => c.k)).toEqual(["contract", "paid", "login", "next"]);
+    expect(r.checklist.map((c) => c.k)).toEqual(["scope", "contract", "paid", "setup"]);
   });
 });
 
