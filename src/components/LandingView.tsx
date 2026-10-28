@@ -186,6 +186,8 @@ export default async function LandingView() {
             <Link href="/coaches" className="hover:text-tx2">認識教練</Link>
             <Link href="/passport" className="hover:text-tx2">免費試算</Link>
             <Link href="/join" className="hover:text-tx2">加入我們</Link>
+            <Link href="/privacy" className="hover:text-tx2">隱私權政策</Link>
+            <Link href="/terms" className="hover:text-tx2">服務條款</Link>
           </div>
           <span>理解自己・做出選擇・走向未來</span>
         </div>

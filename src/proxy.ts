@@ -22,6 +22,8 @@ const isPublicRoute = createRouteMatcher([
   // 按「開始規劃」才導去註冊。這是企業主客群的入場門，地位等同人生護照。
   '/bizcheck',
   '/join', // 招募頁：對外公開，訪客要看得到
+  '/privacy', // 隱私權政策（Google OAuth 對外發布的硬條件，必須公開）
+  '/terms', // 服務條款（同上）
   '/login', // 登入身分選擇頁（官網只有一顆登入，教練/客戶在這裡分流）
   '/api/version',
   '/api/brand(.*)', // 品牌 logo/icon 讀取：favicon、PWA、iframe app 需匿名可讀
