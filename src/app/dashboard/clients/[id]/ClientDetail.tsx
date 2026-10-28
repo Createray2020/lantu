@@ -29,6 +29,7 @@ import {
 import { StageGuideModal } from "../../StageGuide";
 import Collaborators, { type CollaboratorLite } from "./Collaborators";
 import ClientLogin, { type ClientLoginInfo } from "./ClientLogin";
+import CaseProgress from "./CaseProgress";
 import ConsultRecordForm, { type ConsultRecordValue } from "../../ConsultRecordForm";
 import {
   fmtMoney,
@@ -225,6 +226,8 @@ export default function ClientDetail({
         />
       )}
 
+      {/* 服務進度只住在「年度版本」分頁（Ray 2026/10/28）：它是這一年服務怎麼走，不是每個分頁都要看的東西 */}
+      {tab === "plans" && <div className="mb-4"><CaseProgress clientId={client.id} readOnly={readOnly} /></div>}
       {tab === "plans" && (
         <Plans
           plans={plans}
