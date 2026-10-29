@@ -35,6 +35,16 @@ export default async function RequestsPage() {
       <DashboardHeader {...hp} />
       <ReadOnlyBanner license={hp.license} />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+        {/* 三條綁定路線怎麼選（2026/10/29 Ray）：教練只要判斷「我知道他是誰嗎？」 */}
+        <section className="mb-8 rounded-xl border border-line bg-panel2 p-4 shadow-e1">
+          <h2 className="font-bold mb-2">要讓客戶連到你，選哪一種？</h2>
+          <ul className="grid gap-2 text-sm text-tx2">
+            <li><b className="text-tx">已經知道是誰（一對一）</b>：先在「客戶」建好這位客戶，到他的客戶頁「客戶登入」按「複製訊息」貼給他。規劃做好了沒都走這條——做好了他一登入就看得到。</li>
+            <li><b className="text-tx">講座、群組（一對多）</b>：用頁面最下面的「群發邀請連結」，誰點進來就新增成你的客戶。</li>
+            <li><b className="text-tx">客戶自己來的</b>：你不用做什麼。他在客戶端選了你，申請會出現在下面，按接受就好。</li>
+          </ul>
+        </section>
+
         <h1 className="font-serif text-2xl mb-1">客戶連結申請</h1>
         <p className="text-tx2 text-sm mb-5">客戶從人生護照送出的連結邀請；接受後對方就掛到你名下、可一起規劃。</p>
         <RequestList requests={requests.map((r) => ({ id: r.id, clientId: r.clientId, clientName: r.clientName, note: r.note }))} />

@@ -196,7 +196,7 @@ export default function ClientDetail({
       />
 
       {isOwner && <Collaborators clientId={client.id} collaborators={collaborators} readOnly={readOnly} />}
-      {isOwner && login && <ClientLogin clientId={client.id} info={login} readOnly={readOnly} />}
+      {isOwner && login && <ClientLogin clientId={client.id} clientName={client.name} info={login} readOnly={readOnly} />}
 
       {err && <div className="mt-3 text-danger text-sm">{err}</div>}
 

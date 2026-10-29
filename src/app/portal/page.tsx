@@ -26,13 +26,16 @@ import { countMyPending, listMyInstances, hasReminderFor } from "@/lib/docsStore
 import { portalCaseState } from "@/lib/portalCase";
 import { unreadCount } from "@/lib/notify";
 import MemberCenter from "./MemberCenter";
+import GuideCard from "./GuideCard";
+import { getClientLinkStatus } from "@/lib/coachLink";
+import { portalGuideState } from "@/lib/inviteMessage";
 
 export const dynamic = "force-dynamic";
 
 // 客戶端首頁。
 // - 尚未做人生護照：導引開始。
 // - 已有基礎方案：顯示能力分析摘要；「真的進入規劃」要等掛上教練（雙向連結，之後開放）。
-export default async function Portal({ searchParams }: { searchParams?: Promise<{ joined?: string }> }) {
+export default async function Portal({ searchParams }: { searchParams?: Promise<{ joined?: string }> } = {}) {
   // 任何登入者（含教練）都看客戶介面；未登入才導去客戶登入。
   const client = await ensureClientUser();
   if (!client) redirect("/client/sign-in");
@@ -64,6 +67,10 @@ export default async function Portal({ searchParams }: { searchParams?: Promise<
   // 會員中心（2026/10/28 案件進度）：有案件就以「服務進度」為首屏；掛了教練但還沒委託顯示一張「尚未委託」卡；自助客戶什麼都不多畫。
   const caseState = planCase ? await portalCaseState(planCase.clientId, name) : { kind: "none" as const };
   const unread = await unreadCount("client", client.id).catch(() => 0);
+  // 我的進度（2026/10/29）：三條綁定路線都走同一條三步驟，首頁依狀態只給一個主要動作。
+  const link = await getClientLinkStatus(client.id);
+  const guide = portalGuideState({ hasPassport: !!r, coachPlan: own?.source === "coach", link: link.state });
+  const guideCoach = link.state === "none" ? null : link.coachName;
   // 教練↔客戶是雙棲的：教練也會用客戶介面做自己的規劃。
   // 但這裡原本沒有任何回教練端的路——進來就出不去，只能登出或自己打網址。
   // 教練端頁首早就有「我的規劃」指過來，這條是把單向補成雙向。
@@ -228,6 +235,7 @@ export default async function Portal({ searchParams }: { searchParams?: Promise<
           </div>
         )}
         <RiskQuizGate invited={quizInvited} />
+        <GuideCard state={guide} coachName={guideCoach} />
         {caseState.kind === "case" && <MemberCenter d={caseState.data} />}
         {caseState.kind === "no_case" && (
           <div className="max-w-2xl mx-auto mb-8 rounded-xl border border-line bg-panel2 px-5 py-4 text-sm">
@@ -330,7 +338,7 @@ export default async function Portal({ searchParams }: { searchParams?: Promise<
               </div>
             </details>
           </div>
-        ) : (
+        ) : guide === "start" ? null : (
           <div className="max-w-lg mx-auto text-center pt-6">
             <div className="text-brand text-xs tracking-[0.3em] mb-3">MY FINANCIAL PLAN</div>
             <h1 className="font-serif text-3xl mb-4">{name}，歡迎回來</h1>
@@ -340,16 +348,6 @@ export default async function Portal({ searchParams }: { searchParams?: Promise<
             </p>
             <Link href="/portal/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-8 py-3 rounded-lg">
               開始我的人生護照
-            </Link>
-          </div>
-        )}
-
-        {/* 開通碼入口（2026/10/29）：教練先做好規劃、給了「客戶編號-開通碼」，客戶自己登入後從這裡接上。
-            已經接上教練規劃的人不用看到。 */}
-        {own?.source !== "coach" && (
-          <div className="max-w-2xl mx-auto mt-10 text-center">
-            <Link href="/portal/claim" className="inline-flex items-center gap-2 text-sm text-tx2 hover:text-tx border border-line rounded-lg px-4 py-2">
-              🔑 我有教練給的開通碼
             </Link>
           </div>
         )}

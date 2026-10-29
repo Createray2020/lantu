@@ -66,7 +66,7 @@ export default async function ClaimPage({ searchParams }: { searchParams: Promis
           <p className="text-tx3 text-xs mb-6">確認後，你的帳號（{user.email ?? "此帳號"}）會連結到這位教練。</p>
         </>
       )}
-      <ClaimConfirm code={code} />
+      <ClaimConfirm code={code} group={!inv.clientId} />
     </Shell>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { shareJoinUrl } from "@/lib/joinFlow";
+import { dedicatedMessage } from "@/lib/inviteMessage";
 
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -22,10 +23,12 @@ export type ClientLoginInfo = {
 // 一人一碼、綁定後失效；「重新產生」會作廢舊碼。
 export default function ClientLogin({
   clientId,
+  clientName = null,
   info,
   readOnly = false,
 }: {
   clientId: string;
+  clientName?: string | null;
   info: ClientLoginInfo;
   readOnly?: boolean;
 }) {
@@ -33,13 +36,17 @@ export default function ClientLogin({
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState<string | null>(info.pendingCode);
   const [claim, setClaim] = useState<string | null>(info.claimCode);
-  const [copied, setCopied] = useState<"" | "link" | "claim">("");
+  const [copied, setCopied] = useState<"" | "link" | "claim" | "msg">("");
+  // 複製訊息（2026/10/29）：連結＋步驟＋開通碼一段貼 LINE；規劃做好了沒，訊息講法不同
+  const [ready, setReady] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   // 連結要帶完整網域；伺服端沒有 window，先給空字串，水合後補上（避免 effect 裡 setState）。
   const origin = useSyncExternalStore(() => () => {}, () => window.location.origin, () => "");
   const link = code ? shareJoinUrl(origin, code) : null;
+  const host = useSyncExternalStore(() => () => {}, () => window.location.host, () => "");
+  const message = link ? dedicatedMessage({ clientName, link, claimCode: claim, host, ready }) : "";
 
   function gen() {
     setErr(null); setCopied("");
@@ -89,6 +96,22 @@ export default function ClientLogin({
                   </button>
                 </div>
               ) : null}
+              {link && (
+                <div className="rounded-lg border border-brand/30 bg-brand/5 p-3 grid gap-2">
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className="font-bold text-tx">傳給客戶的訊息</span>
+                    <label className="flex items-center gap-1.5 text-xs text-tx2 cursor-pointer"><input type="radio" checked={ready} onChange={() => setReady(true)} />規劃已整理好</label>
+                    <label className="flex items-center gap-1.5 text-xs text-tx2 cursor-pointer"><input type="radio" checked={!ready} onChange={() => setReady(false)} />先開通帳號，之後再規劃</label>
+                    <span className="flex-1" />
+                    <button onClick={() => { navigator.clipboard?.writeText(message); setCopied("msg"); }}
+                      className="text-onbrand bg-brand hover:bg-brand2 px-4 py-1.5 rounded-lg text-sm font-bold">
+                      {copied === "msg" ? "已複製 ✓" : "複製訊息"}
+                    </button>
+                  </div>
+                  <pre className="whitespace-pre-wrap text-xs text-tx2 bg-field border border-line rounded-md p-2.5 font-sans leading-relaxed">{message}</pre>
+                  <p className="text-11 text-tx3">直接貼到 LINE 就好：連結、要按哪一顆、打不開時的開通碼都寫在裡面，不用另外解釋。</p>
+                </div>
+              )}
               {link && (
                 <div className="flex flex-wrap gap-2 items-center text-sm">
                   <span className="text-xs text-tx3">開通碼</span>
