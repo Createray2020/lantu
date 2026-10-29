@@ -658,15 +658,37 @@ export type DocTaskView = DocTask & { total: number; done: number; rows: { coach
  * 建立補簽任務：用範本「最新啟用版」替每位對象產一份實例（case_type='coach_doc'，case_id=`${taskId}:${coachId}`）。
  * 簽署人＝那位教練本人（member）；範本若有 company 簽名位，由建立任務的管理員擔任。
  */
-export async function createDocTask(input: { templateKey: string; coachIds: string[]; deadline: string | null; note?: string }, createdBy: string): Promise<{ ok: true; task: DocTask; created: number; skipped: string[] } | { ok: false; error: string }> {
+/**
+ * 補簽時要略過的人（LT04，2026/10/29 Ray 定案）：同一份範本「同一版本」已經有待簽或已完成的文件
+ * （不管是從報聘培訓流程來的、還是之前的補簽任務），且他是本人那一格（member／coach）。
+ * 拒簽、逾期、作廢的不算——那些要重發。重試時已成功建立的也因此不會重複產生。
+ */
+export async function coachesWithLiveDoc(templateKey: string, version: number, coachIds: string[]): Promise<Set<string>> {
+  if (!coachIds.length) return new Set();
+  const insts = await db.select({ id: docInstances.id }).from(docInstances)
+    .where(and(eq(docInstances.templateKey, templateKey), eq(docInstances.version, version), inArray(docInstances.status, ["pending", "completed"])));
+  if (!insts.length) return new Set();
+  const rows = await db.select({ coachId: docSigners.coachId, role: docSigners.role }).from(docSigners)
+    .where(and(inArray(docSigners.instanceId, insts.map((i) => i.id)), inArray(docSigners.coachId, coachIds)));
+  return new Set(rows.filter((r) => r.role === "member" || r.role === "coach").map((r) => r.coachId).filter((x): x is string => !!x));
+}
+
+export type DocTaskResult = { ok: true; task: DocTask | null; title: string; created: number; skipped: string[]; already: string[] } | { ok: false; error: string };
+
+export async function createDocTask(input: { templateKey: string; coachIds: string[]; deadline: string | null; note?: string }, createdBy: string): Promise<DocTaskResult> {
   const t = await latestEnabledTemplate(input.templateKey);
   if (!t) return { ok: false, error: "找不到啟用中的範本" };
   const ids = [...new Set(input.coachIds.filter(Boolean))];
   if (!ids.length) return { ok: false, error: "請選至少一位對象" };
-  const people = await db.select({ id: coaches.id, name: coachDisplayName, email: coaches.email, code: coaches.code }).from(coaches).where(inArray(coaches.id, ids));
+  const allPeople = await db.select({ id: coaches.id, name: coachDisplayName, email: coaches.email, code: coaches.code }).from(coaches).where(inArray(coaches.id, ids));
+  const live = await coachesWithLiveDoc(t.key, t.version, ids);
+  const already = allPeople.filter((p) => live.has(p.id)).map((p) => p.name ?? p.id);
+  const people = allPeople.filter((p) => !live.has(p.id));
+  const targets = ids.filter((id) => !live.has(id));
+  if (!targets.length) return { ok: true, task: null, title: t.name, created: 0, skipped: [], already };
   const admin = (await db.select({ id: coaches.id, name: coachDisplayName }).from(coaches).where(eq(coaches.id, createdBy)).limit(1))[0];
   const deadline = input.deadline && /^\d{4}-\d{2}-\d{2}$/.test(input.deadline) ? input.deadline : null;
-  const [task] = await db.insert(docTasks).values({ templateKey: t.key, templateVersion: t.version, title: t.name, deadline, targetCoachIds: ids, note: (input.note ?? "").trim().slice(0, 400), createdBy }).returning();
+  const [task] = await db.insert(docTasks).values({ templateKey: t.key, templateVersion: t.version, title: t.name, deadline, targetCoachIds: targets, note: (input.note ?? "").trim().slice(0, 400), createdBy }).returning();
   const seal = (await getDocSeal()).img;
   let created = 0;
   const skipped: string[] = [];
@@ -683,7 +705,7 @@ export async function createDocTask(input: { templateKey: string; coachIds: stri
     );
     if (ok) created++;
   }
-  return { ok: true, task, created, skipped };
+  return { ok: true, task, title: t.name, created, skipped, already };
 }
 
 export async function listDocTasks(): Promise<DocTaskView[]> {

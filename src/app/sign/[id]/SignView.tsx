@@ -16,6 +16,7 @@ export type SignerLite = {
   status: string;
   signedAt: string | null;
   isMe: boolean;
+  declineReason?: string | null;
 };
 
 // 簽署側欄：進度 → 同意聲明（預設不勾）→ 簽名 → 確認。
@@ -167,6 +168,12 @@ export default function SignView({
       {(st === "declined" || st === "expired" || st === "void") && (
         <section className="rounded-lg border border-line bg-panel p-4 text-sm text-tx2">
           {st === "declined" ? "這份文件已被拒簽，負責人會重新確認內容後再發一份。" : st === "expired" ? "簽署期限已過，請聯絡負責人重新開放。" : "這份文件已作廢，不需要再簽；若有新版本會另外通知你。"}
+          {st === "declined" && signers.filter((s) => s.status === "declined").map((s) => (
+            <div key={s.id} className="mt-3 rounded-md border border-danger/40 bg-danger/5 p-2.5 grid gap-1">
+              <div className="text-xs text-danger font-bold">{s.displayName || s.label}{s.isMe ? "（你）" : ""} 拒簽{s.signedAt ? `・${s.signedAt.slice(0, 10)}` : ""}</div>
+              <div className="text-sm text-tx whitespace-pre-wrap break-words">{s.declineReason || "（沒有填原因）"}</div>
+            </div>
+          ))}
         </section>
       )}
       {admin && !isMine && <p className="text-11 text-tx3">你以後台身分唯讀檢視這份文件。</p>}

@@ -57,6 +57,8 @@ export default async function Admin() {
         docsDone: v.progress.done, docsRequired: v.progress.required, docsTotal: v.docs.length, anyDeclined: v.progress.anyDeclined, needsCompany,
         admin: { memberKind: e.memberKind, briefKind: e.briefKind, briefDate: e.briefDate, briefVersion: e.briefVersion, resignDate: e.resignDate },
         missing: ready.missing,
+        // LT01：待查帳那幾筆直接在審核列確認；沒有任何提報時後台可代記
+        pendingReceipts: v.receipts.filter((r) => r.verified === false && !r.void).map((r) => ({ id: r.id, on: r.on, amount: r.gross ?? r.amount, last5: r.last5 })),
       };
     }),
   );

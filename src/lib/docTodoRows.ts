@@ -15,5 +15,6 @@ export function toTodoRows(list: DocTodo[], me: Identity | null = null): DocTodo
     days: t.days,
     expiresAt: t.instance.expiresAt,
     remindCount: t.instance.signers.filter((s) => canSignNow(s, t.instance.signers)).reduce((a, s) => a + (s.remindCount ?? 0), 0),
+    reason: t.kind === "declined" ? t.instance.signers.filter((s) => s.status === "declined").map((s) => s.declineReason ?? "").filter(Boolean).join("；") || null : null,
   }));
 }

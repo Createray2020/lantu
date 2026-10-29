@@ -6,7 +6,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { approveCoach, resetCoach, suspendCoach, retryActivateAction, rejectTrainingAction, reopenTrainingAction, saveEnrollmentAdminAction } from "./actions";
+import { approveCoach, resetCoach, suspendCoach, retryActivateAction, rejectTrainingAction, reopenTrainingAction, saveEnrollmentAdminAction, verifyTrainingReceiptAction, recordTrainingPaymentAction } from "./actions";
 import { FIELD_SM, SELECT_SM } from "@/components/ui/Field";
 import { fmtMoney0 } from "@/lib/money";
 
@@ -17,6 +17,7 @@ export type TrainingBrief = {
   // 2026/10/28 合約自動帶入：行政確認欄＋啟動前還缺什麼（誰填）
   admin: TrainingAdminFields;
   missing: { label: string; by: "person" | "admin" }[];
+  pendingReceipts?: { id: string; on: string; amount: number; last5: string }[];
 };
 export type CompanyOption = { id: string; name: string };
 
@@ -43,6 +44,9 @@ export default function StatusActions({ id, status, training = null, companyOpti
   const [adminOpen, setAdminOpen] = useState(false);
   const [af, setAf] = useState<TrainingAdminFields>(t?.admin ?? { memberKind: "intern", briefKind: null, briefDate: null, briefVersion: "", resignDate: null });
   const [adminMsg, setAdminMsg] = useState<string | null>(null);
+  // LT01：後台代記收款
+  const [payOpen, setPayOpen] = useState(false);
+  const [pay, setPay] = useState({ on: new Date().toISOString().slice(0, 10), amount: String(t ? Math.max(0, t.amountDue - t.confirmed) : ""), last5: "", note: "" });
   function saveAdmin() {
     setAdminMsg(null);
     startTransition(async () => {
@@ -90,6 +94,29 @@ export default function StatusActions({ id, status, training = null, companyOpti
       {t && status !== "active" && (
         <div className="text-10 text-right text-tx2 leading-relaxed">
           <div>收款 <b className={t.met ? "text-ok" : "text-danger"}>{fmtMoney0(t.confirmed)}／{fmtMoney0(t.amountDue)}</b>{t.pending > 0 && <span className="text-brand2">（待查帳 {fmtMoney0(t.pending)}）</span>}</div>
+          {/* LT01（2026/10/29）：待查帳直接在這裡確認入帳；申請人沒提報（之前就付過款）時後台代記 */}
+          {!t.met && t.stage === "pending" && (t.pendingReceipts ?? []).map((r) => (
+            <div key={r.id} className="flex items-center justify-end gap-1.5">
+              <span>{r.on}・{fmtMoney0(r.amount)}{r.last5 ? `・後五碼 ${r.last5}` : ""}</span>
+              <button type="button" className="rounded border border-ok text-ok px-1.5 py-0.5 font-bold disabled:opacity-40" disabled={pending} onClick={() => run((cid) => verifyTrainingReceiptAction(cid, r.id))}>確認入帳</button>
+            </div>
+          ))}
+          {!t.met && t.stage === "pending" && !(t.pendingReceipts ?? []).length && (!payOpen ? (
+            <button type="button" className="underline text-brand2" onClick={() => setPayOpen(true)}>申請人沒提報？後台代記收款</button>
+          ) : (
+            <div className="grid gap-1.5 text-left rounded-md border border-line p-2 bg-panel mt-1 text-xs">
+              <p className="text-tx3">核對過銀行明細再記；記下就算公司已確認，會進帳務收款明細與分潤。</p>
+              <label className="grid gap-0.5 text-tx3">收款日<input type="date" className={FIELD_SM} value={pay.on} onChange={(e) => setPay({ ...pay, on: e.target.value })} /></label>
+              <label className="grid gap-0.5 text-tx3">金額<input inputMode="numeric" className={`${FIELD_SM} text-right`} value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} /></label>
+              <label className="grid gap-0.5 text-tx3">匯款後五碼<input className={FIELD_SM} value={pay.last5} onChange={(e) => setPay({ ...pay, last5: e.target.value })} /></label>
+              <label className="grid gap-0.5 text-tx3">備註<input className={FIELD_SM} value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></label>
+              <div className="flex gap-2">
+                <button type="button" className="rounded-md bg-brand text-onbrand font-bold px-2.5 py-1 disabled:opacity-40" disabled={pending || !(Number(pay.amount.replace(/,/g, "")) > 0) || !pay.on}
+                  onClick={() => run((cid) => recordTrainingPaymentAction(cid, { on: pay.on, amount: Number(pay.amount.replace(/,/g, "")), last5: pay.last5, note: pay.note }).then((r) => { if (r.ok) setPayOpen(false); return r; }))}>記為已確認收款</button>
+                <button type="button" className="text-tx3" onClick={() => setPayOpen(false)}>取消</button>
+              </div>
+            </div>
+          ))}
           <div>文件 {t.docsTotal ? <b className={t.docsDone === t.docsRequired ? "text-ok" : ""}>{t.docsDone}／{t.docsRequired} 必簽</b> : <span className="text-tx3">尚未啟動</span>}{t.anyDeclined && <span className="text-danger ml-1">有拒簽</span>}</div>
         </div>
       )}

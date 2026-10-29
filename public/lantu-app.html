@@ -5551,8 +5551,7 @@ function syncCalcNodesInner(c){
   var sub=el.querySelectorAll('input,select,textarea');
   for(var j=0;j<sub.length;j++){var x=sub[j];
    if(((x.getAttribute('oninput')||'')+'|'+(x.getAttribute('onchange')||''))!==key)continue;
-   try{x.focus();}catch(e3){}
-   try{if(ss!=null&&x.setSelectionRange)x.setSelectionRange(ss,se);}catch(e4){}
+   lnRefocus(x,ss,se);
    break;}
  }
 }
@@ -5560,6 +5559,17 @@ function syncDerived(){if(typeof syncFinSummary==='function')syncFinSummary();if
 // render() 會整棵重建 DOM，正在打字的 input 會連同焦點與游標一起被丟掉
 // （工具箱每打一個字游標就掉出輸入框、展開進階欄捲軸跳回頂端）。
 // 這裡以欄位的 oninput/onchange 屬性字串當識別碼，在重建後把焦點、選取範圍與捲軸還原。
+// ⚠️ LT02（2026/10/29）：重畫後把焦點放回去時，不能讓「數字欄聚焦就全選」把整格選起來——
+//    否則下一個字直接蓋掉整格，工具箱的數字欄永遠只剩一位數。__lnKeepSel 讓 focusin 那支跳過這一次。
+//    type=number 拿不到 selectionStart（null），游標放回尾端（暫時換成 text 才設得了位置）。
+function lnRefocus(el,ss,se){
+ try{el.__lnKeepSel=true;el.focus();}catch(e){}
+ el.__lnKeepSel=false;
+ try{
+  if(ss!=null&&el.setSelectionRange){el.setSelectionRange(ss,se);return;}
+  if(el.type==='number'){var L=String(el.value||'').length;el.type='text';el.setSelectionRange(L,L);el.type='number';}
+ }catch(e){}
+}
 function renderKeepFocus(){
  var a=document.activeElement;
  var tag=a&&a.tagName;
@@ -5572,7 +5582,7 @@ function renderKeepFocus(){
  var list=document.querySelectorAll('input,select,textarea');
  for(var i=0;i<list.length;i++){var el=list[i];
   if(((el.getAttribute('oninput')||'')+'|'+(el.getAttribute('onchange')||''))===key){
-   try{el.focus();if(ss!=null&&el.setSelectionRange)el.setSelectionRange(ss,se);}catch(e){}
+   lnRefocus(el,ss,se);
    return;}
  }
 }
@@ -5619,7 +5629,12 @@ function setMemberParent(i,slot,v){var c=activeCase();var m=c.members[i];if(!m)r
 function setAmtPeriod(arr,idx,v){var c=activeCase();c[arr][idx].period=v;save();render();}
 function setAmtByPeriod(arr,idx,val){var c=activeCase();var it=c[arr][idx];var v=n(val);it.amount=(it.period==='月')?v*12:v;save();if(app.role==='client')render();syncDerived();}
 function shownAmt(it){return (it.period==='月')?Math.round(n(it.amount)/12):n(it.amount);}
-function setTool(g,k,v){app.tools[g][k]=n(v);renderKeepFocus();}
+// 打到一半的「1.」「-」或清空：存數字、畫面留原字串，不然重畫會把小數點吃掉（LT02）
+// 打到一半的「2.」：Chrome 的 number 欄回報 "2"（或 badInput 的空字串）——數字沒變就不重畫，畫面上的小數點才留得住
+function setTool(g,k,v,el){if(el&&el.validity&&el.validity.badInput)return;
+ if(el&&v!==''&&n(v)===n(app.tools[g][k]))return;
+ app.tools[g][k]=n(v);app.toolsRaw=app.toolsRaw||{};app.toolsRaw[g+'.'+k]=String(v==null?'':v);renderKeepFocus();}
+function toolVal(g,k){var raw=(app.toolsRaw||{})[g+'.'+k],cur=app.tools[g][k];return (raw!=null&&n(raw)===n(cur))?raw:cur;}
 // 範本改成 lazy：舊版一次 eager 建立全部 13 個範本，其中會讀 c.members[0]、c.members.find(...)，
 // 舊案缺 members / plan / retire.prepared 時整個 addRow 直接 TypeError（按鈕點了完全沒反應）。
 function addRow(arr){var c=activeCase();if(!c)return;
@@ -17643,10 +17658,10 @@ function toolsPane(c){var L=app.tools.loan,R=app.tools.ret;
 // 工具箱欄位。預設是「金額」→ 走 moneyCell（text＋逗號）；
 // 年數／利率／天數／c.c 這類非金額在 defs 第三格標 'num'，維持 type=number。
 function toolF(g,defs){return defs.map(function(x){
- var bind='oninput="setTool(\''+g+'\',\''+x[0]+'\',this.value)"';
+ var bind='oninput="setTool(\''+g+'\',\''+x[0]+'\',this.value,this)"';
  var box=(x[2]==='num')
-  ? '<input type="number" inputmode="decimal" value="'+esc(app.tools[g][x[0]])+'" '+bind+'>'
-  : moneyCell(bind,app.tools[g][x[0]]);
+  ? '<input type="number" inputmode="decimal" value="'+esc(toolVal(g,x[0]))+'" '+bind+'>'
+  : moneyCell(bind,toolVal(g,x[0]));
  return '<div class="f"><label>'+x[1]+'</label>'+box+'</div>';
 }).join('');}
 function toolBig(items){return '<div class="big3" style="margin-top:12px">'+items.map(function(it){return '<div class="b"><div class="l">'+it[0]+'</div><div class="v"'+(it[2]?' style="color:'+it[2]+'"':'')+'>'+it[1]+'</div></div>'}).join('')+'</div>';}
@@ -20960,6 +20975,7 @@ function isNumField(el){
 document.addEventListener('focusin',function(e){
  var el=e.target;
  if(!isNumField(el))return;
+ if(el.__lnKeepSel)return; // 重畫後還原焦點（lnRefocus），不是使用者新點進來——別全選（LT02）
  pending=el;
  setTimeout(function(){ if(document.activeElement===el){ try{ el.select(); }catch(err){} } },0);
 });

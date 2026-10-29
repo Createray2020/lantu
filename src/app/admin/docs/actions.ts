@@ -112,16 +112,31 @@ export async function saveDocSettingsAction(input: { nudgeDays: number }): Promi
   }
 }
 
-/** 建立補簽任務：一份範本 × 一批既有教練 × 期限。 */
-export async function createDocTaskAction(input: { templateKey: string; coachIds: string[]; deadline: string | null; note?: string }): Promise<ActionResult & { created?: number; skipped?: string[] }> {
+export type DocTaskBatchLine = { templateKey: string; title: string; created: number; already: string[]; skipped: string[]; error: string | null };
+/**
+ * 建立補簽任務（LT04，2026/10/29）：多份範本 × 一批既有教練 × 共用期限與備註。
+ * 每份範本各自一張任務、各自追蹤；同版本已待簽／已簽的人自動略過；某一份失敗不影響其他份，逐份回報。
+ */
+export async function createDocTaskAction(input: { templateKeys?: string[]; templateKey?: string; coachIds: string[]; deadline: string | null; note?: string }): Promise<ActionResult & { created?: number; skipped?: string[]; lines?: DocTaskBatchLine[] }> {
   try {
     const me = await guard();
-    const r = await createDocTask(input, me.id);
-    if (!r.ok) return r;
+    const keys = [...new Set([...(input.templateKeys ?? []), ...(input.templateKey ? [input.templateKey] : [])].filter(Boolean))];
+    if (!keys.length) return { ok: false, error: "請選至少一份文件" };
+    if (!input.coachIds.filter(Boolean).length) return { ok: false, error: "請選至少一位對象" };
+    const lines: DocTaskBatchLine[] = [];
+    for (const key of keys) {
+      try {
+        const r = await createDocTask({ templateKey: key, coachIds: input.coachIds, deadline: input.deadline, note: input.note }, me.id);
+        if (!r.ok) { lines.push({ templateKey: key, title: key, created: 0, already: [], skipped: [], error: r.error }); continue; }
+        lines.push({ templateKey: key, title: r.title, created: r.created, already: r.already, skipped: r.skipped, error: null });
+      } catch (e) {
+        lines.push({ templateKey: key, title: key, created: 0, already: [], skipped: [], error: e instanceof Error ? e.message : "建立失敗" });
+      }
+    }
     revalidatePath("/admin/docs/tasks");
     revalidatePath("/dashboard/docs");
     revalidatePath("/dashboard");
-    return { ok: true, created: r.created, skipped: r.skipped };
+    return { ok: true, created: lines.reduce((a, l) => a + l.created, 0), skipped: lines.flatMap((l) => l.skipped), lines };
   } catch (e) {
     return fail(e);
   }

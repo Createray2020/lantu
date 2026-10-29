@@ -339,10 +339,30 @@ describe("補簽任務", () => {
     const tasks = await listDocTasks();
     expect(tasks[0]).toMatchObject({ total: 2, done: 1 });
     expect(tasks[0].rows.map((x) => [x.name, x.status])).toEqual([["阿一", "completed"], ["阿二", "pending"]]);
-    // 同一位再被另一個任務指定同一份文件：case_id 帶任務 id，不會撞唯一索引
-    const r2 = await createDocTask({ templateKey: t.key, coachIds: ["a1"], deadline: null }, "boss");
-    expect(r2.ok && r2.created).toBe(1);
+    // LT04（2026/10/29）：同一份範本同版本已簽完（阿一）或還在待簽（阿二）→ 自動略過、不另開任務
+    const r2 = await createDocTask({ templateKey: t.key, coachIds: ["a1", "a2"], deadline: null }, "boss");
+    expect(r2.ok && r2.created).toBe(0);
+    expect(r2.ok && r2.already).toEqual(["阿一", "阿二"]);
+    expect(r2.ok && r2.task).toBeNull();
+    expect((await listDocTasks()).length).toBe(1);
     expect(S.coaches.find((c) => c.id === "a1").status).toBe("active");
+    // 阿二拒簽之後可以重發；case_id 帶任務 id，不會撞唯一索引
+    const a2doc = insts.find((i) => i.htmlSnapshot.includes("阿二"))!;
+    await declineSign(a2doc.id, { coachId: "a2" }, "名字打錯");
+    const r3 = await createDocTask({ templateKey: t.key, coachIds: ["a1", "a2"], deadline: null }, "boss");
+    expect(r3.ok && r3.created).toBe(1);
+    expect(r3.ok && r3.already).toEqual(["阿一"]);
+    expect(r3.ok && r3.task?.targetCoachIds).toEqual(["a2"]);
+  });
+
+  it("新版本不算已簽：範本改版後同一位會再產一份", async () => {
+    S.coaches.push({ id: "a1", name: "阿一", email: null, code: null, status: "active" }, { id: "boss", name: "Ray", email: null, code: null, status: "active" });
+    const t = await saveTemplate({ category: "training", name: "保密同意書", html: "<p>{{member.name}}</p>{{sign:member:1}}", signers: [{ role: "member", seq: 1 }] }, "boss");
+    expect((await createDocTask({ templateKey: t.key, coachIds: ["a1"], deadline: null }, "boss") as any).created).toBe(1);
+    await saveTemplate({ key: t.key, category: "training", name: "保密同意書", html: "<p>{{member.name}} 新版</p>{{sign:member:1}}", signers: [{ role: "member", seq: 1 }] }, "boss");
+    const r = await createDocTask({ templateKey: t.key, coachIds: ["a1"], deadline: null }, "boss");
+    expect(r.ok && r.created).toBe(1);
+    expect(r.ok && r.already).toEqual([]);
   });
 });
 

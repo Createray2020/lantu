@@ -426,14 +426,14 @@ export const DOC_CSS = `
 .doc-body p{margin:6px 0}
 .doc-body table{border-collapse:collapse;width:100%;font-size:13px}
 .doc-body td,.doc-body th{border:1px solid #bbb;padding:5px 8px;text-align:left}
-.doc-seal{height:110px;float:right;margin:0 0 8px 12px}
+.doc-seal{height:110px;display:inline-block;vertical-align:middle;margin:4px 8px}
 .doc-sign-block{margin-top:28px;border-top:1px solid #ccc;padding-top:14px}
 .doc-sign-row{margin:10px 0}
 .sign-slot{display:inline-block;min-width:200px;min-height:64px;border-bottom:1px solid #333;vertical-align:bottom;position:relative;padding:0 6px}
 .sign-slot-label{position:absolute;left:6px;bottom:2px;font-size:11px;color:#888}
 .sign-slot.signed{border-bottom-color:#333}
 .sign-img{height:60px;display:block}
-.sign-meta{font-size:11px;color:#444}
+.sign-meta{display:none}
 .doc-ask{display:inline-block;font-size:1.15em;line-height:1;vertical-align:-2px;margin-right:2px}
 .doc-ask.on{color:#1a4fa3}
 .doc-ask-row{margin:4px 0}

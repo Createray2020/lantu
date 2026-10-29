@@ -7,7 +7,7 @@ import { coaches } from "@/Shared/db/schema";
 import { ensureCoach, isAdmin, setCoachStatus, setCoachOrg, transferClients, removeCoach } from "@/lib/coach";
 import { saveBrand } from "@/lib/brand";
 import { saveApplySettings, saveReviewChecks } from "@/lib/coachApplyStore";
-import { passReview, rejectEnrollment, reopenEnrollment, saveEnrollmentAdmin } from "@/lib/trainingStore";
+import { passReview, rejectEnrollment, reopenEnrollment, saveEnrollmentAdmin, recordTrainingPaymentByAdmin, verifyTrainingReceipt } from "@/lib/trainingStore";
 import type { ApplySettings } from "@/lib/coachApply";
 
 // 後台動作的統一回傳型別：讓 client 端能顯示「已儲存 / 失敗原因」，
@@ -103,6 +103,41 @@ export async function approveCoach(id: string, companySignerId?: string | null):
     revalidatePath("/admin");
     revalidatePath("/dashboard");
     return { ok: true, activated: r.activated, docs: r.docs };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** LT01：審核列直接確認申請人提報的培訓費（不用跑去帳務頁的待查帳）。 */
+export async function verifyTrainingReceiptAction(coachId: string, receiptId: string): Promise<ActionResult> {
+  try {
+    await guard();
+    const r = await verifyTrainingReceipt(coachId, receiptId);
+    if (!r.ok) return r;
+    revalidatePath("/admin");
+    revalidatePath("/admin/accounting/receipts");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** LT01：申請人沒提報、但已付款（例如之前就匯過款）——後台核對後代記一筆已確認的培訓費。 */
+export async function recordTrainingPaymentAction(coachId: string, input: { on: string; amount: number; last5?: string; note?: string }): Promise<ActionResult> {
+  try {
+    const me = await guard();
+    const [c] = await db.select({ name: coaches.name, email: coaches.email }).from(coaches).where(eq(coaches.id, coachId)).limit(1);
+    if (!c) return { ok: false, error: "找不到這位申請人" };
+    const r = await recordTrainingPaymentByAdmin(coachId, {
+      amount: Number(input.amount) || 0, on: String(input.on ?? ""), method: "bank", last5: String(input.last5 ?? "").trim(),
+      payer: c.name || c.email || coachId, note: `後台代記${input.note?.trim() ? `：${input.note.trim()}` : ""}`.slice(0, 200),
+    }, me.id);
+    if (!r.ok) return r;
+    revalidatePath("/admin");
+    revalidatePath("/admin/accounting/receipts");
+    revalidatePath("/dashboard");
+    return { ok: true };
   } catch (e) {
     return fail(e);
   }

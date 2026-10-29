@@ -16,6 +16,8 @@ export type DocTodoRow = {
   expiresAt: string | null;
   remindCount: number;
   canRemind: boolean;
+  /** 拒簽原因（LT03）：清單上直接看得到，不必點進去 */
+  reason?: string | null;
 };
 
 const KIND: Record<DocTodoRow["kind"], { label: string; cls: string }> = {
@@ -62,6 +64,7 @@ function Row({ r, days }: { r: DocTodoRow; days: number }) {
         )}
         <Link href={`/sign/${r.id}`} className="text-xs rounded-md border border-line px-2.5 py-1">{r.kind === "declined" ? "看原因" : "查看"}</Link>
       </span>
+      {r.kind === "declined" && <div className="basis-full text-xs text-tx2 whitespace-pre-wrap break-words">拒簽原因：{r.reason || "（沒有填原因）"}</div>}
     </li>
   );
 }

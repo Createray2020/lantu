@@ -6,6 +6,7 @@ import { getInstance, getSignature, getTemplate } from "@/lib/docsStore";
 import { canSignNow, isSigner, asksForRole, DOC_CSS, type DocAsk } from "@/lib/docs";
 import { todayISO } from "@/lib/license";
 import SignView, { type SignerLite } from "./SignView";
+import BackLink from "@/components/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -50,13 +51,18 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
     status: s.status,
     signedAt: s.signedAt?.toISOString() ?? null,
     isMe: !!mine && s.id === mine.id,
+    // LT03：拒簽原因存在 doc_signers.decline_reason，這一頁看得到的人（簽署人本人、同份文件其他簽署人、後台）都看得到
+    declineReason: s.status === "declined" ? s.declineReason ?? null : null,
   }));
+  // LT05：沒有站內上一頁時回哪一張清單——客戶回會員中心的文件、開通的教練回我的文件、申請人回首頁、後台唯讀回簽署總覽
+  const backTo = mine?.clientUserId ? "/portal/docs" : mine?.coachId ? (me.coachStatus === "active" ? "/dashboard/docs" : "/dashboard") : me.admin ? "/admin/docs/instances" : "/";
 
   return (
     <main className="min-h-screen bg-canvas text-tx">
       <header className="sticky top-0 z-10 bg-panel/90 backdrop-blur border-b border-line">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/" aria-label="回首頁"><BrandMark size={32} /></Link>
+          <BackLink fallback={backTo} />
+          <Link href="/" aria-label="回首頁" className="hidden sm:block"><BrandMark size={32} /></Link>
           <div className="min-w-0">
             <h1 className="font-bold truncate">{inst.title}</h1>
             <p className="text-11 text-tx3">版本 v{inst.version}・{inst.docNo ? `合約編號 ${inst.docNo}` : `文件編號 ${inst.id.slice(0, 8)}`}</p>

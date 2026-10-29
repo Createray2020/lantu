@@ -12,7 +12,7 @@ import { and, desc, eq, inArray, ne, notInArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches, coachApplications, coachDisplayName, trainingEnrollments } from "@/Shared/db/schema";
 import { getApplySettings, checkApprovalGate, activateCoach } from "./coachApplyStore";
-import { getAcctState, createCaseReceipt, receiptsForCase, type CaseFeeInput } from "./acctStore";
+import { getAcctState, createCaseReceipt, receiptsForCase, verifyAcctReceipt, type CaseFeeInput } from "./acctStore";
 import { caseFunding, referralChain, type Receipt } from "./acctEngine";
 import { startSigning, listInstancesForCase, withSigners, caseProgress, getSet, latestEnabledTemplate, isUniqueViolation, getSignerProfile, profileVars, profileMissing, type InstanceWithSigners, type SignerProfile, type DocTemplate } from "./docsStore";
 import type { DocSignerSlot } from "./docs";
@@ -123,6 +123,18 @@ export async function enrollmentsFor(coachIds: string[]): Promise<Record<string,
  * 推薦端沿申請時填的推薦人輔導鏈（課程推薦率，V7.2 §14）；沒推薦人就空。
  */
 export async function reportTrainingPayment(coachId: string, input: CaseFeeInput): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  return recordTrainingReceipt(coachId, input, { verified: false, enteredBy: coachId });
+}
+
+/**
+ * 後台代記培訓費（LT01，2026/10/29）：申請人沒自己按「我已付款」（例如之前就匯過款、資料在備註裡），
+ * 後台核對過銀行明細後直接記一筆「已確認」的收款——之前只能等申請人提報，後台沒有任何「確認入帳」可按。
+ */
+export async function recordTrainingPaymentByAdmin(coachId: string, input: CaseFeeInput, adminId: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  return recordTrainingReceipt(coachId, input, { verified: true, enteredBy: adminId });
+}
+
+async function recordTrainingReceipt(coachId: string, input: CaseFeeInput, opts: { verified: boolean; enteredBy: string }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const enr = await getEnrollmentForCoach(coachId);
   if (!enr) return { ok: false, error: "沒有培訓報名案件" };
   if (enr.reviewStage === "activated" || enr.reviewStage === "rejected") return { ok: false, error: "這個案件已經結案" };
@@ -130,11 +142,21 @@ export async function reportTrainingPayment(coachId: string, input: CaseFeeInput
   const intro = appRows[0]?.introducerId ?? null;
   const sharers = intro ? referralChain(intro, S.coachList ?? []) : [];
   try {
-    const id = await createCaseReceipt("training", enr.id, enr.itemId, input, { verified: false, enteredBy: coachId, sharers });
+    const id = await createCaseReceipt("training", enr.id, enr.itemId, input, { verified: opts.verified, enteredBy: opts.enteredBy, sharers });
     return { ok: true, id };
   } catch (e) {
-    return { ok: false, error: e instanceof Error && e.message === "invalid-amount" ? "請填正確的金額與日期" : "提報失敗" };
+    return { ok: false, error: e instanceof Error && e.message === "invalid-amount" ? "請填正確的金額與日期" : opts.verified ? "記帳失敗" : "提報失敗" };
   }
+}
+
+/** 後台在審核列直接「確認入帳」申請人提報的那一筆（只認這位申請人自己案件的收款）。 */
+export async function verifyTrainingReceipt(coachId: string, receiptId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const enr = await getEnrollmentForCoach(coachId);
+  if (!enr) return { ok: false, error: "沒有培訓報名案件" };
+  const rs = await receiptsForCase("training", enr.id);
+  if (!rs.some((r) => r.id === receiptId && !r.void)) return { ok: false, error: "找不到這筆收款" };
+  await verifyAcctReceipt(receiptId, true);
+  return { ok: true };
 }
 
 /** 這個培訓方案的範本組合裡有沒有啟用中的範本。 */
