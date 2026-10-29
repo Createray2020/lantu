@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 // 客戶端首頁。
 // - 尚未做人生護照：導引開始。
 // - 已有基礎方案：顯示能力分析摘要；「真的進入規劃」要等掛上教練（雙向連結，之後開放）。
-export default async function Portal() {
+export default async function Portal({ searchParams }: { searchParams?: Promise<{ joined?: string }> }) {
   // 任何登入者（含教練）都看客戶介面；未登入才導去客戶登入。
   const client = await ensureClientUser();
   if (!client) redirect("/client/sign-in");
@@ -201,6 +201,11 @@ export default async function Portal() {
       </header>
 
       <main className="flex-1 px-6 py-12">
+        {(await searchParams)?.joined === "1" && (
+          <div className="max-w-2xl mx-auto mb-6 rounded-xl border border-ok/40 bg-ok/10 px-5 py-3 text-sm text-ok">
+            已接上{own?.source === "coach" && own.coachName ? `教練 ${own.coachName} ` : "教練"}為你準備的規劃，之後登入這個帳號就能隨時查看。
+          </div>
+        )}
         {docPending > 0 && (
           <div className="max-w-2xl mx-auto mb-6 rounded-xl border border-brand/40 bg-brand/10 px-5 py-4 flex flex-wrap items-center gap-3">
             <span className="text-sm text-brand2 flex-1">
@@ -335,6 +340,16 @@ export default async function Portal() {
             </p>
             <Link href="/portal/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-8 py-3 rounded-lg">
               開始我的人生護照
+            </Link>
+          </div>
+        )}
+
+        {/* 開通碼入口（2026/10/29）：教練先做好規劃、給了「客戶編號-開通碼」，客戶自己登入後從這裡接上。
+            已經接上教練規劃的人不用看到。 */}
+        {own?.source !== "coach" && (
+          <div className="max-w-2xl mx-auto mt-10 text-center">
+            <Link href="/portal/claim" className="inline-flex items-center gap-2 text-sm text-tx2 hover:text-tx border border-line rounded-lg px-4 py-2">
+              🔑 我有教練給的開通碼
             </Link>
           </div>
         )}

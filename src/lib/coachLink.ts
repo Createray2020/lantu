@@ -1,13 +1,14 @@
 // 客戶↔教練 連結（雙向確認）資料層。
 // 客戶端「選擇教練」→ 建 pending 申請；教練端「接受」→ 設 clients.coachId、申請 accepted。
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { seedCoachPlanFromPassport } from "@/lib/plans";
-import { and, eq, desc, count, isNull } from "drizzle-orm";
+import { and, eq, desc, count, gte, isNull } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { clients, coaches, coachLinkRequests, coachInvites, coachDisplayName, plans } from "@/Shared/db/schema";
+import { clients, coaches, coachLinkRequests, coachInvites, coachDisplayName, plans, claimAttempts } from "@/Shared/db/schema";
 import type { ClientUser } from "@/lib/clientUser";
 import { allocCode } from "@/lib/codeAlloc";
 import { normalizeCode } from "@/lib/codes";
+import { CLAIM_MAX_FAILS, CLAIM_WINDOW_MIN, PIN_LEN, formatClaimCode, parseClaimCode } from "@/lib/joinFlow";
 import { QUOTA_FULL_MESSAGE } from "@/lib/license";
 import { clientQuota } from "@/lib/quota";
 
@@ -231,11 +232,11 @@ export async function getInviteByCode(code: string): Promise<InviteInfo | null> 
 // 教練名下出現兩個同名客戶、客戶登入看到的是空的。專用連結改成把帳號接到**既有那一筆**。
 // 一人一碼、綁定後失效（Ray 2026/10/27 拍板）；重新產生就作廢舊碼。
 
-export type ClientInviteResult = { ok: true; code: string } | { ok: false; error: string };
+export type ClientInviteResult = { ok: true; code: string; pin: string; claimCode: string | null } | { ok: false; error: string };
 
 export async function createClientInvite(coachId: string, clientId: string): Promise<ClientInviteResult> {
   const rows = await db
-    .select({ id: clients.id, coachId: clients.coachId, clientUserId: clients.clientUserId, status: clients.status })
+    .select({ id: clients.id, coachId: clients.coachId, clientUserId: clients.clientUserId, status: clients.status, code: clients.code })
     .from(clients)
     .where(and(eq(clients.id, clientId), eq(clients.coachId, coachId)))
     .limit(1);
@@ -246,19 +247,25 @@ export async function createClientInvite(coachId: string, clientId: string): Pro
   // 一人一碼：舊的未用碼直接作廢，免得客戶手上同時有兩條都能用的連結。
   await db.delete(coachInvites).where(and(eq(coachInvites.clientId, clientId), isNull(coachInvites.usedAt)));
   const code = genCode();
-  await db.insert(coachInvites).values({ coachId, clientId, code, note: "客戶專用登入連結" });
-  return { ok: true, code };
+  const pin = genPin();
+  await db.insert(coachInvites).values({ coachId, clientId, code, pin, note: "客戶專用登入連結" });
+  return { ok: true, code, pin, claimCode: c.code ? formatClaimCode(c.code, pin) : null };
 }
 
-/** 這位客戶目前有效（未用）的專用碼；教練頁重整後還能看到同一條連結。 */
-export async function activeClientInvite(clientId: string): Promise<string | null> {
+/** 6 位數開通碼（000000–999999，補零）。用 crypto.randomInt，不用 Math.random。 */
+export function genPin(): string {
+  return String(randomInt(0, 10 ** PIN_LEN)).padStart(PIN_LEN, "0");
+}
+
+/** 這位客戶目前有效（未用）的專用碼與開通碼；教練頁重整後還能看到同一組。舊連結（開通碼上線前產的）pin 為 null。 */
+export async function activeClientInvite(clientId: string): Promise<{ code: string; pin: string | null } | null> {
   const rows = await db
-    .select({ code: coachInvites.code })
+    .select({ code: coachInvites.code, pin: coachInvites.pin })
     .from(coachInvites)
     .where(and(eq(coachInvites.clientId, clientId), isNull(coachInvites.usedAt)))
     .orderBy(desc(coachInvites.createdAt))
     .limit(1);
-  return rows[0]?.code ?? null;
+  return rows[0] ? { code: rows[0].code, pin: rows[0].pin ?? null } : null;
 }
 
 /**
@@ -356,4 +363,37 @@ export async function redeemInvite(code: string, user: ClientUser): Promise<{ ok
   // 已有護照 → 立刻複製成第一份年度版；還沒有 → savePassport 存檔時會補做。
   await seedCoachPlanFromPassport(client.id);
   return { ok: true, coachName: inv.coachName };
+}
+
+// ── 開通碼認領（2026/10/29）────────────────────────────────────────────────
+// 客戶自己登入後輸入「客戶編號-開通碼」→ 找到那條專用連結的 code → 交給認領頁確認、redeemInvite 綁定。
+// 這裡只負責「碼對不對、有沒有在猜」：同一帳號 CLAIM_WINDOW_MIN 分鐘內輸錯 CLAIM_MAX_FAILS 次就先擋。
+// 錯誤訊息刻意一律同一句（不說是編號錯還是開通碼錯），免得幫猜的人縮小範圍。
+export type ClaimLookup = { ok: true; code: string } | { ok: false; error: string };
+const CLAIM_BAD = "開通碼不正確，請再確認一次（或請教練重新產生）";
+
+export async function lookupClaimCode(clientUserId: string, raw: string): Promise<ClaimLookup> {
+  const since = new Date(Date.now() - CLAIM_WINDOW_MIN * 60_000);
+  const fails = await db
+    .select({ n: count() })
+    .from(claimAttempts)
+    .where(and(eq(claimAttempts.clientUserId, clientUserId), eq(claimAttempts.ok, false), gte(claimAttempts.at, since)));
+  if ((fails[0]?.n ?? 0) >= CLAIM_MAX_FAILS) return { ok: false, error: `輸入錯誤太多次，請 ${CLAIM_WINDOW_MIN} 分鐘後再試，或直接向教練確認` };
+
+  const log = (ok: boolean) => db.insert(claimAttempts).values({ clientUserId, input: String(raw).slice(0, 40), ok });
+  const parsed = parseClaimCode(raw);
+  if (!parsed) { await log(false); return { ok: false, error: "格式不對：請輸入教練給的「客戶編號-開通碼」，例如 2610008-483921" }; }
+
+  const c = (await db.select({ id: clients.id }).from(clients).where(eq(clients.code, parsed.clientCode)).limit(1))[0];
+  const inv = c
+    ? (await db
+        .select({ code: coachInvites.code, pin: coachInvites.pin })
+        .from(coachInvites)
+        .where(and(eq(coachInvites.clientId, c.id), isNull(coachInvites.usedAt)))
+        .orderBy(desc(coachInvites.createdAt))
+        .limit(1))[0]
+    : undefined;
+  const match = !!inv?.pin && inv.pin.length === parsed.pin.length && timingSafeEqual(Buffer.from(inv.pin), Buffer.from(parsed.pin));
+  await log(match);
+  return match && inv ? { ok: true, code: inv.code } : { ok: false, error: CLAIM_BAD };
 }

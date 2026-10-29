@@ -18,5 +18,5 @@ export async function createClientInviteAction(clientId: string) {
   const r = await createClientInvite(coach.id, clientId);
   if (!r.ok) return r;
   revalidatePath(`/dashboard/clients/${clientId}`);
-  return { ok: true as const, code: r.code };
+  return { ok: true as const, code: r.code, claimCode: r.claimCode };
 }

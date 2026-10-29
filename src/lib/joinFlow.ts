@@ -28,7 +28,13 @@ export function isJoinCode(v: unknown): v is string {
  */
 export const shareJoinUrl = (origin: string, code: string) => `${origin}/portal/join?code=${encodeURIComponent(code)}&openExternalBrowser=1`;
 
-export const redeemPath = (code: string) => `/portal/redeem?code=${encodeURIComponent(code)}`;
+/**
+ * 認領頁（2026/10/29 第二版）：連結、cookie 補兌換、手動輸入開通碼，三條路都匯到這一頁——先讓客戶看到
+ * 「哪位教練為誰準備的規劃」、按確認才綁。非公開路由（proxy 先完成登入確認）。
+ */
+export const claimPath = (code?: string) => (code ? `/portal/claim?code=${encodeURIComponent(code)}` : "/portal/claim");
+/** 舊名：已經在半路上的人（forceRedirectUrl 指到 /portal/redeem）仍接得上——route 會轉去 claimPath。 */
+export const redeemPath = (code: string) => claimPath(code);
 export const joinPath = (code: string, done = false) => `/portal/join?code=${encodeURIComponent(code)}${done ? "&done=1" : ""}`;
 
 /** 從站內 back 路徑（/portal/join?code=…）取出邀請碼；不是邀請連結回 null。 */
@@ -44,5 +50,39 @@ export function joinCodeFrom(back: string | undefined | null): string | null {
  */
 export function afterAuthPath(back: string | undefined): string | undefined {
   const code = joinCodeFrom(back);
-  return code ? redeemPath(code) : back;
+  return code ? claimPath(code) : back;
+}
+
+// ── 開通碼：客戶編號-6 位數（2610008-483921）──────────────────────────────
+export const PIN_LEN = 6;
+export const CLAIM_MAX_FAILS = 5;
+export const CLAIM_WINDOW_MIN = 30;
+
+export const formatClaimCode = (clientCode: string, pin: string) => `${clientCode}-${pin}`;
+
+/**
+ * 客戶輸入的開通碼 → { clientCode, pin }。容錯：全形數字、空白、各種連字號、沒打連字號（13 位連打）都收。
+ * 客戶編號＝YYMM＋三碼以上（2610008、26101000）；開通碼固定 6 位數字。
+ */
+export function parseClaimCode(raw: unknown): { clientCode: string; pin: string } | null {
+  if (typeof raw !== "string") return null;
+  const s = raw
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[\s]/g, "")
+    .replace(/[－—–‐ー_]/g, "-");
+  let m = /^(\d{7,9})-(\d{6})$/.exec(s);
+  if (!m) m = /^(\d{7,9})(\d{6})$/.exec(s);
+  if (!m) return null;
+  const mm = +m[1].slice(2, 4);
+  if (mm < 1 || mm > 12) return null;
+  return { clientCode: m[1], pin: m[2] };
+}
+
+/** 確認頁上的名字：只露頭尾（徐浩恩 → 徐○恩、王明 → 王○、Amy → A○y）。拿到正確碼的人才看得到，但也不必整個印出來。 */
+export function maskName(name: string | null | undefined): string {
+  const s = (name ?? "").trim();
+  const chars = [...s];
+  if (chars.length <= 1) return s;
+  if (chars.length === 2) return `${chars[0]}○`;
+  return `${chars[0]}${"○".repeat(Math.min(chars.length - 2, 3))}${chars[chars.length - 1]}`;
 }

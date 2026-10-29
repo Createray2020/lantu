@@ -470,12 +470,27 @@ export const coachInvites = pgTable('coach_invites', {
   clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }),
   usedByClientUserId: text('used_by_client_user_id').references(() => clientUsers.id, { onDelete: 'set null' }),
   usedAt: timestamp('used_at', { withTimezone: true }),
+  // 開通碼（2026/10/29）：客戶專用連結的第二條路——客戶自己登入後在首頁輸入「客戶編號-開通碼」（2610008-483921）認領。
+  // 只有專用連結（client_id 有值）才有；6 位數字、一人一碼、跟著連結一起作廢／重產。客戶編號是公開的流水號，猜得到，
+  // 所以一定要配這段才算數；輸錯有次數限制（claim_attempts）。
+  pin: text('pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index('coach_invites_coach_id_idx').on(t.coachId),
   index('coach_invites_client_id_idx').on(t.clientId),
   // used_by_client_user_id 是 SET NULL：刪一位 client_user 會掃全表找他用過的邀請碼。
   index('coach_invites_used_by_idx').on(t.usedByClientUserId),
+]);
+
+// 開通碼輸入紀錄（2026/10/29）：只為了擋猜碼——同一個帳號 30 分鐘內輸錯 5 次就先擋下。成功的也記，查問題時看得到。
+export const claimAttempts = pgTable('claim_attempts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  clientUserId: text('client_user_id').notNull().references(() => clientUsers.id, { onDelete: 'cascade' }),
+  input: text('input').default('').notNull(),
+  ok: boolean('ok').default(false).notNull(),
+  at: timestamp('at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index('claim_attempts_user_at_idx').on(t.clientUserId, t.at),
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────

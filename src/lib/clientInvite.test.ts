@@ -15,28 +15,33 @@ const h = vi.hoisted(() => {
   const col = (t: string, c: string) => ({ _t: t, _c: c });
   const tbl = (n: string, cols: string[]) => Object.fromEntries([["_n", n], ...cols.map((c) => [c, col(n, c)])]);
   const T: any = {
-    clients: tbl("clients", ["id", "coachId", "clientUserId", "status", "name", "source", "updatedAt"]),
+    clients: tbl("clients", ["id", "coachId", "clientUserId", "status", "name", "source", "updatedAt", "code"]),
     coaches: tbl("coaches", ["id", "status", "name", "rankCode", "clientCapOverride"]),
     coachLinkRequests: tbl("clr", ["clientId", "status", "respondedAt"]),
-    coachInvites: tbl("invites", ["code", "coachId", "clientId", "usedAt", "usedByClientUserId", "note", "createdAt"]),
+    coachInvites: tbl("invites", ["code", "coachId", "clientId", "usedAt", "usedByClientUserId", "note", "createdAt", "pin"]),
+    claimAttempts: tbl("claims", ["clientUserId", "ok", "at", "input"]),
     clientUsers: tbl("client_users", ["id"]),
     plans: tbl("plans", ["clientId", "track", "updatedAt"]),
     coachDisplayName: col("coaches", "name"),
   };
-  const store: any = { clients: [], coaches: [], clr: [], invites: [], plans: [] };
+  const store: any = { clients: [], coaches: [], clr: [], invites: [], plans: [], claims: [] };
   const log: any[] = [];
   const match = (row: any, cond: any): boolean => {
     if (!cond) return true;
     if (cond.op === "and") return cond.parts.every((p: any) => match(row, p));
     if (cond.op === "eq") return row[cond.col._c] === cond.val;
     if (cond.op === "isNull") return row[cond.col._c] == null;
+    if (cond.op === "gte") return row[cond.col._c] >= cond.val;
     return true;
   };
   const db = {
     select: (shape?: any) => ({
       from: (t: any) => {
         let cond: any = null;
-        const project = (rows: any[]) => (shape ? rows.map((r) => Object.fromEntries(Object.entries(shape).map(([k, c]: any) => [k, r[c._c]]))) : rows);
+        const project = (rows: any[]) => {
+          if (shape && Object.values(shape).some((c: any) => c?._c === "__count")) return [Object.fromEntries(Object.keys(shape).map((k) => [k, rows.length]))];
+          return shape ? rows.map((r) => Object.fromEntries(Object.entries(shape).map(([k, c]: any) => [k, r[c._c]]))) : rows;
+        };
         const run = () => project((store[t._n] ?? []).filter((r: any) => match(r, cond)));
         const c: any = {
           where: (w: any) => { cond = w; return c; },
@@ -50,7 +55,7 @@ const h = vi.hoisted(() => {
     }),
     insert: (t: any) => ({
       values: (v: any) => {
-        const row = { id: `${t._n}-new`, ...v };
+        const row = { id: `${t._n}-new`, ...(t._n === "claims" ? { at: new Date() } : {}), ...v };
         store[t._n].push(row);
         log.push({ op: "insert", table: t._n, values: v });
         const c: any = { returning: () => Promise.resolve([row]), then: (res: any, rej: any) => Promise.resolve([row]).then(res, rej) };
@@ -83,8 +88,9 @@ vi.mock("drizzle-orm", () => ({
   and: (...parts: any[]) => ({ op: "and", parts }),
   eq: (col: any, val: any) => ({ op: "eq", col, val }),
   isNull: (col: any) => ({ op: "isNull", col }),
+  gte: (col: any, val: any) => ({ op: "gte", col, val }),
   desc: () => ({}),
-  count: () => ({}),
+  count: () => ({ _c: "__count" }),
 }));
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
@@ -93,7 +99,7 @@ const seeded: string[] = [];
 vi.mock("@/lib/plans", () => ({ seedCoachPlanFromPassport: async (clientId: string) => { seeded.push(clientId); return null; } }));
 vi.mock("@/lib/quota", () => ({ clientQuota: async () => ({ cap: 1, used: 1, left: 0, full: true }) }));
 
-import { redeemInvite, createClientInvite, activeClientInvite } from "./coachLink";
+import { redeemInvite, createClientInvite, activeClientInvite, lookupClaimCode } from "./coachLink";
 
 const USER: any = { id: "user_c1", email: "c@example.com", name: "周承翰", status: "active" };
 
@@ -102,7 +108,8 @@ beforeEach(() => {
   h.log.length = 0;
   h.store.coaches = [{ id: "coach_1", name: "Ray", status: "active" }];
   // 教練先建好的那一筆（還沒接登入帳號）＋已做好的年度版
-  h.store.clients = [{ id: "cl_t", coachId: "coach_1", clientUserId: null, status: "active", name: "周承翰", source: "講座" }];
+  h.store.clients = [{ id: "cl_t", coachId: "coach_1", clientUserId: null, status: "active", name: "周承翰", source: "講座", code: "2610008" }];
+  h.store.claims = [];
   h.store.plans = [{ id: "p_coach", clientId: "cl_t", track: "coach" }];
   h.store.clr = [];
   h.store.invites = [{ code: "ded001", coachId: "coach_1", clientId: "cl_t", usedAt: null, usedByClientUserId: null }];
@@ -114,7 +121,9 @@ describe("createClientInvite", () => {
     expect(r1.ok).toBe(true);
     expect(h.store.invites.filter((i: any) => i.clientId === "cl_t")).toHaveLength(1);
     expect(h.store.invites[0].code).not.toBe("ded001");
-    expect(await activeClientInvite("cl_t")).toBe(h.store.invites[0].code);
+    expect(r1.ok && r1.pin).toMatch(/^\d{6}$/);
+    expect(r1.ok && r1.claimCode).toBe(`2610008-${h.store.invites[0].pin}`);
+    expect(await activeClientInvite("cl_t")).toEqual({ code: h.store.invites[0].code, pin: h.store.invites[0].pin });
     expect((await createClientInvite("coach_9", "cl_t")).ok).toBe(false);
   });
 
@@ -191,5 +200,36 @@ describe("redeemInvite（專用連結）", () => {
     const r = await redeemInvite("gen001", USER);
     expect(r.ok).toBe(false); // 額度滿 → 擋
     expect(r.error).toContain("上限");
+  });
+});
+
+describe("開通碼認領（2026/10/29）", () => {
+  beforeEach(() => { h.store.invites[0].pin = "483921"; });
+
+  it("客戶編號-開通碼對了 → 回那條連結的 code；全形、沒連字號也收；成功也記一筆", async () => {
+    expect(await lookupClaimCode("user_c1", "2610008-483921")).toEqual({ ok: true, code: "ded001" });
+    expect(await lookupClaimCode("user_c1", "２６１０００８４８３９２１")).toEqual({ ok: true, code: "ded001" });
+    expect(h.store.claims.filter((c: any) => c.ok)).toHaveLength(2);
+  });
+
+  it("錯碼／不存在的編號／已用過的連結 → 同一句錯誤（不透露是哪一段錯）", async () => {
+    const a = await lookupClaimCode("user_c1", "2610008-000000");
+    const b = await lookupClaimCode("user_c1", "2610099-483921");
+    expect(a.ok).toBe(false);
+    expect(!a.ok && !b.ok && a.error).toBe(!b.ok ? b.error : "");
+    h.store.invites[0].usedAt = new Date();
+    expect((await lookupClaimCode("user_c1", "2610008-483921")).ok).toBe(false);
+  });
+
+  it("30 分鐘內輸錯 5 次就擋，連正確的也先不給", async () => {
+    for (let i = 0; i < 5; i++) await lookupClaimCode("user_c1", `2610008-00000${i}`);
+    const r = await lookupClaimCode("user_c1", "2610008-483921");
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("太多次");
+  });
+
+  it("舊連結沒有開通碼 → 永遠對不上（只能用連結或重新產生）", async () => {
+    h.store.invites[0].pin = null;
+    expect((await lookupClaimCode("user_c1", "2610008-483921")).ok).toBe(false);
   });
 });

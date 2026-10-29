@@ -13,6 +13,8 @@ export type ClientLoginInfo = {
   lastLoginAt: string | null;
   /** 目前有效（未用）的專用碼；重整頁面後還看得到同一條連結 */
   pendingCode: string | null;
+  /** 開通碼（客戶編號-6 位數）；開通碼上線前產的舊連結沒有，按「重新產生」就有 */
+  claimCode: string | null;
 };
 
 // 客戶專用登入連結面板（只有主責教練看得到）。
@@ -30,7 +32,8 @@ export default function ClientLogin({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState<string | null>(info.pendingCode);
-  const [copied, setCopied] = useState(false);
+  const [claim, setClaim] = useState<string | null>(info.claimCode);
+  const [copied, setCopied] = useState<"" | "link" | "claim">("");
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -39,10 +42,10 @@ export default function ClientLogin({
   const link = code ? shareJoinUrl(origin, code) : null;
 
   function gen() {
-    setErr(null); setCopied(false);
+    setErr(null); setCopied("");
     start(async () => {
       const r = await createClientInviteAction(clientId);
-      if (r.ok) { setCode(r.code); router.refresh(); }
+      if (r.ok) { setCode(r.code); setClaim(r.claimCode); router.refresh(); }
       else setErr(r.error);
     });
   }
@@ -68,23 +71,42 @@ export default function ClientLogin({
           ) : (
             <>
               <p className="text-xs text-tx2">
-                把這條連結傳給客戶；他註冊或登入客戶帳號後，會直接接到<b className="text-brand2">這一筆規劃</b>，
-                不會另外長出一位新客戶。一人一碼，開啟綁定後就失效；重新產生會讓舊連結作廢。
+                把這條連結傳給客戶；他註冊或登入客戶帳號後，確認一下就會接到<b className="text-brand2">這一筆規劃</b>，
+                不會另外長出一位新客戶。連結打不開、或客戶事後自己登入，也可以在客戶首頁輸入下面的<b className="text-tx">開通碼</b>。
+                一人一碼，綁定後就失效；重新產生會讓舊連結與舊開通碼一起作廢。
               </p>
               {link ? (
                 <div className="flex flex-wrap gap-2 items-center">
                   <input readOnly value={link} onFocus={(e) => e.currentTarget.select()}
                     className="flex-1 min-w-[220px] bg-field border border-line rounded-lg px-3 py-2 text-sm text-tx" />
-                  <button onClick={() => { navigator.clipboard?.writeText(link); setCopied(true); }}
+                  <button onClick={() => { navigator.clipboard?.writeText(link); setCopied("link"); }}
                     className="text-onbrand bg-brand hover:bg-brand2 px-4 py-2 rounded-lg text-sm font-bold">
-                    {copied ? "已複製 ✓" : "複製"}
+                    {copied === "link" ? "已複製 ✓" : "複製"}
                   </button>
                   <button onClick={gen} disabled={readOnly || pending}
                     className="text-tx2 hover:text-tx border border-line2 px-3 py-2 rounded-lg text-sm disabled:opacity-50">
                     重新產生
                   </button>
                 </div>
-              ) : (
+              ) : null}
+              {link && (
+                <div className="flex flex-wrap gap-2 items-center text-sm">
+                  <span className="text-xs text-tx3">開通碼</span>
+                  {claim ? (
+                    <>
+                      <span className="font-mono text-base tracking-wider text-tx bg-field border border-line rounded-lg px-3 py-1.5">{claim}</span>
+                      <button onClick={() => { navigator.clipboard?.writeText(claim); setCopied("claim"); }}
+                        className="text-tx2 hover:text-tx border border-line2 px-3 py-1.5 rounded-lg text-sm">
+                        {copied === "claim" ? "已複製 ✓" : "複製開通碼"}
+                      </button>
+                      <span className="text-11 text-tx3">客戶登入後在首頁「我有教練給的開通碼」輸入</span>
+                    </>
+                  ) : (
+                    <span className="text-11 text-tx3">這條連結是開通碼上線前產的，按「重新產生」就會同時有開通碼。</span>
+                  )}
+                </div>
+              )}
+              {!link && (
                 <div>
                   <button onClick={gen} disabled={readOnly || pending}
                     className="px-3 py-1.5 text-sm font-bold rounded-md bg-brand text-onbrand disabled:opacity-40 disabled:cursor-not-allowed">

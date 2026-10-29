@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ensureClientUser } from "@/lib/clientUser";
-import { redeemPath } from "@/lib/joinFlow";
-import { redeemInvite, getInviteByCode } from "@/lib/coachLink";
+import { claimPath } from "@/lib/joinFlow";
+import { getInviteByCode } from "@/lib/coachLink";
 
 export const dynamic = "force-dynamic";
 
@@ -57,49 +57,8 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
   if (!code) {
     return <Shell><p className="text-tx2">邀請連結不完整。</p><div className="mt-4"><Link href="/portal" className="underline underline-offset-4">回我的首頁</Link></div></Shell>;
   }
-  // 已登入：兌換一律交給 /portal/redeem（非公開路由、會清 cookie），回來帶 done=1 才顯示結果。
-  // redeemInvite 冪等——結果頁再呼叫一次，得到的是同一個答案（成功就是成功、被擋就是同一個原因）。
-  if (sp.done !== "1") redirect(redeemPath(code));
-
-  // 兌換可能被擋下（連結失效、教練停權、教練客戶數已滿…）。
-  // ⚠️ 防呆兩層：回傳的 { ok:false, error } 要照原文顯示給客戶看；
-  //    真的 throw 出來也不能讓整頁掉進錯誤頁——那會變成一個沒有任何說明的白畫面。
-  // 專用連結（教練已建好規劃）成功後直接進首頁看規劃，不是去填護照——護照在有教練軌時是投影。
-  const dedicated = !!(await getInviteByCode(code))?.clientId;
-  const r = await redeemInvite(code, user).catch((e: unknown) => ({
-    ok: false as const,
-    error: e instanceof Error && e.message ? e.message : "連結時發生問題，請稍後再試一次。",
-    coachName: null,
-  }));
-  return (
-    <Shell>
-      {r.ok ? (
-        <>
-          <div className="text-5xl mb-3">🤝</div>
-          <h1 className="font-serif text-2xl mb-2">連結成功</h1>
-          <p className="text-tx2 mb-6">
-            {dedicated
-              ? `你已接上教練${r.coachName ? ` ${r.coachName}` : ""}為你做的財務規劃。`
-              : `你已連結教練${r.coachName ? `：${r.coachName}` : ""}，可以一起規劃了。`}
-          </p>
-          {dedicated ? (
-            <Link href="/portal" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg">看我的規劃</Link>
-          ) : (
-            <>
-              <Link href="/portal/passport" className="inline-block font-bold text-onbrand bg-brand hover:bg-brand2 px-6 py-2.5 rounded-lg">開始填人生護照</Link>
-              <div className="mt-4">
-                <Link href="/portal" className="text-sm text-tx2 hover:text-tx underline underline-offset-4">先回我的首頁</Link>
-              </div>
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          <h1 className="font-serif text-2xl mb-2">無法連結</h1>
-          <p className="text-danger mb-6">⚠ {r.error || "這個邀請連結目前無法使用，請向教練確認。"}</p>
-          <Link href="/portal" className="underline underline-offset-4">回我的首頁</Link>
-        </>
-      )}
-    </Shell>
-  );
+  // 已登入：一律交給認領頁（非公開路由，先確認是誰的規劃、按確認才綁）。
+  // done=1 是上一版兌換完導回來的結果頁網址——還留在誰的瀏覽器紀錄裡就送回首頁。
+  if (sp.done === "1") redirect("/portal");
+  redirect(claimPath(code));
 }

@@ -456,6 +456,13 @@
       "when": 1793178311163,
       "tag": "0064_esign_profiles_asks_docno",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1793248723793,
+      "tag": "0065_claim_pin",
+      "breakpoints": true
     }
   ]
 }

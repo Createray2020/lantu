@@ -49,16 +49,17 @@ const isApiRoute = createRouteMatcher(['/api(.*)', '/trpc(.*)']);
 // 交給 auth.protect 就對了：它先完成 handshake，真的沒登入才吃 unauthenticatedUrl。
 const isApplyEntry = createRouteMatcher(['/apply']);
 
-// 邀請碼兌換（2026/10/29 徐醫師事故，見 lib/joinFlow.ts）。
-// /portal/redeem 必須在 isPublicRoute 之前攔下來：它落在 '/portal(.*)' 底下，但**刻意不公開**——
+// 邀請碼兌換／認領（2026/10/29 徐醫師事故，見 lib/joinFlow.ts）。
+// /portal/claim（認領確認頁）與舊的 /portal/redeem 必須在 isPublicRoute 之前攔下來：它落在 '/portal(.*)' 底下，但**刻意不公開**——
 // 要先讓 auth.protect 完成 handshake，剛從 Google 回來的人才不會被當成沒登入；真的沒登入就回邀請說明頁。
-const isRedeem = createRouteMatcher(['/portal/redeem']);
+const isRedeem = createRouteMatcher(['/portal/redeem', '/portal/claim']);
 const isJoin = createRouteMatcher(['/portal/join']);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isRedeem(req)) {
     const code = req.nextUrl.searchParams.get('code');
-    const back = isJoinCode(code) ? joinPath(code) : '/portal';
+    // 沒登入：帶著碼回邀請說明頁（那裡有註冊／登入）；手動輸入開通碼的頁面沒有碼 → 去客戶登入再回來。
+    const back = isJoinCode(code) ? joinPath(code) : '/client/sign-in?redirect_url=%2Fportal%2Fclaim';
     await auth.protect({ unauthenticatedUrl: new URL(back, req.url).toString() });
     return;
   }
