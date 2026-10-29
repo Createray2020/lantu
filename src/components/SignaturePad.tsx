@@ -57,78 +57,100 @@ export default function SignaturePad({
 }
 
 // ── 畫布 ─────────────────────────────────────────────────────────────────────
-function Canvas({ onDone, disabled, big }: { onDone: (png: string | null) => void; disabled?: boolean; compact?: boolean; big?: boolean }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-  const last = useRef<{ x: number; y: number } | null>(null);
-  const [dirty, setDirty] = useState(false);
+type Pt = { x: number; y: number };
+type Stroke = { pts: Pt[] };
 
-  // 依實際 CSS 尺寸×DPR 配置像素，線條才不會糊。
-  const fit = useCallback(() => {
+/**
+ * ⚠️ LT10（2026/10/29）：筆跡存成座標（畫布的 CSS 座標，不受外層 transform 影響），不是存一張圖。
+ *   · 畫布尺寸改變（轉向、網址列收合）時照原比例重畫——舊版存圖再拉伸貼回去，轉向一次字就變形。
+ *   · rotated：外層把整個介面轉 90°（直向畫面裡畫一個橫向簽名板）。pointer 的螢幕座標要反轉回畫布座標；
+ *     畫布內容本身就是「紙」的方向，輸出不必再旋轉。
+ */
+function Canvas({ onDone, disabled, big, rotated = false }: { onDone: (png: string | null) => void; disabled?: boolean; compact?: boolean; big?: boolean; rotated?: boolean }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const strokes = useRef<Stroke[]>([]);
+  const base = useRef<{ w: number; h: number } | null>(null); // 第一筆落下時的畫布大小＝紙的大小
+  const cur = useRef<Stroke | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const width = big ? 3.2 : 2.4;
+
+  // 紙座標 → 目前畫布座標：等比縮放、置中（不拉伸）
+  const view = useCallback(() => {
+    const c = ref.current;
+    const W = c?.clientWidth ?? 0, H = c?.clientHeight ?? 0;
+    const b = base.current ?? { w: W, h: H };
+    const k = b.w && b.h ? Math.min(W / b.w, H / b.h) : 1;
+    return { k, ox: (W - b.w * k) / 2, oy: (H - b.h * k) / 2 };
+  }, []);
+
+  const redraw = useCallback(() => {
     const c = ref.current;
     if (!c) return;
-    const r = c.getBoundingClientRect();
     const dpr = Math.min(3, window.devicePixelRatio || 1);
-    if (c.width === Math.round(r.width * dpr) && c.height === Math.round(r.height * dpr)) return;
-    // 重配置會清空：把舊圖存起來再貼回去
-    const keep = dirty ? c.toDataURL() : null;
-    c.width = Math.round(r.width * dpr);
-    c.height = Math.round(r.height * dpr);
+    const W = c.clientWidth, H = c.clientHeight;
+    if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) {
+      c.width = Math.round(W * dpr);
+      c.height = Math.round(H * dpr);
+    }
     const g = c.getContext("2d")!;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, c.width, c.height);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.lineCap = "round";
     g.lineJoin = "round";
     g.strokeStyle = "#111";
-    g.lineWidth = big ? 3.2 : 2.4;
-    if (keep) {
-      const im = new Image();
-      im.onload = () => g.drawImage(im, 0, 0, r.width, r.height);
-      im.src = keep;
+    g.fillStyle = "#111";
+    const { k, ox, oy } = view();
+    g.lineWidth = width * Math.max(0.6, Math.min(1.5, k));
+    for (const st of strokes.current) {
+      const P = st.pts.map((p) => ({ x: ox + p.x * k, y: oy + p.y * k }));
+      if (P.length === 1) { g.beginPath(); g.arc(P[0].x, P[0].y, g.lineWidth / 2, 0, Math.PI * 2); g.fill(); continue; }
+      g.beginPath();
+      g.moveTo(P[0].x, P[0].y);
+      for (let i = 1; i < P.length; i++) g.lineTo(P[i].x, P[i].y);
+      g.stroke();
     }
-  }, [dirty, big]);
+  }, [view, width]);
 
   useEffect(() => {
-    fit();
-    const ro = new ResizeObserver(() => fit());
+    redraw();
+    const ro = new ResizeObserver(() => redraw());
     if (ref.current) ro.observe(ref.current);
     return () => ro.disconnect();
-  }, [fit]);
+  }, [redraw]);
 
-  const pos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  // 螢幕座標 → 紙座標
+  const pos = (e: React.PointerEvent<HTMLCanvasElement>): Pt => {
     const r = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    // rotate(90deg)：畫布的 (0,0) 在螢幕上是外框的右上角；x 沿螢幕往下、y 沿螢幕往左
+    const local = rotated ? { x: e.clientY - r.top, y: r.right - e.clientX } : { x: e.clientX - r.left, y: e.clientY - r.top };
+    const { k, ox, oy } = view();
+    return { x: (local.x - ox) / k, y: (local.y - oy) / k };
   };
   const down = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (disabled) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drawing.current = true;
-    last.current = pos(e);
-    const g = e.currentTarget.getContext("2d")!;
-    g.beginPath();
-    g.arc(last.current.x, last.current.y, (big ? 3.2 : 2.4) / 2, 0, Math.PI * 2);
-    g.fillStyle = "#111";
-    g.fill();
+    const c = e.currentTarget;
+    if (!base.current) base.current = { w: c.clientWidth, h: c.clientHeight };
+    cur.current = { pts: [pos(e)] };
+    strokes.current.push(cur.current);
     setDirty(true);
+    redraw();
   };
   const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current || !last.current) return;
-    const p = pos(e);
-    const g = e.currentTarget.getContext("2d")!;
-    g.beginPath();
-    g.moveTo(last.current.x, last.current.y);
-    g.lineTo(p.x, p.y);
-    g.stroke();
-    last.current = p;
+    if (!cur.current) return;
+    cur.current.pts.push(pos(e));
+    redraw();
   };
   const up = () => {
-    drawing.current = false;
-    last.current = null;
+    cur.current = null;
   };
   const clear = () => {
-    const c = ref.current;
-    if (!c) return;
-    c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
+    strokes.current = [];
+    base.current = null;
+    cur.current = null;
     setDirty(false);
+    redraw();
   };
   const done = () => {
     const c = ref.current;
@@ -162,30 +184,45 @@ function Canvas({ onDone, disabled, big }: { onDone: (png: string | null) => voi
 }
 
 // ── 全螢幕（手機橫向）────────────────────────────────────────────────────────
+/**
+ * ⚠️ LT10：手機開著「直向鎖定」時把手機轉橫，瀏覽器畫面仍是直的——使用者沿長邊寫，存下來就側一邊。
+ * 所以畫面是直的時候，整個簽名介面直接畫成橫的（轉 90°），請使用者把手機向左轉橫：
+ * 鎖定開著＝畫面不動、介面剛好正過來；鎖定關著＝畫面跟著轉成橫向、改回一般版面——兩種都寫得正、存得正。
+ */
 function FullScreen({ onClose, onDone }: { onClose: () => void; onDone: (png: string) => void }) {
+  const [vp, setVp] = useState<{ w: number; h: number }>(() => ({ w: typeof window === "undefined" ? 0 : window.innerWidth, h: typeof window === "undefined" ? 0 : window.innerHeight }));
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    // 能鎖就鎖橫向；不能（iOS Safari）就靠畫面提示。
+    // 能鎖就鎖橫向（Android Chrome）；不能（iOS Safari）就靠轉 90° 的版面。
     try {
       type Lockable = { lock?: (o: string) => Promise<void> };
       (screen.orientation as unknown as Lockable).lock?.("landscape").catch(() => {});
     } catch {}
+    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
     return () => {
       document.body.style.overflow = prev;
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
       try {
         (screen.orientation as unknown as { unlock?: () => void }).unlock?.();
       } catch {}
     };
   }, []);
+  const rotated = vp.h > vp.w; // 直向畫面 → 介面轉成橫的
+  const box: React.CSSProperties = rotated
+    ? { position: "fixed", top: 0, left: vp.w, width: vp.h, height: vp.w, transform: "rotate(90deg)", transformOrigin: "top left" }
+    : { position: "fixed", inset: 0 };
   return (
-    <div className="fixed inset-0 z-[100] bg-canvas text-tx grid grid-rows-[auto_1fr] p-3 gap-2" role="dialog" aria-modal="true" aria-label="放大簽名">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-tx2">在框內手寫簽名<span className="portrait:inline hidden">（把手機轉橫會更好寫）</span></span>
-        <button type="button" className="text-sm rounded-md border border-line px-3 py-1.5" onClick={onClose}>取消</button>
+    <div className="z-[100] bg-canvas text-tx grid grid-rows-[auto_1fr] p-3 gap-2" style={box} role="dialog" aria-modal="true" aria-label="放大簽名">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm text-tx2">{rotated ? "請把手機向左轉成橫向（頂端朝左），在框內手寫簽名" : "在框內手寫簽名"}</span>
+        <button type="button" className="text-sm rounded-md border border-line px-3 py-1.5 shrink-0" onClick={onClose}>取消</button>
       </div>
       <div className="min-h-0">
-        <Canvas big onDone={(png) => png && onDone(png)} />
+        <Canvas big rotated={rotated} onDone={(png) => png && onDone(png)} />
       </div>
     </div>
   );

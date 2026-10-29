@@ -5,7 +5,7 @@ import { applyAsCoach, ensureCoach } from "@/lib/coach";
 import { getApplySettings, lookupCoachByCode, submitApplication } from "@/lib/coachApplyStore";
 import { canSubmit, routeMeta, type ApplyDraft } from "@/lib/coachApply";
 import { ensureEnrollment, reportTrainingPayment } from "@/lib/trainingStore";
-import { saveSignerProfile } from "@/lib/docsStore";
+import { saveSignerProfile, refreshUnsignedCoachDocs } from "@/lib/docsStore";
 import type { CaseFeeInput } from "@/lib/acctStore";
 import { revalidatePath } from "next/cache";
 
@@ -85,6 +85,8 @@ export async function saveMyProfileAction(input: unknown): Promise<{ ok: true } 
   if (!me) return { ok: false, error: "請先登入" };
   try {
     await saveSignerProfile({ kind: "coach", id: me.id }, input);
+    // LT12：還沒有人簽過的補簽文件用新資料重產（失敗不擋存檔）
+    try { await refreshUnsignedCoachDocs(me.id); } catch (e) { console.error("[docs] refreshUnsignedCoachDocs", e); }
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/docs");
     return { ok: true };

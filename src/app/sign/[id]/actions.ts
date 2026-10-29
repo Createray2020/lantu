@@ -2,7 +2,8 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { consentAndSign, declineSign, saveSignature, deleteSignature, remindInstance, reopenInstance } from "@/lib/docsStore";
+import { consentAndSign, declineSign, saveSignature, deleteSignature, remindInstance, reopenInstance, saveSignerProfile, refreshUnsignedCoachDocs, getInstance } from "@/lib/docsStore";
+import { isSigner } from "@/lib/docs";
 import { currentSignIdentity } from "@/lib/docsIdentity";
 import { onDocCompleted } from "@/lib/docsHooks";
 import type { DocCaseType } from "@/lib/docs";
@@ -17,6 +18,26 @@ async function clientMeta() {
 }
 
 const PATHS = ["/dashboard", "/dashboard/docs", "/portal", "/portal/docs", "/admin", "/admin/docs/instances"];
+
+/**
+ * LT12（2026/10/29）：簽署頁上補簽約資料——補簽文件用到身分證／電話／地址但本人還沒填時，簽之前先在這裡填，
+ * 存完把他還沒有人簽過的補簽文件重產（含這一份），頁面重新載入新內容與新雜湊。
+ */
+export async function saveProfileForDocAction(instanceId: string, input: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const me = await currentSignIdentity();
+  if (!me?.coachId) return { ok: false, error: "請先登入" };
+  const inst = await getInstance(instanceId);
+  if (!inst || !inst.signers.some((s) => s.role === "member" && isSigner(s, me))) return { ok: false, error: "這份文件不是給你簽的" };
+  try {
+    await saveSignerProfile({ kind: "coach", id: me.coachId }, input);
+    await refreshUnsignedCoachDocs(me.coachId);
+  } catch {
+    return { ok: false, error: "儲存失敗，請再試一次" };
+  }
+  revalidatePath(`/sign/${instanceId}`);
+  revalidatePath("/dashboard/docs");
+  return { ok: true };
+}
 
 /** 本人確認簽署：勾同意＋簽名圖＋當時看到的雜湊。全員簽完 → 觸發業務後續（例如培訓開通）。 */
 export async function signAction(instanceId: string, input: { consent: boolean; answers?: Record<string, boolean>; signatureImg: string; hashSeen: string; saveAsDefault: boolean }): Promise<SignActionResult> {

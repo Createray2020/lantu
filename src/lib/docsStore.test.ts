@@ -135,7 +135,7 @@ vi.mock("next/cache", () => ({ unstable_cache: (fn: any) => fn, updateTag: () =>
 vi.mock("@/Shared/db", () => ({ db: h.db }));
 vi.mock("@/Shared/db/schema", () => h.T);
 
-import { saveSignerProfile, getSignerProfile, profileMissing, profileVars, deleteTemplate, listTemplates, getSet, startSigning, consentAndSign, declineSign, voidInstance, saveTemplate, saveSet, listMyInstances, countMyPending, caseProgress, getInstance, saveSignature, getSignature, latestEnabledTemplate, setTemplateEnabled, remindInstance, reopenInstance, listDocTodos, createDocTask, listDocTasks, hasReminderFor } from "./docsStore";
+import { saveSignerProfile, getSignerProfile, profileMissing, profileVars, deleteTemplate, listTemplates, getSet, startSigning, consentAndSign, declineSign, voidInstance, saveTemplate, saveSet, listMyInstances, countMyPending, caseProgress, getInstance, saveSignature, getSignature, latestEnabledTemplate, setTemplateEnabled, remindInstance, reopenInstance, listDocTodos, createDocTask, listDocTasks, hasReminderFor, refreshUnsignedCoachDocs } from "./docsStore";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const S = h.state;
@@ -353,6 +353,30 @@ describe("補簽任務", () => {
     expect(r3.ok && r3.created).toBe(1);
     expect(r3.ok && r3.already).toEqual(["阿一"]);
     expect(r3.ok && r3.task?.targetCoachIds).toEqual(["a2"]);
+  });
+
+  it("LT12：補簽文件發出時沒有簽約資料 → 本人補填後，還沒人簽的那份重產帶入；已簽完的不改寫", async () => {
+    S.coaches.push({ id: "a1", name: "阿一", email: "a@x", code: null, status: "active" }, { id: "a2", name: "阿二", email: "b@x", code: null, status: "active" }, { id: "boss", name: "Ray", email: null, code: null, status: "active" });
+    const t = await saveTemplate({ category: "training", name: "委任契約", html: "<p>身分證：{{member.id_no}} 地址：{{member.address}}</p>{{sign:member:1}}", signers: [{ role: "member", seq: 1 }] }, "boss");
+    await createDocTask({ templateKey: t.key, coachIds: ["a1", "a2"], deadline: null }, "boss");
+    const d1 = S.doc_instances.find((i) => i.htmlSnapshot.includes("身分證： 地址："))!;
+    expect(S.doc_instances.every((i) => i.htmlSnapshot.includes("身分證： 地址："))).toBe(true);
+    // 阿二直接簽了（空白版）→ 之後補資料也不改寫
+    const d2 = S.doc_instances.filter((i) => i.caseType === "coach_doc")[1];
+    const a2signer = S.doc_signers.find((x) => x.instanceId === d2.id);
+    const signerOf = (id: string) => S.doc_signers.find((x) => x.instanceId === id).coachId;
+    const done = signerOf(d1.id) === "a1" ? d2 : d1;
+    const open = done === d2 ? d1 : d2;
+    expect(a2signer).toBeTruthy();
+    await consentAndSign({ instanceId: done.id, me: { coachId: signerOf(done.id) }, consent: true, signatureImg: PNG, hashSeen: done.hash, saveAsDefault: false, ip: null, ua: null });
+    const before = { done: S.doc_instances.find((i) => i.id === done.id).htmlSnapshot, openHash: open.hash };
+    for (const id of ["a1", "a2"]) await saveSignerProfile({ kind: "coach", id }, { idNo: "A123456789", birthDate: "1990-01-01", phone: "0912", email: "x@x", address: "桃園市", invoiceKind: "personal" });
+    expect(await refreshUnsignedCoachDocs(signerOf(open.id))).toBe(1);
+    expect(await refreshUnsignedCoachDocs(signerOf(done.id))).toBe(0);
+    const o2 = S.doc_instances.find((i) => i.id === open.id);
+    expect(o2.htmlSnapshot).toContain("身分證：A123456789 地址：桃園市");
+    expect(o2.hash).not.toBe(before.openHash);
+    expect(S.doc_instances.find((i) => i.id === done.id).htmlSnapshot).toBe(before.done);
   });
 
   it("新版本不算已簽：範本改版後同一位會再產一份", async () => {

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
 import { currentSignIdentity } from "@/lib/docsIdentity";
-import { getInstance, getSignature, getTemplate } from "@/lib/docsStore";
+import { getInstance, getSignature, getTemplate, getSignerProfile, profileMissing, usesPersonVars } from "@/lib/docsStore";
+import { profileDraftOf } from "@/lib/signerProfileDraft";
 import { canSignNow, isSigner, asksForRole, DOC_CSS, type DocAsk } from "@/lib/docs";
 import { todayISO } from "@/lib/license";
 import SignView, { type SignerLite } from "./SignView";
@@ -41,6 +42,11 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
   // 本人確認項：依我這一列的 role 從範本取；簽名前逐項作答（server 端 consentAndSign 再驗一次）
   const tpl = mine && myTurn ? await getTemplate(inst.templateId) : null;
   const asks = mine && tpl ? asksForRole((tpl.asks as DocAsk[]) ?? [], mine.role) : [];
+  // LT12：補簽文件用到本人簽約資料、而他還沒填齊 → 簽之前先補（還沒有人簽過才重產得了內容）
+  const noneSigned = inst.signers.every((s) => s.status === "pending");
+  const profileNeed = !!(mine && myTurn && tpl && mine.coachId && mine.role === "member" && inst.caseType === "coach_doc" && noneSigned && usesPersonVars(tpl.html));
+  const myProf = profileNeed ? await getSignerProfile({ kind: "coach", id: mine!.coachId! }) : null;
+  const profileGap = profileNeed ? profileMissing(myProf) : [];
 
   const signers: SignerLite[] = inst.signers.map((s) => ({
     id: s.id,
@@ -86,6 +92,8 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
           isMine={!!mine}
           saved={saved}
           admin={me.admin}
+          profileGap={profileGap}
+          profileDraft={profileGap.length ? profileDraftOf(myProf) : null}
         />
       </div>
     </main>

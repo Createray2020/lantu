@@ -7,7 +7,9 @@ import DocTodoList from "@/components/DocTodoList";
 import { toTodoRows } from "@/lib/docTodoRows";
 import DocList from "@/components/DocList";
 import MySignature from "@/components/MySignature";
-import { getSignature } from "@/lib/docsStore";
+import { getSignature, getSignerProfile } from "@/lib/docsStore";
+import MySignerProfile from "@/components/MySignerProfile";
+import { profileDraftOf } from "@/lib/signerProfileDraft";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +19,7 @@ export default async function CoachDocsPage() {
   if (!me) redirect("/dashboard");
   if (me.status !== "active") redirect("/dashboard");
   await sweepExpired();
-  const [hp, list, saved, todos] = await Promise.all([headerProps(me), listMyInstances({ coachId: me.id }), getSignature({ kind: "coach", id: me.id }), listDocTodos({ coachId: me.id })]);
+  const [hp, list, saved, todos, prof] = await Promise.all([headerProps(me), listMyInstances({ coachId: me.id }), getSignature({ kind: "coach", id: me.id }), listDocTodos({ coachId: me.id }), getSignerProfile({ kind: "coach", id: me.id })]);
   return (
     <main className="flex-1 bg-canvas text-tx min-h-screen">
       <DashboardHeader {...hp} />
@@ -28,6 +30,7 @@ export default async function CoachDocsPage() {
         </div>
         <DocTodoList rows={toTodoRows(todos, { coachId: me.id })} />
         <DocList list={list} me={{ coachId: me.id }} />
+        <MySignerProfile initial={profileDraftOf(prof)} email={me.email ?? ""} />
         <MySignature saved={saved} />
       </section>
     </main>

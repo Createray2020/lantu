@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import SignaturePad from "@/components/SignaturePad";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { CONSENT_LABEL, E_SIGN_CLAUSE, ROLE_LABEL, STATUS_LABEL, type DocAsk, type DocInstanceStatus, type DocRole } from "@/lib/docs";
-import { declineAction, signAction } from "./actions";
+import { declineAction, signAction, saveProfileForDocAction } from "./actions";
+import SignerProfileForm, { emptyProfile, profileComplete, type ProfileDraft } from "@/components/SignerProfileForm";
 
 export type SignerLite = {
   id: string;
@@ -32,6 +33,8 @@ export default function SignView({
   isMine,
   saved,
   admin,
+  profileGap = [],
+  profileDraft = null,
 }: {
   instanceId: string;
   status: string;
@@ -43,6 +46,8 @@ export default function SignView({
   isMine: boolean;
   saved: string | null;
   admin: boolean;
+  profileGap?: string[];
+  profileDraft?: ProfileDraft | null;
 }) {
   const router = useRouter();
   const [consent, setConsent] = useState(false);
@@ -55,6 +60,17 @@ export default function SignView({
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, start] = useTransition();
+  const [prof, setProf] = useState<ProfileDraft>(profileDraft ?? emptyProfile());
+  const [profErr, setProfErr] = useState<string | null>(null);
+  const needProfile = profileGap.length > 0;
+  function saveProf() {
+    setProfErr(null);
+    start(async () => {
+      const r = await saveProfileForDocAction(instanceId, prof);
+      if (!r.ok) return setProfErr(r.error);
+      router.refresh();
+    });
+  }
 
   const mustOk = asks.every((a) => a.kind !== "must" || answers[a.key] === true);
   const canSubmit = myTurn && consent && mustOk && !!img && !busy && !done;
@@ -109,6 +125,14 @@ export default function SignView({
             <p className="text-sm text-ok font-bold">已完成你的簽署，等其他簽署人完成。</p>
           ) : !myTurn ? (
             <p className="text-sm text-tx2">還沒輪到你——前一順位的簽署人完成後，這裡就會開放。</p>
+          ) : needProfile ? (
+            <>
+              <h2 className="font-bold">先補簽約資料</h2>
+              <p className="text-xs text-tx2">這份文件會帶入你的{profileGap.join("、")}，目前還沒填。填一次就好，之後的文件也會共用；存完文件內容會自動帶入，再簽名。</p>
+              <SignerProfileForm value={prof} onChange={setProf} disabled={busy} />
+              {profErr && <p className="text-sm text-danger">{profErr}</p>}
+              <SubmitButton state={busy ? "pending" : "idle"} disabled={busy || !profileComplete(prof)} onClick={saveProf} className="w-full">儲存並帶入文件</SubmitButton>
+            </>
           ) : (
             <>
               <h2 className="font-bold">本人確認簽署</h2>

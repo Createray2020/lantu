@@ -78,3 +78,12 @@ describe("LT03 拒簽原因", () => {
     expect(rows[1].reason).toBeNull();
   });
 });
+
+describe("LT11／LT05 補充 列印頁", () => {
+  it("列印頁不再印文件識別碼與 SHA-256；有返回鈕回同一份文件", () => {
+    const src = readFileSync(new URL("../app/sign/[id]/print/page.tsx", import.meta.url), "utf8");
+    expect(src).not.toMatch(/文件識別碼 \{inst\.id\}/);
+    expect(src).not.toContain("SHA-256 {");
+    expect(src).toContain("<BackLink fallback={`/sign/${inst.id}`}");
+  });
+});

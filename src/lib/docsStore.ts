@@ -38,10 +38,12 @@ import {
   type DocVars,
   type SlotContext,
   type TemplateInput,
+  fmtDateTaipei,
 } from "./docs";
 import { addDaysISO, todayISO } from "./license";
 import { sanitizeTemplateHtml } from "./docsSanitize";
 import { allocCode } from "./codeAlloc";
+import { varDef, varsInHtml } from "./docsVars";
 import type { CodeKind } from "./codes";
 
 /** 合約編號的號段：案件類型 → code_counters 的 kind。 */
@@ -697,8 +699,7 @@ export async function createDocTask(input: { templateKey: string; coachIds: stri
     if (!resolved.ok) { skipped.push(p.name ?? p.id); continue; }
     const docNo = await allocCode(DOC_NO_KIND.coach_doc);
     const prof = await getSignerProfile({ kind: "coach", id: p.id });
-    const vars: DocVars = { title: t.name, today: todayISO(), "doc.no": docNo, "doc.expires": deadline ?? "", esign_clause: E_SIGN_CLAUSE, "member.name": p.name ?? "", "member.email": p.email ?? "", "member.code": p.code ?? "", ...profileVars("member", prof, { email: p.email ?? "" }) };
-    const html = renderTemplate({ html: sanitizeTemplateHtml(t.html), signers: t.signers as DocSignerSlot[], useSeal: t.useSeal, asks: t.asks as DocAsk[] }, vars, { seal });
+    const html = coachDocHtml(t, p, { docNo, deadline, today: todayISO(), prof, seal });
     const ok = await insertInstanceWithSigners(
       { id: crypto.randomUUID(), caseType: "coach_doc", caseId: `${task.id}:${p.id}`, templateId: t.id, templateKey: t.key, version: t.version, title: t.name, docNo, required: t.required, htmlSnapshot: html, hash: sha256(html), status: "pending", expiresAt: deadline, createdBy },
       resolved.signers.map((s) => ({ ...s, status: "pending" })),
@@ -706,6 +707,51 @@ export async function createDocTask(input: { templateKey: string; coachIds: stri
     if (ok) created++;
   }
   return { ok: true, task, title: t.name, created, skipped, already };
+}
+
+/** 補簽文件（coach_doc）的內容：建立與重產（LT12）共用同一套變數。 */
+function coachDocHtml(
+  t: Pick<DocTemplate, "name" | "html" | "signers" | "useSeal" | "asks">,
+  p: { name: string | null; email: string | null; code: string | null },
+  o: { docNo: string; deadline: string | null; today: string; prof: SignerProfile | null; seal: string | null },
+): string {
+  const vars: DocVars = { title: t.name, today: o.today, "doc.no": o.docNo, "doc.expires": o.deadline ?? "", esign_clause: E_SIGN_CLAUSE, "member.name": p.name ?? "", "member.email": p.email ?? "", "member.code": p.code ?? "", ...profileVars("member", o.prof, { email: p.email ?? "" }) };
+  return renderTemplate({ html: sanitizeTemplateHtml(t.html), signers: t.signers as DocSignerSlot[], useSeal: t.useSeal, asks: t.asks as DocAsk[] }, vars, { seal: o.seal });
+}
+
+/** 範本有沒有用到「要本人填」的簽約資料欄位（成員身分證、電話、地址…）。 */
+export function usesPersonVars(html: string): boolean {
+  return varsInHtml(html).some((k) => k.startsWith("member.") && varDef(k)?.need === "person");
+}
+
+/**
+ * LT12（2026/10/29）：已開通教練的補簽文件，當初發出時他還沒填簽約資料 → 身分證／電話／地址空白。
+ * 他補填之後，把「還沒有任何人簽過」的補簽文件用新資料重產（快照與雜湊一起換，簽署頁會重新載入新雜湊）。
+ * 已有人簽過、已完成、拒簽、作廢的一律不動（Ray：已簽完的不改寫）。回傳重產了幾份。
+ */
+export async function refreshUnsignedCoachDocs(coachId: string): Promise<number> {
+  const mine = await db.select({ instanceId: docSigners.instanceId, role: docSigners.role }).from(docSigners).where(eq(docSigners.coachId, coachId));
+  const ids = [...new Set(mine.filter((r) => r.role === "member").map((r) => r.instanceId))];
+  if (!ids.length) return 0;
+  const insts = await db.select().from(docInstances).where(and(inArray(docInstances.id, ids), eq(docInstances.caseType, "coach_doc"), eq(docInstances.status, "pending")));
+  if (!insts.length) return 0;
+  const all = await db.select().from(docSigners).where(inArray(docSigners.instanceId, insts.map((i) => i.id)));
+  const [p] = await db.select({ id: coaches.id, name: coachDisplayName, email: coaches.email, code: coaches.code }).from(coaches).where(eq(coaches.id, coachId)).limit(1);
+  if (!p) return 0;
+  const prof = await getSignerProfile({ kind: "coach", id: coachId });
+  const seal = (await getDocSeal()).img;
+  let n = 0;
+  for (const inst of insts) {
+    if (all.some((s) => s.instanceId === inst.id && s.status !== "pending")) continue;
+    const t = await getTemplate(inst.templateId);
+    if (!t || !usesPersonVars(t.html)) continue;
+    const today = inst.createdAt ? fmtDateTaipei(inst.createdAt) : todayISO();
+    const html = coachDocHtml(t, p, { docNo: inst.docNo ?? "", deadline: inst.expiresAt, today, prof, seal });
+    if (html === inst.htmlSnapshot) continue;
+    await db.update(docInstances).set({ htmlSnapshot: html, hash: sha256(html), updatedAt: new Date() }).where(and(eq(docInstances.id, inst.id), eq(docInstances.status, "pending")));
+    n++;
+  }
+  return n;
 }
 
 export async function listDocTasks(): Promise<DocTaskView[]> {
