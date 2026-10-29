@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SignUp } from "@clerk/nextjs";
 import AuthShell from "@/components/AuthShell";
 import { getInviteByCode } from "@/lib/coachLink";
+import { afterAuthPath, joinCodeFrom } from "@/lib/joinFlow";
 
 // 客戶端申請帳號（獨立入口）。註冊後進 /portal，於該頁 ensureClientUser 建立客戶帳號。
 // redirect_url：見 /client/sign-in 的說明——邀請連結的 code 必須跨過註冊流程活下來。
@@ -15,7 +16,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const back = safeBackPath(sp.redirect_url);
 
   // 只從自家的 redirect_url 取 code，取不到就當作沒有——查不到教練名字不影響註冊。
-  const code = back?.startsWith("/portal/join") ? new URLSearchParams(back.split("?")[1] ?? "").get("code") : null;
+  const code = joinCodeFrom(back);
   const inv = code ? await getInviteByCode(code).catch(() => null) : null;
 
   const signInHref = back ? `/client/sign-in?redirect_url=${encodeURIComponent(back)}` : "/client/sign-in";
@@ -38,7 +39,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       <SignUp
         routing="hash"
         signInUrl={signInHref}
-        forceRedirectUrl={back}
+        // 邀請連結回來改走 /portal/redeem（非公開，先完成登入確認再兌換）——2026/10/29 徐醫師事故
+        forceRedirectUrl={afterAuthPath(back)}
         fallbackRedirectUrl="/portal"
       />
     </AuthShell>

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ensureClientUser } from "@/lib/clientUser";
+import { redirectIfPendingJoin } from "@/lib/joinRedirect";
 import { getClientOwnPlan } from "@/lib/clientPlan";
 import PassportWizard from "@/components/PassportWizard";
 import { currentPassportYear } from "@/lib/passport";
@@ -18,6 +19,7 @@ export default async function PassportPage({
 }) {
   const user = await ensureClientUser();
   if (!user) redirect("/client/sign-in?redirect_url=%2Fportal%2Fpassport%3Frestore%3D1");
+  await redirectIfPendingJoin(); // 邀請碼在註冊途中沒兌換到 → 先補（2026/10/29）
   const sp = await searchParams;
   const own = await getClientOwnPlan(user.id);
   return (

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ensureClientUser } from "@/lib/clientUser";
+import { redirectIfPendingJoin } from "@/lib/joinRedirect";
 import { getClientOwnPlan, getClientSetup } from "@/lib/clientPlan";
 import { listActiveCoaches, getClientLinkStatus } from "@/lib/coachLink";
 import SetupWizard from "./SetupWizard";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function SetupPage() {
   const user = await ensureClientUser();
   if (!user) redirect("/client/sign-in");
+  await redirectIfPendingJoin(); // 邀請碼在註冊途中沒兌換到 → 先補（2026/10/29）
   const own = await getClientOwnPlan(user.id);
   if (!own?.result) redirect("/portal/passport"); // 還沒做人生護照
   const setup = await getClientSetup(user.id);

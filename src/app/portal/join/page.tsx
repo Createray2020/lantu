@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ensureClientUser } from "@/lib/clientUser";
+import { redeemPath } from "@/lib/joinFlow";
 import { redeemInvite, getInviteByCode } from "@/lib/coachLink";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +15,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 // 客戶開啟教練的邀請連結 → 直接掛到該教練。
-export default async function JoinPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
+export default async function JoinPage({ searchParams }: { searchParams: Promise<{ code?: string; done?: string }> }) {
   const sp = await searchParams;
   const code = sp.code || "";
   const user = await ensureClientUser();
@@ -22,6 +24,7 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
     // 未登入：把整條邀請連結（含 code）當 redirect_url 帶進客戶端註冊/登入，
     // 回來時才綁得到教練。舊版只給一顆「前往客戶登入」，沒有註冊入口、也沒帶 code——
     // 新客戶無路可走，最後從官網點到教練入口，就變成「教練申請」待審核。
+    // 註冊／登入頁會把它換成 /portal/redeem（lib/joinFlow.afterAuthPath）；碼另外也已由 proxy 記進 cookie。
     const back = encodeURIComponent(`/portal/join?code=${code}`);
     const inv = code ? await getInviteByCode(code) : null;
     return (
@@ -54,6 +57,9 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
   if (!code) {
     return <Shell><p className="text-tx2">邀請連結不完整。</p><div className="mt-4"><Link href="/portal" className="underline underline-offset-4">回我的首頁</Link></div></Shell>;
   }
+  // 已登入：兌換一律交給 /portal/redeem（非公開路由、會清 cookie），回來帶 done=1 才顯示結果。
+  // redeemInvite 冪等——結果頁再呼叫一次，得到的是同一個答案（成功就是成功、被擋就是同一個原因）。
+  if (sp.done !== "1") redirect(redeemPath(code));
 
   // 兌換可能被擋下（連結失效、教練停權、教練客戶數已滿…）。
   // ⚠️ 防呆兩層：回傳的 { ok:false, error } 要照原文顯示給客戶看；

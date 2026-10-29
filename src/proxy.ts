@@ -1,5 +1,7 @@
 // Next.js 16：Middleware 更名為 Proxy。Clerk 授權入口。
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import { JOIN_COOKIE, JOIN_COOKIE_MAX_AGE, isJoinCode, joinPath } from '@/lib/joinFlow';
 
 // 公開路由：首頁與登入/註冊；其餘一律需登入。
 const isPublicRoute = createRouteMatcher([
@@ -47,7 +49,30 @@ const isApiRoute = createRouteMatcher(['/api(.*)', '/trpc(.*)']);
 // 交給 auth.protect 就對了：它先完成 handshake，真的沒登入才吃 unauthenticatedUrl。
 const isApplyEntry = createRouteMatcher(['/apply']);
 
+// 邀請碼兌換（2026/10/29 徐醫師事故，見 lib/joinFlow.ts）。
+// /portal/redeem 必須在 isPublicRoute 之前攔下來：它落在 '/portal(.*)' 底下，但**刻意不公開**——
+// 要先讓 auth.protect 完成 handshake，剛從 Google 回來的人才不會被當成沒登入；真的沒登入就回邀請說明頁。
+const isRedeem = createRouteMatcher(['/portal/redeem']);
+const isJoin = createRouteMatcher(['/portal/join']);
+
 export default clerkMiddleware(async (auth, req) => {
+  if (isRedeem(req)) {
+    const code = req.nextUrl.searchParams.get('code');
+    const back = isJoinCode(code) ? joinPath(code) : '/portal';
+    await auth.protect({ unauthenticatedUrl: new URL(back, req.url).toString() });
+    return;
+  }
+
+  // 打開邀請連結就把碼記進 cookie：之後註冊途中網址參數掉了，登入後進首頁／護照也能補兌換。
+  // ⚠️ done=1 是 /portal/redeem 兌換完導回來的結果頁——這時再寫 cookie，客戶之後每次進首頁都會被拉回去重兌一次。
+  if (isJoin(req)) {
+    const code = req.nextUrl.searchParams.get('code');
+    if (!isJoinCode(code) || req.nextUrl.searchParams.get('done') === '1') return;
+    const res = NextResponse.next();
+    res.cookies.set(JOIN_COOKIE, code, { path: '/', maxAge: JOIN_COOKIE_MAX_AGE, httpOnly: true, sameSite: 'lax', secure: req.nextUrl.protocol === 'https:' });
+    return res;
+  }
+
   if (isPublicRoute(req)) return;
 
   if (isApiRoute(req)) {

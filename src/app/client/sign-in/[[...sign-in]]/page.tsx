@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SignIn } from "@clerk/nextjs";
 import AuthShell from "@/components/AuthShell";
 import { getInviteByCode } from "@/lib/coachLink";
+import { afterAuthPath, joinCodeFrom } from "@/lib/joinFlow";
 
 // 客戶端登入（獨立入口）。用元件 props 覆寫導向，登入後進 /portal，
 // 不影響教練流程（教練走 /sign-in，導向 /dashboard）。
@@ -12,7 +13,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const sp = await searchParams;
   const back = safeBackPath(sp.redirect_url);
 
-  const code = back?.startsWith("/portal/join") ? new URLSearchParams(back.split("?")[1] ?? "").get("code") : null;
+  const code = joinCodeFrom(back);
   const inv = code ? await getInviteByCode(code).catch(() => null) : null;
 
   const signUpHref = back ? `/client/sign-up?redirect_url=${encodeURIComponent(back)}` : "/client/sign-up";
@@ -35,7 +36,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       <SignIn
         routing="hash"
         signUpUrl={signUpHref}
-        forceRedirectUrl={back}
+        // 邀請連結回來改走 /portal/redeem（非公開，先完成登入確認再兌換）——2026/10/29 徐醫師事故
+        forceRedirectUrl={afterAuthPath(back)}
         fallbackRedirectUrl="/portal"
       />
     </AuthShell>

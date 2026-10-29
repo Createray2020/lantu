@@ -1,5 +1,7 @@
 "use client";
 
+import { shareJoinUrl } from "@/lib/joinFlow";
+
 import { useState } from "react";
 import SubmitButton from "@/components/ui/SubmitButton";
 import { createInviteAction } from "./actions";
@@ -15,7 +17,7 @@ export default function InviteBox() {
     setBusy(true); setErr(null); setCopied(false);
     try {
       const r = await createInviteAction();
-      if (r.ok) setLink(`${window.location.origin}/portal/join?code=${r.code}`);
+      if (r.ok) setLink(shareJoinUrl(window.location.origin, r.code));
       else setErr(r.error || "產生失敗");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "產生失敗");

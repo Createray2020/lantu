@@ -1,5 +1,7 @@
 "use client";
 
+import { shareJoinUrl } from "@/lib/joinFlow";
+
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClientInviteAction } from "./loginActions";
@@ -34,7 +36,7 @@ export default function ClientLogin({
 
   // 連結要帶完整網域；伺服端沒有 window，先給空字串，水合後補上（避免 effect 裡 setState）。
   const origin = useSyncExternalStore(() => () => {}, () => window.location.origin, () => "");
-  const link = code ? `${origin}/portal/join?code=${code}` : null;
+  const link = code ? shareJoinUrl(origin, code) : null;
 
   function gen() {
     setErr(null); setCopied(false);

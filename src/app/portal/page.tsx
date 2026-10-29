@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
+import { redirectIfPendingJoin } from "@/lib/joinRedirect";
 import { listClientCases } from "@/lib/comp/survey";
 import { getClientOwnPlan, getClientPlanCase, getClientSetup } from "@/lib/clientPlan";
 import { flowActionsOf } from "@/lib/flowActions";
@@ -35,6 +36,7 @@ export default async function Portal() {
   // 任何登入者（含教練）都看客戶介面；未登入才導去客戶登入。
   const client = await ensureClientUser();
   if (!client) redirect("/client/sign-in");
+  await redirectIfPendingJoin(); // 邀請碼在註冊途中沒兌換到 → 先補（2026/10/29）
   const name = client.name || "貴賓";
   const own = await getClientOwnPlan(client.id);
   // ⚠️ 這一頁的數字一律走 src/lib/passport.ts 的 computePassport()——
