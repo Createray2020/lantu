@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SignOutButton } from "@clerk/nextjs";
 import { ensureClientUser } from "@/lib/clientUser";
 import { redirectIfPendingJoin } from "@/lib/joinRedirect";
 import { listClientCases } from "@/lib/comp/survey";
@@ -16,13 +15,14 @@ import RiskQuizGate from "./RiskQuizGate";
 import CoachEntry from "./CoachEntry";
 import { getApplication } from "@/lib/coachApplyStore";
 import { normalizeIntent } from "@/lib/intent";
-import DisplayPrefsFab from "@/components/DisplayPrefsFab";
 import { computePassport, wan, ntfmt } from "@/lib/passport";
 import { eq } from "drizzle-orm";
 import { db } from "@/Shared/db";
 import { coaches } from "@/Shared/db/schema";
-import BrandMark from "@/components/BrandMark";
-import { countMyPending, listMyInstances, hasReminderFor } from "@/lib/docsStore";
+import ShellBar from "@/components/shell/ShellBar";
+import { DEFAULT_THEME } from "@/lib/theme";
+import { DEFAULT_UI_SCALE } from "@/lib/uiScale";
+import { countMyPending, hasReminderFor } from "@/lib/docsStore";
 import { portalCaseState } from "@/lib/portalCase";
 import { unreadCount } from "@/lib/notify";
 import MemberCenter from "./MemberCenter";
@@ -61,7 +61,6 @@ export default async function Portal({ searchParams }: { searchParams?: Promise<
   const quizInvited = planCase ? await pendingInvites(planCase.clientId) : { self: false, spouse: false };
   const mustHave = setup.intent ? normalizeIntent({ ...setup.intent }).mustHave : [];
   // 電子簽署（2026/10/28）：輪到客戶簽的合約份數；有任何文件才在頁首放「我的合約」。
-  const myDocs = await listMyInstances({ clientUserId: client.id });
   const docPending = await countMyPending({ clientUserId: client.id });
   const docReminded = docPending > 0 && (await hasReminderFor({ clientUserId: client.id }));
   // 會員中心（2026/10/28 案件進度）：有案件就以「服務進度」為首屏；掛了教練但還沒委託顯示一張「尚未委託」卡；自助客戶什麼都不多畫。
@@ -141,71 +140,21 @@ export default async function Portal({ searchParams }: { searchParams?: Promise<
 
   return (
     <div className="min-h-screen bg-canvas text-tx flex flex-col">
-      <DisplayPrefsFab />
-      {/* ⚠️ 客戶登入後看到的第一個畫面就是這裡。原本是不會 wrap 的單列 flex：
-          右側（主題 88＋字級 122＋教練工作台 100＋登出 48＋gap）約 465px，
-          390px 的手機只有約 350px 可用 → 右側按鈕直接被推出畫面外。 */}
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 sm:px-8 py-4 border-b border-line">
-        <Link href="/home" className="flex items-center gap-3 min-w-0" title="回官網首頁">
-          <BrandMark />
-          <span className="leading-tight">
-            <span className="block font-serif tracking-[0.14em] text-lg">嵐途 LAN TU</span>
-            {caseState.kind === "case" && <span className="block text-10 tracking-[0.3em] text-brand">MEMBER CENTER</span>}
-          </span>
-        </Link>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {caseState.kind === "case" && (
-            <span className="hidden sm:flex items-center gap-2 mr-1">
-              <span className="w-8 h-8 rounded-full bg-panel2 border border-line grid place-items-center text-xs font-bold">{name.slice(0, 1)}</span>
-              <span className="leading-tight">
-                <span className="block text-sm font-bold">{name}</span>
-                {setup.code && <span className="block text-10 text-tx3">規劃編號 {setup.code}</span>}
-              </span>
-            </span>
-          )}
-          {coachState === "active" && (
-            <Link
-              href="/dashboard"
-              className="text-13 sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
-            >
-              教練工作台
-            </Link>
-          )}
-          {coachState === "pending" && (
-            <Link
-              href="/dashboard"
-              className="text-13 sm:text-sm text-brand2 hover:text-tx border border-brand/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
-            >
-              報聘審核中
-            </Link>
-          )}
-          {coachState === "none" && (
-            <Link
-              href="/dashboard/apply"
-              className="text-13 sm:text-sm text-brand2 hover:text-tx border border-brand/40 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
-            >
-              申請成為教練
-            </Link>
-          )}
-          <Link
-            href="/portal/notifications"
-            className={`text-13 sm:text-sm border rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap ${unread > 0 ? "border-brand/40 text-brand2" : "border-line2 text-tx2 hover:text-tx"}`}
-          >
-            通知{unread > 0 ? `（${unread}）` : ""}
-          </Link>
-          {myDocs.length > 0 && (
-            <Link
-              href="/portal/docs"
-              className="text-13 sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5 whitespace-nowrap"
-            >
-              我的合約{docPending > 0 ? `（${docPending}）` : ""}
-            </Link>
-          )}
-          <SignOutButton redirectUrl="/">
-            <button className="text-13 sm:text-sm text-tx2 hover:text-tx border border-line2 rounded-lg px-2.5 sm:px-3 py-1.5">登出</button>
-          </SignOutButton>
-        </div>
-      </header>
+      {/* 2026/11/01 介面整理第一波：改用三端共用頂欄。教練工作台／報聘狀態／申請成為教練、外觀、登出
+          收進頭像選單；通知＋待簽合約集中到收件匣；我的合約改叫「文件」放主導覽。 */}
+      <ShellBar
+        kind="client"
+        theme={DEFAULT_THEME}
+        uiScale={DEFAULT_UI_SCALE}
+        persist={false}
+        counts={unread + docPending}
+        menuExtra={
+          coachState === "active" ? [{ href: "/dashboard", label: "教練工作台" }]
+          : coachState === "pending" ? [{ href: "/dashboard", label: "報聘審核中" }]
+          : coachState === "none" ? [{ href: "/dashboard/apply", label: "申請成為教練" }]
+          : []
+        }
+      />
 
       <main className="flex-1 px-6 py-12">
         {(await searchParams)?.joined === "1" && (

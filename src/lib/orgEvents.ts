@@ -194,6 +194,24 @@ export async function upcomingEvents(rank: OrgRank, days = 7): Promise<CalEvent[
   return listEvents(rank, from, addDaysISO(from, days));
 }
 
+/**
+ * 首頁「近期行程」的公司行程：視窗內（預設 7 天）全部列出；不足 min 場就往後補到最近的 min 場，
+ * 最遠看 horizonDays 天。
+ *
+ * 2026/11/01 Ray：後台排了 11/22 的說明會，教練首頁卻一片空白——只抓 7 天，
+ * 行程要「等時間到」才會出現。教練要的是先看到接下來最近的幾場，好排自己的時間。
+ * ⚠️ 只放寬公司行程；客戶約訪仍然是 7 天（跟 thisWeek 同寬，見 home.ts）。
+ */
+export async function nextEvents(
+  rank: OrgRank,
+  { windowDays = 7, min = 3, horizonDays = 180 }: { windowDays?: number; min?: number; horizonDays?: number } = {},
+): Promise<CalEvent[]> {
+  const from = todayISO();
+  const until = addDaysISO(from, windowDays);
+  const rows = await listEvents(rank, from, addDaysISO(from, horizonDays));
+  return rows.filter((e, i) => e.date <= until || i < min);
+}
+
 export async function listMonth(rank: OrgRank, ym: string): Promise<CalEvent[]> {
   const { from, to } = monthRange(ym);
   return listEvents(rank, from, to);

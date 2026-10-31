@@ -28,6 +28,8 @@ beforeAll(async () => {
   const dom = new JSDOM(HTML, { runScripts: "dangerously", url: "https://lantu.test/" });
   w = dom.window;
   await new Promise<void>((r) => w.addEventListener("load", () => r(), { once: true }));
+  // 2026/11/01 起規劃器預設淺色；這支釘的是深色畫面色盤（既有語意色），所以明確切到深色。
+  w.applyTheme("dark");
   // jsdom 沒有 scrollIntoView，anJump() 會用到。
   w.Element.prototype.scrollIntoView = function () {};
 });

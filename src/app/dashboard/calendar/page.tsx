@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import { rankOf } from "@/lib/org";
 import { todayISO } from "@/lib/license";
-import { currentMonth, getEvent, listMonth, listPastEvents } from "@/lib/orgEvents";
+import { currentMonth, getEvent, listMonth, listPastEvents, nextEvents } from "@/lib/orgEvents";
+import HomeTabs from "../HomeTabs";
 import DashboardHeader from "../DashboardHeader";
 import { headerProps } from "../headerProps";
 import CalendarBoard from "./CalendarBoard";
@@ -40,14 +41,17 @@ export default async function CalendarPage({
   }
   const month = ym ?? currentMonth();
 
-  const [events, past] = await Promise.all([
+  // 「接下來」跨月份列出最近的 5 場（2026/11/01 Ray：下個月的行程不用等翻月才看得到）。
+  const [events, past, upcoming] = await Promise.all([
     listMonth(rank, month),
     listPastEvents(rank, 40),
+    nextEvents(rank, { windowDays: 0, min: 5 }),
   ]);
 
   return (
     <div className="min-h-screen bg-canvas text-tx">
       <DashboardHeader {...hp} />
+      <HomeTabs />
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-6">
         <div className="mb-4">
           <h1 className="text-xl font-bold">公司行事曆</h1>
@@ -60,6 +64,7 @@ export default async function CalendarPage({
           ym={month}
           events={events}
           past={past}
+          upcoming={upcoming}
           today={todayISO()}
           initialOpenId={openId}
         />

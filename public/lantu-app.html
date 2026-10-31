@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-theme="light">
 <head>
+<script>/* 2026/11/01 預設淺色：只有選了深色才拿掉。父層 lantu:theme 會再對一次。 */try{if(localStorage.getItem("lantu.theme")==="dark")document.documentElement.removeAttribute("data-theme")}catch(e){}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>嵐途 LAN TU · 全方位財務規劃</title>
@@ -28,21 +29,22 @@
  color-scheme:dark;
 }
 :root[data-theme="light"]{
- --bg:#f4f6f8;--panel:#ffffff;--card:#eaeef3;--card2:#dfe6ee;
- --field:#fbfcfd;--line:#e3e8ee;--line2:#c9d2dc;
+ /* 2026/11/01「高對比晨嵐」：與 globals.css 淺色同值。amber＝Logo 墨藍（主色），amber2＝日出金（強調字）。 */
+ --bg:#eaeff5;--panel:#ffffff;--card:#f2f5f9;--card2:#e4eaf1;
+ --field:#ffffff;--line:#c9d3df;--line2:#b9c5d3;
  /* ⚠️ 2026/10/27 Ray：淺色版字糊——--mut2 舊值 #75838f 白底只有 3.9:1；
     --amber2 舊值 #c08f3c 更只有 2.9:1，而它是全站用最多的強調色（228 處文字）。
     深色版 amber2 比 amber「亮」才是強調，淺色版要反過來比 amber「深」。
     現值：mut2 5.4:1、amber 5.5:1、amber2 6.7:1（白底），卡片底仍 ≥4.5。themeUI.test 守著。 */
- --tx:#14212e;--mut:#4a5c6e;--mut2:#5c6c7a;
+ --tx:#0a1730;--mut:#3a4759;--mut2:#5b687a;
  /* ⚠️ 金色是唯一兩套主題不能共用亮度的地方：#c99a5b 在白底上只有 2.4:1 */
- --amber:#8a6220;--amber2:#7d5415;--onbrand:#ffffff;
+ --amber:#0f2d52;--amber2:#9a6416;--onbrand:#ffffff;
   /* 同上：淺色版 --teal 也等於 --mut(#4a5c6e)。新值對白底約 5.7:1。 */
- --teal:#2a6f7a;--blue:#2c6fb5;--purple:#5f7a63;
+ --teal:#1d6f6b;--blue:#2b5f9e;--purple:#5b6f62;
  --ap1:#3f7a9a;--ap2:#9a6f22;--ap3:#b8503f;--ap0:#6b7f90;
- --ok:#2a7050;--warn:#915a12;--danger:#c0362f;--info:#2c6fb5;--gap2:#c2453e;
- --c1:#2e6db4;--c2:#237a4f;--c3:#8c6208;--c4:#c2453e;--c5:#5f7a63;--c6:#a8497e;
- --sh:96,116,136;
+ --ok:#1f6a48;--warn:#8a5410;--danger:#a8342d;--info:#2b5f9e;--gap2:#a8342d;
+ --c1:#2b5f9e;--c2:#1f6a48;--c3:#9a6416;--c4:#a8342d;--c5:#5b6f62;--c6:#9a4579;
+ --sh:10,23,48;
  color-scheme:light;
 }
 *{box-sizing:border-box}

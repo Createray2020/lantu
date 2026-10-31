@@ -78,7 +78,7 @@ export const coaches = pgTable('coaches', {
 
   // 介面主題：dark（預設，深藍底）/ light（白面板、淡藍灰底）。
   // 與 ui_scale 同一類——跟著帳號走的介面偏好，不是業務設定，所以不過使用期限的唯讀閘。
-  theme: text('theme').default('dark').notNull(),
+  theme: text('theme').default('light').notNull(),
 
   // ── 教練編號（2026/08/24 Ray 拍板）──────────────────────────
   // 格式：FC + 西元年後兩碼 + 月 + 三碼流水號（FC2609002 ＝ 2026/09 第二位報聘的教練）。

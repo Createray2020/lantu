@@ -44,7 +44,7 @@ function applyDom(v: ThemeName) {
   // 瀏覽器分頁工具列的顏色。layout.tsx 的 viewport.themeColor 是靜態的，
   // 不跟著切換就會出現「白色頁面配深藍瀏覽器邊框」。
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", v === "light" ? "#f4f6f8" : "#0d2b45");
+  if (meta) meta.setAttribute("content", v === "light" ? "#ffffff" : "#0d2b45");
   broadcastToFrames(v);
 }
 
@@ -59,6 +59,17 @@ function setTheme(v: ThemeName) {
   }
   applyDom(n);
   if (changed) subs.forEach((f) => f());
+}
+
+/**
+ * 頂欄改版後（2026/11/01）切換鈕收進頭像選單，平常不掛載——但「登入者以帳號設定為準、蓋回本機」
+ * 這件事每一頁都要做（換裝置、或後台把主題重設時）。所以把那段同步拆出來，由頂欄常駐呼叫。
+ */
+export function useThemeSync(initial: ThemeName, persist: boolean) {
+  useEffect(() => {
+    if (persist) setTheme(initial);
+    else applyDom(readLocal());
+  }, [initial, persist]);
 }
 
 export default function ThemeToggle({

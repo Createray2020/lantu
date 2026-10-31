@@ -55,6 +55,7 @@ vi.mock("./orgEvents", async () => {
   return {
     ...actual,
     upcomingEvents: async () => h.state.events,
+    nextEvents: async () => h.state.events,
     KIND_LABEL: { meeting: "會議", activity: "活動", ops: "公司行程", training: "教育訓練" },
     VIS_LABEL: { all: "全體教練", manager: "主管以上", owner: "僅核心成員" },
   };

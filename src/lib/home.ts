@@ -7,9 +7,9 @@
 //    收益、達成率、留存率、組織健康度這些數字全部會算成 0／0%。
 //    畫面上的「0 分」跟假數字一樣糟——它看起來是一個結論，實際上只是「沒人填」。
 //    所以這裡把「有沒有資料」跟「資料是 0」分開，讓 HomeView 有辦法說實話。
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc, inArray } from "drizzle-orm";
 import { db } from "@/Shared/db";
-import { announcements, coaches } from "@/Shared/db/schema";
+import { announcements, coaches, plans } from "@/Shared/db/schema";
 import type { CompParams } from "./comp/types";
 import { nextYm } from "./acctEngine";
 import {
@@ -19,7 +19,7 @@ import {
 import { getCoachDashboard } from "./dashboard";
 // ⚠️ 同 dashboard.ts：今天是哪一天用 Asia/Taipei 那一支，不要用 UTC 的 toISOString()。
 import { todayISO, addDaysISO } from "./license";
-import { upcomingEvents, KIND_LABEL, VIS_LABEL, type EventKind } from "./orgEvents";
+import { nextEvents, KIND_LABEL, VIS_LABEL, type EventKind } from "./orgEvents";
 import {
   listActiveCoaches, teamsUnder, downlineIds, visibleCoachIds, rankOf,
   type CoachRow, type OrgRank,
@@ -80,9 +80,13 @@ export type AgendaItem = {
   visLabel: string | null;
   /** 點下去要去哪；約訪連到客戶頁。 */
   href: string;
+  /** 約訪：那位客戶最新一份教練年度版的編輯器網址（首頁「今天」卡的「開啟規劃」）。沒有版本就 null。2026/11/01。 */
+  planHref?: string | null;
 };
 
 export const AGENDA_DAYS = 7;
+/** 公司行程至少列幾場（7 天內不夠就往後補）。2026/11/01 Ray。 */
+export const AGENDA_MIN_EVENTS = 3;
 
 async function agendaFor(
   rank: OrgRank,
@@ -90,7 +94,8 @@ async function agendaFor(
 ): Promise<AgendaItem[]> {
   const today = todayISO();
   const until = addDaysISO(today, AGENDA_DAYS);
-  const events = await upcomingEvents(rank, AGENDA_DAYS);
+  // 公司行程：7 天內全部，不足 3 場就補到最近的 3 場（下個月的說明會不用等到前一週才看得到）。
+  const events = await nextEvents(rank, { windowDays: AGENDA_DAYS, min: AGENDA_MIN_EVENTS });
 
   // 同一天內的排序鍵：全天（整天都算）'00:00' → 有時間的依時間 → 沒指定時間的約訪 '99:99'。
   // reviews.next_appt 只有日期沒有時間，硬把它排在最前面會蓋掉真的整天事件。
@@ -110,7 +115,7 @@ async function agendaFor(
   }));
 
   for (const a of appts) {
-    // upcomingEvents 已經把區間切好了，約訪這邊要自己切——thisWeek 是 7 天沒錯，
+    // nextEvents 已經把公司行程切好了，約訪這邊要自己切——thisWeek 是 7 天沒錯，
     // 但它不含「今天之前」的判斷以外的東西，邊界還是自己守著比較安全。
     if (a.date < today || a.date > until) continue;
     rows.push({
@@ -127,6 +132,25 @@ async function agendaFor(
         href: `/dashboard/clients/${a.clientId}`,
       },
     });
+  }
+
+  // 約訪的「開啟規劃」：一次撈這幾位客戶的教練軌版本，取最新一份（年度新→建立時間新）。
+  const apptIds = [...new Set(rows.filter((r) => r.item.kind === "appt").map((r) => r.item.id.split(":")[1]))];
+  if (apptIds.length) {
+    try {
+      const ps = await db.select({ id: plans.id, clientId: plans.clientId, year: plans.year, createdAt: plans.createdAt })
+        .from(plans).where(and(inArray(plans.clientId, apptIds), eq(plans.track, "coach")));
+      const latest = new Map<string, { id: string; year: number; t: number }>();
+      for (const p of ps) {
+        const t = new Date(p.createdAt).getTime(), cur = latest.get(p.clientId);
+        if (!cur || p.year > cur.year || (p.year === cur.year && t > cur.t)) latest.set(p.clientId, { id: p.id, year: p.year, t });
+      }
+      for (const r of rows) {
+        if (r.item.kind !== "appt") continue;
+        const hit = latest.get(r.item.id.split(":")[1]);
+        r.item.planHref = hit ? `/dashboard/plans/${hit.id}/edit` : null;
+      }
+    } catch { /* 撈不到版本就不給「開啟規劃」，不讓首頁掛掉 */ }
   }
 
   rows.sort((x, y) =>

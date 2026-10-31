@@ -54,6 +54,14 @@ function setScale(v: number) {
   if (changed) subs.forEach((f) => f());
 }
 
+/** 同 useThemeSync：切換鈕收進頭像選單後，帳號字級仍要每頁蓋回本機。 */
+export function useUiScaleSync(initial: number, persist: boolean) {
+  useEffect(() => {
+    if (persist) setScale(initial);
+    else applyDom(readLocal());
+  }, [initial, persist]);
+}
+
 export default function UiScaleToggle({
   initial = DEFAULT_UI_SCALE,
   persist = false,

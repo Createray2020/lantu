@@ -147,16 +147,18 @@ describe("③ 規劃器（獨立文件）也跟得上", () => {
     expect(style).not.toMatch(/--line:rgba\(255,255,255/);
   });
 
-  it("applyTheme 會換屬性，色盤跟著重讀", () => {
+  it("applyTheme 會換屬性，色盤跟著重讀（2026/11/01 起預設淺色）", () => {
     const win = w as never as { applyTheme: (t: string) => void; TPAL: Record<string, string>; document: Document };
-    const dark = win.TPAL.panel;
+    // 預設淺色：文件一載入 <html> 就帶 data-theme="light"（父層還沒送 lantu:theme 前也不會先閃深色）。
+    expect(win.document.documentElement.getAttribute("data-theme")).toBe("light");
+    const light = win.TPAL.panel;
+    win.applyTheme("dark");
+    // 深色＝不掛屬性（裸 :root 就是完整的深色版）。
+    expect(win.document.documentElement.getAttribute("data-theme")).toBe(null);
+    expect(win.TPAL.panel).not.toBe(light);
     win.applyTheme("light");
     expect(win.document.documentElement.getAttribute("data-theme")).toBe("light");
-    expect(win.TPAL.panel).not.toBe(dark);
-    win.applyTheme("dark");
-    // 深色＝不掛屬性。屬性掉了畫面要是完整的深色版，而不是半深半淺。
-    expect(win.document.documentElement.getAttribute("data-theme")).toBe(null);
-    expect(win.TPAL.panel).toBe(dark);
+    expect(win.TPAL.panel).toBe(light);
   });
 
   it("父層的 lantu:theme 與 lantu:init 都接得到", () => {
@@ -170,19 +172,20 @@ describe("③ 規劃器（獨立文件）也跟得上", () => {
 });
 
 describe("④ 切換鈕掛在教練走得到的地方", () => {
-  it("教練端頂欄、後台頂欄、客戶端、官網都有", () => {
-    for (const f of ["app/dashboard/DashboardHeader.tsx", "app/admin/AdminHeader.tsx",
-                     "components/DisplayPrefsFab.tsx"]) {
-      expect(readFileSync(join(SRC, f), "utf8"), `${f} 沒有掛主題切換`).toContain("ThemeToggle");
+  it("三端共用頂欄的頭像選單有主題切換，並且每頁都同步帳號設定（2026/11/01）", () => {
+    // 頂欄改版後切換鈕收進頭像選單；平常不掛載，所以「帳號設定蓋回本機」改由頂欄常駐的 useThemeSync 做。
+    expect(readFileSync(join(SRC, "components/shell/AccountMenu.tsx"), "utf8")).toContain("<ThemeToggle");
+    expect(readFileSync(join(SRC, "components/shell/ShellBar.tsx"), "utf8")).toContain("useThemeSync(theme, persist)");
+    for (const f of ["app/dashboard/DashboardHeader.tsx", "app/admin/AdminHeader.tsx", "app/portal/page.tsx"]) {
+      expect(readFileSync(join(SRC, f), "utf8"), `${f} 沒有用共用頂欄`).toContain("ShellBar");
     }
+    expect(readFileSync(join(SRC, "components/DisplayPrefsFab.tsx"), "utf8")).toContain("ThemeToggle");
   });
 
-  it("官網與客戶端改用側邊懸浮鈕（2026/09/25），不再放頂欄", () => {
-    for (const f of ["app/portal/page.tsx", "components/LandingView.tsx"]) {
-      const src = readFileSync(join(SRC, f), "utf8");
-      expect(src, `${f} 要掛 DisplayPrefsFab`).toContain("<DisplayPrefsFab />");
-      expect(src, `${f} 頂欄不該再直接放切換`).not.toContain("<ThemeToggle");
-    }
+  it("官網仍用側邊懸浮鈕（2026/09/25），頂欄不直接放切換", () => {
+    const src = readFileSync(join(SRC, "components/LandingView.tsx"), "utf8");
+    expect(src).toContain("<DisplayPrefsFab />");
+    expect(src).not.toContain("<ThemeToggle");
   });
 
   it("三支 iframe 容器都把主題灌進規劃器", () => {

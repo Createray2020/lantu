@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ensureCoach } from "@/lib/coach";
 import { getCoachDashboard } from "@/lib/dashboard";
+import HomeTabs from "../HomeTabs";
 import DashboardHeader from "../DashboardHeader";
 import { headerProps } from "../headerProps";
 import ReadOnlyBanner from "../ReadOnlyBanner";
@@ -28,6 +29,7 @@ export default async function OverviewPage() {
   return (
     <div className="min-h-screen bg-canvas text-tx">
       <DashboardHeader {...hp} />
+      <HomeTabs />
       <ReadOnlyBanner license={hp.license} />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 grid gap-6">
         <h1 className="font-serif text-xl tracking-wide">教練儀表板</h1>

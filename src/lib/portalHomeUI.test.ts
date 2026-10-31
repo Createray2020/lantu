@@ -49,8 +49,11 @@ vi.mock("@/lib/docsStore", () => ({ listMyInstances: async () => [], countMyPend
 vi.mock("@/lib/clientRiskQuiz", () => ({ pendingInvite: async () => false, pendingInvites: async () => ({ self: false, spouse: false }) }));
 vi.mock("@clerk/nextjs", () => ({
   SignOutButton: ({ children }: { children: unknown }) => children,
+  // 2026/11/01 共用頂欄的頭像選單用到這兩個 hook
+  useUser: () => ({ user: null }),
+  useClerk: () => ({}),
 }));
-vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("redirected"); } }));
+vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("redirected"); }, usePathname: () => "/portal" }));
 
 let doc: Document;
 let html: string;

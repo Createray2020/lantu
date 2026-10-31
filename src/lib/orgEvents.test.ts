@@ -65,7 +65,7 @@ vi.mock("./license", () => ({
 }));
 
 import {
-  listEvents, upcomingEvents, listMonth, listPastEvents, getEvent,
+  listEvents, upcomingEvents, nextEvents, listMonth, listPastEvents, getEvent,
   visibleLevels, normalizeTime, normalizeKind, normalizeVisibility,
   monthRange, addDaysISO, updateEvent, deleteEvent, createEvent,
 } from "./orgEvents";
@@ -108,6 +108,10 @@ describe("可見層級（往上包含）", () => {
     h.state.wheres = [];
     await upcomingEvents("owner", 7);
     expect(visFilter(h.state.wheres[0])).toEqual(["all", "manager", "owner"]);
+
+    h.state.wheres = [];
+    await nextEvents("member");
+    expect(visFilter(h.state.wheres[0])).toEqual(["all"]);
 
     h.state.wheres = [];
     await listPastEvents("member");
@@ -207,5 +211,28 @@ describe("日期工具（純 UTC，不吃伺服器時區）", () => {
     expect(monthRange("2026-10")).toEqual({ from: "2026-10-01", to: "2026-10-31" });
     expect(monthRange("2026-02")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
     expect(monthRange("2028-02")).toEqual({ from: "2028-02-01", to: "2028-02-29" });
+  });
+});
+
+describe("近期行程的公司行程（nextEvents）", () => {
+  it("7 天內沒有行程時，往後補到最近的 3 場——下個月的說明會不用等時間到才看得到", async () => {
+    h.state.org = [
+      org({ id: "a", eventDate: "2026-10-20", title: "說明會" }),
+      org({ id: "b", eventDate: "2026-11-05", title: "月會" }),
+      org({ id: "c", eventDate: "2026-11-22", title: "說明會" }),
+      org({ id: "d", eventDate: "2026-12-05", title: "月會" }),
+    ];
+    const rows = await nextEvents("member");
+    expect(rows.map((e) => e.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("7 天內有很多場就全部列出，不會被 3 場截掉；7 天外的不再補", async () => {
+    h.state.org = [
+      org({ id: "a", eventDate: "2026-09-15" }), org({ id: "b", eventDate: "2026-09-16" }),
+      org({ id: "c", eventDate: "2026-09-17" }), org({ id: "d", eventDate: "2026-09-19" }),
+      org({ id: "e", eventDate: "2026-10-30" }),
+    ];
+    const rows = await nextEvents("member");
+    expect(rows.map((e) => e.id)).toEqual(["a", "b", "c", "d"]);
   });
 });

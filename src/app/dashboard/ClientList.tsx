@@ -166,7 +166,7 @@ export default function ClientList({
         </div>
       ) : (
         <div className="grid gap-2">
-          <div className="hidden md:grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-3 text-11 uppercase tracking-wider text-tx3">
+          <div className="hidden md:grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1.3fr] gap-3 px-3 text-11 uppercase tracking-wider text-tx3">
             <div>客戶</div>
             <div>最新版本</div>
             <div>
@@ -191,7 +191,7 @@ export default function ClientList({
                徽章則靠 relative z-10 浮在連結上面，兩者變成兄弟而不是父子。 */
             <div
               key={c.id}
-              className="relative grid grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 items-center bg-panel hover:bg-panel2 border border-line rounded-lg px-3 py-3 transition shadow-e1"
+              className="relative grid grid-cols-2 md:grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1.3fr] gap-3 items-center bg-panel hover:bg-panel2 border border-line rounded-lg px-3 py-3 transition shadow-e1"
             >
               <Link
                 href={`/dashboard/clients/${c.id}`}
@@ -236,7 +236,16 @@ export default function ClientList({
                 <div>上次 {c.lastReviewDate ?? "—"}</div>
                 <div className={c.nextAppt ? "text-brand2" : "text-tx3"}>下次 {c.nextAppt ?? "—"}</div>
               </div>
-              <div className="text-xs text-tx2">{STATUS_LABEL[c.status] ?? c.status}</div>
+              {/* 2026/11/01：每一列直接「開啟規劃」——打開最新年度版本從四步（列表→客戶頁→年度版本→開啟）變一步。
+                  relative z-10 浮在整列連結上面，兩者是兄弟不是父子（理由見上面那段註解）。 */}
+              <div className="relative z-10 flex items-center justify-between md:justify-end gap-2 text-xs text-tx2">
+                <span>{STATUS_LABEL[c.status] ?? c.status}</span>
+                {c.latestPlan && (
+                  <Link href={`/dashboard/plans/${c.latestPlan.id}/edit`} className="rounded-lg bg-brand text-onbrand font-bold px-2.5 py-1 whitespace-nowrap hover:opacity-90">
+                    開啟規劃
+                  </Link>
+                )}
+              </div>
             </div>
           ))}
         </div>

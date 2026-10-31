@@ -5,6 +5,7 @@ import { getHome } from "@/lib/home";
 import { getApplication } from "@/lib/coachApplyStore";
 import { getEnrollmentForCoach, enrollmentView, enrollmentReadiness } from "@/lib/trainingStore";
 import { canSignNow, isSigner } from "@/lib/docs";
+import HomeTabs from "./HomeTabs";
 import DashboardHeader from "./DashboardHeader";
 import { headerProps } from "./headerProps";
 import ReadOnlyBanner from "./ReadOnlyBanner";
@@ -86,6 +87,7 @@ export default async function Dashboard({
   return (
     <div className="min-h-screen bg-canvas text-tx">
       <DashboardHeader {...hp} />
+      <HomeTabs />
       <ReadOnlyBanner license={hp.license} />
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-6">
         <HomeSwitcher

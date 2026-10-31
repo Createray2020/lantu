@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d2b45",
+  themeColor: "#ffffff",
 };
 
 export default async function RootLayout({
@@ -48,6 +48,8 @@ export default async function RootLayout({
     <ClerkProvider appearance={clerkAppearance(hasLogo)}>
       <html
         lang="zh-Hant"
+        data-theme="light"
+        suppressHydrationWarning
         className={`${sans.variable} ${serif.variable} h-full antialiased`}
       >
         <head>

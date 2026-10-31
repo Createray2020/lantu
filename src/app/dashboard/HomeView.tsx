@@ -1,4 +1,5 @@
 // 首頁三角色版面（伺服器元件，純呈現）。設計對齊嵐途 v12 深藍＋琥珀金色票。
+import LineIcon, { splitIconTitle } from "@/components/LineIcon";
 import Link from "next/link";
 import type { AgendaItem, HomeView, MemberHome, ManagerHome, OwnerHome } from "@/lib/home";
 import { fmtNTD } from "@/lib/money";
@@ -22,8 +23,8 @@ const TAG: Record<string, string> = {
 function Section({ title, more, moreHref, children }: { title: string; more?: string; moreHref?: string; children: React.ReactNode }) {
   return (
     <div className="bg-panel border border-line rounded-xl px-4 py-4 mb-4 shadow-e1">
-      <h4 className="text-sm font-bold text-brand2 flex items-center gap-2 mb-3">
-        {title}
+      <h4 className="text-sm font-bold text-tx flex items-center gap-2 mb-3">
+        {(() => { const t = splitIconTitle(title); return <>{t.icon && <LineIcon name={t.icon} className="text-brand2" />}{t.text}</>; })()}
         {more && (moreHref
           ? <Link href={moreHref} className="ml-auto text-tx2 hover:text-brand2 text-xs font-bold transition">{more} →</Link>
           : <span className="ml-auto text-tx2 text-xs font-bold">{more} →</span>)}
@@ -45,7 +46,7 @@ function Kpi({ icon, label, value, sm, note, up, dn, top = "var(--tx2)", pending
   if (pending) { value = "—"; sm = undefined; note = "尚未填寫"; up = undefined; dn = undefined; }
   return (
     <div className="bg-panel2 border border-line rounded-xl px-4 py-3 shadow-e1" style={{ borderTop: `3px solid ${top}` }}>
-      <div className="text-tx2 text-xs flex items-center gap-1.5">{icon && <span>{icon}</span>}{label}</div>
+      <div className="text-tx2 text-xs flex items-center gap-1.5">{icon && <LineIcon name={icon} size={14} />}{label}</div>
       <div className={"text-[23px] font-extrabold mt-1 leading-tight" + (pending ? " text-tx3" : "")}>{value}{sm && <span className="text-xs text-tx3 font-semibold"> {sm}</span>}</div>
       {(note || up || dn) && (
         <div className="text-11 mt-0.5 text-tx3">
@@ -363,7 +364,7 @@ function dayLabel(iso: string, todayISO: string): { dd: string; wd: string; isTo
 
 function Agenda({ items, today }: { items: AgendaItem[]; today: string }) {
   if (items.length === 0) {
-    return <Empty>未來七天沒有排定的行程</Empty>;
+    return <Empty>接下來沒有排定的行程</Empty>;
   }
   // 依日期分組，日期當左軸。
   const groups: { date: string; rows: AgendaItem[] }[] = [];
@@ -409,11 +410,47 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <div className="text-tx3 text-sm bg-panel2 border border-line rounded-lg px-3 py-6 text-center shadow-e1">{children}</div>;
 }
 
+// ══════════ 今天（2026/11/01 介面整理第一波）══════════
+// 首頁第一眼回答「今天要去哪、見誰」，約訪直接附「開啟規劃」——打開規劃從四步變一步。
+// 今天沒有行程時，告訴他下一場是哪一天，而不是一塊空白。
+function TodayCard({ agenda }: { agenda: AgendaItem[] }) {
+  const today = todayISO();
+  const items = agenda.filter((a) => a.date === today);
+  const next = agenda.find((a) => a.date > today);
+  return (
+    <div className="rounded-2xl border border-line bg-panel shadow-e2 px-5 py-4 mb-5" style={{ backgroundImage: "linear-gradient(120deg, color-mix(in srgb, var(--brand) 7%, transparent), transparent 65%)" }}>
+      <div className="flex items-baseline gap-3 flex-wrap">
+        <span className="text-11 font-bold tracking-[0.16em] text-tx3">今天</span>
+        <span className="font-serif text-2xl font-bold">{items.length ? `${items.length} 件行程` : "今天沒有排定的行程"}</span>
+        {!items.length && next && <span className="text-13 text-tx2">下一場：{next.date.slice(5).replace("-", "/")} {next.title}</span>}
+      </div>
+      {items.length > 0 && (
+        <div className="mt-3 flex flex-col">
+          {items.map((r) => (
+            <div key={r.id} className="grid grid-cols-[56px_1fr_auto] items-center gap-3 py-2.5 border-t border-line">
+              <span className="font-mono text-sm text-brand2 tabular-nums">{r.timeLabel}</span>
+              <Link href={r.href} className="min-w-0 hover:underline">
+                <span className="font-bold">{r.title}</span>
+                <span className="block text-xs text-tx2">{r.kindLabel}{r.place ? ` · ${r.place}` : ""}</span>
+              </Link>
+              {r.planHref ? (
+                <Link href={r.planHref} className="rounded-lg bg-brand text-onbrand text-sm font-bold px-3 py-1.5 hover:opacity-90 whitespace-nowrap">開啟規劃</Link>
+              ) : <span />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home({ data }: { data: HomeView }) {
   // pl＝期間在句子裡的叫法：當月仍說「本月」，其他說「2026年8月」「2026 第四季」這種。
   const multi = data.period.multi, pl = !multi && data.period.current ? "本月" : data.period.label;
+  const agenda = (data.member ?? data.manager ?? data.owner)?.agenda ?? [];
   return (
     <div>
+      <TodayCard agenda={agenda} />
       {data.member && <MemberView d={data.member} today={data.today} pl={pl} multi={multi} />}
       {data.manager && <ManagerView d={data.manager} pl={pl} multi={multi} />}
       {data.owner && <OwnerView d={data.owner} pl={pl} multi={multi} />}

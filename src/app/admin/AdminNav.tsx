@@ -104,26 +104,8 @@ export default function AdminNav() {
   }, [pathname]);
 
   return (
-    <nav className="border-b border-line bg-field">
-      {/* 第一排：大類。點大類＝去那一類的第一頁。 */}
-      <div className="px-5 pt-2.5 flex gap-1 overflow-x-auto">
-        {ADMIN_GROUPS.map((g) => {
-          const on = g.key === group.key;
-          return (
-            <Link
-              key={g.key}
-              href={g.items[0].href}
-              aria-current={on ? "true" : undefined}
-              className={
-                "px-3 py-1.5 text-13 whitespace-nowrap border-b-2 transition " +
-                (on ? "border-brand text-tx font-bold" : "border-transparent text-tx2 hover:text-tx")
-              }
-            >
-              {g.title}
-            </Link>
-          );
-        })}
-      </div>
+    <nav aria-label="後台頁面" className="border-b border-line bg-panel2">
+      {/* 2026/11/01：第一排（六大類）搬進共用頂欄 ShellBar 的主導覽，這裡只留這一類底下的頁面。 */}
       {/* 第二排：這一類底下的頁面。手機單列橫捲，不 wrap 成好幾列。 */}
       <div className="px-5 py-2 flex gap-1.5 overflow-x-auto">
         {group.items.map((it) => {

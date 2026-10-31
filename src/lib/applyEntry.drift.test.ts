@@ -60,8 +60,8 @@ describe("申請入口的每一段都要接得上", () => {
     expect(portal, "客戶端首頁要引入報聘入口區塊").toContain("CoachEntry");
     const entry = R("src/app/portal/CoachEntry.tsx");
     expect(entry, "報聘入口要真的連到申請頁").toMatch(/href="\/dashboard\/apply"/);
-    // 頁首那顆按鈕也要在（首屏就看得到，不用捲到底）。
-    expect(portal).toMatch(/href="\/dashboard\/apply"/);
+    // 頁首那顆按鈕也要在（首屏就看得到，不用捲到底）。2026/11/01 起收進頂欄頭像選單（menuExtra）。
+    expect(portal).toMatch(/href(?:=|: )"\/dashboard\/apply"/);
   });
 
   it("⚠️ 待審中的人在客戶端不可以被標成「教練工作台」", () => {

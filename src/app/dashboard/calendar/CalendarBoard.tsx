@@ -84,11 +84,13 @@ function EventRow({ e, onOpen, showMinuteState }: { e: CalEvent; onOpen: (e: Cal
 }
 
 export default function CalendarBoard({
-  ym, events, past, today, initialOpenId,
+  ym, events, past, upcoming = [], today, initialOpenId,
 }: {
   ym: string;
   events: CalEvent[];
   past: CalEvent[];
+  /** 跨月份的「接下來」最近幾場，不受目前看的月份影響。 */
+  upcoming?: CalEvent[];
   today: string;
   initialOpenId: string | null;
 }) {
@@ -97,7 +99,7 @@ export default function CalendarBoard({
   // ⚠️ 不要改成 useEffect + setOpen —— 那是 effect 裡同步 setState，會多一次 render，
   //    而且抽屜會先閃一下空的。換月份是 server navigation，這個元件會重建，初始值照樣會重算。
   const [open, setOpen] = useState<CalEvent | null>(() =>
-    initialOpenId ? ([...events, ...past].find((e) => e.id === initialOpenId) ?? null) : null,
+    initialOpenId ? ([...events, ...upcoming, ...past].find((e) => e.id === initialOpenId) ?? null) : null,
   );
   const titleId = useId();
 
@@ -123,6 +125,19 @@ export default function CalendarBoard({
 
   return (
     <>
+      {/* ── 接下來（跨月份，最近幾場）── */}
+      {upcoming.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-bold text-brand2 flex items-center gap-2 mb-3">
+            接下來
+            <span className="text-xs font-normal text-tx3">最近 {upcoming.length} 場，不管在哪個月</span>
+          </h2>
+          <div className="flex flex-col gap-1.5">
+            {upcoming.map((e) => <EventRow key={e.id} e={e} onOpen={setOpen} />)}
+          </div>
+        </div>
+      )}
+
       {/* ── 月份導覽 ── */}
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <Link href={`/dashboard/calendar?m=${shiftMonth(ym, -1)}`} className="px-2.5 py-1 rounded-md border border-line text-tx2 hover:text-tx text-sm font-bold">‹</Link>

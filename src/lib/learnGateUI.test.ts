@@ -30,7 +30,7 @@ vi.mock("next/navigation", () => ({
   redirect: () => { throw new Error("redirected"); },
   usePathname: () => "/dashboard/learn",
 }));
-vi.mock("@clerk/nextjs", () => ({ UserButton: () => null }));
+vi.mock("@clerk/nextjs", () => ({ UserButton: () => null, useUser: () => ({ user: null }), useClerk: () => ({}) }));
 
 async function render() {
   const [{ default: LearnPage }, { renderToStaticMarkup }] = await Promise.all([
