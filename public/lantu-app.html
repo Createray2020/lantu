@@ -1018,6 +1018,7 @@ details.antools .anbar,details.antools .sec{margin-bottom:8px}
    :focus-visible 只在鍵盤操作時出現，滑鼠點擊不會觸發。 */
 :focus-visible{outline:2px solid var(--amber2);outline-offset:2px;border-radius:4px}
 input:disabled,select:disabled,textarea:disabled,button:disabled{opacity:.45;cursor:not-allowed}
+input.agero{background:var(--card);color:var(--tx);cursor:default}
 [aria-invalid="true"],.invalid{border-color:var(--danger)!important;
  background:color-mix(in srgb, var(--danger) 8%, transparent)}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{
@@ -1888,6 +1889,8 @@ function migrateCase(c){
  var d=newCase();
  if(!c.id)c.id=uid();
  c.profile=_fill(d.profile,c.profile);
+ // 2026/11/01 有出生日期就以生日推算的年齡為準（年齡欄不再可手動覆寫）
+ {var _pa=ageFromBirth(c.profile.birth);if(_pa!=null)c.profile.age=_pa;}
  c.params=_fill(d.params,c.params);
  c.retire=_fill(d.retire,c.retire);
  if(!Array.isArray(c.retire.prepared))c.retire.prepared=[];
@@ -1946,6 +1949,7 @@ function migrateCase(c){
  if(c.bizReportNote==null)c.bizReportNote='';
  ensureJobFields(c);
  c.members.forEach(function(m){if(m&&(m.role==='本人'||m.role==='配偶'))ensureMemberJob(m);});
+ c.members.forEach(function(m){if(!m||m.unborn)return;var _ma=ageFromBirth(m.birth);if(_ma!=null)m.age=_ma;});
  ensureMemberIds(c);
  migrateCompanies(c);
  try{normalizeIntent(c);}catch(e){c.intent={purposes:[],targets:[DEFAULT_TARGET],mustHave:[DEFAULT_TARGET]};}
@@ -6140,9 +6144,10 @@ function birthField(v,attr){
  return '<div class="f"><label>出生日期</label><input type="date" value="'+esc(v||'')+'" '+attr+'></div>';
 }
 function ageField(age,birth,attr,label,key){
+ // 2026/11/01 Ray：有出生日期就自動推算、不給輸入；沒有出生日期才手填年齡。
  var auto=ageFromBirth(birth);
- var note=(auto!=null)?'<div class="hint" style="margin-top:3px">由出生日期自動計算（'+auto+' 歲）'+((n(age)!==auto)?'，目前手動覆寫為 '+n(age)+' 歲':'')+'</div>':'<div class="hint" style="margin-top:3px">可直接填年齡，或改填上方出生日期自動換算</div>';
- return '<div class="f"><label>'+(label||'目前年齡')+'</label><input type="number" inputmode="decimal" data-ageof="'+esc(key||'')+'" value="'+esc(age==null?'':age)+'" '+attr+'>'+note+'</div>';
+ if(auto!=null)return '<div class="f"><label>'+(label||'目前年齡')+'</label><input type="text" class="agero" data-ageof="'+esc(key||'')+'" value="'+auto+'" readonly tabindex="-1" title="由出生日期自動計算"><div class="hint" style="margin-top:3px">由出生日期自動計算；要改請改出生日期</div></div>';
+ return '<div class="f"><label>'+(label||'目前年齡')+'</label><input type="number" inputmode="decimal" data-ageof="'+esc(key||'')+'" value="'+esc(age==null?'':age)+'" '+attr+'><div class="hint" style="margin-top:3px">沒有出生日期時才手填；填了出生日期會自動換算</div></div>';
 }
 // ── 月投保薪資：下拉選公告級距 ＋ 仍可手填 ──
 function insLabelOf(insType){return insType==='國民年金'?'月投保金額':'月投保薪資';}
