@@ -630,7 +630,14 @@ export async function hasReminderFor(me: Identity): Promise<boolean> {
 }
 
 // ── 待辦（後台／教練）──────────────────────────────────────────────────────
-export type DocTodo = { instance: InstanceWithSigners; kind: "stale" | "expired" | "declined"; waitingOn: string; days: number };
+export type DocTodo = {
+  instance: InstanceWithSigners;
+  kind: "stale" | "expired" | "declined";
+  waitingOn: string;
+  days: number;
+  /** 2026/11/01：卡住的這份，本人那一格的人已經簽完「同範本同版本」的另一份 → 這份是重複的，建議作廢 */
+  dupSigned?: { name: string; at: string } | null;
+};
 
 /** 卡住的文件：待簽超過 nudgeDays（從建立或最後一次催算）、逾期、拒簽。opts.coachId 只看那位教練是簽署人的。 */
 export async function listDocTodos(opts: { coachId?: string } = {}): Promise<DocTodo[]> {
@@ -649,7 +656,36 @@ export async function listDocTodos(opts: { coachId?: string } = {}): Promise<Doc
     else if (i.status === "expired") out.push({ instance: i, kind: "expired", waitingOn, days });
     else if (isStale(i, lastRemind ? new Date(lastRemind) : null, nudgeDays, now)) out.push({ instance: i, kind: "stale", waitingOn, days });
   }
+  await markDupSigned(out);
   return out;
+}
+
+/**
+ * 重複發出的偵測（2026/11/01 Ray：邱浩軍拒簽「我剛剛簽過了」）：本人那一格（member／coach）的人，
+ * 同範本同版本已經有一份「已完成」→ 這份卡住的是重複的。只讀不改，給清單標示與作廢原因預填。
+ */
+async function markDupSigned(todos: DocTodo[]) {
+  const want = todos.flatMap((t) => t.instance.signers
+    .filter((s) => (s.role === "member" || s.role === "coach") && s.coachId && s.status !== "signed")
+    .map((s) => ({ t, coachId: s.coachId as string, name: s.displayName || s.label })));
+  if (!want.length) return;
+  // 兩段查（不用 join）：先找同範本已完成的文件，再找那些文件裡這幾個人的簽名。標示失敗不該拖垮整個待辦清單。
+  let rows: { coachId: string | null; signedAt: Date | null; key: string; version: number; id: string }[] = [];
+  try {
+    const insts = await db.select({ id: docInstances.id, key: docInstances.templateKey, version: docInstances.version }).from(docInstances)
+      .where(and(eq(docInstances.status, "completed"), inArray(docInstances.templateKey, [...new Set(want.map((w) => w.t.instance.templateKey))])));
+    if (!insts.length) return;
+    const sg = await db.select({ coachId: docSigners.coachId, signedAt: docSigners.signedAt, instanceId: docSigners.instanceId }).from(docSigners)
+      .where(and(inArray(docSigners.instanceId, insts.map((i) => i.id)), inArray(docSigners.coachId, [...new Set(want.map((w) => w.coachId))])));
+    rows = sg.flatMap((x) => { const i = insts.find((y) => y.id === x.instanceId); return i ? [{ coachId: x.coachId, signedAt: x.signedAt, key: i.key, version: i.version, id: i.id }] : []; });
+  } catch {
+    return;
+  }
+  for (const w of want) {
+    if (w.t.dupSigned) continue;
+    const hit = rows.find((r) => r.coachId === w.coachId && r.key === w.t.instance.templateKey && r.version === w.t.instance.version && r.id !== w.t.instance.id);
+    if (hit) w.t.dupSigned = { name: w.name, at: hit.signedAt ? new Date(hit.signedAt).toISOString().slice(0, 10) : "" };
+  }
 }
 
 // ── 補簽任務 ─────────────────────────────────────────────────────────────────

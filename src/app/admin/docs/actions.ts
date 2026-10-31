@@ -79,6 +79,7 @@ export async function voidInstanceAction(id: string, reason: string): Promise<Ac
     const r = await voidInstance(id, reason);
     if (!r.ok) return { ok: false, error: r.error ?? "作廢失敗" };
     revalidatePath("/admin/docs/instances");
+    revalidatePath("/admin/inbox");
     return { ok: true };
   } catch (e) {
     return fail(e);

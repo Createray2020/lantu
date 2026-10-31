@@ -98,7 +98,7 @@ export default async function InboxPage() {
         </div>
         <InboxBoard items={items} settings={settings} />
         {/* 電子簽署（2026/10/28）：待簽太久、逾期、拒簽的文件——催簽、延長、看原因都在這裡做 */}
-        <div className="mt-6"><DocTodoList rows={toTodoRows(docTodos, { coachId: me.id })} /></div>
+        <div className="mt-6"><DocTodoList rows={toTodoRows(docTodos, { coachId: me.id })} canVoid /></div>
       </section>
     </main>
   );
