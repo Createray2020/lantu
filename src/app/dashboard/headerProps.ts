@@ -8,12 +8,12 @@ import { DEFAULT_THEME, normalizeTheme, type ThemeName } from "@/lib/theme";
 import { isModuleOn } from "@/lib/platformModules";
 import { countMyPending } from "@/lib/docsStore";
 import { unreadCount } from "@/lib/notify";
-import { countPendingApplications } from "@/lib/inbox";
+import { countPendingApplications, countOrgDocTodos } from "@/lib/inbox";
 
 // learnOn：學習區模組的開關（/admin/modules）。關閉時頂欄不出現學習區入口——
 // 入口與頁面各自判斷會漂（頁面擋住了、頂欄還亮著一個點進去是建置中的分頁），
 // 所以跟 isAdmin 一樣收在這裡算一次。
-// adminPending：管理者收件匣的「待我處理」（待審報聘數）；非管理者恆為 0。2026/11/01 收件匣。
+// adminPending：管理者收件匣的「待我處理」（待審報聘＋需要處理的文件）；非管理者恆為 0。2026/11/01 收件匣。
 export type HeaderProps = { isAdmin: boolean; uiScale: number; theme: ThemeName; license: LicenseState; learnOn: boolean; docsPending: number; unread: number; adminPending: number };
 
 export async function headerProps(coach: Coach): Promise<HeaderProps> {
@@ -28,6 +28,7 @@ export async function headerProps(coach: Coach): Promise<HeaderProps> {
     docsPending: await countMyPending({ coachId: coach.id }).catch(() => 0),
     // 站內通知未讀數（2026/10/28 案件進度）；查不到就 0。
     unread: await unreadCount("coach", coach.id).catch(() => 0),
-    adminPending: admin ? await countPendingApplications().catch(() => 0) : 0,
+    // 待我處理＝待審報聘＋需要處理的文件（跟收件匣、後台待我處理同一組）。
+    adminPending: admin ? (await countPendingApplications().catch(() => 0)) + (await countOrgDocTodos().catch(() => 0)) : 0,
   };
 }
