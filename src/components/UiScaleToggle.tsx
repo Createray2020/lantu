@@ -20,6 +20,11 @@ import { setUiScaleAction } from "@/app/uiScaleAction";
 let cache: number | null = null;
 const subs = new Set<() => void>();
 
+// 2026/11/01 bug：切成深色後一點頭像就跳回淺色——選單裡的切換鈕每次打開都重新掛載，
+// 拿頁面當初伺服器帶來的舊帳號值（initial）蓋回去；客戶端路由快取的頁面也一樣舊。
+// 所以這次瀏覽中本人親手選過的值優先，帳號值只在「還沒選過」時才當權威（整頁重新載入就會是新值）。
+let picked: number | null = null;
+
 function readLocal(): number {
   if (cache == null) {
     try {
@@ -57,7 +62,7 @@ function setScale(v: number) {
 /** 同 useThemeSync：切換鈕收進頭像選單後，帳號字級仍要每頁蓋回本機。 */
 export function useUiScaleSync(initial: number, persist: boolean) {
   useEffect(() => {
-    if (persist) setScale(initial);
+    if (persist) setScale(picked ?? initial);
     else applyDom(readLocal());
   }, [initial, persist]);
 }
@@ -78,11 +83,12 @@ export default function UiScaleToggle({
   useEffect(() => {
     // 登入者：帳號設定是權威，蓋回本機（換裝置時本機值可能是舊的或空的）。
     // 未登入：以本機為準，別把它重設回 100。
-    if (persist) setScale(initial);
+    if (persist) setScale(picked ?? initial);
     else applyDom(readLocal());
   }, [initial, persist]);
 
   function pick(v: number) {
+    picked = v;
     setScale(v);
     if (persist) startTransition(() => void setUiScaleAction(v).catch(() => {}));
   }
