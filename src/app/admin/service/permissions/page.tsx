@@ -25,7 +25,7 @@ export default async function CasePermissionsPage() {
       <AdminNav />
       <section className="max-w-5xl mx-auto px-5 py-6 space-y-6">
         <div>
-          <h1 className="text-xl font-bold">案件進度 · 誰能看、誰能改</h1>
+          <h1 className="page-title">案件進度 · 誰能看、誰能改</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             原則「最小必要」：每個角色只看得到完成工作所需的資料，變更一律留下紀錄。<b className="text-brand2">系統管理（核心成員／管理員）永遠看得到全部。</b>
             下表依目前的開關即時產生；角色誰擔任，到「教練帳號」名冊勾「客戶關係／行政財法」，S3 看組織樹的推薦人子樹。

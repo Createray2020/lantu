@@ -60,7 +60,7 @@ export default async function ProfilePage() {
 
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         <div className="mb-5">
-          <h1 className="text-xl font-bold">我的公開檔案</h1>
+          <h1 className="page-title">我的公開檔案</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             這裡的內容會<b className="text-brand2">公開顯示在官網的教練頁</b>，
             客戶挑選教練時看到的就是這一份。沒有填寫的教練不會出現在公開列表——

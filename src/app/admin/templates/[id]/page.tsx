@@ -36,7 +36,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
       <AdminNav />
       <section className="max-w-4xl mx-auto px-5 py-6">
         <Link href="/admin/templates" className="text-sm text-tx2 hover:text-tx">← 範本清單</Link>
-        <h1 className="text-xl font-bold mt-2 mb-1">{tpl.client.name}</h1>
+        <h1 className="page-title mt-2 mb-1">{tpl.client.name}</h1>
         <p className="text-tx2 text-sm mb-5">
           {tpl.client.templateLabel ?? "（未設客群標籤）"}
           <span className="ml-3 text-tx3 text-xs">這份範本全公司教練共用，他們只能看。</span>

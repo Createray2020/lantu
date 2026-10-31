@@ -46,7 +46,7 @@ export default async function LearnPage() {
       <ReadOnlyBanner license={hp.license} />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex flex-wrap items-baseline gap-3 mb-1">
-          <h1 className="font-serif text-2xl">學習區</h1>
+          <h1 className="page-title">學習區</h1>
           <span className="text-sm text-tx2">
             共 {courses.length} 門課 · 已完成 <b className="text-brand2">{doneAll}</b> 門
           </span>

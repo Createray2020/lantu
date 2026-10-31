@@ -32,7 +32,7 @@ export default async function DocInstancesPage({ searchParams }: { searchParams:
       <AdminNav />
       <section className="max-w-5xl mx-auto px-5 py-6 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-bold">簽署總覽</h1>
+          <h1 className="page-title">簽署總覽</h1>
           <Link href="/admin/docs" className="text-xs rounded-md border border-line px-2.5 py-1.5 text-tx2 hover:text-tx">範本與組合</Link>
           <div className="ml-auto flex gap-1 text-xs">
             {TABS.map((t) => (

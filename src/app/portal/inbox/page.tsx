@@ -29,7 +29,7 @@ export default async function PortalInbox() {
       <main className="flex-1 px-4 sm:px-6 py-8">
         <section className="max-w-2xl mx-auto flex flex-col gap-7">
           <div>
-            <h1 className="font-serif text-2xl font-bold">收件匣</h1>
+            <h1 className="page-title">收件匣</h1>
             <p className="text-sm text-tx2 mt-1">教練傳給你的事和要你做的事都在這裡。</p>
           </div>
           {docPending > 0 && (

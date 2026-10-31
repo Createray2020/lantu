@@ -26,7 +26,7 @@ export default async function TemplatesAdminPage() {
       <AdminHeader label="教練管理後台" />
       <AdminNav />
       <section className="max-w-5xl mx-auto px-5 py-6">
-        <h1 className="text-xl font-bold mb-1">示範範本</h1>
+        <h1 className="page-title mb-1">示範範本</h1>
         <p className="text-tx2 text-sm mb-1">
           做給教練坐在客戶旁邊翻的示範個案。<b className="text-brand2">每位教練登入後看到的都是這一份</b>，
           他們只能看、不能改；要動內容只有在這裡。

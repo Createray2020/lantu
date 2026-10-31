@@ -56,7 +56,7 @@ export default async function TrainingPage() {
 
       <section className="w-full px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">訓練時數與研討會</h1>
+          <h1 className="page-title">訓練時數與研討會</h1>
           <p className="text-sm text-tx2 mt-1">
             維持資格的訓練門檻（辦法第十六條第二項）就靠這一頁的資料。
           </p>

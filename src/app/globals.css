@@ -225,6 +225,14 @@
   --font-sans: var(--font-sans-loaded), -apple-system, "PingFang TC",
     "Microsoft JhengHei", system-ui, sans-serif;
   --font-serif: var(--font-serif-loaded), "Songti TC", Georgia, serif;
+
+  /* 圓角收成三階（2026/11/01 介面整理第三波）：小元件 4、按鈕／輸入框 8、面板 12。
+     改版前 rounded-sm/md/lg/xl/2xl 是 2/6/8/12/16 五種混用，同一張卡裡的按鈕與外框各圓各的。
+     只動 token、不逐頁改 class：md 併進 8、2xl／3xl 併進 12、sm 拉到 4。 */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.75rem;
 }
 
 body {
@@ -353,4 +361,29 @@ input[type="number"], .num {
   textarea {
     font-size: 16px !important;
   }
+}
+
+/* ============================================================================
+   頁面標題（2026/11/01 介面整理第三波）
+   改版前 78 頁有 12 種 h1 寫法（text-xl font-bold／font-serif text-2xl／3xl…），
+   同一個系統裡換一頁標題就換一個字體大小。現在工作台、後台、客戶端的頁面標題一律 .page-title：
+   宋體 26px（跟 Logo 的襯線同一家族），標題下面那一句說明統一成 14px 次要文字。
+   ⚠️ 這是無 layer 的規則，會蓋過 Tailwind 的 utilities（那是刻意的：說明句不論各頁寫成
+      text-sm 還是 text-xs，看起來都要一樣）。
+   ========================================================================== */
+.page-title {
+  font-family: var(--font-serif);
+  font-size: 1.625rem;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--tx);
+  text-wrap: balance;
+}
+.page-title + p {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--tx2);
+  margin-top: 0.375rem;
+  max-width: 68ch;
 }

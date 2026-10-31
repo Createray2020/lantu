@@ -30,7 +30,7 @@ export default async function SystemPage({
 
       <section className="max-w-6xl mx-auto px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">財務教練業務制度</h1>
+          <h1 className="page-title">財務教練業務制度</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             所有數字欄位預設留空。<b className="text-brand2">留空＝該門檻不檢查、該規則不計算</b>，
             不是 0；引擎遇到未設定的門檻會跳過而不是擋人。要照《業務制度辦法 V4.0》開跑，

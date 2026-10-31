@@ -48,7 +48,7 @@ export default async function DocsAdminPage() {
       <AdminNav />
       <section className="max-w-5xl mx-auto px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">電子簽署 · 印鑑、文件範本與組合</h1>
+          <h1 className="page-title">電子簽署 · 印鑑、文件範本與組合</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             範本改了內容會存成<b className="text-brand2">新版本</b>，已經發出去的文件不會跟著變；
             「組合」決定某個方案啟動簽署時要產哪幾份。簽署人分類（公司／成員／客戶／教練）與順序在每份範本裡設。

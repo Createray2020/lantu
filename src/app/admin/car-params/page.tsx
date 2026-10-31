@@ -19,7 +19,7 @@ export default async function CarParamsPage() {
       <AdminNav />
       <section className="w-full px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">購車規劃・車價、品牌與持有成本參數</h1>
+          <h1 className="page-title">購車規劃・車價、品牌與持有成本參數</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             規劃器的「這一台車」卡用這裡的數字把<b className="text-brand2">品牌×車型×動力×車況</b>換算成市場起手估值，
             並依規格推養車成本。查價順序：<b>品牌列 → 等級層列 × 品牌價格係數 → 程式內建</b>。

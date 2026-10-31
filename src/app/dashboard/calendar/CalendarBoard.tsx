@@ -128,7 +128,7 @@ export default function CalendarBoard({
       {/* ── 接下來（跨月份，最近幾場）── */}
       {upcoming.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-sm font-bold text-brand2 flex items-center gap-2 mb-3">
+          <h2 className="text-sm font-bold text-tx flex items-center gap-2 mb-3">
             接下來
             <span className="text-xs font-normal text-tx3">最近 {upcoming.length} 場，不管在哪個月</span>
           </h2>
@@ -212,7 +212,7 @@ export default function CalendarBoard({
 
       {/* ── 過往活動與會議紀錄 ── */}
       <div className="mt-8">
-        <h2 className="text-sm font-bold text-brand2 flex items-center gap-2 mb-3">
+        <h2 className="text-sm font-bold text-tx flex items-center gap-2 mb-3">
           🗂 過往紀錄
           <span className="text-xs font-normal text-tx3">
             {past.length} 筆

@@ -25,7 +25,7 @@ export default async function ClientViewPage() {
 
       <section className="max-w-3xl mx-auto px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">客戶財務儀表板 · 顯示哪些模組</h1>
+          <h1 className="page-title">客戶財務儀表板 · 顯示哪些模組</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             客戶登入之後看到的那一頁要放什麼。除了原本的總覽六塊，
             教練端「<b className="text-brand2">分析</b>」與「<b className="text-brand2">建議</b>」

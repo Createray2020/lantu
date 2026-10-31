@@ -69,7 +69,7 @@ export default function ClientViewBoard({ hidden }: { hidden: string[] }) {
         return (
           <section key={g} className="mb-5">
             <div className="flex flex-wrap items-center gap-3 mb-2">
-              <h2 className="text-15 font-bold text-brand2">{g}</h2>
+              <h2 className="text-15 font-bold text-tx">{g}</h2>
               <span className="text-xs text-tx2">
                 {onN} / {mods.length} 塊顯示
               </span>

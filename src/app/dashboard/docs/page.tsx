@@ -25,7 +25,7 @@ export default async function CoachDocsPage() {
       <DashboardHeader {...hp} />
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
         <div>
-          <h1 className="text-xl font-bold">我的文件</h1>
+          <h1 className="page-title">我的文件</h1>
           <p className="text-sm text-tx2 mt-1">你是簽署人的合約與文件都在這裡；客戶那一邊看到的是同一份。</p>
         </div>
         <DocTodoList rows={toTodoRows(todos, { coachId: me.id })} />

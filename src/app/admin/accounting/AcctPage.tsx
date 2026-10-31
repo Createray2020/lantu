@@ -17,7 +17,7 @@ export async function acctShell(title: string, lead: string, body: (state: AcctS
       <AdminNav />
       <section className="w-full px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">{title}</h1>
+          <h1 className="page-title">{title}</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">{lead}</p>
         </div>
         {body(state, currentYm())}

@@ -80,7 +80,7 @@ export default async function BizGuidePage() {
       <DashboardHeader {...hp} />
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         <div>
-          <h1 className="font-serif text-2xl">企業主財務規劃 · 作業手冊</h1>
+          <h1 className="page-title">企業主財務規劃 · 作業手冊</h1>
           <p className="text-xs text-tx3 mt-1">
             教練的背景知識與現場工具。資料基準 {BIZ_TAX_BASIS}，法規數字統一維護於 <code className="text-brand2">src/lib/bizTax.ts</code>。
             本頁不構成稅務或法律建議。
@@ -120,7 +120,7 @@ export default async function BizGuidePage() {
               </ol>
             </div>
             <div>
-              <h3 className="text-xs text-brand2 mb-1">B. 公私交界面（核心，最有價值的一組）</h3>
+              <h3 className="text-xs font-bold text-tx2 mb-1">B. 公私交界面（核心，最有價值的一組）</h3>
               <ol className="list-decimal list-inside space-y-1 text-13" start={6}>
                 <li>公司的借款，你個人有簽連帶保證嗎？總金額大概多少？</li>
                 <li>你自己在公司領多少薪水？當初怎麼決定這個數字的？</li>
@@ -140,7 +140,7 @@ export default async function BizGuidePage() {
               </ol>
             </div>
             <div>
-              <h3 className="text-xs text-brand2 mb-1">D. 未來面（最能打開規劃需求）</h3>
+              <h3 className="text-xs font-bold text-tx2 mb-1">D. 未來面（最能打開規劃需求）</h3>
               <ol className="list-decimal list-inside space-y-1 text-13" start={16}>
                 <li className="text-tx font-semibold">如果明天你想退休，這家公司在沒有你的情況下，還值多少錢？</li>
                 <li>你希望幾歲的時候可以不用每天進公司？</li>

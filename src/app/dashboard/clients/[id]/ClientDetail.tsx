@@ -323,7 +323,7 @@ function ClientHeader({ client, onSave, onArchive, onUnarchive, onDelete, pendin
     <div className="bg-panel border border-line rounded-xl p-4 flex flex-wrap items-start gap-3 shadow-e1">
       <div className="flex-1 min-w-[200px]">
         <div className="flex items-center gap-2">
-          <h1 className="font-serif text-2xl">{client.name}</h1>
+          <h1 className="page-title">{client.name}</h1>
           <span className="text-11 px-2 py-0.5 rounded-full bg-panel text-tx2 border border-line shadow-e1">{STATUS_LABEL[client.status] ?? client.status}</span>
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">

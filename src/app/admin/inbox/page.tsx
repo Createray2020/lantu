@@ -90,7 +90,7 @@ export default async function InboxPage() {
 
       <section className="p-4 sm:p-6 max-w-2xl">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">待我處理</h1>
+          <h1 className="page-title">待我處理</h1>
           <p className="mt-1 text-sm leading-relaxed text-tx2">
             需要你判斷、而且有人在等的事。點一張卡片會開出完整內容與核准鈕——
             這一頁在手機上做得完，設定類的工作請用電腦開「教練帳號」。

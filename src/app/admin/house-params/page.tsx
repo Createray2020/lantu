@@ -19,7 +19,7 @@ export default async function HouseParamsPage() {
       <AdminNav />
       <section className="w-full px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">購屋規劃・房價與付款參數</h1>
+          <h1 className="page-title">購屋規劃・房價與付款參數</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             規劃器的「這一間房」卡用這裡的數字把<b className="text-brand2">地區×屋況×規格</b>換算成市場起手估值。
             查價順序：<b>行政區列 → 縣市列 → 程式內建</b>；行政區沒填就沿用縣市。

@@ -26,7 +26,7 @@ export default async function AdminServicePage() {
       <AdminNav />
       <section className="max-w-4xl mx-auto px-5 py-6 space-y-6">
         <div>
-          <h1 className="text-xl font-bold">客戶服務 · 案件進度規則</h1>
+          <h1 className="page-title">客戶服務 · 案件進度規則</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             服務階段 4–8 的預設期限與檢查清單、逾期升級用的假日表、會員中心的聯絡客服面板、服務回饋問卷。
             所有期限都是<b className="text-brand2">預設值</b>：客戶端以教練承諾的日期為準（日曆天）；逾期升級的提醒天數以工作日計。

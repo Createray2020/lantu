@@ -42,7 +42,7 @@ export default async function ModulesPage() {
 
       <section className="max-w-3xl mx-auto px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">模組開關 · 維修與開放</h1>
+          <h1 className="page-title">模組開關 · 維修與開放</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             還沒建置完成、或臨時要進維修的模組在這裡關掉。
             關閉的模組<b className="text-brand2">入口會整個不出現</b>，直接打網址的人看到下方那段說明文字，

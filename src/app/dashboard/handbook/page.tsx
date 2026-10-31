@@ -45,7 +45,7 @@ export default async function HandbookPage() {
 
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         <div>
-          <h1 className="text-xl font-bold">業務制度說明</h1>
+          <h1 className="page-title">業務制度說明</h1>
           <p className="text-sm text-tx2 mt-1">
             目前生效版本 <b className="text-brand2">{version.version}</b>
             {version.effectiveFrom && `（{生效日} ${version.effectiveFrom}）`.replace("{生效日}", "生效日")}。

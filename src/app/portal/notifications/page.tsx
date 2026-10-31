@@ -20,7 +20,7 @@ export default async function PortalNotifications() {
       </header>
       <main className="flex-1 px-6 py-10">
         <section className="max-w-2xl mx-auto space-y-4">
-          <h1 className="font-serif text-2xl">通知</h1>
+          <h1 className="page-title">通知</h1>
           <NotificationList side="client" rows={list.map((n) => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, href: n.href, read: !!n.readAt, at: n.createdAt.toISOString() }))} />
         </section>
       </main>

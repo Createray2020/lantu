@@ -35,7 +35,7 @@ export default async function CategoriesPage() {
 
       <section className="w-full px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">收支資債類別・教育與生育費用參數</h1>
+          <h1 className="page-title">收支資債類別・教育與生育費用參數</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             這裡改的是<b className="text-brand2">全平台共用</b>的選項，所有教練即時生效（重新整理即可看到）。
             顆粒度愈細，之後的分析資料愈有得比——但同一個概念請只留一個名字，別出現同義詞。

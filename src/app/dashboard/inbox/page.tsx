@@ -56,7 +56,7 @@ export default async function InboxPage() {
       <DashboardHeader {...hp} />
       <section className="max-w-3xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-7">
         <div>
-          <h1 className="font-serif text-2xl font-bold">收件匣</h1>
+          <h1 className="page-title">收件匣</h1>
           <p className="text-sm text-tx2 mt-1">所有在等你處理的事都在這裡：待確認、待簽文件、通知{hp.isAdmin ? "、後台的待我處理" : ""}。每一項都直接連到原本處理的地方。</p>
         </div>
 

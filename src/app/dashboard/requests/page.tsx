@@ -45,7 +45,7 @@ export default async function RequestsPage() {
           </ul>
         </section>
 
-        <h1 className="font-serif text-2xl mb-1">客戶連結申請</h1>
+        <h1 className="page-title mb-1">客戶連結申請</h1>
         <p className="text-tx2 text-sm mb-5">客戶從人生護照送出的連結邀請；接受後對方就掛到你名下、可一起規劃。</p>
         <RequestList requests={requests.map((r) => ({ id: r.id, clientId: r.clientId, clientName: r.clientName, note: r.note }))} />
         <div className="mt-8 pt-6 border-t border-line">

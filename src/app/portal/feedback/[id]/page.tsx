@@ -24,7 +24,7 @@ export default async function FeedbackPage({ params }: { params: Promise<{ id: s
       <main className="flex-1 px-6 py-10">
         <section className="max-w-xl mx-auto">
           <div className="text-brand text-xs tracking-[0.3em] mb-2">FEEDBACK</div>
-          <h1 className="font-serif text-2xl mb-2">這次服務，你的感受</h1>
+          <h1 className="page-title mb-2">這次服務，你的感受</h1>
           <p className="text-sm text-tx2 mb-6">四題評分加一句話，大約一分鐘。你的意見會直接回到嵐途，不只給教練看。</p>
           <FeedbackForm id={f.id} questions={settings.questions} initial={f.submittedAt ? { scores: f.scores, comment: f.comment } : null} />
         </section>

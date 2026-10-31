@@ -59,7 +59,7 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
         <Link href="/dashboard/learn" className="text-sm text-tx2 hover:text-tx">
           ← 回學習區
         </Link>
-        <h1 className="font-serif text-2xl mt-2">{course.title}</h1>
+        <h1 className="page-title mt-2">{course.title}</h1>
         {course.summary && <p className="text-sm text-tx2 mt-1 mb-1">{course.summary}</p>}
         {course.trainingHours != null && (
           <p className="text-xs text-tx3 mb-4">

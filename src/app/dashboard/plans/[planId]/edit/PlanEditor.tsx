@@ -105,7 +105,7 @@ const NOTE_ERR_FALLBACK = "沒有存成功。請檢查網路後再試一次。";
 
 /** 規劃器頂列要的導覽（← 回客戶、版本紀錄、版本名稱），隨 lantu:init 送進 iframe（2026/11/01）。 */
 function navFor(clientId: string, planId: string, year: number, label: string | null) {
-  return { back: `/dashboard/clients/${clientId}`, history: `/dashboard/plans/${planId}/history`, versionLabel: `${year}${label ? ` · ${label}` : ""}` };
+  return { back: `/dashboard/clients/${clientId}`, history: `/dashboard/plans/${planId}/history`, versionLabel: label || `${year} 年度版本` }; // label 本身多半已含年份（「2026 初版」），不再前面重複一次
 }
 
 // v12 App（/lantu-app.html?embed=1）以 iframe 載入。

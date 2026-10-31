@@ -44,7 +44,7 @@ export default async function VisitorsPage() {
 
       <section className="w-full px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">訪客記錄</h1>
+          <h1 className="page-title">訪客記錄</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             官網註冊的<b className="text-brand2">外部客戶</b>，以及每一位走到哪一步：
             註冊 → 登入 → 存檔人生護照 → 指定教練 → 申請成為教練。

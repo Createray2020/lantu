@@ -54,7 +54,7 @@ export default async function CalendarPage({
       <HomeTabs />
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">公司行事曆</h1>
+          <h1 className="page-title">公司行事曆</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             會議、活動與公司行程，加上<b className="text-brand2">教育訓練場次</b>。
             訓練場次由後台「訓練時數」建立，這裡只顯示。

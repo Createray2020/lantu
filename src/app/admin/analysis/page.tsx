@@ -22,7 +22,7 @@ export default async function AnalysisDefaultsPage() {
 
       <section className="max-w-4xl mx-auto px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">客戶分析頁 · 模組預設順序</h1>
+          <h1 className="page-title">客戶分析頁 · 模組預設順序</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             決定教練打開客戶分析頁時，那一排模組<b className="text-brand2">第一時間</b>怎麼排、哪些先收起來。
             排在前面的是你希望大家一坐下來就先談的東西。

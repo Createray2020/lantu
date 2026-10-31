@@ -32,7 +32,7 @@ export default async function OverviewPage() {
       <HomeTabs />
       <ReadOnlyBanner license={hp.license} />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 grid gap-6">
-        <h1 className="font-serif text-xl tracking-wide">教練儀表板</h1>
+        <h1 className="page-title">教練儀表板</h1>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {kpi("客戶總數", d.counts.total)}

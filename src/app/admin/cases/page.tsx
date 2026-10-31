@@ -82,7 +82,7 @@ export default async function CasesPage() {
 
       <section className="w-full px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">案件與分潤</h1>
+          <h1 className="page-title">案件與分潤</h1>
           <p className="text-sm text-tx2 mt-1">
             登錄案件後系統立刻依「簽約當下的制度版本」算出逐層分潤；問卷回收才算結案並計入晉升指標，
             實際收訖才會進發放批次。

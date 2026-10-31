@@ -26,7 +26,7 @@ export default async function MyPayoutsPage({ searchParams }: { searchParams: Pr
       <DashboardHeader {...hp} />
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-3">
         <div>
-          <h1 className="text-xl font-bold">我的分潤</h1>
+          <h1 className="page-title">我的分潤</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">每個月分到的錢怎麼來、扣多少、實匯多少、匯了沒。收款帳號在 <Link href="/dashboard/profile" className="underline underline-offset-4 hover:text-tx">我的檔案 › 收款設定</Link>。</p>
         </div>
         {!rec && <div className="rounded-xl border border-danger/40 bg-panel px-4 py-3 text-sm text-tx2">還沒填收款設定——分潤算得出來但匯不出去。<Link href="/dashboard/profile" className="text-brand2 underline ml-1">去填</Link></div>}

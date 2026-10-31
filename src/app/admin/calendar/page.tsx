@@ -25,7 +25,7 @@ export default async function AdminCalendarPage() {
 
       <section className="max-w-4xl mx-auto px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">公司行事曆</h1>
+          <h1 className="page-title">公司行事曆</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">
             這裡排的行程，教練在首頁「近期行程」與行事曆頁看得到。
             <b className="text-brand2">可見層級是往上包含</b>——標「主管以上」的，核心成員也看得到、教練看不到。

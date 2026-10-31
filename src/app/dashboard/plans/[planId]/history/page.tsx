@@ -44,7 +44,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ planId
         ) : (
           <Link href={`/dashboard/plans/${planId}/edit`} className="text-sm text-tx2 hover:text-tx">← 返回編輯</Link>
         )}
-        <h1 className="font-serif text-2xl my-4">版本紀錄</h1>
+        <h1 className="page-title my-4">版本紀錄</h1>
         <p className="text-tx2 text-sm mb-5">
           年度版與客戶自己的人生護照是兩條並行的紀錄，這裡依時間合併呈現。
           {isOwner

@@ -92,7 +92,7 @@ export default function ClientList({
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <h1 className="font-serif text-xl tracking-wide mr-1">客戶</h1>
+        <h1 className="page-title mr-1">客戶</h1>
         <span className="text-tx3 text-sm">{rows.length} / {clients.length}</span>
         {quota?.cap != null && (
           <span

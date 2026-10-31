@@ -25,7 +25,7 @@ export default async function InvoicesPage() {
       <AdminNav />
       <section className="max-w-5xl mx-auto px-5 py-6 space-y-4">
         <div>
-          <h1 className="text-xl font-bold">發票待辦</h1>
+          <h1 className="page-title">發票待辦</h1>
           <p className="text-sm text-tx2 mt-1 leading-relaxed">收款達門檻的案件在這裡回填發票；客戶簽沒簽合約不影響開票，發票沒開也不擋簽約。</p>
         </div>
         <InvoiceBoard rows={rows} />

@@ -209,7 +209,7 @@ export default function CalendarAdmin({ rows, today }: { rows: CalEvent[]; today
 
       {/* ── 即將到來 ── */}
       <div>
-        <h2 className="text-sm font-bold text-brand2 mb-2">即將到來　<span className="text-xs font-normal text-tx3">{upcoming.length} 筆</span></h2>
+        <h2 className="text-sm font-bold text-tx mb-2">即將到來　<span className="text-xs font-normal text-tx3">{upcoming.length} 筆</span></h2>
         {upcoming.length === 0 ? (
           <div className="text-tx3 text-sm bg-panel2 border border-line rounded-lg px-3 py-6 text-center">還沒有排定的行程</div>
         ) : (
@@ -219,7 +219,7 @@ export default function CalendarAdmin({ rows, today }: { rows: CalEvent[]; today
 
       {/* ── 已過去 ── */}
       <div>
-        <h2 className="text-sm font-bold text-brand2 mb-2">
+        <h2 className="text-sm font-bold text-tx mb-2">
           已過去　<span className="text-xs font-normal text-tx3">
             {past.length} 筆
             {past.filter((e) => !e.minutes).length > 0 && `　·　${past.filter((e) => !e.minutes).length} 筆未補紀錄`}

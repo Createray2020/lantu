@@ -70,7 +70,7 @@ export default async function AdminLearnPage() {
 
       <section className="max-w-5xl mx-auto px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">學習區 · 課程與教材</h1>
+          <h1 className="page-title">學習區 · 課程與教材</h1>
           <p className="text-sm text-tx2 mt-1">
             影片與文件一律放<b className="text-brand2">外部連結</b>（YouTube / Vimeo / Google 雲端硬碟）——
             系統本身沒有檔案儲存服務。YouTube、Vimeo 與雲端硬碟的檔案連結會直接內嵌播放，

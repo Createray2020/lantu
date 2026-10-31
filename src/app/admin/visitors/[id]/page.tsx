@@ -42,7 +42,7 @@ export default async function VisitorDetail({ params }: { params: Promise<{ id: 
           ← 回訪客記錄
         </Link>
 
-        <h1 className="text-xl font-bold mt-3">{visitor.name || "（未填姓名）"}</h1>
+        <h1 className="page-title mt-3">{visitor.name || "（未填姓名）"}</h1>
         <div className="text-sm text-tx2">{visitor.email || "—"}</div>
 
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-4">

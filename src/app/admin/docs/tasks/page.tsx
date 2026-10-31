@@ -23,7 +23,7 @@ export default async function DocTasksPage() {
       <AdminNav />
       <section className="max-w-5xl mx-auto px-5 py-6 space-y-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold">補簽任務</h1>
+          <h1 className="page-title">補簽任務</h1>
           <Link href="/admin/docs" className="text-xs rounded-md border border-line px-2.5 py-1.5 text-tx2 hover:text-tx">範本與組合</Link>
         </div>
         <p className="text-sm text-tx2 leading-relaxed">新增或修訂文件之後，指定既有教練補簽。每個任務記錄文件版本、對象、期限與完成結果；<b className="text-tx">不會</b>改動任何人的既有權限——要不要影響、何時影響，由公司另訂。</p>

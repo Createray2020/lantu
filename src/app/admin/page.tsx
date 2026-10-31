@@ -82,7 +82,7 @@ export default async function Admin() {
       <section className="w-full px-5 py-6">
 
         <div className="flex items-center gap-4 mb-3">
-          <h1 className="text-xl font-bold">教練帳號</h1>
+          <h1 className="page-title">教練帳號</h1>
         </div>
 
         {/* 半成品帳號（開通了卻沒定級／沒設期限）與快到期的，一律先彙總在頂端 ——

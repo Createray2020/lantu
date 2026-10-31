@@ -33,7 +33,7 @@ export default async function ProfilesPage() {
 
       <section className="w-full px-5 py-6">
         <div className="mb-4">
-          <h1 className="text-xl font-bold">教練公開檔案</h1>
+          <h1 className="page-title">教練公開檔案</h1>
           <p className="text-sm text-tx2 mt-1">
             檔案由教練自己填寫，存檔即公開。這裡只做檢視與下架——
             內容是教練本人的話，代寫會讓它失去意義；有問題就下架並請本人修改。

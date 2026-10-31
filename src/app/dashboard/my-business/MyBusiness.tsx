@@ -83,7 +83,7 @@ export default function MyBusiness({ v }: { v: MyView }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-bold">我的業務</h1>
+        <h1 className="page-title">我的業務</h1>
         <span className="text-xs text-tx3">制度版本 {v.versionLabel}</span>
       </div>
 

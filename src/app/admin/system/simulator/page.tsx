@@ -32,7 +32,7 @@ export default async function SimulatorPage({
 
       <section className="max-w-5xl mx-auto px-5 py-6">
         <div className="mb-4 flex flex-wrap items-baseline gap-3">
-          <h1 className="text-xl font-bold">分潤試算</h1>
+          <h1 className="page-title">分潤試算</h1>
           <span className="text-sm text-tx2">
             套用制度版本：<b className="text-brand2">{cur?.version ?? "—"}</b>
             {cur?.status === "draft" && "（草稿）"}

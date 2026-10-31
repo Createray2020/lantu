@@ -17,7 +17,7 @@ export default async function CoachNotificationsPage() {
       <DashboardHeader {...hp} />
       <section className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         <div>
-          <h1 className="text-xl font-bold">通知</h1>
+          <h1 className="page-title">通知</h1>
           <p className="text-sm text-tx2 mt-1">案件到期、逾期升級、客戶提問、文件簽署都在這裡；只在站內，不會寄信。</p>
         </div>
         <NotificationList side="coach" rows={list.map((n) => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, href: n.href, read: !!n.readAt, at: n.createdAt.toISOString() }))} />

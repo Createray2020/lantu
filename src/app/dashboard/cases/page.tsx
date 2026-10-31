@@ -23,7 +23,7 @@ export default async function CasesPage() {
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-5">
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <h1 className="text-xl font-bold">案件進度</h1>
+            <h1 className="page-title">案件進度</h1>
             <p className="text-sm text-tx2 mt-1">{SCOPE_LABEL[data.scope] ?? data.scope}・共 {data.rows.length} 案</p>
           </div>
           <div className="ml-auto flex gap-2 text-xs">
