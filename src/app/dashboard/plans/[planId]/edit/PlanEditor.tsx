@@ -103,6 +103,11 @@ function nextReviewOf(data: unknown): string | null {
 }
 const NOTE_ERR_FALLBACK = "沒有存成功。請檢查網路後再試一次。";
 
+/** 規劃器頂列要的導覽（← 回客戶、版本紀錄、版本名稱），隨 lantu:init 送進 iframe（2026/11/01）。 */
+function navFor(clientId: string, planId: string, year: number, label: string | null) {
+  return { back: `/dashboard/clients/${clientId}`, history: `/dashboard/plans/${planId}/history`, versionLabel: `${year}${label ? ` · ${label}` : ""}` };
+}
+
 // v12 App（/lantu-app.html?embed=1）以 iframe 載入。
 // 握手：iframe onLoad / 'lantu:ready' → 父層 postMessage 'lantu:init' 灌入 data；
 // iframe 每次 save() → 'lantu:save'，父層 debounce 後呼叫 savePlanDataAction 存回 DB。
@@ -148,7 +153,11 @@ export default function PlanEditor({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef<unknown>(null);
+  // 規劃器頂列要的導覽（← 回客戶、版本紀錄、版本名稱）。隨 lantu:init 送進 iframe。
   const [state, setState] = useState<SaveState>("idle");
+  // 2026/11/01 介面整理第二波：規劃器自己的頂列已經有「← 回客戶／版本／諮詢狀態／儲存」，
+  // 這一列在 iframe 握手成功之後收起來（兩列合一）。握手前保留——iframe 載不起來時它是唯一出口。
+  const [frameReady, setFrameReady] = useState(false);
   // ⚠️ 結束諮詢不再直接寫紀錄，而是回一份草稿讓教練當場改（可改日期、類型、貼全文）。
   //    表單跟客戶詳情頁是同一個元件，就地彈出＝不用離開規劃編輯器。
   const [draft, setDraft] = useState<{ sessionId: string; draft: string; todos: string[]; date?: string; nextAppt?: string | null } | null>(null);
@@ -208,6 +217,7 @@ export default function PlanEditor({
         {
           type: "lantu:init",
           data,
+          nav: navFor(clientId, planId, year, label),
           uiScale: currentScale(),
           theme: currentTheme(),
           readOnly,
@@ -367,6 +377,7 @@ export default function PlanEditor({
       if (!msg || typeof msg !== "object") return;
 
       if (msg.type === "lantu:ready") {
+        setFrameReady(true);
         postInit();
       } else if (msg.type === "lantu:note" || msg.type === "lantu:session") {
         enqueue(msg as unknown as NoteMsg);
@@ -452,7 +463,7 @@ export default function PlanEditor({
       window.removeEventListener("message", onMessage);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [planId, clientId, data, uiScale, readOnly, readOnlyReason, clientCode, birthDate, clientQuiz, noteAccess, router, doSave, assistant]);
+  }, [planId, clientId, year, label, data, uiScale, readOnly, readOnlyReason, clientCode, birthDate, clientQuiz, noteAccess, router, doSave, assistant]);
 
   /**
    * 存檔狀態回報給 iframe（v12 App 的頂列會顯示「儲存中… / 已儲存 HH:MM / 儲存失敗」）。
@@ -491,7 +502,7 @@ export default function PlanEditor({
     <div className="fixed inset-0 flex flex-col bg-canvas">
       {/* ⚠️ 這一列原本沒有 flex-wrap：「← 返回客戶」在 390px 下會被逐字斷行成直條，
           而它是離開規劃器的唯一出口。 */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 bg-panel border-b border-line text-tx">
+      <div className={"flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 bg-panel border-b border-line text-tx" + (frameReady ? " hidden" : "")}>
         <Link
           href={`/dashboard/clients/${clientId}`}
           onClick={() => router.refresh()}
@@ -619,7 +630,7 @@ export default function PlanEditor({
           className="flex-1 w-full border-0"
           onLoad={() =>
             iframeRef.current?.contentWindow?.postMessage(
-              { type: "lantu:init", data, uiScale: normalizeScale(uiScale), theme: currentTheme(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz, assistant },
+              { type: "lantu:init", data, nav: navFor(clientId, planId, year, label), uiScale: normalizeScale(uiScale), theme: currentTheme(), readOnly, readOnlyNote: RO_NOTE[readOnlyReason], clientCode: clientCode ?? null, birthDate: birthDate ?? null, clientQuiz, assistant },
               window.location.origin,
             )
           }

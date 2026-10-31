@@ -10744,7 +10744,11 @@ function flowTuneKpi(pb,pa){ // 外層 id=tuneKpis 讓拖曳預覽能整塊換
 function flowTuneHeroHTML(c){
  var f=flowOf(c),pb=projection(f?flowTuneBase(c):baseCase(c)),pa=projection(c);
  return '<div class="sec tunehero"><h4>全生涯財務流 <span class="hint">畫的是拉完之後；三個數字左邊原本（沒有動作、願景原本的時間）、右邊拉完。缺口從這張圖抓。</span></h4>'+
-  '<div data-calc="tuneHero" id="tuneHeroChart">'+annualBalanceSVG(pa,'dark','cf',pb)+'</div>'+flowTuneKpi(pb,pa)+
+  // 2026/11/01：這張圖分析頁首屏已經有了（畫的是原本），這裡畫的是拉完之後——預設收起、三個數字照常露出；
+  //   S4 拉桿階段一定展開（拉的時候圖要在眼前）。收起只是 <details>，元素都還在，拖曳預覽照常換圖。
+  //   ⚠️ 不用 <details>：方案頁「第一個 <details> 之前」是首屏的定義（planChartsUI／trialsUI 守著方案比較要在它前面）。
+  '<div class="tunefold'+((f&&f.step==='S4')||app.tuneFoldOpen?' open':'')+'"><button type="button" class="tfsw" onclick="app.tuneFoldOpen=!this.parentNode.classList.contains(\'open\');this.parentNode.classList.toggle(\'open\')">展開／收起全生涯財務流（拉完之後）</button>'+
+  '<div class="tfbody"><div data-calc="tuneHero" id="tuneHeroChart">'+annualBalanceSVG(pa,'dark','cf',pb)+'</div></div></div>'+flowTuneKpi(pb,pa)+
   (f&&f.step==='S4'?'<div class="tunelevs">'+flowTuneLeversHTML(c)+'</div>':'')+'</div>';
 }
 /* 三根拉桿（S4 時住在頁首圖的正下方：拉的時候圖就在眼前） */
@@ -20479,7 +20483,7 @@ var CSS = `
 .lnbtn{background:var(--card);border:1px solid var(--line);color:var(--teal);border-radius:8px;
  padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .lnbtn:hover{background:var(--card2)}
-.lnbtn.pri{background:var(--amber);border-color:var(--amber);color:#0b1f33}
+.lnbtn.pri{background:var(--amber);border-color:var(--amber);color:var(--onbrand)}
 .lnbtn.pri:hover{background:var(--amber2)}
 .lnbtn.sm{padding:2px 8px;font-size:11px}
 .lnbtn:disabled{opacity:.4;cursor:not-allowed}
@@ -20993,6 +20997,370 @@ document.addEventListener('mouseup',function(e){
  pending=null;
 },true);
 document.addEventListener('focusout',function(){ pending=null; });
+})();
+</script>
+
+<style id="pl2css">
+/* ═══ 規劃器第二版外殼（2026/11/01 介面整理第二波）═══
+   只在「教練端、嵌在編輯器裡（html.embed）」生效，class 是 html.pl2。
+   原本的五層導覽（品牌列／六大分頁／①–④ 群下拉／資料完整度 16 標籤／右緣浮貼）收成兩層：
+   頂列一條＋左側步驟欄；記事／助理／願景／工具收進右側同一條抽屜；底部諮詢列變成頂列的狀態膠囊。
+   ⚠️ 只藏不刪：#dgbar、完整度列、分頁列都還在 DOM 裡（既有測試與 applyIvFocus／syncNavH 照常運作），
+      步驟欄是另一個入口，點下去走的是同一條 ivGoto／bindTabs。 */
+html.pl2 .main>.tabbar,html.pl2 #dgbar,html.pl2 [data-calc="completeness"]{display:none!important}
+html.pl2 .top{padding:8px 16px;gap:10px;background:var(--panel);box-shadow:0 1px 0 var(--line)}
+html.pl2 .top .brand{display:none}
+html.pl2 .main{padding-top:0}
+html.pl2 body{padding-bottom:0!important}
+.p2back{color:var(--mut);text-decoration:none;font-size:18px;padding:2px 6px;border-radius:4px}
+.p2back:hover{color:var(--tx);background:var(--card)}
+.p2name{font-family:var(--serif);font-size:18px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.p2ver{position:relative}
+.p2ver>button{background:none;border:1px solid var(--line2);color:var(--mut);border-radius:999px;padding:2px 11px;font-size:12px;cursor:pointer}
+.p2ver .p2menu{display:none;position:absolute;left:0;top:calc(100% + 6px);min-width:190px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 30px rgba(var(--sh),.28);padding:6px;z-index:80}
+.p2ver.on .p2menu{display:block}
+.p2menu a,.p2menu span{display:block;padding:7px 10px;border-radius:8px;font-size:13px;color:var(--tx);text-decoration:none}
+.p2menu span{color:var(--mut2);font-size:12px;padding-bottom:2px}
+.p2menu a:hover{background:var(--card)}
+.p2sess{display:flex;align-items:center;gap:7px;background:none;border:1px solid var(--line2);color:var(--mut);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.p2sess i{width:7px;height:7px;border-radius:50%;background:var(--mut2)}
+.p2sess.on{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
+.p2sess.on i{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 18%,transparent)}
+html.pl2 #lnSessBar{display:none!important}
+html.pl2.p2sessopen #lnSessBar{display:block!important;position:fixed;top:calc(var(--apptop-h,56px) + 6px);right:60px;left:auto;bottom:auto;width:min(480px,calc(100vw - 80px));border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px rgba(var(--sh),.3);padding:12px 14px;z-index:90}
+html.pl2.p2sessopen #lnSessBar .lnbarin{flex-wrap:wrap;gap:8px}
+html.pl2.p2sessopen #lnSessBar .lnsp{flex-basis:100%;height:0}
+html.pl2 .lnpadtab,html.pl2 #vdr .vtab{display:none!important}
+html.pl2 #lnPad,html.pl2 #aiPad{right:46px;top:var(--apptop-h,56px);bottom:0!important}
+html.pl2 #vdr{right:46px;top:calc(var(--apptop-h,56px) + 8px)}
+html.pl2 .lntoast{bottom:20px}
+html.pl2 .vmodpanel{bottom:20px}
+.p2wrap{display:grid;grid-template-columns:236px minmax(0,1fr)}
+.p2rail{position:sticky;top:var(--apptop-h,56px);align-self:start;max-height:calc(100vh - var(--apptop-h,56px));overflow:auto;border-right:1px solid var(--line);padding:16px 10px 48px;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin}
+.p2body{min-width:0;padding:4px 64px 40px 26px}
+.p2cap{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.16em;color:var(--mut2);padding:6px 10px 6px}
+.p2jump{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 6px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--tx);font-size:13px;font-weight:700;text-align:left;cursor:pointer}
+.p2jump>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p2jump.ghost{background:transparent;font-weight:500;color:var(--mut)}
+.p2jump kbd{font-family:ui-monospace,monospace;font-size:11px;color:var(--mut2);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-weight:500}
+.p2step{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:8px;border:0;background:none;color:var(--mut);font-size:14px;text-align:left;cursor:pointer}
+.p2step:hover{background:var(--card)}
+.p2step .t{flex:1;min-width:0}
+.p2step .n{font-family:ui-monospace,monospace;font-size:11px;color:var(--mut2)}
+.p2step.cur{background:color-mix(in srgb,var(--amber) 10%,transparent);color:var(--tx);font-weight:700}
+.p2step.cur .n{color:var(--amber2)}
+.p2ring{width:20px;height:20px;flex:none}
+.p2subs{display:flex;flex-direction:column;margin:2px 0 8px 29px;border-left:1px solid var(--line)}
+.p2fw{display:flex;align-items:center}
+.p2f{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:5px 10px;border:0;background:none;color:var(--mut);font-size:13px;text-align:left;cursor:pointer;border-radius:0 8px 8px 0}
+.p2f:hover{color:var(--tx);background:var(--card)}
+.p2f i{width:7px;height:7px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1.5px var(--mut2);opacity:.75}
+.p2f i.full{background:var(--ok);box-shadow:none;opacity:1}
+.p2f.dim{opacity:.6}
+.p2f.cur{color:var(--tx);font-weight:700;box-shadow:inset 2px 0 0 var(--amber2);margin-left:-1px}
+.p2tick{border:0;background:none;color:var(--mut2);font-size:11px;padding:2px 6px;cursor:pointer;opacity:0;border-radius:4px}
+.p2fw:hover .p2tick,.p2tick:focus-visible{opacity:1}
+.p2tick.on{opacity:1;color:var(--ok)}
+.p2div{height:1px;background:var(--line);margin:12px 10px}
+.p2dot{width:20px;display:grid;place-items:center;flex:none}
+.p2dot i{width:6px;height:6px;border-radius:50%;background:var(--mut2)}
+.p2step.cur .p2dot i{background:var(--amber2)}
+.p2focus{margin:6px 2px 0;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--mut);cursor:pointer;text-align:left}
+.p2focus.on{border-color:var(--amber);color:var(--amber2);font-weight:700}
+.p2dock{position:fixed;right:0;top:var(--apptop-h,56px);bottom:0;width:46px;border-left:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:14px;z-index:70}
+.p2dock button{writing-mode:vertical-rl;letter-spacing:.24em;font-size:13px;color:var(--mut);background:none;border:0;padding:12px 0;width:34px;border-radius:8px;cursor:pointer;position:relative}
+.p2dock button:hover{color:var(--tx);background:var(--panel)}
+.p2dock button[aria-pressed="true"]{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--tx);font-weight:700}
+.p2dock button b{writing-mode:horizontal-tb;position:absolute;top:2px;right:2px;font-size:10px;min-width:15px;padding:0 3px;border-radius:999px;background:var(--amber);color:var(--onbrand);letter-spacing:0;font-weight:700}
+.p2tools{position:fixed;right:46px;top:var(--apptop-h,56px);bottom:0;width:min(440px,calc(100vw - 60px));background:var(--panel);border-left:1px solid var(--line);box-shadow:-10px 0 30px rgba(var(--sh),.25);overflow:auto;padding:14px 16px 30px;z-index:60}
+.p2tools .p2th{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.p2tools .p2th h3{font-family:var(--serif);font-size:18px}
+.p2tools .p2th button{background:none;border:0;color:var(--mut);font-size:20px;cursor:pointer}
+.p2k{position:fixed;inset:0;background:rgba(var(--sh),.35);z-index:200;display:grid;place-items:start center;padding-top:14vh}
+.p2k>div{width:min(540px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(var(--sh),.4);overflow:hidden}
+.p2k input{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--tx);font:inherit;font-size:16px;padding:14px 18px;outline:none}
+.p2k .res{max-height:320px;overflow:auto;padding:6px}
+.p2k .res button{display:flex;justify-content:space-between;width:100%;text-align:left;padding:8px 12px;border-radius:8px;border:0;background:none;color:var(--tx);font-size:14px;cursor:pointer}
+.p2k .res button.sel,.p2k .res button:hover{background:color-mix(in srgb,var(--amber) 12%,transparent)}
+.p2k .res span{color:var(--mut2);font-size:12px}
+.tfsw{background:none;border:0;padding:2px 0 8px;font-size:13px;color:var(--mut);cursor:pointer}
+.tfsw::before{content:"▸ ";}
+.tunefold.open .tfsw::before{content:"▾ ";}
+.tunefold:not(.open) .tfbody{display:none}
+@media (max-width:900px){
+ .p2wrap{grid-template-columns:minmax(0,1fr)}
+ .p2rail{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)}
+ .p2body{padding:4px 56px 40px 12px}
+ html.pl2 .top{flex-wrap:wrap}
+}
+</style>
+<script id="pl2js">
+/* ═══ 規劃器第二版外殼（2026/11/01）。說明見 #pl2css 檔頭。
+   作法是「包一層」：coachView 換成帶步驟欄的版本、render 後補掛頂列／抽屜／捲動同步；
+   原本的 coachView、dataPane、ivGoto、mountSessBar、LN、AI 一行都沒改。 */
+(function(){
+ 'use strict';
+ var CLIENTQ=/[?&]role=client/.test(location.search);
+ var NAV=null; // 父層送來的 { back, history, versionLabel }
+ function on(){return document.documentElement.classList.contains('embed')&&app.role==='coach'&&!CLIENTQ}
+ function e(s){return esc(String(s==null?'':s))}
+ // 步驟欄用短名（236px 放得下一行）；完整群名「基礎參數 · 諮詢資料」照樣印在分頁模組的標籤上。
+ var GROUPS=[{fg:1,no:'①',nm:'基礎參數'},{fg:2,no:'②',nm:'未來的需求'},{fg:3,no:'③',nm:'現在的狀況'}];
+ var OUTS=[['analysis','分析'],['plan','方案'],['advice','建議'],['report','報告']];
+ function ring(d,t,hot){var C=50.27,p=t?d/t:0;
+  return '<svg class="p2ring" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="var(--line2)" stroke-width="2.6"/>'+
+   (p?'<circle cx="10" cy="10" r="8" fill="none" stroke="'+(hot?'var(--amber2)':(p>=1?'var(--ok)':'var(--mut2)'))+'" stroke-width="2.6" stroke-dasharray="'+(C*p).toFixed(1)+' '+C+'" transform="rotate(-90 10 10)" stroke-linecap="round"/>':'')+'</svg>'}
+ function bizSubs(c){
+  if(!entityOn(c,'company'))return [];
+  var s=BIZ_BASE_TABS.slice();
+  visibleTargets(c).forEach(function(x){if(x[5]==='company'&&targetOn(c,x[0]))s.push([x[1],x[2]])});
+  return s;
+ }
+ // 現在落在哪一群：資料頁看面向；企業分頁＝第 4 群；其他頁沒有
+ function curGroup(c){
+  if(app.activeTab!=='data')return 0;
+  if(bizSubs(c).some(function(x){return x[0]===app.dataTab}))return 4;
+  var st=navStep(navCurFacet(c));return st?st.g:0;
+ }
+ function nextGap(c){
+  var cur=app.activeTab==='data'?navCurFacet(c):'',all=INTERVIEW_STEPS,idx=-1;
+  all.forEach(function(s,i){if(s.k===cur)idx=i});
+  var gaps=all.filter(function(s){return !(s.t&&!targetOn(c,s.t))&&!ivDone(c,s)});
+  if(!gaps.length)return null;
+  for(var i=0;i<gaps.length;i++){if(all.indexOf(gaps[i])>idx)return gaps[i]}
+  return gaps[0];
+ }
+ window.PL2_NEXT=function(){var c=activeCase();var g=c&&nextGap(c);if(g){window.scrollTo(0,0);ivGoto(g.k)}};
+ function rail(c){
+  var cur=app.activeTab==='data'?navCurFacet(c):'',cg=curGroup(c);
+  if(app.pl2Open==null||app.pl2OpenFor!==cg){if(cg){app.pl2Open=cg;app.pl2OpenFor=cg}else if(app.pl2Open==null)app.pl2Open=1}
+  var tot=0,dn=0;GROUPS.forEach(function(g){var p=navProgress(c,g.fg);tot+=p.total;dn+=p.done});
+  var nx=nextGap(c);
+  var h='<nav class="p2rail" aria-label="諮詢流程"><div class="p2cap"><span>諮詢流程</span><span>'+dn+' / '+tot+'</span></div>'+
+   (nx?'<button class="p2jump" type="button" onclick="PL2_NEXT()" title="跳到下一個還沒填的面向"><span>下一個沒填：'+e(nx.name)+'</span><kbd>N</kbd></button>':'')+
+   '<button class="p2jump ghost" type="button" onclick="PL2_K()"><span>搜尋跳到任何一項</span><kbd>⌘K</kbd></button>';
+  GROUPS.forEach(function(g){
+   var p=navProgress(c,g.fg),isCur=cg===g.fg,open=app.pl2Open===g.fg;
+   h+='<button class="p2step'+(isCur?' cur':'')+'" type="button" data-p2g="'+g.fg+'" aria-expanded="'+open+'">'+ring(p.done,p.total,isCur)+'<span class="t">'+g.no+' '+e(g.nm)+'</span><span class="n">'+p.done+'/'+p.total+'</span></button>';
+   if(open){
+    h+='<div class="p2subs">'+navFacets(c,g.fg).map(function(x){var st=x.st,man=(c.interviewCheck||{})[st.k]===true;
+     return '<div class="p2fw"><button type="button" class="p2f'+(x.dim?' dim':'')+(st.k===cur?' cur':'')+'" data-ivk="'+e(st.k)+'" data-p2k="'+e(st.k)+'"'+(x.dim?' title="客戶沒勾這個目標"':'')+'><i class="'+(x.state?'full':'')+'"></i>'+e(st.name)+'</button>'+
+      '<button type="button" class="p2tick'+(man?' on':'')+'" data-ivtick="'+e(st.k)+'" title="'+(man?'取消手動標記完成':'手動標記完成')+'" aria-label="手動標記完成">✓</button></div>';
+    }).join('')+'</div>';
+   }
+  });
+  var bs=bizSubs(c);
+  if(bs.length){
+   var bc=cg===4,bo=app.pl2Open===4;
+   h+='<button class="p2step'+(bc?' cur':'')+'" type="button" data-p2g="4" aria-expanded="'+bo+'">'+ring(0,0,false)+'<span class="t">④ 企業</span><span class="n">'+bs.length+'</span></button>';
+   if(bo)h+='<div class="p2subs">'+bs.map(function(x){return '<div class="p2fw"><button type="button" class="p2f'+(app.activeTab==='data'&&app.dataTab===x[0]?' cur':'')+'" data-p2tab="'+e(x[0])+'"><i></i>'+e(x[1])+'</button></div>'}).join('')+'</div>';
+  }
+  if(app.activeTab==='data')h+='<button type="button" class="p2focus'+(app.ivFocusOn?' on':'')+'" onclick="toggleIvFocus()" aria-pressed="'+(app.ivFocusOn?'true':'false')+'" title="只顯示目前這一段，同分頁其餘折起來">'+(app.ivFocusOn?'聚焦中 · 點一下回到整頁':'聚焦目前這一段')+'</button>';
+  h+='<div class="p2div"></div><div class="p2cap"><span>產出</span></div>';
+  OUTS.forEach(function(o){h+='<button class="p2step'+(app.activeTab===o[0]?' cur':'')+'" type="button" data-tab="'+o[0]+'"><span class="p2dot"><i></i></span><span class="t">'+o[1]+'</span></button>'});
+  return h+'</nav>';
+ }
+ function toolsDrawer(c){
+  if(!app.pl2Tools)return '';
+  var t='';try{t=toolsPane(c)}catch(_){t='<div class="muted">工具箱載入失敗</div>'}
+  return '<aside class="p2tools" aria-label="工具"><div class="p2th"><h3>工具</h3><button type="button" onclick="PL2_DOCK(\'tools\')" aria-label="關閉">×</button></div>'+t+'</aside>';
+ }
+ var _coachView=coachView;
+ coachView=function(){
+  var c=activeCase();
+  document.documentElement.classList.toggle('pl2',on()&&!!c);
+  if(!on()||!c)return _coachView();
+  if(app.activeTab==='tools'){app.activeTab='data';app.pl2Tools=true}
+  if(app.activeTab==='data'&&(app.dataTab==='plan'||app.dataTab==='tracking')){app.activeTab='plan';app.dataTab='family'}
+  var body=app.activeTab==='data'?dataPane(c):app.activeTab==='analysis'?analysisPane(c):app.activeTab==='plan'?planSec(c):app.activeTab==='advice'?advicePane(c):reportPane(c);
+  return '<div class="shell"><div class="side"></div><div class="main"><div class="p2wrap">'+rail(c)+'<div class="p2body">'+body+'</div></div></div></div>'+toolsDrawer(c);
+ };
+
+ /* ── 頂列：返回／客戶名／版本／諮詢狀態，接在原本 .top 上（儲存、客戶端切換、列印照舊） ── */
+ function top(){
+  var tp=document.querySelector('.top');if(!tp)return;
+  var c=activeCase();
+  var x=document.getElementById('p2lead');
+  if(!on()){if(x)x.style.display='none';var s0=document.getElementById('p2sess');if(s0)s0.style.display='none';return}
+  if(!x){
+   x=document.createElement('span');x.id='p2lead';x.style.cssText='display:flex;align-items:center;gap:10px;min-width:0';
+   tp.insertBefore(x,tp.firstChild);
+  }
+  x.style.display='flex';
+  var back=NAV&&NAV.back,hist=NAV&&NAV.history,ver=(NAV&&NAV.versionLabel)||'';
+  x.innerHTML=(back?'<a class="p2back" href="'+e(back)+'" target="_top" title="回客戶頁" aria-label="回客戶頁">←</a>':'')+
+   '<span class="p2name">'+e(c&&c.profile&&c.profile.name||'')+'</span>'+
+   (ver||hist?'<span class="p2ver" id="p2ver"><button type="button" onclick="this.parentNode.classList.toggle(\'on\')" aria-haspopup="menu">'+e(ver||'年度版本')+' ▾</button><div class="p2menu" role="menu"><span>年度版本</span>'+(hist?'<a href="'+e(hist)+'" target="_top" role="menuitem">版本紀錄…</a>':'')+(back?'<a href="'+e(back)+'" target="_top" role="menuitem">回客戶頁（其他年度）</a>':'')+'</div></span>':'');
+  var s=document.getElementById('p2sess');
+  if(!s){s=document.createElement('button');s.type='button';s.id='p2sess';s.className='p2sess';
+   s.onclick=function(){document.documentElement.classList.toggle('p2sessopen')};
+   var sb=document.getElementById('saveBtn');tp.insertBefore(s,sb||null);}
+  s.style.display='';
+  sessPill();
+  var pr=[].slice.call(tp.querySelectorAll('.tbtn')).filter(function(b){return /列印報告|產出報告/.test(b.textContent||'')})[0];
+  if(pr)pr.textContent='產出報告';
+ }
+ function sessPill(){
+  var s=document.getElementById('p2sess'),bar=document.getElementById('lnSessBar');if(!s)return;
+  var live=!!(bar&&bar.classList.contains('on'));
+  var b=bar&&bar.querySelector('.lnbarin>b');
+  s.className='p2sess'+(live?' on':'');
+  s.innerHTML='<i></i>'+e(b?b.textContent:'不在諮詢中')+' ▾';
+  s.setAttribute('aria-expanded',document.documentElement.classList.contains('p2sessopen')?'true':'false');
+  s.title='諮詢狀態：開始／結束諮詢、回到上次開始時、帶議程都在這裡';
+ }
+ var watched=null;
+ function watchBar(){
+  var bar=document.getElementById('lnSessBar');if(!bar||bar===watched)return;watched=bar;
+  try{new MutationObserver(function(){sessPill();zeroBar()}).observe(bar,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']})}catch(_){}
+  try{if(window.ResizeObserver)new ResizeObserver(zeroBar).observe(bar)}catch(_){}
+ }
+ // 狀態列不在底部了：讓開它的高度（--lnbar-h）要歸零，否則全頁底部會留一條空白。
+ function zeroBar(){if(document.documentElement.classList.contains('pl2'))setTimeout(function(){document.documentElement.style.setProperty('--lnbar-h','0px')},0)}
+
+ /* ── 右側抽屜：記事／助理／願景／工具 ── */
+ window.PL2_DOCK=function(k){
+  if(k==='notes'&&window.LN&&LN.padToggle)LN.padToggle();
+  else if(k==='ai'&&window.AI&&AI.toggle)AI.toggle();
+  else if(k==='vision'&&typeof flowVisionToggle==='function')flowVisionToggle();
+  else if(k==='tools'){app.pl2Tools=!app.pl2Tools;render();return}
+  setTimeout(dockState,30);
+ };
+ function dock(){
+  var d=document.getElementById('p2dock');
+  if(!on()||!activeCase()){if(d)d.style.display='none';return}
+  if(!d){d=document.createElement('div');d.id='p2dock';d.className='p2dock';d.setAttribute('role','group');d.setAttribute('aria-label','輔助工具');document.body.appendChild(d)}
+  d.style.display='';
+  var hasAI=!!document.getElementById('aiPad'),vdr=document.getElementById('vdr'),hasV=!!(vdr&&vdr.style.display!=='none'&&vdr.innerHTML);
+  d.innerHTML='<button type="button" data-k="notes" onclick="PL2_DOCK(\'notes\')" title="記事（⌘/Ctrl+J）">記事</button>'+
+   (hasAI?'<button type="button" data-k="ai" onclick="PL2_DOCK(\'ai\')" title="AI 助理（⌘/Ctrl+Shift+J）">助理</button>':'')+
+   (hasV?'<button type="button" data-k="vision" onclick="PL2_DOCK(\'vision\')" title="客戶的願景">願景</button>':'')+
+   '<button type="button" data-k="tools" onclick="PL2_DOCK(\'tools\')" title="貸款、退休、IRR…獨立快速試算">工具</button>';
+  dockState();
+ }
+ function dockState(){
+  var d=document.getElementById('p2dock');if(!d)return;
+  var st={notes:!!document.querySelector('#lnPad.on'),ai:!!document.querySelector('#aiPad.on'),vision:!!document.querySelector('#vdr.on'),tools:!!app.pl2Tools};
+  d.querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',st[b.dataset.k]?'true':'false')});
+  var cnt=document.getElementById('lnPadCnt'),nb=d.querySelector('[data-k=notes]');
+  if(nb&&cnt&&cnt.textContent&&!nb.querySelector('b'))nb.insertAdjacentHTML('beforeend','<b>'+e(cnt.textContent)+'</b>');
+ }
+
+ /* ── 捲動同步：資料頁往下捲，左邊亮到正在看的那一項 ── */
+ var raf=0,spyLock=0;
+ function spy(){
+  if(raf||!document.documentElement.classList.contains('pl2')||app.activeTab!=='data'||Date.now()<spyLock)return;
+  raf=requestAnimationFrame(function(){raf=0;
+   var c=activeCase();if(!c)return;
+   var cands=INTERVIEW_STEPS.filter(function(s){return app.dataTab==='needhub'?s.g===2:s.tab===app.dataTab&&s.g!==2});
+   // 面向在頁面上的順序不一定等於清單順序（同一分頁裡的錨點是照版面排的），所以取「已經捲過的裡面最靠下的那一個」。
+   var lim=window.innerHeight*0.35,best=null,bt=-1e9;
+   cands.forEach(function(s){var el=document.querySelector(ivSecSel(s));if(!el||!el.offsetParent)return;var t=el.getBoundingClientRect().top;if(t<lim&&t>bt){bt=t;best=s}});
+   if(!best)best=cands.filter(function(s){var el=document.querySelector(ivSecSel(s));return el&&el.offsetParent})[0];
+   if(!best||best.k===app.ivFacet)return;
+   app.ivFacet=best.k;
+   document.querySelectorAll('.p2f.cur').forEach(function(b){b.classList.remove('cur')});
+   var b=document.querySelector('.p2f[data-p2k="'+best.k+'"]');
+   if(b){b.classList.add('cur');var r=document.querySelector('.p2rail');if(r){var t=b.offsetTop;if(t<r.scrollTop+40||t>r.scrollTop+r.clientHeight-60)r.scrollTop=t-r.clientHeight/2}}
+  });
+ }
+ window.addEventListener('scroll',spy,{passive:true});
+
+ /* ── ⌘K 搜尋跳轉 ── */
+ var kq='';
+ function kItems(c){
+  var a=[];
+  INTERVIEW_STEPS.forEach(function(s){var g=GROUPS.filter(function(x){return x.fg===s.g})[0];a.push({k:'iv',v:s.k,nm:s.name,g:g?g.no+' '+g.nm:''})});
+  bizSubs(c).forEach(function(x){a.push({k:'tab',v:x[0],nm:x[1],g:'④ 企業'})});
+  OUTS.forEach(function(o){a.push({k:'out',v:o[0],nm:o[1],g:'產出'})});
+  [['notes','打開記事'],['ai','打開助理'],['tools','打開工具']].forEach(function(d){a.push({k:'dock',v:d[0],nm:d[1],g:'抽屜'})});
+  return a;
+ }
+ function kRes(){var c=activeCase();if(!c)return '';
+  var q=kq.trim(),hit=kItems(c).filter(function(x){return !q||(x.nm+x.g).indexOf(q)>=0}).slice(0,12);
+  return hit.length?hit.map(function(x,i){return '<button type="button"'+(i===0?' class="sel"':'')+' data-kk="'+x.k+'" data-kv="'+e(x.v)+'">'+e(x.nm)+'<span>'+e(x.g)+'</span></button>'}).join(''):'<div style="padding:12px;color:var(--mut)">找不到「'+e(q)+'」</div>';
+ }
+ window.PL2_K=function(){
+  if(!on())return;
+  var box=document.getElementById('p2k');
+  if(box){box.remove();return}
+  kq='';box=document.createElement('div');box.id='p2k';box.className='p2k';
+  box.innerHTML='<div role="dialog" aria-label="快速跳轉"><input id="p2kq" placeholder="輸入要跳去的地方，例如：退休、保障、稅" autocomplete="off"><div class="res">'+kRes()+'</div></div>';
+  document.body.appendChild(box);
+  var inp=document.getElementById('p2kq');inp.focus();
+  inp.oninput=function(){kq=inp.value;box.querySelector('.res').innerHTML=kRes()};
+  box.onclick=function(ev){
+   if(ev.target===box){box.remove();return}
+   var b=ev.target.closest&&ev.target.closest('[data-kk]');if(!b)return;
+   box.remove();go(b.dataset.kk,b.dataset.kv);
+  };
+ };
+ function go(k,v){
+  window.scrollTo(0,0);
+  if(k==='iv')ivGoto(v);
+  else if(k==='tab'){app.activeTab='data';app.dataTab=v;app.ivFacet='';render()}
+  else if(k==='out'){app.activeTab=v;render()}
+  else if(k==='dock')PL2_DOCK(v);
+ }
+ document.addEventListener('keydown',function(ev){
+  if(!document.documentElement.classList.contains('pl2'))return;
+  var box=document.getElementById('p2k');
+  if((ev.metaKey||ev.ctrlKey)&&(ev.key==='k'||ev.key==='K')){ev.preventDefault();PL2_K();return}
+  if(box){
+   if(ev.key==='Escape'){box.remove();return}
+   if(ev.key==='Enter'){var f=box.querySelector('[data-kk]');if(f){ev.preventDefault();box.remove();go(f.dataset.kk,f.dataset.kv)}}
+   return;
+  }
+  if(ev.key==='Escape'){document.documentElement.classList.remove('p2sessopen');var pv=document.getElementById('p2ver');if(pv)pv.classList.remove('on');sessPill()}
+  var tag=(ev.target&&ev.target.tagName)||'';
+  if((ev.key==='n'||ev.key==='N')&&!ev.metaKey&&!ev.ctrlKey&&!ev.altKey&&!/INPUT|TEXTAREA|SELECT/.test(tag)&&!(ev.target&&ev.target.isContentEditable)){ev.preventDefault();PL2_NEXT()}
+ });
+ document.addEventListener('click',function(ev){
+  var t=ev.target;
+  if(!t||!t.closest)return;
+  if(document.documentElement.classList.contains('p2sessopen')&&!t.closest('#lnSessBar')&&!t.closest('#p2sess')){document.documentElement.classList.remove('p2sessopen');sessPill()}
+  var pv=document.getElementById('p2ver');if(pv&&pv.classList.contains('on')&&!t.closest('#p2ver'))pv.classList.remove('on');
+ },true);
+
+ /* ── render 之後：步驟欄的點擊、頂列、抽屜、切分頁回頁首 ── */
+ var lastTab=null;
+ var _render=render;
+ render=function(){
+  var before=app.activeTab+'|'+app.dataTab;
+  var r=_render.apply(this,arguments);
+  try{after(before)}catch(err){try{console.error(err)}catch(_){}}
+  return r;
+ };
+ function after(before){
+  // 客戶端檢視走 clientView、不經過 coachView，class 要在這裡對一次。
+  document.documentElement.classList.toggle('pl2',on()&&!!activeCase());
+  if(!document.documentElement.classList.contains('pl2'))document.documentElement.classList.remove('p2sessopen');
+  top();dock();watchBar();zeroBar();
+  if(!document.documentElement.classList.contains('pl2'))return;
+  document.querySelectorAll('[data-p2g]').forEach(function(b){b.onclick=function(){
+   var g=+b.dataset.p2g,c=activeCase();
+   if(app.pl2Open===g&&curGroup(c)===g){app.pl2Open=0;app.pl2OpenFor=g;render();return}
+   app.pl2Open=g;app.pl2OpenFor=g;
+   if(g===4){var bs=bizSubs(c);if(bs.length){window.scrollTo(0,0);app.activeTab='data';app.dataTab=bs[0][0];app.ivFacet='';render()}return}
+   var f=navFacets(c,g).filter(function(x){return !x.dim})[0]||navFacets(c,g)[0];
+   if(f){window.scrollTo(0,0);ivGoto(f.st.k)}else render();
+  }});
+  document.querySelectorAll('[data-p2tab]').forEach(function(b){b.onclick=function(){window.scrollTo(0,0);app.activeTab='data';app.dataTab=b.dataset.p2tab;app.ivFacet='';render()}});
+  // 點步驟欄裡的面向：捲動同步先停一下，不然 ivGoto 的平滑捲動途中會把亮點拉回去。
+  document.querySelectorAll('.p2f[data-ivk]').forEach(function(b){var o=b.onclick;b.onclick=function(ev){spyLock=Date.now()+900;return o&&o.call(b,ev)}});
+  // 切到別的分頁就回到頁首（改版前會停在上一頁的捲動位置，落在圖表半截）。
+  // （ivGoto 換分頁後會在 40ms 後自己捲到錨點，所以這裡先回頂不會蓋掉它。）
+  var now=app.activeTab+'|'+app.dataTab;
+  if(lastTab!==null&&now!==before)window.scrollTo(0,0);
+  lastTab=now;
+ }
+
+ /* 父層的 lantu:init 帶 nav（返回網址、版本紀錄、版本名稱） */
+ window.addEventListener('message',function(ev){
+  if(ev.source!==parent)return;
+  var m=ev.data;if(!m||m.type!=='lantu:init'||!m.nav)return;
+  NAV=m.nav;setTimeout(top,0);
+ });
 })();
 </script>
 
